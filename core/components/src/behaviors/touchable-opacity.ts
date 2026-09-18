@@ -168,7 +168,8 @@ export function createTouchableOpacityBehavior(
   disabledOf?: IDisabledResolver,
 ): IHostBehavior {
   // Its own machine rather than the module-level `press`, so a composing tag can say what
-  // `disabled` MEANS to it. `foldPayload` below is the same function either way.
+  // `disabled` MEANS to it — the answer feeds the machine, not a payload: the props half of that
+  // question is `foldPressableProps` in `SymbioteFabricProps.cpp` and reads the authored bag.
   const machine = createPressBehavior(refine, disabledOf);
   return {
     ...machine,

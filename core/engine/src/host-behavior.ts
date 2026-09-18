@@ -273,7 +273,24 @@ export interface IHostBehavior {
   // Runs once the node is known to have left the tree for good. Must release everything `attach`
   // took — a timer left behind outlives the tree that owned it.
   detach(node: ISymbioteNode): void;
-  // This primitive's own prop folds. See IPayloadFold.
+  /**
+   * This primitive's own prop folds. See IPayloadFold.
+   *
+   * NO PRODUCTION BEHAVIOR DECLARES ONE since 2026-09-18 — the sticky header's was the last, and it
+   * is `foldStickyHeaderProps` in `SymbioteFabricProps.cpp` now. So this reads as a leftover, and
+   * the question this codebase asks of one is what it REACHES rather than who uses it today. Two
+   * answers, and either alone would keep it:
+   *
+   * - It is the JS ARM of every cost measurement in `tag-rule-cost.itest.ts`. That file prices a
+   *   rule by running it on both sides of the wire with the payloads asserted equal key by key
+   *   first; without a fold there is no second arm, and the ~9-31 us-per-node figures every port in
+   *   this migration was justified by could not be taken again.
+   * - It is the declared seam a third-party behavior would extend. A tag rule is ours to write in
+   *   C++; a package that ships its own primitive has no such option.
+   *
+   * What it is NOT any more is where a Symbiote primitive puts its platform props. A new one that
+   * reaches for this is one whose rule belongs in the engine — read `SymbioteFabricProps.h` first.
+   */
   readonly foldPayload?: IPayloadFold;
   /**
    * Resolve `source` / `defaultSource` / `loadingIndicatorSource` on the way IN — Image's, and only

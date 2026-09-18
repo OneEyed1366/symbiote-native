@@ -373,10 +373,8 @@ export function registerButtonBehavior(): void {
   // that leave with the sweep, and each carries only a pure fold, so this behavior owns no per-node
   // runtime of its own to release.
   //
-  // No `foldPayload` here on purpose — `buildStructure` binds the owner's fold to its node.
   const behavior: IHostBehavior = {
     ...touchable,
-    foldPayload: undefined,
     buildStructure,
     onOwnedListenerChange,
     slotProps: SLOT_PROPS,
