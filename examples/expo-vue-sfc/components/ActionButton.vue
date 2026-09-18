@@ -35,10 +35,7 @@ const actionButtonStyle = ({ pressed }: IPressState) => ({
     :style="actionButtonStyle"
     @press="onPress"
   >
-    <text
-      class="action-button-text"
-      :style="{ color }"
-    >
+    <text class="action-button-text" :style="{ color }">
       {{ title }}
     </text>
   </pressable>

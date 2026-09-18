@@ -1,7 +1,7 @@
 // Co-located Vue-driven virtualization test, the Vue twin of
 // adapters/react/src/virtualized-list/*.test.tsx. Drives a FlatList (the thin convenience over
-// VirtualizedList, exactly as the React twins do) on the shared fake Fabric slot and proves the
-// windowing core: only a bounded window of cells is committed (never the full data) with
+// VirtualizedList, exactly as the React twins do) on the shared recording Fabric slot and proves
+// the windowing core: only a bounded window of cells is committed (never the full data) with
 // leading/trailing spacers reserving the off-window extent, the window SHIFTS on a scroll-driven
 // recommit, onViewableItemsChanged fires for the visible cells, and an imperative
 // scrollToOffset / scrollToIndex lands as the native scrollTo view command. Vue reactivity is
@@ -21,6 +21,10 @@
 // claim, including onScrollToIndexFailed — that's RN's own documented FAILURE CALLBACK contract
 // (not a JS exception), so asserting it fires with no scrollTo dispatched is still a positive
 // claim about correct behavior, not a throw/reject to catch.
+//
+// A RECORDING host, read through the LIVE tree — every structural question here (window bounds,
+// spacer placement, separator geometry) is about the CURRENT committed shape. `fabric.commands`
+// carries the engine's own dispatchCommand calls, so no local recording override is needed.
 
 import {
   defineComponent,
@@ -35,7 +39,11 @@ import {
   unmount,
   type IFlatListHandle,
 } from '@symbiote-native/vue';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 
 // FlatList (over the generic VirtualizedList) is a GENERIC component, so its value is a generic
 // construct signature that h()'s overloads can't resolve. These are runtime pipeline tests, not type
@@ -44,11 +52,6 @@ import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 const FlatListHost = FlatList as unknown as FunctionalComponent<
   Record<string, unknown>
 >;
-
-type ICommandCall = {
-  name: string;
-  args: readonly unknown[];
-};
 
 type IViewToken = {
   key: string;
@@ -97,17 +100,8 @@ const MVCP_PREPEND_COUNT = 5;
 const MVCP_SCROLL_OFFSET = 20_000;
 const mvcpData = ref<IRow[]>(makeRows(0, ITEM_COUNT));
 
-const commands: ICommandCall[] = [];
-
-// The shared harness slot does not record view commands; the imperative cases assert the scrollTo
-// command, which the engine destructures off the live global slot on its first commit, so graft a
-// recording dispatchCommand before any mount.
-const fabric = installFabric();
-const slot = globalThis.nativeFabricUIManager;
-if (slot === undefined) throw new Error('fabric slot was not installed');
-slot.dispatchCommand = (_node, name, args) => {
-  commands.push({ name, args });
-};
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
@@ -116,7 +110,6 @@ const viewableBatches: IViewToken[][] = [];
 
 beforeEach(() => {
   fabric.reset();
-  commands.length = 0;
   viewableBatches.length = 0;
   failures.length = 0;
   mvcpData.value = makeRows(0, ITEM_COUNT);
@@ -152,56 +145,42 @@ function makeList(
   });
 }
 
-function walk(nodes: IFakeNode[], visit: (node: IFakeNode) => void): void {
-  for (const node of nodes) {
-    visit(node);
-    walk(node.children, visit);
-  }
-}
-
 function collectRowLabels(): Set<string> {
   const labels = new Set<string>();
-  walk(fabric.committed, node => {
-    const text = node.props.text;
+  live.walkLive(live.appRoot(), node => {
+    const text = node.payload.text;
     if (typeof text === 'string' && text.startsWith('row-')) labels.add(text);
   });
   return labels;
 }
 
-function findInCommitted(
-  predicate: (node: IFakeNode) => boolean,
-): IFakeNode | undefined {
-  let found: IFakeNode | undefined;
-  walk(fabric.committed, node => {
-    if (found === undefined && predicate(node)) found = node;
-  });
-  return found;
-}
-
 // Does this committed subtree carry a raw-text payload anywhere inside it? Asks WHERE a node sits
 // rather than merely whether it exists — placement is geometry for a separator.
-function carriesText(node: IFakeNode, text: string): boolean {
+function carriesText(node: ILiveNode, text: string): boolean {
   return (
-    node.props.text === text ||
+    node.payload.text === text ||
     node.children.some(child => carriesText(child, text))
   );
 }
 
 // A spacer is the ONLY childless RCTView carrying a numeric height: it reserves the off-window
 // extent. Cell wrappers always hold their content child, so they never match.
-function isSpacer(node: IFakeNode): boolean {
+function isSpacer(node: ILiveNode): boolean {
   return (
     node.viewName === 'RCTView' &&
     node.children.length === 0 &&
-    typeof node.props.height === 'number' &&
-    node.props.height > 0
+    typeof node.payload.height === 'number' &&
+    node.payload.height > 0
   );
 }
 
 // The committed cells + spacers sit in document order under the scroll content view, so the
 // leading spacer is the FIRST child and the trailing spacer is the LAST.
-function contentChildren(): IFakeNode[] {
-  const content = findInCommitted(n => n.viewName === 'RCTScrollContentView');
+function contentChildren(): ILiveNode[] {
+  const content = live.findLive(
+    live.appRoot(),
+    n => n.viewName === 'RCTScrollContentView',
+  );
   expect(content, 'scroll content view committed').toBeDefined();
   if (content === undefined)
     throw new Error('unreachable: RCTScrollContentView missing');
@@ -218,9 +197,12 @@ function hasTrailingSpacer(): boolean {
   return children.length > 0 && isSpacer(children[children.length - 1]);
 }
 
-function findScrollView(): IFakeNode {
-  const node = fabric.find(n => n.viewName === 'RCTScrollView');
-  expect(node, 'an RCTScrollView was created').toBeDefined();
+function findScrollView(): ILiveNode {
+  const node = live.findLive(
+    live.appRoot(),
+    n => n.viewName === 'RCTScrollView',
+  );
+  expect(node, 'an RCTScrollView was committed').toBeDefined();
   if (node === undefined) throw new Error('unreachable: RCTScrollView missing');
   return node;
 }
@@ -235,7 +217,7 @@ function scrollTo(handle: unknown, offsetY: number): void {
 
 async function mountWithComponent(
   component: ReturnType<typeof defineComponent>,
-): Promise<IFakeNode> {
+): Promise<ILiveNode> {
   mount(ROOT_TAG, component);
   await tick();
   const scrollView = findScrollView();
@@ -243,13 +225,13 @@ async function mountWithComponent(
     layout: { x: 0, y: 0, width: 320, height: VIEWPORT_HEIGHT },
   });
   await tick();
-  return scrollView;
+  return findScrollView();
 }
 
 async function mountWithViewport(
   extra: Record<string, unknown> = {},
   extraSlots: Record<string, unknown> = {},
-): Promise<IFakeNode> {
+): Promise<ILiveNode> {
   return mountWithComponent(makeList(extra, extraSlots));
 }
 
@@ -402,7 +384,7 @@ describe('Vue VirtualizedList virtualization on the engine', () => {
 
     listRef.value!.scrollToOffset({ offset: 200, animated: true });
     listRef.value!.scrollToOffset({ offset: 80, animated: false });
-    const scrolls = commands.filter(c => c.name === 'scrollTo');
+    const scrolls = fabric.commands.filter(c => c.commandName === 'scrollTo');
     expect(scrolls.length, 'two scrollTo commands').toBe(2);
 
     expect(scrolls[0].args[0]).toBe(0);
@@ -420,7 +402,7 @@ describe('Vue VirtualizedList virtualization on the engine', () => {
     expect(listRef.value, 'FlatList handle attached').not.toBeNull();
 
     listRef.value!.scrollToIndex({ index: 5, animated: true });
-    const scrolls = commands.filter(c => c.name === 'scrollTo');
+    const scrolls = fabric.commands.filter(c => c.commandName === 'scrollTo');
     expect(scrolls.length, 'one scrollTo from scrollToIndex').toBe(1);
     // getItemLayout pins index 5 at offset 5 * ITEM_HEIGHT.
     expect(scrolls[0].args[1]).toBe(5 * ITEM_HEIGHT);
@@ -481,7 +463,7 @@ describe('Vue VirtualizedList sticky header force-mount', () => {
 
     // Scroll to offset 500: with windowSize:1 (zero overscan) the window collapses to [5,5],
     // clear of both sticky origins (0 and 10). Only the force-mount keeps row-0 resident.
-    fabric.fireEvent(scrollView.instanceHandle, 'topScroll', {
+    fabric.fireEvent(findScrollView().instanceHandle, 'topScroll', {
       contentOffset: { x: 0, y: 500 },
       contentSize: {
         width: 320,
@@ -504,6 +486,47 @@ describe('Vue VirtualizedList sticky header force-mount', () => {
       labels.has('row-10'),
       'the other sticky index (not the nearest one below the window) is not force-mounted',
     ).toBe(false);
+  });
+
+  // why: A WINDOWED list cannot drive sticky headers by INDEX. `stickyHeaderIndices` numbers the
+  // scroll view's own paint children, so the behavior synthesizes a wrapper around child N — but a
+  // windowed list paints a header, a spacer and a slice, so the positions have to be recomputed
+  // every time the window slides, and the reconciler then re-wraps a different child each pass.
+  //
+  // Device-diagnosed 2026-09-18 on examples/vue, sticky path B, and the log measured all three
+  // symptoms: a wrapper's height grew 988 -> 1976 -> 2964, i.e. one WHOLE SECTION swallowed per
+  // slide (988 = a 28pt header plus 32 rows of 30); the wrapped cell's own `onLayout` then reports
+  // y RELATIVE to the wrapper (`cell 136 measured length=28 offset=0`), which poisons the list's
+  // offset table; and `nextHeaderLayoutY` wanders (2004 -> 2962 -> 1044 -> 2032 -> 4880). The
+  // header pins for half a section and then stops, permanently.
+  //
+  // React and Svelte never had it because their lists name the `sticky-header` TAG on the cell,
+  // which pins by DOCUMENT order and survives windowing. Vue and Angular were the only two left on
+  // the index form, and they are the only two that broke.
+  //
+  // TWO-SIDED ON PURPOSE. "A sticky-header tag was committed" alone would go green on a list that
+  // still ALSO drives the index form; "the scroll view was given no indices" alone would go green
+  // on a list that dropped sticky support altogether. The pair is what pins the swap.
+  it('pins by tag and hands the scroll view no sticky indices', async () => {
+    mount(ROOT_TAG, makeStickyList());
+    await tick();
+    fabric.fireEvent(findScrollView().instanceHandle, 'topLayout', {
+      layout: { x: 0, y: 0, width: 320, height: STICKY_VIEWPORT },
+    });
+    await tick();
+
+    let stickyTags = 0;
+    live.walkLive(live.appRoot(), node => {
+      if (node.tagName === 'sticky-header') stickyTags += 1;
+    });
+
+    expect(stickyTags, 'the sticky cells commit under the tag').toBeGreaterThan(
+      0,
+    );
+    expect(
+      findScrollView().props.stickyHeaderIndices,
+      'the index form is gone — nothing asks the behavior to synthesize a wrapper',
+    ).toBe(undefined);
   });
 });
 
@@ -568,14 +591,16 @@ describe('Vue VirtualizedList maintainVisibleContentPosition and scrollToIndex f
       { header: () => [h('text', {}, 'header')] },
     );
 
-    // Read from the COMMITTED tree (the clones): fabric.find returns the createNode node whose props
-    // can be stale after clone-on-write; the latest maintainVisibleContentPosition rides the clone.
-    const scrollView = findInCommitted(n => /scroll/i.test(n.viewName));
+    // Read the CURRENT committed scroll view — the payload carries the latest
+    // maintainVisibleContentPosition.
+    const scrollView = live.findLive(live.appRoot(), n =>
+      /scroll/i.test(n.viewName),
+    );
     expect(scrollView, 'scroll view committed').toBeDefined();
     if (scrollView === undefined)
       throw new Error('unreachable: scroll view missing');
 
-    const mvcp = scrollView.props.maintainVisibleContentPosition;
+    const mvcp = scrollView.payload.maintainVisibleContentPosition;
     expect(
       typeof mvcp,
       'maintainVisibleContentPosition forwarded as an object',
@@ -607,7 +632,7 @@ describe('Vue VirtualizedList maintainVisibleContentPosition and scrollToIndex f
     ];
     await tick();
 
-    const scrolls = commands.filter(c => c.name === 'scrollTo');
+    const scrolls = fabric.commands.filter(c => c.commandName === 'scrollTo');
     expect(scrolls.length, 'MVCP dispatches one compensating scrollTo').toBe(1);
     expect(scrolls[0].args[0], 'x stays 0 for a vertical list').toBe(0);
     // The leading spacer grew by MVCP_PREPEND_COUNT * ITEM_HEIGHT, so the offset shifts by exactly
@@ -629,9 +654,13 @@ describe('Vue VirtualizedList maintainVisibleContentPosition and scrollToIndex f
     if (listRef.value === null)
       throw new Error('unreachable: FlatList handle missing');
 
-    const scrollsBefore = commands.filter(c => c.name === 'scrollTo').length;
+    const scrollsBefore = fabric.commands.filter(
+      c => c.commandName === 'scrollTo',
+    ).length;
     listRef.value.scrollToIndex({ index: FAIL_TARGET_INDEX, animated: true });
-    const scrollsAfter = commands.filter(c => c.name === 'scrollTo').length;
+    const scrollsAfter = fabric.commands.filter(
+      c => c.commandName === 'scrollTo',
+    ).length;
 
     expect(failures.length, 'onScrollToIndexFailed fires once').toBe(1);
     expect(failures[0].index, 'failure index is the requested 50').toBe(

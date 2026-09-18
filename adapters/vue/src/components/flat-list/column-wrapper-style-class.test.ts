@@ -20,7 +20,11 @@ import {
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { FlatList, mount, unmount } from '@symbiote-native/vue';
 import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  installRecordingFabric,
+  payloadOf,
+  type IAuthoredNode,
+} from '@symbiote-native/test-utils';
 
 // Generic-component limitation (see flat-list.test.ts): drive FlatList through a loose functional
 // handle rather than the typed construct signature h() can't resolve imperatively.
@@ -32,7 +36,7 @@ const ROOT_TAG = 515;
 
 type IRow = { id: number; label: string };
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -42,20 +46,14 @@ beforeEach(() => {
 });
 afterEach(() => unmount(ROOT_TAG));
 
-function walk(nodes: IFakeNode[], visit: (node: IFakeNode) => void): void {
-  for (const node of nodes) {
-    visit(node);
-    walk(node.children, visit);
-  }
-}
-
-function rowsWithFlexDirection(): IFakeNode[] {
-  const rows: IFakeNode[] = [];
-  walk(fabric.committed, node => {
-    if (node.viewName === 'RCTView' && node.props.flexDirection === 'row')
-      rows.push(node);
-  });
-  return rows;
+// `flexDirection` and `gap` are STYLE keys, so they live in the payload the engine builds, not in
+// the author's prop bag.
+function rowsWithFlexDirection(): IAuthoredNode[] {
+  return fabric.findAll(
+    node =>
+      node.viewName === 'RCTView' &&
+      payloadOf(node.handle).flexDirection === 'row',
+  );
 }
 
 function mountFlatList(columnWrapperStyle: unknown): Promise<void> {
@@ -97,7 +95,7 @@ describe('Vue FlatList columnWrapperStyle class-name support', () => {
 
       const rows = rowsWithFlexDirection();
       expect(rows.length, 'two flex-row rows for 4 items in 2 columns').toBe(2);
-      expect(rows[0].props.gap).toBe(8);
+      expect(payloadOf(rows[0].handle).gap).toBe(8);
     });
 
     it('still accepts an ordinary style object unchanged', async () => {
@@ -106,7 +104,7 @@ describe('Vue FlatList columnWrapperStyle class-name support', () => {
       await mountFlatList({ gap: 4 });
 
       const rows = rowsWithFlexDirection();
-      expect(rows[0].props.gap).toBe(4);
+      expect(payloadOf(rows[0].handle).gap).toBe(4);
     });
 
     it('drops an unresolvable columnWrapperStyle rather than throwing', async () => {
@@ -119,7 +117,7 @@ describe('Vue FlatList columnWrapperStyle class-name support', () => {
         rows.length,
         'rows still render with the base flex-row style',
       ).toBe(2);
-      expect(rows[0].props.gap).toBeUndefined();
+      expect(payloadOf(rows[0].handle).gap).toBeUndefined();
     });
   });
 });

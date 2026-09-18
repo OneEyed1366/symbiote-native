@@ -22,7 +22,15 @@
 import { defineComponent, h, ref } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Animated, mount, unmount, Dimensions } from '@symbiote-native/vue';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  childrenOf,
+  isAnchor,
+  type ISymbioteNode,
+} from '@symbiote-native/engine';
+import {
+  installRecordingFabric,
+  type IAuthoredNode,
+} from '@symbiote-native/test-utils';
 import { Drawer } from './index';
 import type { IDrawerNavigatorHandle } from './index';
 import {
@@ -70,7 +78,7 @@ function installRequestAnimationFrame(): void {
   });
 }
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -94,35 +102,61 @@ function ProfileScreen() {
   return h('text', {}, 'profile');
 }
 
-function findAllText(nodes: readonly IFakeNode[]): string[] {
-  const found: string[] = [];
-  const collect = (list: readonly IFakeNode[]): void => {
-    for (const node of list) {
-      if (
-        node.viewName === 'RCTRawText' &&
-        typeof node.props.text === 'string'
-      ) {
-        found.push(node.props.text);
-      }
-      collect(node.children);
+// OPENING AND CLOSING is the subject, so every walk below descends the LIVE child links from the
+// app root down. A recording keeps every node it ever saw created, so a screen the drawer
+// unmounted would still answer here — and several cases assert a label is NOT present.
+//
+// Anchors are FLATTENED, the commit walk's own rule (`renderableChildren`): an anchor is
+// structural bookkeeping nothing native ever sees, so its children stand in its place. The
+// positional reads below therefore mean the children Drawer actually rendered.
+function kidsOf(handle: ISymbioteNode): IAuthoredNode[] {
+  const kids: IAuthoredNode[] = [];
+  for (const child of childrenOf(handle)) {
+    if (isAnchor(child)) {
+      kids.push(...kidsOf(child));
+      continue;
     }
-  };
-  collect(nodes);
+    const recorded = fabric.find(one => one.handle === child);
+    if (recorded !== undefined) kids.push(recorded);
+  }
+  return kids;
+}
+
+// The AppContainer root, the same node `installFabric`'s `appRoot()` named: the engine creates it
+// with `pointerEvents: 'box-none'`, and that is an authored prop rather than anything derived.
+function appRoot(): ISymbioteNode {
+  const root = fabric.find(node => node.props.pointerEvents === 'box-none');
+  if (root === undefined) throw new Error('no AppContainer root was created');
+  return root.handle;
+}
+
+function findAllText(handle: ISymbioteNode = appRoot()): string[] {
+  const found: string[] = [];
+  for (const child of childrenOf(handle)) {
+    const recorded = fabric.find(one => one.handle === child);
+    if (
+      recorded?.viewName === 'RCTRawText' &&
+      typeof recorded.props.text === 'string'
+    ) {
+      found.push(recorded.props.text);
+    }
+    found.push(...findAllText(child));
+  }
   return found;
 }
 
 // Drawer's own root view (holds panResponder.panHandlers) - first child under the AppContainer.
-function drawerRoot(): IFakeNode {
-  return fabric.appRoot().children[0];
+function drawerRoot(): IAuthoredNode {
+  return kidsOf(appRoot())[0];
 }
 
 // Default drawerType ('front') paints [content, overlay, panel] in that sibling order
 // (render-drawer.ts's drawerChildOrder) - the overlay's pointerEvents prop ('auto' while open,
 // 'none' while closed) is the one stable, non-animated signal of state.isOpen this file reads,
 // since the slide/opacity transforms themselves are driven by a real (unawaited) Animated.timing.
-function overlayNode(): IFakeNode {
-  const overlay = drawerRoot().children[1];
-  if (!overlay) throw new Error('no overlay child committed');
+function overlayNode(): IAuthoredNode {
+  const overlay = kidsOf(drawerRoot().handle)[1];
+  if (!overlay) throw new Error('no overlay child created');
   return overlay;
 }
 
@@ -217,8 +251,8 @@ describe('Vue Drawer navigator', () => {
         }),
       );
       await tick();
-      expect(findAllText(fabric.committed)).toContain('home');
-      expect(findAllText(fabric.committed)).not.toContain('profile');
+      expect(findAllText()).toContain('home');
+      expect(findAllText()).not.toContain('profile');
       expect(isOpenByOverlay()).toBe(false);
     });
 
@@ -279,8 +313,8 @@ describe('Vue Drawer navigator', () => {
       await tick();
       handleRef.value?.jumpTo('Profile');
       await tick();
-      expect(findAllText(fabric.committed)).toContain('profile');
-      expect(findAllText(fabric.committed)).not.toContain('home');
+      expect(findAllText()).toContain('profile');
+      expect(findAllText()).not.toContain('home');
     });
 
     // why: jumpTo() to a name with no registered screen must be a no-op (fail closed) - matches
@@ -294,7 +328,7 @@ describe('Vue Drawer navigator', () => {
       await tick();
       handleRef.value?.jumpTo('Nowhere');
       await tick();
-      expect(findAllText(fabric.committed)).toContain('home');
+      expect(findAllText()).toContain('home');
     });
 
     // Regression: jumpTo() used to animate off a pre-dispatch `wasOpen` snapshot alone, so an
@@ -334,7 +368,7 @@ describe('Vue Drawer navigator', () => {
       handleRef.value?.jumpTo('Profile');
       await tick();
       expect(isOpenByOverlay()).toBe(false);
-      expect(findAllText(fabric.committed)).toContain('profile');
+      expect(findAllText()).toContain('profile');
     });
 
     // why: a real edge-swipe that clears both the distance and velocity thresholds must open the

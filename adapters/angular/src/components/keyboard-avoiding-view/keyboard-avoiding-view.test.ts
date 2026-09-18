@@ -19,13 +19,13 @@ import {
   type IEventSubscription,
   type IKeyboardEventName,
 } from '@symbiote-native/engine';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import { installRecordingFabric, payloadOf } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../../render';
 import { KeyboardAvoidingView, type IKeyboardAvoidingBehavior } from './index';
 
 const ROOT_TAG = 911;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -104,24 +104,24 @@ function fireLayout(testID: string, y: number, height: number): void {
   });
 }
 
-// `fabric.find` only ever sees a node's FIRST-created props (createNode, never re-run on
-// update); a prop that changes after mount — like paddingBottom growing on keyboardWillShow —
-// only shows up on the current CLONE living in `fabric.committed`, so every lookup here walks
-// the live committed tree instead.
-function committedWrapper(testID: string): IFakeNode {
-  const visit = (node: IFakeNode): IFakeNode | undefined => {
-    if (node.props.testID === testID) return node;
-    for (const child of node.children) {
-      const found = visit(child);
-      if (found) return found;
-    }
-    return undefined;
-  };
-  for (const node of fabric.committed) {
-    const found = visit(node);
-    if (found) return found;
-  }
-  throw new Error(`no wrapper with testID "${testID}" was committed`);
+// The recording host mutates a node's props IN PLACE (no clone-on-write), so `fabric.find`
+// reflects a prop set after mount — like paddingBottom growing on keyboardWillShow — just as well
+// as one set at creation; there is no separate "live clone" to walk here.
+function committedWrapper(testID: string): {
+  handle: object;
+  instanceHandle: unknown;
+} {
+  const node = fabric.find(n => n.props.testID === testID);
+  if (node === undefined)
+    throw new Error(`no wrapper with testID "${testID}" was committed`);
+  return node;
+}
+
+// The inset values (paddingBottom / height) and the class-derived backgroundColor are all
+// computed on the way into the PAYLOAD (style flattened, the class merge resolved) — the raw
+// authored bag keeps `style` as an object/array, not a top-level key.
+function committedPayload(testID: string): Record<string, unknown> {
+  return payloadOf(committedWrapper(testID).handle);
 }
 
 @Component({
@@ -206,11 +206,11 @@ describe('KeyboardAvoidingView (no throwing path — see file header)', () => {
     // wrapper bottom edge (100 + 500 = 600) minus the keyboard's top edge (300) = 300.
     emitKeyboardShow(300, 346);
     await tick();
-    expect(committedWrapper('kav').props.paddingBottom).toBe(300);
+    expect(committedPayload('kav').paddingBottom).toBe(300);
 
     emitKeyboardHide();
     await tick();
-    expect(committedWrapper('kav').props.paddingBottom).toBe(0);
+    expect(committedPayload('kav').paddingBottom).toBe(0);
   });
 
   it("subscribes to exactly this host's show/hide pair and tears both down on unmount", async () => {
@@ -261,17 +261,17 @@ describe('KeyboardAvoidingView (no throwing path — see file header)', () => {
     ]) {
       emitKeyboardShow(300, 346, eventType);
       await tick();
-      expect(committedWrapper('kav').props.paddingBottom).toBe(0);
+      expect(committedPayload('kav').paddingBottom).toBe(0);
     }
 
     emitKeyboardShow(300, 346);
     await tick();
-    expect(committedWrapper('kav').props.paddingBottom).toBe(300);
+    expect(committedPayload('kav').paddingBottom).toBe(300);
 
     // The did* twin of the subscribed hide must not clear it either.
     emitKeyboardHide(KEYBOARD_EVENT.didHide);
     await tick();
-    expect(committedWrapper('kav').props.paddingBottom).toBe(300);
+    expect(committedPayload('kav').paddingBottom).toBe(300);
   });
 
   it('holds the height-mode inset when the shrunk wrapper re-measures shorter', async () => {
@@ -287,7 +287,7 @@ describe('KeyboardAvoidingView (no throwing path — see file header)', () => {
     emitKeyboardShow(300, 346);
     await tick();
     // 0 + 600 - 300 = 300 of overlap, so the wrapper shrinks from 600 to 300.
-    expect(committedWrapper('kav').props.height).toBe(300);
+    expect(committedPayload('kav').height).toBe(300);
 
     // Native re-measures the now-shrunk wrapper.
     fireLayout('kav', 0, 300);
@@ -296,7 +296,7 @@ describe('KeyboardAvoidingView (no throwing path — see file header)', () => {
     await tick();
     // 300 (applied) + 0 + 300 - 300 = 300 — the same inset, so the height stays put. Without the
     // correction it computes 0 and the shrink is dropped entirely.
-    expect(committedWrapper('kav').props.height).toBe(300);
+    expect(committedPayload('kav').height).toBe(300);
   });
 
   it('uses the behavior in force at event time, not the one bound when it subscribed', async () => {
@@ -311,7 +311,7 @@ describe('KeyboardAvoidingView (no throwing path — see file header)', () => {
     await tick();
     emitKeyboardShow(300, 346);
     await tick();
-    expect(committedWrapper('kav').props.paddingBottom).toBe(300);
+    expect(committedPayload('kav').paddingBottom).toBe(300);
 
     // Nothing else ticks change detection under zoneless, so the keyboard event's own
     // markForCheck is what carries the new input down: this emit still resolves the OLD
@@ -319,7 +319,7 @@ describe('KeyboardAvoidingView (no throwing path — see file header)', () => {
     boundBehavior.value = 'height';
     emitKeyboardShow(300, 346);
     await tick();
-    expect(committedWrapper('kav').props.height).toBe(300);
+    expect(committedPayload('kav').height).toBe(300);
 
     // Native re-measures the now-shrunk wrapper. Only a handler reading `behavior` live sees
     // 'height' here and adds the applied inset back; a captured 'padding' computes 0 and drops
@@ -328,7 +328,7 @@ describe('KeyboardAvoidingView (no throwing path — see file header)', () => {
     await tick();
     emitKeyboardShow(300, 346);
     await tick();
-    expect(committedWrapper('kav').props.height).toBe(300);
+    expect(committedPayload('kav').height).toBe(300);
   });
 
   it('lifts nothing when the keyboard reports screenY 0 and Prefer Cross-Fade Transitions is on', async () => {
@@ -344,7 +344,7 @@ describe('KeyboardAvoidingView (no throwing path — see file header)', () => {
 
     emitKeyboardShow(0, 346);
     await tick();
-    expect(committedWrapper('kav').props.paddingBottom).toBe(0);
+    expect(committedPayload('kav').paddingBottom).toBe(0);
   });
 
   it('still lifts on a screenY 0 keyboard when Prefer Cross-Fade Transitions is off', async () => {
@@ -357,7 +357,7 @@ describe('KeyboardAvoidingView (no throwing path — see file header)', () => {
 
     emitKeyboardShow(0, 346);
     await tick();
-    expect(committedWrapper('kav').props.paddingBottom).toBe(600);
+    expect(committedPayload('kav').paddingBottom).toBe(600);
   });
 
   it('does not apply an inset when enabled is explicitly false', async () => {
@@ -371,7 +371,7 @@ describe('KeyboardAvoidingView (no throwing path — see file header)', () => {
     emitKeyboardShow(300, 346);
     await tick();
 
-    expect(committedWrapper('kav').props.paddingBottom).toBe(0);
+    expect(committedPayload('kav').paddingBottom).toBe(0);
   });
 
   it('resolves a class= on the KeyboardAvoidingView use site onto the real committed view, not the anchor', async () => {
@@ -387,6 +387,6 @@ describe('KeyboardAvoidingView (no throwing path — see file header)', () => {
     mount(ROOT_TAG, KeyboardAvoidingViewHostFixture);
     await tick();
 
-    expect(committedWrapper('kav').props.backgroundColor).toBe('teal');
+    expect(committedPayload('kav').backgroundColor).toBe('teal');
   });
 });

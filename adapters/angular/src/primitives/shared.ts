@@ -14,6 +14,7 @@ import { createCallbackWrapper } from '../change-detection-flush';
 import {
   flattenStyle,
   isSymbioteNode,
+  propOf,
   type IHostInstance,
   type IStyleProp,
 } from '@symbiote-native/engine';
@@ -43,7 +44,7 @@ import {
  */
 export function anchorHostStyle(elementRef: ElementRef<unknown>): unknown {
   const node = elementRef.nativeElement;
-  return isSymbioteNode(node) ? node.props.style : undefined;
+  return isSymbioteNode(node) ? propOf(node, 'style') : undefined;
 }
 
 // anchorHostStyle returns `unknown` (it reads whatever already resolved onto the anchor node's

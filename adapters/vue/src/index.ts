@@ -3,7 +3,7 @@
 // lives in the engine, shared with every other adapter. App code names only @symbiote-native/vue.
 
 // Side-effect import, FIRST and deliberately not a re-export: it installs the engine-side press
-// machine that a lowered `<pressable>` needs. `export * from './register'` or a bare
+// machine that `<pressable>` needs. `export * from './register'` or a bare
 // import sitting beside a re-export of the same specifier both go lazy under Metro's production
 // `inlineRequires` and the registration silently never runs in a release build. See register.ts.
 
@@ -88,9 +88,8 @@ export type {
 export type { IActivityIndicatorProps } from './components/activity-indicator-props';
 // `Switch` is a TAG — `<switch>` — and there is nothing to import in its place. The
 // `lastNativeReport` mirror, the snap-back command and the platform track-color mapping all live on
-// the engine node (`registerSwitchBehavior`), so the `switch-managed` twin that kept the wrapper's
-// machine apart from it is dead too. `v-model` still works: on an element it compiles to a runtime
-// directive, and `vModelText` in `./runtime-helpers` is ours.
+// the engine node (`registerSwitchBehavior`). `v-model` still works: on an element it compiles to a
+// runtime directive, and `vModelText` in `./runtime-helpers` is ours.
 export type {
   ISwitchProps,
   ISwitchTrackColor,

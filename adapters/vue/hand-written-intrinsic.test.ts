@@ -1,8 +1,5 @@
-// A bare intrinsic tag WRITTEN BY HAND, with no lowering transform in the picture. This is the
-// authoring shape the adapter is moving to: the app writes `<view>` / `<pressable>` itself and no
-// build step rewrites anything, so nothing here compiles a wrapper component and nothing imports
-// one. That is also what makes the arms honest — the lowering transform keys on an
-// `@symbiote-native/vue` import, and these sources have none, so it provably cannot fire.
+// A bare intrinsic tag WRITTEN BY HAND. This is the authoring shape: the app writes `<view>` /
+// `<pressable>` itself, so nothing here compiles a wrapper component and nothing imports one.
 //
 // Both Vue paths, separately. `@vue/compiler-sfc` and `@vue/babel-plugin-jsx` decide
 // element-vs-component in two different places, so one rule reaching two mechanisms is the drift
@@ -23,9 +20,10 @@ import * as engine from '@symbiote-native/engine';
 import * as vueAdapter from '@symbiote-native/vue';
 import { mount, unmount } from '@symbiote-native/vue';
 import {
-  installFabric,
+  createLiveTree,
+  installRecordingFabric,
   waitForQuiet,
-  type IFakeNode,
+  type ILiveNode,
 } from '@symbiote-native/test-utils';
 import { descriptorFor } from '@symbiote-native/components';
 import * as runtimeHelpers from './src/runtime-helpers';
@@ -39,7 +37,8 @@ const {
   compileSfc,
 }: { compileSfc: (s: string, f: string) => Promise<string> } =
   metroVueTransformer;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 
 // Derived from the shared tag set, never enumerated: a primitive that joins the spec joins this
 // suite by existing, which is the repair `.claude/rules/adapter-parity-audit.md` records for every
@@ -110,37 +109,28 @@ async function compileJsx(source: string): Promise<string> {
   return result.code;
 }
 
-// Matched WITH ITS QUOTES. `text-input` is a prefix of `text-input-multiline` and of both `-managed`
-// spellings, so a bare `includes(tag)` reads any of the four as this one and a compiler emitting a
-// sibling would report correct.
+// Matched WITH ITS QUOTES. `text-input` is a prefix of `text-input-multiline`, so a bare
+// `includes(tag)` reads the sibling as this one and a compiler emitting the wrong of the two would
+// report correct.
 const namesElement = (code: string, tag: string): boolean =>
   code.includes(`"${tag}"`) && !code.includes(`_resolveComponent("${tag}")`);
 
-function deepCount(nodes: readonly IFakeNode[]): number {
-  return nodes.reduce((total, node) => total + 1 + deepCount(node.children), 0);
-}
-
-async function mountArm(component: Component): Promise<readonly IFakeNode[]> {
+async function mountArm(component: Component): Promise<readonly ILiveNode[]> {
   fabric.reset();
   mount(ROOT_TAG, defineComponent({ setup: () => () => h(component) }));
-  await waitForQuiet(
-    () => deepCount(fabric.committed),
-    'the mount to stop committing',
-  );
-  const flat: IFakeNode[] = [];
-  const walk = (nodes: readonly IFakeNode[]): void => {
-    for (const node of nodes) {
-      flat.push(node);
-      walk(node.children);
-    }
+  await waitForQuiet(() => fabric.commits, 'the mount to stop committing');
+  const flat: ILiveNode[] = [];
+  const walk = (node: ILiveNode): void => {
+    flat.push(node);
+    for (const child of node.children) walk(child);
   };
-  walk(fabric.committed);
+  for (const child of live.nodeOf(live.appRoot()).children) walk(child);
   unmount(ROOT_TAG);
   return flat;
 }
 
-function subject(nodes: readonly IFakeNode[]): IFakeNode {
-  const found = nodes.find(node => node.props.testID === TEST_ID);
+function subject(nodes: readonly ILiveNode[]): ILiveNode {
+  const found = nodes.find(node => node.payload.testID === TEST_ID);
   if (found === undefined)
     throw new Error(
       `no committed node carries testID "${TEST_ID}" — the tag resolved to a component that ` +
@@ -226,9 +216,9 @@ describe('a hand-written element reaches the engine', () => {
     const node = subject(await mountArm(evaluate(await arm())));
 
     expect(node.viewName).toBe(descriptorFor('view').component);
-    expect(node.props.nativeID).toBe('pane');
-    expect(node.props.id).toBeUndefined();
-    expect(node.props.onLayout).toBe(true);
+    expect(node.payload.nativeID).toBe('pane');
+    expect(node.payload.id).toBeUndefined();
+    expect(node.payload.onLayout).toBe(true);
   });
 
   // The multiline pair is TWO native views, and with no transform left there is nothing to read a
@@ -297,6 +287,9 @@ describe('v-model on a hand-written element', () => {
       '/sfc-model-payload.vue',
     );
     const node = subject(await mountArm(evaluate(code)));
-    expect(node.props.text).toBe('a');
+    // `value`, not `text`: the fold is the engine's rule now (`foldTextInputValue`), which this
+    // harness's TypeScript payload builder deliberately holds no copy of. The claim here is that the
+    // SFC compiler's `v-model` output reaches the payload at all.
+    expect(node.payload.value).toBe('a');
   });
 });

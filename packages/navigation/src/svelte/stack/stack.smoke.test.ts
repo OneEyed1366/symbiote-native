@@ -10,20 +10,13 @@
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import { setNativeViewConfigSource } from '@symbiote-native/engine';
 import type { INativeViewConfig } from '@symbiote-native/engine';
 import { mount, unmount } from '@symbiote-native/svelte/native-view-bridge';
 import type { INavigatorHandle } from '../../core';
 import type { ISearchBarCommands } from '../../core';
-import {
-  countLive,
-  findAllLive,
-  findLive,
-  findLiveByTestId,
-  outline,
-  rawTextsOutsideTextContainer,
-} from '../fabric-tree.test-helper';
+import { createNavigationLiveTree } from '../fabric-tree.test-helper';
 import {
   createSvelteHarness,
   loadComponent,
@@ -102,7 +95,16 @@ const VIEW_CONFIGS: Record<string, INativeViewConfig> = {
 };
 
 const ROOT_TAG = 91_701;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const {
+  appRoot,
+  countLive,
+  findAllLive,
+  findLive,
+  findLiveByTestId,
+  outline,
+  rawTextsOutsideTextContainer,
+} = createNavigationLiveTree(fabric);
 setNativeViewConfigSource(name => VIEW_CONFIGS[name]);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
@@ -268,8 +270,13 @@ describe('Stack (real compiled index.svelte)', () => {
       // screen must paint as RNSScreen > RNSScreenStackHeaderConfig + RNSScreenContentWrapper.
       await mountStack();
 
-      expect(outline(fabric.appRoot())).toEqual([
-        'RCTView',
+      // The root line reads `#surface` rather than `RCTView`, and the change is a CORRECTION.
+      // The app root is the surface node; it is created as an `RCTView` and then set to the
+      // surface component, so `componentOf` says `#surface` and Fabric commits it as `RootView`.
+      // The stand-in tree kept the creation name — a third answer, and the only one nothing
+      // downstream agrees with. Everything below the root is unchanged.
+      expect(outline(appRoot())).toEqual([
+        '#surface',
         '  RCTView',
         '    RCTView',
         '      RCTText',
@@ -288,18 +295,18 @@ describe('Stack (real compiled index.svelte)', () => {
       // immediately reaching a route the collector registered moments earlier - and the exported
       // handle's push/pop must move canGoBack() in lockstep with the actual RNSScreen count.
       const handle = await mountStack();
-      expect(countLive(fabric.appRoot(), 'RNSScreen')).toBe(1);
+      expect(countLive(appRoot(), 'RNSScreen')).toBe(1);
 
       handle.push('details');
       await tick();
       await tick();
-      expect(countLive(fabric.appRoot(), 'RNSScreen')).toBe(2);
+      expect(countLive(appRoot(), 'RNSScreen')).toBe(2);
       expect(handle.canGoBack()).toBe(true);
 
       handle.pop();
       await tick();
       await tick();
-      expect(countLive(fabric.appRoot(), 'RNSScreen')).toBe(1);
+      expect(countLive(appRoot(), 'RNSScreen')).toBe(1);
       expect(handle.canGoBack()).toBe(false);
     });
 
@@ -312,8 +319,8 @@ describe('Stack (real compiled index.svelte)', () => {
       await tick();
       await tick();
 
-      expect(countLive(fabric.appRoot(), 'RNSScreen')).toBe(1);
-      const screen = findLive(fabric.appRoot(), 'RNSScreenContentWrapper');
+      expect(countLive(appRoot(), 'RNSScreen')).toBe(1);
+      const screen = findLive(appRoot(), 'RNSScreenContentWrapper');
       expect(screen?.children?.[0]?.props?.testID).toBe('details');
     });
 
@@ -321,7 +328,7 @@ describe('Stack (real compiled index.svelte)', () => {
       // why: initialRouteName must win over "whichever <Screen> registered first" - the second
       // registered screen ("details") mounts as the initial route when named explicitly.
       await mountStack('initial-route', 'initialRouteName="details"');
-      const wrapper = findLive(fabric.appRoot(), 'RNSScreenContentWrapper');
+      const wrapper = findLive(appRoot(), 'RNSScreenContentWrapper');
       expect(wrapper?.children?.[0]?.props?.testID).toBe('details');
     });
 
@@ -334,7 +341,7 @@ describe('Stack (real compiled index.svelte)', () => {
         '',
         'options={{ title: "Home screen", headerLargeTitle: true }}',
       );
-      const header = findLive(fabric.appRoot(), 'RNSScreenStackHeaderConfig');
+      const header = findLive(appRoot(), 'RNSScreenStackHeaderConfig');
       expect(header?.props?.title).toBe('Home screen');
       expect(header?.props?.largeTitle).toBe(true);
     });
@@ -345,10 +352,10 @@ describe('Stack (real compiled index.svelte)', () => {
       // false, since a route genuinely isn't focused at the instant it mounts.
       await mountStack();
       expect(
-        findLiveByTestId(fabric.appRoot(), 'home')?.props?.accessibilityLabel,
+        findLiveByTestId(appRoot(), 'home')?.props?.accessibilityLabel,
       ).toBe('home:false');
 
-      const screen = findLive(fabric.appRoot(), 'RNSScreen');
+      const screen = findLive(appRoot(), 'RNSScreen');
       expect(screen).toBeDefined();
       if (screen === undefined) return;
 
@@ -356,14 +363,14 @@ describe('Stack (real compiled index.svelte)', () => {
       await tick();
       await tick();
       expect(
-        findLiveByTestId(fabric.appRoot(), 'home')?.props?.accessibilityLabel,
+        findLiveByTestId(appRoot(), 'home')?.props?.accessibilityLabel,
       ).toBe('home:true');
 
       fabric.fireEvent(screen.instanceHandle, 'topDisappear', {});
       await tick();
       await tick();
       expect(
-        findLiveByTestId(fabric.appRoot(), 'home')?.props?.accessibilityLabel,
+        findLiveByTestId(appRoot(), 'home')?.props?.accessibilityLabel,
       ).toBe('home:false');
     });
 
@@ -376,14 +383,14 @@ describe('Stack (real compiled index.svelte)', () => {
       await tick();
       await tick();
 
-      const topScreen = findAllLive(fabric.appRoot(), 'RNSScreen')[1];
+      const topScreen = findAllLive(appRoot(), 'RNSScreen')[1];
       expect(topScreen).toBeDefined();
       if (topScreen === undefined) return;
 
       fabric.fireEvent(topScreen.instanceHandle, 'topDismissed', {});
       await tick();
       await tick();
-      expect(countLive(fabric.appRoot(), 'RNSScreen')).toBe(1);
+      expect(countLive(appRoot(), 'RNSScreen')).toBe(1);
     });
 
     it('mounts the search bar and wires its imperative ref to real view commands', async () => {
@@ -412,10 +419,10 @@ describe('Stack (real compiled index.svelte)', () => {
       await tick();
       await tick();
 
-      const searchBar = findLive(fabric.appRoot(), 'RNSSearchBar');
+      const searchBar = findLive(appRoot(), 'RNSSearchBar');
       expect(searchBar?.props?.placeholder).toBe('Find');
       expect(
-        findLive(fabric.appRoot(), 'RNSScreenStackHeaderSubview')?.props?.type,
+        findLive(appRoot(), 'RNSScreenStackHeaderSubview')?.props?.type,
       ).toBe('searchBar');
 
       expect(searchBarRef.current).not.toBeNull();
@@ -435,8 +442,9 @@ describe('Stack (real compiled index.svelte)', () => {
         'options={{ stackPresentation: "formSheet" }}',
       );
 
-      expect(outline(fabric.appRoot())).toEqual([
-        'RCTView',
+      // `#surface` at the root, for the reason spelled out on the first outline above.
+      expect(outline(appRoot())).toEqual([
+        '#surface',
         '  RCTView',
         '    RCTView',
         '      RCTText',
@@ -461,15 +469,15 @@ describe('Stack (real compiled index.svelte)', () => {
       handle.push('details');
       await tick();
       await tick();
-      expect(countLive(fabric.appRoot(), 'RNSScreen')).toBe(2);
+      expect(countLive(appRoot(), 'RNSScreen')).toBe(2);
 
       hideDetails();
       await tick();
       await tick();
 
-      expect(countLive(fabric.appRoot(), 'RNSScreen')).toBe(1);
-      expect(findLiveByTestId(fabric.appRoot(), 'home')).toBeDefined();
-      expect(findLiveByTestId(fabric.appRoot(), 'details')).toBeUndefined();
+      expect(countLive(appRoot(), 'RNSScreen')).toBe(1);
+      expect(findLiveByTestId(appRoot(), 'home')).toBeDefined();
+      expect(findLiveByTestId(appRoot(), 'details')).toBeUndefined();
       expect(handle.canGoBack()).toBe(false);
     });
 
@@ -491,8 +499,8 @@ describe('Stack (real compiled index.svelte)', () => {
       await tick();
       await tick();
 
-      expect(countLive(fabric.appRoot(), 'RNSScreen')).toBe(1);
-      expect(findLiveByTestId(fabric.appRoot(), 'home')).toBeDefined();
+      expect(countLive(appRoot(), 'RNSScreen')).toBe(1);
+      expect(findLiveByTestId(appRoot(), 'home')).toBeDefined();
       expect(handle.canGoBack()).toBe(false);
     });
   });
@@ -504,7 +512,7 @@ describe('Stack (real compiled index.svelte)', () => {
   describe('committed-tree hygiene', () => {
     it('commits no raw text outside a text container', async () => {
       await mountStack();
-      expect(rawTextsOutsideTextContainer(fabric.appRoot())).toEqual([]);
+      expect(rawTextsOutsideTextContainer(appRoot())).toEqual([]);
     });
 
     it('commits no raw text outside a text container for a modal route', async () => {
@@ -513,7 +521,7 @@ describe('Stack (real compiled index.svelte)', () => {
         '',
         'options={{ stackPresentation: "formSheet" }}',
       );
-      expect(rawTextsOutsideTextContainer(fabric.appRoot())).toEqual([]);
+      expect(rawTextsOutsideTextContainer(appRoot())).toEqual([]);
     });
   });
 });

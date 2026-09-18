@@ -27,7 +27,10 @@ import { compile } from 'svelte/compiler';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
-import { installFabric } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 import { mount, unmount } from './render';
 
 if (globalThis.window === undefined) {
@@ -45,7 +48,8 @@ const ROOT_TAG = 91_002;
 // either file's own logic — found running this package's suite as a whole).
 const TMP_DIR = join(__dirname, '../build/__smoke__/inspect-rune');
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -123,9 +127,10 @@ describe('$inspect under the svelte adapter mount pipeline', () => {
       // the $inspect probe is silently gone, proving svelte/compiler stripped the call site
       // rather than the mount pipeline breaking reactivity.
       expect(log).toEqual([]);
-      expect(fabric.serialize([fabric.appRoot()])).toContain(
-        'RCTRawText "count 2"',
-      );
+      const texts = live
+        .findAllLive(live.appRoot(), node => node.viewName === 'RCTRawText')
+        .map(node => String(node.payload.text));
+      expect(texts).toContain('count 2');
     });
   });
 

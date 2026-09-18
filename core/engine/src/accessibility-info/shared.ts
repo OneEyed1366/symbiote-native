@@ -12,7 +12,7 @@
 
 import { isSymbioteNode, type ISymbioteNode } from '../node';
 import type { IEventSubscription } from '../native-events';
-import { sendAccessibilityEvent as dispatchAccessibilityEvent } from '../commit';
+import { sendAccessibilityEvent as dispatchAccessibilityEvent } from '../imperative';
 import { dlog } from '../debug';
 export { isBoolean } from '../type-guards';
 

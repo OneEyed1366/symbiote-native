@@ -1,5 +1,13 @@
 import { useRef, useState } from 'react';
-import { FlatList, SectionList, Keyboard, AccessibilityInfo, type IHostInstance, type IFlatListHandle, type ISection } from '@symbiote-native/react';
+import {
+  FlatList,
+  SectionList,
+  Keyboard,
+  AccessibilityInfo,
+  type IHostInstance,
+  type IFlatListHandle,
+  type ISection,
+} from '@symbiote-native/react';
 import { ActionButton } from './ActionButton';
 
 // Verification panel for five feature-parity behaviors with

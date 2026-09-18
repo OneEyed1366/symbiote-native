@@ -18,6 +18,7 @@
 // native-node-parity.test.ts, which diffs committed native trees against the Vue adapter.
 
 import {
+  isTextContainer,
   appendChild as engineAppendChild,
   createAnchor,
   createRawText,
@@ -63,7 +64,8 @@ function isFormattingWhitespace(
   parent: ShimNode | null,
 ): boolean {
   if (!WHITESPACE_ONLY.test(value)) return false;
-  return parent?.engineNode?.isText !== true;
+  const engineNode = parent?.engineNode;
+  return engineNode === undefined || !isTextContainer(engineNode);
 }
 
 export class ShimText extends ShimNode {

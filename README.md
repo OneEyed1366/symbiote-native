@@ -109,6 +109,9 @@ three `View`, three `Text`, three raw text nodes and a `TextInput` — so a run 
 iOS 26.5 simulator, Release, 1 000 rows, all mounted. Lower is better; the ratio is ours over
 stock, so **below 1.00 means faster than stock React Native**. Bold marks a row we win.
 
+> **These are the released packages**, and an engine rework in progress moves them — see
+> [below](#the-engine-rework-in-progress).
+
 | Operation      | stock RN |             Solid |            Svelte |               Vue |             React |          Angular |
 | -------------- | -------: | ----------------: | ----------------: | ----------------: | ----------------: | ---------------: |
 | Create 1 000   |    257.3 | **195.7 · 0.76x** | **205.0 · 0.80x** | **228.7 · 0.89x** |     264.7 · 1.03x |    367.2 · 1.43x |
@@ -119,6 +122,35 @@ stock, so **below 1.00 means faster than stock React Native**. Bold marks a row 
 | Swap 2 rows    |      9.6 |   **6.1 · 0.64x** |   **8.4 · 0.88x** |   **8.7 · 0.91x** |      35.3 · 3.68x |     18.4 · 1.92x |
 | Select row     |      7.3 |   **5.5 · 0.75x** |      14.7 · 2.01x |       8.4 · 1.15x |       7.9 · 1.08x |     10.5 · 1.44x |
 | Clear          |     10.7 |   **9.1 · 0.85x** |      12.6 · 1.18x |      14.1 · 1.32x |   **8.7 · 0.81x** |     44.2 · 4.13x |
+
+### The engine rework in progress
+
+The retained tree is moving out of JavaScript and into C++: adapters emit a command buffer and the
+tree lives on the native side. It is not released, and **it changes the table above** — measured
+headless on that branch, `Create` regressed across every adapter while update-shaped rows improved.
+
+The same eight operations, the same 1 000-row screen, run headless through all six renderers in one
+sitting (ms; ratio is ours / stock):
+
+| 1 000 rows | stock RN | React |   Vue | Solid | Svelte | Angular |
+| ---------- | -------: | ----: | ----: | ----: | -----: | ------: |
+| Create     |     91.6 | 115.2 | 143.6 | 107.7 |  124.3 |   265.2 |
+| Replace    |    102.0 | 118.8 | 162.4 | 115.2 |  137.0 |   301.8 |
+| Partial    |     11.7 |   9.2 |  12.0 |   7.8 |    9.9 |    11.3 |
+| Select     |     13.0 |  13.5 |  11.1 |  14.3 |   12.3 |    14.8 |
+| Swap       |     16.0 |  23.5 |   4.2 |   4.5 |    5.4 |     7.3 |
+| Remove     |     18.7 |   4.5 |   3.5 |   4.0 |    4.7 |     7.2 |
+| Append     |    125.4 | 116.9 | 149.1 | 117.3 |  136.4 |   283.8 |
+| Clear      |      9.0 |  10.9 |  35.4 | 394.9 |   21.4 |    43.6 |
+
+So the three adapters that beat stock on `Create` today — Solid, Svelte and Vue — do not beat it on
+that branch yet, while `Swap` and `Remove` are 3-5x wins for every non-React adapter. Solid's `Clear`
+is a known outlier under investigation; the engine is 3% of it. That work is why the branch exists
+and is not finished.
+
+These are **headless** figures and not the device's: JavaScriptCore rather than Hermes, a test host
+rather than a real Fabric pipeline. They are a sound comparison of the columns against each other,
+taken on one ruler; the released table above remains the device-measured one.
 
 ---
 

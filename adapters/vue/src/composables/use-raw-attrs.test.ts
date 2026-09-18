@@ -19,11 +19,11 @@ import {
 } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '@symbiote-native/vue';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import { useRawAttrs } from './use-raw-attrs';
 
 const ROOT_TAG = 909;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));

@@ -40,7 +40,10 @@ import { compile } from 'svelte/compiler';
 import { rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 import { mount, unmount } from '../render';
 import { scopedStyles } from '../preprocessor/scoped-styles';
 
@@ -76,7 +79,8 @@ const COMPILE_OPTIONS = {
 } as const;
 const preprocess = scopedStyles();
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -113,17 +117,14 @@ async function loadDefault(outPath: string): Promise<Component> {
 }
 
 // fabric.find() walks the CREATION log, so it can return a node that is no longer mounted and
-// whose props are stale (§15). Every assertion below reads the LIVE committed tree instead.
-function findLive(nativeID: string): IFakeNode | undefined {
-  const walk = (nodes: readonly IFakeNode[]): IFakeNode | undefined => {
-    for (const node of nodes) {
-      if (node.props.nativeID === nativeID) return node;
-      const found = walk(node.children);
-      if (found !== undefined) return found;
-    }
-    return undefined;
-  };
-  return walk(fabric.appRoot().children);
+// whose props are stale (§15). Every assertion below reads the LIVE committed tree instead. The
+// declarations under test (padding, backgroundColor, color, margin) all travel through the style
+// slot, so they only show up in the flattened payload.
+function findLive(nativeID: string) {
+  return live.findLive(
+    live.appRoot(),
+    node => node.payload.nativeID === nativeID,
+  );
 }
 
 const CARD_A = `<view class="card" nativeID="a"></view>
@@ -218,8 +219,8 @@ describe('svelte <style> block (real preprocess + compile + mount)', () => {
 
       const card = findLive('a');
       expect(card).toBeDefined();
-      expect(card?.props.padding).toBe(12);
-      expect(card?.props.backgroundColor).toBe('#262626');
+      expect(card?.payload.padding).toBe(12);
+      expect(card?.payload.backgroundColor).toBe('#262626');
     });
 
     // why: the class registry is ONE flat global Map (skill §25b) — scoping must be real, not
@@ -228,11 +229,11 @@ describe('svelte <style> block (real preprocess + compile + mount)', () => {
     it('does not let one component .card bleed into another component .card', async () => {
       await mountBoth();
 
-      expect(findLive('a')?.props.padding).toBe(12);
-      expect(findLive('b')?.props.padding).toBe(3);
+      expect(findLive('a')?.payload.padding).toBe(12);
+      expect(findLive('b')?.payload.padding).toBe(3);
       // The bleed that a flat, unscoped registry would produce: B's rule sets no background, so
       // A's must not be visible here (and B's padding must not have overwritten A's).
-      expect(findLive('b')?.props.backgroundColor).toBeUndefined();
+      expect(findLive('b')?.payload.backgroundColor).toBeUndefined();
     });
 
     // why: a scoped `<style>` block must compose with the adapter's OWN clsx `class` value
@@ -246,8 +247,8 @@ describe('svelte <style> block (real preprocess + compile + mount)', () => {
 
       const node = findLive('d');
       expect(node).toBeDefined();
-      expect(node?.props.padding).toBe(7);
-      expect(node?.props.color).toBe('#fff');
+      expect(node?.payload.padding).toBe(7);
+      expect(node?.payload.color).toBe('#fff');
     });
 
     // why: a compound selector (`.card.big`) must LAYER over its own single-class rules rather
@@ -262,21 +263,21 @@ describe('svelte <style> block (real preprocess + compile + mount)', () => {
       });
 
       it('applies .card.big to a static class="card big"', () => {
-        expect(findLive('compound')?.props.padding).toBe(16);
+        expect(findLive('compound')?.payload.padding).toBe(16);
       });
 
       it('keeps the single-class declarations the compound rule does not restate', () => {
         // The cascade: `.card` still contributes its background, `.card.big` only overrides
         // padding. Returning the compound rule alone would blank the background here.
-        expect(findLive('compound')?.props.backgroundColor).toBe('#262626');
+        expect(findLive('compound')?.payload.backgroundColor).toBe('#262626');
       });
 
       it('leaves an element carrying only .card on the single rule', () => {
-        expect(findLive('plain')?.props.padding).toBe(8);
+        expect(findLive('plain')?.payload.padding).toBe(8);
       });
 
       it('applies .card.big to a dynamic clsx class too', () => {
-        expect(findLive('dyn')?.props.padding).toBe(16);
+        expect(findLive('dyn')?.payload.padding).toBe(16);
       });
     });
 
@@ -293,17 +294,17 @@ describe('svelte <style> block (real preprocess + compile + mount)', () => {
       });
 
       it('applies the :global() rule to an element carrying the unsuffixed token', () => {
-        expect(findLive('partial')?.props.margin).toBe(4);
+        expect(findLive('partial')?.payload.margin).toBe(4);
       });
 
       it('keeps the scoped half of the same element resolving as usual', () => {
-        expect(findLive('partial')?.props.padding).toBe(8);
-        expect(findLive('partial')?.props.backgroundColor).toBe('#262626');
+        expect(findLive('partial')?.payload.padding).toBe(8);
+        expect(findLive('partial')?.payload.backgroundColor).toBe('#262626');
       });
 
       it('leaves an element without the global token on the single rule', () => {
-        expect(findLive('own')?.props.margin).toBeUndefined();
-        expect(findLive('own')?.props.padding).toBe(8);
+        expect(findLive('own')?.payload.margin).toBeUndefined();
+        expect(findLive('own')?.payload.padding).toBe(8);
       });
     });
   });

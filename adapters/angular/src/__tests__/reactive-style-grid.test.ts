@@ -22,8 +22,14 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  childrenOf,
+  clearGlobalStyles,
+  parentOf,
+  registerRules,
+  type ISymbioteNode,
+} from '@symbiote-native/engine';
+import { installRecordingFabric, payloadOf } from '@symbiote-native/test-utils';
 
 import '../register';
 import { mount, unmount } from '../render';
@@ -54,7 +60,7 @@ import {
 } from '../elements';
 
 const ROOT_TAG = 9484;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -369,47 +375,36 @@ function tileIdsFromScreen(): string[] {
 // image while the class styles the box ABOVE it. So search outward: node, subtree, then ancestors
 // nearest-first. A plain global search would match a neighbouring tile and pass while the component
 // under test was frozen. Same walk as `anchor-class-tracking.test.ts`, which explains it at length.
+//
+// `backgroundColor` is only ever a top-level key on the PAYLOAD — the class merge resolves onto
+// `props.style` as the engine's `[classStyle, explicitStyle]` pair, and only `payloadOf` (the
+// engine's own `fabricProps`) flattens that.
 function nearestBackground(testID: string): unknown {
-  const pathTo = (node: IFakeNode): IFakeNode[] | undefined => {
-    if (node.props.testID === testID) return [node];
-    for (const child of node.children) {
-      const below = pathTo(child);
-      if (below) return [node, ...below];
-    }
-    return undefined;
-  };
-  const backgroundOf = (node: IFakeNode): unknown => {
-    const style: unknown = node.props.style;
-    if (
-      typeof style === 'object' &&
-      style !== null &&
-      'backgroundColor' in style
-    ) {
-      return Reflect.get(style, 'backgroundColor');
-    }
-    return node.props.backgroundColor;
-  };
-  const inSubtree = (node: IFakeNode): unknown => {
-    const own = backgroundOf(node);
+  const owner = fabric.find(node => node.props.testID === testID);
+  if (owner === undefined)
+    throw new Error(`no committed node carrying testID="${testID}"`);
+
+  const inSubtree = (handle: ISymbioteNode): unknown => {
+    const own = payloadOf(handle).backgroundColor;
     if (own !== undefined && own !== null) return own;
-    for (const child of node.children) {
+    for (const child of childrenOf(handle)) {
       const below = inSubtree(child);
       if (below !== undefined && below !== null) return below;
     }
     return undefined;
   };
+  const below = inSubtree(owner.handle);
+  if (below !== undefined && below !== null) return below;
 
-  for (const root of fabric.committed) {
-    const path = pathTo(root);
-    if (path === undefined) continue;
-    for (let i = path.length - 1; i >= 0; i -= 1) {
-      const hit =
-        i === path.length - 1 ? inSubtree(path[i]) : backgroundOf(path[i]);
-      if (hit !== undefined && hit !== null) return hit;
-    }
-    return undefined;
+  for (
+    let ancestor = parentOf(owner.handle);
+    ancestor !== undefined;
+    ancestor = parentOf(ancestor)
+  ) {
+    const value = payloadOf(ancestor).backgroundColor;
+    if (value !== undefined && value !== null) return value;
   }
-  throw new Error(`no committed node carrying testID="${testID}"`);
+  return undefined;
 }
 
 function backgroundsByTile(ids: readonly string[]): Record<string, unknown> {

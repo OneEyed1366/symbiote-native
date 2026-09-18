@@ -5,7 +5,7 @@
 import '@angular/compiler';
 import { Component } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import type { ISection } from '@symbiote-native/components';
 
 import { mount, unmount } from '../../render';
@@ -13,7 +13,7 @@ import { VirtualizedSectionList, VSectionItemDirective } from './index';
 
 const ROOT_TAG = 955;
 const ROW_HEIGHT = 40;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 

@@ -20,7 +20,8 @@
 import { createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { VirtualizedList, mount, unmount } from '@symbiote-native/react';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import { childrenOf, type ISymbioteNode } from '@symbiote-native/engine';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 
 interface IRow {
   id: number;
@@ -31,29 +32,23 @@ const ITEM_HEIGHT = 100;
 const VIEWPORT = 100;
 const CONTENT_VIEW = 'RCTScrollContentView';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-function flatten(nodes: IFakeNode[]): IFakeNode[] {
-  return nodes.flatMap(node => [node, ...flatten(node.children)]);
-}
-
 // The content container's DIRECT children — the level a spacer collapses, and the only level at
-// which "inside the cell" and "beside the cell" look different.
-function contentChildren(): IFakeNode[] {
-  const content = flatten(fabric.committed).find(
-    node => node.viewName === CONTENT_VIEW,
-  );
-  if (content === undefined) throw new Error('no content container committed');
-  return content.children;
+// which "inside the cell" and "beside the cell" look different. Read off the engine's own child
+// links, which is where "who was put inside whom" is stated.
+function contentChildren(): readonly ISymbioteNode[] {
+  const content = fabric.find(node => node.viewName === CONTENT_VIEW);
+  if (content === undefined) throw new Error('no content container created');
+  return childrenOf(content.handle);
 }
 
-function carriesText(node: IFakeNode, text: string): boolean {
-  return (
-    node.props.text === text ||
-    node.children.some(child => carriesText(child, text))
-  );
+function carriesText(handle: ISymbioteNode, text: string): boolean {
+  const recorded = fabric.find(node => node.handle === handle);
+  if (recorded?.props.text === text) return true;
+  return childrenOf(handle).some(child => carriesText(child, text));
 }
 
 // windowSize is a parameter because the gate test needs the LAST data index actually rendered:
@@ -78,10 +73,8 @@ function listOf(rows: number, windowSize: number): ReactElement {
 }
 
 function layoutViewport(): void {
-  const scroll = flatten(fabric.committed).find(
-    node => node.viewName === 'RCTScrollView',
-  );
-  if (scroll === undefined) throw new Error('no scroll view committed');
+  const scroll = fabric.find(node => node.viewName === 'RCTScrollView');
+  if (scroll === undefined) throw new Error('no scroll view created');
   fabric.fireEvent(scroll.instanceHandle, 'topLayout', {
     layout: { x: 0, y: 0, width: 320, height: VIEWPORT },
   });

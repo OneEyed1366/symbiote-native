@@ -13,7 +13,11 @@
 
 import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 // SIDE-EFFECT IMPORT: the controlled handshake lives in the tag's behavior, and only this module
 // installs it. An app reaches it through the package barrel; a test importing render does not.
 import '../register';
@@ -23,12 +27,9 @@ import { mount, unmount } from '../render';
 
 const ROOT_TAG = 812;
 const SWITCH_VIEW = 'Switch';
-const TRACK_ON = '#81b0ff';
-const TRACK_OFF = '#767577';
-const THUMB = '#f5dd4b';
-const IOS_BACKGROUND = '#3e3e3e';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -44,29 +45,19 @@ afterEach(() => unmount(ROOT_TAG));
 // case below carries its own testID so the oracle names the node it is about.
 function commandsFor(testId: string): readonly string[] {
   return fabric.commands
-    .filter(command => command.node.props.testID === testId)
+    .filter(command => fabric.propsOf(command.handle).testID === testId)
     .map(command => `${command.commandName}:${JSON.stringify(command.args)}`);
 }
 
-function walk(nodes: IFakeNode[], visit: (node: IFakeNode) => void): void {
-  for (const node of nodes) {
-    visit(node);
-    walk(node.children, visit);
-  }
-}
-
-// The created node's props are frozen at first commit (clone-on-write hands back a new object), so
-// anything asserted after an update must be read off the live committed tree.
-function committedSwitch(): IFakeNode {
-  let found: IFakeNode | undefined;
-  walk(fabric.committed, node => {
-    if (node.viewName === SWITCH_VIEW) found = node;
-  });
+// The live tree re-derives on every read, so anything asserted after an update is safe off it —
+// no more "frozen at first commit" caveat.
+function committedSwitch(): ILiveNode {
+  const found = live.findLive(live.appRoot(), n => n.viewName === SWITCH_VIEW);
   if (found === undefined) throw new Error(`no ${SWITCH_VIEW} was committed`);
   return found;
 }
 
-function createdSwitch(): IFakeNode {
+function createdSwitch(): { instanceHandle: unknown } {
   const node = fabric.find(n => n.viewName === SWITCH_VIEW);
   if (node === undefined) throw new Error(`no ${SWITCH_VIEW} was created`);
   return node;
@@ -76,60 +67,45 @@ describe('Solid Switch on the engine', () => {
   describe('Positive', () => {
     // why: RN's real Switch view name is `Switch` — a wrong native view name means the host never
     // resolves a component, which no JS-level check would otherwise catch.
-    it('emits the Fabric view name Switch and passes value through as a strict boolean', async () => {
-      mount(ROOT_TAG, () => <switch value />);
-      await tick();
-      expect(committedSwitch().props.value).toBe(true);
-    });
-
-    // why: RN sends `value === true` to native (Switch.js) — an absent `value` must fold to a real
-    // `false`, not ride through as `undefined`, which native would misread.
-    it('folds an undefined value to a strict false', async () => {
-      mount(ROOT_TAG, () => <switch />);
-      await tick();
-      expect(committedSwitch().props.value).toBe(false);
-    });
-
-    // why: trackColor/thumbColor/ios_backgroundColor are RN's public prop names, but native reads
-    // them under different keys — using the public names on the wire silently fails to paint. This
-    // also pins the one prop whose NAME lies about its kind: `onTintColor` must reach Fabric as a
-    // PROP, and does, because routeProp asks the Switch ViewConfig (whose only event is `change`)
-    // instead of guessing from an `on` prefix.
-    it('maps color + disabled props to the native iOS prop names', async () => {
-      mount(ROOT_TAG, () => (
-        <switch
-          value
-          disabled
-          trackColor={{ false: TRACK_OFF, true: TRACK_ON }}
-          thumbColor={THUMB}
-          ios_backgroundColor={IOS_BACKGROUND}
-        />
-      ));
+    it('emits the Fabric view name Switch and carries the authored props through', async () => {
+      mount(ROOT_TAG, () => <switch value disabled />);
       await tick();
 
-      const props = committedSwitch().props;
-      expect(props.onTintColor).toBe(TRACK_ON);
-      expect(props.tintColor).toBe(TRACK_OFF);
-      expect(props.thumbTintColor).toBe(THUMB);
-      expect(props.disabled).toBe(true);
-      // ios_backgroundColor folds into the style, which the engine flattens onto the node, so
-      // backgroundColor lands as a top-level committed prop.
-      expect(props.backgroundColor).toBe(IOS_BACKGROUND);
+      expect(committedSwitch().viewName).toBe('Switch');
+      expect(committedSwitch().payload.disabled).toBe(true);
     });
 
-    // why: native reads only `accessibility*`; the web aliases must be folded in JS before commit
-    // (RN's own View.js transform). Switch owns its host element rather than rendering through a
-    // View, so the fold is the component's own job — skipping it would leave `aria-label` riding to
-    // Fabric as a meaningless prop and the switch unlabelled for a screen reader.
-    it('folds aria aliases into the canonical accessibility props', async () => {
+    // THE PROP-RESOLUTION CASES MOVED, as a GROUP:
+    // `core/engine/cpp/tests/js/switch-payload.itest.ts`. `value === true`, the per-platform colour
+    // renames and the `ios_backgroundColor` style fold are `foldSwitchProps` in
+    // `SymbioteFabricProps.cpp` now, and this harness commits through the TypeScript `fabricProps`,
+    // which holds no copy of that rule.
+    //
+    // They travelled together on purpose. The `<switch value />` case above would have stayed GREEN
+    // on its own — the app authored `true`, so a payload with no rule at all satisfies it — and a
+    // green case over a rule that no longer runs is worse than no case. It is renamed to what it
+    // still proves: the tag picks the right Fabric view and the authored props reach the commit.
+    //
+    // One claim went with them and is now unreachable BY CONSTRUCTION, which is worth recording:
+    // this file used to pin that `onTintColor` reaches Fabric as a PROP rather than being mistaken
+    // for a listener, because `routeProp` asks the Switch ViewConfig instead of guessing from the
+    // `on` prefix. The engine writes that name into the payload directly now, so `routeProp` never
+    // sees it and the hazard cannot occur. The authored name it DOES see is `trackColor`.
+
+    // why: native reads only `accessibility*`, and the engine folds the web aliases into them off
+    // the authored, HYPHENATED names. Switch owns its host element rather than rendering through a
+    // View, so nothing else could carry the aliases down for it — losing one leaves the switch
+    // unlabelled for a screen reader, on device, silently.
+    // The fold's own cases: `core/engine/cpp/tests/js/aria-payload.itest.ts`.
+    it('forwards the aria aliases under their authored names', async () => {
       mount(ROOT_TAG, () => (
         <switch value={false} aria-label="wifi" aria-disabled />
       ));
       await tick();
 
-      const props = committedSwitch().props;
-      expect(props.accessibilityLabel).toBe('wifi');
-      expect(props.accessibilityState).toEqual({ disabled: true });
+      const payload = committedSwitch().payload;
+      expect(payload['aria-label']).toBe('wifi');
+      expect(payload['aria-disabled']).toBe(true);
     });
 
     // why: onValueChange hands the caller ONE event, with the derived boolean carried as
@@ -167,7 +143,7 @@ describe('Solid Switch on the engine', () => {
     it('never forwards onValueChange itself onto the native prop bag', async () => {
       mount(ROOT_TAG, () => <switch value={false} onValueChange={() => {}} />);
       await tick();
-      expect('onValueChange' in committedSwitch().props).toBe(false);
+      expect('onValueChange' in committedSwitch().payload).toBe(false);
     });
 
     // why: Solid runs a component body ONCE. Every prop read here sits inside an accessor precisely
@@ -177,15 +153,15 @@ describe('Solid Switch on the engine', () => {
       const [value, setValue] = createSignal(false);
       mount(ROOT_TAG, () => <switch value={value()} />);
       await tick();
-      const createdAtMount = fabric.counts.createNode;
-      expect(committedSwitch().props.value).toBe(false);
+      const hostAtMount = committedSwitch().handle;
+      expect(committedSwitch().payload.value).toBe(false);
 
       setValue(true);
       await tick();
 
-      expect(committedSwitch().props.value).toBe(true);
-      expect(fabric.counts.createNode, 'the host node kept its identity').toBe(
-        createdAtMount,
+      expect(committedSwitch().payload.value).toBe(true);
+      expect(committedSwitch().handle, 'the host node kept its identity').toBe(
+        hostAtMount,
       );
     });
 
@@ -241,7 +217,7 @@ describe('Solid Switch on the engine', () => {
       });
       await tick();
 
-      expect(committedSwitch().props.value).toBe(true);
+      expect(committedSwitch().payload.value).toBe(true);
       expect(commandsFor('accept-probe')).toEqual([]);
     });
   });

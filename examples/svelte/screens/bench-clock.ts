@@ -20,26 +20,20 @@ const SUITE_STEP_TIMEOUT_MS = 30_000;
 export const SUITE_TIMED_OUT = Number.NaN;
 
 // What the ENGINE did inside one timed step. Every adapter builds the same tree for a given step,
-// so a nodesVisited or propWrites that differs between adapters is work the SCREEN generates, not
-// a cost of the platform.
+// so a propWrites that differs between adapters is work the SCREEN generates, not a cost of the
+// platform.
 //
-// `walkMs` is NOT the engine's JS cost — the window around reconcile() contains the createNode and
-// appendChild JSI crossings. Read it only as a DELTA between adapters, where the native part is a
-// shared constant.
+// There is no walk number here any more, and none is coming back: the shadow tree lives in C++ and
+// JS holds only a command buffer, so what the host spends turning that buffer into a tree is not
+// observable from JS at all. Sizing it means instrumenting the host.
 export type IStepProfile = {
-  nodesVisited: number;
   propWrites: number;
-  propNoops: number;
   commits: number;
-  walkMs: number;
 };
 
 export const EMPTY_STEP_PROFILE: IStepProfile = {
-  nodesVisited: 0,
   propWrites: 0,
-  propNoops: 0,
   commits: 0,
-  walkMs: 0,
 };
 
 export const EMPTY_FABRIC_PROFILE: IFabricCallProfile = {
@@ -141,15 +135,12 @@ export function createBenchClock(gate: {
       if (finished === null) return;
       pending = null;
       const durationMs = performance.now() - finished.startedAt;
-      // Complete by now: commitContainer increments walkMs and commits before completeRoot, and
-      // runPostCommitHooks() fires after it.
+      // Complete by now: the commit is recorded before completeRoot, and runPostCommitHooks()
+      // fires after it.
       const profile = readCommitProfile();
       lastStepProfile = {
-        nodesVisited: profile.nodesVisited,
         propWrites: profile.propWrites,
-        propNoops: profile.propNoops,
         commits: profile.commits,
-        walkMs: profile.walkMs,
       };
       lastFabricProfile = readFabricCallProfile();
       finished.settle(durationMs);

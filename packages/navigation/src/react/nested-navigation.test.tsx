@@ -16,7 +16,8 @@ import {
   setNativeViewConfigSource,
 } from '@symbiote-native/react';
 import type { INativeViewConfig } from '@symbiote-native/engine';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import { childrenOf, type ISymbioteNode } from '@symbiote-native/engine';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import { Stack } from './stack';
 import type { INavigatorHandle } from './stack';
 import { Tab } from './tabs';
@@ -70,26 +71,33 @@ const VIEW_CONFIGS: Record<string, INativeViewConfig> = {
   },
 };
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 setNativeViewConfigSource(name => VIEW_CONFIGS[name]);
 
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-function findAllText(nodes: readonly IFakeNode[]): string[] {
+// Descends the LIVE child links from the outer stack down, rather than searching the recording: a
+// recording keeps every node it ever saw created, so a screen left behind by a push would still
+// answer here long after it stopped being on screen.
+function outerStack(): ISymbioteNode {
+  const stack = fabric.find(node => node.viewName === STACK_VIEW);
+  if (stack === undefined) throw new Error('no screen stack created');
+  return stack.handle;
+}
+
+function findAllText(handle: ISymbioteNode = outerStack()): string[] {
   const found: string[] = [];
-  const collect = (list: readonly IFakeNode[]): void => {
-    for (const node of list) {
-      if (
-        node.viewName === 'RCTRawText' &&
-        typeof node.props.text === 'string'
-      ) {
-        found.push(node.props.text);
-      }
-      collect(node.children);
+  for (const child of childrenOf(handle)) {
+    const recorded = fabric.find(one => one.handle === child);
+    if (
+      recorded?.viewName === 'RCTRawText' &&
+      typeof recorded.props.text === 'string'
+    ) {
+      found.push(recorded.props.text);
     }
-  };
-  collect(nodes);
+    found.push(...findAllText(child));
+  }
   return found;
 }
 
@@ -165,7 +173,7 @@ describe('nested navigators (Context parent chain)', () => {
         ),
       );
 
-      expect(findAllText(fabric.committed)).toContain('tab-home');
+      expect(findAllText()).toContain('tab-home');
 
       if (!capturedParent) throw new Error('getParent() returned undefined');
       if (!('push' in capturedParent)) {
@@ -174,7 +182,7 @@ describe('nested navigators (Context parent chain)', () => {
       // capturedParent is now narrowed to INavigatorHandle by the 'push in' guard above.
       act(() => capturedParent.push('Details'));
 
-      expect(findAllText(fabric.committed)).toContain('stack-details');
+      expect(findAllText()).toContain('stack-details');
       expect(ref.current?.canGoBack()).toBe(true);
     });
   });

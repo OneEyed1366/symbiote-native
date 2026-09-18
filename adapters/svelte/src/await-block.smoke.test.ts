@@ -18,7 +18,11 @@ import { compile } from 'svelte/compiler';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 import { mount, unmount } from './render';
 
 // RN sets both before any app code runs (setUpGlobals.js / setUpNavigator.js); a bare vitest
@@ -32,7 +36,8 @@ if (globalThis.navigator === undefined) {
 const ROOT_TAG = 91_301;
 const TMP_DIR = join(__dirname, '../build/__await_smoke__');
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -79,14 +84,18 @@ async function compileComponent(
 // children. Reading them off `fabric.appRoot()` (which re-reads the latest child set) rather than
 // `fabric.find()` is deliberate: find() walks the creation log and would still report a branch
 // that has since been swapped out.
-function appChildren(): IFakeNode[] {
-  const wrapper = fabric.appRoot().children[0];
+function appChildren(): ILiveNode[] {
+  const wrapper = live.nodeOf(live.appRoot()).children[0];
   expect(wrapper, 'the root wrapper view committed').toBeDefined();
   return wrapper?.children ?? [];
 }
 
 function testIds(): Array<unknown> {
   return appChildren().map(child => child.props.testID);
+}
+
+function serialize(nodes: readonly ILiveNode[]): string {
+  return nodes.map(node => live.serialize(node.handle)).join('');
 }
 
 // Marks a branch with a unique testID AND a Text child, so a leftover branch shows up both as an
@@ -138,7 +147,7 @@ describe('{#await} (real compiled output, real fake-Fabric)', () => {
       // Exactly the pending branch — not pending PLUS an anchor-turned-RCTRawText, and not both
       // branches at once.
       expect(testIds()).toEqual(['pending']);
-      expect(fabric.serialize(appChildren())).toBe(
+      expect(serialize(appChildren())).toBe(
         'RCTView(RCTText(RCTRawText "loading"))',
       );
 
@@ -148,7 +157,7 @@ describe('{#await} (real compiled output, real fake-Fabric)', () => {
 
       // The pending subtree must be GONE, not merely followed by the then subtree.
       expect(testIds()).toEqual(['then']);
-      expect(fabric.serialize(appChildren())).toBe(
+      expect(serialize(appChildren())).toBe(
         'RCTView(RCTText(RCTRawText "ready"))',
       );
     });
@@ -178,7 +187,7 @@ describe('{#await} (real compiled output, real fake-Fabric)', () => {
       await tick();
 
       expect(testIds()).toEqual(['then']);
-      expect(fabric.serialize(appChildren())).toBe(
+      expect(serialize(appChildren())).toBe(
         'RCTView(RCTText(RCTRawText "late"))',
       );
     });
@@ -230,7 +239,7 @@ describe('{#await} (real compiled output, real fake-Fabric)', () => {
       await tick();
       await tick();
       expect(testIds()).toEqual(['then']);
-      expect(fabric.serialize(appChildren())).toBe(
+      expect(serialize(appChildren())).toBe(
         'RCTView(RCTText(RCTRawText "fresh"))',
       );
     });
@@ -260,7 +269,7 @@ describe('{#await} (real compiled output, real fake-Fabric)', () => {
       mount(ROOT_TAG, List, { rows });
       await tick();
 
-      const listChildren = (): IFakeNode[] => appChildren()[0]?.children ?? [];
+      const listChildren = (): ILiveNode[] => appChildren()[0]?.children ?? [];
       expect(listChildren().map(child => child.props.testID)).toEqual([
         'r0-pending',
         'r1-pending',
@@ -286,7 +295,7 @@ describe('{#await} (real compiled output, real fake-Fabric)', () => {
         'r1-then',
         'r2-then',
       ]);
-      expect(fabric.serialize(listChildren())).toBe(
+      expect(serialize(listChildren())).toBe(
         'RCTView(RCTText(RCTRawText "zero"))RCTView(RCTText(RCTRawText "one"))RCTView(RCTText(RCTRawText "two"))',
       );
     });
@@ -315,7 +324,7 @@ describe('{#await} (real compiled output, real fake-Fabric)', () => {
       await tick();
 
       expect(testIds()).toEqual(['catch']);
-      expect(fabric.serialize(appChildren())).toBe(
+      expect(serialize(appChildren())).toBe(
         'RCTView(RCTText(RCTRawText "nope"))',
       );
     });

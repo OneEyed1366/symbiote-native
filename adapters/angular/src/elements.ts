@@ -53,8 +53,10 @@ import { NG_VALUE_ACCESSOR, type ControlValueAccessor } from '@angular/forms';
 import { VALUE_CHANGE_EVENT } from './renderer/value-change';
 import {
   createCallbackWrapper,
+  isWrappableCallback,
   registerViewFlush,
   unregisterViewFlush,
+  type ICallbackWrapper,
 } from './change-detection-flush';
 import type {
   IActivityIndicatorProps,
@@ -89,7 +91,7 @@ import type { IAngularScrollViewProps } from './components/scroll-view-props';
  * — so without this loop a bare tag commits nothing at all. It stays generic on purpose: per-prop
  * forwarding code is a component wrapper by another name, which is what this migration removes.
  * `renderer.setProperty` lands in the adapter's own renderer, which routes the value through the
- * engine's `routeProp` and applies the `id` -> `nativeID` and `symbioteStyle` -> `style` aliases.
+ * engine's `routeProp` and applies the `id` -> `nativeID` alias.
  */
 @Directive()
 export abstract class SymbioteElement implements OnChanges {
@@ -100,10 +102,21 @@ export abstract class SymbioteElement implements OnChanges {
   // An `onX` PROP is called by the engine, so Angular is never told it fired. Shared with the
   // component path's `SymbioteHostPropsDirective`, which has the identical deficit — see
   // `createCallbackWrapper`.
-  private readonly wrapCallback = createCallbackWrapper(
-    this.detector,
-    this.host.nativeElement,
-  );
+  //
+  // BUILT ON THE FIRST CALLBACK PROP, not at construction. This directive is instantiated once per
+  // TAG on a screen that imports `SYMBIOTE_ELEMENTS`, and the overwhelming majority of tags carry no
+  // `on*` function prop at all — an eager wrapper is a closure and a `WeakMap` per element for
+  // nothing. Measured on the directive-shaped bench arm: 7 000 per 1 000-row create.
+  private wrapper: ICallbackWrapper | undefined;
+
+  private wrapCallback(key: string, value: unknown): unknown {
+    if (!isWrappableCallback(key, value)) return value;
+    this.wrapper ??= createCallbackWrapper(
+      this.detector,
+      this.host.nativeElement,
+    );
+    return this.wrapper(key, value);
+  }
 
   @Input() testID?: IElementProps['testID'];
   @Input() nativeID?: IElementProps['nativeID'];
@@ -183,7 +196,6 @@ export abstract class SymbioteElement implements OnChanges {
   @Input() shouldRasterizeIOS?: IElementProps['shouldRasterizeIOS'];
   @Input()
   needsOffscreenAlphaCompositing?: IElementProps['needsOffscreenAlphaCompositing'];
-  @Input() symbioteStyle?: IElementProps['symbioteStyle'];
   // Declared, and the reason is the one `element-props.ts` used to give for NOT declaring it —
   // reversed by measurement. `[style]` on an element with no directive input reaches Angular's own
   // CSS styling engine (`ɵɵstyleMap`), which cannot represent an RN StyleProp: an ARRAY decomposes
@@ -269,6 +281,9 @@ export class PressableElement extends SymbioteElement {
   pressRetentionOffset?: IAngularPressableProps['pressRetentionOffset'];
   @Input() unstable_pressDelay?: IAngularPressableProps['unstable_pressDelay'];
   @Input() android_ripple?: IAngularPressableProps['android_ripple'];
+  // ON THE BASE, so both touchables inherit it — the prop is Pressable's AND
+  // TouchableHighlight's upstream, and they extend this rather than repeat its surface.
+  @Input() testOnly_pressed?: IAngularPressableProps['testOnly_pressed'];
   @Input()
   android_disableSound?: IAngularPressableProps['android_disableSound'];
   @Input() hasTVPreferredFocus?: IAngularPressableProps['hasTVPreferredFocus'];
@@ -499,7 +514,7 @@ export class HorizontalScrollContentElement extends SymbioteElement {}
  * obvious reading is wrong: the file header's "an `@Output` CONSUMES the binding" holds for a
  * COMPONENT, and an element is the other case — Angular attaches the renderer listener for the
  * event as well, so `Renderer2.listen` still runs and the engine still hears the change. Measured
- * under JIT by deleting this whole hook: every case in `lowered-two-way-value.test.ts` stayed
+ * under JIT by deleting this whole hook: every case in `renderer/two-way-value.test.ts` stayed
  * green, delivery included, and exactly ONCE (nothing double-fires when both paths exist).
  *
  * It is kept because the measurement is JIT-only and this adapter has a recorded case of JIT and
@@ -604,15 +619,6 @@ export class TextInputElement extends ValueChangeElement {
 @Directive({ selector: 'text-input-multiline', standalone: true })
 export class MultilineTextInputElement extends TextInputElement {}
 
-// The COMPONENT path's spelling of the pair above — same native views, a tag the behavior registry
-// deliberately does not carry (`component-names/shared.ts`). Declared so the tag alphabet is
-// complete; an app writes the plain name.
-@Directive({ selector: 'text-input-managed', standalone: true })
-export class ManagedTextInputElement extends TextInputElement {}
-
-@Directive({ selector: 'text-input-multiline-managed', standalone: true })
-export class ManagedMultilineTextInputElement extends TextInputElement {}
-
 @Directive({ selector: 'switch', standalone: true })
 export class SwitchElement extends ValueChangeElement {
   @Input() value?: ISwitchProps['value'];
@@ -634,9 +640,6 @@ export class SwitchElement extends ValueChangeElement {
     if (typeof value === 'boolean') this.valueChange.emit(value);
   }
 }
-
-@Directive({ selector: 'switch-managed', standalone: true })
-export class ManagedSwitchElement extends SwitchElement {}
 
 /**
  * `[(ngModel)]` / `formControlName` on a `<text-input>` or a `<switch>`.
@@ -716,8 +719,7 @@ export class TextInputValueAccessor extends SymbioteValueAccessor {
 }
 
 @Directive({
-  selector:
-    'switch[ngModel], switch[formControl], switch[formControlName], switch-managed[ngModel], switch-managed[formControl], switch-managed[formControlName]',
+  selector: 'switch[ngModel], switch[formControl], switch[formControlName]',
   standalone: true,
   providers: [
     {
@@ -824,10 +826,7 @@ export const SYMBIOTE_ELEMENTS = [
   HorizontalScrollContentElement,
   TextInputElement,
   MultilineTextInputElement,
-  ManagedTextInputElement,
-  ManagedMultilineTextInputElement,
   SwitchElement,
-  ManagedSwitchElement,
   ActivityIndicatorElement,
   ActivityIndicatorSpinnerElement,
   SafeAreaViewElement,

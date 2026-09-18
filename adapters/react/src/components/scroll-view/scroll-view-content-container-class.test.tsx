@@ -16,10 +16,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { mount, unmount } from '@symbiote-native/react';
-import { installFabric } from '@symbiote-native/test-utils';
+// A RECORDING host. The search is by the view name the OPS carry, and the assertion is on the
+// PAYLOAD — `padding` only exists once the style slot is flattened on the way into it.
+import { installRecordingFabric, payloadOf } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 54;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 
 beforeEach(() => fabric.reset());
 afterEach(() => {
@@ -51,12 +53,12 @@ describe('React <scroll-view> contentContainerStyle class-name resolution', () =
       node => node.viewName === 'RCTScrollContentView',
     );
     expect(content, 'RCTScrollContentView was created').toBeDefined();
-    expect(content!.props.padding).toBe(8);
+    expect(payloadOf(content!.handle).padding).toBe(8);
 
     // The class must NOT leak onto the outer scroll view.
     const outer = fabric.find(node => node.viewName === 'RCTScrollView');
     expect(outer, 'RCTScrollView was created').toBeDefined();
-    expect('padding' in outer!.props).toBe(false);
+    expect('padding' in payloadOf(outer!.handle)).toBe(false);
   });
 
   // why: adding class-name support must be additive — the pre-existing plain-object form of
@@ -72,6 +74,6 @@ describe('React <scroll-view> contentContainerStyle class-name resolution', () =
     const content = fabric.find(
       node => node.viewName === 'RCTScrollContentView',
     );
-    expect(content!.props.padding).toBe(12);
+    expect(payloadOf(content!.handle).padding).toBe(12);
   });
 });

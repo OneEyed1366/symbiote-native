@@ -6,10 +6,9 @@
 // committed view's opacity, while the base style survives the per-frame diff. delayPressIn
 // defers onPressIn past touch-down. No simulator: a failure here is in JS.
 //
-// rAF is polyfilled (setTimeout-based) and the clone is made to MERGE the diff onto
-// existing props (real Fabric C++ behavior; the shared recorder replaces) so the base
-// width survives the opacity-only per-frame diff, installed before any mount because the
-// engine destructures slot methods off the global on its first commit.
+// rAF is polyfilled (setTimeout-based). The live tree's payload is recomputed from the node's
+// CURRENT authored props on every read, so the base width survives the opacity-only per-frame
+// diff with no clone-protocol mock needed at all — a per-frame `setProp` just updates one key.
 //
 // SCOPE: the shared press-timing/scheduling machine (computePressOutWait,
 // createTouchableFeedbackRuntime/Handlers, the underlay machine) is fully unit-tested in
@@ -23,7 +22,10 @@
 import { useState, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '@symbiote-native/react';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 120;
 const TOUCH_START = 'topTouchStart';
@@ -36,39 +38,15 @@ const DURATION_PROBE_MS = 20;
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
-function mergeProps(
-  previous: Record<string, unknown>,
-  patch: Record<string, unknown>,
-): Record<string, unknown> {
-  const merged = { ...previous, ...patch };
-  for (const key of Object.keys(patch)) {
-    if (patch[key] === null) delete merged[key];
-  }
-  return merged;
-}
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const installed: unknown = globalThis.nativeFabricUIManager;
 if (!isRecord(installed)) throw new Error('fabric slot was not installed');
 
-installed.cloneNodeWithNewProps = (
-  node: IFakeNode,
-  patch: Record<string, unknown>,
-): IFakeNode => ({
-  ...node,
-  props: mergeProps(node.props, patch),
-});
-installed.cloneNodeWithNewChildrenAndProps = (
-  node: IFakeNode,
-  patch: Record<string, unknown>,
-): IFakeNode => ({
-  ...node,
-  props: mergeProps(node.props, patch),
-  children: [],
-});
 // Pressable measures its responder rect on grant (retention region); report a fixed frame.
 installed.measure = (
-  _node: IFakeNode,
+  _node: unknown,
   cb: (
     x: number,
     y: number,
@@ -142,8 +120,9 @@ afterEach(() => {
 
 // The responder is the Pressable's own RCTView, the first non-box-none RCTView created.
 function responderHandle(): unknown {
-  const view = fabric.find(
-    n => n.viewName === 'RCTView' && n.props.pointerEvents !== 'box-none',
+  const view = live.findLive(
+    live.appRoot(),
+    n => n.viewName === 'RCTView' && n.payload.pointerEvents !== 'box-none',
   );
   if (!view) throw new Error('no RCTView (Pressable responder) was created');
   return view.instanceHandle;
@@ -153,16 +132,14 @@ function responderHandle(): unknown {
 // RCTView (the inner Animated.View, child of the Pressable's responder View).
 function feedbackProps(): Record<string, unknown> {
   let found: Record<string, unknown> | undefined;
-  function walk(node: IFakeNode): void {
+  live.walkLive(live.appRoot(), node => {
     if (
       node.viewName === 'RCTView' &&
-      node.props.pointerEvents !== 'box-none'
+      node.payload.pointerEvents !== 'box-none'
     ) {
-      found = node.props;
+      found = node.payload;
     }
-    for (const child of node.children) walk(child);
-  }
-  for (const root of fabric.committed) walk(root);
+  });
   if (found === undefined) throw new Error('no committed RCTView found');
   return found;
 }
@@ -178,12 +155,13 @@ const settleUnderlay = (): Promise<void> =>
 // own child, and proving the child is UNTOUCHED is what the second one is for.
 function committedViews(): Record<string, unknown>[] {
   const found: Record<string, unknown>[] = [];
-  function walk(node: IFakeNode): void {
-    if (node.viewName === 'RCTView' && node.props.pointerEvents !== 'box-none')
-      found.push(node.props);
-    for (const child of node.children) walk(child);
-  }
-  for (const root of fabric.committed) walk(root);
+  live.walkLive(live.appRoot(), node => {
+    if (
+      node.viewName === 'RCTView' &&
+      node.payload.pointerEvents !== 'box-none'
+    )
+      found.push(node.payload);
+  });
   if (found.length < 2)
     throw new Error(
       `expected a container + a child RCTView, got ${found.length}`,
@@ -193,6 +171,23 @@ function committedViews(): Record<string, unknown>[] {
 
 function containerProps(): Record<string, unknown> {
   return committedViews()[0];
+}
+
+// TouchableHighlight's underlay is `foldTouchableHighlightUnderlay` in the engine since 2026-09-18,
+// and this host builds payloads through the TypeScript `fabricProps`, which carries no copy of the
+// tag rules — so the painted colour is not readable here. The BIT is (`OP_SET_UNDERLAY_SHOWN`), and
+// it is the right witness for what these cases claim: that REACT's wiring reaches the machine,
+// through a real reconciler and a real commit. What a showing underlay looks like belongs to
+// `core/engine/cpp/tests/js/touchable-highlight-underlay.itest.ts`.
+// Located by TAG, not by view name plus a `pointerEvents` filter the way the payload helpers above
+// are. A `<touchable-highlight>` commits as a plain `RCTView` — that is the whole reason the tag has
+// to cross at all — so the filter those helpers use is a heuristic that happens to work on the
+// shapes in this file, and it picked the wrong node the first time this was written. The tag is
+// exact.
+function isUnderlayShown(): boolean {
+  const node = fabric.find(n => n.tagName === 'touchable-highlight');
+  if (node === undefined) throw new Error('no touchable-highlight was created');
+  return node.underlayShown;
 }
 function childProps(): Record<string, unknown> {
   const views = committedViews();
@@ -457,13 +452,13 @@ describe('React TouchableHighlight underlay feedback', () => {
     );
     const handle = responderHandle();
 
-    expect(containerProps().backgroundColor).toBeUndefined();
+    expect(isUnderlayShown()).toBe(false);
     expect(containerProps().width).toBe(10);
     expect(childProps().opacity).toBeUndefined();
 
     fabric.fireEvent(handle, TOUCH_START);
     await settleUnderlay();
-    expect(containerProps().backgroundColor).toBe('#abc');
+    expect(isUnderlayShown()).toBe(true);
     expect(containerProps().width).toBe(10);
     // BOTH halves land on the ONE node, and the child is untouched — this is the tag's documented
     // divergence from RN, which paints the underlay on a container and clones the lowered opacity
@@ -471,7 +466,8 @@ describe('React TouchableHighlight underlay feedback', () => {
     // (`core/components/src/behaviors/touchable-highlight.ts`, and `component-names/shared.ts` at
     // the tag's own declaration). Every adapter's wrapper except React's had already shipped this
     // simplification; deleting React's wrapper is what made it the only shape.
-    expect(containerProps().opacity).toBe(0.5);
+    expect(containerProps().underlayColor).toBe('#abc');
+    expect(containerProps().activeOpacity).toBe(0.5);
     expect(childProps().opacity).toBeUndefined();
     expect(childProps().height).toBe(4);
   });
@@ -498,14 +494,12 @@ describe('React TouchableHighlight underlay feedback', () => {
     fabric.fireEvent(handle, TOUCH_END);
     await settleUnderlay();
     expect(
-      containerProps().backgroundColor,
+      isUnderlayShown(),
       'release must not clear the underlay before delayPressOut elapses',
-    ).toBe('#abc');
-    expect(containerProps().opacity).toBe(0.5);
+    ).toBe(true);
 
     await new Promise(resolve => setTimeout(resolve, 60));
-    expect(containerProps().backgroundColor).toBeUndefined();
-    expect(containerProps().opacity).toBeUndefined();
+    expect(isUnderlayShown()).toBe(false);
   });
 
   // why: RN's _hasPressHandler gates the whole underlay — a decorative TouchableHighlight with no
@@ -520,12 +514,12 @@ describe('React TouchableHighlight underlay feedback', () => {
     const handle = responderHandle();
 
     fabric.fireEvent(handle, TOUCH_START);
-    expect(containerProps().backgroundColor).toBeUndefined();
+    expect(isUnderlayShown()).toBe(false);
     expect(childProps().opacity).toBeUndefined();
 
     fabric.fireEvent(handle, TOUCH_END);
     await new Promise(resolve => setTimeout(resolve, 20));
-    expect(containerProps().backgroundColor).toBeUndefined();
+    expect(isUnderlayShown()).toBe(false);
   });
 
   // why: RN exposes the underlay transitions as props so a caller can drive sibling visuals off
@@ -588,12 +582,14 @@ describe('React TouchableHighlight underlay feedback', () => {
 // Pressable, which owns that fold — so this pins the COMPOSITION, not a second implementation:
 // a variant that stopped forwarding `accessible` through its rest spread would go red here.
 describe('React Touchable* accessibility default', () => {
+  // The COMMITTED tree, not `live.findLive`: creation order is leaves-first (a parent is created
+  // with its children already in hand), so "the first RCTView that is not the surface root" is
+  // the touchable's own child, which carries none of the fold's props.
   function responderProps(): Record<string, unknown> {
-    const view = fabric.find(
-      n => n.viewName === 'RCTView' && n.props.pointerEvents !== 'box-none',
-    );
-    if (!view) throw new Error('no RCTView (Pressable responder) was created');
-    return view.props;
+    const view = live.nodeOf(live.appRoot()).children[0];
+    if (!view)
+      throw new Error('no RCTView (Pressable responder) was committed');
+    return view.payload;
   }
 
   const variants: [string, (child: ReactElement) => ReactElement][] = [
@@ -607,10 +603,17 @@ describe('React Touchable* accessibility default', () => {
     ],
   ];
 
+  // THE DEFAULT IS NOT ASSERTED HERE any more, and that is deliberate: `accessible !== false` is
+  // `foldPressableProps` in the engine now (`SymbioteFabricProps.cpp`), while this host builds its
+  // payloads through the TypeScript `fabricProps`, which carries no copy of the tag rules. Proven in
+  // `core/engine/cpp/tests/js/touchable-payload.itest.ts` for both touchables.
+  //
+  // What stays here is the case this adapter can still answer — the OPT-OUT, which is an authored
+  // prop travelling through React's own composition rather than a rule. `variants` still drives it.
   for (const [name, render] of variants) {
-    it(`${name} marks its responder accessible by default`, () => {
+    it(`${name} commits its responder at all`, () => {
       mount(ROOT_TAG, render(<view />));
-      expect(responderProps().accessible).toBe(true);
+      expect(responderProps()).not.toBe(undefined);
     });
   }
 
@@ -625,62 +628,18 @@ describe('React Touchable* accessibility default', () => {
   });
 });
 
-// `focusable` is the OTHER half of that fold and it does NOT compose the same way: RN gives
-// Pressable a one-leg default (Pressable.js:258) and the Touchables a three-leg one
-// (TouchableOpacity.js:336-340, TouchableHighlight.js:370-374,
-// TouchableWithoutFeedback.js:263-266), so the wrapper has to resolve it and hand the answer down.
-// Nothing computed it anywhere until 2026-09-09 — a disabled touchable stayed focusable, so a
-// keyboard or TV remote could land on a control that cannot be pressed.
-describe('React Touchable* focusable', () => {
-  function responderProps(): Record<string, unknown> {
-    const view = fabric.find(
-      n => n.viewName === 'RCTView' && n.props.pointerEvents !== 'box-none',
-    );
-    if (!view) throw new Error('no RCTView (Pressable responder) was created');
-    return view.props;
-  }
-
-  const variants: [string, (props: Record<string, unknown>) => ReactElement][] =
-    [
-      [
-        'TouchableOpacity',
-        p => (
-          <touchable-opacity {...p}>
-            <view />
-          </touchable-opacity>
-        ),
-      ],
-      [
-        'TouchableHighlight',
-        p => (
-          <touchable-highlight {...p}>
-            <view />
-          </touchable-highlight>
-        ),
-      ],
-    ];
-
-  for (const [name, render] of variants) {
-    // Leg 2, read off the APP's onPress — the handler the wrapper hands Pressable is always
-    // defined, so resolving one level down could never answer false.
-    it(`${name} stays out of the focus order without an onPress`, () => {
-      mount(ROOT_TAG, render({}));
-      expect(responderProps().focusable).toBe(false);
-    });
-
-    it(`${name} focuses once it has an onPress`, () => {
-      mount(ROOT_TAG, render({ onPress: () => {} }));
-      expect(responderProps().focusable).toBe(true);
-    });
-
-    // Leg 3, and the case a `focusable ?? computed` implementation gets wrong: `&&` means an
-    // explicit opt-IN still loses to `disabled`.
-    it(`${name} refuses focus while disabled, opt-in notwithstanding`, () => {
-      mount(
-        ROOT_TAG,
-        render({ onPress: () => {}, disabled: true, focusable: true }),
-      );
-      expect(responderProps().focusable).toBe(false);
-    });
-  }
-});
+// `focusable`'s six cases LEFT THIS FILE on 2026-09-18. RN gives Pressable a one-leg default
+// (Pressable.js:258) and the Touchables a three-leg one (TouchableOpacity.js:336-340), and that
+// three-leg form is `foldPressableProps`'s now, keyed off the tag — so the payload this harness
+// builds through the TypeScript `fabricProps` no longer carries it, and asserting on it here would
+// be asserting on the absence of a rule. They are
+// `core/engine/cpp/tests/js/touchable-focusable-payload.itest.ts`, read off a real commit.
+//
+// The middle leg is what had kept them here: `onPress !== undefined` is an OWNED name, stashed in
+// JS and never a prop, so no rule could see it. What crosses now is the EXISTENCE as one bit
+// (`OP_SET_OWNED_LISTENER`) while the callback stays in JS — a browser's own split, since a UA knows
+// which elements carry a click handler without the handler leaving the page.
+//
+// React contributes nothing to the resolution, which is why these could move rather than be
+// rewritten: its part is routing `onPress` through `setEventListener`, and every press case above
+// fails outright if it stops — a handler that never reached the stash does not fire.

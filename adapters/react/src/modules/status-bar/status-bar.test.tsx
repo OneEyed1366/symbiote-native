@@ -8,7 +8,10 @@ import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { StatusBar, mount, unmount } from '@symbiote-native/react';
 import { statusBarImperative } from '@symbiote-native/engine';
-import { installFabric } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 
 const BAR_STYLE = 'dark-content';
 const ROOT_TAG = 270;
@@ -66,7 +69,8 @@ function find(method: string): IRecordedCall | undefined {
   return recorded.find(call => call.method === method);
 }
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 beforeEach(() => {
   fabric.reset();
   recorded.length = 0;
@@ -76,7 +80,9 @@ afterEach(() => unmount(ROOT_TAG));
 describe('StatusBar (iOS)', () => {
   it('renders null — only the app View sits under the container', () => {
     mount(ROOT_TAG, <App />);
-    expect(fabric.serialize(fabric.appRoot().children)).toBe('RCTView');
+    const root = live.nodeOf(live.appRoot());
+    expect(root.children.map(child => child.viewName)).toEqual(['RCTView']);
+    expect(root.children[0].children, 'and it is empty').toHaveLength(0);
   });
 
   it('drives setStyle with the bar style and the animated flag', () => {

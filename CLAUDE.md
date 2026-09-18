@@ -596,9 +596,11 @@ Full incident record: `angular-adapter` skill §19.
 **zero** imports from `react-native` — a module we already carry as a `peerDependency` and that
 is therefore always present at runtime. Every one of those files re-derives by hand the corner
 cases of an implementation we already ship. It is the same mistake the CSS parser had before it
-was rebuilt around `lightningcss`, and it has already cost a real device bug (`process-transform`
-diverged from upstream on array input and crashed Android with
-`String cannot be cast to ReadableArray`).
+was rebuilt around `lightningcss`, and it has already cost a real device bug: `process-transform` crashed
+Android with `String cannot be cast to ReadableArray`. **The cause was the ABSENCE of the JS parse,
+not a divergence** - RN parses `transform` in JS only for a STRING, and we forwarded a raw string.
+This line read "diverged from upstream on array input" until 2026-09-10, which sends the next
+reader auditing the wrong branch.
 
 Measured against `react-native@0.86.0`, the candidates split cleanly:
 
@@ -627,6 +629,385 @@ re-runnable closure script: `.claude/skills/symbiote-rn-port-elimination`. Read 
 porting ANY further RN module by hand.**
 
 ## Where we stand against stock React Native (measured 2026-08-23)
+
+> ### !!! EVERY DEVICE NUMBER BELOW PREDATES THE BUFFER ARCHITECTURE. DO NOT READ IT AS CURRENT.
+>
+> The whole chapter — the table, every per-adapter column, every ratio against stock — was measured
+> on the **JS retained-tree** engine, the one `mutation-buffer.ts`'s header describes as replaced.
+> This branch (`feature/69-removing-shadow-tree`) moved the tree into C++ and the numbers MOVED WITH
+> IT. Device-verified 2026-09-17 across react, vue-sfc, angular, svelte and solid, and the direction
+> is not uniform:
+>
+> - **create-shaped rows REGRESSED** — `Create`, `Replace`, `Append`, `Swap`
+> - **update-shaped rows IMPROVED** — `Select` and its neighbours, everywhere
+>
+> So the buffer architecture did not pay off where it was expected to, and the gains it does show are
+> framework-level rather than architectural.
+>
+> ### The provisional replacement — THE WHOLE BENCHMARK SCREEN, headless (2026-09-17)
+>
+> The eight device steps, in the device's order, with the device's constants, driven through all six
+> renderers. One file per arm, one process per arm, one ten-node row, the census asserted by absolute
+> count on EVERY step before any millisecond is read. `pnpm run bench:itest`, one clean sitting:
+>
+> ```
+>               stock   react     vue   solid  svelte  angular      ratio = ours / stock
+> Create         93.4   114.4   131.7    99.9   114.9    253.9      1.22 1.41 1.07 1.23 2.72
+> Replace       101.5   117.2   152.8   110.9   127.1    283.2      1.15 1.51 1.09 1.25 2.79
+> Partial        11.3    10.4    12.3     7.3     8.2     10.2      0.92 1.09 0.65 0.73 0.90
+> Select         12.9    13.8    12.9    15.4    11.8     19.3      1.07 1.00 1.19 0.91 1.50
+> Swap           15.5    22.4     5.1     5.5     5.0      8.3      1.45 0.33 0.35 0.32 0.54
+> Remove         16.8     4.1     4.5     8.2     4.4      8.0      0.24 0.27 0.49 0.26 0.48
+> Append        122.5   117.0   142.0   105.9   121.1    271.3      0.96 1.16 0.86 0.99 2.21
+> Clear          10.0    11.1    41.0   409.1    19.1     44.1      1.11 4.10 40.9 1.91 4.41
+> ```
+>
+> **The first behavior port is in these numbers** (2026-09-17). `text-input`'s prop resolution — the
+> W3C aliases onto RN's own names — moved out of a JS `payloadFold` and into the engine
+> (`foldTextInputAliases`, `SymbioteFabricProps.cpp`). The signature is exact and the control is
+> React, which never had the fold:
+>
+> ```
+>  arm      walk before   after    folds     create before -> after
+>  react       26.8        26.8      0 -> 0   115.2 -> 114.4    the control, flat
+>  vue         41.3        26.4   1000 -> 0   143.6 -> 131.7
+>  solid       41.0        26.8   1000 -> 0   107.7 ->  99.9
+>  svelte      42.2        26.5   1000 -> 0   124.3 -> 114.9
+>  angular     41.9        26.0   1000 -> 0   265.2 -> 253.9
+> ```
+>
+> Every adapter's walk converged on React's, which is what "the fold was the whole difference" looks
+> like when it is true. Solid is now 1.07x of stock on `Create`.
+>
+> WHY IT COULD MOVE, and the criterion is the browser's rather than "is it expressible as data":
+> mapping `inputMode` onto `keyboardType` is what Blink does for `<input>` — a property of the
+> PLATFORM, not of any app, framework or component instance. The machine stayed in JS (the
+> controlled-value handshake, the event-count acknowledgement, autofocus) because it runs at gesture
+> rate and calls back into app code, which is where a browser keeps it too.
+>
+> **NO TWIN**, and that is what the port is for: `fabric-props.ts` did not get a copy. The contract is
+> `core/engine/cpp/tests/js/text-input-payload.itest.ts`, which reads the payload the commit actually
+> sent through `committedPayloadOf` — the harness read added the same day, without which this rule
+> would have been unverifiable in its new home. Seventeen assertions across six vitest files moved
+> there; one of them, React's `submitBehavior="submit"` case, would have gone GREEN on an unfolded bag
+> and is the reason a passing test is not proof that its rule still runs.
+>
+> The JS that went with it: `ALIAS_ONLY_KEYS`, two narrowing helpers, and the per-tag closure the two
+> registrations needed — `text-input` and `text-input-multiline` now share one behavior object,
+> because `multiline` was the only thing they did not share and the engine reads it off the component
+> name instead.
+>
+> The fixtures are `core/engine/cpp/tests/js/{stock,react,vue,solid,svelte,angular}-suite.itest.*`,
+> all six driven by one `bench-suite.ts` that owns the state machine, the steps and the oracle. A
+> seventh arm — the engine's own mutation API with no reconciler above it — is not here;
+> `update-shapes-cost.itest.ts` is that floor and it is unchanged.
+>
+> ### The SECOND port — `pressable` — and the wire slot it needed (2026-09-17)
+>
+> `disabled` folding into `accessibilityState`, `accessible`/`focusable` defaulting on, the Android
+> ripple config, and the nine machine-only props being kept out of a payload no ViewConfig declares:
+> all of it is `foldPressableProps` in `SymbioteFabricProps.cpp` now, and `pressable.ts` keeps no
+> `foldPayload`. Same criterion as text-input — `Pressable.js` does this for every Pressable in every
+> app, so it is the platform's and not any app's.
+>
+> **IT COULD NOT MOVE THE WAY TEXT-INPUT DID, and that is the reusable part.** That rule keys off the
+> Fabric view name, which already crossed: `RCTSinglelineTextInputView` names nothing else. A
+> pressable commits as `RCTView` — byte-identical to a plain view — so nothing on the native side
+> could tell them apart. The missing fact was the TAG, which JS knew at `createElement` and kept.
+>
+> So the tag crosses now, once, as `OP_SET_TAG`, emitted from `attachHostBehavior` for the nodes a
+> behavior actually attached to and no others. That is the browser's arrangement rather than a
+> workaround: an element knows what tag it is, and its user-agent behavior follows from that rather
+> than from whatever view its layout engine allocated. **Every remaining behavior port rides on this**
+> — it is what makes a tag-keyed rule possible at all.
+>
+> **THE RULE SERVES THREE TAGS, because three tags ARE a pressable in RN's own terms**:
+> `pressable`, `touchable-opacity` (a pressable plus a fade), and `button` (a touchable plus a label —
+> `TouchableOpacity` on iOS, `TouchableNativeFeedback` on Android, `Button.js:283`). All three
+> composed the same JS function before it moved; `usesPressableRule` is the record of that.
+> `touchable-highlight` is deliberately absent and always was — its behavior REPLACES the fold rather
+> than composing it, so it has never carried the machine-key strip. That is a gap in it, not here.
+>
+> **THE EIGHT-STEP SUITE CANNOT SHOW THIS PORT, and quoting it would be quoting nothing.** Those arms'
+> row is the device row with its two `<Pressable>`s spelled as plain `view`s, so `folds` reads 0 on
+> every arm whether or not the rule moved. The A/B is `pressable-fold-cost.itest.ts` instead — one
+> process, one tree, two tags: `pressable` (the rule in C++) against a tag registered in that file
+> with a `payloadFold` doing the identical work, with the two payloads asserted EQUAL key by key
+> before any millisecond is read. `build-release`, three consecutive runs, 1 000 pressables:
+>
+> ```
+>  native walk   5.6  5.7  5.8 ms    folds=0
+>  js     walk  28.6 28.4 28.3 ms    folds=1000      ~22.7 us per node per commit
+> ```
+>
+> The rule is ~5.7 ms; the CROSSING was ~23 ms, four times the work it carried. Same shape as
+> text-input's ~17 us on a smaller bag, and the reason a fold's price is the trip and not the function.
+>
+> **TWO TRAPS THE PORT SET, and they generalise to every port after it.** A tag rule runs BEFORE the
+> JS fold, so a JS fold that reads a key the rule STRIPS now reads it gone: `touchable-opacity`'s
+> `focusable` and `button`'s `projectionOf` both read `disabled` out of the bag, and both would have
+> resolved every disabled control as focusable — a focus-order bug visible on a TV remote and in no
+> test that reads props. Both now read the NODE. **Anything a JS fold needs after a tag rule has
+> stripped it must come from `propsOf(node)`, not from the bag.**
+>
+> And the composition was load-bearing in a way the type system did not protect: `button`'s owner fold
+> called `touchable.foldPayload?.(props)` through an `undefined` check, so deleting the function would
+> have silently dropped Button's whole accessibility half with every test still green.
+>
+> **ONE COVERAGE GAP, recorded rather than hidden.** The ripple's Android branch is `#ifdef ANDROID`
+> and this host is not Android, so `nativeBackgroundAndroid`'s shape is now asserted nowhere headless.
+> `core/components/src/behaviors/ripple-android.test.ts` used to do it by mocking `Platform.OS`; what
+> it mocked was a JS function that no longer exists. The same already applies to text-input's
+> `underlineColorAndroid` and its `search` keyboard split, which makes it a PROPERTY of porting a
+> platform-split rule: a compile-time branch is only testable in a build that compiles it. Closing it
+> means an Android arm of the test host, not a mock.
+>
+> **CLOSED LATER THE SAME DAY — the arm exists, and all three gaps are now written.** `pnpm run
+> test:android`, and the ripple's dict, its foreground slot and its null colour are asserted on the
+> committed payload there. See "The test host has an ANDROID ARM now". `underlineColorAndroid` (its
+> default AND that an authored value beats it) and the `search` keyboard split followed within the
+> hour — three cases, each BREAK-TESTED by flipping its branch in `SymbioteFabricProps.cpp` and
+> confirming it went red alone, because a guard that has never failed is one you are only hoping
+> works. The iOS arm already asserted both NEGATIVES (`underlineColorAndroid` absent, `search` ->
+> `web-search`), so the two arms are twins rather than one side of a split.
+>
+> ### The THIRD port — `switch` — and the first whose authored names are ALL invented (2026-09-18)
+>
+> `trackColor`, `thumbColor` and `ios_backgroundColor` are not Fabric props at any point. RN's Switch
+> view declares `onTintColor`/`tintColor` on iOS and `trackColorFor*`/`trackTintColor` on Android,
+> plus `thumbTintColor` on both — and `ios_backgroundColor` is not a prop at all, it is a STYLE
+> (`Switch.js:266-276`: a background plus a 16pt radius so the pill shows through the track). A
+> wrapper body took those per-platform NAMES from an adapter-supplied table; a tag has no adapter to
+> ask. `foldSwitchProps` in `SymbioteFabricProps.cpp` now, keyed off the tag; `switch.ts` keeps the
+> snap-back machine and no fold.
+>
+> **THE TWO RULES ARE NOW PRICED ON ONE RULER**, in one file, one process, one sitting —
+> `tag-rule-cost.itest.ts`, which replaced `pressable-fold-cost.itest.ts`. Each rule runs on BOTH
+> arms and the payloads are asserted equal key by key before any millisecond is read, so the only
+> difference left is the crossing. `build-release`, three consecutive runs, 1 000 nodes per commit:
+>
+> ```
+>             native walk          js walk             per node
+>  pressable  4.7  3.9  4.1 ms     18.9 18.5 18.7 ms   ~14.5 us    folds 0 against 1000
+>  switch     5.1  5.1  5.7 ms     23.9 24.3 24.4 ms   ~18.9 us    folds 0 against 1000
+> ```
+>
+> The pressable row read 5.6/28.6 when measured alone on a busier machine. Both are real and neither
+> is the other's before/after — that is exactly why they were re-measured together.
+>
+> ### The FOURTH port — `image` — and the first rule that does NOT move whole (2026-09-18)
+
+`srcSet` > `src` > `source` precedence, the W3C header decoration (`crossOrigin`/`referrerPolicy`),
+the `width`/`height` fold into style, `alt` becoming `accessibilityLabel` + `accessible`,
+`resizeMode`/`tintColor` falling back to style keys, `loadingIndicatorSource` plucked down to a bare
+uri: all of it is `foldImageProps` in `SymbioteFabricProps.cpp` now, contract in
+`image-payload.itest.ts`.
+
+**ONE STEP COULD NOT CROSS, and naming why is the reusable part.** `resolveAssetSource` turns the
+number `require('./logo.png')` returns into a `{uri, width, height, scale}` by asking METRO'S ASSET
+REGISTRY — a JS table populated at bundle time. There is no such table in C++ and there should not
+be: it belongs to the bundler, not to the platform.
+
+So the lookup moved EARLIER instead of across. `routeProp` resolves the three source props on the
+way IN (`core/engine/src/image-source-write.ts`), which is the seam and the argument
+`structured-style.ts` already established for `boxShadow`/`filter`/`transform`: **a value resolved
+at payload-build time is resolved HEADLESS ONLY**, because the C++ builder has no JS to call, and
+the device then commits the raw input for Fabric to drop in silence. By commit time the bag holds
+resolved sources and the rest of the rule is pure. **This is the pattern for every remaining port
+whose rule touches something only JS knows.**
+
+It is gated on the NODE (`resolvesImageSources`, declared by the behavior, one boolean read per
+write beside `hasCommitHook`) rather than on the key, because the resolution normalises to Image's
+ARRAY shape and a `WebView` or a third-party video view spells `source` too.
+
+**NO TWIN, and this is the port that had to earn it.** `mapImageProps` had a second caller — Angular's
+`<Image>`, whose typed `@Input()`s meant it folded in a component body rather than writing props on
+a tag. `renderImage` is a GATHER now: it flattens the typed view back into the bag an app would have
+authored and names the `image` tag, and the engine folds once for every adapter. Six helpers went
+with the rule (`normalizeSource`, `headersFromAliases`, `expandSrcSet`, `resolveSourceArray`,
+`readStyleString`, `readSourceUri`), and `render-image.test.ts` went from ~70 fold assertions to
+four about what `renderImage` still decides.
+
+**`image-background` now BUILDS ITS INNER IMAGE WITH THE TAG, which is the reverse of what it did.**
+It used to withhold the tag so the node would not get Image's `payloadFold` — a single slot it
+needed for its own derived style — and call the mapping by hand. The mapping is reached off the tag
+now, so the tag is how that node gets a platform half at all, and the JS slot is free for the
+COMPOSITION, which is where the browser model wants it. `registerImageBackgroundBehavior` calls
+`registerImageBehavior` as a result: a real dependency, declared rather than assumed, and the kind
+that would otherwise surface first on a device.
+
+**Two things fall out of it, both recorded rather than smoothed over.** A style `resizeMode` beats
+the PROP, where RN's `??` says the opposite — and the fold is not why: `fabricProps` writes the
+top-level keys and THEN hoists the style over them, so the `??` is dead for exactly the two keys
+that can appear in both places. Pre-existing, survives the port unchanged because the hoist order is
+the payload builder's rather than the rule's, pinned as characterization. And the inner image's own
+`width`/`height` props now beat the proxied box size where RN nests it the other way — left that
+way deliberately (RN's own comment calls its nesting a "Temporary Workaround", an explicit prop
+winning over an inherited box is the less surprising reading, and reproducing it would need either a
+JS copy of the rule or a per-node fold-ORDER knob in the payload builder).
+
+**All three ported rules, on one ruler** — `tag-rule-cost.itest.ts`, one process, one sitting, each
+rule run on BOTH arms with the payloads asserted equal key by key first, best-of-4 per arm:
+
+```
+            native walk          js walk             per node
+ pressable  4.1  4.3  4.3 ms     20.6 21.6 23.1 ms   ~17 us
+ switch     5.6  5.5  6.0 ms     27.1 38.4 28.8 ms   ~26 us
+ image      6.9  7.3  7.8 ms     32.2 38.2 33.3 ms   ~27 us
+```
+
+The crossing was four to five times the rule in every case, and **the bigger the bag the worse the
+ratio** — which is why image, whose rule touches the most keys, was the most expensive to have had
+in JS. Read the native column as a measurement and the JS column as a floor: a JS fold allocates, so
+its cost carries GC that best-of-N cannot suppress.
+
+### A small-ms scaling test needs BEST-OF-N, not one sample (2026-09-18)
+>
+> `child-list-scaling.itest.ts` reads a doubling FACTOR rather than a millisecond, which is the right
+> instrument for a complexity claim — and it was failing intermittently under the full suite while
+> passing in isolation, twice costing a false alarm on a test with no defect.
+>
+> The cause is scale plus parallelism: a 1 000-wide clear is ~0.45 ms on the assert build, and the
+> runner spawns a process per test file (62 of them), so a sample can be descheduled for longer than
+> the thing being measured. **Timing noise is one-sided — it only ever ADDS — so the MINIMUM of
+> several runs is the closest reading to the work itself, while a mean carries every interruption
+> into the ratio.** Five samples per width, a fresh list for each (a cleared list has nothing left to
+> remove, and re-timing the same one reports a beautifully flat curve for the wrong reason). Bounds
+> unchanged; only the sampling. The insert row went from a spread to a dead-flat 3.77x.
+>
+> **THREE DIVERGENCES FROM RN FELL OUT OF READING `Switch.js` TO PORT IT, and all three are now
+> FIXED — in the commit AFTER the port, so the move and the correction each have their own before and
+> after.** A port is a MOVE; folding a correctness change into it makes the measurement and any
+> future regression unattributable.
+>
+> - `accessibilityRole` defaults to `'switch'` on both platforms (`Switch.js:255,293`). We emitted
+>   nothing, so a screen reader announced our switch as a plain view — the same class of silent gap
+>   `accessible`/`focusable` were on Pressable before 2026-09-09. `??`, so an app that calls it a
+>   checkbox keeps its answer.
+> - iOS composes `{alignSelf: 'flex-start'}` UNDER the app's style (`:266`), so a stock Switch keeps
+>   its intrinsic width. Ours stretched. UNDER is the whole of it — `alignSelf: 'stretch'` still
+>   wins — and the composition is iOS's alone: `:263-281` is the `else` branch, so Android's style is
+>   the app's untouched and `ios_backgroundColor` is not read there at all.
+> - Android's native component is a DIFFERENT one with different prop names — `on` and `enabled`
+>   (`:240-243`), never `value`/`disabled` — `_disabled` falls back to `accessibilityState.disabled`
+>   and is written back into it (`:232-238`), and the iOS colour names are destructured OUT (`:230`).
+>   We sent the iOS names on both platforms, so an Android switch painted from nothing and could not
+>   be disabled.
+>
+> **AND THE ANDROID HALF IS TESTABLE HEADLESSLY, because the branch is the VIEW NAME rather than
+> `#ifdef ANDROID`.** `Switch` and `AndroidSwitch` are genuinely two Fabric components with two prop
+> surfaces, and the name is already on the wire — so `foldSwitchProps` reads it and a test can ask
+> for either. That is strictly better than a compile-time branch and it is the shape to prefer
+> wherever a platform difference has a name: the ripple in `foldPressableProps` stays `#ifdef`
+> precisely because it has no such tell, an `android_ripple` sitting on an ordinary `RCTView`.
+>
+> **The A/B guard earned its keep the same hour.** `expectSamePayload` refuses to time two arms that
+> send different bags, so the corrected rule turned `tag-rule-cost.itest.ts` red the moment it landed
+> — a measurement that would otherwise have compared the new rule against the old one and called the
+> difference a speed-up.
+>
+> **One latent C++ bug came out of it, found by needing two values at once.** `boolAt` returned a
+> `const bool *` into a single `static thread_local` slot, so any two results held simultaneously
+> aliased — the second read rewrote the first. Nothing had ever needed two, so nothing was wrong;
+> Android's `disabled` beside `accessibilityState.disabled` is the first caller that does, and it
+> would have resolved every switch through whichever was read last. It returns `std::optional<bool>`
+> now, and all five call sites moved with it.
+>
+> **AND ONE HAZARD CLOSED BY CONSTRUCTION.** The adapters used to pin that `onTintColor` reaches
+> Fabric as a PROP rather than being mistaken for a listener, because `routeProp` asks the Switch
+> ViewConfig instead of guessing from the `on` prefix. The engine writes that name straight into the
+> payload now, so `routeProp` never sees it; the only name it sees is `trackColor`.
+>
+> **This confirms the device report, and sharpens it.** The old table had Solid 0.76x, Svelte 0.80x
+> and Vue 0.89x on Create — all UNDER stock. Here **every adapter is over stock on both create-shaped
+> rows**, while `Swap` and `Remove` are 3-5x WINS for everyone but React. That is exactly the split
+> the device screenshots showed: create-shaped regressed, update-shaped improved.
+>
+> **`Append` is the one create-shaped row that did not regress**, and it separates the two costs: the
+> row count is identical to `Create`'s but the list already stands, so the four lighter adapters land
+> at 0.93-1.19x where `Create` puts them at 1.18-1.57x. Stock pays more for appending than for
+> creating (125.4 against 91.6) and we pay the same for both.
+>
+> **`Solid`'s `Clear` at 394.9 ms is the largest single anomaly this project has measured and it is
+> NOT the engine.** The engine's own halves read `walk=0.3 apply=13.3` — 3% of the wall — with
+> `created=0 cloned=2`. Reproduced four times across two different state spellings (394.9 / 395.1 /
+> 399.1 / 415.9), so it is not noise and not the store. Everything else clears in 9-44 ms.
+> `adapters/solid/src/renderer.ts`'s `getParentNode` comment already records "an increasingly slow
+> Clear on the benchmark screen" as a bug that path once had; this is the next thing to chase.
+>
+> WHAT THIS TABLE IS, said plainly so nobody reads it as the device's: JavaScriptCore rather than
+> Hermes, the native side a test host rather than a real Fabric pipeline, and no app-level Babel
+> lowering applied by the runner — the arms are written as intrinsic TAGS, which is the lowered shape,
+> but an SFC's static-prop hoisting and patch flags are not modelled. It is a sound comparison of the
+> six columns AGAINST EACH OTHER, taken on one ruler in one sitting. Treat a ratio against stock as
+> indicative and re-measure on device before publishing one.
+>
+> **THE SPELLING OF STATE MOVED TWO COLUMNS MORE THAN ANY ENGINE CHANGE HAS**, which is the finding
+> that came free with building this. Every arm replaces the whole list on every step, so the reactive
+> primitive has to be a SHALLOW one, and the device screens all spell it that way:
+>
+> ```
+>  arm     wrong spelling          right one            what it cost
+>  svelte  $state (deep proxy)     $state.raw           create 160.8 -> 124.3, and a flat ~20 ms on
+>                                                       EVERY mutation step (select 30.1 -> 12.3)
+>  solid   createSignal, replaced  createStore +        partial 16.7 -> 7.8, and `created` 1000 -> 0:
+>          wholesale               reconcile({key:'id'}) `<For>` was rebuilding every row it re-keyed
+> ```
+>
+> Both were measured, not reasoned about, and both are app-author mistakes rather than adapter ones —
+> but they are the mistakes a real developer makes, and they dwarf everything in the perf chapter
+> below. Vue's arm uses `shallowRef` and Angular's a `signal` over the same replaced object for the
+> same reason.
+>
+> Three provenance notes that belong with the census. The adapter arms commit ONE more `View` than
+> stock (the container `createSurface` puts under the RootView; stock's `render` mounts straight into
+> the root) and Svelte commits TWO more (its DOM shim's own root wrapper, `createRootShimElement`) —
+> named rather than fitted, and asserted on every step. The Angular row needs
+> `registerComposedComponent('BenchRow')` or its component host falls through to a raw `createNode`
+> and the row commits ELEVEN nodes; on device a Babel plugin injects that call, the itest runner does
+> not run it. And `setProps` differs per adapter for one identical tree — vue/solid 10 000,
+> react 12 000, svelte/angular 13 000 — which by the benchmark screen's own rule is work the ADAPTER
+> generates, not a cost of the platform. That is the cheapest open lead on this page.
+>
+> **HALF OF THAT LEAD IS CLOSED (2026-09-18), and the counter is where it shows.** Re-run after the
+> `foldHostBag` deletion and the Text-defaults collapse, same fixture, same tree:
+>
+> ```
+>            before   after
+>  vue       10 000   10 000     unchanged
+>  solid     10 000   10 000     unchanged
+>  angular   13 000   13 000     unchanged
+>  react     12 000    9 000     -3 000
+>  svelte    13 000   10 000     -3 000
+> ```
+>
+> React and Svelte are exactly the two adapters whose CREATE path ran `foldHostBag` over
+> `HOST_PRIMITIVES[*].defaults` (`react/src/host-config.ts`, `svelte/src/dom-shim/element.ts`), and
+> the other three are unchanged in the way their own removals predict: Angular's `applyTextDefaults`
+> returned early unless one of the two props was authored, and Vue's `textDefaultFor` and Solid's
+> `foldTextValue` sat on the PATCH path, not create. So every column moved, or did not, for a reason
+> named in advance.
+>
+> **It is an inference from a coincidence, not an isolated A/B**, and the honest weight is that the
+> delta lands on exactly the predicted two adapters at exactly 3 000 each. No wall-clock verdict is
+> claimed: this fixture's per-arm spread is far wider than three thousand writes could move.
+>
+> What is LEFT of the lead is Angular's 13 000 against Solid's 10 000 — three per row, still
+> unenumerated, and now the whole of it. And React at 9 000 is BELOW vue/solid for the first time,
+> which is a new question rather than an answer.
+>
+> **What this invalidates, concretely.** Any cross-check of a headless measurement against a device
+> figure taken from this chapter is comparing two different engines. The `Swap` work below does
+> exactly that — it reads a headless 2.42x against "3.68x on device" — and that pairing is void: the
+> headless arm is this branch, the 3.68x is the old one. The headless numbers themselves stand, being
+> measured directly; only the device column they are read against is stale.
+>
+> `README.md`'s published table has the same provenance. It describes the RELEASED packages, so it is
+> not wrong today — it becomes wrong the moment this branch lands, and must be re-measured first.
+>
+> Everything below is kept because the METHOD in it is sound and hard-won — read the counters before
+> the milliseconds, one ruler per comparison, no verdict off a small-ms row. The METHOD transfers;
+> the numbers do not.
 
 `examples/bare-rn` is plain react-native 0.86 on React's own Fabric renderer, with a port of the
 same benchmark screen and the same 20 measurement constants — the baseline the adapters are read
@@ -1245,6 +1626,1825 @@ counters are clean, so the cause is above it.
 Open work, priority order, and the per-adapter detail (React is an outlier three times over —
 `Swap`, `Remove`, and the whole virtualized column — against its own siblings on the same engine):
 `symbiote-perf-measurement`, "The stock-React-Native baseline".
+
+### Headless measurement runs on `build-release`, and the assert build's SHAPE is wrong
+
+```
+pnpm run test:itest    # correctness — asserts ON, the reason this harness exists
+pnpm run bench:itest   # timings — NDEBUG + -O, with RN_ENABLE_DEBUG_STRING_CONVERTIBLE kept ON
+```
+
+That `core/engine/cpp/tests/build` is Debug with no `-O` was already known and already caveated. What
+was not: `NDEBUG` off also defines `REACT_NATIVE_DEBUG` (`ReactCommon/react/debug/flags.h`), and that
+compiles `ensureYogaChildrenLookFine` + `ensureYogaChildrenAlignment` into
+`YogaLayoutableShadowNode::appendChild` — each walks the parent's whole child list, so building an
+N-child list one append at a time is **O(N²) there and O(N) in the build that ships**. Measured
+2026-09-17: 10 000 appends onto one parent, 3 554 ms on the assert build against 27 ms optimized.
+
+It put `materialize` at 61% of a create when it is ~27%, and reported an O(N²) in list width that
+does not exist off the harness. **A number whose ORDER is right and whose SHAPE is wrong survives
+review**, which is what makes this worse than no number. Both readings were published before the
+second build existed.
+
+### A create, fully attributed (10 003 nodes, `build-release`, 2026-09-17)
+
+```
+fill    24   ours, JS      prop writes 12 · appendChild 5 · creates 6
+apply   16   ours, C++     decode 4 · setProp 1.5 · structure 1.2 · rawtext ~3 · op loop ~6
+commit  34                 materialize 24 (of which UIManager::createNode 17) + Fabric commit 8.5
+total   74                 0.90x of a bare-`nativeFabricUIManager` driver doing nothing else
+```
+
+The floor arm is `core/engine/cpp/tests/js/raw-fabric-vs-engine.itest.ts`: the same tree built
+through `createNode`/`appendChild`/`completeRoot` with no retained tree, no diff, no buffer. It sits
+BELOW React's own renderer, which still runs a fiber tree and builds every payload through
+`ReactNativeAttributePayload` — so "are we worse at driving Fabric than React" is answered a
+fortiori, and the answer is no.
+
+### One visual selection, two spellings, 6.5x apart — and nothing in the app can see it
+
+`canReplaceInPlace` refuses a clone that is not layout-clean (F-51), so whether a selected style
+keeps the row's layout properties decides whether the commit rewrites one slot or hands Fabric the
+whole child list. Measured on a standing 1 000-row list
+(`core/engine/cpp/tests/js/update-shapes-cost.itest.ts`):
+
+```
+                          wall    walk   Fabric   layout   targetedReplaces
+paint-only selection       0.4     0.2      0.0      0.0          2
+drops one paddingLeft      2.6     0.9      1.5      1.4          0
+```
+
+Both paint the same screen. **Write a selected style as the base style plus the paint properties, not
+as its own object** — an independently written selected style drops the fast path by omitting a
+padding, silently. The engine is not wrong here and there is nothing to fix in it: a genuine layout
+change must re-measure. The cost is the authoring spelling, and it is invisible to every other test.
+
+Update shapes otherwise behave: a select clones 3 nodes and reuses 1 003, a partial update of every
+tenth row clones 302, `clear` walks 0.1 ms. The expensive update is `append` (73 ms for 1 000 rows
+onto a standing 1 000), and it is create-shaped — 10 000 `createNode`s plus a Yoga pass over 2 000
+rows.
+
+### The reconciler is 40% of a React create, and it is React's — measured, not assumed
+
+Every headless number above builds the tree by calling the engine's own mutation API. The layer above
+it had never been measured here, which matters because the engine is already BELOW the floor of a
+zero-cost driver — so a create that got slower cannot have got slower there.
+`core/engine/cpp/tests/js/adapter-create-cost.itest.tsx` builds the identical ten-node row both ways
+in one process and asserts the committed node counts match before reading any millisecond:
+
+```
+engine's mutation API directly    67-75 ms      walk 24-28   apply 43-49
+the same tree through React      115-120 ms     walk 23      apply 43
+delta                             45-48 ms      1.6-1.7x
+```
+
+**The engine's own two phases do not move between the arms** — same tree, same work, and that is
+asserted rather than observed. The 45-48 ms is fibers, and ~4.8 us per node of it. So for the React
+adapter, engine work is 58% of a create and further engine optimization has a hard ceiling; for
+Vue/Svelte/Solid, whose reconcilers are far lighter, the same engine is most of the cost, which is
+why those three beat stock on create-shaped rows and React sits at parity with it.
+
+One hypothesis was checked and is a NEGATIVE result, recorded so it is not rebuilt: `foldHostBag`
+copies the props bag to seed an absent default, so every `<Text>` that does not spell
+`allowFontScaling` — which is nearly all of them — allocates a copy. Three thousand of them on this
+screen cost 0.8-5.4 ms of ~116, inside the spread of the arm it is compared against.
+
+### A fold is charged for EXISTING, not for what it does — the one that did nothing cost 10.7 us/node
+
+Four tag rules priced on one ruler, `build-release`, three runs, a thousand nodes per commit
+(`core/engine/cpp/tests/js/tag-rule-cost.itest.ts` — both arms the same tree in the same process,
+payloads asserted equal key by key before any millisecond is read):
+
+```
+             native walk   js walk    per node   the bag / what the rule does
+ content        2.8         11.1        8.6 us   3 + a 2-key style / READS ITS PARENT
+ imagebg        2.9         12.2        9.7 us   2 + a 3-key style / writes ONE key
+ spinner        3.8         14.6       10.7 us   4, no style / the MOST work in the file
+ accessory      3.4         14.8       11.4 us   4 / nothing at all
+ button         4.1         16.8       12.4 us   5 + a 2-key style
+ pressable      3.7         17.8       14.8 us   4 + a 3-key style
+ scroll         4.2         19.1       15.4 us   4 + a 2-key style / the BIGGEST rule
+ switch         4.8         23.9       19.6 us   6 + nested trackColor
+ image          5.9         27.6       22.9 us   6 + what the rule BUILDS
+ bgimage        7.5         36.9       30.6 us   6 + a 3-part style / TWO rules, READS ITS PARENT
+```
+
+`scroll` is the fourth point on the experiment and the one that closes it: its rule is the biggest in
+the file — compose a base style, default a flag, strip the axis, resolve an asymmetric pair, erase two
+keys, map a word to a friction constant — and it lands mid-table beside `pressable`, whose rule does
+far less over a bag of the same size.
+
+**The top three rows are a deliberate experiment, not three ports that happened to be cheap.** Their
+rules do, in order: almost nothing (one key written), the most work in the file (builds a style
+object, resolves a size two ways, writes two defaults, picks a colour), and literally nothing at all.
+They land within 1.4 us of each other.
+
+So the cost model for a fold is **bag in, bag out, body free** — the column orders by what has to be
+marshalled, with the dearest row dear because its rule CREATES keys that then travel back. Two
+consequences worth keeping: a trivial fold over a large bag is the worst value available, and
+DELETING a fold that does nothing is worth as much as porting one that does a lot.
+
+### A rule may read its PARENT — `ownerProps`, and "a per-node rule cannot reach another node" was wrong
+
+Three iterations of this migration recorded that ScrollView's content fold, ImageBackground's image
+fold and the two clone-folds must stay in JS because "a per-node rule cannot reach another node".
+That was true of the JS FOLD shape and false of the engine: **the tree lives in C++, so a node
+already knows its parent.** `fabricProps` now takes `ownerProps` from `node.parent`, and a rule that
+is DERIVED from the node above reads it there. (The two clone-folds needed one thing more than this
+— the parent's TAG, to be dispatched at all — and moved the same day; see "A rule may key on its
+PARENT'S TAG".)
+
+ScrollView's content rule is the first user, which takes the whole primitive to **zero crossings on
+both nodes**. Its two halves are why it was the right one: the row direction is a constant of the
+content node's OWN tag (portable all along), and `collapsableChildren` comes from
+`maintainVisibleContentPosition` / `snapToAlignment`, which stay on the scroller.
+
+**The boundary did not move, only the reading of it.** A rule may read another node's PROPS —
+declarative, present at commit time. It cannot read live JS state (`stickyFold`'s `translateY`) or
+anything a framework computes per render. That is the browser model's own line: a UA rule sees the
+tree, not the application's closures.
+
+**AND "ANOTHER NODE" MEANT "AN ANCESTOR" FOR A DAY LONGER THAN IT SHOULD HAVE.** This paragraph said
+"the parent's PROPS", and three separate notes then cited direction as if it were the boundary —
+ScrollView's Android wrap reads DOWNWARD and was recorded as unportable three times over. Nothing in
+the argument above mentions a direction: the tree is in C++, so any node is a pointer hop. See "A
+rule may read its CHILD".
+
+**This list used to carry a third entry — an owned LISTENER — and it was wrong.** See the section
+below: a listener is two facts wearing one word, and only one of them is the application's.
+
+**Reading a parent costs nothing measurable** — `content` has the CHEAPEST native walk in the cost
+table (2.8 ms) while being the first rule that does it. A pointer hop on a tree already in memory,
+against a JS closure plus a crossing for as long as the fold lived on the far side.
+
+**ImageBackground's inner image is the SECOND user, and the pair settles what `content` alone could
+not.** `content` reads its owner while doing almost nothing, so its cheapest-of-nine walk could have
+been the rule's smallness rather than the read's cheapness. `bgimage` puts the same read inside the
+most expensive rule in the file — its tag runs `foldImageProps` AND `foldImageBackgroundImageProps`,
+so it carries image's whole bag plus a three-part composed style, and it is the dearest row at
+30.6 us/node. Subtract the two native walks and the read isolates: **`bgimage` 7.5 minus `image` 5.9
+is ~1.4 us per node for the parent read plus the style it builds.** Cheap whatever surrounds it.
+
+That takes the primitive to **zero crossings on both nodes** — the owner shed its fold when the Smart
+Invert opt-out moved, and the image was the last one. It also needed a TAG of its own
+(`image-background-image`, served by `usesImageRule` as well), because a bare `<image>` must not get
+an absolute fill; and that tag needs its own registration carrying `resolvesImageSources`, since the
+flag is looked up by tag and without it an ImageBackground would commit the raw asset NUMBER.
+
+One failure mode is new and has its own case on both users: a rule that reads its parent runs when
+THIS node is dirty, so a late write to the owner must mark the child dirty or the rule never re-reads
+it — here the box would freeze at its first size while the background visibly resizes around it.
+`slotDerived` already named the props, so it worked, and it worked for the JS fold for the same
+reason. The seam did not change the requirement; nothing said so out loud until it was asserted.
+**Verified by breaking it** — commenting out `slotDerived` turns both re-derive cases red.
+
+### A listener's EXISTENCE is the platform's; only its BODY is the app's — `OP_SET_OWNED_LISTENER`
+
+`focusable` on a touchable is `focusable !== false && onPress !== undefined && !disabled`
+(`TouchableOpacity.js:336-339`). Two legs are ordinary props. The middle one is an app callback, and
+on one of our tags `onPress` never becomes a prop at all — `setEventListener` diverts a name the
+behavior OWNS into a JS stash, because `node.listeners` is single-slot and the behavior's own
+dispatcher holds it. So this one key kept a per-node fold alive on `touchable-opacity` and
+`touchable-highlight` after every other rule had moved, and three places in this repo recorded it as
+unportable.
+
+**The browser settles it, not taste.** A UA computes focusability itself, and it can, because
+`addEventListener` is the UA's own API: the browser knows which of its elements carry a click
+handler while the handler's body stays the page's. Same split here — one bit crosses per flip as
+`OP_SET_OWNED_LISTENER`, the closure never leaves JS, and `foldPressableProps` resolves the whole
+expression off the node.
+
+**A FLIP IS A MOUNT-TIME EVENT**, which is what makes the op affordable: the engine already refuses
+to notify on listener IDENTITY (a framework hands a fresh closure nearly every render), so this
+fires when a handler appears or disappears and at no other time. Against a fold charged on every
+commit its node was dirty in — and `touchable-focusable-payload.itest.ts` measured `foldsFound` **5**
+for a SINGLE mounted touchable, not 1, because the opacity settle re-commits the node before it
+comes to rest. So the saving is ~5 trips per touchable at mount.
+
+The tag-rule ruler is unmoved by it (`pressable` native walk 3.6-3.7 ms against 3.7-3.9 before),
+which is the expected answer for an op that runs at mount and not in the walk.
+
+**Scope as it stood that hour, and BOTH of its exceptions expired the same day** — kept because the
+wording is a worked example of the mistake this page keeps making. It read: `touchable-opacity` is at
+ZERO folds; `touchable-highlight` keeps one for its UNDERLAY, "which is built from live press state
+(`shown` flips inside a gesture) and is the genuine unportable article"; `button` keeps its own for a
+three-way `disabled` and its Android view style.
+
+Button went first (see "A raw text can carry a TAG"). The underlay went last, and its note was half
+right in the way this whole section warns about: `shown` really is live and really is JS's, but the
+RULE was made of four inputs and three were already portable — two ordinary props the engine ALREADY
+strips, and listener existence, which this very section had just established crosses as a bit. See
+"The UNDERLAY was three portable inputs and one bit". **All three touchables are at zero.**
+
+**The general form, and it is the reusable half: "JS holds it" is not the same claim as "only JS can
+compute it."** The first is a wiring question and wiring is cheap. The second is the real boundary.
+Every remaining "cannot be ported" note is worth re-reading against that distinction.
+
+### The port found a shipping accessibility bug, and the JS harness could not have
+
+A disabled `<touchable-highlight>` committed `focusable: true` — reachable from a keyboard and a TV
+remote, announced as a focus stop, doing nothing when activated. Reproduced on unmodified HEAD,
+before a line of the port had landed, by writing the contract itest first.
+
+Cause is Trap A, the one this file already records: a tag rule runs BEFORE the JS fold, so a fold
+reading a key the rule STRIPS reads it gone. `foldPressableProps` erases `disabled`;
+`touchable-opacity`'s fold had been corrected to read the NODE and `touchable-highlight`'s had not.
+Two copies of one expression, and one of them drifted.
+
+**What makes it worth a section is WHY it survived: its vitest case asserted exactly this and
+PASSED.** That harness builds payloads through the TypeScript `fabricProps`, which deliberately
+carries no copy of the tag rules — so there was no pressable rule to strip `disabled`, the key was
+still in the bag, and the expression resolved correctly there and nowhere else.
+
+So the property that makes the JS harness correct — **it holds no mirror** — is the same property
+that blinds it to a rule-ORDERING bug. A fold that reads a key an engine rule removes is invisible to
+every test on that side. Only the committed payload can see it, which means the itest is not merely
+the better place for these assertions; for this class of bug it is the ONLY place. Read that together
+with the false-green rule already on this page: an assertion can be in the wrong harness and green
+for years.
+
+### A mirror that cannot be removed is made LOUD — SUPERSEDED, it could be removed after all
+
+`SCROLL_VIEW_BASE_{VERTICAL,HORIZONTAL}` existed in C++ (`foldScrollViewProps`) AND in JS
+(`render-scroll-view.ts`), and this section argued both were needed: Android's RefreshControl path
+does not go through the rule, because RN wraps the scroll view and splits the app's style across two
+boxes with the base composed onto BOTH (`ScrollView.js:1854-1863`) — and "that split reads the
+OWNER's style from the WRAPPER's fold, one node reading another, so it is composition and stays in
+JS". `scroll-view-base-parity.itest.ts` held the two copies in step, break-tested by flipping the C++
+`flexGrow` to 2 and watching both rows go red.
+
+**THE PREMISE WAS THE SAME ONE `ownerProps` HAD ALREADY FALSIFIED IN THE OTHER DIRECTION, and it
+took a day to notice.** "One node reading another" is not a reason to stay in JS — it is the exact
+thing `ownerProps` was built for. What was actually true is narrower: this read goes DOWN, and every
+seam the engine had went UP. `IFirstChild` closed that, the split moved, and the JS copy, the field
+that carried it (`IScrollIntrinsics.scrollViewBaseStyle`, read by nobody) and this test all went with
+it — the orphan shape again. See "A rule may read its CHILD".
+
+**The lesson that outlives the mirror: a guard written to hold two copies in step is also the thing
+that makes deleting one SAFE, and it should be re-read as a candidate for deletion every time its
+subject moves.** This one was cited three times as proof the JS copy was permanent. It was proof of
+nothing except that the two agreed.
+
+### A test that "flakes" in the full run and passes alone — read the walk before blaming the build
+
+`load-time-registration.test.ts` failed intermittently and was dismissed as a stale-build artifact
+TWICE in one session before anyone looked. It is a real race, and a repo-shaped one: the audit walks
+`adapters/`, and the Svelte suites write a `.smoke-compiled-*.mjs` beside their own source and
+`rmSync` it in an `afterAll` — dozens of them, by design. `readdirSync` followed by a separate
+`statSync` leaves a window where one of those vanishes in between, and `statSync` throws ENOENT on an
+entry the walk was about to discard for its extension anyway.
+
+Fixed with `readdirSync(dir, { withFileTypes: true })`: the type comes from the SAME syscall, so the
+window does not exist rather than being caught. One syscall cheaper per entry, too.
+
+**AND IT FIRED AGAIN THE NEXT DAY, so read "fixed" as "that window is closed" rather than "the test
+is settled".** Once on 2026-09-18, in a full run, then NINE consecutive clean full runs afterwards —
+and the message was not captured, so whether it is the same cause is unproven. Chasing it further by
+guessing is the thing this section warns against.
+
+What was done instead is narrower and is the reusable half: `parse()`'s `readFileSync` is a SECOND
+listed-then-read window, and unlike the first it cannot be collapsed into one syscall. It now
+rethrows with the path and says out loud that an ENOENT there is a race rather than a finding.
+**Labelling beats swallowing here** — skipping an unreadable file would turn a report this guard
+exists to make into silence — and it means the next occurrence arrives diagnosed instead of being
+dismissed a third time.
+
+The general form is the part worth keeping: **a failure with no assertion in the message is not
+evidence of flakiness, it is evidence that something threw** — and "passes alone, fails in parallel"
+points at shared filesystem state, not at a build. Its corollary, learned here: **a race you closed
+is not the same claim as a test that stopped failing.** Say which one you have.
+
+**AND THE FIX WAS NEVER SWEPT — four more walks carried it, found by asking the repo rather than by
+waiting for the next failure (2026-09-18).** A different file went red the next day
+(`tests/dlog-argument-budget.test.ts`, again with no assertion in the message), which is what
+prompted the question. One line answers it, and it is worth keeping as the query:
+
+```
+\grep -rln "readdirSync" tests core adapters --include="*.ts" | \grep -v "/build/" |
+  while read f; do \grep -q "statSync" "$f" && ! \grep -q "withFileTypes" "$f" && echo "RACY: $f"; done
+```
+
+Five files, of which four were genuinely the pattern and now carry `withFileTypes`.
+**The fifth is the instructive one and was deliberately LEFT ALONE**:
+`adapters/svelte/src/host-tag-invariants.test.ts` already wraps its `statSync` in a
+`try`/`continue`, so it is race-proof by a different route — and it FOLLOWS symlinks on purpose,
+for a broken link inside `examples/svelte/ios/Pods`. `dirent.isDirectory()` is FALSE for a symlink,
+so converting it would have started collecting a broken `*.svelte` link instead of skipping it. **A
+mechanical sweep of a pattern is wrong wherever the pattern is load-bearing** — read what each
+`statSync` is FOR before replacing it.
+
+Two things this sweep settles about the shape itself. The window is a property of the WALK, not of
+the directory: `tests/build-output-has-no-orphans.test.ts` walks `build/**`, where no
+`.smoke-compiled-*` ever lands, and it is fixed anyway, because a walk that can throw ENOENT on an
+entry it was about to discard has no reason to. And **the second window — `readFileSync` on a listed
+path — cannot be collapsed into one syscall**, so it takes the labelled rethrow instead, the same
+treatment `load-time-registration.test.ts` gives its own `parse()`. Swallowing it would turn a count
+this guard exists to make into a quietly smaller one.
+
+### The engine can WARN now — `SymbioteDebug.h`, and it was ScrollView's blocker
+
+Until 2026-09-18 the only channel out of `core/engine/cpp` was `throw jsi::JSError`: a rule could
+CRASH or stay SILENT, nothing between. That is a gap the moment the commit path, the payload builder
+and every tag rule live there, because `<keep_logs_gate_behind_DEBUG>` asks new code to log at its
+seam as a matter of course — unsatisfiable on that side of the wire.
+
+It became concrete rather than tidy when ScrollView's rule came up for porting: it carries a
+developer WARNING (a `horizontal` prop written on the vertical tag is ignored), so moving it as
+written would have DELETED a diagnostic, which the same rule forbids.
+
+```
+SYMBIOTE_DLOG(expr)     guards BEFORE evaluating, so building the message is free when off
+symbiote::debugLog      "[symbiote] …" to stderr, and RETAINED while the switch is on
+takeNativeDebugLog()    drains them in JS — what makes a log assertable instead of merely visible
+setNativeDebug(bool)    the later toggle; `installBindings` already read DEBUG=1 / __SYMBIOTE_DEBUG__
+```
+
+**The macro is the contract, not the function.** C++ has exactly the trap `debug.ts`'s header
+describes for JS — an argument is evaluated at the call site — so a bare `debugLog("x " + y)` on the
+per-node commit path pays its concatenation with nothing listening. `SYMBIOTE_DLOG` tests the flag
+first, which makes the cheap thing the DEFAULT instead of a rule every call site must remember.
+
+**The lines are retained because a diagnostic nobody can assert on is one that rots.** That is what
+turns "the engine warned about that" into a test (`native-debug-log.itest.ts`) rather than a human
+noticing a line scroll past. Retention costs nothing while the switch is off, because nothing is
+called at all.
+
+With that in place ScrollView's `ownerFold` moved whole: the base style composition,
+`nestedScrollEnabled`, the `horizontal` strip, the asymmetric bounce pair, the two ViewConfig-less
+strips and `decelerationRate`. Two consequences worth keeping:
+
+- **`decelerationRate`'s constants are `#ifdef ANDROID`**, because on iOS BOTH scroll tags resolve to
+  `RCTScrollView` — a component name cannot tell iOS-vertical from Android-vertical the way it tells
+  `Switch` from `AndroidSwitch`. Android's pair is outside headless reach, like `android_ripple`.
+- **Android's wrap path stopped delegating.** `wrappedOwnerFold` used to call `ownerFold` and then
+  replace `style`; it now does only the split, and reads `propOf(owner, 'style')` because the engine's
+  rule has already replaced the bag's `style` with `[base, authored]` — Trap A, the same correction
+  the touchables and Button needed. A whole CLASS of bug went with it: the wrap used to swap the
+  owner's fold out, so anything the ordinary fold did had to be repeated in the wrapped copy, and
+  `decelerationRate` once was not — it reached Fabric as the string `'fast'` on every Android
+  ScrollView carrying a RefreshControl. A rule that runs off the TAG cannot be swapped out.
+
+This was the largest test migration of the port — 27 vitest cases across 12 files — and most of them
+had a deliberate negative CONTROL beside them ("invents no key on the vertical tag", "honours an
+explicit false", "lets an explicit value win"). **Every one of those controls went on passing after
+the rule left**, because an absent key and an untouched passthrough are exactly what a harness with
+no rule produces. They moved as pairs: a control only controls beside the thing it controls.
+
+`input-accessory-view`'s fold took the bag apart and reassembled it unchanged, so the port DELETED
+it rather than moving it — and it still cost 10.7 us per node to have had. Read down the column and
+the price tracks BAG SIZE, not rule complexity. **So the worst value available is a trivial fold
+over a large bag**, which inverts the intuition that a cheap-looking fold is cheap.
+
+Two holes the vendor read turned up beside the port, both fixed in the same commit: TouchableHighlight
+never folded `disabled` into `accessibilityState` (`TouchableHighlight.js:311-319`), so a disabled
+highlight announced itself to a screen reader as enabled; and neither touchable stripped the six
+props its feedback machine consumes (`activeOpacity`, `underlayColor`, `onShowUnderlay`,
+`onHideUnderlay`, `delayPressIn`, `delayPressOut`), two of them FUNCTIONS, all forwarded to a native
+view that declares none of them.
+
+`id` -> `nativeID` became ONE rule (`foldIdAlias`) applied to every TAGGED node instead of five JS
+copies. **It did not survive that shape for a day — see "the seventh implementation" below.** The
+objection it was built to answer (a rule must not reach a third-party view) turned out to be the
+thing that made it wrong.
+
+**The corollary bit the measurement before it bit anything else: a node built with a tag NOBODY
+registered carries an EMPTY `tagName`, so no rule fires.** `recordSetTag` is emitted by
+`attachHostBehavior` and by nothing else. The new `button` arm was written without a registration
+and measured a native side doing no work at all; what caught it was `expectSamePayload` refusing to
+time two arms that disagree, not a suspiciously good number. Any bare-tag fixture needs a stub
+behavior registered or it measures nothing.
+
+### The test host has an ANDROID ARM now, and five recorded coverage gaps close at once (2026-09-18)
+
+Every port in this migration that touched a platform split landed with the same sentence: *a
+compile-time branch is only testable in a build that compiles it*. `android_ripple`,
+`underlineColorAndroid`, `decelerationRate`'s constants, Button's uppercase label and its Material
+style, TouchableNativeFeedback's background — five gaps, each recorded honestly and each needing a
+device. `Switch` was the lucky exception, because `Switch` and `AndroidSwitch` are genuinely two
+Fabric components and its rule branches on a name already on the wire.
+
+```
+pnpm run test:android
+```
+
+**What made it cheap is a fact about where the rules live, not a trick: all twelve `#ifdef ANDROID`
+sites are in `SymbioteFabricProps.cpp`**, which includes `folly/dynamic.h` and our own headers and
+nothing else. So the define is scoped to that ONE translation unit
+(`set_source_files_properties`, `SYMBIOTE_PLATFORM_ANDROID`) and never reaches ReactCommon, whose own
+Android branches want fbjni and a real NDK. Defining it target-wide is the version that does not
+build.
+
+**One line genuinely could not cross and the split it needed is the reusable part.**
+`android_get_device_api_level` is the NDK's, so it exists when `__ANDROID__` is defined — which the
+real toolchain sets and `-DANDROID` does not. `androidApiLevel()` answers with the minimum RN
+supports on a host, so the arm exercises the branch a modern device takes while the QUERY stays the
+device's. A rule's logic and a rule's platform call are separable, and only the second needs hardware.
+
+**The fixtures split by SUFFIX, `*.android.itest.ts`, and the split is hard in both directions**:
+that file runs only on `build-android` and every other fixture runs only on the others. Each arm's
+cases assume their own platform — an Android fixture asserts keys the default build never writes, and
+the default fixtures assert their absence — so a one-way filter would leave half of them lying. It is
+Metro's own `.ios.js` / `.android.js` shape, and nothing has to maintain a list.
+
+**It is NOT a device and the file says so.** `Platform.OS` in JS still reads the host, so a behavior
+whose JS half branches on it takes its iOS path here — Button composes the iOS touchable, which is
+why one case asserts a late `color` write and not a late `disabled` one (the latter starts an opacity
+settle wanting a `requestAnimationFrame` the host lacks). What this build settles is what the RULE
+emits, which is where the ported logic now lives.
+
+**Button reached ZERO folds on both platforms in the same commit**, and the arm is what made that
+safe rather than a coverage trade: its Android owner fold — the Material style plus the selectable
+background TNF clones onto it — moved into `foldButtonProps`, and the four vitest cases that watched
+it were replaced by itest cases reading the committed payload. Strictly better than what they were:
+a mocked `Platform.OS` steers the JS half, and a rule in `SymbioteFabricProps.cpp` never reads it.
+It is the most expensive primitive this codebase ships (four crossings per commit three days ago) and
+it now costs nothing in JS.
+
+### A rule may key on its PARENT'S TAG — the descendant rule, and the two clone-folds it freed (2026-09-18)
+
+Every ported rule until now keys off the node's OWN tag, and three iterations of this migration
+recorded `TouchableNativeFeedback` / `TouchableWithoutFeedback` as unportable for that reason. Both
+render no view: RN's bodies end in `cloneElement(child, {…})`, so our tag commits an ANCHOR and the
+owner's props land on whatever the app wrote underneath — and that child usually carries NO TAG,
+because a plain `<view>` registers no behavior. A self-keyed rule can never reach it.
+
+**Giving the child the owner's tag is the obvious route and it is wrong**: the child may already own
+one (`<pressable>` under a TWF), and a node has exactly one tag. So the DISPATCH moved instead.
+`IOwner` now carries the parent's `tagName` beside its props, and `fabricProps` runs a second,
+parent-keyed step after the self-keyed chain — a node can match both, in that order, which is the
+order RN composes them in.
+
+**That is the browser's shape rather than a workaround.** A user-agent stylesheet is full of
+descendant rules (`td > *`), and an element's user-agent behaviour has always been allowed to depend
+on what contains it. It is the same argument `ownerProps` already made for reading the parent's
+PROPS, taken one step further to reading its NAME — and it costs the same, a pointer hop on a tree
+already in memory.
+
+Everything the rule needed had already crossed, which is why this was one commit and not a project:
+`ownerProps` (the scroll-content seam), the engine's own aria fold, `usesTouchableFocusableRule`,
+and `OP_SET_OWNED_LISTENER` — read off the PARENT, since `focusable` on a cloned child is a function
+of whether the OWNER has a press callback.
+
+**Priced on the same ruler as the other nine rules** (`tag-rule-cost.itest.ts`, `build-release`,
+three runs, payloads asserted equal key by key first): **~13.6 us per cloned child per commit**,
+landing mid-table beside `pressable` and `button`. The cost model held on a rule that could have
+broken it — the child's own bag is ONE prop and the rule marshals EIGHTEEN off its parent, and the
+price follows what crosses rather than whose node the keys came from. Read it as the price of one
+touchable per commit, not per row: these tags have exactly one child.
+
+**THE TEST MIGRATION WAS THE EXPENSIVE HALF, and its shape is the reusable part.** Thirty-six vitest
+cases went red on ONE cause: every file located its subject by the `testID` the owner CLONES, and a
+locator that depends on the ported rule stops working the moment the rule moves. The recording host
+builds payloads through the TypeScript `fabricProps`, which deliberately carries no copy of the tag
+rules — the property that makes it a sound harness for everything else is exactly what blinds it
+here. Locate a derived node by POSITION, which the tag guarantees anyway.
+
+Three things fell out of it, all recorded rather than smoothed over:
+
+- **Five adapter tests needed a NEW WITNESS, not a deleted case.** Each proved `./register` ran by
+  checking the clone; that is unobservable now, so they check a forwarded `onLayout` instead — the
+  other thing only a registered behavior installs, still JS, and visible in the payload because it is
+  a Fabric boolean-gated event. Same claim, different instrument.
+- **A control got WEAKER and says so.** "Clones nothing when the behavior is not registered" had
+  three absence assertions that now pass whether or not it is registered, because this host can no
+  longer produce a clone at all. The listener half still controls; the absence half moved.
+- **Two Android cases have NO new home and that is a coverage LOSS.** The background half is `#ifdef
+  ANDROID`, so it is not compiled into the test host, and mocking `Platform.OS` no longer reaches it
+  — what that mock steered was a JS function that no longer exists. Same hole `android_ripple`,
+  `underlineColorAndroid` and `decelerationRate` already carry, and a PROPERTY of porting a
+  platform-split rule.
+
+**One mirror survived the port by a commit, and closing it made the code SHORTER rather than
+longer.** The clone lists stayed behind to feed `slotDerived` — which owner writes must dirty the
+child — so thirty names in JS had to agree with `kNativeFeedbackClonedKeys` and
+`kWithoutFeedbackWhenSetKeys` in C++, failing silently on the one prop a list forgot.
+
+`SLOT_DERIVED_ALL` replaced both lists, and it is the honest spelling rather than a shortcut: **a
+`cloneElement` owner never derived its slot from a NAMED set** — it re-clones on every render,
+whatever changed. Naming the keys was an optimisation, and one whose upkeep was a mirror. What it
+costs is a false dirty on an owner prop the clone does not carry, and for these two tags that is
+nearly empty: the owner is an anchor whose props reach Fabric nowhere else, so every name it holds is
+either cloned or consumed by the press machine.
+
+The guard is a case that a NAMED list gets wrong, not one it gets right: a late `hitSlop` write
+reaching the child. **Break-tested by reducing `SLOT_DERIVED` to `['accessibilityLabel']`** — which
+turned exactly that case red and left every other one in the file green, so it is the list it
+measures and not the port. A first attempt used `opacity` (a prop TNF does not clone) and the commit
+counter, and that one stayed GREEN under the reduced list: it was watching the wrong thing, and only
+running the break-test found out.
+
+And two dead JS legs went with the port: both clone-folds read `stringOr(source.id) ?? stringOr(
+source.nativeID)` where `source` is the owner's NODE props, which `routeProp` had already resolved
+that morning. **A second opinion about precedence, kept alive by nothing.**
+
+### THE LAST `payloadFold` IS GONE — sticky headers, and zero JS folds in production (2026-09-18)
+
+`stickyFold` was the only one left, and it had outlived three rounds of this migration because it
+reads per-node RUNTIME STATE rather than props. Splitting its three outputs by ORIGIN is what moved
+it, and that split is the reusable part:
+
+```
+ zIndex: 10     a constant of the wrapper      RN: `styles.header` (ScrollViewStickyHeader.js:318)
+ collapsable    a constant of the wrapper      RN: a literal JSX prop (:291)
+ translateY     the DEBOUNCED settled value    RN: `passthroughAnimatedPropExplicitValues` (:302)
+```
+
+Two of the three were never anything but the platform's. **The third is live and crosses anyway,
+because it is live at SETTLE rate rather than frame rate** — the smooth pin rides the AnimatedProps
+leaf and never passed through the fold at all, while this one is what hit-testing reads, pushed once
+per debounce behind a same-value guard in the reducer.
+
+**AND RN ITSELF SPELLS IT AS A PROP, which is what decided the seam — no new opcode and no new host
+field.** The underlay precedent had just added `OP_SET_UNDERLAY_SHOWN` for a comparable bit, so an
+op was the obvious move; reading `ScrollViewStickyHeader.js` first said otherwise. The machine writes
+`stickyTranslateY` like any other prop, `foldStickyHeaderProps` composes it into the style, and the
+key is stripped before Fabric — the treatment `kPressableMachineKeys` already gives Pressable's nine
+machine props. **Check whether upstream already carries the value as a prop before inventing a
+channel for it.**
+
+**COMPOSED OVER, not under, and it inverts every neighbouring rule.** `foldActivityIndicatorProps`
+and `foldScrollViewProps` put their base UNDER so an app can still override it; here a header whose
+own style set a transform would cancel the pin, which is the entire point of the element. The test
+is whether the style is a DEFAULT or a MECHANISM.
+
+Contract: `core/engine/cpp/tests/js/sticky-header-payload.itest.ts`, nine cases, no JS twin.
+**Break-tested three ways** — a wrong `zIndex`, the composition flipped to UNDER, and the strip
+removed — each turning red exactly the cases it should and no others. The middle one is the reason to
+bother: only "beats a transform the app wrote itself" catches an order flip, and it was written for
+that.
+
+**THE COST IS A FOLD COUNT, not a millisecond, and saying so is the honest part.** The tag-rule
+ruler cannot price this one for the same reason it could not price the underlay: every arm there
+needs a JS twin with a `payloadFold`, and the twin cannot exist once the rule lives only in C++.
+What is exact is `foldsFound` 1 -> 0 per commit per header, and a header re-commits on every
+settle — so it is per-settle, not per-mount. A screen holds a handful of these, so the absolute
+saving is small and the reason to do it is that **`IHostBehavior.foldPayload` is now declared by
+nothing in production.**
+
+**And the CONTROL, because the port adds a branch to a chain every node walks.** The self-keyed
+dispatch in `fabricProps` is an `if`/`else if` over tag names with no early-out, so an untagged node
+— which is nearly all of them — already pays every compare in it, and this made it one longer.
+`adapter-create-cost.itest.tsx` on `build-release`, three runs: engine wall **72.9 / 73.4 / 75.4**,
+walk 26.3-27.8, against the 67-75 and 24-28 this page already records. Inside the band, so **no
+regression and no claim of one either.**
+
+An `if (tagName.empty())` skip over that chain was considered and NOT written: at ~13 compares over
+10 000 nodes it is a few tenths of a millisecond against an arm whose own spread is ~2.5 ms, so this
+instrument could not attribute it. **A change this page could not measure is a change this page does
+not ship** — the same rule applied to the combined Vue run that could not be attributed.
+
+**THE SEAM STAYS ANYWAY, and the reason is recorded on the field rather than left to be re-derived.**
+It reads as a leftover, and this codebase's question about one is what it REACHES, not who uses it
+today. It reaches two things: it is the JS ARM of every measurement in `tag-rule-cost.itest.ts` —
+delete it and the ~9-31 us-per-node figures that justified every port in this migration can never be
+taken again — and it is the declared extension point for a third-party primitive, which has no
+option to write a C++ rule.
+
+**THE TEST MIGRATION WAS FOURTEEN CASES ACROSS EIGHT FILES AND ONE CAUSE**, the same one the
+clone-onto-child port hit: **every file located the sticky wrapper by `payload.zIndex === 10` or
+`payload.collapsable === false`** — the fold's own output. A locator made of the thing under test
+expires with it, and the vitest host builds payloads through the TypeScript `fabricProps`, which
+deliberately carries no copy of the tag rules.
+
+The replacement was already sitting there: **the recording host has retained `tagName` all along,
+for exactly this** ("so a test can ask what the host was TOLD, separately from what a rule made of
+it"). `ILiveNode` did not expose it, which is a one-line addition, and every locator became
+`node.tagName === STICKY_HEADER_TAG`.
+
+Three things fell out, all improvements rather than trade-offs:
+
+- **Two locators lost an exclusion they needed.** Both section-list files had to skip
+  `RCTScrollContentView`, because the content node carries `collapsable: false` too. A tag needs no
+  exclusion — a content node's is `scroll-content`.
+- **React's `<sticky-header>` case got its OWN claim back.** Its `why:` says the point is that React
+  resolved the hyphenated tag and the behavior found it; `collapsable` was a proxy for that, and the
+  tag says it directly.
+- **One case was strengthened while being re-aimed.** The section-header test asserted a COUNT of
+  two wrappers, which two wrapped ITEMS would also satisfy; it now asserts the titles. The `why:`
+  had always been about which children got marked and the assertion had never said so.
+
+### READING THE VENDOR TO PORT A CONSTANT FOUND A SHIPPING BUG INSTEAD (2026-09-18)
+
+The census's next lead was `setProp(content, 'collapsable', false)` in `buildStructure` — a platform
+CONSTANT written from JS onto a node whose tag already has a rule. Opening `ScrollView.js` to confirm
+it is unconditional turned up something worth more than the port:
+
+```
+ RN    maintainVisibleContentPosition != null || (Platform.OS === 'android' && snapToAlignment != null)
+ ours  maintainVisibleContentPosition != nullptr ||                            snapToAlignment != nullptr
+```
+
+**`snapToAlignment`'s leg is ANDROID-ONLY upstream and we honoured it on both platforms**, so every
+iOS ScrollView that merely SNAPS was telling Yoga not to flatten its children — work RN never asks
+for, on the commonest scroll configuration there is. Shipped, and invisible: the tree is correct,
+only more expensive.
+
+**A TEST PINNED IT AS CORRECT.** `scroll-content-payload.itest.ts` asserted
+`snapToAlignment: 'center'` -> `collapsableChildren: false` on the default build. It was written
+from the code rather than from upstream, which is the one thing a characterization must not be —
+**an assertion copied from the implementation cannot disagree with it.** The case now asserts RN's
+answer on the iOS arm and its twin on the Android arm, and break-testing the gate fires the iOS one.
+
+**The JS twin in `tag-rule-cost.itest.ts` refused to time the fix**, which is exactly what
+`expectSamePayload` is for: its arm used `snapToAlignment`, so the C++ rule and the JS copy disagreed
+the moment the gate landed. That arm now uses the platform-INVARIANT prop, because a cost ruler that
+only prices correctly on one build is a ruler that will mislead on the other.
+
+**Then the constant moved**, and its case needed a second assertion to mean anything. `collapsable`
+reaches the payload whether a `setProp` seeds it or a rule writes it, so the obvious case is green
+both ways; what discriminates is that a rule's output lives in the payload and **nowhere else**, so
+`propsOf(content).collapsable === undefined` is the half that says the seed is gone. Same witness the
+sticky port used a commit earlier.
+
+**It retired the rule's identity fast path** — there is no content node with nothing to add any more —
+and the ruler CANNOT price that, which is worth saying rather than implying. Its arm sets an anchor
+prop, so the fast path never fired there in the recorded 2.8 ms either; the retirement costs one bag
+copy per SCROLL VIEW, not per node. Measured anyway: `content` native walk 3.0/3.0/3.4 against a
+recorded 2.8, with the untouched `scroll` control moving 4.2 -> 4.3/4.4/4.5 in the same sitting. **A
+control that drifts with the subject is machine state**, so no row here carries a verdict.
+
+Six vitest cases went with it, all reading `collapsable` as the seed — the same group migration the
+sticky port had. Two adapter files already carried the note for `nestedScrollEnabled` moving the same
+way, which made the third and fourth obvious: **once a file has lost one assertion to the engine, the
+next one is a pattern rather than a surprise.**
+
+### THE CENSUS AFTER THE LAST FOLD — one more mirror, and the two things that cannot move
+
+With no `payloadFold` left, "what still serves a TAG from JS" needs a different query than a fold
+count. The one that worked: **ask what every remaining `Platform.OS` / `IS_ANDROID` branch in
+`core/components` is FOR.** A platform branch is where a platform rule hides once the obvious
+channel is closed.
+
+Five sites, and four are correctly placed: `switch.ts` picks an imperative command NAME at gesture
+time, `nativeFeedbackRefinement` configures the press MACHINE and dispatches view commands,
+`button.ts:257` picks WHICH machine, and `render-keyboard-avoiding-view` takes the host as an
+ARGUMENT so both branches stay testable. Machines and imperative calls are JS by the model, not by
+omission.
+
+**The fifth was a mirror: `backgroundProps`.** It mapped TouchableNativeFeedback's resolved
+background plus `useForeground` onto the Android slot — which is the `#ifdef ANDROID` tail of
+`foldCloneOntoChild`, api-level gate included, since `Platform.Version` on Android IS the api level.
+No runtime caller, no test, reachable only through the package barrel. Deleted.
+
+**`canUseNativeForeground` beside it STAYS, and the line between them is the reusable half.** It is
+a QUESTION an app asks the platform — RN's own public `TouchableNativeFeedback.canUseNativeForeground()`
+— not a rule that decides a payload. Same class as the slider reading a folded `accessibilityState`:
+**asking is not reimplementing.** Two functions in one file, one a mirror and one not.
+
+Break-tested before deleting, and the FIRST attempt did not run: inlining the slot pick left
+`androidApiLevel` unused and `-Werror` failed the build. The same trap `IFirstChild`'s A/B already
+recorded — **a build that fails is a test that did not run** — and it is easy to miss here, because
+the runner prints a clean-looking result from the stale binary. Re-broken by inverting the gate
+instead (which keeps every symbol used), it fires exactly one case on the Android arm.
+
+**WHAT IS LEFT IS TWO THINGS, and neither is a fold, a mirror or an oversight:**
+
+- **A tag's derived STRUCTURE is built in JS** (`buildStructure`). Button assembles four nodes on
+  iOS and three on Android; ScrollView, ActivityIndicator and ImageBackground do the same. That is
+  the platform's — RN builds it in a component body — but moving it means a tree builder in C++,
+  which is a different piece of work from a prop rule and has no seam yet.
+- **The tag -> Fabric component NAME table is in JS** (`component-names/index.{ios,android}.ts`),
+  and it cannot simply move. `createElement` needs the native name BEFORE anything crosses, so a
+  C++ table would cost a crossing per node — ten thousand on a benchmark create. Same shape as
+  `resolveAssetSource`: a lookup that belongs on the side that needs it first.
+
+So "all behavior lives beside the C++" is TRUE OF PROPS and not yet of structure. Say which one is
+meant before calling this migration finished.
+
+### A rule may read its CHILD — `IFirstChild`, and the last structural blocker goes (2026-09-18)
+
+Every seam before this one reads UP: `ownerProps` (the parent's props), `IOwner.tagName` (the
+descendant rule), `IAncestorLookup` (the nearest tagged ancestor). ScrollView's Android RefreshControl
+wrap needs the other direction and was recorded as unportable in three separate places for it.
+
+An Android ScrollView holds exactly ONE child, so a sibling refresh control is an `addViewAt` crash
+rather than a layout mistake. RN inverts the tree — `AndroidSwipeRefreshLayout` WRAPS the scroll view
+— and splits the app's style across the two boxes, layout on the wrapper's frame and visual on the
+scroller, with the axis base composed onto BOTH (`ScrollView.js:1854-1863`). **The wrapper is the
+scroll view's PARENT and needs the scroll view's AUTHORED style.**
+
+**IT IS NOT A NEW KIND OF CLAIM, which is the whole reason it was affordable.** `ownerProps`' own
+argument — the tree lives in C++, so reading another node costs a pointer hop rather than a closure
+and a crossing — never mentioned a direction. Upstream builds this parent FROM its child
+(`cloneElement(refreshControl, {style: outer}, scrollView)`), so "derived from what it contains" is
+RN's shape rather than one invented here; a UA has the same, in `:has()` and in a table frame that
+has always followed its cells.
+
+**THE DIRTY PATH IS THE HALF THAT IS NOT FREE, AND IT ALREADY EXISTED.** A rule runs when ITS node is
+dirty, so a wrapper reading its child re-derives only if a write to that child marks the wrapper —
+which `routeProp` does through its `node.wrapper` branch under `slotDerived`. Without it the wrapper
+freezes at its mount frame while the scroller visibly restyles inside it. `slotDerived: ['style']`
+was already there for the JS fold and is now load-bearing for the engine's rule; the seam did not
+change the requirement.
+
+**TOPOLOGY GATES BOTH HALVES, NOT `#ifdef ANDROID`** — iOS claims the refresh control BESIDE the
+content, so a scroll view is never one's child there and neither branch can fire however the host was
+compiled. Strictly better than a compile-time split for the reason `Switch`/`AndroidSwitch` already
+showed, and it is why the fixture runs on the ORDINARY test host: the behaviour under test is a tree
+shape, and a tree shape is reachable on any build. (`index.android` is imported by PATH, exactly as
+`wrap-android.test.ts` does — the platform FILE is still Metro's choice and the harness resolves iOS.)
+
+**FIRST child rather than a list, deliberately.** The only shape that needs this is a wrapper, and a
+wrapper has one. A rule surveying N children would be reading the tree rather than deriving from it,
+which is the line this seam should not cross.
+
+**IT COSTS NOTHING, and that had to be measured rather than assumed, because `firstChildOf` runs for
+EVERY node in the walk** — unlike `IAncestorLookup`, which is a callback nothing pays for until a
+rule asks. Two instruments:
+
+```
+ tag-rule-cost, native walk, 3 runs   every one of the eleven rows inside its own prior spread
+ adapter-create-cost, best-of-5       68.2 ms with the read · 68.2 ms without   walk 25.3 · 25.5
+```
+
+The create arm's own spread is 68.2-89.3 — about 20% — so **only the MINIMUM carries anything**, and
+the A/B was run in one sitting with the call replaced by `IFirstChild{}` and the binary rebuilt. The
+first attempt at that arm silently measured nothing: `-Werror` rejected the now-unused function, the
+build failed, and five runs went to the STALE binary. A build that fails is a measurement that did
+not happen — read the compiler's exit, not the numbers that follow it.
+
+**WHAT WENT WITH THE PORT is more than the two folds.** `splitLayoutProps` and `splitScrollViewStyle`
+(and RN's twenty-eight-key layout partition) left `scroll-view-commands.ts`; `SCROLL_VIEW_BASE_*` and
+`IScrollIntrinsics.scrollViewBaseStyle` left `render-scroll-view.ts` with the parity test that held
+them; and `IHostBehavior.onWrapChange` — whose own doc said "neither node can work that out alone" —
+left the engine with its only implementor. **A hook that exists to work around a missing seam should
+be deleted when the seam lands, not left to misdirect the next reader.**
+
+**ScrollView is now at ZERO crossings on all three of its nodes** — scroller, content view and
+wrapper — which no other composed primitive of this size has reached.
+
+**THE TEST MIGRATION HAD THE GROUP LESSON IN ITS SHARPEST FORM YET.** `wrap-android.test.ts`'s
+style-split `describe` held three cases. TWO went red on the move, honestly. The THIRD — "stops
+splitting the style when the wrap goes away" — went on PASSING, because with no rule in that host
+there is no split to stop, so an unwrapped owner carries its whole style whatever the engine does. It
+would have stayed green forever and meant nothing. **A case whose subject is a fold cannot stay
+behind beside the twins that failed**; the whole group moves. Same shape ActivityIndicator's "OMITS
+colour entirely" case had, and the second time this migration has had to delete a case that was
+GREEN.
+
+What stays in that file is what the JS host is authoritative for and the itest is not: the TOPOLOGY —
+who ends up whose parent, that the owner keeps its identity across a wrap, that removing the
+RefreshControl puts it back.
+
+### The UNDERLAY was three portable inputs and one bit — and this page said otherwise three times
+
+TouchableHighlight's underlay fold outlived every other per-node rule, and three separate notes here
+called it "the genuine unportable article" because `shown` flips inside a gesture. Splitting the
+fold's inputs is what settled it:
+
+```
+ shown            live, held past release by a `delayPressOut` timer      JS — and still is
+ hasPressHandler  the EXISTENCE of any of four press listeners            crossing since OP_SET_OWNED_LISTENER
+ underlayColor    an ordinary prop — one the engine ALREADY strips        a prop
+ activeOpacity    the same                                                a prop
+```
+
+**Three of four were portable before the port began, and the fourth is ONE BIT.** `shown` is not the
+press state (`setNodePressed`) and could not reuse it: RN holds the underlay past release so a fast
+tap still flashes, so it LAGS the press by a timer. It crosses as `OP_SET_UNDERLAY_SHOWN`, on a flip
+— twice a tap — against a fold charged on every commit the node was dirty in.
+
+**THE TELL THAT MADE IT WORTH DOING was in the code rather than in the reasoning.** The engine strips
+`underlayColor` and `activeOpacity` (`kTouchableFeedbackKeys`, because RN forwards neither to the View
+it renders), so the JS fold could not read them off the bag it was handed and reached back to the NODE
+for them. **One side erasing a prop while the other reaches around it for the same value is two halves
+of one rule.** That is a cheap thing to grep for and a good signal for whatever is ported next.
+
+**The press-listener state had to become a MASK, and the field's own comment had predicted it.** It
+read "`press` is the only owned name any platform rule reads; a second would be a second bool, and
+only a third would be worth a bitmask." Two bools is not enough and not for a size reason: `focusable`
+asks about `onPress` ALONE (`TouchableOpacity.js:336-339`) while `_hasPressHandler` asks about any of
+four (`:296-302`) — and "any of four" can go DOWN when one name departs, which nothing on the C++ side
+can recompute, because the listeners live in JS and each op is about ONE name. A bit per name is the
+smallest state that answers both questions from what the ops carry. **Break-tested both ways**:
+collapsing the mask to one bit turns exactly the two four-name cases red, and making it OR-only (never
+clearing) turns the take-away case red here and one case red in `touchable-focusable-payload.itest.ts`.
+
+`bool hasPressListener` became `ISelf` in the same change — the lone bool beside three structs was the
+shape that grows a fourth unreadable positional argument, which is what `IOwner` had already learned.
+
+**THE COST MEASUREMENT IS A FOLD COUNT, NOT A MILLISECOND, and saying so is the honest part.** The
+tag-rule ruler cannot price this one: every arm there needs a JS twin with a `payloadFold`, and the
+twin cannot exist once the bit lives only in C++. What is exact is `foldsFound` — 1 -> 0 per commit,
+and the recorded FIVE at mount for a single touchable (the opacity settle re-commits it before it
+rests) -> 0. A screen holds a handful of these, not a thousand, so the absolute saving is small and
+the reason to do it is architectural.
+
+The ruler did move ~5% across every row in the same sitting, INCLUDING `image`, `content` and `clone`,
+which this change cannot reach. That is a built-in control: a uniform shift across untouched rows is
+machine state, and no row carries a verdict at that size.
+
+**ONE PARITY GAP FOUND HERE AND CLOSED IN THE NEXT COMMIT** — `testOnly_pressed`, which we supported
+nowhere. Deliberately deferred rather than folded in: a port is a MOVE, and mixing a behaviour change
+into one makes both unattributable. See "One prop, two mechanisms" below.
+
+**The test migration split cleanly for once, and the reason is worth keeping.** Every case asking WHEN
+the underlay shows survived on a new witness — the recorded bit, which the recording host takes from
+the op without applying any rule — while the two asking what it LOOKS like moved to the itest whole.
+A bit cannot tell a crimson underlay from a black one, so a colour case has no business being
+rewritten onto it; that is what makes "move the group" the right call rather than a shortcut. Across
+the three adapters the surviving claim sharpened rather than weakened: what an adapter owes is that
+its wiring reaches the machine and that the app's props reach the node, which is exactly what
+`underlayShown` plus `payload.underlayColor` say.
+
+**And the fixture lied to itself first.** `folds` was written as a lazy getter over
+`readSurfaceTelemetry`, which answers about the LAST commit — so the cost assertion read 0 while the
+`print` on the line above showed 1, and passed. **An assertion that reads its subject twice is not
+asserting about the same thing twice.** Captured at commit now.
+
+### One prop, two mechanisms — `testOnly_pressed`, and a budget test that caught the wrong seam
+
+RN's snapshot affordance, supported nowhere here until 2026-09-18 and found by reading the vendor for
+the underlay port. It is one prop NAME over two unrelated mechanisms, and treating it as one thing is
+how it would have been got wrong:
+
+```
+ TouchableHighlight  PAINTS an underlay with no gesture, and `_hideUnderlay` returns early on it
+                     so the pin LATCHES              ->  a C++ rule, off the authored bag
+ Pressable           SEEDS the pressed state, which selects `activeStyle` and any `:active` class
+                     (`usePressState(testOnly_pressed === true)`)  ->  JS, where the class registry is
+```
+
+**THE ASYMMETRY IN UPSTREAM IS EASY TO "FIX" AND MUST NOT BE.** `_showUnderlay` gates on
+`_hasPressHandler` (`TouchableHighlight.js:271`), but the INITIAL state does not — `:187-190` is a
+bare ternary with no such check — so a decorative highlight with no callbacks still snapshots pressed.
+That is what a snapshot of one needs. Reproducing the gate would look more consistent and be wrong.
+
+**THE FIRST SEAM WAS WRONG AND A BUDGET TEST SAID SO, in the one currency that matters.** Pressable's
+half went into `attachAfterCommit`, because `attach` runs at `createElement` before any prop is
+routed. That costs a post-commit WAITER on every pressable in the app:
+`adapters/solid/src/crossing-and-payload-census.probe.test.tsx` budgets crossings per
+behaviour-carrying node at two and reported **six**.
+
+The reasoning that put it there is the reusable mistake: the alternative was a string compare in
+`routeProp`, and that was rejected as "the hottest path in the engine, for a testing prop". **A JS
+compare is not a boundary crossing, and weighing it as one picks the seam that actually costs
+something.** In `routeProp` it costs one comparison on a write that already reached the tail, lands on
+the FIRST commit rather than the second, and crosses nothing.
+
+**AND IT IS A SIDE EFFECT PLUS A PASSTHROUGH, not a consume.** The first spelling returned early;
+that kept the prop out of `node.props`, so TouchableHighlight's rule — which reads the AUTHORED bag —
+went blind and three of its cases went red. Setting the state and letting the write continue is the
+shape `GATED_EVENT_PROPS` already uses. Keeping the name out of the PAYLOAD is a separate job done by
+`kPressableMachineKeys`, and **break-testing that strip fires two cases**, one of them the Pressable
+case that has nothing to do with the underlay — a leaked prop no ViewConfig declares is otherwise
+silent.
+
+**The type surface is part of the feature**, eleven declarations across five adapters plus Angular's
+`PressableElement` base. Svelte's `canonical-prop-names` audit failed until its shim list learned the
+name, which is what that guard is for: a prop an app cannot spell is not shipped.
+
+### `id` -> `nativeID` had SEVEN implementations, and the one in C++ was the wrong seam (2026-09-18)
+
+A tag rule keys off `tagName`, which `recordSetTag` writes and `attachHostBehavior` alone emits — so
+`foldIdAlias` reached a node only if some behavior had been registered for its tag. `view` and
+`text` register none. **The rule never touched the two commonest elements in any app**, and the
+adapters' own folds were what saved them: `foldHostBag` off `HOST_PRIMITIVES[*].aliases` (nineteen
+entries, the same pair on every one) for React/Svelte/Angular, plus Vue's `patchProp`, Solid's
+renderer with a `WeakSet` for precedence, and Angular's own `PROP_ALIASES`.
+
+**THE OBVIOUS CLEANUP WAS THE WRONG ONE AND A TEST STOPPED IT.** With the C++ rule in place,
+`foldHostBag`'s alias half read as a leftover mirror — the shape this project deletes on sight.
+`id-alias-coverage.itest.ts` was written to confirm that before deleting it, and it reported the
+opposite: the coverage sets were different, not duplicated. **A second implementation of one rule is
+not automatically a mirror; ask what each one REACHES before removing either.**
+
+So the seam is `routeProp`. Every adapter's prop write ends there whatever shape it starts in, which
+is the one thing a bag fold and a per-key renderer have in common — a bag fold cannot serve Vue or
+Solid, and a per-key fold cannot serve React's `applyProps`. Seven implementations, one left.
+
+**It is a behaviour CHANGE for three adapters and the divergence was the bug, not the rename.** Vue,
+Solid and Angular folded per key with no gate, so they were ALREADY renaming `id` on third-party
+views while React and Svelte were not. One answer for everybody now, and it is upstream's: RN's
+convention is `nativeID`, and a raw `id` is dropped by any ViewConfig whatever the view.
+
+**The engine carries the PRECEDENCE that only Solid had built.** `nativeID={id ?? nativeID}`
+(`View.js:77-79`) is a whole-BAG expression; a renderer folding one key at a time never sees both, so
+precedence fell out of WRITE ORDER — `<view id nativeID>` keeping the stale legacy value while
+`<view nativeID id>` did not. `routeIdAlias` remembers which source fed the slot, so `id` wins in
+either order and clearing it hands the slot back to an authored `nativeID` rather than to undefined.
+
+**STRUCTURALLY INERT, which is the measurement that carries a verdict here.** Every counter on the
+eight-step bench suite is byte-identical to the recorded run — `setProps` vue/solid 10 000, react
+12 000, svelte/angular 13 000, with `unchanged=0`, `folds=0`, `created=10000 cloned=2 nodes=10003`.
+Same writes, same crossings, no fold. The wall clock on the machine that sitting ran on had a ~50%
+per-arm spread (react's create read 154-209 across four runs), far wider than two string compares
+could move, so **no timing verdict is claimed and none should be quoted from it.**
+
+Two dead JS legs fell out afterwards, and both were the same shape: `touchable-without-feedback` and
+`touchable-native-feedback` clone `stringOr(source.id) ?? stringOr(source.nativeID)` onto their
+child, where `source` is the OWNER'S NODE PROPS — which `routeProp` has already resolved. The `.id`
+leg read a key that can no longer exist. **A second opinion about precedence, kept alive by nothing.**
+
+And three tests were quietly measuring one thing twice. Each ran an `id` case over TWO arms, raw and
+`foldHostBag`-folded, because the adapters renamed in three different places; with one place left,
+`foldHostBag` returns its input and the two arms became one bag mounted twice. **A loop whose arms
+have converged reports agreement with itself** — collapsed rather than left green.
+
+### `foldHostBag` is GONE, and the deletion needed the break-test its own predecessor prescribed
+
+With the aliases moved to `routeProp`, the function's other half was `HOST_PRIMITIVES[*].defaults` —
+nineteen entries seeding a bag before it was written. It read as a leftover, and the section above
+had just established that reading-as-a-leftover is not a finding: **ask what it REACHES.**
+
+So the same instrument was used, and it answered the other way this time. Emptying `defaults` and
+running the whole itest suite produced **zero failures**, and the behavioural claim it looked like it
+was making turned out to live somewhere else entirely —
+`core/engine/cpp/tests/js/committed-payload.itest.ts:89`, "shows a text node the platform defaults no
+adapter writes", which commits an `RCTText` with `{}` and asserts `ellipsizeMode === 'tail'` and
+`allowFontScaling === true`. That is `applyTextDefaults` in the payload builder, which took over the
+job the day the seed was deleted from three adapters. The fold's copy had been dead since.
+
+**One fixture looked like the instrument and was not**, which is the trap worth naming: a Text arm
+whose bag authors both keys explicitly cannot go red when a DEFAULT disappears, however loudly it
+mentions them. An unchanged counter is evidence only once you have checked the fixture could have
+moved it.
+
+Four files and 664 lines went: the function, its tests, the Svelte shim's copy, React's host-config
+call, Angular's `textDefaultFor`, the `defaults`/`IFoldOp` half of `host-primitives.cjs`, and two
+package subpaths. **Seven implementations of the alias, then the bag fold itself — the whole
+mechanism, not just its users.**
+
+### RN's two Text defaults had SIX implementations, and the headless builder was the wrong place for the last
+
+`ellipsizeMode ?? 'tail'` and `allowFontScaling !== false` (`Text.js:289,291`) were written out in
+`SymbioteFabricProps.cpp`, in `core/engine/src/fabric-props.ts`, in `core/components/src/text-props.ts`
+(`resolveTextProps`), in Angular's `TextHost`, in Vue's renderer and in Solid's. Every copy had a
+sound-sounding local reason and most had a comment saying the OTHERS were the seed. All five JS ones
+are gone.
+
+**The seam is the payload builder, keyed on the component**, and what makes it the right one is that
+it reads the AUTHORED bag: a null, an explicit `undefined` and an absent prop are alike by the time
+it looks. That is the question every copy existed to answer. Angular declared two real `@Input()`s
+specifically because "a default can only be applied by code that can SEE whether the caller supplied
+a value, and a pass-through host binding is invisible to the component" — true, and answered one
+layer down, so `TextHost` is an ordinary primitive host again. Solid went through THREE shapes for
+the same reason (a create seed, a substitute-on-`undefined`, then a fold per key because `??` has to
+catch a null too); the null that cost it two revisions is `ellipsize->isNull()` in C++, once.
+
+**THE HEADLESS BUILDER'S COPY IS THE ONE WORTH READING TWICE, because it looks like the one that
+should stay.** `core/engine/src/fabric-props.ts` is not dead code — it builds every payload the
+recording host serves, so its copy is what made ~29 vitest cases green. But it is a TEST-ONLY
+builder (the TypeScript reference applier it was also written for no longer exists), and a payload
+rule asserted against a second copy of itself is asserted against nothing. That is already the
+stated policy for the ten tag rules — `fabric-props.ts` deliberately holds none of them — and these
+two were simply on the wrong side of a line the file had already drawn.
+
+**The hazard was live, not theoretical.** `foldTextInputValue`'s `defaultValue` leg appeared in NO
+itest, so the device rule could have broken with every suite green; `text-input-payload.itest.ts` now
+pins the precedence, the erasure, the explicit-`text` case, the component gate and the multiline tag.
+**Break-tested by neutering the C++ rule** — four of the five new cases go red, and the fifth stays
+green because it is the control (a view is untouched either way).
+
+**One test file's header contained its own refutation, and reading it is what turned the deletion
+from a guess into a decision.** `core/engine/src/__tests__/text-payload-defaults.test.ts` said it
+"keeps the copies honest"; being a vitest over one of the two copies, it could only ever keep the one
+honest. The C++ file's comment cited it for the same claim. Two places asserted a guarantee that no
+code provided.
+
+**WHAT THE ADAPTER TESTS BECAME, and the rule generalises to the next port.** Each case split into a
+claim about the PLATFORM (moved to an itest) and a claim about the ADAPTER (kept, re-aimed). The
+adapter half is almost always one of two things: *does this adapter commit the node under the
+component the rule is keyed on*, and *does an authored value reach the engine unchanged* — including
+the `false` that `!== false` exists for, which is the value a renderer is most likely to swallow.
+Vue's and Solid's clear-back cases INVERT: they used to assert the adapter substitutes the default
+for an explicit `undefined`, and now assert it forwards the clear untouched, which is the opposite
+behaviour and the correct one.
+
+**Two cases had to be deleted rather than re-aimed, and the tell is the same both times: after the
+change they passed for a reason unrelated to their subject.** "Does not seed text defaults onto a
+View" is trivially true once nothing seeds anything anywhere. An absence assertion whose harness can
+no longer produce the key passes forever and means nothing — the same shape already recorded for
+ActivityIndicator's colour case.
+
+**`foldTextInputValue` DID NOT GO WITH THEM, and splitting there was the point rather than a
+shortcut.** Removing both at once turned 47 tests red across 25 files; removing the defaults alone,
+29. The remainder are mostly TextInput MACHINE tests — the controlled-value handshake, which stays in
+JS by design — using `payload.text` as their observable, so re-aiming them is a different piece of
+work with a different argument. Two rules deleted in one commit is one commit that cannot be
+attributed, which is the discipline this file already applies to measurements.
+
+**IT WENT IN THE NEXT COMMIT, and the split paid for itself in the counting.** Measured alone it is
+**18 cases across 8 files**, not the ~32 the combined run implied — the inflation was the two rules
+overlapping in the same files, which is exactly what makes a combined change hard to reason about
+before doing it. `core/engine/src/fabric-props.ts` now holds NO platform rule at all, and its header
+says so as the file's own contract.
+
+**The re-aim is one substitution with one idea behind it: `payload.text` becomes `payload.value`.**
+A machine test asking "did the app's controlled value settle correctly" can read it under the name
+the MACHINE writes, and the rename into RN's private `text` is the engine's. Nothing lost: the
+census probe still reads two keys (`mostRecentEventCount` + `value` where it was `+ text`), so even
+the key COUNT is unchanged — which is what makes it visibly a rename rather than a deletion.
+
+**One case flipped rather than moved, and it is the group-migration rule again.** `v-model`'s
+CONTROL arm asserted `committedProps()?.text` is undefined without the directive. After the port
+`text` is absent from every payload this harness builds, so that control would have passed forever
+while controlling nothing — it moved to `value` WITH its two positives, where it still discriminates
+because nothing writes `value` without the directive either. And Solid's "never forwards the JS-only
+props" lost its `defaultValue` leg for the same reason its `inputMode` leg went earlier: the stripping
+is the engine's. What is still that layer's is the FUNCTION, because dropping a function is not a
+rule about text inputs — it is a property of building a payload at all.
+
+### The aria fold is the THIRD rule written twice, and the first whose JS copy is not a mirror
+
+`foldAriaProps` exists in `core/engine/src/accessibility-props.ts` and in `SymbioteFabricProps.cpp`,
+the two written to be read side by side. Until 2026-09-18 every assertion about it ran against the
+FIRST, in vitest — so the device copy could have broken with the whole suite green, the same gap
+`foldTextInputValue`'s `defaultValue` leg had. `core/engine/cpp/tests/js/aria-payload.itest.ts` closes
+it: eleven cases off the committed payload, **break-tested by returning the bag unfolded**, which
+turns nine red and leaves exactly the two gate controls green.
+
+**BUT THE TWIN DOES NOT GET DELETED, and that is the distinction worth carrying.** The JS copy has a
+real runtime caller that is not the payload builder — `resolveAccessibilityProps` in `core/components`,
+which component bodies use to fold a bag before handing it on. "A second implementation is not
+automatically a mirror; ask what each one REACHES" cut the other way for the Text defaults, where
+nothing else reached them, and it cuts this way here. What is still arguably wrong is the payload
+builder's CALL to it, which puts a platform rule back in the headless payload; removing that costs
+**27 cases across 16 files**, measured, so it is its own piece with its own argument.
+
+**THE CALL WENT ANYWAY, the same day, and the headless builder now holds NO platform rule at all.**
+The distinction above still stands — the FUNCTION stays, because `pickAccessibilityProps` folds a bag
+and then picks fields BY NAME, which it cannot do from a bag holding only `aria-label`. What was
+wrong was the payload builder calling it. 27 cases across 16 files, as measured.
+
+**IT DRAGGED A WRITE-ONLY FIELD OUT WITH IT, which is the part worth generalising.**
+`node.hasAriaAlias` existed to let the builder skip the fold on the ~99% of nodes carrying no alias,
+and `routeProp` maintained it with an `isAriaAliasKey(key)` on EVERY prop write — the hottest path in
+the engine, 13 000 writes on one benchmark create. With the fold gone nothing read it, and nothing
+would have noticed: a write-only field type-checks, tests green, and reads as load-bearing to the
+next person maintaining that line. **A field with a cost and no reader is worse than a slow one.**
+The field, both writers and `isAriaAliasKey` itself all went; the C++ recomputes the gate from the
+bag it already holds, which its own comment had said all along.
+
+Structurally inert on the bench suite — `setProps` 13000/9000/10000/10000/10000, `created=10000
+cloned=2 nodes=10003`, `folds=0`, every counter byte-identical. **No timing verdict and none is
+expected**: a boolean check over 13 000 writes is microseconds against a 150-400 ms create, and that
+sitting's wall clock swung ±60% in both directions between runs.
+
+**THE RE-AIM HAS ONE SHAPE ACROSS ALL 16 FILES, and it is sharper than what it replaced**: assert the
+AUTHORED, hyphenated key arrives. That is not a consolation claim — the rule reads `aria-label`
+literally, so a compiler that camelised or dropped it ends accessibility in silence, and Svelte's
+really does lowercase every static attribute name. Two cases kept their full force with only the key
+name changed: Solid's `withStableKeys` widening (its `spread` has no removal pass, so a prop going
+undefined can leave its key standing) is now watched on `aria-label`, **the key the spread actually
+holds** — the better place for it.
+
+**ONE CALLER CONVERTED, AND THE COUNT I GAVE FOR THE REST WAS WRONG.** After the call left the
+builder, this section said the remaining JS fold was "one Svelte file, 4 uses". That was a census of
+`pickAccessibilityProps` — the wrapper — not of `resolveAccessibilityProps`, which is what actually
+folds. Counted properly: **~15 runtime callers across all five adapters and the slider package**
+(Modal, KeyboardAvoidingView, VirtualizedList, Image, Slider). Measuring the wrapper and reporting
+the number as the rule's is the same mistake as reading a call site instead of a call graph.
+
+The Svelte list wrapper did convert, Red-Green: a new case in `flat-list.smoke.test.ts` asserts an
+`aria-label` survives the component hop to the committed `RCTScrollView`, which **failed first**
+because the pick folded it. It forwards the aria half RAW now and the engine folds once at the leaf.
+
+**The key list is DERIVED, which is the part that generalises.** Adding fifteen hand-written
+`if (props['aria-…'])` lines would have traded one mirror for another — a second copy of the alias
+list, the exact thing `ARIA_ALIAS_KEYS`' own comment says goes stale one member at a time. The loop
+reads that exported list instead, so the wrapper gains a new alias the day the engine does.
+
+**It needed `ARIA_ALIAS_KEYS` narrowed from `readonly string[]` to `as const`**, because a `string`
+cannot index a prop type and this repo forbids `as`. That is a strict improvement rather than a
+concession: the members are literals now, so the engine's list and `IAriaProps` CHECK EACH OTHER —
+a name in one that is not a key of the other stops compiling at the use site instead of going
+quietly unforwarded. (`Object.assign(picked, {[key]: value})` rather than `picked[key] = value`:
+the key is a union correlated with its value type, which TypeScript cannot follow across a loop, and
+this is the spelling that stays sound without a cast.)
+
+**WHAT IS NOT DONE, stated plainly rather than implied by the commit.** The other ~15 callers still
+fold in JS, so the codebase is MIXED: one path forwards raw, the rest fold first. That is not a
+correctness problem — folding is idempotent and the engine folds whatever reaches it.
+
+**AND THE REST SHOULD NOT BE CONVERTED, which is the opposite of what this section assumed.** The
+whole value of converting them was to DELETE the JS fold. That is off the table, and one call site
+settles it rather than a judgement call:
+
+```
+packages/slider/src/core/slider-state.ts
+  resolveSliderDisabled(disabled, accessibilityState) -> accessibilityState?.disabled === true
+```
+
+`<Slider aria-disabled>` must disable the slider's GESTURE MACHINE, and that decision is made in JS
+before any commit. **A component whose machine branches on the folded value needs the folded value in
+JS — it cannot wait for the payload.** That is the browser's arrangement too: a page may ask for an
+element's computed accessible state, and asking is not reimplementing.
+
+With the fold staying, converting the remaining callers buys almost nothing: `foldAriaProps` returns
+its input BY IDENTITY when the bag holds no alias, which is the ~99% case, so the cost it would
+remove is already not paid. Fifteen sites across five adapters for that is churn.
+
+**One claim in the paragraph above was WRONG and is corrected here.** It said
+`adapters/react/src/components/modal/index.ts:94` destructures the folded result by canonical name.
+It destructures the component's OWN props (`visible`, `style`, `children`) with `...passthrough`
+taking the rest, and never reads an `accessibility*` name — it could forward raw. The real reader is
+the slider, found by looking instead of inferring from a call shape.
+
+**So the mirror is load-bearing and is made LOUD instead**: `core/engine/cpp/tests/js/
+aria-fold-parity.itest.ts` computes the JS fold and commits the same bag through the C++ rule, over
+seventeen bags chosen one per branch, and compares every key both sides produce. **Break-tested** by
+flipping the C++ `aria-live="off"` answer from `none` to `assertive` — it fails naming the key and
+both values. It is the only place the comparison is possible, because the itest harness holds both
+in one process.
+
+It deliberately treats `undefined` and `null` as ONE answer. Both sides build a composite by listing
+every known field, so an unset field is present-with-no-value, and each spells that in its own
+language — JS `undefined`, C++ a `folly::dynamic` null. Every consumer reads them identically
+(`state?.disabled === true`, `coalesce`), so forcing agreement would make one side lie about its own
+types. **What must agree is every field that HAS a value**, and that is what is compared.
+
+**Two findings fell out that had nothing to do with the port:**
+
+- **React's `aria-fold-double-pass.test.tsx` never tested a double pass.** Its subject is real on
+  device — a wrapper folds, then the C++ rule folds again — but both of its cases mounted a BARE
+  `<view>`, which has no wrapper, so pass 1 never ran. Green for two passes while exercising one.
+  The claim moved to `aria-payload.itest.ts`, where both passes exist; it holds by CONSTRUCTION,
+  because pass 1 blanks its aliases and `recordSetProp` ERASES a key written `undefined` rather than
+  storing a null, so the gate sees them genuinely absent.
+- **Five Solid component files carried the same case copied**, each asserting the engine's rule
+  through a different component. One claim, five copies, and the `why:` on each said the fold happens
+  "in JS" — which had been false since the port.
+
+**Three things the writing of that file taught, none of which came from reading the rule:**
+
+- **A case can assert an inner rule while never satisfying the OUTER gate.** "Replaces the state
+  composite" was written with only an `accessibilityState` in the bag — but the whole fold is behind
+  `hasAriaAlias`, so nothing ran and the composite passed through with its invented field intact. The
+  fix was an `aria-busy` in the bag, and the discovery became its own case: **a composite written
+  with no aria key beside it reaches Fabric exactly as authored**, unnormalised. Both implementations
+  agree, so it is the contract rather than a bug — and it is the surprising half, because the
+  composite rules do not apply to a node that only uses RN's own spelling.
+- **The itest harness's `toEqual` is `JSON.stringify`, so it is KEY-ORDER sensitive.** The two
+  implementations build `accessibilityState` in different orders and agree on every value; that read
+  as two failures. Assert a composite field by field. (It also means `toEqual` cannot see a key whose
+  value is `undefined`, since `JSON.stringify` drops it — worth knowing before trusting one.)
+- **"The explicit value survived" is a one-sided oracle**, true of a rule that never ran at all. It
+  needs the ERASURE asserted beside it, which is what makes the case fail under the break. Found by
+  running the break-test and noticing which cases stayed green, not by review.
+
+### TWO GUARDS THAT HAVE STOPPED GUARDING — found while porting, recorded rather than quietly fixed
+
+Both were noticed by asking what a passing test can still SEE, which is the question the text-defaults
+port made routine. Neither is fixed: each repair is a decision with its own scope, and folding either
+into a port would be the unattributable-commit mistake the section above exists about.
+
+**`core/engine/src/applier-is-not-forked.test.ts` is trivially green, for the FOURTH time**, in a
+file that documents its own three previous expiries and states the lesson each time ("a guard keyed
+on HOW something is built expires when the build changes"). Its scan looks for `registerCommitHook` /
+`completeSurface` in our native sources after stripping comments; both markers now appear ONLY in
+comments in `SymbioteTree.cpp` and `SymbioteEngineBindings.h`, so `nativeApplierFiles()` returns
+empty and the "whole point" case early-returns before asserting anything. Verified by running the
+file's own `withoutComments` over both sources.
+
+And the obligation itself has no subject any more: the differential it demands,
+`core/test-utils/src/tree-applier.fuzz.test.ts`, does not exist — nor does `tree-applier.ts`, the
+TypeScript reference tree host it was written to hold honest. **There are not two tree hosts over one
+buffer now; there is one.** So the pair this file forbids is, for the fourth time, not a pair. The
+open question is whether anything survives re-aiming, or whether the file should go.
+
+**`adapters/solid/src/bare-tag-payload-parity.test.tsx` compares a payload with itself**, in all its
+cases. It mounts `payloadOf(WRAPPER_ROOT, () => <text …/>)` against
+`payloadOf(TAG_ROOT, () => <text …/>)` — identical JSX, and `adapters/solid/src/components/` holds no
+`text` or `view` component any more, only `*-props.ts`. Its own header predicted exactly this ("once
+`View` is a string, there is no component left to compare against"). The comparison DID its job
+across the switch and the record is in git; what is left is a test that cannot go red for its stated
+reason. The repair is the shape its sibling `tag-folds.test.tsx` already uses — one arm, absolute
+expectations naming the keys the layer now produces — and the Text case has had it done; the other
+seven are noted in the file and left standing.
+
+**The general form, and it is the cheap check both came from: a test that passes tells you nothing
+until you know what would make it fail.** For the first, the scan's own input had drifted out from
+under it; for the second, the two arms converged. Neither is visible in a green run, and both are one
+question away.
+
+### A derived node's tag never reached C++ — and ActivityIndicator is the first primitive at ZERO folds
+
+`recordSetTag` is emitted by `attachHostBehavior` and by nothing else, so a tag crosses only when JS
+has a BEHAVIOR registered for it. ActivityIndicator's spinner is built by its owner's
+`buildStructure` and named by no app: it had a tag, had platform semantics, and carried an empty
+`tagName` in the host, so no rule could fire for it however the rule was written.
+
+The fix is a **registration with no runtime** — `registerHostBehavior('activity-indicator-spinner',
+{attach(){}, detach(){}})`. That is not a trick to smuggle a tag across: a registration is how this
+codebase declares a tag HAS platform semantics, which is exactly the claim being made. Emitting the
+tag from `createElement` for every node was the alternative and stays rejected for the reason
+`attachHostBehavior` already gives — an app's own `<div>`-equivalent would pay an intern and an op to
+name something the host has no rule for.
+
+With that, **both** of the primitive's folds moved (`foldActivityIndicatorProps`,
+`foldActivityIndicatorSpinnerProps`) and it is the first two-node primitive to reach **zero crossings
+per commit** rather than merely moving work out of one. Every other port so far left a JS fold
+standing for the half that reads a node, an owner or live state.
+
+Four JS constants went with them (the two size boxes, the default size, the centering style) and a
+whole vitest file lost most of its cases — **including ones that were still GREEN**. "OMITS colour
+entirely on the theme default" passed after the port for the wrong reason: the key is absent because
+no rule ran at all, not because Android's half omitted it. An absence assertion on a harness that can
+no longer produce the key passes forever and means nothing, so cases whose subject was a fold move as
+a GROUP with their positive twins, not one failing case at a time.
+
+### A raw text can carry a TAG, and two of Button's four folds were not rules at all
+
+Button's derived nodes are `button -> view -> text -> rawtext` on iOS and `button -> text -> rawtext`
+on Android. Two of their folds went on 2026-09-18, and neither went the way a port usually does.
+
+**`viewFold` was DELETED, not ported, because it was doing nothing on the only platform that runs
+it.** It wrote `style: resolveButtonViewStyle(color, disabled)`; that function returns the constant
+`buttonViewStyle` on every platform but Android, `buttonViewStyle` is `{}` off Android, and the view
+node is built only in the non-Android branch. So it read two props off its owner, discarded both, and
+spent a JSI round trip per button per commit to write an empty object. Second time this migration has
+found that shape after `input-accessory-view`, and the cost model says why it keeps happening: **the
+price is the TRIP, so a fold whose body is empty costs exactly what a fold that does real work
+costs.**
+
+**`labelFold` moved, and it needed `createRawText` to take a tag.** `button-payload.itest.ts`
+recorded "a raw text carries no tag at all, so there is nothing for a tag-keyed rule to key on" —
+true of the old signature, not of raw texts. A raw text has no props an app can write, but its
+CONTENT can still be the platform's decision: RN renders a button's title uppercased on Android
+(`Button.js:352-353`), which is a user-agent choice about a control. `foldButtonLabel` does it now.
+
+The guard on that new parameter is NOT `createElement`'s. There, every element might have a behavior,
+so the gate is `hasHostBehaviors()`. A raw text is the leaf under every `<Text>` on a screen and
+exactly one kind is tagged, so an untagged one compares `tag !== RAW_TEXT_COMPONENT` first — the same
+string literal, therefore pointer equality — and skips the intern, the op and the registry miss.
+Measured on the 3 000-raw-text create fixture: `engine wall` 69.0/69.3 ms against the recorded
+67-75 band, i.e. unmoved.
+
+**The count was wrong in both directions and the measurement corrected it.** This file recorded FOUR
+crossings, one per node. A button driven through `routeProp` measured **five** before and **three**
+after: the fold counter is per SURFACE over the commits a button actually performs, and its
+touchable's `afterCommit` settle re-commits it — the same reason a single touchable reads 5 rather
+than 1. What is exact is the delta: two folds removed, two crossings gone, one each.
+
+**And the two fixtures disagree on purpose.** `button-payload.itest.ts` writes with `setProp`, which
+skips the slot redirect that lives in `routeProp`, so its label never receives the title, an empty
+raw text is dropped from its parent's child set, and that label's fold never ran there at all. Its
+count went 4 -> 3 and shows only the view's deletion. Read the two numbers together or neither.
+
+**The owner's fold then went too, the same day, and off Android Button now binds NO fold at all —
+one crossing left, down from five.** Its last line was `focusable`, and both of its blockers had
+already dissolved: the middle leg is an owned listener, whose existence crosses as a bit since the
+touchable port, and Button's three-way `disabled` (`props.disabled ?? aria-disabled ??
+accessibilityState.disabled`, `Button.js:331,337`) was only ever three PROPS. `foldButtonProps`
+layers the three-leg answer over the one-leg one `foldPressableProps` writes, which is why
+`usesTouchableFocusableRule` excludes `button` — the same order the JS composition had.
+
+It reads the AUTHORED bag, not the one it is handed: by then `disabled` has been erased into
+`accessibilityState` and `aria-disabled` folded into the same place, so the `??` precedence would
+collapse to whatever ended up there. Trap A again, and the JS fold carried the identical correction
+as `projectionOf(propsOf(node))`.
+
+**That one fold was worth TWO crossings**, 3 -> 1 in both fixtures, because the touchable's
+`afterCommit` settle re-commits the node and a fold is charged per commit rather than per node. On
+Android the fold survives for the view style and the ripple background — a theme computation and a
+native config object, neither a prop rewrite — so `buildStructure` binds it behind `IS_ANDROID` and
+binds nothing otherwise.
+
+**And then the last one went, so off Android a `<Button>` binds NO fold on any of its four nodes —
+zero trips into JS, down from five.** The label text's style needed the BUTTON's `color` and
+`disabled` while its parent is the wrapping view, so `ownerProps` could not reach it.
+
+**The seam is an ANCESTOR QUERY, not a second parent pointer**, and that choice is the reusable part.
+"Two up" would encode one platform's tree shape into a rule: the button is this node's grandparent on
+iOS (`button -> view -> text`) and its PARENT on Android, where TNF clones onto the button itself.
+"The nearest ancestor that is a button" is true on both — it is a CSS ancestor selector, which is
+what a browser would use for exactly this.
+
+`IAncestorLookup` is a function pointer plus a context, not a `std::function`: this is the per-node
+commit path and a `std::function` would allocate for every node whether or not any rule asks. The
+WALK belongs to `SymbioteTree`, which owns `Node`; the choice of tag belongs to the rule. Costs
+nothing measurable — the tag-rule ruler is unmoved (`content` 2.8, `pressable` 3.7, `button` 3.8-4.0).
+
+**This was the largest test migration of the whole port — 25 cases across 8 files**, and the split is
+worth reading before the next one. Each case divided into a half this harness can still see and a
+half it cannot:
+
+```
+kept here    the subtree SHAPE, the Text defaults (real props written at build time),
+             the accessibilityState merge, Solid's node IDENTITY across a reactive update
+moved        every style assertion, to `button-derived-payload.itest.ts`
+deleted      the unit tests of `resolveButtonTextStyle`, which no longer exists
+```
+
+One case MOVED rather than being deleted and it is the important one: the re-tint after a late
+`color` write pins that `addDerivedNode` extends `slotDerived`'s mark past the slot to the text.
+That is not fold content — it is the failure mode an ancestor-reading rule introduces, since
+`markPropsDirty` bubbles UP and nothing would reach the label otherwise. **Verified by breaking it**:
+commenting out `addDerivedNode(node, text)` turns it red.
+
+`resolveButtonTextStyle`, `buttonTextStyle` and seven colour constants were deleted with it — the
+orphan shape again, and the label's constants now live only in C++.
+
+**One coverage gap went with the port and is recorded rather than hidden.** `foldButtonLabel`'s
+uppercase arm is `#ifdef ANDROID`, because a raw text commits as `RCTRawText` on both platforms and
+there is no view NAME to branch on the way `Switch`/`AndroidSwitch` gives one. Two vitest cases
+covered it by mocking `Platform.OS`, and what they mocked was a JS function that no longer exists —
+they would pass forever against a mock of nothing. Same class as `android_ripple` and
+`decelerationRate`'s constants: **a compile-time branch is only testable in a build that compiles
+it.** And one behaviour difference shipped deliberately: RN uppercases through JavaScript's
+full-Unicode `toUpperCase`, the C++ rule is ASCII-only, so a Cyrillic label will not uppercase on
+Android. Judged a cosmetic difference on one platform against dragging ICU into the engine.
+
+`resolveButtonTitle` was deleted with it — no caller left but its own two unit tests, which is the
+orphan shape this migration keeps turning up.
+
+### A `<Button>` cost FOUR crossings per commit — SUPERSEDED, it is ZERO, see above
+
+Pinned in `core/engine/cpp/tests/js/button-payload.itest.ts`: one JS fold per node the behavior
+builds — the owner, the iOS wrapper view, the text, and the raw label. At the per-node figures above
+that is ~50 us per button per commit, so a screen holding fifty of them pays about 3 ms of pure
+marshalling every commit they are dirty in.
+
+Porting Button's own rules (`accessibilityRole`, the `importantForAccessibility` promotion, the
+`touchSoundDisabled` rename, the `color` strip) did NOT move that count and the test says so: what
+moved is the work inside the owner's trip. The owner's fold survives for `focusable` (an owned
+listener, invisible to a props-only rule) and the Android view style; the other three hang on DERIVED
+nodes, and a raw text carries no tag at all, so there is nothing for a tag-keyed rule to key on.
+**Eliminating those three is the largest single crossing win left in the engine, and it needs a seam
+that does not exist yet** — derived nodes have no tag.
+
+Two JS functions were deleted outright rather than left behind: `BUTTON_ACCESSIBILITY_ROLE` and
+`resolveButtonImportantForAccessibility` had no caller after the port except their own unit test.
+That is the mirror shape to watch for — a JS copy of a rule that runs elsewhere, kept alive by the
+test asserting it, green forever and meaning nothing.
+
+### A `payloadFold` costs ~17 us per node PER COMMIT, and it is billed inside the C++ walk
+
+Running the same fixture through Vue put its delta at 54.7 ms against React's 49.0 — on an identical
+tree with byte-identical node counters, which should have made Vue the CHEAPER arm, its reconciler
+being far lighter than fibers. Splitting the walk's `props` phase found the whole gap in one place:
+
+```
+react   props= 1.4   foldLookup=2.9   folds=0
+vue     props=18.4   foldLookup=3.3   folds=1000
+```
+
+One node per row carries a `payloadFold` on Vue and none does on React. It is the `text-input`,
+whose host behavior declares `foldPayload`; Vue reaches the behavior because `text-input` is a tag
+resolved through `descriptorFor`, while React's adapter renders its own React component and attaches
+nothing. 17 ms for a thousand folds.
+
+**What a fold costs is the TRIP, not the function.** `fabricProps` converts the whole props bag to a
+`jsi::Value`, calls into JS, and converts the result back — for a fold that rewrites two keys. And
+`foldProbe` caches only the answer NO, so a node that folds pays this on every commit it is dirty in,
+for the life of the screen.
+
+That generalises past this fixture and past Vue, which is why it is here rather than in a Vue note:
+**every lowered primitive is a host behavior.** A thousand-row screen with two lowered `Pressable`s
+would pay this twice per row if those behaviors declared a fold. So read `foldsFound` before
+attributing any per-adapter deficit — a fold count that differs between two adapters on one tree is
+the difference, and nothing else in the walk has to be examined.
+
+**Splitting the fold three ways says which part, and it is not the part it looks like:**
+
+```
+toJs = 1.6    call = 1.6    fromJs = 13.3
+```
+
+The SAME bag travels both directions — `foldPayload` returns `{ ...props, ...folded }` — and reading
+it back costs eight times sending it and eight times the fold's own work. Sending is
+`jsi::valueFromDynamic`, building an object out of a `folly::dynamic` the host already holds. Reading
+back is `jsi::dynamicFromValue`: `getPropertyNames`, then per key `getValueAtIndex` + `getString` + a
+`std::string` allocation + `getProperty` — the same per-key JSI walk `RawProps::parse` pays and
+`mutation-buffer.ts`'s header describes. It is upstream's function; there is nothing to tune inside
+it.
+
+So the cost is not that a fold RUNS. It is that a fold's contract is **bag in, bag out**, so ~18 keys
+come back to express a change to about five. **A fold that returned a PATCH would leave `toJs` and
+`call` untouched and cut `fromJs` by the ratio of the bags — ~10 ms of the 18 measured here.**
+
+**That was tried and pulled back the same hour, and the premise it rested on is worth not repeating.**
+The plan was to merge the patch over the bag and call it backwards-compatible, since a whole-bag
+return is a superset of the patch and merging a superset over its own base changes nothing — which
+would let the ~14 fold sites convert one at a time. False: **a fold expresses a REMOVAL by not
+putting the key back**, so replacing is load-bearing. Merge, and every stripped key returns. Button's
+`ownerFold` strips `title` and `color`, `pressable` strips `MACHINE_ONLY_KEYS`, `text-input` strips
+`ALIAS_ONLY_KEYS` — and a grep for `delete` finds only the last two, because the first drops them by
+omission. The button tests caught it in one run. There is no safe subset to convert first.
+
+The obvious removal channel is closed too: `jsi::dynamicFromValue` maps JS `null` AND JS `undefined`
+onto the same `folly::dynamic` nullptr, so no value a key can hold distinguishes "drop this" from
+"reset this to the platform default", and the second is a real instruction Fabric reads.
+
+So the contract has to carry removal SEPARATELY — a two-slot return (`{ set, omit }`, unambiguous
+through the conversion and cheap) or a static per-component omit list, which two of the three
+strippers already have and Button does not. Whichever it is, **it lands in one commit across every
+site**: a mixed contract silently drops props. And an opt-in flag per behavior does not rescue it —
+the three folds that cost the most on device (`pressable`, `text-input`, Button's owner) are exactly
+the three that strip keys, so the sites a partial migration could safely take are the ones worth
+nothing. Full record, and the assertions that pin why replacing is load-bearing:
+`core/engine/src/__tests__/payload-fold-merge.test.ts`.
+
+**And the apply phase is ruled out as a second cause, which is what makes the fold the whole
+remaining lever.** Splitting `applyOps`' own half three ways on the same fixture:
+
+```
+           ops   decode  setProp  convert  structure  publish  handles   decoded
+ engine   19.3    4.0     1.3      0.4      1.2        2.4      1.6       7002
+ react    23.3    5.9     1.6      0.7      2.5        3.8      2.3       7002
+ vue      20.6    4.5     1.5      0.6      1.2        2.7      1.9       7002
+```
+
+`apply` is `walk` plus `ops` in all three, and `ops` barely moves between them — so Vue's 14 ms of
+extra `apply` is entirely its walk, i.e. the fold again. **The books close on this fixture: React's
+deficit against the direct arm is fibers, Vue's deficit against React is the fold.** The one residue
+is React's `ops` running 4 ms over the direct arm for byte-identical op counts, which at ~20% of a
+19 ms phase with allocation as the obvious suspect does not yet carry a hypothesis.
+
+### React's `Swap` anomaly is not the engine, and the benchmark row's `memo` is why the first probe missed
+
+`Swap` at 3.68x stock (35.3 against 9.6) is the largest unexplained loss in the device table and has
+stood unchanged through every re-measurement. `core/engine/cpp/tests/js/adapter-swap-cost.itest.tsx`
+exchanges two rows of a standing thousand through the React adapter, three ways:
+
+```
+ arm                  wall    engine    what the row hands React
+ swap (plain)         76.0     3.3      ten thousand rebuilt elements
+ hoisted              21.0     3.4      the same element objects, by identity
+ memo                 24.5     2.4      a thousand rebuilt wrappers, every body bailing out
+```
+
+**The engine is ruled out, and by assertion rather than by the clock:** all three arms report
+`created=0 cloned=2 reused=1000 targetedReplaces=1 setProps=0`, byte-identical to each other and to
+what `update-shapes-cost.itest.ts` gets with no reconciler at all (1.8 ms for the whole step). Not one
+prop write crosses. So ~22 ms of the comparable arm is React walking a thousand children to find the
+two that moved.
+
+**And the first arm was not the device's workload.** It read as the answer — 73% of a swap is the app
+rebuilding elements it throws away — and both benchmark screens wrap their row in `memo`
+(`examples/react/…:387`, `examples/bare-rn/…:395`), so neither pays it. Reading the OTHER side's
+screen is what turned a comparison into two workloads wearing one name; the 55 ms split is real but
+it is a fact about unmemoized lists, not about this row.
+
+What stays open is the half this fixture cannot reach: both sides run the SAME reconciler, so the
+9.6-vs-35.3 difference is what React does per fiber against a mutation-mode host config versus its
+own persistent-mode one. Answering it needs React's own Fabric renderer standing up in this harness.
+
+### Every headless React arm ever timed here ran the DEVELOPMENT React, and `bench:itest` now does not
+
+`scripts/run-itests.mjs` pinned `__DEV__: true` and `NODE_ENV: "development"` for every run. That is
+right for the correctness build — it is what keeps React Native's invariants and warnings armed, the
+same reason the C++ side is Debug there — and it was applied to `build-release` too. `react/index.js`
+picks `react.development.js` off `NODE_ENV`, so **every React arm in `core/engine/cpp/tests/js/` was
+measured with validation and warnings on.** It is the JS twin of the mistake this file already
+records for the native side ("never benchmark adapters in a Debug build; the sign of the headline
+comparison flipped"), and it went unnoticed because nothing named it.
+
+Fixed: the defines follow the build (`isBenchBuild`). The measured cost on the swap fixture is
+**24.5 ms -> 20.6 ms, i.e. ~16% of that arm was development React** — so every reconciler delta this
+directory has published carries a share of it, including the 45-48 ms attributed to fibers. Re-read
+before quoting any of them.
+
+It also blocked the stock arm outright, and silently: `ReactFabric-prod` sets React's internals up in
+their production shape, a development `createElement` then calls `dispatcher.getOwner()` which
+production does not carry, React catches the throw, retries three times, and reports it through RN's
+error dialog into `console.error`. What the caller sees is a component that RAN and a surface holding
+`RootView()`, empty, with no error anywhere — which reads as "components do not work here".
+
+### React's own Fabric renderer LOADS headlessly — a stock baseline is now a build-out, not a question
+
+Every stock comparison in this file is taken on a device because nothing here could run the other
+side. `core/engine/cpp/tests/js/stock-renderer-probe.itest.tsx` settles the feasibility:
+`ReactFabric-prod.js` imports and exposes `render` / `stopSurface` / `dispatchCommand`, and the
+`nativeFabricUIManager` it drives is the same binding `raw-fabric-vs-engine.itest.ts` already uses.
+
+**Neither wall was the expected one, and Flow was not a wall at all** — the itest runner already
+strips it with Hermes' own parser. What actually failed:
+
+1. 75x `The JSX syntax extension is not currently enabled`. Stripping Flow leaves JSX alone, and RN
+   writes JSX in `.js` files that the loader handed esbuild as `js`. It reads as a Flow failure and
+   is not one. Fixed by returning the `jsx` loader — strictly wider, since a `.js` file with no JSX
+   parses identically either way.
+2. Unresolvable dev modules and `.png` imports from LogBox, all behind
+   `ReactNativePrivateInitializeCore` — RN's app bootstrap, required by the renderer on line 16 for
+   its side effects. Stubbed to empty in the runner; a measurement that ran an app bootstrap would be
+   measuring the bootstrap.
+
+`ReactNativePrivateInterface`, the thing that was budgeted for, needed no stub: all twelve of the
+renderer's uses resolved. **This is also the RN-port backlog's "step 0", which that section records
+as never tried** — it is now tried, in the itest runner rather than in `vitest.config.ts`, and the
+answer is that RN's Flow is not what blocks importing it.
+
+**And RN's own view config for `RCTView` now resolves too — 194 `validAttributes`, the real one.**
+That matters because `createAttributePayload` reads exactly that table, so a hand-written stand-in
+would produce a different payload and the comparison would be measuring the stand-in. Reaching it
+went five steps, each found by satisfying the previous and reading the next throw:
+
+```
+1. Can't find variable: global                  runner prelude, global = globalThis
+2. __fbBatchedBridgeConfig is not set           an EMPTY bridge, so NativeModules can evaluate
+                                                and every lookup misses cleanly
+3. getEnforcing('SourceCode') not found         a turbomodule proxy answering to any name
+4. Cannot destructure property 'screen'         getConstants() returning a screen shape
+5. Platform_default.select is undefined         Metro's platform extensions, in the runner
+```
+
+Only the fifth was not a fake. `Libraries/Utilities/Platform.js` is a compatibility shim whose whole
+body is `import Platform from './Platform'; export default Platform;`, relying on **Metro** resolving
+`./Platform` to `Platform.ios.js`. esbuild has none, so it resolved the file to itself, the cycle
+yielded `undefined`, and the throw named `BridgelessUIManager` — several modules from the cause.
+
+**Platform extensions are OPT-IN per file (`// @symbiote-platform-extensions`), and the rest of the
+suite paid to establish that.** Turned on for everything they broke 154 of 158 itests: the engine
+imports RN's `processColor`, which imports `Platform`, and resolved properly `Platform.ios.js` wants
+`NativePlatformConstantsIOS` → a native module → every bundle dies at import. Satisfying that
+harness-wide would need a permissive `__turboModuleProxy`, and **the engine reads that global
+itself** — so every itest asserting a module is absent would silently start finding one, which is
+the trap `<native_module_name_is_platform_specific>` names.
+
+**The latent fact underneath is worth carrying into the RN-port backlog:** in every itest bundle
+without the directive, RN's `Platform` is `undefined`, and any upstream module that dereferences it
+throws. Our colour path imports `processColor`, whose `Platform.OS === 'android'` check sits on a
+branch our itests evidently never reach — on device they would. So "it imports and the tests pass"
+is NOT evidence that an upstream module works headlessly; it may only mean the line that needs
+`Platform` was never executed. Tier A's candidates should be checked against this specifically.
+
+**AND IT RENDERS: `RootView(View())`, committed through `nativeFabricUIManager`.** React's own Fabric
+renderer mounts a real view into the harness's surface, with RN's own view config and RN's own
+`createAttributePayload` building the payload. **Every stock-vs-ours question in this file is now a
+two-arm headless fixture rather than a simulator run** — starting with `Swap` at 3.68x, where both
+sides run the same reconciler and the only difference left is mutation-mode against persistent-mode.
+
+Two things the control caught, and both would have shipped as findings without it. **"render
+returned" is not "a node committed"** — React schedules its work, so a clean return says only that
+nothing threw; `flushTimers()` then `mounted()` is what settles it. And **the harness has exactly ONE
+surface**, `kSurfaceId = 1` (`symbiote-host.h`), which every reader visits and no other: rendering
+into a root tag of its own — the careful-looking choice, since the raw arm keeps its tags clear of
+ours — committed into a surface nothing can read, and reported `RootView()` empty while `render` came
+back perfectly clean.
+
+### The headline metric, headless, on one ruler — and it lands on the device ratio
+
+`core/engine/cpp/tests/js/stock-create-cost.itest.tsx` builds the same ten-node row a thousand times
+through `ReactFabric-prod`. Census asserted by absolute count first (`View=3001 Paragraph=3000
+RawText=3000 TextInput=1000`), then the clock:
+
+```
+ stock              85.9
+ engine directly    67.3    0.78x
+ our React          90.8    1.06x
+ our Vue           109.4    1.27x     still carrying the 17 ms text-input fold
+```
+
+**The device says React 264.7 against stock 257.3, i.e. 1.03x; headless says 1.06x.** So the harness
+reproduces the device ratio on the number everyone reads first, which is what a baseline is for — a
+create-path change can now be judged before a simulator ever runs.
+
+Read Vue's column with care: this fixture drives raw tags through `h()`, while the device's Vue is an
+SFC with compile-time lowering and static-prop hoisting, so 1.27x here and 0.89x there are not the
+same workload. What IS comparable is that its fold is still on the books.
+
+And React's 90.8 is down from the ~120 this same fixture reported an hour earlier — that is the
+development-React fix above paying out, at roughly a quarter of the arm.
+
+### And the `Swap` anomaly reproduces headlessly: 2.42x, against 3.68x on device
+
+`core/engine/cpp/tests/js/stock-swap-cost.itest.tsx` builds the same thousand memoized rows through
+`ReactFabric-prod` and exchanges the same two. Census first, as always — `View=3001 Paragraph=3000
+RawText=3000 TextInput=1000`, the ten-node row exactly:
+
+```
+ stock          8.5 ms      device says 9.6 — the harness lands on the real number
+ our React     20.6 ms      engine 2.7 ms of it, `created=0 cloned=2 reused=1000 setProps=0`
+ ratio         2.42x        device says 3.68x
+```
+
+Both sides run the SAME reconciler over the same tree, and the engine is 2.7 ms of our 20.6 — so the
+remaining ~12 ms is the host config, mutation mode against React's own persistent mode, and it is
+now bisectable without a simulator. A SEPARATE FILE per arm on purpose: the runner spawns a process
+per file, which removes both the ~3%/arm contamination this directory has measured and the question
+of whether two renderers can share the harness's single surface.
+
+Three traps worth not re-paying. A failing stock render is **silent** (React retries, then reports
+through RN's error dialog into `console.error`), so a swap measured against an empty tree reads
+0.1 ms and passes every before/after comparison — the fixture captures `console.error` permanently
+for that reason. The census must assert ABSOLUTE counts, not that before matches after: two empty
+censuses match perfectly. And the shadow names are not the element names — `RCTText` commits as
+`Paragraph`, its string child as `RawText`, `RCTSinglelineTextInputView` as `TextInput`.
+
+**Split into render and move, the deficit is entirely the move — and our RENDER is faster than
+stock's.** A re-render with the SAME order reconciles all thousand children, every one bailing out of
+`memo`, and commits nothing:
+
+```
+                  re-render   swap    the move itself
+ stock               3.5       5.9         2.4
+ ours                1.8      19.9        18.1     engine 2.6 of it
+```
+
+**And the move does not track DISTANCE**: swapping rows 1 and 2 costs 20.8 ms against 19.9 for rows 1
+and 998. Both move exactly two rows, so React's flag walk and our host-config calls are identical and
+only the travel differs — which rules out the two obvious suspects, `getHostSibling`'s search in
+React's mutation commit and the `std::vector::insert` tail shift `kOpInsertBefore` still pays. What
+is left is a FIXED price that appears the moment any placement exists.
+
+That looked like React's mutation-effect traversal — with no placement the parent's `subtreeFlags`
+carry no `MutationMask` and React skips its thousand children outright, and one placement makes it
+walk all of them, which persistent mode has no equivalent of. **The widening arm weakens it.** At
+2 000 rows the swap costs 29.4 ms against 22.7, i.e. 1.29x for a 2x widening; the engine's own halves
+did double (walk 0.9 → 2.0, apply 2.8 → 5.8) as a walk over twice the list must, and taking that out
+leaves the JS above it at **1.19x**. A cost that came from walking the children would have doubled.
+
+**What it is NOT is now most of the answer:**
+
+```
+ the engine            2.8 ms of 22.7, and it scales with the list as it should
+ Fabric's own commit   fabric=0.8, layout=0.0 — the platform is not in this at all
+ the render phase      1.9 ms, and faster than stock's 3.5
+ a search or a shift   adjacent and distant swaps cost the same
+ the child count       1.19x on a 2x widening, engine excluded
+```
+
+So ~18 ms is JS, above the engine, triggered by the existence of a placement, nearly flat in the list
+size.
+
+**One more bisection landed it without a profiler.** The host config's `insertBefore` was replaced by
+an empty function, the arm re-run in the same sitting, then reverted:
+
+```
+ swap, as it is              23.3 ms    fabric 0.7  layout 0.0
+ swap, insertBefore no-op    16.7 ms
+ re-render, nothing moved     1.8 ms
+```
+
+**With our insertion removed entirely the swap still costs 16.7 ms against an idle 1.8** — so at
+least ~15 ms is React's own mutation-mode commit, with a host config doing literally nothing, against
+the 2.4 ms stock's persistent mode spends on the same move. That is the cost of `<M1 + M2>`'s
+deliberate choice to drive React in MUTATION mode so R2 could not be skipped, and the engine cannot
+remove it. **`Swap` is therefore React-adapter-specific by construction** — Vue/Svelte/Solid/Angular
+emit their moves straight into the engine and the device table already shows them at 0.64-0.91x of
+stock on that row.
+
+The remaining ~6.6 ms is our insertion chain, and that split is NOT clean: with the no-op the
+committed tree is wrong, so that arm's own commit differs (`fabric=9.2 layout=8.2` against 0.7/0.0).
+Only the lower bound on React's share survives it — do not quote 6.6 as ours without an arm that
+keeps the tree correct.
+
+**And a direct counter has now confirmed the seed and priced it — pointing the opposite way from the
+device figure that prompted the instrument.** `writesOfUnchanged` counts the `setProp` ops that leave
+AFTER the JSI -> `folly::dynamic` conversion because the node already holds that value, so the
+crossing was paid for nothing. It was added to chase the device benchmark's `WRITES 17037/16000` on
+REACT. On this fixture's row:
+
+```
+ engine  unchanged=0        react  unchanged=0        vue  unchanged=6000
+```
+
+Six thousand is 3 000 text nodes times two, i.e. `seedTextDefaults` exactly: the renderer writes
+`ellipsizeMode` and `allowFontScaling` on every text node at `createElement`, the app then authors
+the same two, and each one crosses, converts and is dropped. **6 000 wasted crossings per 1 000-row
+create**, on Vue, Angular and Solid alike (all three seed; React folds instead). The device's React
+figure is about the device's row, which authors props the fold already supplies — do not conflate
+them.
+
+**Fixed the same day, and NOT with another `payloadFold`** — one of those costs ~17 us per node per
+commit, worse than what it saves. RN's text defaults are the PLATFORM's semantics rather than any
+adapter's, so the rule now lives in the payload builder beside the component-keyed folds already
+there: `applyTextDefaults` in `core/engine/src/fabric-props.ts` and its twin in
+`SymbioteFabricProps.cpp`, with `seedTextDefaults` deleted from Vue, Angular and Solid.
+`writesOfUnchanged` on Vue's arm went **6 000 → 0**, and `setProps` held at 13 003 — the accepted
+writes are the same ones, six thousand seed ops simply stopped being emitted for the app to overwrite.
+Wall moved 121-130 → 116.6, which is at the edge of this fixture's spread and carries no verdict on
+its own; the counter does.
+
+**The counter is now a guard, not just a readout.** `update-shapes-cost.itest.ts` drives the engine's
+own mutation API with no reconciler above it and asserts `writesOfUnchanged === 0` and
+`deletesOfAbsent === 0` on every shape — select, partial, swap, remove, append, clear. That zero is
+what makes a non-zero on an ADAPTER's arm attributable to the adapter rather than to the engine,
+which is exactly how the seed was found and priced.
+
+**Pointed at the commonest shape a real app makes, it found nothing — and that is the useful answer.**
+A parent's state moves and a thousand UNMEMOIZED rows re-render, writing back exactly what they
+already had (`adapter-swap-cost.itest.tsx`, the no-op arm): `setProps=0 unchanged=0 cloned=0`. React
+diffs props itself and never reaches `commitUpdate` when they compare equal, so **nothing crosses the
+boundary at all** — the whole 27.3 ms is React re-rendering a thousand rows the app chose not to
+memoize. Both counts are asserted, because a regression that made the adapter write unconditionally
+would leave the tree, the payload and the wall clock looking identical.
+
+Two things that came with it. The adapters keep their clear-back-to-`undefined` path (a framework
+that clears a prop it set must get the default BACK, and that is off the create path by its own
+comment) — only the create-time seed is gone. And two tests had to move from `.props` to the
+PAYLOAD, which is what they were always trying to assert: `adapters/solid/src/
+renderer-defaults-fold.test.tsx` said so in its own header ("survives … being lifted into the
+engine"), and `adapters/angular/src/__tests__/text-defaults.test.ts` read the recording host, whose
+`props` is "as the ops named it" and therefore cannot see a payload-time rule at all.
+
+A second, smaller thing came out of the same bisect and is a structural fix with NO measured time
+win, recorded honestly as that. `internValue` excluded booleans from the intern table on the
+reasoning that a `Map` lookup costs what converting a boolean costs. Booleans need no `Map` — there
+are two of them, so a dedicated slot each is a branch — and the conversion was never the whole cost,
+since `values` is a JSI array the host reads entry by entry. Three adapters seed
+`allowFontScaling: true` at `createElement`, so the table held one entry per text node on the screen.
+Folding them took it from 5007 to 2008 on React's arm and 9007 to 3008 on Vue's, and moved the wall
+clock ~2%, which is inside the noise. Kept because the table is now an honest diagnostic — it counts
+DISTINCT values rather than writes of un-interned kinds — which is what made the fold count readable
+in the first place.
+
+### A re-render that changes nothing is free now, whichever way the style is written
+
+The commonest shape any app produces: a parent's state moves, the framework re-renders the subtree,
+every child writes back what it already had. A component that builds its style inline hands over a
+FRESH object each time, which `Object.is` cannot refuse — so the write used to cross into the host
+and become a `folly::dynamic` before anything could say it was unchanged. Measured on 1 000 rows with
+nothing changed (`core/engine/cpp/tests/js/no-op-rerender-cost.itest.ts`):
+
+```
+                    before   after
+hoisted style          0.3     0.6      StyleSheet.create / a CSS class / a module constant
+rebuilt literal        9.7     0.6      16x — the whole gap was the conversion
+whole row rewritten   12.9     2.3      the 1 000 left are per-row testID strings, genuinely distinct
+```
+
+`routeProp` now compares a rebuilt style against the standing one key for key before recording
+anything (`isSameShallowStyle`, `core/engine/src/node.ts`) — shallow and conservative, so a nested
+value (transform list, shadow, style array) still crosses and the host's `diffProps` refuses it as
+before. Being wrong there is slow, never incorrect. Nothing propagates in any of the three passes:
+`created=0 cloned=0`, and the differ is told nothing.
+
+### `Clear` was quadratic in list width, in our C++, and it is the one row stock wins
+
+Every device run this project has taken has stock ahead on `Clear` — 10.7 ms against our 9.1-44.2 —
+and the row was left alone because small-ms rows do not carry a verdict. A suspicious row plus a
+suspicious ALGORITHM is a different thing, and the algorithm was in `SymbioteTree.cpp`:
+`detachFromParent` ran `std::remove` over the parent's whole child vector and then `erase`d. That is
+O(width) per removal from EITHER end — `std::remove` scans the whole range whatever it finds, and
+`erase` shifts the tail — so clearing N children was O(N²).
+
+Measured with `core/engine/cpp/tests/js/child-list-scaling.itest.ts`, which reads a doubling factor
+rather than a millisecond (linear work doubles, quadratic quadruples):
+
+```
+clearing 1 000 / 2 000 / 4 000 children      apply ms        doubling factors
+before   std::remove + erase                 0.45 1.27 4.29     2.8  3.4
+after    hole + slot hint + lazy compaction  0.33 0.47 0.85     1.4  1.8
+```
+
+Per removal it went 0.45 → 1.07 us as the list grew, and is now flat at ~0.25 us. A node carries
+`slotInParent` (a HINT, validated against the vector before it is believed, with a scan as the
+fallback) and a detach nulls that slot instead of erasing; every reader of `children` calls
+`compactChildren` first, which is one branch on a dense vector and one linear pass on a churned one.
+
+**And the bigger half of `Clear` was a GATE asking the wrong question.** `removeChild` nominates a
+teardown candidate when `hasHostBehaviors()`, which is true as soon as a behavior TYPE is
+registered — and `@symbiote-native/components` registers `Pressable` at module load, in every app,
+before a node exists. The commit sweep then crosses EVERY removed node into JS: ten thousand handles
+to clear a thousand rows, whether or not the screen holds a single Pressable.
+
+The gate now asks `hasAttachedBehaviors()` — has a behavior ever attached to a node — which is
+monotone, needs no accounting on a `WeakMap` with no size, and can only ever be late. Nothing the
+sweep does can matter before the first attach: `attached` is written only by `attachHostBehavior`,
+`awaitingCommit` and `committedEachTime` only inside a `behavior.` branch, `parked` only by
+`detachAnimatedProps` (which has its own gate). Measured with
+`core/engine/cpp/tests/js/teardown-sweep-cost.itest.ts`:
+
+```
+clearing 1 000 rows (10 000 nodes)          before   after
+no behavior type registered anywhere          1.98    1.98
+a type registered, attached to nothing        6.23    1.96     3.2x -> 1.0x
+a behavior attached to one node per row       9.23    9.23     unchanged, and correctly so
+```
+
+The third row is what a screen with Pressables still pays, and it is recorded rather than fixed.
+Split from the inside (`hostReadMs` on `readSurfaceTelemetry`, added for this question):
+
+```
+a 5.2 ms sweep over 10 000 removed nodes
+  subtreesOf, the crossing        1.70 ms   0.17 us per handle   32%
+  the JS loop above it            3.53 ms                        68%
+```
+
+**Two fixes were ruled out by that split rather than by taste, and the reasons are worth keeping.**
+Moving the torn-down mark into C++ so no handle crosses buys at most the 1.7 ms and costs a crossing
+per INSERT — `reattachHostBehaviors` runs ~9 000 times on a benchmark create, where today it is a
+`WeakSet` miss. And marking only the detach ROOTS instead of whole subtrees would cut the sweep to a
+tenth, but it is unsound: a framework that removes a parent and then re-inserts one of its CHILDREN
+elsewhere would find that child unmarked and its behavior never re-armed. `detachOne`'s own comment
+records an earlier narrowing that failed for the neighbouring reason.
+
+What is left is a 10 000-iteration JS loop doing about five operations each, with no fat item in it.
+Removing the redundant per-call `seen` Set (`tornDown.add` two lines below the guard already dedupes
+within a call) changed nothing measurable — 4.4-4.6 ms either way — and the `.filter(isSymbioteNode)`
+on the result is the type NARROWING, not a defensive check, so it cannot go without an `as`.
+
+**`insertBefore` is still quadratic and that is recorded, not fixed.** Finding the anchor is O(1) now
+through its hint; the `std::vector::insert` that follows shifts the tail, which is the container's
+problem and not the search's. An intrusive doubly-linked list would make insert, remove AND
+`nextSiblingOf` all O(1) and every reader in that file is already a forward walk — but the device
+table has us BEATING stock on `Swap` (6.1-8.7 against 9.6), so the core data structure does not get
+replaced on the strength of a row nobody has lost. The scaling test characterises it with a loose
+tripwire bound rather than asserting quadratic is right.
+
+Two traps this cost, both worth not repeating. Renumbering the tail's hints after an insert to keep
+them exact made a 4 000-row reorder 34.6 ms against 6.7 — five times worse to maintain a hint that
+nothing requires to be exact, since the detach validates before believing it. And a move WITHIN one
+parent must erase rather than hole: the insert shifts that vector anyway, so a hole adds a
+compaction pass on top of the shift.
+
+**Do not read `commitMs` / `layoutMs` for a step whose commit was SKIPPED.** `readSurfaceTelemetry`
+answers off `getCurrentRevision().telemetry`, so a skipped commit leaves the PREVIOUS commit's
+numbers standing — all three passes above report the create's `fabric=8.4 layout=7.6`. Use
+`mountingLogs()` (the differ's output) to ask whether the platform was told anything.
 
 ## Reference material
 

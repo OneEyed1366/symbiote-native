@@ -69,13 +69,8 @@ function bumpDeep(): void {
       reactive/shallowReactive/readonly/shallowReadonly/toRaw/markRaw +
       predicates
     </text>
-    <text
-      class="list-row-text"
-      testID="checks-deep-n"
-    >
-      {{
-        `reactive({n}).n = ${deep.n} (live)`
-      }}
+    <text class="list-row-text" testID="checks-deep-n">
+      {{ `reactive({n}).n = ${deep.n} (live)` }}
     </text>
     <ActionButton
       testID="checks-bump-deep"
@@ -88,14 +83,8 @@ function bumpDeep(): void {
       TypeScript's DeepReadonly&lt;T&gt; suppressed just for this button, not
       worth adding to app code.
     </text>
-    <text
-      v-for="(entry, index) in checks"
-      :key="index"
-      class="list-row-text"
-    >
-      {{
-        entry
-      }}
+    <text v-for="(entry, index) in checks" :key="index" class="list-row-text">
+      {{ entry }}
     </text>
   </view>
 </template>

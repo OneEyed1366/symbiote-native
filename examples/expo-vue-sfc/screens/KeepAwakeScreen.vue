@@ -56,24 +56,17 @@ function handleToggle(): void {
     >
       <view :class="`line-tag line-tag-${lineInfo.line}`">
         <text class="line-tag-text">
-          {{
-            `${lineInfo.code} · ${lineInfo.label}`
-          }}
+          {{ `${lineInfo.code} · ${lineInfo.label}` }}
         </text>
       </view>
       <view class="hero-card">
-        <view
-          class="hero-badge"
-          :style="{ backgroundColor: lineColor }"
-        >
+        <view class="hero-badge" :style="{ backgroundColor: lineColor }">
           <text class="hero-badge-text">
             {{ lineInfo.code }}
           </text>
         </view>
         <view class="hero-copy">
-          <text class="hero-title">
-            Keep Awake
-          </text>
+          <text class="hero-title"> Keep Awake </text>
           <text class="hero-body">
             @symbiote-native/keep-awake — keeps the screen on for as long as a
             component holding useKeepAwake() stays mounted.
@@ -81,17 +74,10 @@ function handleToggle(): void {
         </view>
       </view>
 
-      <view
-        testID="keep-awake-card"
-        class="keep-awake-card"
-      >
-        <text class="keep-awake-card-title">
-          Screen lock
-        </text>
+      <view testID="keep-awake-card" class="keep-awake-card">
+        <text class="keep-awake-card-title"> Screen lock </text>
         <view class="keep-awake-row">
-          <text class="keep-awake-row-label">
-            Available
-          </text>
+          <text class="keep-awake-row-label"> Available </text>
           <view
             :class="`keep-awake-status-badge keep-awake-status-badge-${isAvailable}`"
           >
@@ -107,16 +93,9 @@ function handleToggle(): void {
           </view>
         </view>
         <view class="keep-awake-row">
-          <text class="keep-awake-row-label">
-            Held
-          </text>
-          <text
-            testID="keep-awake-held-value"
-            class="keep-awake-value-text"
-          >
-            {{
-              isHeld ? 'true' : 'false'
-            }}
+          <text class="keep-awake-row-label"> Held </text>
+          <text testID="keep-awake-held-value" class="keep-awake-value-text">
+            {{ isHeld ? 'true' : 'false' }}
           </text>
         </view>
         <ActionButton

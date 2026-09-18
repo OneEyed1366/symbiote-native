@@ -4,7 +4,7 @@
 // framework may spell a MOVE as remove-then-reinsert. The reorder case below is the whole point —
 // it is green either way if you only assert "removeChild tears down".
 import { afterEach, describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import {
   appendChild,
   clearHostBehaviors,
@@ -18,8 +18,11 @@ import {
   setProp,
   type ISymbioteNode,
 } from './index';
+// The seam: a node's children live in the HOST, not in a field (`host-access.ts`).
+import { childrenOf } from './host-access';
 
-installFabric();
+// A RECORDING host: nothing here reads a committed tree.
+installRecordingFabric();
 let nextRootTag = 9000;
 
 // A view DISTINCT from the plain containers below. Reusing 'RCTView' for both made the first
@@ -104,7 +107,7 @@ describe('teardown', () => {
     surface.commit();
 
     expect(log.detached, 'a reorder is not a removal').toEqual([]);
-    expect(root.children).toEqual([first, second]);
+    expect(childrenOf(root)).toEqual([first, second]);
   });
 
   it('tears down the whole removed SUBTREE, not just the node named', () => {
@@ -292,7 +295,7 @@ describe('attachAfterCommit', () => {
 // The RECURRING beat, for a behavior whose contract is driven by a PROP rather than by an event.
 // A controlled TextInput is the case: RN commands the text back down when the app's `value`
 // diverges from what native last reported, and in a component the render is what re-runs that
-// comparison. A lowered element has no render, so the commit is the only equivalent.
+// comparison. A tag has no render, so the commit is the only equivalent.
 describe('afterCommit', () => {
   interface IRecurringLog extends ILog {
     order: string[];

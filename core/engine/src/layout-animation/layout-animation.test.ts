@@ -7,7 +7,7 @@
 // headless fake answers to any name).
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import type { ILayoutAnimationConfig } from './index';
 
 // The single correct TurboModule name. Kept in sync with index.ts's
@@ -197,10 +197,10 @@ describe('LayoutAnimation.setLayoutAnimationEnabled', () => {
 
 describe('LayoutAnimation native resolution mechanism', () => {
   it('prefers the Fabric global slot when it exposes configureNextLayoutAnimation', () => {
-    installFabric();
+    installRecordingFabric();
     const slot: unknown = Reflect.get(globalThis, 'nativeFabricUIManager');
     if (typeof slot !== 'object' || slot === null) {
-      throw new Error('installFabric did not install a slot');
+      throw new Error('installRecordingFabric did not install a slot');
     }
     let fabricCalls = 0;
     Object.assign(slot, {

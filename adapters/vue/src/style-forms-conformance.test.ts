@@ -28,9 +28,9 @@ import * as engine from '@symbiote-native/engine';
 import * as vueAdapter from '@symbiote-native/vue';
 import { mount, unmount } from '@symbiote-native/vue';
 import {
-  installFabric,
+  createLiveTree,
+  installRecordingFabric,
   waitUntil,
-  type IFakeNode,
 } from '@symbiote-native/test-utils';
 import * as runtimeHelpers from './runtime-helpers';
 import metroVueTransformer from '../metro-vue-transformer.cjs';
@@ -41,7 +41,8 @@ const {
   metroVueTransformer;
 
 const ROOT_TAG = 973;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 
 beforeEach(() => {
   fabric.reset();
@@ -106,27 +107,18 @@ function evaluateCompiledSfc(code: string): Component {
 // engine flattens the class-derived and explicit style halves into the committed prop bag, so
 // what comes back IS the RN style object - testID dropped, being the lookup key rather than style.
 //
-// Walks `committed` rather than `created`, and matches on testID rather than viewName: both are
-// the harness traps in .claude/rules/test-harness-false-greens.md (a clone-on-write supersedes a
-// created node's frozen props; the tree carries container RCTViews of the same name).
-function findCommitted(
-  nodes: readonly IFakeNode[],
-  testId: string,
-): IFakeNode | undefined {
-  for (const node of nodes) {
-    if (node.props.testID === testId) return node;
-    const found = findCommitted(node.children, testId);
-    if (found !== undefined) return found;
-  }
-  return undefined;
-}
-
+// Walks the LIVE tree and matches on testID rather than viewName: both are the harness traps in
+// .claude/rules/test-harness-false-greens.md (a clone-on-write supersedes a created node's frozen
+// props; the tree carries container RCTViews of the same name).
 function committedStyleOf(testId: string): Record<string, unknown> {
-  const node = findCommitted(fabric.committed, testId);
+  const node = live.findLive(
+    live.appRoot(),
+    candidate => candidate.payload.testID === testId,
+  );
   if (node === undefined) {
     throw new Error(`no committed node carries testID "${testId}"`);
   }
-  const { testID: _testId, ...style } = node.props;
+  const { testID: _testId, ...style } = node.payload;
   return style;
 }
 
@@ -134,7 +126,7 @@ async function renderSfc(source: string, filename: string): Promise<string> {
   const code = await compileSfc(source, filename);
   mount(ROOT_TAG, evaluateCompiledSfc(code));
   await waitUntil(
-    () => fabric.counts.completeRoot > 0,
+    () => fabric.commits > 0,
     `the Vue commit for ${filename} to reach Fabric`,
   );
   return code;
@@ -528,7 +520,7 @@ describe('<style module> — the name map is correct, and the template reaches i
 
     mount(ROOT_TAG, evaluateCompiledSfc(code));
     await waitUntil(
-      () => fabric.counts.completeRoot > 0,
+      () => fabric.commits > 0,
       'the Vue commit for Module.vue to reach Fabric',
     );
     expect(committedStyleOf('single')).toEqual({ padding: 10 });
@@ -547,7 +539,7 @@ describe('<style module> — the name map is correct, and the template reaches i
 
     mount(ROOT_TAG, evaluateCompiledSfc(code));
     await waitUntil(
-      () => fabric.counts.completeRoot > 0,
+      () => fabric.commits > 0,
       'the Vue commit for NamedModule.vue to reach Fabric',
     );
     expect(committedStyleOf('single')).toEqual({ padding: 10 });

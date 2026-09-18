@@ -18,7 +18,12 @@ import {
   unmount,
   registerComposedComponent,
 } from '@symbiote-native/angular';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import { childrenOf, type ISymbioteNode } from '@symbiote-native/engine';
+import {
+  installRecordingFabric,
+  payloadOf,
+  type IAuthoredNode,
+} from '@symbiote-native/test-utils';
 import { Tab } from './index';
 import type { ITabNavigatorHandle } from './index';
 import { TabScreenDirective } from '../tab-screen.directive';
@@ -30,7 +35,7 @@ const ROOT_TAG = 5121;
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 // On a real Metro build, adapters/angular's babel-register-composed.cjs auto-registers `Tab`
 // as an anchor host by scanning the AOT-compiled @Component's selector - vitest never runs that
 // pipeline, so this test drives the same self-registration entry point by hand (mirrors
@@ -45,13 +50,26 @@ beforeEach(() => {
 });
 afterEach(() => unmount(ROOT_TAG));
 
+// SWITCHING TABS is the subject, so every walk below descends the LIVE child links from the app
+// root down. A recording keeps every node it ever saw created, so the screen a switch unmounted
+// would still answer here — and several cases assert a label is NOT present.
+//
+// The AppContainer root is the same node `installFabric`'s `appRoot()` named: the engine creates it
+// with `pointerEvents: 'box-none'`, and that is an authored prop rather than anything derived.
+function appRoot(): ISymbioteNode {
+  const root = fabric.find(node => node.props.pointerEvents === 'box-none');
+  if (root === undefined) throw new Error('no AppContainer root was created');
+  return root.handle;
+}
+
 function findInTree(
-  predicate: (node: IFakeNode) => boolean,
-  nodes = fabric.committed,
-): IFakeNode | undefined {
-  for (const node of nodes) {
-    if (predicate(node)) return node;
-    const found = findInTree(predicate, node.children);
+  predicate: (node: IAuthoredNode) => boolean,
+  handle: ISymbioteNode = appRoot(),
+): IAuthoredNode | undefined {
+  for (const child of childrenOf(handle)) {
+    const recorded = fabric.find(one => one.handle === child);
+    if (recorded !== undefined && predicate(recorded)) return recorded;
+    const found = findInTree(predicate, child);
     if (found) return found;
   }
   return undefined;
@@ -202,26 +220,38 @@ async function mountToggleTab(): Promise<TabToggleHost> {
 // the toggle host, whose options carry no tabBarBadge - a badge paints a second text of its own.
 function tabItemLabels(): string[] {
   const labels: string[] = [];
-  const collect = (nodes: readonly IFakeNode[]): void => {
-    for (const node of nodes) {
-      if (node.viewName === 'RCTRawText' && typeof node.props.text === 'string')
-        labels.push(node.props.text);
-      collect(node.children);
+  const collect = (handle: ISymbioteNode): void => {
+    for (const child of childrenOf(handle)) {
+      const recorded = fabric.find(one => one.handle === child);
+      if (
+        recorded?.viewName === 'RCTRawText' &&
+        typeof recorded.props.text === 'string'
+      ) {
+        labels.push(recorded.props.text);
+      }
+      collect(child);
     }
   };
-  collect(tabItemNodes());
+  for (const item of tabItemNodes()) collect(item.handle);
   return labels;
 }
 
-function tabItemNodes(): IFakeNode[] {
-  const found: IFakeNode[] = [];
-  const collect = (nodes: readonly IFakeNode[]): void => {
-    for (const node of nodes) {
-      if (node.props.accessibilityRole === 'tab') found.push(node);
-      collect(node.children);
+// `accessibilityRole` reaches the renderer through the payload, not the author's bag.
+function tabItemNodes(): IAuthoredNode[] {
+  const found: IAuthoredNode[] = [];
+  const collect = (handle: ISymbioteNode): void => {
+    for (const child of childrenOf(handle)) {
+      const recorded = fabric.find(one => one.handle === child);
+      if (
+        recorded !== undefined &&
+        payloadOf(recorded.handle).accessibilityRole === 'tab'
+      ) {
+        found.push(recorded);
+      }
+      collect(child);
     }
   };
-  collect(fabric.committed);
+  collect(appRoot());
   return found;
 }
 

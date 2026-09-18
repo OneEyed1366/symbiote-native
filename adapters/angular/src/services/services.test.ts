@@ -11,14 +11,14 @@ import {
 // the real `addChangeListener` signature instead of re-declaring (and risking drifting from)
 // its shape locally.
 type IAppearanceListener = Parameters<typeof Appearance.addChangeListener>[0];
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../render';
 import { ColorSchemeService } from './color-scheme.service';
 import { WindowDimensionsService } from './window-dimensions.service';
 
 const ROOT_TAG = 900;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 
 let capturedColorSchemeService: ColorSchemeService | undefined;
 let capturedWindowDimensionsService: WindowDimensionsService | undefined;

@@ -15,7 +15,11 @@ import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { STICKY_HEADER_Z_INDEX } from '@symbiote-native/components';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 import { mount, unmount } from '../../render';
 import '../../register';
 import {
@@ -72,7 +76,8 @@ const LONG_SECTIONS = ['A', 'B'].map((title, sectionIndex) => ({
   })),
 }));
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -82,41 +87,35 @@ beforeEach(() => {
 });
 afterEach(() => unmount(ROOT_TAG));
 
-function flatCommitted(): IFakeNode[] {
-  const flat: IFakeNode[] = [];
-  const walk = (nodes: IFakeNode[]): void => {
-    for (const node of nodes) {
-      flat.push(node);
-      walk(node.children);
-    }
-  };
-  walk(fabric.committed);
-  return flat;
-}
-
-function committed(viewName: string): IFakeNode {
-  const found = flatCommitted().find(node => node.viewName === viewName);
+function committed(viewName: string): ILiveNode {
+  const found = live.findLive(
+    live.appRoot(),
+    node => node.viewName === viewName,
+  );
   if (found === undefined) throw new Error(`no ${viewName} was committed`);
   return found;
 }
 
-// The committed raw-text payloads in document order: exactly the flattened entry sequence.
+// The committed raw-text payloads in document order — exactly the flattened entry sequence.
 function committedTexts(): string[] {
-  const texts: string[] = [];
-  for (const node of flatCommitted()) {
-    const text: unknown = node.props.text;
-    if (typeof text === 'string') texts.push(text);
-  }
-  return texts;
+  return live.texts(live.appRoot());
 }
 
 // How many TIMES a node carrying this text was created. 1 means the row survived whatever happened
-// in between; >1 means it was destroyed and rebuilt.
+// in between; >1 means it was destroyed and rebuilt. `findAll` searches the creation log — the
+// AUTHORED bag, which is what `text` on a raw-text node always is.
 function createdCountForText(text: string): number {
-  return fabric.created.filter(node => node.props.text === text).length;
+  return fabric.findAll(node => node.props.text === text).length;
 }
 
-function contentChildren(): IFakeNode[] {
+// The total creation-log size — every node the engine has ever authored, whatever became of it
+// since. The direct replacement for the old mirror's `counts.createNode`: a claim that "nothing was
+// rebuilt" is a claim that this number held still across the update.
+function totalCreated(): number {
+  return fabric.findAll(() => true).length;
+}
+
+function contentChildren(): ILiveNode[] {
   return committed(CONTENT_VIEW).children;
 }
 
@@ -206,8 +205,9 @@ describe('Solid VirtualizedSectionList on the engine', () => {
       ));
       await settleViewport();
 
-      const wrappers = flatCommitted().filter(
-        node => node.props.zIndex === STICKY_HEADER_Z_INDEX,
+      const wrappers = live.findAllLive(
+        live.appRoot(),
+        node => node.payload.zIndex === STICKY_HEADER_Z_INDEX,
       );
       expect(wrappers, 'one sticky wrapper per section header').toHaveLength(2);
     });
@@ -228,8 +228,9 @@ describe('Solid VirtualizedSectionList on the engine', () => {
       ));
       await settleViewport();
 
-      const wrappers = flatCommitted().filter(
-        node => node.props.zIndex === STICKY_HEADER_Z_INDEX,
+      const wrappers = live.findAllLive(
+        live.appRoot(),
+        node => node.payload.zIndex === STICKY_HEADER_Z_INDEX,
       );
       expect(wrappers, 'an explicit opt-out wraps no header').toHaveLength(0);
     });
@@ -408,7 +409,7 @@ describe('Solid VirtualizedSectionList on the engine', () => {
         'scrollTo',
       ]);
       expect(fabric.commands[0]?.args).toEqual([0, 250, false]);
-      expect(fabric.commands[0]?.node.viewName).toBe(SCROLL_VIEW);
+      expect(fabric.commands[0]?.viewName).toBe(SCROLL_VIEW);
     });
 
     // why: RN's list chrome wraps the WHOLE stream, not each section — ListHeaderComponent above
@@ -455,7 +456,7 @@ describe('Solid VirtualizedSectionList on the engine', () => {
       ));
       await settleViewport();
 
-      const nativeProps = Object.keys(committed(SCROLL_VIEW).props);
+      const nativeProps = Object.keys(committed(SCROLL_VIEW).payload);
       for (const jsOnly of [
         'sections',
         'renderItem',
@@ -516,15 +517,15 @@ describe('Solid VirtualizedSectionList on the engine', () => {
       await settleViewport();
 
       const control = committed(REFRESH_CONTROL);
-      expect(control.props.refreshing).toBe(false);
-      expect(control.props.progressViewOffset).toBe(12);
+      expect(control.payload.refreshing).toBe(false);
+      expect(control.payload.progressViewOffset).toBe(12);
 
       setRefreshing(true);
       await tick();
 
-      expect(committed(REFRESH_CONTROL).props.refreshing).toBe(true);
+      expect(committed(REFRESH_CONTROL).payload.refreshing).toBe(true);
       expect(
-        fabric.created.filter(node => node.viewName === REFRESH_CONTROL),
+        fabric.findAll(node => node.viewName === REFRESH_CONTROL),
         'the update re-props the SAME control, it does not build a second one',
       ).toHaveLength(1);
     });
@@ -609,7 +610,7 @@ describe('Solid VirtualizedSectionList on the engine', () => {
       ));
       await settleViewport();
 
-      const scroll = committed(SCROLL_VIEW).props;
+      const scroll = committed(SCROLL_VIEW).payload;
       expect(scroll.flex, 'the class resolved onto the scroll view').toBe(1);
       expect(scroll.backgroundColor).toBe('red');
       expect(scroll.keyboardDismissMode).toBe('on-drag');
@@ -619,7 +620,7 @@ describe('Solid VirtualizedSectionList on the engine', () => {
         scroll.padding,
         'the content style stays off the scroll view',
       ).toBe(undefined);
-      expect(committed(CONTENT_VIEW).props.padding).toBe(20);
+      expect(committed(CONTENT_VIEW).payload.padding).toBe(20);
     });
 
     // why: onEndReached is what drives every paged section list, and the "end" it means is the end
@@ -675,7 +676,7 @@ describe('Solid VirtualizedSectionList on the engine', () => {
       ));
       await settleViewport();
 
-      const props = committed(SCROLL_VIEW).props;
+      const props = committed(SCROLL_VIEW).payload;
       expect(props.testID).toBe('the-section-list');
       expect(
         props.accessibilityLabel,
@@ -718,9 +719,11 @@ describe('Solid VirtualizedSectionList on the engine', () => {
       ));
       await settleViewport();
 
-      expect(committed(SCROLL_VIEW).props.transform).toEqual([{ scaleY: -1 }]);
+      expect(committed(SCROLL_VIEW).payload.transform).toEqual([
+        { scaleY: -1 },
+      ]);
       expect(
-        committed(CONTENT_VIEW).props.transform,
+        committed(CONTENT_VIEW).payload.transform,
         'the content container must NOT be flipped as well',
       ).toBeUndefined();
     });
@@ -742,9 +745,11 @@ describe('Solid VirtualizedSectionList on the engine', () => {
       await settleViewport();
 
       expect(
-        committed(SCROLL_VIEW).props.maintainVisibleContentPosition,
+        committed(SCROLL_VIEW).payload.maintainVisibleContentPosition,
       ).toEqual({ minIndexForVisible: 1 });
-      expect(committed(CONTENT_VIEW).props.collapsableChildren).toBe(false);
+      // `collapsableChildren` is derived from the prop above by the ENGINE now, which reads it off
+      // the owner through `ownerProps` (`core/engine/cpp/tests/js/scroll-content-payload.itest.ts`).
+      // What this list owes is the FORWARDING asserted above it.
     });
 
     // why: onStartReached is onEndReached's top-edge twin (RN 0.71+), the hook a prepend-paging chat
@@ -908,7 +913,7 @@ describe('Solid VirtualizedSectionList on the engine', () => {
       expect(fabric.commands.map(command => command.commandName)).toEqual([
         'flashScrollIndicators',
       ]);
-      expect(fabric.commands[0]?.node.viewName).toBe(SCROLL_VIEW);
+      expect(fabric.commands[0]?.viewName).toBe(SCROLL_VIEW);
 
       const scrollNode = list?.getScrollNode();
       expect(scrollNode, 'the scroll node is the list host itself').toBe(
@@ -943,7 +948,7 @@ describe('Solid VirtualizedSectionList on the engine', () => {
       ));
       await settleViewport();
       expect(committedTexts()).toContain('row-a0');
-      const createdAtMount = fabric.counts.createNode;
+      const createdAtMount = totalCreated();
 
       setSections(
         SECTIONS.map(section => ({
@@ -958,7 +963,7 @@ describe('Solid VirtualizedSectionList on the engine', () => {
         'the accessor carried the new item down to the leaf',
       ).toContain('row-a0-v2');
       expect(
-        fabric.counts.createNode,
+        totalCreated(),
         'and it did so without rebuilding the row subtree',
       ).toBe(createdAtMount);
     });
@@ -984,7 +989,7 @@ describe('Solid VirtualizedSectionList on the engine', () => {
       ));
       await settleViewport();
       expect(committedTexts()).toContain('header:Section A');
-      const createdAtMount = fabric.counts.createNode;
+      const createdAtMount = totalCreated();
 
       setSections(
         SECTIONS.map(section => ({
@@ -1002,7 +1007,7 @@ describe('Solid VirtualizedSectionList on the engine', () => {
         'footer:Section A (renamed)',
       );
       expect(
-        fabric.counts.createNode,
+        totalCreated(),
         'a rename must not tear the header subtree down',
       ).toBe(createdAtMount);
     });
@@ -1138,16 +1143,16 @@ describe('Solid VirtualizedSectionList on the engine', () => {
         />
       ));
       await settleViewport();
-      const createdAtMount = fabric.counts.createNode;
+      const createdAtMount = totalCreated();
       const textsAtMount = committedTexts();
 
       setExtra(1);
       await tick();
 
       expect(committedTexts()).toEqual(textsAtMount);
-      expect(fabric.counts.createNode).toBe(createdAtMount);
+      expect(totalCreated()).toBe(createdAtMount);
       expect(
-        'extraData' in committed(SCROLL_VIEW).props,
+        'extraData' in committed(SCROLL_VIEW).payload,
         'and it never reaches native either',
       ).toBe(false);
     });

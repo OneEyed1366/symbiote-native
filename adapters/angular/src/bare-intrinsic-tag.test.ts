@@ -1,14 +1,11 @@
-// A HAND-WRITTEN intrinsic tag, in an ordinary Angular template — the only shape there is now that
-// no lowering transform stands between an app and the engine.
+// A HAND-WRITTEN intrinsic tag, in an ordinary Angular template — the only shape there is.
 //
-// This is deliberately NOT `lowering-equivalence.test.ts`. That file asks whether the two
-// SPELLINGS of a primitive agree, and answers it by mounting both. It cannot see the question
-// here, which is whether the bare spelling is usable AT ALL from app code: it supplies its own
-// fixture, so it never exercises the props, events and defaults an app actually binds, and it
-// compiles through JIT, which does not enforce `schemas` (measured — a bare `<view>` mounts clean
-// under JIT with no schema and no warning, while ngtsc rejects the same template outright). The
-// compile half therefore lives in its own file, `bare-intrinsic-tag-aot.test.ts`, and neither file
-// is sufficient alone: this one would stay green for a template no app could build.
+// The question is whether the tag is usable AT ALL from app code, so the templates below carry the
+// props, events and defaults an app actually binds. It mounts through JIT, which does not enforce
+// `schemas` (measured — a bare `<view>` mounts clean under JIT with no schema and no warning, while
+// ngtsc rejects the same template outright), so the COMPILE half lives in its own file,
+// `bare-intrinsic-tag-aot.test.ts`. Neither is sufficient alone: this one would stay green for a
+// template no app could build.
 //
 // EACH FIXTURE CARRIES THE SCHEMA ITS TAG GENUINELY NEEDS, and the two differ on purpose:
 //   dashless `<view>`          -> NO_ERRORS_SCHEMA      (nothing else compiles it)
@@ -24,9 +21,14 @@ import {
 } from '@angular/core';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createRequire } from 'node:module';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
-import { ANCHOR_COMPONENT } from '@symbiote-native/engine';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
+import { ANCHOR_COMPONENT, parentOf } from '@symbiote-native/engine';
 import { COMPONENT_DESCRIPTORS } from '@symbiote-native/components';
+import { ViewElement } from './elements';
 // SIDE-EFFECT IMPORT. `register.ts` installs the host behaviors, and a behavior's `foldPayload` is
 // the bare path's ONLY source for the folds a wrapper would otherwise apply — without it
 // `text-input`/`switch`/`image` below commit a payload missing every default. An app reaches this
@@ -51,20 +53,20 @@ function isPrimitive(value: unknown): value is IPrimitiveSpec {
   return typeof intrinsic === 'string';
 }
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
-// Sampled rather than a fixed count, mirroring `lowering-equivalence.test.ts`: a half-built tree is
-// indistinguishable from a missing prop in the assertions below. The cap is a failure, not a
-// fallback.
+// Sampled rather than a fixed count: a half-built tree is indistinguishable from a missing prop in
+// the assertions below. The cap is a failure, not a fallback.
 const MAX_SETTLE_TICKS = 20;
 
 async function flushUntilSettled(): Promise<void> {
   let previous = -1;
   for (let index = 0; index < MAX_SETTLE_TICKS; index += 1) {
     await tick();
-    const current = fabric.counts.completeRoot;
+    const current = fabric.commits;
     if (current === previous && current > 0) return;
     previous = current;
   }
@@ -73,9 +75,9 @@ async function flushUntilSettled(): Promise<void> {
   );
 }
 
-// `fabric.committed` is the ROOT child set, not a flat list — a `find` across it alone sees only
-// the AppContainer and reports every probe below as absent.
-function flatten(nodes: readonly IFakeNode[]): IFakeNode[] {
+// Root included, the same shape `fabric.committed`'s flatten had — a `find` across children alone
+// would see only the AppContainer and report every probe below as absent.
+function flatten(nodes: readonly ILiveNode[]): ILiveNode[] {
   return nodes.flatMap(node => [node, ...flatten(node.children)]);
 }
 
@@ -88,25 +90,30 @@ function flatten(nodes: readonly IFakeNode[]): IFakeNode[] {
 // `ActivityIndicator.js:99` onto the spinner). So a row reading the probe's OWN view name reports a
 // composed primitive as committing the wrong native view.
 //
-// ONE hop, not an ancestor walk: widening it to the whole chain would let any name pass, since the
-// container root is an RCTView and most descriptors name one.
-function committedViewNames(
-  all: readonly IFakeNode[],
-  probe: IFakeNode | undefined,
-): string[] {
+// ONE hop via `parentOf` — the engine's own answer, not a `children`-includes scan (`children` is a
+// getter returning fresh `ILiveNode`s per read, so two calls never share a reference to `.includes`
+// against). Widening it to the whole ancestor chain would let any name pass, since the container
+// root is an RCTView and most descriptors name one.
+function committedViewNames(probe: ILiveNode | undefined): string[] {
   if (probe === undefined) return [];
-  const parent = all.find(candidate => candidate.children.includes(probe));
+  const parent = parentOf(probe.handle);
   return parent === undefined
     ? [probe.viewName]
-    : [probe.viewName, parent.viewName];
+    : [probe.viewName, live.nodeOf(parent).viewName];
 }
 
 let nextRoot = 8_600;
 
 interface IMounted {
-  node: IFakeNode | undefined;
-  all: IFakeNode[];
+  node: ILiveNode | undefined;
+  all: ILiveNode[];
   thrown: string;
+  // `node?.payload` snapshotted BEFORE `unmount()`, for the one thing unmount changes: `onLayout`
+  // and its five siblings are cleared by the listener's own teardown
+  // (`setEventListener(target, name, undefined)`), so `.payload` — a live getter — would re-run
+  // `propsOf` and see the clear too if read after `unmount()` returns. Structural props (`nativeID`,
+  // `testID`, `style`…) are unaffected; only a gated event flag needs the pre-unmount snapshot.
+  payload: Record<string, unknown> | undefined;
 }
 
 // A fixture per case, compiled at run time, so a case differs from its neighbour by exactly its
@@ -114,6 +121,10 @@ interface IMounted {
 async function mountTemplate(
   template: string,
   schema: typeof NO_ERRORS_SCHEMA | typeof CUSTOM_ELEMENTS_SCHEMA,
+  // The element directives, when the case is about what MATCHING one changes. An app imports them
+  // from the package barrel; a schema alone leaves the tag unmatched, which is a different shape
+  // and the reason `[style]` behaves differently in the two.
+  imports: readonly Type<unknown>[] = [],
 ): Promise<IMounted> {
   fabric.reset();
   nextRoot += 1;
@@ -125,6 +136,7 @@ async function mountTemplate(
     selector: `bare-tag-fixture-${root}`,
     standalone: true,
     schemas: [schema],
+    imports: [...imports],
     template,
   })
   class BareTagFixture {
@@ -141,19 +153,28 @@ async function mountTemplate(
   } catch (error) {
     thrown = String(error);
   }
-  const all = flatten(fabric.committed);
-  const node = all.find(candidate => candidate.props.testID === 'probe');
+  // Angular can throw before the surface's own root ever committed (the `[style]` array-without-
+  // directive case below) — `appRoot()` then has nothing to find and throws, which the old mirror's
+  // `fabric.committed` (defaulted to `[]`) tolerated silently.
+  let all: ILiveNode[] = [];
+  try {
+    all = flatten([live.nodeOf(live.appRoot())]);
+  } catch {
+    // Nothing committed before the throw; `all`/`node` stay empty, same as the mirror's `[]`.
+  }
+  const node = all.find(candidate => candidate.payload.testID === 'probe');
+  const payload = node?.payload;
   try {
     unmount(root);
   } catch {
     // A fixture that threw on mount has nothing to tear down; the assertion reports the throw.
   }
-  return { node, all, thrown };
+  return { node, all, thrown, payload };
 }
 
 beforeEach(() => fabric.reset());
 
-describe('a bare intrinsic tag, hand-written, no lowering transform', () => {
+describe('a bare intrinsic tag, hand-written', () => {
   it('commits a real native view and folds id -> nativeID', async () => {
     const { node } = await mountTemplate(
       `<view [id]="'probe-id'" [testID]="'probe'"></view>`,
@@ -162,56 +183,60 @@ describe('a bare intrinsic tag, hand-written, no lowering transform', () => {
     expect(node?.viewName).toBe('RCTView');
     // The alias is the renderer's, not a wrapper's — the composed `<view>` has no `id` @Input at
     // all, so this is the one fold the bare path has and the component path lacks.
-    expect(node?.props).toMatchObject({
+    expect(node?.payload).toMatchObject({
       nativeID: 'probe-id',
       testID: 'probe',
     });
   });
 
-  it('seeds the two Text defaults and takes a raw-text child', async () => {
+  it('commits as RCTText and takes a raw-text child', async () => {
     const { node, all } = await mountTemplate(
       `<text testID="probe">hello</text>`,
       NO_ERRORS_SCHEMA,
     );
+    // RN's two Text defaults were asserted here until 2026-09-18 and are the engine's rule now
+    // (`foldTextDefaults`), keyed on exactly this component name — so the name IS the claim, and
+    // `core/engine/cpp/tests/js/committed-payload.itest.ts` is where the values are read.
     expect(node?.viewName).toBe('RCTText');
-    // RN's Text.js applies both unconditionally; without them a clamped Text cuts mid-word with no
-    // ellipsis, on device only.
-    expect(node?.props).toMatchObject({
-      ellipsizeMode: 'tail',
-      allowFontScaling: true,
-    });
+    expect(node?.payload).toMatchObject({ testID: 'probe' });
     expect(
-      all.find(candidate => candidate.viewName === 'RCTRawText')?.props,
+      all.find(candidate => candidate.viewName === 'RCTRawText')?.payload,
     ).toMatchObject({ text: 'hello' });
   });
 
   it('routes an (event) binding through to the engine, gate flag included', async () => {
-    const { node } = await mountTemplate(
+    const { payload } = await mountTemplate(
       `<view testID="probe" (layout)="hit()"></view>`,
       NO_ERRORS_SCHEMA,
     );
     // `onLayout` is one of the six events Fabric's C++ emits only when a BOOLEAN prop reaches the
     // payload, so the flag IS the observable: a listener that never set it is dead on device with
     // nothing red anywhere. Asserting the committed payload, not the listener map.
-    expect(node?.props.onLayout).toBe(true);
+    expect(payload?.onLayout).toBe(true);
   });
 
-  it('attaches the host behavior, so a bare tag carries its folds', async () => {
+  it('attaches the host behavior to a bare tag', async () => {
     const { all } = await mountTemplate(
       `<text-input testID="probe"></text-input><switch testID="sw"></switch>`,
       CUSTOM_ELEMENTS_SCHEMA,
     );
     // The behavior registry is keyed by the intrinsic TAG. A renderer that handed it the resolved
-    // Fabric name instead would attach nothing and these defaults would silently vanish.
-    expect(
-      all.find(node => node.props.testID === 'probe')?.props,
-    ).toMatchObject({
-      submitBehavior: 'blurAndSubmit',
-      underlineColorAndroid: 'transparent',
-    });
-    expect(all.find(node => node.props.testID === 'sw')?.props.value).toBe(
-      false,
-    );
+    // Fabric name instead would attach nothing and this would silently vanish.
+    //
+    // `mostRecentEventCount` rather than `submitBehavior`: the latter was a fold output and the
+    // fold is the engine's now (`foldTextInputAliases`, `SymbioteFabricProps.cpp`), which this
+    // harness's payload — built by the TypeScript `fabricProps` — cannot see. The count is written
+    // by the MACHINE at attach, so it is the observable this test was always reaching for.
+    // The `<switch>` used to corroborate this through its folded `value`, and no longer can for the
+    // same reason — `foldSwitchProps` is the engine's too. It stays in the template because the
+    // claim is about the RENDERER handing over a tag, and a second tag is what makes the case about
+    // the mechanism rather than about text-input; its own payload is asserted in
+    // `core/engine/cpp/tests/js/switch-payload.itest.ts`.
+    const probePayload = all.find(
+      node => node.payload.testID === 'probe',
+    )?.payload;
+    expect(probePayload).toMatchObject({ mostRecentEventCount: 0 });
+    expect(all.find(node => node.payload.testID === 'sw')).toBeDefined();
   });
 });
 
@@ -259,14 +284,14 @@ describe('no intrinsic is swallowed by the anchor-host registry', () => {
   });
 
   it.each(paints)('<%s> paints its own native view', async tag => {
-    const { node, all } = await mountTemplate(
+    const { node } = await mountTemplate(
       `<${tag} testID="probe"></${tag}>`,
       NO_ERRORS_SCHEMA,
     );
     // An anchor commits nothing, so `node` would be undefined — a bare `toBe(undefined)` on the
     // viewName would pass for both an anchor and a wrong view.
     expect(node).toBeDefined();
-    expect(committedViewNames(all, node)).toContain(
+    expect(committedViewNames(node)).toContain(
       COMPONENT_DESCRIPTORS[tag]?.component,
     );
   });
@@ -314,17 +339,17 @@ describe('the hyphenated spelling an ngtsc-checked template can use', () => {
       // resolved to nothing would pass a bare `toBe` against a bare tag that also failed.
       expect(bare.node?.viewName).toBe(COMPONENT_DESCRIPTORS[tag]?.component);
       expect(aliased.node?.viewName).toBe(bare.node?.viewName);
-      expect(aliased.node?.props).toEqual(bare.node?.props);
+      expect(aliased.node?.payload).toEqual(bare.node?.payload);
     },
   );
 
   it('carries bound props and event gates through the alias too', async () => {
-    const { node } = await mountTemplate(
+    const { node, payload } = await mountTemplate(
       `<symbiote-view [id]="'probe-id'" [testID]="'probe'" (layout)="hit()"></symbiote-view>`,
       CUSTOM_ELEMENTS_SCHEMA,
     );
     expect(node?.viewName).toBe('RCTView');
-    expect(node?.props).toMatchObject({
+    expect(payload).toMatchObject({
       nativeID: 'probe-id',
       testID: 'probe',
       onLayout: true,
@@ -332,34 +357,39 @@ describe('the hyphenated spelling an ngtsc-checked template can use', () => {
   });
 });
 
-describe('style on a bare tag: what works and what cannot', () => {
-  it('takes a plain object [style], which Angular decomposes per key', async () => {
+// `[style]` is the ONLY spelling — there is no alias prop, and an app writes what RN writes. Which
+// of the two Angular routes carries it is decided by whether the element directive MATCHES, and
+// that is the whole content of this block.
+describe('[style] on a tag', () => {
+  it('takes a plain object through the schema route, decomposed per key', async () => {
     const { node } = await mountTemplate(
       `<view testID="probe" [style]="{ opacity: 1 }"></view>`,
       NO_ERRORS_SCHEMA,
     );
-    // Angular compiles `[style]` to ɵɵstyleMap -> one setStyle call per key; the renderer merges
-    // them back into the single `style` prop RN wants.
-    expect(node?.props.opacity).toBe(1);
+    // Unmatched, `[style]` compiles to ɵɵstyleMap -> one setStyle call per key; the renderer merges
+    // them back into the single `style` prop RN wants. An object is the one shape that survives it.
+    expect(node?.payload.opacity).toBe(1);
   });
 
-  it('LIMITATION: an ARRAY [style] throws inside Angular, before the renderer sees it', async () => {
+  it('takes an ARRAY when the element directive matches', async () => {
+    const { node, thrown } = await mountTemplate(
+      `<view testID="probe" [style]="[{ opacity: 1 }, { margin: 2 }]"></view>`,
+      NO_ERRORS_SCHEMA,
+      [ViewElement],
+    );
+    expect(thrown).toBe('');
+    expect(node?.payload).toMatchObject({ opacity: 1, margin: 2 });
+  });
+
+  // The control, and the reason `SymbioteElement` declares `style` at all: a declared input CLAIMS
+  // the binding at compile time so it never reaches the styling engine. Without the directive,
+  // ɵɵstyleMap parses its argument as a CSS string and calls `.indexOf` on it. Keeping both arms is
+  // what makes the case above a measurement rather than an assumption.
+  it('and throws inside Angular without it', async () => {
     const { thrown } = await mountTemplate(
       `<view testID="probe" [style]="[{ opacity: 1 }]"></view>`,
       NO_ERRORS_SCHEMA,
     );
-    // ɵɵstyleMap parses its argument as a CSS string and calls `.indexOf` on it. An RN StyleProp
-    // array never survives that, and no directive can reclaim the binding name — same constraint
-    // already recorded for a FUNCTION `[style]`. `[symbioteStyle]` below is the supported spelling;
-    // this case exists so the failure is a documented one rather than a device-only surprise.
     expect(thrown).toContain('indexOf is not a function');
-  });
-
-  it('takes an array through [symbioteStyle], the alias that dodges the styling engine', async () => {
-    const { node } = await mountTemplate(
-      `<view testID="probe" [symbioteStyle]="[{ opacity: 1 }, { margin: 2 }]"></view>`,
-      NO_ERRORS_SCHEMA,
-    );
-    expect(node?.props).toMatchObject({ opacity: 1, margin: 2 });
   });
 });

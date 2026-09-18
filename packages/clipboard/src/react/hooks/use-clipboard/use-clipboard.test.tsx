@@ -6,7 +6,7 @@
 import { createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount } from '@symbiote-native/react';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import { useClipboard } from './index';
 import type { IClipboardEvent } from '../../../core';
 // Imported from the types module directly (not the mocked `../../../core` barrel below) — a
@@ -35,7 +35,7 @@ function Probe(): ReactElement {
   return createElement('view');
 }
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 
 beforeEach(() => {
   fabric.reset();

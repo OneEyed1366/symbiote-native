@@ -18,6 +18,11 @@
 // that shared mechanism through this thin wrapper.
 //
 // No Negative group: SectionList's public props have no throwing path.
+//
+// A RECORDING host. `stickyWrappers()` reads the CREATION log (`fabric.findAll`), the same
+// question the old mirror's `.created` answered — the sticky seam sets `collapsable:false` at
+// CREATE, so this is a fact about what the ops named, not about current residency. Everything
+// else that walks the current committed shape goes through the LIVE tree.
 
 import {
   defineComponent,
@@ -32,18 +37,18 @@ import {
   unmount,
   type ISectionListHandle,
 } from '@symbiote-native/vue';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import { STICKY_HEADER_TAG } from '@symbiote-native/components';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type IAuthoredNode,
+} from '@symbiote-native/test-utils';
 
 // SectionList is a generic component (generic construct signature), which h()'s overloads can't
 // resolve. Drive it through a loose functional-component handle (generic-component h() limitation).
 const SectionListHost = SectionList as unknown as FunctionalComponent<
   Record<string, unknown>
 >;
-
-type ICommandCall = {
-  name: string;
-  args: readonly unknown[];
-};
 
 type IRow = { id: number; label: string };
 type ISectionShape = { title: string; data: readonly IRow[] };
@@ -68,49 +73,36 @@ const SECTIONS: ISectionShape[] = [
   },
 ];
 
-const commands: ICommandCall[] = [];
-
-const fabric = installFabric();
-const slot = globalThis.nativeFabricUIManager;
-if (slot === undefined) throw new Error('fabric slot was not installed');
-slot.dispatchCommand = (_node, name, args) => {
-  commands.push({ name, args });
-};
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
-beforeEach(() => {
-  fabric.reset();
-  commands.length = 0;
-});
+beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
-
-function walk(nodes: IFakeNode[], visit: (node: IFakeNode) => void): void {
-  for (const node of nodes) {
-    visit(node);
-    walk(node.children, visit);
-  }
-}
 
 function collectTexts(): string[] {
   const texts: string[] = [];
-  walk(fabric.committed, node => {
-    const text = node.props.text;
+  live.walkLive(live.appRoot(), node => {
+    const text = node.payload.text;
     if (typeof text === 'string') texts.push(text);
   });
   return texts;
 }
 
-// `collapsable: false` is what the sticky seam sets at CREATE, and nothing else in this tree sets
-// it except the scroll view's own content node (excluded below) — a plain cell wrapper leaves it
-// absent. The translateY `transform` is NOT the oracle here: it needs a measurement round trip,
-// so a create-time `Array.isArray(transform)` reads 0 for a correct tree
+// The TAG the engine was told, which the recording host retains for exactly this kind of question.
+// The translateY `transform` is NOT the oracle here: it needs a measurement round trip, so a
+// create-time `Array.isArray(transform)` reads 0 for a correct tree
 // (`.claude/rules/test-harness-false-greens.md` §34).
-function stickyWrappers(): IFakeNode[] {
-  return fabric.created.filter(
-    n => n.props.collapsable === false && n.viewName !== 'RCTScrollContentView',
-  );
+//
+// It used to key on `payload.collapsable === false`, and two things went with that: the key is a
+// tag rule in `SymbioteFabricProps.cpp` now (this harness builds payloads through the TypeScript
+// `fabricProps`, which carries no copy of the tag rules), and the scroll view's own content node
+// carried the same key, so the locator needed an `RCTScrollContentView` exclusion to mean anything.
+// A tag needs no exclusion — a content node's is `scroll-content`.
+function stickyWrappers(): readonly IAuthoredNode[] {
+  return fabric.findAll(n => n.tagName === STICKY_HEADER_TAG);
 }
 
 function mountSectionList(extra: Record<string, unknown>): Promise<void> {
@@ -153,20 +145,16 @@ describe('Vue SectionList on the engine', () => {
       }
     });
 
-    it('wraps each section header in a collapsable:false sticky wrapper when enabled', async () => {
+    it('wraps each section header in a sticky wrapper when enabled', async () => {
       // why: proves stickySectionHeadersEnabled on the PUBLIC SectionList surface actually reaches
       // the inner stickyHeaderIndices mechanism through this wrapper — the shared wrap/transform
       // shape itself lives in VirtualizedList (N/A here) and is exercised, not re-derived.
       await mountSectionList({ stickySectionHeadersEnabled: true });
 
-      const wrappers = stickyWrappers();
-      expect(wrappers.length, 'one sticky wrapper per section header').toBe(2);
-      for (const wrapper of wrappers) {
-        expect(
-          wrapper.props.collapsable,
-          'sticky wrapper is collapsable:false',
-        ).toBe(false);
-      }
+      expect(
+        stickyWrappers().length,
+        'one sticky wrapper per section header',
+      ).toBe(2);
     });
 
     it('wraps nothing when stickySectionHeadersEnabled is false', async () => {
@@ -204,7 +192,7 @@ describe('Vue SectionList on the engine', () => {
         itemIndex: 1,
         animated: true,
       });
-      const scrolls = commands.filter(c => c.name === 'scrollTo');
+      const scrolls = fabric.commands.filter(c => c.commandName === 'scrollTo');
       expect(scrolls.length, 'one scrollTo from scrollToLocation').toBe(1);
       expect(scrolls[0].args[1]).toBe(5 * ITEM_HEIGHT);
       expect(scrolls[0].args[2]).toBe(true);

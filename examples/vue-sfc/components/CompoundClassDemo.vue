@@ -32,16 +32,10 @@ const isLoud = ref(false);
   <view class="section-nested">
     <text class="section-label">Compound class · scoped style block</text>
     <view class="row">
-      <view
-        class="badge"
-        testID="compound-badge-plain"
-      >
+      <view class="badge" testID="compound-badge-plain">
         <text class="badge-text">plain</text>
       </view>
-      <view
-        class="badge loud"
-        testID="compound-badge-loud"
-      >
+      <view class="badge loud" testID="compound-badge-loud">
         <text class="badge-text">loud</text>
       </view>
       <view
@@ -51,10 +45,7 @@ const isLoud = ref(false);
         <text class="badge-text">dynamic</text>
       </view>
     </view>
-    <text
-      class="note-text"
-      testID="compound-badge-readout"
-    >
+    <text class="note-text" testID="compound-badge-readout">
       {{
         isLoud
           ? 'dynamic badge carries both tokens — green border, same pill shape'

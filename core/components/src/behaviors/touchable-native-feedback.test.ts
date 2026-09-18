@@ -6,7 +6,11 @@
 // `touchable-native-feedback-android.test.ts`, because `Platform.OS` is read at module load.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { installFabric, type IFakeNode } from '../../../test-utils/src/index';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '../../../test-utils/src/index';
 import {
   appendChild as engineAppend,
   insertBefore as engineInsertBefore,
@@ -20,20 +24,18 @@ import {
   type ISymbioteNode,
 } from '@symbiote-native/engine';
 import { descriptorFor } from '../component-names';
-import { foldHostBag } from '../fold-host-bag';
-import {
-  registerTouchableNativeFeedbackBehavior,
-  TOUCHABLE_NATIVE_FEEDBACK_TAG as TAG,
-} from './touchable-native-feedback';
+import { registerTouchableNativeFeedbackBehavior } from './touchable-native-feedback';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 let nextRootTag = 7600;
 
 const ROOT_TEST_ID = 'root';
 // ON THE OWNER, not the child, and that placement is itself the RN contract: `testID` is one of the
 // props TNF clones (:389), and React's `cloneElement` assigns every key of its config INCLUDING the
-// undefined ones — so a TNF with no testID CLEARS its child's. `subject()` therefore finds the
-// committed child by the OWNER's id. Pinned by its own case below.
+// undefined ones — so a TNF with no testID CLEARS its child's. That clearing is the rule's and is
+// asserted in `clone-onto-child-payload.itest.ts`; here the id is only the ordinary shape an app
+// writes, and `subject()` finds the child by position instead.
 const SUBJECT_TEST_ID = 'subject';
 
 function touchAt(x: number, y: number): ISymbioteEvent {
@@ -78,27 +80,39 @@ function listenerOf(node: ISymbioteNode, name: string): IListener {
   return listener;
 }
 
-function findCommitted(testID: string): IFakeNode {
-  const walk = (nodes: readonly IFakeNode[]): IFakeNode | undefined => {
-    for (const node of nodes) {
-      if (node.props.testID === testID) return node;
-      const hit = walk(node.children);
-      if (hit !== undefined) return hit;
-    }
-    return undefined;
-  };
-  const hit = walk(fabric.appRoot().children);
+function findCommitted(testID: string): ILiveNode {
+  const hit = live.findLive(
+    live.appRoot(),
+    node => node.payload.testID === testID,
+  );
   if (hit === undefined) throw new Error(`no committed node testID=${testID}`);
   return hit;
 }
 
-function countNodes(node: IFakeNode): number {
+/**
+ * The committed CHILD, by POSITION rather than by the `testID` the owner clones onto it.
+ *
+ * It was `findCommitted(SUBJECT_TEST_ID)` until 2026-09-18, and that stopped working the day the
+ * clone moved to `foldCloneOntoChild` in C++: this host builds its payloads through the TypeScript
+ * `fabricProps`, which carries no copy of the tag rules. Position is what the tag guarantees anyway
+ * — one child in, one node out.
+ */
+function subject(): ILiveNode {
+  const child = findCommitted(ROOT_TEST_ID).children[0];
+  if (child === undefined) throw new Error('the owner committed no child');
+  return child;
+}
+
+function countNodes(node: ILiveNode): number {
   return 1 + node.children.reduce((sum, kid) => sum + countNodes(kid), 0);
 }
 
 beforeEach(() => {
   vi.useFakeTimers();
-  fabric.commands.length = 0;
+  // `reset()` rather than clearing `commands` alone: every case opens its OWN surface, and
+  // `appRoot()` searches the CREATION log, so without this it answers with the first case's root
+  // for the rest of the file.
+  fabric.reset();
   registerTouchableNativeFeedbackBehavior();
 });
 
@@ -120,7 +134,6 @@ describe('touchable-native-feedback host behavior', () => {
     const committedRoot = findCommitted(ROOT_TEST_ID);
     expect(committedRoot.children).toHaveLength(1);
     expect(committedRoot.children[0].viewName).toBe('RCTView');
-    expect(committedRoot.children[0].props.testID).toBe(SUBJECT_TEST_ID);
     expect(countNodes(committedRoot)).toBe(2);
   });
 
@@ -128,108 +141,25 @@ describe('touchable-native-feedback host behavior', () => {
   // adoption notify. Without this case that copy is unwitnessed — two entry points, one covered,
   // which is the shape `verify-the-deciding-side.md` calls an unmeasured guard.
   it('adopts a child inserted with insertBefore, not only appendChild', () => {
-    const { root, owner, child, surface } = mount({
-      accessibilityLabel: 'Save',
-    });
+    const { root, owner, child, surface } = mount();
     engineAppend(root, owner);
     engineInsertBefore(owner, child, null);
     surface.commit();
 
-    const committedRoot = findCommitted(ROOT_TEST_ID);
-    expect(countNodes(committedRoot)).toBe(2);
-    expect(committedRoot.children[0].props.accessibilityLabel).toBe('Save');
+    expect(countNodes(findCommitted(ROOT_TEST_ID))).toBe(2);
+    expect(owner.childHost).toBe(child);
   });
 
-  it('clones RN’s prop list onto the child and leaves the rest behind', () => {
-    const { root, owner, child, surface } = mount(
-      {
-        accessibilityLabel: 'Save',
-        accessibilityRole: 'button',
-        accessibilityHint: 'Saves the draft',
-        hitSlop: 8,
-        nextFocusDown: 12,
-        // NOT in RN's clone list (:342-390): a TNF declares no style prop, and this one stays on a
-        // node that never commits.
-        opacity: 0.25,
-      },
-      { backgroundColor: 'red' },
-    );
-    engineAppend(root, owner);
-    engineAppend(owner, child);
-    surface.commit();
-
-    const committed = findCommitted(SUBJECT_TEST_ID);
-    expect(committed.props.accessibilityLabel).toBe('Save');
-    expect(committed.props.accessibilityRole).toBe('button');
-    expect(committed.props.accessibilityHint).toBe('Saves the draft');
-    expect(committed.props.hitSlop).toBe(8);
-    expect(committed.props.nextFocusDown).toBe(12);
-    // The child's own props survive where the clone list does not name them.
-    expect(committed.props.backgroundColor).toBe('red');
-    expect(Object.keys(committed.props)).not.toContain('opacity');
-  });
-
-  it('computes accessible, focusable, nativeID and accessibilityState', () => {
-    const { root, owner, child, surface } = mount({
-      id: 'from-id',
-      nativeID: 'losing-value',
-      onPress: () => {},
-      accessibilityState: { busy: true },
-      disabled: true,
-    });
-    engineAppend(root, owner);
-    engineAppend(owner, child);
-    surface.commit();
-
-    const committed = findCommitted(SUBJECT_TEST_ID);
-    expect(committed.props.accessible).toBe(true);
-    // :373 — `id` wins over `nativeID` unconditionally.
-    expect(committed.props.nativeID).toBe('from-id');
-    // :369-372 — an onPress is present but `disabled` is true.
-    expect(committed.props.focusable).toBe(false);
-    // :324-330 — the explicit `disabled` overrides, and the rest of the state survives.
-    expect(committed.props.accessibilityState).toEqual({
-      busy: true,
-      disabled: true,
-    });
-    // A machine-only prop must not ride into the payload as a key no ViewConfig declares.
-    expect(Object.keys(committed.props)).not.toContain('disabled');
-  });
-
-  // why: the spec entry carries `ID_ALIAS`, and the case against it was that the behavior's own
-  // `id ?? nativeID` (:373) would then fold twice. It does not — the alias renames on the OWNER,
-  // whose props never reach Fabric, and the `??` reads whichever key survived. Both arms, because
-  // the adapters disagree about WHERE they rename (React/Svelte per tag through `foldHostBag`,
-  // Solid/Vue/Angular globally in the renderer) and the answer must not depend on that.
-  it('folds `id` the same whichever layer renamed it', () => {
-    const authored = { id: 'from-id', nativeID: 'losing-value' };
-    for (const ownerProps of [authored, foldHostBag(TAG, authored)]) {
-      fabric.reset();
-      const { root, owner, child, surface } = mount(ownerProps);
-      engineAppend(root, owner);
-      engineAppend(owner, child);
-      surface.commit();
-      expect(findCommitted(SUBJECT_TEST_ID).props.nativeID).toBe('from-id');
-    }
-  });
-
-  it('folds the owner’s aria aliases, which the engine’s own fold cannot see', () => {
-    const { root, owner, child, surface } = mount({
-      'aria-label': 'Close',
-      'aria-hidden': true,
-    });
-    engineAppend(root, owner);
-    engineAppend(owner, child);
-    surface.commit();
-
-    const committed = findCommitted(SUBJECT_TEST_ID);
-    expect(committed.props.accessibilityLabel).toBe('Close');
-    expect(committed.props.importantForAccessibility).toBe(
-      'no-hide-descendants',
-    );
-    expect(committed.props.accessibilityElementsHidden).toBe(true);
-    expect(Object.keys(committed.props)).not.toContain('aria-label');
-  });
+  // WHAT THE CLONE PUTS ON THE CHILD LEFT THIS FILE ON 2026-09-18 — RN's unconditional prop list,
+  // the four computed values (`accessible`, `focusable`, `nativeID`, `accessibilityState`), the aria
+  // fold over the owner's bag and the `id` precedence. All of it is `foldCloneOntoChild` in
+  // `SymbioteFabricProps.cpp`, asserted against the committed payload in
+  // `core/engine/cpp/tests/js/clone-onto-child-payload.itest.ts`.
+  //
+  // They could not stay: this host builds its payloads through the TypeScript `fabricProps`, which
+  // deliberately carries no copy of the tag rules — the property that makes it sound for everything
+  // else is what blinds it here. What stays is what is still JS: the SHAPE, adoption, the press
+  // machine, the view commands and the listener forwarding.
 
   // The responder is the CHILD's, and it has to be: `bubble` (events/index.ts) skips anchors for
   // listener lookup and `handOverNativeResponder` has no Fabric handle for an uncommitted node, so
@@ -271,50 +201,10 @@ describe('touchable-native-feedback host behavior', () => {
     expect(onPressOut).toHaveBeenCalledTimes(1);
   });
 
-  it('re-clones when an owner prop changes after mount', () => {
-    const { root, owner, child, surface } = mount({
-      accessibilityLabel: 'Before',
-    });
-    engineAppend(root, owner);
-    engineAppend(owner, child);
-    surface.commit();
-    expect(findCommitted(SUBJECT_TEST_ID).props.accessibilityLabel).toBe(
-      'Before',
-    );
-
-    routeProp(owner, 'accessibilityLabel', 'After');
-    surface.commit();
-    expect(findCommitted(SUBJECT_TEST_ID).props.accessibilityLabel).toBe(
-      'After',
-    );
-  });
-
-  // Vue's order: children mount before props are patched. A prop redirect would have been correct
-  // here and wrong in `mount`; the fold is correct in both.
-  it('clones props written AFTER the child was inserted', () => {
-    const { root, owner, child, surface } = mount();
-    engineAppend(root, owner);
-    engineAppend(owner, child);
-    routeProp(owner, 'accessibilityLabel', 'Late');
-    surface.commit();
-
-    expect(findCommitted(SUBJECT_TEST_ID).props.accessibilityLabel).toBe(
-      'Late',
-    );
-  });
-
-  // `focusable` is a function of a LISTENER, and a listener flip dirties no payload by itself.
-  it('re-clones focusable when onPress is wired after mount', () => {
-    const { root, owner, child, surface } = mount();
-    engineAppend(root, owner);
-    engineAppend(owner, child);
-    surface.commit();
-    expect(findCommitted(SUBJECT_TEST_ID).props.focusable).toBe(false);
-
-    routeProp(owner, 'onPress', () => {});
-    surface.commit();
-    expect(findCommitted(SUBJECT_TEST_ID).props.focusable).toBe(true);
-  });
+  // THE DIRTYING CASES LEFT THIS FILE ON 2026-09-18 — a late owner write, a late listener flip, and
+  // Vue's children-before-props order. The dirtying is still JS (`SLOT_DERIVED`,
+  // `onOwnedListenerChange`), but the only way to SEE it is the payload the rule produces, which
+  // this host cannot build. They live in `clone-onto-child-payload.itest.ts` with the rule.
 
   // :386-387. Both are Fabric BOOLEAN-GATED events, so the flag must land on the CHILD — the only
   // node with a native view — and only while the app has one wired.
@@ -324,22 +214,25 @@ describe('touchable-native-feedback host behavior', () => {
     engineAppend(root, owner);
     engineAppend(owner, child);
     surface.commit();
-    expect(Object.keys(findCommitted(SUBJECT_TEST_ID).props)).not.toContain(
-      'onLayout',
-    );
+    expect(Object.keys(subject().payload)).not.toContain('onLayout');
 
     routeProp(owner, 'onLayout', onLayout);
     surface.commit();
-    expect(findCommitted(SUBJECT_TEST_ID).props.onLayout).toBe(true);
+    expect(subject().payload.onLayout).toBe(true);
     listenerOf(child, 'layout')(touchAt(0, 0));
     expect(onLayout).toHaveBeenCalledTimes(1);
 
     routeProp(owner, 'onLayout', undefined);
     surface.commit();
-    // `null`, not absent: Fabric MERGES a clone's prop diff, so `diffProps` (commit.ts) spells a
-    // removed key as an explicit null and the committed record keeps it. The listener going with
-    // it is the half an app can observe.
-    expect(findCommitted(SUBJECT_TEST_ID).props.onLayout).toBeNull();
+    // ABSENT, not null, and the change of spelling is a correction rather than a weakening. The
+    // literal null was the CLONE PROTOCOL's way of saying "reset this to its default" — it existed
+    // only inside the diff the stand-in merged, and no other consumer ever saw it. The engine's op
+    // stream says the same thing with `NO_VALUE`, and a host replaying that op DELETES the key.
+    expect(Object.hasOwn(subject().payload, 'onLayout')).toBe(false);
+    // The half that proves the engine ACTED rather than merely stopping: the record carried
+    // `onLayout` after the write above, so the key being gone from it means a clearing op was sent.
+    const recorded = fabric.find(node => node.tag === subject().tag);
+    expect(Object.hasOwn(recorded?.props ?? {}, 'onLayout')).toBe(false);
     expect(child.listeners?.get('layout')).toBeUndefined();
   });
 
@@ -351,11 +244,11 @@ describe('touchable-native-feedback host behavior', () => {
     surface.commit();
     fabric.commands.length = 0;
 
-    const committed = findCommitted(SUBJECT_TEST_ID);
-    expect(Object.keys(committed.props)).not.toContain(
+    const committed = subject();
+    expect(Object.keys(committed.payload)).not.toContain(
       'nativeBackgroundAndroid',
     );
-    expect(Object.keys(committed.props)).not.toContain(
+    expect(Object.keys(committed.payload)).not.toContain(
       'nativeForegroundAndroid',
     );
 
@@ -376,29 +269,18 @@ describe('touchable-native-feedback host behavior', () => {
 
     engineRemove(owner, child);
     const replacement = nodeFor('view');
-    // A prop RN does NOT clone, so it identifies the replacement past the owner's own `testID`.
+    // A prop RN does NOT clone, so the replacement is identifiable whatever the rule writes over it.
     routeProp(replacement, 'backgroundColor', 'blue');
     engineAppend(owner, replacement);
     surface.commit();
 
     const committedRoot = findCommitted(ROOT_TEST_ID);
     expect(committedRoot.children).toHaveLength(1);
-    expect(committedRoot.children[0].props.backgroundColor).toBe('blue');
-    expect(committedRoot.children[0].props.accessibilityLabel).toBe('Hi');
+    expect(committedRoot.children[0].payload.backgroundColor).toBe('blue');
     expect(countNodes(committedRoot)).toBe(2);
-  });
-
-  // React's `cloneElement` assigns every key of its config, undefined ones included, so RN's TNF
-  // genuinely clears a child prop it does not carry itself. Reproduced rather than avoided: a fold
-  // that skipped undefined would be a divergence from upstream with nothing to show for it.
-  it('clears a cloned child prop the owner does not carry', () => {
-    const { root, owner, child, surface } = mount({}, { testID: 'mine' });
-    engineAppend(root, owner);
-    engineAppend(owner, child);
-    surface.commit();
-
-    const committedRoot = findCommitted(ROOT_TEST_ID);
-    expect(committedRoot.children[0].props.testID).toBe(SUBJECT_TEST_ID);
+    // ADOPTED, which is what this case is about — the owner tracks the replacement, so the rule has
+    // a parent to read on its commit. What it then WRITES is the itest's.
+    expect(owner.childHost).toBe(replacement);
   });
 
   // THE CONTROL. Without a registration the tag is a bare anchor: the child still commits (an
@@ -417,9 +299,9 @@ describe('touchable-native-feedback host behavior', () => {
     const committedRoot = findCommitted(ROOT_TEST_ID);
     expect(committedRoot.children).toHaveLength(1);
     const committed = committedRoot.children[0];
-    expect(Object.keys(committed.props)).not.toContain('accessibilityLabel');
-    expect(Object.keys(committed.props)).not.toContain('focusable');
-    expect(Object.keys(committed.props)).not.toContain('testID');
+    expect(Object.keys(committed.payload)).not.toContain('accessibilityLabel');
+    expect(Object.keys(committed.payload)).not.toContain('focusable');
+    expect(Object.keys(committed.payload)).not.toContain('testID');
     expect(child.listeners?.get('pressIn')).toBeUndefined();
   });
 });

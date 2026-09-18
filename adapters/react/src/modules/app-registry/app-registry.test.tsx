@@ -15,7 +15,9 @@ import {
   type IAppParameters,
   type IRunnable,
 } from '@symbiote-native/react';
-import { installFabric } from '@symbiote-native/test-utils';
+// A RECORDING host: the assertion is that the registry ran an app at all, read off the view name
+// the ops carry. Nothing here asks what Fabric kept.
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 
 const APP_KEY = 'canary';
 const ROOT_TAG = 210;
@@ -28,7 +30,7 @@ function App(): ReactElement {
   );
 }
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 
 // The host registrar the native side drives (RN's AppRegistry stand-in).
 const hostRunnables = new Map<string, IRunnable>();

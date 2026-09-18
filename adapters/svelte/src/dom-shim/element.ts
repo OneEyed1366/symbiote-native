@@ -36,7 +36,6 @@ import {
   CANONICAL_BY_LOWER,
   CANONICAL_PROP_NAMES,
 } from './canonical-prop-names';
-import { foldHostBag } from './fold-host-bag';
 import { ShimNode } from './shim-node';
 import { discoverStyleCacheKey } from './style-cache';
 
@@ -76,7 +75,7 @@ export class ShimElement extends ShimElementBase {
   // The four attribute doors write `doorBag`, `set p` writes `pBag`, `lastBag` is the folded merge.
   // Held in ONE object, `set p` deleted the `class` `from_tree` had written at clone time, so
   // `<view p={handlers} class="x">` committed with no style at all and nothing was red. Unreachable
-  // while an element used one door, which every lowered tag and adapter component does.
+  // while an element used one door, which nearly every element does.
   // Both LAZY: an element touching one door still allocates one object.
   private doorBag: IShimPropBag | undefined = undefined;
   private pBag: IShimPropBag | undefined = undefined;
@@ -96,7 +95,7 @@ export class ShimElement extends ShimElementBase {
   // no-opping — a `style` attribute on a bare tag crashed the mount. LAZY, for the reason
   // `.claude/rules/svelte-shim-is-the-per-node-create-path.md` records about the two Maps below it:
   // an eager field is one object per element, ~9 000 per create, in the window where GC is the
-  // largest bucket. Only `set_style` touches this, and no lowered element takes that path.
+  // largest bucket. Only `set_style` touches this, and a bag-carrying element never takes it.
   private styleSlot: { cssText: string } | undefined = undefined;
 
   get style(): { cssText: string } {
@@ -147,12 +146,10 @@ export class ShimElement extends ShimElementBase {
     this.surface?.requestCommit();
   }
 
-  // A BARE tag's props arrive here, one key at a time, and they used to stop here: an inert Map,
-  // nothing routed, nothing committed, nothing red. That was survivable only while every host
-  // element in an app was produced by the lowering transform, which builds the `p` bag above —
-  // and it is exactly what made that transform load-bearing for CORRECTNESS on this adapter
-  // alone. Routing the key makes `<view testID="x">` and `<view p={{ testID: 'x' }}>` the same
-  // commit, so the transform goes back to being the optimisation it is everywhere else.
+  // A tag's props arrive here one key at a time, and they used to stop here: an inert Map, nothing
+  // routed, nothing committed, nothing red. Routing the key is what makes `<view testID="x">` and
+  // `<view p={{ testID: 'x' }}>` the same commit — the bag spelling is an optimisation, not the
+  // only way to reach the engine.
   //
   // `value` is `unknown`, not `string`: Svelte's `set_attribute` hands the raw value straight
   // through for a name with no prototype setter, so an object `style` or a number arrives
@@ -204,11 +201,9 @@ export class ShimElement extends ShimElementBase {
   private foldedBag(): IShimPropBag {
     const door = this.doorBag;
     const bag = this.pBag;
-    if (door === undefined)
-      return foldHostBag(this.tagName, normalizeBagClasses(bag ?? {}));
-    if (bag === undefined)
-      return foldHostBag(this.tagName, normalizeBagClasses(door));
-    return foldHostBag(this.tagName, normalizeBagClasses({ ...bag, ...door }));
+    if (door === undefined) return normalizeBagClasses(bag ?? {});
+    if (bag === undefined) return normalizeBagClasses(door);
+    return normalizeBagClasses({ ...bag, ...door });
   }
 
   // THE FIFTH DOOR, and it converges on the same bag as the other four. Svelte turns EVERY

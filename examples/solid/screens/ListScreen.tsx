@@ -10,10 +10,7 @@
 // so a snapshot would rebuild the whole cell on every update (.claude/rules/solid-descriptor-bridge.md §4).
 
 import { createSignal } from 'solid-js';
-import {
-  FlatList,
-  type IFlatListHandle,
-} from '@symbiote-native/solid';
+import { FlatList, type IFlatListHandle } from '@symbiote-native/solid';
 import { ListDiagnostics } from './ListDiagnostics';
 
 interface ITile {

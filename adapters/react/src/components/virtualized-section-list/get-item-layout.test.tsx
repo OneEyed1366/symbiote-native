@@ -16,7 +16,10 @@
 import { createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { VirtualizedSectionList, mount, unmount } from '@symbiote-native/react';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  installRecordingFabric,
+  type IAuthoredNode,
+} from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 34;
 const VIEWPORT_HEIGHT = 400;
@@ -76,14 +79,14 @@ function App(): ReactElement {
   });
 }
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 beforeEach(() => {
   fabric.reset();
   calls = [];
 });
 afterEach(() => unmount(ROOT_TAG));
 
-function findScrollView(): IFakeNode {
+function findScrollView(): IAuthoredNode {
   const node = fabric.find(n => n.viewName === 'RCTScrollView');
   expect(node, 'RCTScrollView was created').toBeDefined();
   if (node === undefined) throw new Error('unreachable: RCTScrollView missing');

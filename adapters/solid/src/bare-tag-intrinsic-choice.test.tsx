@@ -1,22 +1,28 @@
-// A HAND-WRITTEN intrinsic tag, with no lowering transform in front of it — the shape an app writes
-// once primitives are tags rather than components.
+// The one prop that picks a NATIVE VIEW rather than a value, and both directions of it were
+// silently wrong:
 //
-// Everything else about a bare tag was already covered: props, the `id` -> `nativeID` fold and the
-// behavior folds by `lowering-equivalence.test.tsx` (its `lowered:` arms are literal tags), a
-// spread by `spread-fold-parity.test.tsx`, listeners by
-// `components/pressable-lowered-active-class.test.tsx`. What NOTHING covered is the one prop that
-// picks a NATIVE VIEW rather than a value, and both directions of it were silently wrong:
+//   <text-input-multiline />        committed the SINGLE-line view, so Return blurs instead of
+//                                   inserting a newline
+//   <text-input multiline />        committed the single-line view while claiming to be multiline
 //
-//   <text-input-multiline />        the multiline view folded as SINGLE-line — `submitBehavior`
-//                                   'blurAndSubmit', so Return blurs instead of inserting a newline
-//   <text-input multiline />        the SINGLE-line view carrying the multiline fold
+// `viewName` IS the observable, and it is the only one now: these cases used to corroborate it with
+// `submitBehavior`, whose resolution moved into the engine (`foldTextInputAliases`,
+// `SymbioteFabricProps.cpp`) and is asserted there —
+// `core/engine/cpp/tests/js/text-input-payload.itest.ts`. Reading the view name is the more direct
+// answer to the question this file asks anyway.
 //
-// Neither path that existed before could hit this: the wrapper consumes `multiline` to choose its
-// intrinsic, and the transform resolves a literal at compile time. Device-only, nothing red.
+// The wrapper that used to stand here consumed `multiline` to choose its intrinsic, so it could not
+// reach either case. Device-only, nothing red. Everything else about a tag is covered by its
+// neighbours: props and the `id` -> `nativeID` fold by `tag-folds.test.tsx`, a spread by
+// `spread-fold.test.tsx`, listeners by `components/pressable-active-class.test.tsx`.
 import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
 import type { Component } from 'solid-js';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 // The TextInput behavior is what folds `submitBehavior`, and it is installed only here. Without it
 // every payload below is bare and the assertions fail as if the engine were broken.
 import './register';
@@ -27,7 +33,8 @@ const { HOST_PRIMITIVES } = require_(
   '@symbiote-native/components/host-primitives',
 );
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 let nextRoot = 9_400;
 
 const flush = async (): Promise<void> => {
@@ -35,20 +42,14 @@ const flush = async (): Promise<void> => {
   await Promise.resolve();
 };
 
-function walk(node: IFakeNode, out: IFakeNode[]): IFakeNode[] {
-  out.push(node);
-  for (const child of node.children) walk(child, out);
-  return out;
-}
-
-async function committed(tree: Component): Promise<IFakeNode> {
+async function committed(tree: Component): Promise<ILiveNode> {
   const root = (nextRoot += 1);
   fabric.reset();
   mount(root, tree);
   await flush();
-  const last = fabric.committed[fabric.committed.length - 1];
-  const hit = (last === undefined ? [] : walk(last, [])).find(
-    node => node.props.testID === 'probe',
+  const hit = live.findLive(
+    live.appRoot(),
+    node => node.payload.testID === 'probe',
   );
   unmount(root);
   if (hit === undefined) throw new Error('nothing committed with testID=probe');
@@ -71,18 +72,15 @@ describe('the tag decides the text-input view, on a hand-written tag', () => {
     const node = await committed(() => <text-input-multiline testID="probe" />);
 
     expect(node.viewName).toBe('RCTMultilineTextInputView');
-    // The fold the seed exists for: single-line resolves this to 'blurAndSubmit'.
-    expect(node.props.submitBehavior).toBe('newline');
   });
 
   it('folds the single-line tag as single-line', async () => {
     const node = await committed(() => <text-input testID="probe" />);
 
     expect(node.viewName).toBe('RCTSinglelineTextInputView');
-    expect(node.props.submitBehavior).toBe('blurAndSubmit');
     // Not seeded on this tag: the wrapper's payload carries no `multiline` key either, and adding
     // one here would be a divergence in the opposite direction.
-    expect(Object.keys(node.props)).not.toContain('multiline');
+    expect(Object.keys(node.payload)).not.toContain('multiline');
   });
 
   it('refuses a multiline prop on the single-line tag', async () => {
@@ -105,7 +103,6 @@ describe('the tag decides the text-input view, on a hand-written tag', () => {
     ));
 
     expect(node.viewName).toBe('RCTMultilineTextInputView');
-    expect(node.props.submitBehavior).toBe('newline');
   });
 
   // The spread is the shape a transform must REFUSE (`unreadableAttributeSet`) because it cannot

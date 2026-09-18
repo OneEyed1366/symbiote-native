@@ -22,7 +22,8 @@
 import '@angular/compiler';
 import { Component } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import { childrenOf, propsOf } from '@symbiote-native/engine';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../render';
 import {
@@ -36,27 +37,18 @@ const TOUCH_START = 'topTouchStart';
 const TOUCH_MOVE = 'topTouchMove';
 const TOUCH_END = 'topTouchEnd';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 
-// Fabric is clone-on-write: a prop update yields a NEW node object in the committed tree,
-// never in `created`. Walk the live committed child-set for post-mutation assertions.
-function findCommitted(
-  predicate: (node: IFakeNode) => boolean,
-): IFakeNode | undefined {
-  const stack = [...fabric.committed];
-  while (stack.length > 0) {
-    const node = stack.pop();
-    if (node === undefined) continue;
-    if (predicate(node)) return node;
-    stack.push(...node.children);
-  }
-  return undefined;
-}
-
+// The recording host mutates a node's props IN PLACE (no clone-on-write), so `fabric.find`
+// reflects a mutation made after mount just as well as one made at creation — there is no
+// separate "live clone" to walk here, unlike the old mirror.
 function statusText(testID: string): string | undefined {
-  const node = findCommitted(n => n.props.testID === testID);
-  const raw = node?.children[0];
-  return typeof raw?.props.text === 'string' ? raw.props.text : undefined;
+  const node = fabric.find(n => n.props.testID === testID);
+  if (node === undefined) return undefined;
+  const [rawText] = childrenOf(node.handle);
+  if (rawText === undefined) return undefined;
+  const text = propsOf(rawText).text;
+  return typeof text === 'string' ? text : undefined;
 }
 
 // The stable SymbioteNode (event target). Its identity and listener map survive clone-on-

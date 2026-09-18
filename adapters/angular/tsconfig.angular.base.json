@@ -9,6 +9,17 @@
   "compilerOptions": {
     "target": "ES2022",
     "module": "ES2022",
+    // ANGULAR'S OWN SETTING, and it defaults the other way at this target. Every `@Input()` on a
+    // directive is a bare field DECLARATION, so with ES2022 class-field semantics each one is a real
+    // `[[Define]]` on every instance — `SymbioteElement` declares 279 of them, and a screen written
+    // against `SYMBIOTE_ELEMENTS` instantiates a directive per TAG. Angular's own integration
+    // configs carry this line beside the same target (`.vendors/angular/integration/*/tsconfig.json`),
+    // and a declaration with no initializer emits nothing at all under it.
+    //
+    // It is a CORRECTNESS setting there before it is a speed one: a subclass field declaration
+    // re-defines an inherited property to `undefined` under define semantics, which is how an input
+    // set before construction finishes gets silently erased.
+    "useDefineForClassFields": false,
     "moduleResolution": "Bundler",
     "strict": true,
     "skipLibCheck": true,

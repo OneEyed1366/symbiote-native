@@ -6,11 +6,14 @@
 // class-derived one, regardless of which prop is set first or last.
 
 import { afterEach, describe, expect, it } from 'vitest';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import {
   clearGlobalStyles,
   createElement,
+  createSurface,
   flattenStyle,
   getExplicitStyle,
+  getPublishedStyle,
   registerRules,
   routeProp,
 } from '../index';
@@ -37,7 +40,7 @@ describe('routeProp class/className + style merge', () => {
 
     routeProp(node, 'class', 'card');
 
-    expect(flattenStyle(node.props.style)).toEqual({ padding: 10 });
+    expect(flattenStyle(getPublishedStyle(node))).toEqual({ padding: 10 });
   });
 
   // why: Vue templates author `class`, React JSX authors `className` — both must resolve through
@@ -56,7 +59,7 @@ describe('routeProp class/className + style merge', () => {
 
     routeProp(node, 'className', 'card');
 
-    expect(flattenStyle(node.props.style)).toEqual({ padding: 10 });
+    expect(flattenStyle(getPublishedStyle(node))).toEqual({ padding: 10 });
   });
 
   // why: an inline `style` prop is the more specific, more local override — it must always win
@@ -76,7 +79,7 @@ describe('routeProp class/className + style merge', () => {
     routeProp(node, 'class', 'card');
     routeProp(node, 'style', { backgroundColor: 'blue' });
 
-    expect(flattenStyle(node.props.style)).toEqual({
+    expect(flattenStyle(getPublishedStyle(node))).toEqual({
       padding: 10,
       backgroundColor: 'blue',
     });
@@ -96,7 +99,7 @@ describe('routeProp class/className + style merge', () => {
     routeProp(node, 'style', { backgroundColor: 'blue' });
     routeProp(node, 'class', 'card');
 
-    expect(flattenStyle(node.props.style)).toEqual({
+    expect(flattenStyle(getPublishedStyle(node))).toEqual({
       padding: 10,
       backgroundColor: 'blue',
     });
@@ -120,7 +123,9 @@ describe('routeProp class/className + style merge', () => {
     routeProp(node, 'style', { backgroundColor: 'blue' });
     routeProp(node, 'class', undefined);
 
-    expect(flattenStyle(node.props.style)).toEqual({ backgroundColor: 'blue' });
+    expect(flattenStyle(getPublishedStyle(node))).toEqual({
+      backgroundColor: 'blue',
+    });
   });
 
   // why: an adapter building style prop-by-prop (Angular's Ivy ɵɵstyleProp) must merge onto the
@@ -153,6 +158,29 @@ describe('routeProp class/className + style merge', () => {
     routeProp(node, 'class', 42);
     routeProp(node, 'style', { backgroundColor: 'blue' });
 
-    expect(flattenStyle(node.props.style)).toEqual({ backgroundColor: 'blue' });
+    expect(flattenStyle(getPublishedStyle(node))).toEqual({
+      backgroundColor: 'blue',
+    });
+  });
+
+  // why (F-22, `.docs/tree-inefficiency-findings.md`): a class that matches NO rule and no
+  // explicit `style` prop means the authored style is genuinely absent — `pushClassStyle` must
+  // spell that as `setProp(node, 'style', undefined)`, the wire's own NO_VALUE/delete encoding
+  // (`mutation-buffer.ts`), not as a real `[undefined, undefined]` array. Both are "no style" once
+  // the payload builder flattens them, but only the former costs the host nothing — the array
+  // must be converted to a `folly::dynamic`, stored, and diffed on every later commit for real
+  // work that produces zero visible props. Wire-level, not `getPublishedStyle` (which reads the
+  // resolved slots, not what was actually sent) — a recording host is what can tell an omitted
+  // key apart from a key present with an `[undefined, undefined]` value.
+  it('publishes no wire value at all when the class matches nothing and style is absent', () => {
+    const fabric = installRecordingFabric();
+    const surface = createSurface(88_001);
+    const node = createElement('RCTView');
+
+    routeProp(node, 'class', 'does-not-match-any-registered-rule');
+    surface.appendChild(node);
+    surface.commit();
+
+    expect(fabric.propOf(node, 'style')).toBeUndefined();
   });
 });

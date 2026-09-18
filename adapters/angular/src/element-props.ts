@@ -15,8 +15,6 @@
 // wrapper component accepted. The claim that a directive can reclaim it "solely by executing a
 // linked AOT artifact" was answered rather than assumed: `elements.test.ts` compiles the binding
 // through real ngtsc and runs the LINKED output. See `SymbioteElement.style`.
-//
-// `symbioteStyle` stays as an alias — it is public API and the renderer still folds it.
 import type {
   IAccessibilityProps,
   IAriaProps,
@@ -45,10 +43,8 @@ export interface IElementProps
   renderToHardwareTextureAndroid?: boolean;
   shouldRasterizeIOS?: boolean;
   needsOffscreenAlphaCompositing?: boolean;
-  /** The array-capable `[style]`, aliased to `style` in the renderer. */
-  symbioteStyle?: IStyleProp<IViewStyle>;
   /**
-   * RN's own spelling. The press-state callback is in the union because a subclass cannot widen an
+   * The press-state callback is in the union because a subclass cannot widen an
    * inherited property and `<pressable>`/`<touchable-*>` are the tags that take one; on every other
    * tag the engine resolves it at `pressed: false`.
    */

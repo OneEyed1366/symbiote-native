@@ -16,7 +16,12 @@
 import { useState, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '@symbiote-native/react';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import { propsOf } from '@symbiote-native/engine';
+import {
+  installRecordingFabric,
+  payloadOf,
+  type IAuthoredNode,
+} from '@symbiote-native/test-utils';
 
 interface ICommandCall {
   target: string | undefined;
@@ -39,25 +44,23 @@ let currentRootTag = 190;
 let probeId = 'switch-0';
 const SWITCH_VIEW = 'Switch';
 
-const commands: ICommandCall[] = [];
-
-// The snap-back cases assert the `setValue` command, so graft a recording `dispatchCommand` onto
-// the live slot before any mount (the engine destructures it off the global on its first commit).
-const fabric = installFabric();
-const slot = globalThis.nativeFabricUIManager;
-if (slot === undefined) throw new Error('fabric slot was not installed');
-slot.dispatchCommand = (node, name, args) => {
-  const target = node.props.testID;
-  commands.push({
-    target: typeof target === 'string' ? target : undefined,
-    name,
-    args,
-  });
-};
+// A RECORDING host, and the snap-back cases need no graft any more. `dispatchCommand` is something
+// the ENGINE does — it asked the platform to set a value — so the host records it as output rather
+// than deriving it, and the recording carries the authored node the call was aimed at.
+const fabric = installRecordingFabric();
 
 // Commands sent to the node THIS case mounted, and nothing else.
 function commandsForProbe(): ICommandCall[] {
-  return commands.filter(command => command.target === probeId);
+  return fabric.commands
+    .map(command => {
+      const target = propsOf(command.handle).testID;
+      return {
+        target: typeof target === 'string' ? target : undefined,
+        name: command.commandName,
+        args: command.args,
+      };
+    })
+    .filter(command => command.target === probeId);
 }
 
 // The snap-back check is DEFERRED by the behavior, deliberately — an accepted toggle updates the
@@ -73,16 +76,21 @@ function mountFresh(element: ReactElement): void {
   mount(currentRootTag, element);
 }
 
-function switchNode(): IFakeNode {
+function switchNode(): IAuthoredNode {
   const node = fabric.find(n => n.viewName === SWITCH_VIEW);
   if (!node) throw new Error(`no ${SWITCH_VIEW} was created`);
   return node;
 }
 
+function switchProps(): Record<string, unknown> {
+  return payloadOf(switchNode().handle);
+}
+
 let caseCount = 0;
 beforeEach(() => {
+  // `reset()` clears the recorded commands and the creation list together — the two used to be a
+  // local array and a host counter, and keeping them in step by hand is what this removes.
   fabric.reset();
-  commands.length = 0;
   caseCount += 1;
   probeId = `switch-${String(caseCount)}`;
 });
@@ -91,40 +99,21 @@ afterEach(() => unmount(currentRootTag));
 describe('React <switch> on the engine', () => {
   // why: RN's real Switch view name is `Switch` — a wrong native view name means the host
   // simply never resolves a component, which no JS-level check would otherwise catch.
-  it('emits the Fabric view name Switch and passes value through as a strict boolean', () => {
-    mountFresh(<switch value />);
-    expect(switchNode().props.value).toBe(true);
+  it('emits the Fabric view name Switch and carries the authored props through', () => {
+    mountFresh(<switch value disabled />);
+
+    expect(switchProps().disabled).toBe(true);
   });
 
-  // why: RN sends `value === true` to the native side (Switch.js) — an absent `value` prop must
-  // fold to a real `false`, not ride through as `undefined`, which native would reject/misread.
-  it('folds an undefined value to a strict false', () => {
-    mountFresh(<switch />);
-    expect(switchNode().props.value).toBe(false);
-  });
-
-  // why: trackColor/thumbColor/ios_backgroundColor are RN's public prop names, but native reads
-  // them under different keys (onTintColor/tintColor/thumbTintColor/backgroundColor) — using the
-  // public names on the wire would just silently not paint on device.
-  it('maps color + disabled props to the native iOS prop names', () => {
-    mountFresh(
-      <switch
-        value
-        disabled
-        trackColor={{ false: '#767577', true: '#81b0ff' }}
-        thumbColor="#f5dd4b"
-        ios_backgroundColor="#3e3e3e"
-      />,
-    );
-    const props = switchNode().props;
-    expect(props.onTintColor).toBe('#81b0ff');
-    expect(props.tintColor).toBe('#767577');
-    expect(props.thumbTintColor).toBe('#f5dd4b');
-    expect(props.disabled).toBe(true);
-    // ios_backgroundColor folds into the style, which the commit engine flattens onto the
-    // node, so backgroundColor lands as a top-level committed prop.
-    expect(props.backgroundColor).toBe('#3e3e3e');
-  });
+  // THE PROP-RESOLUTION CASES MOVED, as a GROUP:
+  // `core/engine/cpp/tests/js/switch-payload.itest.ts`. `value === true`, the per-platform colour
+  // renames and the `ios_backgroundColor` style fold are `foldSwitchProps` in
+  // `SymbioteFabricProps.cpp` now, and this harness commits through the TypeScript `fabricProps`,
+  // which holds no copy of that rule.
+  //
+  // As a group on purpose: `<switch value />` would have stayed GREEN alone, since the app authored
+  // `true` and a payload with no rule at all satisfies it. A green case over a rule that no longer
+  // runs is worse than no case — the same false green the text-input port was caught by.
 
   // why: onValueChange hands the caller ONE event, with the derived boolean carried as `.value`
   // on it — a consumer that reads `event.nativeEvent.value` (RN's own event shape) must still work.

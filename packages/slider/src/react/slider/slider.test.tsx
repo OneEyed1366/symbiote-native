@@ -12,7 +12,12 @@ import {
   unmount,
   setNativeViewConfigSource,
 } from '@symbiote-native/react';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type IAuthoredNode,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 import { Slider } from '.';
 
 const ROOT_TAG = 312;
@@ -59,7 +64,8 @@ const RNC_SLIDER_VIEW_CONFIG = {
   },
 };
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 setNativeViewConfigSource(name =>
   name === SLIDER_VIEW ? RNC_SLIDER_VIEW_CONFIG : undefined,
 );
@@ -70,38 +76,28 @@ afterEach(() => unmount(ROOT_TAG));
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
-function findInTree(
-  predicate: (node: IFakeNode) => boolean,
-  nodes = fabric.committed,
-): IFakeNode | undefined {
-  for (const node of nodes) {
-    if (predicate(node)) return node;
-    const child = findInTree(predicate, node.children);
-    if (child) return child;
-  }
-  return undefined;
-}
-
-function sliderNode(): IFakeNode {
+// The RNCSlider leaf is created once per test and never recreated, so the same authored handle
+// answers every read — including after a re-commit (`sliderProps()` always re-derives its
+// payload, so it reflects the CURRENT committed props, not the ones captured at creation).
+function sliderNode(): IAuthoredNode {
   const node = fabric.find(n => n.viewName === SLIDER_VIEW);
   if (!node) throw new Error(`no ${SLIDER_VIEW} was created`);
   return node;
 }
 
-function currentSliderNode(): IFakeNode {
-  const node = findInTree(n => n.viewName === SLIDER_VIEW);
-  if (!node) throw new Error(`no committed ${SLIDER_VIEW} exists`);
-  return node;
+// The COMMITTED payload — the third-party ViewConfig's `process` functions (the tint colors'
+// `fakeColor`) and the library's own resolvers run here, not on the authored prop bag.
+function sliderProps(): Record<string, unknown> {
+  return live.nodeOf(sliderNode().handle).payload;
 }
 
-function sliderWrapperNode(): IFakeNode {
-  const node = findInTree(
+function sliderWrapperNode(): ILiveNode | undefined {
+  return live.findLive(
+    live.appRoot(),
     n =>
       n.viewName === 'RCTView' &&
       n.children.some(child => child.viewName === SLIDER_VIEW),
   );
-  if (!node) throw new Error('no committed Slider wrapper exists');
-  return node;
 }
 
 // createSlider's render body has no throwing path — it's pure prop folding + descriptor
@@ -121,7 +117,7 @@ describe('React Slider wrapper', () => {
           step: 0.1,
         }),
       );
-      const props = sliderNode().props;
+      const props = sliderProps();
       expect(props.value).toBe(0.5);
       expect(props.minimumValue).toBe(0);
       expect(props.maximumValue).toBe(1);
@@ -133,7 +129,7 @@ describe('React Slider wrapper', () => {
       // why: an app that only sets `value` still needs a usable 0..1 default range and unbounded
       // limits — this is the library's documented default contract, ported verbatim.
       mount(ROOT_TAG, createElement(Slider, { value: 0.3 }));
-      const props = sliderNode().props;
+      const props = sliderProps();
       expect(props.minimumValue).toBe(0);
       expect(props.maximumValue).toBe(1);
       expect(props.step).toBe(0);
@@ -151,29 +147,31 @@ describe('React Slider wrapper', () => {
         ROOT_TAG,
         createElement(Slider, { value: 0.5, lowerLimit: 0.2, upperLimit: 0.8 }),
       );
-      const props = sliderNode().props;
+      const props = sliderProps();
       expect(props.lowerLimit).toBe(0.2);
       expect(props.upperLimit).toBe(0.8);
     });
 
     it('sanitizes a falsy/NaN value to undefined (library passedValue quirk)', () => {
       mount(ROOT_TAG, createElement(Slider, { value: 0 }));
-      expect(sliderNode().props.value).toBeUndefined();
+      expect(sliderProps().value).toBeUndefined();
       unmount(ROOT_TAG);
       fabric.reset();
       mount(ROOT_TAG, createElement(Slider, { value: Number.NaN }));
-      expect(sliderNode().props.value).toBeUndefined();
+      expect(sliderProps().value).toBeUndefined();
     });
 
     it('measures the wrapper and pins the native slider width in the common non-steps path', async () => {
       // why: the wrapper's onLayout is the only source of `width` — without it the native slider
       // would size naturally rather than sharing a coordinate space with a future step overlay.
       mount(ROOT_TAG, createElement(Slider, { value: 0.5 }));
-      fabric.fireEvent(sliderWrapperNode().instanceHandle, 'topLayout', {
+      const wrapper = sliderWrapperNode();
+      expect(wrapper, 'no committed Slider wrapper exists').toBeDefined();
+      fabric.fireEvent(wrapper!.instanceHandle, 'topLayout', {
         layout: { x: 0, y: 0, width: 240, height: 40 },
       });
       await tick();
-      expect(currentSliderNode().props.width).toBe(240);
+      expect(sliderProps().width).toBe(240);
     });
 
     it('forwards tint props and runs them through the derived processor', () => {
@@ -186,7 +184,7 @@ describe('React Slider wrapper', () => {
           thumbTintColor: '#0000ff',
         }),
       );
-      const props = sliderNode().props;
+      const props = sliderProps();
       expect(props.minimumTrackTintColor).toBe('processed(#ff0000)');
       expect(props.maximumTrackTintColor).toBe('processed(#00ff00)');
       expect(props.thumbTintColor).toBe('processed(#0000ff)');
@@ -240,7 +238,7 @@ describe('React Slider wrapper', () => {
           accessibilityState: { disabled: true },
         }),
       );
-      expect(sliderNode().props.disabled).toBe(true);
+      expect(sliderProps().disabled).toBe(true);
     });
 
     it('an explicit disabled prop wins over accessibilityState.disabled', () => {
@@ -255,8 +253,8 @@ describe('React Slider wrapper', () => {
           accessibilityState: { disabled: true },
         }),
       );
-      expect(sliderNode().props.disabled).toBe(false);
-      expect(sliderNode().props.accessibilityState).toEqual({
+      expect(sliderProps().disabled).toBe(false);
+      expect(sliderProps().accessibilityState).toEqual({
         disabled: false,
       });
     });
@@ -350,10 +348,10 @@ describe('React Slider wrapper', () => {
       // 'processed(...)' is the fake color processor from RNC_SLIDER_VIEW_CONFIG — the fold's own
       // job stops at picking 'transparent'; the value still runs through the same derived
       // processor every other tint does.
-      expect(sliderNode().props.thumbTintColor).toBe('processed(transparent)');
+      expect(sliderProps().thumbTintColor).toBe('processed(transparent)');
       // why: shouldPassNativeThumbImage's other half of the same contract — the marker draws its
       // own thumb image, so the native leaf must not ALSO receive one underneath it.
-      expect(sliderNode().props.thumbImage).toBeUndefined();
+      expect(sliderProps().thumbImage).toBeUndefined();
     });
 
     it('does NOT leak the JS onValueChange callback to the native node as a prop', () => {
@@ -361,7 +359,7 @@ describe('React Slider wrapper', () => {
         ROOT_TAG,
         createElement(Slider, { value: 0.2, onValueChange: () => undefined }),
       );
-      expect(typeof sliderNode().props.onValueChange).not.toBe('function');
+      expect(typeof sliderProps().onValueChange).not.toBe('function');
     });
   });
 });

@@ -36,7 +36,15 @@ import {
   setNativeViewConfigSource,
 } from '@symbiote-native/angular';
 import type { INativeViewConfig } from '@symbiote-native/engine';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  childrenOf,
+  isAnchor,
+  type ISymbioteNode,
+} from '@symbiote-native/engine';
+import {
+  installRecordingFabric,
+  type IAuthoredNode,
+} from '@symbiote-native/test-utils';
 import { Stack } from './index';
 import type { INavigatorHandle } from './index';
 import { ScreenDirective } from '../screen.directive';
@@ -99,7 +107,7 @@ const VIEW_CONFIGS: Record<string, INativeViewConfig> = {
   [MODAL_SCREEN_VIEW]: RNS_SCREEN_VIEW_CONFIG,
 };
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 setNativeViewConfigSource(name => VIEW_CONFIGS[name]);
 // On a real Metro build, adapters/angular's babel-register-composed.cjs auto-registers `Stack`
 // as an anchor host by scanning the AOT-compiled @Component's selector - vitest never runs that
@@ -114,32 +122,58 @@ const tick = (): Promise<void> =>
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-function findInTree(
-  predicate: (node: IFakeNode) => boolean,
-  nodes = fabric.committed,
-): IFakeNode | undefined {
-  for (const node of nodes) {
-    if (predicate(node)) return node;
-    const found = findInTree(predicate, node.children);
-    if (found) return found;
-  }
-  return undefined;
+// A POP is the subject of half this file, so every walk below descends the LIVE child links from
+// the outermost stack container down. A recording keeps every node it ever saw created, so a
+// popped screen is still in the record and only the tree says it is gone.
+function stackRoot(): ISymbioteNode {
+  const stack = fabric.find(node => node.viewName === STACK_VIEW);
+  if (stack === undefined) throw new Error('no screen stack created');
+  return stack.handle;
 }
 
-function screenNodes(): IFakeNode[] {
-  const found: IFakeNode[] = [];
-  const collect = (nodes: readonly IFakeNode[]): void => {
-    for (const node of nodes) {
-      if (node.viewName === SCREEN_VIEW) found.push(node);
-      collect(node.children);
+// ANCHORS ARE FLATTENED, and on this adapter that is not a detail. Angular's renderer leaves an
+// anchor under the header config; an anchor is structural bookkeeping nothing native ever sees, so
+// the commit walk puts its children in its place (`renderableChildren`) and so does this. The count
+// below means NATIVE children — "zero children when there is no search bar" is a claim about native
+// cost, and an anchor is none.
+function kidsOf(node: IAuthoredNode): IAuthoredNode[] {
+  const walk = (handle: ISymbioteNode): IAuthoredNode[] => {
+    const kids: IAuthoredNode[] = [];
+    for (const child of childrenOf(handle)) {
+      if (isAnchor(child)) {
+        kids.push(...walk(child));
+        continue;
+      }
+      const recorded = fabric.find(one => one.handle === child);
+      if (recorded !== undefined) kids.push(recorded);
     }
+    return kids;
   };
-  collect(fabric.committed);
+  return walk(node.handle);
+}
+
+function liveNodes(handle: ISymbioteNode = stackRoot()): IAuthoredNode[] {
+  const found: IAuthoredNode[] = [];
+  for (const child of childrenOf(handle)) {
+    const recorded = fabric.find(one => one.handle === child);
+    if (recorded !== undefined) found.push(recorded);
+    found.push(...liveNodes(child));
+  }
   return found;
 }
 
-function headerConfigOf(screen: IFakeNode): IFakeNode {
-  const header = screen.children.find(
+function findInTree(
+  predicate: (node: IAuthoredNode) => boolean,
+): IAuthoredNode | undefined {
+  return liveNodes().find(predicate);
+}
+
+function screenNodes(): IAuthoredNode[] {
+  return liveNodes().filter(node => node.viewName === SCREEN_VIEW);
+}
+
+function headerConfigOf(screen: IAuthoredNode): IAuthoredNode {
+  const header = kidsOf(screen).find(
     child => child.viewName === HEADER_CONFIG_VIEW,
   );
   if (!header) throw new Error('no header config child on screen');
@@ -514,13 +548,13 @@ describe('Angular Stack navigator', () => {
     });
     await tick();
     const header = headerConfigOf(screenNodes()[0]);
-    expect(header.children).toHaveLength(1);
-    const subview = header.children[0];
+    expect(kidsOf(header)).toHaveLength(1);
+    const subview = kidsOf(header)[0];
     expect(subview.viewName).toBe(HEADER_SUBVIEW_VIEW);
     expect(subview.props.type).toBe('searchBar');
-    expect(subview.children).toHaveLength(1);
-    expect(subview.children[0].viewName).toBe(SEARCH_BAR_VIEW);
-    expect(subview.children[0].props.placeholder).toBe('Search');
+    expect(kidsOf(subview)).toHaveLength(1);
+    expect(kidsOf(subview)[0].viewName).toBe(SEARCH_BAR_VIEW);
+    expect(kidsOf(subview)[0].props.placeholder).toBe('Search');
   });
 
   it('drives imperative SearchBarCommands (focus/setText/…) through the app-supplied ref', async () => {
@@ -553,7 +587,7 @@ describe('Angular Stack navigator', () => {
   it('renders the header config with zero children when there is no search bar', async () => {
     await mountStack();
     const header = headerConfigOf(screenNodes()[0]);
-    expect(header.children).toHaveLength(0);
+    expect(kidsOf(header)).toHaveLength(0);
   });
 
   // why: a modally-presented screen has no UINavigationController on iOS (render-stack.ts's
@@ -569,19 +603,22 @@ describe('Angular Stack navigator', () => {
     const outer = findInTree(n => n.viewName === MODAL_SCREEN_VIEW);
     if (!outer) throw new Error('no RNSModalScreen mounted');
 
-    const innerStack = outer.children.find(
+    const innerStack = kidsOf(outer).find(
       child => child.viewName === STACK_VIEW,
     );
     if (!innerStack)
       throw new Error('no inner RNSScreenStack nested inside the modal screen');
-    const innerScreen = innerStack.children.find(
+    const innerScreen = kidsOf(innerStack).find(
       child => child.viewName === SCREEN_VIEW,
     );
     if (!innerScreen)
       throw new Error('no inner RNSScreen nested inside the inner stack');
     // The only RNSScreen anywhere is this inner one - the OUTER screen mounted as RNSModalScreen
-    // instead, exactly the substitution outerScreenIsModal exists to make.
-    expect(screenNodes()).toEqual([innerScreen]);
+    // instead, exactly the substitution outerScreenIsModal exists to make. Compared by node
+    // IDENTITY: a recorded node is a fresh view object per lookup, so only the handle is the node.
+    expect(screenNodes().map(node => node.handle)).toEqual([
+      innerScreen.handle,
+    ]);
     expect(headerConfigOf(innerScreen).props.title).toBe('Home');
   });
 

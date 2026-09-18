@@ -48,5 +48,8 @@
   "scripts": {
     "typecheck": "tsc --build",
     "format": "prettier --write \"src/**/*.{ts,tsx}\""
+  },
+  "dependencies": {
+    "@symbiote-native/engine": "workspace:*"
   }
 }

@@ -6,16 +6,14 @@
 // re-exports `.svelte` sources Vite's plain test transform cannot parse.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
-import type { IFakeNode } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import { Dimensions } from '@symbiote-native/engine';
 import * as engine from '@symbiote-native/engine';
 import { mount, unmount } from '@symbiote-native/svelte/native-view-bridge';
 import type { IDrawerNavigatorHandle } from '../../core';
 import {
-  findLiveByTestId,
-  outline,
-  rawTextsOutsideTextContainer,
+  createNavigationLiveTree,
+  type IFabricNode,
 } from '../fabric-tree.test-helper';
 import {
   createSvelteHarness,
@@ -64,7 +62,14 @@ function installRequestAnimationFrame(): void {
 // module-level singleton, same convention as react/drawer/drawer.test.tsx).
 Dimensions.set({ window: { width: 375, height: 812, scale: 1, fontScale: 1 } });
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const {
+  appRoot,
+  findLiveByTestId,
+  nodeOf,
+  outline,
+  rawTextsOutsideTextContainer,
+} = createNavigationLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve_ => setTimeout(resolve_, 0));
 
@@ -151,14 +156,14 @@ async function mountDrawer(
 // `panResponder.panHandlers` - sits two levels under the mount's own AppContainer wrapper (a
 // fixed shape this file's paint-order assertions already rely on): appRoot -> the mount bridge's
 // content view -> Drawer's root.
-function drawerRootNode(): IFakeNode {
-  return fabric.appRoot().children[0].children[0];
+function drawerRootNode(): IFabricNode {
+  return nodeOf(appRoot()).children[0].children[0];
 }
 
 // children: [registry-host RCTText, content, overlay, panel] for the default 'front' order
 // (render-drawer.ts's drawerChildOrder) - the registry host is always first, painted by
 // index.svelte ahead of the `{#each order}` loop.
-function overlayNode(): IFakeNode | undefined {
+function overlayNode(): IFabricNode | undefined {
   return drawerRootNode().children[2];
 }
 
@@ -172,7 +177,6 @@ const TOUCH_ID = 1;
 function swipe(path: readonly ITouchFrame[]): void {
   const node = drawerRootNode();
   const handle = node.instanceHandle;
-  const tag = node.tag;
   const point = (frame: ITouchFrame) => ({
     identifier: TOUCH_ID,
     pageX: frame.x,
@@ -182,10 +186,11 @@ function swipe(path: readonly ITouchFrame[]): void {
   });
   const fire = (type: string, frame: ITouchFrame, isEnd: boolean): void => {
     const touch = point(frame);
+    // No top-level `target`: nothing in the engine's touch path reads one (it resolves ancestry
+    // from `touches[].target`), and a tag was only ever the fake tree's stand-in for a node.
     fabric.fireEvent(handle, type, {
       touches: isEnd ? [] : [touch],
       changedTouches: [touch],
-      target: tag,
       timestamp: frame.t,
     });
   };
@@ -231,8 +236,14 @@ describe('Drawer (real compiled index.svelte)', () => {
 
       // front: content, overlay, panel - preceded by the collapsed registry host that absorbs the
       // whitespace between the two `<Drawer.Screen>` markers.
-      expect(outline(fabric.appRoot())).toEqual([
-        'RCTView',
+      //
+      // The root line reads `#surface` rather than `RCTView`, and the change is a CORRECTION.
+      // The app root is the surface node; it is created as an `RCTView` and then set to the
+      // surface component, so `componentOf` says `#surface` and Fabric commits it as `RootView`.
+      // The stand-in tree kept the creation name — a third answer, and the only one nothing
+      // downstream agrees with. Everything below the root is unchanged.
+      expect(outline(appRoot())).toEqual([
+        '#surface',
         '  RCTView',
         '    RCTView',
         '      RCTText',
@@ -243,10 +254,8 @@ describe('Drawer (real compiled index.svelte)', () => {
         '      RCTView',
         '        RCTView',
       ]);
-      expect(findLiveByTestId(fabric.appRoot(), 'inbox')).toBeDefined();
-      expect(
-        findLiveByTestId(fabric.appRoot(), 'drawer-panel-content'),
-      ).toBeDefined();
+      expect(findLiveByTestId(appRoot(), 'inbox')).toBeDefined();
+      expect(findLiveByTestId(appRoot(), 'drawer-panel-content')).toBeDefined();
     });
 
     // why: an app-authored `drawerContent` snippet needs the live route count, open state,
@@ -257,7 +266,7 @@ describe('Drawer (real compiled index.svelte)', () => {
       await mountDrawer();
       // routes:isOpen:descriptorCount:typeof openDrawer
       expect(
-        findLiveByTestId(fabric.appRoot(), 'drawer-panel-content')?.props
+        findLiveByTestId(appRoot(), 'drawer-panel-content')?.props
           ?.accessibilityLabel,
       ).toBe('2:false:2:function');
     });
@@ -271,7 +280,7 @@ describe('Drawer (real compiled index.svelte)', () => {
       await tick();
       await tick();
       expect(
-        findLiveByTestId(fabric.appRoot(), 'drawer-panel-content')?.props
+        findLiveByTestId(appRoot(), 'drawer-panel-content')?.props
           ?.accessibilityLabel,
       ).toBe('2:true:2:function');
 
@@ -279,7 +288,7 @@ describe('Drawer (real compiled index.svelte)', () => {
       await tick();
       await tick();
       expect(
-        findLiveByTestId(fabric.appRoot(), 'drawer-panel-content')?.props
+        findLiveByTestId(appRoot(), 'drawer-panel-content')?.props
           ?.accessibilityLabel,
       ).toBe('2:false:2:function');
     });
@@ -289,14 +298,14 @@ describe('Drawer (real compiled index.svelte)', () => {
     // behind the panel, wasting work and risking cross-screen side effects.
     it('mounts only the focused route and swaps it on jumpTo', async () => {
       const handle = await mountDrawer();
-      expect(findLiveByTestId(fabric.appRoot(), 'inbox')).toBeDefined();
-      expect(findLiveByTestId(fabric.appRoot(), 'settings')).toBeUndefined();
+      expect(findLiveByTestId(appRoot(), 'inbox')).toBeDefined();
+      expect(findLiveByTestId(appRoot(), 'settings')).toBeUndefined();
 
       handle.jumpTo('settings');
       await tick();
       await tick();
-      expect(findLiveByTestId(fabric.appRoot(), 'inbox')).toBeUndefined();
-      expect(findLiveByTestId(fabric.appRoot(), 'settings')).toBeDefined();
+      expect(findLiveByTestId(appRoot(), 'inbox')).toBeUndefined();
+      expect(findLiveByTestId(appRoot(), 'settings')).toBeDefined();
     });
 
     // why: useIsFocused()/useFocusEffect() consumers rely on a focus event firing for the
@@ -306,7 +315,7 @@ describe('Drawer (real compiled index.svelte)', () => {
       const handle = await mountDrawer();
       await tick();
       expect(
-        findLiveByTestId(fabric.appRoot(), 'inbox')?.props?.accessibilityLabel,
+        findLiveByTestId(appRoot(), 'inbox')?.props?.accessibilityLabel,
       ).toBe('inbox:true');
 
       handle.jumpTo('settings');
@@ -314,8 +323,7 @@ describe('Drawer (real compiled index.svelte)', () => {
       await tick();
       await tick();
       expect(
-        findLiveByTestId(fabric.appRoot(), 'settings')?.props
-          ?.accessibilityLabel,
+        findLiveByTestId(appRoot(), 'settings')?.props?.accessibilityLabel,
       ).toBe('settings:true');
     });
 
@@ -326,9 +334,10 @@ describe('Drawer (real compiled index.svelte)', () => {
     it('drops the overlay and reverses the slot order for a permanent drawer', async () => {
       await mountDrawer('permanent', 'drawerType="permanent"');
 
-      // permanent + left: panel, content, and no overlay at all.
-      expect(outline(fabric.appRoot())).toEqual([
-        'RCTView',
+      // permanent + left: panel, content, and no overlay at all. `#surface` at the root, for the
+      // reason spelled out on the front-order outline above.
+      expect(outline(appRoot())).toEqual([
+        '#surface',
         '  RCTView',
         '    RCTView',
         '      RCTText',
@@ -345,8 +354,8 @@ describe('Drawer (real compiled index.svelte)', () => {
     // straight into Settings) without an extra jumpTo round-trip after mount.
     it('honours initialRouteName', async () => {
       await mountDrawer('initial-route', 'initialRouteName="settings"');
-      expect(findLiveByTestId(fabric.appRoot(), 'settings')).toBeDefined();
-      expect(findLiveByTestId(fabric.appRoot(), 'inbox')).toBeUndefined();
+      expect(findLiveByTestId(appRoot(), 'settings')).toBeDefined();
+      expect(findLiveByTestId(appRoot(), 'inbox')).toBeUndefined();
     });
 
     // why: structural regression guard for svelte-adapter-dom-shim skill §16b - the templates
@@ -356,12 +365,12 @@ describe('Drawer (real compiled index.svelte)', () => {
     // drawer open, because the panel slot only mounts then.
     it('commits no raw text outside a text container', async () => {
       const handle = await mountDrawer('hygiene');
-      expect(rawTextsOutsideTextContainer(fabric.appRoot())).toEqual([]);
+      expect(rawTextsOutsideTextContainer(appRoot())).toEqual([]);
 
       handle.openDrawer();
       await tick();
       await tick();
-      expect(rawTextsOutsideTextContainer(fabric.appRoot())).toEqual([]);
+      expect(rawTextsOutsideTextContainer(appRoot())).toEqual([]);
     });
 
     // why: seedState's `routes.length === 0` branch (dlog-documented) must produce a mounted,
@@ -372,7 +381,7 @@ describe('Drawer (real compiled index.svelte)', () => {
       const handle = await mountDrawer('empty', '', false);
       expect(handle.jumpTo).toBeTypeOf('function');
       expect(
-        findLiveByTestId(fabric.appRoot(), 'drawer-panel-content')?.props
+        findLiveByTestId(appRoot(), 'drawer-panel-content')?.props
           ?.accessibilityLabel,
       ).toBe('0:false:0:function');
     });
@@ -403,7 +412,7 @@ describe('Drawer (real compiled index.svelte)', () => {
       await tick();
       await tick();
       expect(
-        findLiveByTestId(fabric.appRoot(), 'drawer-panel-content')?.props
+        findLiveByTestId(appRoot(), 'drawer-panel-content')?.props
           ?.accessibilityLabel,
       ).toBe('2:true:2:function');
 
@@ -411,7 +420,7 @@ describe('Drawer (real compiled index.svelte)', () => {
       await tick();
       await tick();
       expect(
-        findLiveByTestId(fabric.appRoot(), 'drawer-panel-content')?.props
+        findLiveByTestId(appRoot(), 'drawer-panel-content')?.props
           ?.accessibilityLabel,
       ).toBe('2:false:2:function');
     });
@@ -424,8 +433,8 @@ describe('Drawer (real compiled index.svelte)', () => {
       handle.jumpTo('does-not-exist');
       await tick();
       await tick();
-      expect(findLiveByTestId(fabric.appRoot(), 'inbox')).toBeDefined();
-      expect(findLiveByTestId(fabric.appRoot(), 'settings')).toBeUndefined();
+      expect(findLiveByTestId(appRoot(), 'inbox')).toBeDefined();
+      expect(findLiveByTestId(appRoot(), 'settings')).toBeUndefined();
     });
 
     // Regression: jumpTo() used to animate off a pre-dispatch `wasOpen` snapshot alone, so an
@@ -443,7 +452,7 @@ describe('Drawer (real compiled index.svelte)', () => {
       await tick();
       expect(timingSpy).not.toHaveBeenCalled();
       expect(overlayNode()?.props?.pointerEvents).toBe('auto');
-      expect(findLiveByTestId(fabric.appRoot(), 'inbox')).toBeDefined();
+      expect(findLiveByTestId(appRoot(), 'inbox')).toBeDefined();
       timingSpy.mockRestore();
     });
 
@@ -455,8 +464,8 @@ describe('Drawer (real compiled index.svelte)', () => {
         'initial-route-unknown',
         'initialRouteName="does-not-exist"',
       );
-      expect(findLiveByTestId(fabric.appRoot(), 'inbox')).toBeDefined();
-      expect(findLiveByTestId(fabric.appRoot(), 'settings')).toBeUndefined();
+      expect(findLiveByTestId(appRoot(), 'inbox')).toBeDefined();
+      expect(findLiveByTestId(appRoot(), 'settings')).toBeUndefined();
     });
 
     // why: shouldClaimDrawerSwipe's first gate is `options.swipeEnabled ?? true` - an app that

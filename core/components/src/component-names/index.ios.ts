@@ -34,14 +34,7 @@ const IOS_NAMES: Readonly<Record<ISymbioteIntrinsic, string>> = {
   'horizontal-scroll-content': 'RCTScrollContentView',
   'text-input': 'RCTSinglelineTextInputView',
   'text-input-multiline': 'RCTMultilineTextInputView',
-  // The component path's pair — same native views, a tag the behavior registry does not
-  // carry. See `shared.ts` for why the wrapper may not share the lowered tag.
-  'text-input-managed': 'RCTSinglelineTextInputView',
-  'text-input-multiline-managed': 'RCTMultilineTextInputView',
   switch: 'Switch',
-  // The wrapper's tag — same native view, a tag the behavior registry does not carry. See
-  // `shared.ts` for why the wrapper may not share the lowered tag.
-  'switch-managed': 'Switch',
   'activity-indicator': 'RCTView',
   'activity-indicator-spinner': 'ActivityIndicatorView',
   'safe-area-view': 'SafeAreaView',

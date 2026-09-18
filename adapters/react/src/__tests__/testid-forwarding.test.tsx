@@ -23,7 +23,15 @@ import {
   VirtualizedSectionList,
   Animated,
 } from '@symbiote-native/react';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+// A RECORDING host. The question is "did some node the engine created carry this id", which the op
+// stream answers outright — no commit rule decides it, and a stand-in TREE was only a place the ops
+// had been copied to. The AUTHORED tree is the right one to search here for a second reason: a
+// `testID` on a bare view is exactly what stops Fabric flattening it away, so searching the
+// committed tree would confuse "the id was forwarded" with "the view survived".
+import {
+  installRecordingFabric,
+  type IAuthoredNode,
+} from '@symbiote-native/test-utils';
 
 // KeyboardAvoidingView subscribes to the native Keyboard hub on mount; install the minimal fake
 // device-event hub + KeyboardObserver the dedicated keyboard tests use so it mounts headless.
@@ -41,12 +49,12 @@ Object.assign(globalThis, {
 });
 
 const ROOT_TAG = 770;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-function carriesTestId(id: string): IFakeNode | undefined {
+function carriesTestId(id: string): IAuthoredNode | undefined {
   return fabric.find(node => node.props.testID === id);
 }
 

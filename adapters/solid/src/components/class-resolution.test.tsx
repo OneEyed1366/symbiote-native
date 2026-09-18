@@ -9,7 +9,11 @@
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 import { mount, unmount } from '../render';
 
 const ROOT_TAG = 977;
@@ -22,7 +26,8 @@ const LABEL_FONT_SIZE = 15;
 // an app-entry seam no unit mount installs. Colors would make this file test color processing
 // instead of what it is for: whether the component hands `class` to routeProp at all.
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -50,23 +55,12 @@ afterEach(() => {
   clearGlobalStyles();
 });
 
-function walk(nodes: IFakeNode[], visit: (node: IFakeNode) => void): void {
-  for (const node of nodes) {
-    visit(node);
-    walk(node.children, visit);
-  }
-}
-
-// Found by testID, NOT by viewName. The committed tree carries container nodes of the same
-// viewName, so `first RCTView` is not the node under test — matching on viewName made an assertion
-// pass against a wrapper that happens to carry `flex`, i.e. a false green. Reads `fabric.committed`
-// because a clone-on-write supersedes the created node's frozen props.
-function committed(testID: string): IFakeNode | undefined {
-  let found: IFakeNode | undefined;
-  walk(fabric.committed, node => {
-    if (found === undefined && node.props.testID === testID) found = node;
-  });
-  return found;
+// Found by testID, NOT by viewName. The tree carries container nodes of the same viewName, so
+// `first RCTView` is not the node under test — matching on viewName made an assertion pass against
+// a wrapper that happens to carry `flex`, i.e. a false green. Reads the LIVE tree because the
+// recording holds the node as it was CREATED, with its props frozen at that moment.
+function committed(testID: string): ILiveNode | undefined {
+  return live.findLive(live.appRoot(), node => node.payload.testID === testID);
 }
 
 const PROBE = 'class-probe';
@@ -79,10 +73,10 @@ describe('class resolution through the adapter components', () => {
     await tick();
 
     const view = committed(PROBE);
-    expect(view?.props.flex).toBe(SCREEN_FLEX);
-    expect(view?.props.opacity).toBe(SCREEN_OPACITY);
+    expect(view?.payload.flex).toBe(SCREEN_FLEX);
+    expect(view?.payload.opacity).toBe(SCREEN_OPACITY);
     // The class name itself is a JS-side lookup key; it must never reach Fabric.
-    expect('class' in (view?.props ?? {})).toBe(false);
+    expect('class' in (view?.payload ?? {})).toBe(false);
   });
 
   it('resolves a registered class on Text', async () => {
@@ -94,8 +88,8 @@ describe('class resolution through the adapter components', () => {
     await tick();
 
     const text = committed(PROBE);
-    expect(text?.props.fontSize).toBe(LABEL_FONT_SIZE);
-    expect('class' in (text?.props ?? {})).toBe(false);
+    expect(text?.payload.fontSize).toBe(LABEL_FONT_SIZE);
+    expect('class' in (text?.payload ?? {})).toBe(false);
   });
 
   it('resolves a registered class on the pressable tag', async () => {
@@ -103,8 +97,8 @@ describe('class resolution through the adapter components', () => {
     await tick();
 
     const view = committed(PROBE);
-    expect(view?.props.flex).toBe(SCREEN_FLEX);
-    expect(view?.props.opacity).toBe(SCREEN_OPACITY);
+    expect(view?.payload.flex).toBe(SCREEN_FLEX);
+    expect(view?.payload.opacity).toBe(SCREEN_OPACITY);
   });
 
   // why: `class` and `style` together must BOTH reach the node — the component forwarding only one
@@ -118,7 +112,7 @@ describe('class resolution through the adapter components', () => {
     await tick();
 
     const view = committed(PROBE);
-    expect(view?.props.flex, 'the class half').toBe(SCREEN_FLEX);
-    expect(view?.props.margin, 'the explicit-style half').toBe(7);
+    expect(view?.payload.flex, 'the class half').toBe(SCREEN_FLEX);
+    expect(view?.payload.margin, 'the explicit-style half').toBe(7);
   });
 });

@@ -28,25 +28,38 @@ import {
   unmount,
   type ISymbioteEvent,
 } from '@symbiote-native/react';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 220;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-function modalNode(): IFakeNode {
-  const node = fabric.find(n => n.viewName === 'ModalHostView');
+function modalNode(): ILiveNode {
+  const node = live.findLive(
+    live.appRoot(),
+    n => n.viewName === 'ModalHostView',
+  );
   if (!node) throw new Error('no ModalHostView was created');
   return node;
 }
 
 // The container View RN wraps children in is the one View directly under the host.
-function containerNode(): IFakeNode {
+function containerNode(): ILiveNode {
   const child = modalNode().children[0];
   if (!child) throw new Error('ModalHostView has no container child');
   return child;
+}
+
+// The serializer runs siblings together, same shorthand `fabric.serialize` used to produce.
+function serialize(nodes: ILiveNode[]): string {
+  return nodes.map(node => live.serialize(node.handle)).join('');
 }
 
 describe('React Modal on the engine', () => {
@@ -64,10 +77,10 @@ describe('React Modal on the engine', () => {
           <view />
         </Modal>,
       );
-      expect(fabric.serialize(fabric.appRoot().children)).toBe(
+      expect(serialize(live.nodeOf(live.appRoot()).children)).toBe(
         'ModalHostView(RCTView(RCTView))',
       );
-      expect(modalNode().props.visible).toBe(true);
+      expect(modalNode().payload.visible).toBe(true);
     });
 
     // why: shouldRenderModal's boolean result is core-tested directly; this proves the React
@@ -80,7 +93,7 @@ describe('React Modal on the engine', () => {
           <view />
         </Modal>,
       );
-      expect(fabric.appRoot().children.length).toBe(0);
+      expect(live.nodeOf(live.appRoot()).children.length).toBe(0);
       expect(fabric.find(n => n.viewName === 'ModalHostView')).toBeUndefined();
     });
 
@@ -216,8 +229,8 @@ describe('React Modal on the engine', () => {
           <view />
         </Modal>,
       );
-      expect(containerNode().props.backgroundColor).toBe('transparent');
-      expect(modalNode().props.presentationStyle).toBe('overFullScreen');
+      expect(containerNode().payload.backgroundColor).toBe('transparent');
+      expect(modalNode().payload.presentationStyle).toBe('overFullScreen');
     });
   });
 
@@ -238,7 +251,7 @@ describe('React Modal on the engine', () => {
           <view />
         </Modal>,
       );
-      const props = modalNode().props;
+      const props = modalNode().payload;
       expect(props.testID).toBe('my-modal');
       expect(props.accessible).toBe(true);
       expect(props.accessibilityLabel).toBe('a dialog');
@@ -264,7 +277,7 @@ describe('React Modal on the engine', () => {
           <view />
         </Modal>,
       );
-      const props = modalNode().props;
+      const props = modalNode().payload;
       expect(props.supportedOrientations).toEqual(['portrait', 'landscape']);
       expect(props.hardwareAccelerated).toBe(true);
       expect(props.statusBarTranslucent).toBe(true);

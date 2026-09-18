@@ -17,9 +17,9 @@ function toCamel(key: string): string {
   );
 }
 
-// The per-KEY half, for the path that never sees a whole attrs bag: a host primitive lowered to
-// its intrinsic tag by the SFC transformer reaches the renderer one patchProp call at a time,
-// with no component in between to fold the bag. Returns the key unchanged (same string identity)
+// The per-KEY half, for the path that never sees a whole attrs bag: an intrinsic tag reaches the
+// renderer one patchProp call at a time, with no component in between to fold the bag. Returns the
+// key unchanged (same string identity)
 // whenever there is nothing to convert, which is every key on the hot path.
 export function normalizeVueAttrKey(key: string): string {
   if (!key.includes('-')) return key;

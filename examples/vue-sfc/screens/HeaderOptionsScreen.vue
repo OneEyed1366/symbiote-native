@@ -37,9 +37,7 @@ const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.HeaderOptions];
     <view class="section">
       <view :class="`line-tag line-tag-${lineInfo.line}`">
         <text class="line-tag-text">
-          {{
-            `${lineInfo.code} · ${lineInfo.label}`
-          }}
+          {{ `${lineInfo.code} · ${lineInfo.label}` }}
         </text>
       </view>
       <view class="hero-card">
@@ -47,14 +45,10 @@ const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.HeaderOptions];
           class="hero-badge"
           :style="{ backgroundColor: LINE_COLOR.presentation }"
         >
-          <text class="hero-badge-text">
-            HD
-          </text>
+          <text class="hero-badge-text"> HD </text>
         </view>
         <view class="hero-copy">
-          <text class="hero-title">
-            Header options
-          </text>
+          <text class="hero-title"> Header options </text>
           <text class="hero-body">
             Bar buttons, a right-side menu, a native search bar, and
             headerLargeTitle — every headerSearchBarOptions callback wired to a
@@ -65,34 +59,22 @@ const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.HeaderOptions];
       <text class="info-text">
         headerLargeTitle · headerTintColor · headerStyle.backgroundColor
       </text>
-      <text
-        testID="header-last-action"
-        class="info-text"
-      >
+      <text testID="header-last-action" class="info-text">
         {{
           `last header action: ${params.lastHeaderAction ?? 'none yet — tap a bar button or menu item'}`
         }}
       </text>
-      <text
-        testID="header-search-text"
-        class="info-text"
-      >
+      <text testID="header-search-text" class="info-text">
         {{
           `last search text: ${params.lastSearchText ?? 'none yet — pull down and type'}`
         }}
       </text>
-      <text
-        testID="header-search-submitted"
-        class="info-text"
-      >
+      <text testID="header-search-submitted" class="info-text">
         {{
           `last search submitted: ${params.lastSearchSubmitted ?? 'none yet — type and press search'}`
         }}
       </text>
-      <text
-        testID="header-search-event"
-        class="info-text"
-      >
+      <text testID="header-search-event" class="info-text">
         {{
           `last search bar event: ${params.lastSearchBarEvent ?? 'none yet — focus/blur/cancel the search bar'}`
         }}

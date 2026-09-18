@@ -8,11 +8,13 @@
 import { defineComponent, h } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '@symbiote-native/vue';
-import { installFabric } from '@symbiote-native/test-utils';
+// A RECORDING host: the node is found over the AUTHORED nodes and the touch is aimed at the
+// `instanceHandle` the ops named — no commit rule decides either.
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 518;
 const PRESS_DELAY_MS = 30;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 

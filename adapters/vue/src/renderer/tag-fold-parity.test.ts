@@ -9,26 +9,29 @@
 // arms share, and Vue's folds all live in that layer (`.claude/rules/test-harness-false-greens.md`
 // §16, measured on this adapter). Each `toEqual` below names the payload RN produces.
 //
-// `tests/lowered-primitive-fold-parity.test.ts` guards this repo-wide by diffing each wrapper's
-// shared-layer IMPORTS against the behavior's, which is a proxy: a fold applied inline, or one
-// living in an adapter's own renderer, is invisible to it. Vue's folds are exactly that shape —
-// kebab->camel has no counterpart in any other adapter — so this asserts the PAYLOAD instead.
+// Vue's folds live in its own renderer and one of them — kebab->camel — has no counterpart in any
+// other adapter, so nothing repo-wide can check them. This asserts the PAYLOAD instead.
 
 import { describe, expect, it } from 'vitest';
 import { defineComponent, h, type VNodeProps } from '@vue/runtime-core';
 import { mount, unmount } from '@symbiote-native/vue';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 // The press machine `pressable` reaches. An unregistered tag commits a bare view with the app's
 // props raw on it, which is a different tree than the one asserted below.
 import '../register';
 
 const ROOT_TAG = 7301;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
 // The surface commits its own container view as the forest root, so the subject is the node under
-// it — index 1 in tree order, not index 0.
+// it, not the root itself.
 async function commit(
   type: unknown,
   props: Record<string, unknown>,
@@ -42,25 +45,17 @@ async function commit(
     }),
   );
   await tick();
-  const flat: IFakeNode[] = [];
-  const walk = (nodes: readonly IFakeNode[]): void => {
-    for (const node of nodes) {
-      flat.push(node);
-      walk(node.children);
-    }
-  };
-  walk(fabric.committed);
-  const subject = flat[1];
+  const subject = live.nodeOf(live.appRoot()).children[0];
   if (subject === undefined) {
     throw new Error('nothing committed under the surface container');
   }
-  const props_ = { ...subject.props };
+  const payload = { ...subject.payload };
   unmount(ROOT_TAG);
-  return props_;
+  return payload;
 }
 
 // Every committed node as `viewName{sortedKeys}`, in tree order — for the primitive whose wrapper
-// is more than one node.
+// is more than one node. Root included: the first row is the surface's own container.
 async function subtree(
   type: unknown,
   props: Record<string, unknown>,
@@ -74,15 +69,11 @@ async function subtree(
   );
   await tick();
   const shape: string[] = [];
-  const walk = (nodes: readonly IFakeNode[]): void => {
-    for (const node of nodes) {
-      shape.push(
-        `${node.viewName}{${Object.keys(node.props).sort().join(',')}}`,
-      );
-      walk(node.children);
-    }
-  };
-  walk(fabric.committed);
+  live.walkLive(live.appRoot(), (node: ILiveNode) => {
+    shape.push(
+      `${node.viewName}{${Object.keys(node.payload).sort().join(',')}}`,
+    );
+  });
   unmount(ROOT_TAG);
   return shape;
 }
@@ -113,21 +104,34 @@ describe('a bare tag commits what a wrapper used to', () => {
     });
 
     expect(tag).toEqual([
-      'RCTView{flex,pointerEvents}',
-      // `accessible` (Pressable.js:252) and `focusable` (Pressable.js:258) are RN's defaults, and
-      // the behavior is the only thing that supplies them now.
-      'RCTView{accessibilityLabel,accessible,focusable,testID}',
+      // `#surface` is the engine's own current name for the surface root (`componentOf`) — not
+      // what a real device commits it as (`RootView`), nor its creation-time name (`RCTView`), but
+      // it is the live tree's honest answer and incidental to what this case is actually pinning.
+      '#surface{flex,pointerEvents}',
+      // No `accessible`/`focusable`: RN's two Pressable defaults are the engine's rule now
+      // (`foldPressableProps`), and this harness's payload comes from the TypeScript
+      // `fabricProps`, which holds no copy of it —
+      // `core/engine/cpp/tests/js/pressable-payload.itest.ts` has them.
+      //
+      // The case is unharmed: what it pins is that a tag reaches its BEHAVIOR and lands in the
+      // right tree SHAPE, and the shape is the half a single-node check cannot see.
+      'RCTView{accessibilityLabel,testID}',
     ]);
   });
 
-  it("text: RN's defaults reach the tag", async () => {
-    // These come from seedTextDefaults in createElement, NOT from textDefaultFor in patchProp —
-    // that one fires only when a value is an explicit `undefined`, so it is never reached by a
-    // text carrying no props at all. Disabling it leaves this test green; disabling
-    // seedTextDefaults empties the payload. The wrapper's own `resolveTextProps` copy was the
-    // second of two mechanisms that happened to agree; the seed is the one that survived.
+  it('text: the tag adds nothing of the adapter’s own', async () => {
+    // RN's two Text defaults left on 2026-09-18, the same way and for the same reason as the
+    // Pressable pair one case up: the rule is `foldTextDefaults` in `SymbioteFabricProps.cpp` now,
+    // and this harness's payload comes from the TypeScript `fabricProps`, which holds no copy of it.
+    // `core/engine/cpp/tests/js/committed-payload.itest.ts` has them.
+    //
+    // An EMPTY payload is the real assertion here rather than a leftover: this renderer once held
+    // three successive mechanisms for these two keys (a wrapper fold, a create-time seed, a
+    // patch-time substitution), each invisible to the others, and the seed in particular put both
+    // keys on every text node in the app. So "a text carrying no props commits no props" is exactly
+    // the regression that history makes worth pinning.
     const tag = await commit('text', {}, 'hi');
 
-    expect(tag).toEqual({ ellipsizeMode: 'tail', allowFontScaling: true });
+    expect(tag).toEqual({});
   });
 });

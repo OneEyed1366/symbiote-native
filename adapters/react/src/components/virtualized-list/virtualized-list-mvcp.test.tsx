@@ -44,12 +44,10 @@ import {
   unmount,
   type IFlatListHandle,
 } from '@symbiote-native/react';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
-
-interface ICommandCall {
-  name: string;
-  args: readonly unknown[];
-}
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 
 interface IScrollToIndexFailure {
   index: number;
@@ -67,33 +65,22 @@ const FAIL_DATA = Array.from({ length: 100 }, (_unused, index) => ({
 
 const listRef = createRef<IFlatListHandle>();
 const failures: IScrollToIndexFailure[] = [];
-const commands: ICommandCall[] = [];
 
-// The shared harness slot doesn't record view commands; the fail-path case asserts that NO
-// scrollTo is dispatched, so graft a recording `dispatchCommand` onto the live slot before
-// any mount (the engine destructures it off the global on its first commit).
-const fabric = installFabric();
-const slot = globalThis.nativeFabricUIManager;
-if (slot === undefined) throw new Error('fabric slot was not installed');
-slot.dispatchCommand = (_node, name, args) => {
-  commands.push({ name, args });
-};
+// dispatchCommand is one of the engine's own imperative calls, recorded natively by the recording
+// host — no graft needed, unlike the old shared mirror slot.
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
+const commands = fabric.commands;
 
 beforeEach(() => {
   fabric.reset();
-  commands.length = 0;
   failures.length = 0;
 });
 afterEach(() => unmount(ROOT_TAG));
 
-// Walk the committed tree; return the first node whose viewName looks like a scroll view.
-function findScrollView(nodes: IFakeNode[]): IFakeNode | undefined {
-  for (const node of nodes) {
-    if (/scroll/i.test(node.viewName)) return node;
-    const nested = findScrollView(node.children);
-    if (nested !== undefined) return nested;
-  }
-  return undefined;
+// The first node under the app root whose viewName looks like a scroll view.
+function findScrollView() {
+  return live.findLive(live.appRoot(), node => /scroll/i.test(node.viewName));
 }
 
 function MvcpApp(): ReactElement {
@@ -128,17 +115,15 @@ describe('VirtualizedList MVCP forwarding and scrollToIndex failure path (Positi
   // one row too early (the header instead of the caller's intended first data row).
   it('forwards maintainVisibleContentPosition to the scroll view, bumping minIndexForVisible for the header', () => {
     mount(ROOT_TAG, <MvcpApp />);
-    expect(fabric.committed.length, 'MVCP FlatList committed').toBeGreaterThan(
-      0,
-    );
+    expect(fabric.commits, 'MVCP FlatList committed').toBeGreaterThan(0);
 
-    const scrollView = findScrollView(fabric.committed);
+    const scrollView = findScrollView();
     expect(
       scrollView,
       'scroll view node found in committed tree',
     ).toBeDefined();
 
-    const mvcp = scrollView!.props.maintainVisibleContentPosition;
+    const mvcp = scrollView!.payload.maintainVisibleContentPosition;
     expect(typeof mvcp).toBe('object');
     expect(mvcp).not.toBeNull();
 
@@ -155,15 +140,16 @@ describe('VirtualizedList MVCP forwarding and scrollToIndex failure path (Positi
   // instead of silently jumping to a guessed offset, which would land the user somewhere wrong.
   it('fires onScrollToIndexFailed for an unmeasured cell and dispatches no scrollTo', () => {
     mount(ROOT_TAG, <FailPathApp />);
-    expect(
-      fabric.committed.length,
-      'fail-path FlatList committed',
-    ).toBeGreaterThan(0);
+    expect(fabric.commits, 'fail-path FlatList committed').toBeGreaterThan(0);
     expect(listRef.current, 'fail-path FlatList ref attached').not.toBeNull();
 
-    const scrollsBefore = commands.filter(c => c.name === 'scrollTo').length;
+    const scrollsBefore = commands.filter(
+      c => c.commandName === 'scrollTo',
+    ).length;
     listRef.current!.scrollToIndex({ index: 50, animated: true });
-    const scrollsAfter = commands.filter(c => c.name === 'scrollTo').length;
+    const scrollsAfter = commands.filter(
+      c => c.commandName === 'scrollTo',
+    ).length;
 
     expect(failures.length, 'onScrollToIndexFailed fires once').toBe(1);
     expect(failures[0].index, 'failure index is 50').toBe(50);

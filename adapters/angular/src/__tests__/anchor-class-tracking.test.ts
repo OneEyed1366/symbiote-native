@@ -10,14 +10,24 @@
 // per consumption shape rather than all eight - inline `anchorHostStyle`, a style-array fold, and
 // `stableAnchorStyle`'s dedup gate. Verified to fail with the poll removed.
 //
-// `fabric.find` only ever sees a node's FIRST-created props (createNode never re-runs on update),
-// so a style that lands after mount only shows up on the live clone in `fabric.committed`.
+// The recording host mutates a node's props IN PLACE (no clone-on-write), so `fabric.find`
+// reflects a style applied after mount just as well as one applied at creation — unlike the old
+// mirror, there is no separate "live clone" to walk. What still needs the PAYLOAD rather than the
+// raw props bag is the class-derived value itself: a registered class resolves onto `props.style`
+// as the engine's `[classStyle, explicitStyle]` pair, and only `payloadOf` (the engine's own
+// `fabricProps`) flattens that into a top-level `backgroundColor`.
 
 import '@angular/compiler';
 import { ChangeDetectorRef, Component, inject } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  childrenOf,
+  clearGlobalStyles,
+  parentOf,
+  registerRules,
+  type ISymbioteNode,
+} from '@symbiote-native/engine';
+import { installRecordingFabric, payloadOf } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../render';
 import { FlatList } from '../components/flat-list';
@@ -28,7 +38,7 @@ import {
 } from '../components/virtualized-list';
 
 const ROOT_TAG = 981;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 
 // The class-derived style lands neither reliably ON the testID node nor reliably below it:
 // FlatList commits it onto the wrapper that CONTAINS theirs, and `image-background` puts the
@@ -37,35 +47,28 @@ const fabric = installFabric();
 // nearest-first. A plain
 // global search would match a sibling tile and pass while the component under test was frozen.
 function nearestStyled(testID: string, prop: string): unknown {
-  const pathTo = (node: IFakeNode): IFakeNode[] | undefined => {
-    if (node.props.testID === testID) return [node];
-    for (const child of node.children) {
-      const below = pathTo(child);
-      if (below) return [node, ...below];
-    }
-    return undefined;
-  };
-  const inSubtree = (node: IFakeNode): IFakeNode | undefined => {
-    if (node.props[prop] !== undefined) return node;
-    for (const child of node.children) {
-      const found = inSubtree(child);
-      if (found) return found;
-    }
-    return undefined;
-  };
+  const owner = fabric.find(node => node.props.testID === testID);
+  if (owner === undefined) return undefined;
 
-  for (const root of fabric.committed) {
-    const path = pathTo(root);
-    if (path === undefined) continue;
-    const owner = path[path.length - 1];
-    if (owner === undefined) continue;
-    const below = inSubtree(owner);
-    if (below !== undefined) return below.props[prop];
-    for (let index = path.length - 2; index >= 0; index -= 1) {
-      const ancestor = path[index];
-      if (ancestor !== undefined && ancestor.props[prop] !== undefined)
-        return ancestor.props[prop];
+  const inSubtree = (handle: ISymbioteNode): unknown => {
+    const value = payloadOf(handle)[prop];
+    if (value !== undefined) return value;
+    for (const child of childrenOf(handle)) {
+      const found = inSubtree(child);
+      if (found !== undefined) return found;
     }
+    return undefined;
+  };
+  const below = inSubtree(owner.handle);
+  if (below !== undefined) return below;
+
+  for (
+    let ancestor = parentOf(owner.handle);
+    ancestor !== undefined;
+    ancestor = parentOf(ancestor)
+  ) {
+    const value = payloadOf(ancestor)[prop];
+    if (value !== undefined) return value;
   }
   return undefined;
 }

@@ -5,11 +5,11 @@
 // Solid twin (adapters/solid/src/create-portal/create-portal.test.tsx) and the React twin assert
 // the same things.
 //
-// Every parentage assertion reads `fabric.committed`, never `fabric.created`: a created node's
-// children are frozen at its first commit, so parentage after a clone-on-write only exists in the
-// committed tree (.claude/rules/test-harness-false-greens.md §2). Nodes are matched by `testID`,
-// never by `viewName` — the committed tree is full of RCTViews and "the first one" is somebody
-// else's (§3 of the same file).
+// Every parentage assertion reads the LIVE tree (`createLiveTree`, over the engine's own child
+// links), never the creation log: a node the app moved keeps its old parent in the log, so
+// parentage after a move only exists in the live tree (.claude/rules/test-harness-false-greens.md
+// §2). Nodes are matched by `testID`, never by `viewName` — the tree is full of RCTViews and "the
+// first one" is somebody else's (§3 of the same file).
 //
 // Harness shape is ../create-tunnel/create-tunnel.test.ts's: compile the real `.svelte` sources at
 // run time and dynamic-import the output, because no vite-plugin-svelte is wired into this repo's
@@ -20,8 +20,12 @@ import { compile } from 'svelte/compiler';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
-import type { ISymbioteNode } from '@symbiote-native/engine';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
+import { childrenOf, type ISymbioteNode } from '@symbiote-native/engine';
 import { mount, unmount } from '../render';
 
 // Both are set by RN before any app code runs (setUpGlobals.js / setUpNavigator.js); a bare
@@ -37,7 +41,8 @@ if (globalThis.navigator === undefined) {
 // accumulating-state trap .claude/rules/test-harness-false-greens.md warns about.
 let nextRootTag = 91_500;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
@@ -103,38 +108,25 @@ function mountApp(App: Component, props?: object): ReturnType<typeof mount> {
   return mount(nextRootTag, App, props);
 }
 
-function walk(
-  nodes: readonly IFakeNode[],
-  visit: (node: IFakeNode) => void,
-): void {
-  for (const node of nodes) {
-    visit(node);
-    walk(node.children, visit);
-  }
-}
-
 function findCommitted(
-  predicate: (node: IFakeNode) => boolean,
-): IFakeNode | undefined {
-  let found: IFakeNode | undefined;
-  walk(fabric.committed, node => {
-    if (found === undefined && predicate(node)) found = node;
-  });
-  return found;
+  predicate: (node: ILiveNode) => boolean,
+): ILiveNode | undefined {
+  return live.findLive(live.appRoot(), predicate);
 }
 
-const byText = (text: string) => (node: IFakeNode) =>
+const byText = (text: string) => (node: ILiveNode) =>
   node.viewName === 'RCTRawText' && node.props.text === text;
 
-const byTestID = (testID: string) => (node: IFakeNode) =>
+const byTestID = (testID: string) => (node: ILiveNode) =>
   node.props.testID === testID;
 
-function contains(root: IFakeNode, target: IFakeNode): boolean {
-  if (root === target) return true;
+// Identity, not `===` — `ILiveNode` is rebuilt fresh by a getter on every `.children` read.
+function contains(root: ILiveNode, target: ILiveNode): boolean {
+  if (root.handle === target.handle) return true;
   return root.children.some(child => contains(child, target));
 }
 
-function childTestIDs(node: IFakeNode | undefined): unknown[] {
+function childTestIDs(node: ILiveNode | undefined): unknown[] {
   return (node?.children ?? []).map(child => child.props.testID);
 }
 
@@ -414,8 +406,11 @@ describe('Portal', () => {
       childTestIDs(findCommitted(byTestID('overlay-host'))),
       'the target paints nothing again',
     ).toEqual([]);
+    // Through the engine's accessor: a node's desired children are derived from its published
+    // record plus its op log, so there is no `children` field to read.
+    const host = control?.target()?.engineNode;
     expect(
-      control?.target()?.engineNode?.children.length,
+      host === undefined ? undefined : childrenOf(host as never).length,
       'and the fragment host itself left the retained tree — no leaked anchor',
     ).toBe(0);
   });

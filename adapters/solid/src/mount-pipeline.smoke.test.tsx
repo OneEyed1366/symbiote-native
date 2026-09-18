@@ -9,12 +9,17 @@
 // `moduleName`/`generate` the app-facing ../babel-preset.cjs pins.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 import { mount, unmount } from './render';
 
 const ROOT_TAG = 707;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 
 // The surface commits on a microtask (requestCommit), so every assertion waits one macrotask —
 // the same shape as the Vue adapter's renderer tests.
@@ -24,23 +29,12 @@ const tick = (): Promise<void> =>
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-function walk(nodes: IFakeNode[], visit: (node: IFakeNode) => void): void {
-  for (const node of nodes) {
-    visit(node);
-    walk(node.children, visit);
-  }
-}
-
-// Reads the LIVE committed tree, not `fabric.created` (which keeps every node ever created,
-// including ones a later clone-on-write superseded — symbiote-engine-core §8).
+// Reads the LIVE tree, not the recording (which keeps every node ever created, including ones a
+// later clone-on-write superseded — symbiote-engine-core §8).
 function findCommitted(
-  predicate: (node: IFakeNode) => boolean,
-): IFakeNode | undefined {
-  let found: IFakeNode | undefined;
-  walk(fabric.committed, node => {
-    if (found === undefined && predicate(node)) found = node;
-  });
-  return found;
+  predicate: (node: ILiveNode) => boolean,
+): ILiveNode | undefined {
+  return live.findLive(live.appRoot(), predicate);
 }
 
 describe('solid adapter — static paint', () => {
@@ -56,10 +50,10 @@ describe('solid adapter — static paint', () => {
     mount(ROOT_TAG, App);
     await tick();
 
-    const view = findCommitted(node => node.props.testID === 'root');
+    const view = findCommitted(node => node.payload.testID === 'root');
     expect(view, 'the root View committed').toBeDefined();
     expect(view?.viewName).toBe('RCTView');
-    expect(view?.props.flex).toBe(1);
+    expect(view?.payload.flex).toBe(1);
 
     expect(
       findCommitted(node => node.viewName === 'RCTText'),
@@ -67,7 +61,7 @@ describe('solid adapter — static paint', () => {
     ).toBeDefined();
     expect(
       findCommitted(
-        node => node.viewName === 'RCTRawText' && node.props.text === 'hello',
+        node => node.viewName === 'RCTRawText' && node.payload.text === 'hello',
       ),
       'the text content committed as an RCTRawText',
     ).toBeDefined();

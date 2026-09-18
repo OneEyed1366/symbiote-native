@@ -21,8 +21,7 @@ export type { IDescriptorShapeGuard } from './descriptor';
 // and its types. Framework-agnostic, so React, Vue, and the next adapter all fold
 // identically; moved here from @symbiote-native/react. RefreshControl/SafeAreaView/ScrollView consume it.
 export { resolveAccessibilityProps } from './accessibility-props';
-export { resolveTextProps } from './text-props';
-export type { IEllipsizeMode, ITextDefaultableProps } from './text-props';
+export type { IEllipsizeMode } from './text-props';
 export type {
   IAccessibilityProps,
   IAriaProps,
@@ -45,11 +44,8 @@ export type {
   ICrossTypedIntrinsics,
 } from './component-names/shared';
 
-export { renderSwitch } from './view/render-switch';
 export type {
   ISwitchProps,
-  ISwitchViewProps,
-  ISwitchPlatform,
   ISwitchTrackColor,
   ISwitchChangeEvent,
 } from './view/render-switch';
@@ -71,13 +67,10 @@ export type { ISwitchState, ISwitchAction } from './state/switch';
 // owns the refs/effects/element assembly and the sticky-header component; these supply the
 // platform-invariant math and plumbing every adapter shares.
 export {
-  resolveDecelerationRate,
   selectScrollIntrinsics,
   readLayoutDimension,
   didContentSizeChange,
   resolveScrollForwarding,
-  SCROLL_VIEW_BASE_HORIZONTAL,
-  SCROLL_VIEW_BASE_VERTICAL,
 } from './view/render-scroll-view';
 export type {
   IScrollIntrinsics,
@@ -89,8 +82,6 @@ export type {
 
 export {
   buildScrollViewHandle,
-  splitLayoutProps,
-  splitScrollViewStyle,
   attachStickyScroll,
   isSymbioteEvent,
   forwardScrollEvent,
@@ -149,8 +140,7 @@ export { imageStatics, setImageSourceResolver } from '@symbiote-native/engine';
 // No render fn: the only composition this primitive had is the two nodes the behavior builds, so
 // `view/render-image-background.ts` went with the wrappers — same as ActivityIndicator's.
 
-// InputAccessoryView: render-only host assembly (nativeID/backgroundColor).
-export { renderInputAccessoryView } from './view/render-input-accessory-view';
+// InputAccessoryView: the nativeID/backgroundColor fold its behavior applies.
 export type { IInputAccessoryViewViewProps } from './view/render-input-accessory-view';
 
 // Modal: full 3-layer split (state machine gates the iOS keep-alive frame).
@@ -202,7 +192,6 @@ export {
   isTouchWithinRegion,
   readPoint,
   computeRegion,
-  rippleProps,
   DEFAULT_DELAY_LONG_PRESS_MS,
   DEFAULT_MIN_PRESS_DURATION_MS,
   DEFAULT_PRESS_RECT_OFFSETS,
@@ -270,7 +259,6 @@ export type {
   ITouchableHighlightUnderlayView,
 } from './view/render-touchable-highlight';
 export {
-  backgroundProps,
   canUseNativeForeground,
   selectableBackground,
   selectableBackgroundBorderless,
@@ -285,32 +273,21 @@ export type {
   IRippleBackground,
 } from './view/render-touchable-native-feedback';
 
-// Button: the role constant plus every platform fold RN's Button.js performs (the adapter composes
-// its own touchable + view + text around them). The VIEW style is the half that was missing until
-// 2026-09-09 and it is the whole Android look.
-export {
-  BUTTON_ACCESSIBILITY_ROLE,
-  buttonTextStyle,
-  buttonViewStyle,
-  resolveButtonDisabled,
-  resolveButtonImportantForAccessibility,
-  resolveButtonTextStyle,
-  resolveButtonTitle,
-  resolveButtonViewStyle,
-} from './view/render-button';
+// Button: `resolveButtonDisabled` alone now — the `props.disabled ?? aria ?? state.disabled`
+// precedence, which the press MACHINE reads and which is therefore still JS. Every platform fold
+// Button.js performs left this barrel between 2026-09-17 and 2026-09-18 for
+// `SymbioteFabricProps.cpp`; the last two, `buttonViewStyle` and `resolveButtonViewStyle`, went with
+// the Android arm of the test host that finally made their branch assertable.
+export { resolveButtonDisabled } from './view/render-button';
 export type { IButtonProps } from './view/render-button';
 
-// TextInput: the controlled-value / event-count handshake. The logic half is the pure
-// folds/maps + the controlled-write predicate (not a single reducer: count must re-render the
-// imperative handle, lastNativeText must not); the view half picks the intrinsic and maps the
-// resolved native props. Both shared verbatim across React and Vue; the adapter owns only the
-// hooks/reactivity + the imperative handle.
+// TextInput: the controlled-value / event-count handshake, and ONLY that now — the machine. The
+// W3C->native prop resolution that used to sit beside it is the engine's (`foldTextInputAliases`,
+// `SymbioteFabricProps.cpp`), so `resolveTextInputProps` and the four lookup tables under it are
+// gone rather than exported-and-unused: a tag's platform props are resolved once, natively, for
+// every adapter, and a JS copy would only be a second answer to the same question.
 export {
-  resolveTextInputProps,
   foldText,
-  foldAutoComplete,
-  foldSubmitBehavior,
-  mapAutoComplete,
   textFromChange,
   eventCountFromChange,
   shouldCommandText,
@@ -322,16 +299,11 @@ export type {
   ITextInputHandle,
   ITextInputSelection,
   ITextInputEventHandler,
-  ITextInputFoldInput,
-  IFoldedTextInputProps,
   IInputMode,
   IEnterKeyHint,
   ISubmitBehavior,
   ITextInputChangeEvent,
 } from './state/text-input';
-export { keyboardTypeForInputMode } from './state/text-input';
-export { renderTextInput } from './view/render-text-input';
-export type { ITextInputViewProps } from './view/render-text-input';
 
 // VirtualizedList family: the framework-agnostic windowing engine + data shapes. Lists
 // have NO view/render-*.ts (the cell content is the framework's own children, so there is
@@ -488,11 +460,7 @@ export type {
   IActivityIndicatorProps,
   IActivityIndicatorSize,
 } from './behaviors/activity-indicator';
-export {
-  foldImagePayload,
-  IMAGE_TAG,
-  registerImageBehavior,
-} from './behaviors/image';
+export { IMAGE_TAG, registerImageBehavior } from './behaviors/image';
 
 // Registered by all five adapters since 2026-09-09, in the same commit that deleted the five
 // wrappers — the tag builds the background image itself, so a surviving wrapper would have
@@ -503,7 +471,6 @@ export {
 } from './behaviors/image-background';
 
 export {
-  foldInputAccessoryViewPayload,
   INPUT_ACCESSORY_VIEW_TAG,
   registerInputAccessoryViewBehavior,
 } from './behaviors/input-accessory-view';
@@ -534,4 +501,5 @@ export {
   HORIZONTAL_SCROLL_VIEW_TAG,
   registerScrollViewBehavior,
   SCROLL_VIEW_TAG,
+  STICKY_HEADER_TAG,
 } from './behaviors/scroll-view';

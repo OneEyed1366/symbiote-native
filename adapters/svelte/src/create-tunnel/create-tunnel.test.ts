@@ -14,7 +14,10 @@ import { compile } from 'svelte/compiler';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 import { mount, unmount } from '../render';
 
 if (globalThis.window === undefined)
@@ -36,7 +39,8 @@ const MULTI_PARENT_OUT = join(
   '.smoke-compiled-tunnel-multi-parent.mjs',
 );
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -68,18 +72,23 @@ function compileToFile(
   writeFileSync(outPath, result.js.code);
 }
 
-// `fabric.find()` walks the CREATION log — the original `createNode`'d object, whose children
-// array is frozen at first-commit time. A LIVE toggle (In mounting/unmounting after the initial
-// commit) must instead be read off the LATEST committed tree, the same convention used by
-// adapters/vue/src/runtime-helpers/runtime-helpers.test.ts and the restructured switch/text-input
-// smoke tests in this adapter.
-function findText(nodes: IFakeNode[]): string | undefined {
-  for (const node of nodes) {
-    if (node.viewName === 'RCTRawText') return String(node.props.text);
-    const found = findText(node.children);
-    if (found !== undefined) return found;
-  }
-  return undefined;
+// Every read here goes through the LIVE tree rather than the recording. The recording is a log of
+// what was ever created, and a node it holds answers `find` long after the tunnel removed it — so a
+// toggle scenario read off the log would report content that is no longer on screen.
+function findRawText(): string | undefined {
+  const hit = live.findLive(
+    live.appRoot(),
+    node => node.viewName === 'RCTRawText',
+  );
+  return hit === undefined ? undefined : String(hit.payload.text);
+}
+
+function rawTexts(): string[] {
+  const texts: string[] = [];
+  live.walkLive(live.appRoot(), node => {
+    if (node.viewName === 'RCTRawText') texts.push(String(node.payload.text));
+  });
+  return texts;
 }
 
 function compileTunnelPair(): void {
@@ -191,7 +200,9 @@ describe('createTunnel (real compiled tunnel-in.svelte/tunnel-out.svelte)', () =
     await tick();
     await tick();
 
-    expect(fabric.find(n => n.viewName === 'RCTText')).toBeUndefined();
+    expect(
+      live.findLive(live.appRoot(), n => n.viewName === 'RCTText'),
+    ).toBeUndefined();
   });
 
   // why: the whole point of createTunnel is cross-surface content sharing without a tree
@@ -204,9 +215,9 @@ describe('createTunnel (real compiled tunnel-in.svelte/tunnel-out.svelte)', () =
     await tick();
     await tick();
 
-    const text = fabric.find(n => n.viewName === 'RCTText');
+    const text = live.findLive(live.appRoot(), n => n.viewName === 'RCTText');
     expect(text).toBeDefined();
-    expect(text?.children[0]?.props.text).toBe('tunneled');
+    expect(text?.children[0]?.payload.text).toBe('tunneled');
   });
 
   // why: TunnelIn's effect returns a cleanup (`tunnel.items.delete(id)`) that only fires on
@@ -227,20 +238,20 @@ describe('createTunnel (real compiled tunnel-in.svelte/tunnel-out.svelte)', () =
     await tick();
     await tick();
 
-    expect(findText(fabric.committed)).toBe('tunneled');
+    expect(findRawText()).toBe('tunneled');
 
     expect(toggle).toBeDefined();
     toggle?.();
     await tick();
     await tick();
 
-    expect(findText(fabric.committed)).toBeUndefined();
+    expect(findRawText()).toBeUndefined();
 
     toggle?.();
     await tick();
     await tick();
 
-    expect(findText(fabric.committed)).toBe('tunneled');
+    expect(findRawText()).toBe('tunneled');
   });
 
   // why: `{#each tunnel.items as [id, snippet] (id)}` must render EVERY registered entry, not
@@ -252,9 +263,8 @@ describe('createTunnel (real compiled tunnel-in.svelte/tunnel-out.svelte)', () =
     await tick();
     await tick();
 
-    const texts = fabric.created
-      .filter(n => n.viewName === 'RCTRawText')
-      .map(n => String(n.props.text).trim())
+    const texts = rawTexts()
+      .map(text => text.trim())
       .filter(text => text.length > 0);
     expect(texts).toEqual(['first', 'second']);
   });

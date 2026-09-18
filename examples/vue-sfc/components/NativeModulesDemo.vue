@@ -98,13 +98,8 @@ const prefetchLogo = (): void => {
     />
 
     <!-- Settings: counter persisted to NSUserDefaults, survives a relaunch -->
-    <text
-      testID="persist-count"
-      class="info-text"
-    >
-      {{
-        `persisted taps: ${persisted} · survives relaunch`
-      }}
+    <text testID="persist-count" class="info-text">
+      {{ `persisted taps: ${persisted} · survives relaunch` }}
     </text>
     <ActionButton
       testID="persist-btn"
@@ -115,17 +110,9 @@ const prefetchLogo = (): void => {
 
     <!-- Image statics: the rendered asset + getSize's measurement of it -->
     <view class="row-align-center">
-      <image
-        :source="{ uri: LOGO_URI }"
-        class="logo-thumb"
-      />
-      <text
-        testID="logo-size"
-        class="info-text-flex"
-      >
-        {{
-          `logo size: ${imageSize}`
-        }}
+      <image :source="{ uri: LOGO_URI }" class="logo-thumb" />
+      <text testID="logo-size" class="info-text-flex">
+        {{ `logo size: ${imageSize}` }}
       </text>
     </view>
     <!-- prefetch warms a cold url: not cached → (tap) → cached -->

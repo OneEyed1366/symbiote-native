@@ -58,7 +58,23 @@ interface IViewMarker {
   markForCheck(): void;
 }
 
-type ICallbackWrapper = (key: string, value: unknown) => unknown;
+export type ICallbackWrapper = (key: string, value: unknown) => unknown;
+
+/**
+ * Is this prop write one the wrapper would touch at all?
+ *
+ * Exported so a CALLER can ask before building a wrapper it may never need — an element directive is
+ * constructed per TAG, and a screen's tags overwhelmingly carry no `on*` function prop. Keeping the
+ * question here rather than copying the two tests at the call site is what stops the predicate and
+ * the wrapper drifting apart.
+ */
+export function isWrappableCallback(key: string, value: unknown): boolean {
+  return (
+    ON_PREFIX.test(key) &&
+    typeof value === 'function' &&
+    key !== PER_FRAME_CALLBACK
+  );
+}
 
 /**
  * Makes an app callback handed to the engine as a PROP re-enter Angular's update loop.
@@ -86,10 +102,17 @@ export function createCallbackWrapper(
   view: IViewMarker,
   node: unknown,
 ): ICallbackWrapper {
-  const wrappers = new WeakMap<object, (...args: unknown[]) => unknown>();
+  // Allocated on the FIRST wrap, not at construction. The map is per-CALLER, so an eager one is one
+  // `WeakMap` per directive instance — 7 000 on a 1 000-row create of the benchmark row, none of
+  // which is ever read, because that row carries no `on*` prop.
+  let wrappers: WeakMap<object, (...args: unknown[]) => unknown> | undefined;
   return (key: string, value: unknown): unknown => {
-    if (!ON_PREFIX.test(key) || typeof value !== 'function') return value;
-    if (key === PER_FRAME_CALLBACK) return value;
+    // The second test is redundant at RUNTIME and load-bearing for the TYPE: `isWrappableCallback`
+    // answers a boolean, which narrows nothing, and the alternative is a cast. Keeping the `typeof`
+    // here is what lets `value` be a `Function` below without one.
+    if (!isWrappableCallback(key, value) || typeof value !== 'function')
+      return value;
+    wrappers ??= new WeakMap();
     const cached = wrappers.get(value);
     if (cached !== undefined) return cached;
     // Reflect.apply rather than a cast-to-signature local: `typeof value === 'function'` narrows to

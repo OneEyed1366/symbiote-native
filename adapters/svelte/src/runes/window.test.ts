@@ -23,7 +23,7 @@ import {
   type IDimensionsPayload,
   type IEventSubscription,
 } from '@symbiote-native/engine';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import { mount, unmount } from '../render';
 
 if (globalThis.window === undefined)
@@ -49,7 +49,7 @@ const ROTATED: IDimensionsPayload = {
   screen: { width: 900, height: 410, scale: 2, fontScale: 1 },
 };
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 

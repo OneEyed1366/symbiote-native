@@ -13,14 +13,10 @@ const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.TabsDemo];
     <view class="section">
       <view :class="`line-tag line-tag-${lineInfo.line}`">
         <text class="line-tag-text">
-          {{
-            `${lineInfo.code} · ${lineInfo.label}`
-          }}
+          {{ `${lineInfo.code} · ${lineInfo.label}` }}
         </text>
       </view>
-      <text class="section-label">
-        Profile tab
-      </text>
+      <text class="section-label"> Profile tab </text>
       <text class="info-text">
         {{ `focused: ${isFocused}` }}
       </text>

@@ -1,14 +1,18 @@
 import '@angular/compiler';
 import { Component } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import { childrenOf } from '@symbiote-native/engine';
+import {
+  installRecordingFabric,
+  type IAuthoredNode,
+} from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../../render';
 import { FlatList } from './index';
 import { VListItemDirective } from '../virtualized-list/directives';
 
 const ROOT_TAG = 907;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 
 interface IChip {
   id: string;
@@ -68,25 +72,17 @@ class ChipContainerHost {
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-function findWithin(
-  root: (typeof fabric.committed)[number],
-  predicate: (n: (typeof fabric.committed)[number]) => boolean,
-): (typeof fabric.committed)[number] | undefined {
-  if (predicate(root)) return root;
-  for (const child of root.children) {
-    const found = findWithin(child, predicate);
-    if (found !== undefined) return found;
-  }
-  return undefined;
-}
-
-function findTop(
-  nodes: typeof fabric.committed,
-  predicate: (n: (typeof nodes)[number]) => boolean,
-): (typeof nodes)[number] | undefined {
-  for (const node of nodes) {
-    const found = findWithin(node, predicate);
-    if (found !== undefined) return found;
+// The AUTHORED tree, walked from a known handle via the engine's own child links — not a search
+// over `fabric.committed` (the recording host has no committed tree; see its header).
+function findUnder(
+  handle: object,
+  predicate: (node: IAuthoredNode) => boolean,
+): IAuthoredNode | undefined {
+  for (const child of childrenOf(handle)) {
+    const recorded = fabric.find(node => node.handle === child);
+    if (recorded !== undefined && predicate(recorded)) return recorded;
+    const below = findUnder(child, predicate);
+    if (below !== undefined) return below;
   }
   return undefined;
 }
@@ -97,15 +93,12 @@ describe('FlatList cells stay inside the ScrollView content view', () => {
     await new Promise<void>(resolve => setTimeout(resolve, 0));
     await new Promise<void>(resolve => setTimeout(resolve, 0));
 
-    const scroll = findTop(
-      fabric.committed,
-      node => node.viewName === 'RCTScrollView',
-    );
+    const scroll = fabric.find(node => node.viewName === 'RCTScrollView');
     expect(scroll).toBeDefined();
     if (scroll === undefined) return;
 
-    const chip0InsideScroll = findWithin(
-      scroll,
+    const chip0InsideScroll = findUnder(
+      scroll.handle,
       node => node.props.testID === 'chip-0',
     );
     expect(chip0InsideScroll).toBeDefined();

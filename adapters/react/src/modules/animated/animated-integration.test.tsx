@@ -7,7 +7,11 @@ import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount, Animated } from '@symbiote-native/react';
 import { Easing } from '@symbiote-native/engine';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 
 // rAF is not a Node global; polyfill it (setTimeout-based) before any driver runs. The drivers read
 // requestAnimationFrame from the host at call time, so installing it per-test (before .start()) is
@@ -37,11 +41,13 @@ function installRequestAnimationFrame(): void {
   });
 }
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+// Animated writes through the engine's own prop path, so what an app can observe is the PAYLOAD.
+const live = createLiveTree(fabric);
 const ROOT_TAG = 41;
 
-function appView(): IFakeNode {
-  return fabric.appRoot().children[0];
+function appView(): ILiveNode {
+  return live.nodeOf(live.appRoot()).children[0];
 }
 
 beforeEach(() => {
@@ -66,7 +72,7 @@ describe('Animated timing integration', () => {
     }
 
     mount(ROOT_TAG, <App />);
-    expect(appView().props.opacity).toBe(0);
+    expect(appView().payload.opacity).toBe(0);
 
     const frames: number[] = [];
     const opacityListener = opacity.addListener(({ value }) => {
@@ -86,7 +92,7 @@ describe('Animated timing integration', () => {
     opacity.removeListener(opacityListener);
 
     expect(finished).toBe(true);
-    expect(appView().props.opacity).toBe(1);
+    expect(appView().payload.opacity).toBe(1);
     expect(frames.length).toBeGreaterThanOrEqual(2);
 
     const middle = frames[Math.floor(frames.length / 2)];

@@ -25,14 +25,19 @@ import {
 } from '@angular/core';
 import type { OnChanges, SimpleChanges } from '@angular/core';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 import './register';
 import { mount, unmount } from './render';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 let nextRoot = 8_300;
 
-function flatten(nodes: readonly IFakeNode[]): IFakeNode[] {
+function flatten(nodes: readonly ILiveNode[]): ILiveNode[] {
   return nodes.flatMap(node => [node, ...flatten(node.children)]);
 }
 
@@ -86,12 +91,13 @@ describe('a directive standing in for a schema', () => {
     mount(root, Fixture satisfies Type<unknown>);
     await settle();
 
-    const node = flatten(fabric.committed).find(
-      candidate => candidate.props.testID === 'probe',
+    const node = flatten([live.nodeOf(live.appRoot())]).find(
+      candidate => candidate.payload.testID === 'probe',
     );
+    const payload = node?.payload;
     unmount(root);
 
     expect(node?.viewName).toBe('RCTView');
-    expect(node?.props.accessibilityLabel).toBe('hello');
+    expect(payload?.accessibilityLabel).toBe('hello');
   });
 });

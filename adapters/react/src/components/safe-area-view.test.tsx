@@ -14,7 +14,11 @@
 import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '@symbiote-native/react';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 
 const TEST_ID = 'safe-area';
 const ACCESSIBILITY_LABEL = 'screen';
@@ -38,15 +42,19 @@ function App(): ReactElement {
   );
 }
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 beforeEach(() => {
   fabric.reset();
   layoutFired = false;
 });
 afterEach(() => unmount(ROOT_TAG));
 
-function safeAreaNode(): IFakeNode {
-  const node = fabric.find(n => n.viewName === 'SafeAreaView');
+function safeAreaNode(): ILiveNode {
+  const node = live.findLive(
+    live.appRoot(),
+    n => n.viewName === 'SafeAreaView',
+  );
   expect(node, 'a SafeAreaView was created').toBeDefined();
   return node!;
 }
@@ -56,9 +64,9 @@ describe('SafeAreaView', () => {
   // silently degrade to a plain View — the product contract IS the distinct native view name.
   it('commits a SafeAreaView wrapping its children under the app container', () => {
     mount(ROOT_TAG, <App />);
-    expect(fabric.serialize(fabric.appRoot().children)).toBe(
-      'SafeAreaView(RCTView)',
-    );
+    const [child] = live.nodeOf(live.appRoot()).children;
+    expect(child, 'the app rendered a top-level node').toBeDefined();
+    expect(live.serialize(child.handle)).toBe('SafeAreaView(RCTView)');
   });
 
   // why: there is no JS-side layout math here at all — a caller's style must reach the real node
@@ -66,8 +74,8 @@ describe('SafeAreaView', () => {
   it('flattens style onto the safe-area node and nests children', () => {
     mount(ROOT_TAG, <App />);
     const safe = safeAreaNode();
-    expect(safe.props.flex).toBe(1);
-    expect(safe.props.backgroundColor).toBe('#fff');
+    expect(safe.payload.flex).toBe(1);
+    expect(safe.payload.backgroundColor).toBe('#fff');
     expect(safe.children).toHaveLength(1);
     expect(safe.children[0].viewName).toBe('RCTView');
   });
@@ -78,9 +86,9 @@ describe('SafeAreaView', () => {
   it('passes the standard ViewProps through to the safe-area node', () => {
     mount(ROOT_TAG, <App />);
     const safe = safeAreaNode();
-    expect(safe.props.testID).toBe(TEST_ID);
-    expect(safe.props.accessibilityLabel).toBe(ACCESSIBILITY_LABEL);
-    expect(safe.props.accessible).toBe(true);
+    expect(safe.payload.testID).toBe(TEST_ID);
+    expect(safe.payload.accessibilityLabel).toBe(ACCESSIBILITY_LABEL);
+    expect(safe.payload.accessible).toBe(true);
   });
 
   // why: proves the listener actually reaches the native node, so a real topLayout event fires
@@ -102,6 +110,6 @@ describe('SafeAreaView', () => {
       </safe-area-view>,
     );
     const safe = safeAreaNode();
-    expect('onLayout' in safe.props).toBe(false);
+    expect(Object.hasOwn(safe.payload, 'onLayout')).toBe(false);
   });
 });

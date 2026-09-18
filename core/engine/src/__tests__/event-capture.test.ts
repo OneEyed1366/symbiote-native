@@ -1,10 +1,13 @@
 // Co-located unit test: two-phase event delivery. The capture pass (root -> target)
 // must fire each node's `<Event>Capture` listener BEFORE the bubble pass (target -> root),
-// mirroring RN's accumulateTwoPhaseDispatches. The shared fake Fabric captures the engine's event
-// handler (fabric.fireEvent drives it).
+// mirroring RN's accumulateTwoPhaseDispatches.
+//
+// A RECORDING host, and the target is named rather than found: what is under test is the engine's
+// own dispatch walk over the AUTHORED tree, so `fireEvent` only plays back the handler the engine
+// registered. Which node a real touch would land on is hit-testing and belongs to the renderer.
 
 import { beforeEach, describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import {
   appendChild,
   createAnchor,
@@ -18,7 +21,7 @@ import { installEventHandler } from '../events';
 // low-level setter directly. The test drives dispatch ordering, not routeProp's ViewConfig gate.
 import { setEventListener } from '../node';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 installEventHandler();
 
 interface ITree {

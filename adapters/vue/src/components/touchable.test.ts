@@ -1,6 +1,6 @@
 // Vue twin of adapters/react/src/components/touchable/touchable.test.tsx. Drives the real Vue
-// renderer through the engine into the fake Fabric slot, firing the raw touch primitives the way
-// native would.
+// renderer through the engine into the recording Fabric slot, firing the raw touch primitives the
+// way native would.
 //
 // `<touchable-opacity>` / `<touchable-highlight>` are TAGS now — the press machine, the opacity
 // fade and the underlay show/hide machine all live on the engine node
@@ -17,11 +17,20 @@
 // rAF is polyfilled (setTimeout-based) so Animated.timing can run to completion; `measure` is
 // stubbed because Pressable measures its responder rect on grant. Both are installed before any
 // mount, because the engine destructures slot methods off the global on its first commit.
+//
+// A RECORDING host, read through PAYLOADS off the CREATION log. A cleared prop is spelled with a
+// vanished key, never `null` — `null` was the old TypeScript mirror's own clone-protocol spelling
+// of "removed", and the real op stream deletes the key instead (see the mirror-elimination doc's
+// "RESOLVED: the onLayout === null decision").
 
 import { defineComponent, h, ref, type VNode } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '@symbiote-native/vue';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  installRecordingFabric,
+  payloadOf,
+  type IAuthoredNode,
+} from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 733;
 const TARGET = 'touchable-target';
@@ -39,13 +48,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 const installed: unknown = globalThis.nativeFabricUIManager;
 if (!isRecord(installed)) throw new Error('fabric slot was not installed');
 
 // Pressable measures its responder rect on grant (RN's _measureResponderRegion).
 installed.measure = (
-  _node: IFakeNode,
+  _node: unknown,
   callback: (
     x: number,
     y: number,
@@ -119,38 +128,33 @@ afterEach(() => {
   Reflect.deleteProperty(globalThis, 'cancelAnimationFrame');
 });
 
-function findCommitted(
-  predicate: (node: IFakeNode) => boolean,
-): IFakeNode | undefined {
-  function walk(node: IFakeNode): IFakeNode | undefined {
-    if (predicate(node)) return node;
-    for (const child of node.children) {
-      const hit = walk(child);
-      if (hit !== undefined) return hit;
-    }
-    return undefined;
-  }
-  for (const root of fabric.committed) {
-    const hit = walk(root);
-    if (hit !== undefined) return hit;
-  }
-  return undefined;
-}
-
 // The responder is the tag's own node, found by the testID every mount below sets — one node now,
-// for both variants.
-function responderHandle(): unknown {
-  const node = findCommitted(n => n.props.testID === TARGET);
+// for both variants. Read off the CREATION log (residency-agnostic): every question this file
+// asks is about the current PAYLOAD of a node that was created once and mutated in place, not
+// about whether it is still attached.
+function findByTestId(testID: string): IAuthoredNode {
+  const node = fabric.find(n => n.props.testID === testID);
   if (node === undefined)
-    throw new Error(`no node created with testID=${TARGET}`);
-  return node.instanceHandle;
+    throw new Error(`no node created with testID=${testID}`);
+  return node;
 }
 
-function committedProps(testID: string): Record<string, unknown> {
-  const node = findCommitted(n => n.props.testID === testID);
-  if (node === undefined)
-    throw new Error(`no committed node with testID=${testID}`);
-  return node.props;
+function responderHandle(): unknown {
+  return findByTestId(TARGET).instanceHandle;
+}
+
+function committedPayload(testID: string): Record<string, unknown> {
+  return payloadOf(findByTestId(testID).handle);
+}
+
+// TouchableHighlight's underlay is `foldTouchableHighlightUnderlay` in the engine since 2026-09-18,
+// and this host builds payloads through the TypeScript `fabricProps`, which carries no copy of the
+// tag rules — so the colour is not readable here. The BIT is (`OP_SET_UNDERLAY_SHOWN`), and it is
+// the right witness for what these cases actually claim: that VUE's wiring reaches the machine. What
+// the underlay LOOKS like is not Vue's business and is asserted against a real committed payload in
+// `core/engine/cpp/tests/js/touchable-highlight-underlay.itest.ts`.
+function isUnderlayShown(testID: string): boolean {
+  return findByTestId(testID).underlayShown;
 }
 
 function asNumber(value: unknown, label: string): number {
@@ -159,6 +163,12 @@ function asNumber(value: unknown, label: string): number {
       `${label} should be a number, got ${JSON.stringify(value)}`,
     );
   return value;
+}
+
+// A vanished prop travels as a missing key on the real op stream (`NO_VALUE`, deleted), never as
+// `null` — that spelling belonged only to the old mirror's clone-protocol history.
+function isCleared(testID: string, key: string): boolean {
+  return !Object.hasOwn(committedPayload(testID), key);
 }
 
 const childView = (): VNode[] => [h('view', { testID: CHILD })];
@@ -183,24 +193,26 @@ describe('Vue TouchableOpacity', () => {
     mount(ROOT_TAG, App);
     await flush();
 
-    expect(asNumber(committedProps(TARGET).opacity, 'resting opacity')).toBe(1);
-    expect(committedProps(TARGET).width).toBe(BASE_WIDTH);
+    expect(asNumber(committedPayload(TARGET).opacity, 'resting opacity')).toBe(
+      1,
+    );
+    expect(committedPayload(TARGET).width).toBe(BASE_WIDTH);
 
     const handle = responderHandle();
     fabric.fireEvent(handle, TOUCH_START);
     await flushFrames();
     expect(
-      asNumber(committedProps(TARGET).opacity, 'pressed opacity'),
+      asNumber(committedPayload(TARGET).opacity, 'pressed opacity'),
     ).toBeCloseTo(ACTIVE_OPACITY, 6);
     expect(
-      committedProps(TARGET).width,
+      committedPayload(TARGET).width,
       'the base style survived the diff',
     ).toBe(BASE_WIDTH);
 
     fabric.fireEvent(handle, TOUCH_END);
     await flushFrames();
     expect(
-      asNumber(committedProps(TARGET).opacity, 'released opacity'),
+      asNumber(committedPayload(TARGET).opacity, 'released opacity'),
     ).toBeCloseTo(1, 6);
     expect(events).toEqual(['pressIn', 'press', 'pressOut']);
   });
@@ -242,7 +254,7 @@ describe('Vue TouchableOpacity', () => {
     });
     mount(ROOT_TAG, App);
     await flush();
-    expect(asNumber(committedProps(TARGET).opacity, 'initial')).toBeCloseTo(
+    expect(asNumber(committedPayload(TARGET).opacity, 'initial')).toBeCloseTo(
       STYLE_OPACITY,
       6,
     );
@@ -250,14 +262,14 @@ describe('Vue TouchableOpacity', () => {
     const handle = responderHandle();
     fabric.fireEvent(handle, TOUCH_START);
     await flushFrames();
-    expect(asNumber(committedProps(TARGET).opacity, 'pressed')).toBeCloseTo(
+    expect(asNumber(committedPayload(TARGET).opacity, 'pressed')).toBeCloseTo(
       ACTIVE_OPACITY,
       6,
     );
 
     fabric.fireEvent(handle, TOUCH_END);
     await flushFrames();
-    expect(asNumber(committedProps(TARGET).opacity, 'released')).toBeCloseTo(
+    expect(asNumber(committedPayload(TARGET).opacity, 'released')).toBeCloseTo(
       STYLE_OPACITY,
       6,
     );
@@ -277,14 +289,14 @@ describe('Vue TouchableOpacity', () => {
     });
     mount(ROOT_TAG, App);
     await flush();
-    expect(asNumber(committedProps(TARGET).opacity, 'at mount')).toBeCloseTo(
+    expect(asNumber(committedPayload(TARGET).opacity, 'at mount')).toBeCloseTo(
       1,
       6,
     );
 
     fabric.fireEvent(responderHandle(), TOUCH_START);
     await flushFrames();
-    expect(asNumber(committedProps(TARGET).opacity, 'held')).toBeCloseTo(
+    expect(asNumber(committedPayload(TARGET).opacity, 'held')).toBeCloseTo(
       ACTIVE_OPACITY,
       6,
     );
@@ -292,7 +304,7 @@ describe('Vue TouchableOpacity', () => {
     disabled.value = true;
     await flushFrames();
     expect(
-      asNumber(committedProps(TARGET).opacity, 'after disabling'),
+      asNumber(committedPayload(TARGET).opacity, 'after disabling'),
     ).toBeCloseTo(1, 6);
   });
 
@@ -307,13 +319,13 @@ describe('Vue TouchableOpacity', () => {
     });
     mount(ROOT_TAG, App);
     await flush();
-    expect(committedProps(TARGET).margin).toBe(1);
-    expect(committedProps(TARGET).borderWidth).toBeUndefined();
+    expect(committedPayload(TARGET).margin).toBe(1);
+    expect(committedPayload(TARGET).borderWidth).toBeUndefined();
 
     style.value = { margin: 2, borderWidth: 7 };
     await flush();
-    expect(committedProps(TARGET).borderWidth).toBe(7);
-    expect(committedProps(TARGET).margin).toBe(2);
+    expect(committedPayload(TARGET).borderWidth).toBe(7);
+    expect(committedPayload(TARGET).margin).toBe(2);
   });
 
   // why: delayPressIn defers the pressed feedback past a quick swipe-through. Proves the adapter
@@ -363,20 +375,24 @@ describe('Vue TouchableHighlight', () => {
     });
     mount(ROOT_TAG, App);
     await flush();
-    expect(committedProps(TARGET).backgroundColor).toBeUndefined();
-    expect(committedProps(TARGET).width).toBe(BASE_WIDTH);
-    expect(committedProps(CHILD).opacity).toBeUndefined();
+    expect(isUnderlayShown(TARGET)).toBe(false);
+    expect(committedPayload(TARGET).width).toBe(BASE_WIDTH);
+    expect(committedPayload(CHILD).opacity).toBeUndefined();
 
     const handle = responderHandle();
     fabric.fireEvent(handle, TOUCH_START);
     await flush();
-    expect(committedProps(TARGET).backgroundColor, 'the underlay').toBe('#abc');
-    expect(committedProps(TARGET).opacity, 'the lowered opacity').toBe(0.5);
-    expect(committedProps(TARGET).width, 'the base style survived').toBe(
+    expect(isUnderlayShown(TARGET), 'the underlay').toBe(true);
+    // BOTH feedback props reached the node, which is Vue's half. What the engine's rule makes of
+    // them — a background and a lowered `opacity`, on this one node — is asserted on a committed
+    // payload in `core/engine/cpp/tests/js/touchable-highlight-underlay.itest.ts`.
+    expect(committedPayload(TARGET).underlayColor).toBe('#abc');
+    expect(committedPayload(TARGET).activeOpacity).toBe(0.5);
+    expect(committedPayload(TARGET).width, 'the base style survived').toBe(
       BASE_WIDTH,
     );
     expect(
-      committedProps(CHILD).opacity,
+      committedPayload(CHILD).opacity,
       'the child is untouched',
     ).toBeUndefined();
 
@@ -385,9 +401,9 @@ describe('Vue TouchableHighlight', () => {
     fabric.fireEvent(handle, TOUCH_END);
     await wait(20);
     await flush();
-    // `null`, not `undefined` — the fake slot keeps an explicitly-removed prop as null.
-    expect(committedProps(TARGET).backgroundColor).toBeNull();
-    expect(committedProps(TARGET).opacity).toBeNull();
+    // A cleared prop is a vanished key on the real op stream, never `null`.
+    expect(isUnderlayShown(TARGET)).toBe(false);
+    expect(isCleared(TARGET, 'opacity')).toBe(true);
   });
 
   // why: RN's _hasPressHandler gates the underlay — a decorative TouchableHighlight with no press
@@ -406,7 +422,7 @@ describe('Vue TouchableHighlight', () => {
 
     fabric.fireEvent(responderHandle(), TOUCH_START);
     await flush();
-    expect(committedProps(TARGET).backgroundColor).toBeUndefined();
+    expect(isUnderlayShown(TARGET)).toBe(false);
   });
 
   it('counts an onLongPress-only listener as a press handler', async () => {
@@ -423,7 +439,7 @@ describe('Vue TouchableHighlight', () => {
 
     fabric.fireEvent(responderHandle(), TOUCH_START);
     await flush();
-    expect(committedProps(TARGET).backgroundColor).toBe('#abc');
+    expect(isUnderlayShown(TARGET)).toBe(true);
   });
 
   // why: THE reason the underlay is a machine and not a `pressed`-derived style. RN re-shows the
@@ -449,17 +465,11 @@ describe('Vue TouchableHighlight', () => {
     fabric.fireEvent(handle, TOUCH_START);
     fabric.fireEvent(handle, TOUCH_END);
     await flush();
-    expect(
-      committedProps(TARGET).backgroundColor,
-      'still held after the tap',
-    ).toBe('#abc');
+    expect(isUnderlayShown(TARGET), 'still held after the tap').toBe(true);
 
     await wait(HOLD_MS + 20);
     await flush();
-    expect(
-      committedProps(TARGET).backgroundColor,
-      'released after the hold',
-    ).toBeNull();
+    expect(isUnderlayShown(TARGET), 'released after the hold').toBe(false);
   });
 
   // why: the OTHER half of the hold. A cancelled gesture bubbles pressOut with no press before it,
@@ -484,14 +494,14 @@ describe('Vue TouchableHighlight', () => {
     const handle = responderHandle();
     fabric.fireEvent(handle, TOUCH_START);
     await flush();
-    expect(committedProps(TARGET).backgroundColor).toBe('#abc');
+    expect(isUnderlayShown(TARGET)).toBe(true);
 
     fabric.fireEvent(handle, TOUCH_CANCEL);
     await flush();
     expect(
-      committedProps(TARGET).backgroundColor,
+      isUnderlayShown(TARGET),
       'a cancelled press never armed the hold',
-    ).toBeNull();
+    ).toBe(false);
   });
 
   // why: RN fires onShowUnderlay / onHideUnderlay on a real transition only, and runs the visual
@@ -533,8 +543,14 @@ describe('Vue TouchableHighlight', () => {
     ]);
   });
 
-  // why: an underlayColor can be re-supplied after mount; the behavior reads the CURRENT props on
-  // each press, not a value captured at attach.
+  // why: an underlayColor can be re-supplied after mount, and VUE's half of that is getting the new
+  // value onto the node — a reactive `underlayColor` must reach the props rather than being captured
+  // at mount. That is what this asserts now; it used to read the painted `backgroundColor`, which is
+  // `foldTouchableHighlightUnderlay`'s output and no longer visible on this host.
+  //
+  // Reading the prop is not a weaker claim HERE, it is the correctly-scoped one: whether the engine
+  // then re-reads the current bag on every commit is the engine's, and travelled to
+  // `core/engine/cpp/tests/js/touchable-highlight-underlay.itest.ts` as its own case.
   it('honors an underlayColor changed after mount', async () => {
     const color = ref('#abc');
     const App = defineComponent({
@@ -552,7 +568,8 @@ describe('Vue TouchableHighlight', () => {
     await flush();
     fabric.fireEvent(responderHandle(), TOUCH_START);
     await flush();
-    expect(committedProps(TARGET).backgroundColor).toBe('#def');
+    expect(committedPayload(TARGET).underlayColor).toBe('#def');
+    expect(isUnderlayShown(TARGET)).toBe(true);
   });
 });
 
@@ -560,44 +577,13 @@ describe('Vue TouchableHighlight', () => {
 // wiring and its delayPressIn/delayPressOut scheduler are covered against the COMMITTED tree in
 // `core/components/src/behaviors/touchable-without-feedback.test.ts`.
 
-// RN gives Pressable a ONE-leg focusable default (Pressable.js:258) and the Touchables a THREE-leg
-// one (TouchableOpacity.js:336-340, TouchableHighlight.js:370-374), so each tag folds its own.
-describe('Vue Touchable* focusable', () => {
-  const VARIANTS = ['touchable-opacity', 'touchable-highlight'];
-
-  async function mountWith(
-    tag: string,
-    props: Record<string, unknown>,
-  ): Promise<void> {
-    const App = defineComponent({
-      setup: () => (): VNode => h(tag, { testID: TARGET, ...props }),
-    });
-    mount(ROOT_TAG, App);
-    await flush();
-  }
-
-  for (const tag of VARIANTS) {
-    // Leg 2, read off the app's own onPress — the machine's synthesized handler is always defined,
-    // so resolving one level down could never answer false.
-    it(`${tag} stays out of the focus order without an onPress`, async () => {
-      await mountWith(tag, {});
-      expect(committedProps(TARGET).focusable).toBe(false);
-    });
-
-    it(`${tag} focuses once it has an onPress`, async () => {
-      await mountWith(tag, { onPress: () => {} });
-      expect(committedProps(TARGET).focusable).toBe(true);
-    });
-
-    // Leg 3, the case a `focusable ?? computed` implementation gets wrong: an explicit opt-IN
-    // still loses to `disabled`.
-    it(`${tag} refuses focus while disabled, opt-in notwithstanding`, async () => {
-      await mountWith(tag, {
-        onPress: () => {},
-        disabled: true,
-        focusable: true,
-      });
-      expect(committedProps(TARGET).focusable).toBe(false);
-    });
-  }
-});
+// `focusable`'s six cases LEFT THIS FILE on 2026-09-18, with the rule: the Touchables' three-leg
+// form (TouchableOpacity.js:336-340) is `foldPressableProps`'s now, keyed off the tag, and this
+// harness builds its payload through the TypeScript `fabricProps`, which holds no copy of the tag
+// rules. They are `core/engine/cpp/tests/js/touchable-focusable-payload.itest.ts`, against the
+// payload a commit actually sent.
+//
+// Nothing about the ADAPTER went with them, which is why they could go rather than being rewritten:
+// what Vue contributes here is routing `onPress` through `setEventListener` so the engine ever
+// learns of it, and every press case above fails outright if it stops doing that — a tag whose
+// handler never reached the stash does not fire.

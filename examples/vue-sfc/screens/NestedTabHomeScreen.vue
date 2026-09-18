@@ -29,9 +29,7 @@ function popParent(): void {
     <view class="section">
       <view :class="`line-tag line-tag-${lineInfo.line}`">
         <text class="line-tag-text">
-          {{
-            `${lineInfo.code} · ${lineInfo.label}`
-          }}
+          {{ `${lineInfo.code} · ${lineInfo.label}` }}
         </text>
       </view>
       <view class="hero-card">
@@ -39,14 +37,10 @@ function popParent(): void {
           class="hero-badge"
           :style="{ backgroundColor: LINE_COLOR.structure }"
         >
-          <text class="hero-badge-text">
-            NN
-          </text>
+          <text class="hero-badge-text"> NN </text>
         </view>
         <view class="hero-copy">
-          <text class="hero-title">
-            Nested navigators
-          </text>
+          <text class="hero-title"> Nested navigators </text>
           <text class="hero-body">
             A Tab navigator nested inside a Stack screen, reaching its parent's
             own navigation handle through getParent().

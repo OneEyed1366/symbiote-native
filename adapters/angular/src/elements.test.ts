@@ -15,8 +15,15 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { COMPONENT_DESCRIPTORS } from '@symbiote-native/components';
-import { ANCHOR_COMPONENT } from '@symbiote-native/engine';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  ANCHOR_COMPONENT,
+  parentOf,
+  type ISymbioteNode,
+} from '@symbiote-native/engine';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 // SIDE-EFFECT IMPORT: `register.ts` installs the host behaviors, whose `foldPayload` is the bare
 // path's only source for the folds a wrapper would otherwise apply.
 import './register';
@@ -77,11 +84,11 @@ const CASES: Record<string, ICase> = {
   Q_events_style_and_class: {
     source: fixture(
       'Q',
-      `<view class="a" [class]="value" [style]="style" [symbioteStyle]="parts" (layout)="hit()" (press)="hit()"></view>`,
+      `<view class="a" [class]="value" [style]="style" (layout)="hit()" (press)="hit()"></view>`,
       // `style` was `unknown` here while `[style]` belonged to Angular's styling engine, which
       // type-checks nothing. It is a declared input now, so the fixture has to hand it a real
       // style — which is the point of declaring it.
-      `style = { opacity: 1 }; parts = [{ opacity: 1 }];`,
+      `style = { opacity: 1 };`,
     ),
     expect: undefined,
   },
@@ -228,19 +235,27 @@ describe('what ngtsc accepts once an element directive matches the tag', () => {
   });
 });
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 let nextRoot = 8_900;
 
-function flatten(nodes: readonly IFakeNode[]): IFakeNode[] {
-  return nodes.flatMap(node => [node, ...flatten(node.children)]);
-}
+// A plain, pre-unmount SNAPSHOT — not a live `ILiveNode`. `mountTemplate` unmounts before
+// returning, and a gated event flag (`onLayout` and its five siblings) is cleared by the
+// listener's own teardown on unmount; a live `.payload` getter re-read afterward would see that
+// clear. `handle` stays live (structural links survive unmount, same as every other converted tag
+// suite in this batch), so `parentOf` still answers correctly.
+type ISnapshotNode = {
+  viewName: string;
+  payload: Record<string, unknown>;
+  handle: ISymbioteNode;
+};
 
 const MAX_SETTLE_TICKS = 20;
 async function flushUntilSettled(): Promise<void> {
   let previous = -1;
   for (let index = 0; index < MAX_SETTLE_TICKS; index += 1) {
     await new Promise(resolve => setTimeout(resolve, 0));
-    const current = fabric.counts.completeRoot;
+    const current = fabric.commits;
     if (current === previous && current > 0) return;
     previous = current;
   }
@@ -250,7 +265,7 @@ async function flushUntilSettled(): Promise<void> {
 async function mountTemplate(
   template: string,
   extraImports: readonly Type<unknown>[] = [],
-): Promise<{ all: IFakeNode[]; hits: number }> {
+): Promise<{ all: ISnapshotNode[]; hits: number }> {
   fabric.reset();
   nextRoot += 1;
   const root = nextRoot;
@@ -270,13 +285,20 @@ async function mountTemplate(
 
   mount(root, ElementFixture satisfies Type<unknown>);
   await flushUntilSettled();
-  const all = flatten(fabric.committed);
+  const walk = (node: ReturnType<typeof live.nodeOf>): ISnapshotNode[] => [
+    { viewName: node.viewName, payload: node.payload, handle: node.handle },
+    ...node.children.flatMap(walk),
+  ];
+  const all = walk(live.nodeOf(live.appRoot()));
   unmount(root);
   return { all, hits: 0 };
 }
 
-const propsOf = (all: IFakeNode[], testID: string): Record<string, unknown> =>
-  all.find(node => node.props.testID === testID)?.props ?? {};
+const propsOf = (
+  all: ISnapshotNode[],
+  testID: string,
+): Record<string, unknown> =>
+  all.find(node => node.payload.testID === testID)?.payload ?? {};
 
 describe('what the element directives commit', () => {
   beforeEach(() => fabric.reset());
@@ -304,15 +326,23 @@ describe('what the element directives commit', () => {
     expect(propsOf(all, 'probe').onLayout).toBe(true);
   });
 
-  it('still attaches the host behavior, so a bare tag keeps its folds', async () => {
+  // The OBSERVABLE changed and the question did not. This asserts that a bare tag gets its host
+  // behavior attached; it used to read `submitBehavior`, which was a fold output, and that fold is
+  // the engine's now (`foldTextInputAliases`, `SymbioteFabricProps.cpp`) — invisible to a recording
+  // host, which reports props as the OPS named them.
+  //
+  // `mostRecentEventCount` is the right observable and arguably always was: the MACHINE writes it,
+  // at attach, as a real prop op. It proves the thing the test is named for rather than a rule that
+  // happened to run nearby. Switch's `value` followed text-input's into the engine one commit
+  // later (`foldSwitchProps`), so the second tag is now here for the mechanism — two tags is what
+  // makes this a claim about the REGISTRY rather than about text-input — and its payload is
+  // asserted in `core/engine/cpp/tests/js/switch-payload.itest.ts`.
+  it('still attaches the host behavior to a bare tag', async () => {
     const { all } = await mountTemplate(
       `<text-input [testID]="'probe'"></text-input><switch [testID]="'sw'"></switch>`,
     );
-    expect(propsOf(all, 'probe')).toMatchObject({
-      submitBehavior: 'blurAndSubmit',
-      underlineColorAndroid: 'transparent',
-    });
-    expect(propsOf(all, 'sw').value).toBe(false);
+    expect(propsOf(all, 'probe')).toMatchObject({ mostRecentEventCount: 0 });
+    expect(propsOf(all, 'sw').testID).toBe('sw');
   });
 
   // why: the transitional state, and it is reachable today — `ViewHost` matches the tag itself and is exported as `View` for an app's `imports:`, so
@@ -333,7 +363,7 @@ describe('what the element directives commit', () => {
       const { all } = await mountTemplate(
         `<${tag} [testID]="'probe'"></${tag}>`,
       );
-      const node = all.find(candidate => candidate.props.testID === 'probe');
+      const node = all.find(candidate => candidate.payload.testID === 'probe');
       // A tag whose descriptor names the ANCHOR component commits NOTHING by design — RN's
       // TouchableNativeFeedback renders no view and clones onto its single child. Asserted as an
       // absence rather than skipped, so a tag that starts committing a real view goes red here.
@@ -347,9 +377,11 @@ describe('what the element directives commit', () => {
       // A COMPOSED primitive redirects every prop it does not keep — `testID` included — onto the
       // node its behavior built, exactly as RN's wrappers do (`ImageBackground.js:81` spreads
       // `...props` onto the inner Image, `ActivityIndicator.js:99` onto the spinner). So the probe
-      // may sit one level below the tag. ONE hop only: an ancestor walk would let any name pass,
-      // since the container root is an RCTView.
-      const parent = all.find(candidate => candidate.children.includes(node));
+      // may sit one level below the tag. ONE hop via `parentOf` — the engine's own answer, not a
+      // `children`-includes scan, which a live getter's fresh-array-per-read defeats.
+      const parentHandle =
+        node === undefined ? undefined : parentOf(node.handle);
+      const parent = all.find(candidate => candidate.handle === parentHandle);
       expect([node?.viewName, parent?.viewName]).toContain(
         COMPONENT_DESCRIPTORS[tag]?.component,
       );

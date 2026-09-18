@@ -21,7 +21,10 @@ import { compile } from 'svelte/compiler';
 import { rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
-import { installFabric } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 import './register';
 import { mount, unmount } from './render';
 
@@ -30,7 +33,8 @@ if (globalThis.window === undefined)
 if (globalThis.navigator === undefined)
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const ROW_OUT = join(__dirname, '.smoke-compiled-select-row.mjs');
 const APP_OUT = join(__dirname, '.smoke-compiled-select-app.mjs');
 
@@ -117,21 +121,14 @@ describe('a select-shaped update on a 1 000-row list', () => {
     mount(9_400, App, { rows, initial: -1 });
     await settle();
 
+    // The class reaches Fabric folded into `nativeID`, so the read is the payload's, not the bag's.
     const classOf = (testID: string): unknown => {
-      const walk = (nodes: readonly unknown[]): unknown => {
-        for (const node of nodes) {
-          if (typeof node !== 'object' || node === null) continue;
-          const props = (node as { props?: Record<string, unknown> }).props;
-          if (props?.testID === testID) return props.nativeID ?? 'NO-NATIVE-ID';
-          const kids = (node as { children?: unknown[] }).children;
-          if (Array.isArray(kids)) {
-            const hit = walk(kids);
-            if (hit !== undefined) return hit;
-          }
-        }
-        return undefined;
-      };
-      return walk(fabric.appRoot().children);
+      const hit = live.findLive(
+        live.appRoot(),
+        node => node.payload.testID === testID,
+      );
+      if (hit === undefined) return undefined;
+      return hit.payload.nativeID ?? 'NO-NATIVE-ID';
     };
     const before = JSON.stringify(classOf('row-500'));
     const select = (globalThis as { __selectRow?: (id: number) => void })

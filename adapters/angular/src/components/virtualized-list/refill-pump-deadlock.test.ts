@@ -13,7 +13,7 @@
 import '@angular/compiler';
 import { Component } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import {
   subscribeListDiagnostics,
   type IListDiagnosticFrame,
@@ -49,7 +49,7 @@ const SETTLE_STEPS = 120;
 // Consecutive settle steps producing no new window recompute before the pump counts as stopped.
 const STALL_STEPS = 3;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
@@ -132,14 +132,8 @@ class RefillPumpHost {
 let frames: IListDiagnosticFrame[] = [];
 let unsubscribe: (() => void) | undefined;
 
-function flatten(nodes: readonly IFakeNode[]): IFakeNode[] {
-  return nodes.flatMap(node => [node, ...flatten(node.children)]);
-}
-
-function scrollHost(): IFakeNode {
-  const node = flatten(fabric.created).find(
-    candidate => candidate.viewName === SCROLL_VIEW,
-  );
+function scrollHost(): { instanceHandle: unknown } {
+  const node = fabric.find(candidate => candidate.viewName === SCROLL_VIEW);
   if (node === undefined) throw new Error('no scroll host created');
   return node;
 }

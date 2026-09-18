@@ -1,12 +1,9 @@
 // RN's `aria-*` / `role` -> `accessibility*` fold, at the layer every path goes through.
 //
-// WHY IT IS HERE AND NOT IN A WRAPPER. It used to run inside each primitive's COMPONENT, which is
-// exactly the layer host-primitive lowering removes. A per-attribute element path cannot do it —
-// `aria-checked` has to be folded against a sibling `accessibilityState` — so the four lowering
-// transforms REFUSED any element carrying `role` or an `aria-*` attribute
-// (`REFUSAL_CATEGORIES.bagFold`). Accessibility props are ordinary in real code, so that refusal
-// cost lowering coverage on every primitive, including the three already lowered. Moving the fold
-// down deletes the refusal instead of teaching four transforms a bag operation they cannot express.
+// WHY IT IS HERE AND NOT IN A WRAPPER. It used to run inside each primitive's COMPONENT, and a tag
+// has none. It also cannot run per attribute — `aria-checked` has to be folded against a sibling
+// `accessibilityState` — so it belongs at the one point where the whole bag is known, which is the
+// payload build.
 //
 // IT IS A MOVE, NOT A REWRITE, AND THAT IS DELIBERATE. The function carries TWO CONTRADICTORY
 // PRECEDENCE RULES: for the scalars an explicit `accessibility*` WINS and the alias only fills a
@@ -61,7 +58,11 @@ const ROLE_TO_ACCESSIBILITY_ROLE: Readonly<Record<string, string>> = {
 // list. `slotDerived` (host-behavior.ts) takes prop NAMES, so a primitive whose payload derives
 // from an owner's aria props has to enumerate them — and a second hand-written copy is exactly what
 // `.claude/rules/adapter-parity-audit.md` records going stale one member at a time.
-export const ARIA_ALIAS_KEYS: readonly string[] = [
+// `as const` rather than `readonly string[]`, so the members are LITERALS. That is what lets a
+// consumer index a prop type with them — `pickAccessibilityProps` in the Svelte adapter forwards the
+// aria half by looping this list — and it makes the two sides check each other: a name here that is
+// not a key of `IAriaProps` stops compiling at the use site rather than going quietly unforwarded.
+export const ARIA_ALIAS_KEYS = [
   'role',
   'aria-label',
   'aria-labelledby',
@@ -77,7 +78,7 @@ export const ARIA_ALIAS_KEYS: readonly string[] = [
   'aria-valuemin',
   'aria-valuenow',
   'aria-valuetext',
-];
+] as const;
 
 // An indexed loop rather than `.some(key => …)`: the callback captures `props`, so a closure is
 // allocated per call, and this is the gate on a path that runs once per node.
@@ -88,15 +89,11 @@ function hasAnyAriaKey(props: Readonly<Record<string, unknown>>): boolean {
   return false;
 }
 
-/**
- * Whether one key is an alias this fold consumes. `startsWith` rather than a Set lookup: this runs
- * on `setProp`, the hottest write path in the engine (32 001 writes on one benchmark create), and
- * it is guarded by the node's sticky flag so it is reached at most once per node per key. The
- * `role` comparison comes first because it is the one alias with no prefix.
- */
-export function isAriaAliasKey(key: string): boolean {
-  return key === 'role' || key.startsWith('aria-');
-}
+// `isAriaAliasKey` WAS HERE AND IS GONE (2026-09-18). Its whole reason was to maintain
+// `node.hasAriaAlias` from `setProp` — the hottest write path in the engine, 32 001 writes on one
+// benchmark create — and that flag existed only to gate the aria fold inside the headless payload
+// builder. The fold left for `SymbioteFabricProps.cpp`, which recomputes presence from the bag it
+// holds, so the flag became write-only and this function became its only maintainer. Both went.
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;

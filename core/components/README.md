@@ -91,7 +91,7 @@ host node untouched — the render function never names a framework type.
   (`createPressHandlers` / `createPressRuntime` in `state/pressable`) plus its render-decision
   helpers (`buildPressableListeners`, `resolveDisabledAccessibilityState`, `shouldClaimResponder`,
   … in `view/render-pressable`), the `Touchable*` timing constants, `Button`'s shared text-style
-  fold, `TextInput`'s controlled-value/event-count handshake (`resolveTextInputProps`, `foldText`,
+  fold, `TextInput`'s controlled-value/event-count handshake (`foldText`, `shouldCommandText`,
   `eventCountFromChange`, …), `KeyboardAvoidingView`'s inset math, `ScrollView`'s
   intrinsics/sticky-header math (no full 3-layer split — the adapter owns the element assembly).
 - **Two more shared reducers, driven by every adapter's reactive glue**: the sticky-header effect
@@ -104,14 +104,13 @@ host node untouched — the render function never names a framework type.
   row/section folding helpers. Lists have no `view/render-*.ts` (a cell's content is the
   framework's own children) — the shared layer here is pure state/logic, reused verbatim by every
   adapter.
-- **Host behaviors (`src/behaviors/*.ts`)** — tier-2 host-primitive lowering: a primitive's state
-  machine and prop folds registered directly on the engine node (`registerPressableBehavior`,
-  `registerSwitchBehavior`, `registerImageBehavior`, `registerTextInputBehavior`,
-  `registerInputAccessoryViewBehavior`, plus the folds a lowered element still needs —
-  `foldImagePayload`, `foldInputAccessoryViewPayload`, `buildTextInputHandle`) so a
-  `Pressable`/`Switch`/`TextInput`/`Image`/`InputAccessoryView` can compile to a bare intrinsic tag
-  instead of a framework component. Built on `@symbiote-native/engine`'s `registerHostBehavior`
-  seam; see `.claude/rules/host-primitive-tier.md`.
+- **Host behaviors (`src/behaviors/*.ts`)** — a primitive's state machine and prop folds registered
+  directly on the engine node (`registerPressableBehavior`, `registerSwitchBehavior`,
+  `registerImageBehavior`, `registerTextInputBehavior`, `registerInputAccessoryViewBehavior`, plus
+  the folds a tag still needs — `foldImagePayload`, `foldInputAccessoryViewPayload`,
+  `buildTextInputHandle`), so `pressable`/`switch`/`text-input`/`image`/`input-accessory-view` are
+  bare intrinsic tags rather than framework components. Built on `@symbiote-native/engine`'s
+  `registerHostBehavior` seam.
 
 ## What it does NOT do
 
