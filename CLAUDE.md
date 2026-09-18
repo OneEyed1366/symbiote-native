@@ -2137,6 +2137,80 @@ And two dead JS legs went with the port: both clone-folds read `stringOr(source.
 source.nativeID)` where `source` is the owner's NODE props, which `routeProp` had already resolved
 that morning. **A second opinion about precedence, kept alive by nothing.**
 
+### THE LAST `payloadFold` IS GONE — sticky headers, and zero JS folds in production (2026-09-18)
+
+`stickyFold` was the only one left, and it had outlived three rounds of this migration because it
+reads per-node RUNTIME STATE rather than props. Splitting its three outputs by ORIGIN is what moved
+it, and that split is the reusable part:
+
+```
+ zIndex: 10     a constant of the wrapper      RN: `styles.header` (ScrollViewStickyHeader.js:318)
+ collapsable    a constant of the wrapper      RN: a literal JSX prop (:291)
+ translateY     the DEBOUNCED settled value    RN: `passthroughAnimatedPropExplicitValues` (:302)
+```
+
+Two of the three were never anything but the platform's. **The third is live and crosses anyway,
+because it is live at SETTLE rate rather than frame rate** — the smooth pin rides the AnimatedProps
+leaf and never passed through the fold at all, while this one is what hit-testing reads, pushed once
+per debounce behind a same-value guard in the reducer.
+
+**AND RN ITSELF SPELLS IT AS A PROP, which is what decided the seam — no new opcode and no new host
+field.** The underlay precedent had just added `OP_SET_UNDERLAY_SHOWN` for a comparable bit, so an
+op was the obvious move; reading `ScrollViewStickyHeader.js` first said otherwise. The machine writes
+`stickyTranslateY` like any other prop, `foldStickyHeaderProps` composes it into the style, and the
+key is stripped before Fabric — the treatment `kPressableMachineKeys` already gives Pressable's nine
+machine props. **Check whether upstream already carries the value as a prop before inventing a
+channel for it.**
+
+**COMPOSED OVER, not under, and it inverts every neighbouring rule.** `foldActivityIndicatorProps`
+and `foldScrollViewProps` put their base UNDER so an app can still override it; here a header whose
+own style set a transform would cancel the pin, which is the entire point of the element. The test
+is whether the style is a DEFAULT or a MECHANISM.
+
+Contract: `core/engine/cpp/tests/js/sticky-header-payload.itest.ts`, nine cases, no JS twin.
+**Break-tested three ways** — a wrong `zIndex`, the composition flipped to UNDER, and the strip
+removed — each turning red exactly the cases it should and no others. The middle one is the reason to
+bother: only "beats a transform the app wrote itself" catches an order flip, and it was written for
+that.
+
+**THE COST IS A FOLD COUNT, not a millisecond, and saying so is the honest part.** The tag-rule
+ruler cannot price this one for the same reason it could not price the underlay: every arm there
+needs a JS twin with a `payloadFold`, and the twin cannot exist once the rule lives only in C++.
+What is exact is `foldsFound` 1 -> 0 per commit per header, and a header re-commits on every
+settle — so it is per-settle, not per-mount. A screen holds a handful of these, so the absolute
+saving is small and the reason to do it is that **`IHostBehavior.foldPayload` is now declared by
+nothing in production.**
+
+**THE SEAM STAYS ANYWAY, and the reason is recorded on the field rather than left to be re-derived.**
+It reads as a leftover, and this codebase's question about one is what it REACHES, not who uses it
+today. It reaches two things: it is the JS ARM of every measurement in `tag-rule-cost.itest.ts` —
+delete it and the ~9-31 us-per-node figures that justified every port in this migration can never be
+taken again — and it is the declared extension point for a third-party primitive, which has no
+option to write a C++ rule.
+
+**THE TEST MIGRATION WAS FOURTEEN CASES ACROSS EIGHT FILES AND ONE CAUSE**, the same one the
+clone-onto-child port hit: **every file located the sticky wrapper by `payload.zIndex === 10` or
+`payload.collapsable === false`** — the fold's own output. A locator made of the thing under test
+expires with it, and the vitest host builds payloads through the TypeScript `fabricProps`, which
+deliberately carries no copy of the tag rules.
+
+The replacement was already sitting there: **the recording host has retained `tagName` all along,
+for exactly this** ("so a test can ask what the host was TOLD, separately from what a rule made of
+it"). `ILiveNode` did not expose it, which is a one-line addition, and every locator became
+`node.tagName === STICKY_HEADER_TAG`.
+
+Three things fell out, all improvements rather than trade-offs:
+
+- **Two locators lost an exclusion they needed.** Both section-list files had to skip
+  `RCTScrollContentView`, because the content node carries `collapsable: false` too. A tag needs no
+  exclusion — a content node's is `scroll-content`.
+- **React's `<sticky-header>` case got its OWN claim back.** Its `why:` says the point is that React
+  resolved the hyphenated tag and the behavior found it; `collapsable` was a proxy for that, and the
+  tag says it directly.
+- **One case was strengthened while being re-aimed.** The section-header test asserted a COUNT of
+  two wrappers, which two wrapped ITEMS would also satisfy; it now asserts the titles. The `why:`
+  had always been about which children got marked and the assertion had never said so.
+
 ### A rule may read its CHILD — `IFirstChild`, and the last structural blocker goes (2026-09-18)
 
 Every seam before this one reads UP: `ownerProps` (the parent's props), `IOwner.tagName` (the
