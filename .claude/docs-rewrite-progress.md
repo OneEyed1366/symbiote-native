@@ -337,6 +337,13 @@ cdnjs.../react/18.3.1/...>` tag in `react.html`), and only `react.html`/`vue.htm
 matching the "not yet here" list exactly. Nothing to fix — this was a plausible-looking false
 alarm from the version-grep method, worth the two-minute check to rule out.
 
+## Twenty-first pass — broken-link sweep, all clean
+
+A different kind of "lying about the code": a doc link pointing at a page/directory that doesn't
+exist. Extracted every `/docs/...` link across the entire `apps/docs-site` content tree and every
+`](./adapters|packages|core/...)` link in `README.md`, checked each against the filesystem. Zero
+broken links found — every internal cross-reference resolves to a real `.mdx` file or directory.
+
 ## State as of the 6th pass — read this first
 
 The high-signal work is done: every place that described the retired JS-only engine as current
