@@ -58,7 +58,11 @@ const ROLE_TO_ACCESSIBILITY_ROLE: Readonly<Record<string, string>> = {
 // list. `slotDerived` (host-behavior.ts) takes prop NAMES, so a primitive whose payload derives
 // from an owner's aria props has to enumerate them — and a second hand-written copy is exactly what
 // `.claude/rules/adapter-parity-audit.md` records going stale one member at a time.
-export const ARIA_ALIAS_KEYS: readonly string[] = [
+// `as const` rather than `readonly string[]`, so the members are LITERALS. That is what lets a
+// consumer index a prop type with them — `pickAccessibilityProps` in the Svelte adapter forwards the
+// aria half by looping this list — and it makes the two sides check each other: a name here that is
+// not a key of `IAriaProps` stops compiling at the use site rather than going quietly unforwarded.
+export const ARIA_ALIAS_KEYS = [
   'role',
   'aria-label',
   'aria-labelledby',
@@ -74,7 +78,7 @@ export const ARIA_ALIAS_KEYS: readonly string[] = [
   'aria-valuemin',
   'aria-valuenow',
   'aria-valuetext',
-];
+] as const;
 
 // An indexed loop rather than `.some(key => …)`: the callback captures `props`, so a closure is
 // allocated per call, and this is the gate on a path that runs once per node.

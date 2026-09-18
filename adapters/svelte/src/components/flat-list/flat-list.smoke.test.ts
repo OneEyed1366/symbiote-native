@@ -166,6 +166,7 @@ async function loadMountableWithAccessibilityAndRefresh(): Promise<Component> {
        {data}
        item={cell}
        testID="flat-list-a11y"
+       aria-label="the list"
        onRefresh={onRefresh}
        refreshing={true}
      />`,
@@ -284,6 +285,14 @@ describe('FlatList (real compiled index.svelte over a real compiled VirtualizedL
         'testID reached the committed RCTScrollView',
       ).toBeDefined();
       expect(scrollView?.viewName).toBe('RCTScrollView');
+
+      // …and an ARIA key survives the same hop UNDER ITS AUTHORED NAME, which is the half nothing
+      // asserted before. `pickAccessibilityProps` is the shared field list for all four list
+      // components and it forwards through a Svelte COMPONENT spread — so a hyphenated key is the
+      // thing most likely to be lost, and the engine's rule reads `aria-label` literally
+      // (`foldAriaProps`, `SymbioteFabricProps.cpp`). Folding it here instead would be a second
+      // implementation of a rule the device already runs.
+      expect(scrollView?.payload['aria-label']).toBe('the list');
 
       // Gap 2: onRefresh/refreshing set on <FlatList> produce a real RefreshControl
       // (PullToRefreshView), attached as a sibling of the content container.

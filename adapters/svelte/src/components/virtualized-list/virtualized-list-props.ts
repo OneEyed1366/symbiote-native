@@ -9,15 +9,15 @@
 // renderItem-as-a-prop, unlike Vue's scoped-slot form) — `item`/`separator`/`header`/`footer`/
 // `empty` all follow the same shape View.svelte's `children: Snippet` already uses.
 import type { Snippet } from 'svelte';
-import type {
-  IClassNameValue,
-  IStyleProp,
-  ISymbioteEvent,
-  ISymbioteNode,
-  IViewStyle,
+import {
+  ARIA_ALIAS_KEYS,
+  type IClassNameValue,
+  type IStyleProp,
+  type ISymbioteEvent,
+  type ISymbioteNode,
+  type IViewStyle,
 } from '@symbiote-native/engine';
 import {
-  resolveAccessibilityProps,
   type IAccessibilityProps,
   type IAriaProps,
   type ISeparatorProps,
@@ -113,13 +113,16 @@ export type { ISeparators, ISeparatorProps, ISymbioteEvent, ISymbioteNode };
 // field-by-field instead of reusing its spread). Shared by every list component (VirtualizedList's
 // own host-bag construction AND FlatList's/VirtualizedSectionList's/SectionList's component-to-
 // component forwarding down to VirtualizedList) so the field list lives in exactly one place.
-// resolveAccessibilityProps folds aria-*/role into their accessibility* twins first (idempotent —
-// calling it twice, once per forwarding hop, is a documented no-op once the aria keys are gone).
+// It used to call `resolveAccessibilityProps` first, folding `aria-*`/`role` into their
+// `accessibility*` twins so there were canonical names to pick BY NAME. That fold is the device's
+// rule now, so the aria keys are picked and forwarded RAW instead (the loop at the end) and the
+// engine folds once, at the leaf. Picking twice across a forwarding hop stays a no-op for the same
+// reason folding twice was: a pick is idempotent.
 export function pickAccessibilityProps<
   T extends IAccessibilityProps & IAriaProps,
->(props: T): IAccessibilityProps {
-  const resolved = resolveAccessibilityProps(props);
-  const picked: IAccessibilityProps = {};
+>(props: T): IAccessibilityProps & IAriaProps {
+  const resolved = props;
+  const picked: IAccessibilityProps & IAriaProps = {};
   if (resolved.testID !== undefined) picked.testID = resolved.testID;
   if (resolved.nativeID !== undefined) picked.nativeID = resolved.nativeID;
   if (resolved.accessible !== undefined)
@@ -181,5 +184,20 @@ export function pickAccessibilityProps<
     picked.onMagicTap = resolved.onMagicTap;
   if (resolved.onAccessibilityEscape !== undefined)
     picked.onAccessibilityEscape = resolved.onAccessibilityEscape;
+  // THE ARIA HALF, forwarded RAW and DERIVED from the engine's own list rather than named again
+  // here. `ARIA_ALIAS_KEYS` is exported for exactly this — its comment says a second hand-written
+  // copy is what `adapter-parity-audit.md` records going stale one member at a time — so this loop
+  // gains a new alias the day the engine does.
+  //
+  // Raw, because the fold is the device's rule (`foldAriaProps`, `SymbioteFabricProps.cpp`) and it
+  // reads these names literally off the bag it commits. Folding them here would be a second
+  // implementation of it, and the one this file used to hold: `resolveAccessibilityProps`.
+  for (const key of ARIA_ALIAS_KEYS) {
+    const value = props[key];
+    // `Object.assign` with a computed key, not `picked[key] = value`: the key is a union and the
+    // value is its correlated member type, which TypeScript cannot check across a loop. This is the
+    // spelling that stays sound without an `as`.
+    if (value !== undefined) Object.assign(picked, { [key]: value });
+  }
   return picked;
 }
