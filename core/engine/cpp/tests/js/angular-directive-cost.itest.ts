@@ -60,6 +60,31 @@
 // cannot be collected. The next idea has to remove the directive from the RUNTIME rather than make
 // it cheaper — it exists for ngtsc's template checker, which is a compile-time job.
 //
+// AND THAT WORKS, on a seam this adapter has carried all along. `PRIMITIVE_SELECTOR_ALIAS` maps
+// `symbiote-view` onto `view`, while `ViewElement`'s selector is the bare `view` — so a template
+// that spells the hyphenated name gets the IDENTICAL engine node with no directive matching it. The
+// `aliased` arm is that, with the directives still imported exactly as a real screen has them:
+//
+//   full -> aliased     86.4 / 81.8 ms saved    ~8.2-8.6 us/element, outside the bar both runs
+//   aliased vs bare     -3.5 / +12.0 ms         it lands on the bare cost
+//
+// Census identical on every arm, so the committed tree does not change. The hyphen is also what
+// `CUSTOM_ELEMENTS_SCHEMA` wants, so a rewritten template needs no directive to be a legal one.
+//
+// WHAT MAKES IT SHIPPABLE RATHER THAN A CURIOSITY is that ngtsc has already type-checked the
+// template by the time the partial declaration exists, so a build step could rewrite the tag AFTER
+// the check and keep both. Per ELEMENT, not per component, which matters: the benchmark row carries
+// a `<text-input>`, and any component-wide strip would refuse the whole row over it.
+//
+// WHAT STILL HAS TO BE ANSWERED BEFORE WRITING THAT STEP — each of these keeps a directive, so a
+// rewrite must leave those elements alone:
+//   an `[onX]="fn"` prop   `wrapCallback` wraps it for `markForCheck`; without the directive the
+//                          engine calls it and Angular is never told (`change-detection-flush.ts`).
+//   `[(value)]`            `ReadBackElement`'s output and its same-microtask view flush.
+//   a `[style]` binding    without a directive it goes through Angular's STYLING engine instead of
+//                          arriving whole at `setProperty`. Both work — the bare bench arm is the
+//                          one that does — but it is a different path with a different cost.
+//
 // ONE PROP PER ELEMENT AND NOTHING ELSE, deliberately. `[testID]` is declared by `ViewElement`, so
 // the directive arm CLAIMS it and forwards it out of `ngOnChanges`, while the bare arm lets it reach
 // `Renderer2.setProperty` directly. One write per element either way — which is what makes the two
@@ -88,6 +113,7 @@ import { readSurfaceTelemetry } from '@symbiote-native/engine';
 import {
   describe,
   expect,
+  findByTestId,
   flushTimers,
   it,
   mounted,
@@ -141,6 +167,56 @@ class BareArm {
 class DirectiveArm {
   readonly label = label;
   readonly items = ITEMS;
+}
+
+// THE ESCAPE, and the point of this arm is that the seam ALREADY EXISTS. A template that spells the
+// tag `symbiote-view` gets the identical engine node — `PRIMITIVE_SELECTOR_ALIAS` maps it back, and
+// has since long before this question — while `ViewElement`'s selector is the bare `view`, so no
+// directive matches and none is instantiated. The component still IMPORTS them, exactly as a real
+// screen does; they simply have nothing to match.
+//
+// Why it matters: a build step could rewrite the tag AFTER ngtsc has type-checked the template with
+// the directive in place, which is the only way to keep the checking and lose the instance. This arm
+// asks whether the runtime half of that idea is sound before any plugin is written — and whether the
+// hyphen, which `CUSTOM_ELEMENTS_SCHEMA` needs anyway, costs anything on the way through.
+@Component({
+  selector: 'aliased-cost-arm',
+  standalone: true,
+  imports: [SYMBIOTE_ELEMENTS],
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
+  template: `<view>
+    @for (item of items; track item) {
+      <symbiote-view [testID]="item"></symbiote-view>
+    }
+  </view>`,
+})
+class AliasedArm {
+  readonly items = ITEMS;
+}
+
+// THE CORRECTNESS HALF OF THE ESCAPE, and the one that could sink it. Host BEHAVIORS are keyed by
+// the intrinsic tag, so a `<pressable>` gets `accessible` and `focusable` written by a C++ rule that
+// never sees the template. If the alias reached that registry as `symbiote-pressable`, the lookup
+// would miss and every pressable in a rewritten app would lose its accessibility fold — silently,
+// with the tree still looking right.
+//
+// `createElement` passes `engineName`, the RESOLVED tag, which is what makes this work. That is read
+// off the source; this asserts it.
+@Component({
+  selector: 'behavior-arm',
+  standalone: true,
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
+  template: `<view>
+    <pressable testID="plain" (press)="noop()"></pressable>
+    <symbiote-pressable testID="aliased" (press)="noop()"></symbiote-pressable>
+  </view>`,
+})
+class BehaviorArm {
+  // A PRESS LISTENER ON BOTH, because half the fold depends on one. `focusable` is
+  // `focusable !== false && onPress !== undefined && !disabled`, so a pressable nobody listens to
+  // carries `accessible` and no `focusable` at all — which is correct, and made the first spelling
+  // of this case fail on the arm that was working.
+  noop(): void {}
 }
 
 // THE LADDER BETWEEN THE TWO, so the 9 us has a breakdown rather than a name. Every rung declares
@@ -398,6 +474,7 @@ describe('what a matched element directive costs on JavaScriptCore', () => {
       ['map-look', MapLookupArm],
       ['slot', SlotArm],
       ['full', DirectiveArm],
+      ['aliased', AliasedArm],
     ];
     const samples = new Map<string, IArmReading[]>();
     for (let round = 0; round < 5; round += 1) {
@@ -489,12 +566,53 @@ describe('what a matched element directive costs on JavaScriptCore', () => {
         `ngOnChanges, not set  ${verdict('minimal', 'setters')}`,
         `proposal, weakmap     ${verdict('minimal', 'map-look')}`,
         `proposal, node slot   ${verdict('minimal', 'slot')}`,
+        `THE ESCAPE            ${verdict('full', 'aliased')}`,
+        `escape vs bare        ${verdict('aliased', 'bare')}`,
         `279 inputs, not 1     ${verdict('full', 'minimal')}`,
       ].join('\n'),
     );
 
     // No threshold on any delta — that is what the print is for, and a bound would either be so
     // loose it says nothing or so tight it fails on a busy machine.
+  });
+
+  // why: an aliased tag that lost its host behavior would commit a tree that looks identical and is
+  // missing its accessibility fold. Nothing in the timings above could see that.
+  it('gives an aliased tag the same host behavior as the bare one', () => {
+    const surface = mount(ROOT_TAG, BehaviorArm);
+    flushTimers();
+    surface.commit();
+    mounted();
+
+    const plain = findByTestId('plain');
+    const aliased = findByTestId('aliased');
+    print(
+      `plain   ${JSON.stringify(plain?.props)}\naliased ${JSON.stringify(aliased?.props)}`,
+    );
+
+    // KEY FOR KEY, minus the one that names them apart. Stronger than picking a key and better
+    // aimed: what the alias must not do is change ANYTHING about the committed payload, and a named
+    // key can only ever cover the part of the fold somebody thought of. The first spelling asserted
+    // `focusable` and failed on BOTH arms — that key is written only when the owned-listener bit
+    // says a press handler exists, which `getDebugProps` does not report here. An assertion that
+    // fails identically on the control is not measuring the subject.
+    const withoutTestID = (view: typeof plain): string =>
+      JSON.stringify(
+        Object.fromEntries(
+          Object.entries(view?.props ?? {}).filter(([key]) => key !== 'testID'),
+        ),
+      );
+    expect(withoutTestID(aliased), 'the alias changes no key').toBe(
+      withoutTestID(plain),
+    );
+
+    // `accessible` and `focusable` are written by `foldPressableProps` off the TAG, in C++, and
+    // never by the template. Their presence is the witness that the behavior attached at all.
+    // And an ABSOLUTE anchor beside the comparison, because two empty payloads compare equal.
+    expect(plain?.props.accessible, 'a bare pressable folds').toBe('true');
+    expect(aliased?.props.accessible, 'and so does an aliased one').toBe(
+      'true',
+    );
   });
 });
 
