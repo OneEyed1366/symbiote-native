@@ -241,6 +241,83 @@ describe('a Vue list row: stateful component vs functional component', () => {
         `teardownJsOnly=${(functional.teardownMs - engineMs(functional.teardownTelemetry)).toFixed(2)}`,
     );
   });
+
+  // Is the JS-only cost above LINEAR in list width, or does it hide a quadratic the way F-19 once
+  // found in `nextSiblingOf` (fixed at the engine level, `.docs/tree-inefficiency-findings.md`)?
+  // That fix was engine-wide; this asks whether Vue's OWN reactivity/reconciliation adds a second,
+  // adapter-specific one on top. Doubling factor is the right instrument (`child-list-scaling.
+  // itest.ts` uses the same one): linear work doubles per width-doubling, quadratic quadruples.
+  //
+  // RULED OUT (three runs, `build-release`, min-of-5 samples per width): every doubling factor
+  // from 250 through 4 000 rows lands in 1.7-2.1, i.e. flat linear — no hidden quadratic. A single-
+  // sample-per-width first pass read factors climbing toward 3.0 by the top width, which looked
+  // exactly like a real trend; it was pure measurement noise, gone the moment the min-of-N fix
+  // this file's own comment above cites was actually applied. Recorded so the same shape of false
+  // alarm is not rediscovered from a single run.
+  it('a stateful row JS-only cost on a relabel scales linearly with list width', async () => {
+    const widths = [250, 500, 1_000, 2_000, 4_000];
+    // MIN of several samples per width, not one — this directory's own established fix for
+    // exactly this instrument (`child-list-scaling.itest.ts`'s header): timing noise only ever
+    // ADDS, so the minimum is the closest reading to the work itself. A first pass here with one
+    // sample per width read a doubling factor that swung from 1.2 to 3.0 run to run; this is that
+    // finding being corrected before being reported, not a new discovery.
+    const SAMPLES = 5;
+    const jsOnlyByWidth: number[] = [];
+    let nextTag = 9010;
+
+    for (const width of widths) {
+      const tag = nextTag++;
+      const rows = buildRows(width);
+      const state = shallowRef<readonly IBenchRow[]>(rows);
+      const surface = mount(tag, {
+        render: () =>
+          h(
+            'view',
+            {},
+            state.value.map(row => h(StatefulRow, { key: row.id, row })),
+          ),
+      });
+      flushTimers();
+      surface.commit();
+      readSurfaceTelemetry(tag);
+
+      let best = Infinity;
+      let lastTelemetry: ISurfaceTelemetry | undefined;
+      for (let sample = 0; sample < SAMPLES; sample += 1) {
+        const relabeled = rows.map((row, index) =>
+          index % STRIDE === 0
+            ? { ...row, label: `${row.label} !!!${sample}` }
+            : row,
+        );
+        const t0 = performance.now();
+        state.value = relabeled;
+        await nextTick();
+        flushTimers();
+        surface.commit();
+        const wallMs = performance.now() - t0;
+        lastTelemetry = readSurfaceTelemetry(tag);
+        const engineMs =
+          (lastTelemetry?.walkMs ?? 0) + (lastTelemetry?.applyMs ?? 0);
+        best = Math.min(best, wallMs - engineMs);
+      }
+      jsOnlyByWidth.push(best);
+
+      // The width-scaled twin of the fixed-1000 oracle above: a tenth of the width relabeled,
+      // nothing created, on every sample (so this checks only the LAST one's counters).
+      expect(lastTelemetry?.setProps).toBe(Math.ceil(width / STRIDE));
+      expect(lastTelemetry?.nodesCreated).toBe(0);
+      unmount(tag);
+    }
+
+    const factors = jsOnlyByWidth
+      .slice(1)
+      .map((ms, index) => ms / Math.max(jsOnlyByWidth[index], 0.01));
+    print(
+      `DEBUG vue-row-shape scaling widths=${widths.join(',')} ` +
+        `jsOnly=${jsOnlyByWidth.map(ms => ms.toFixed(2)).join(',')} ` +
+        `doublingFactors=${factors.map(f => f.toFixed(2)).join(',')}`,
+    );
+  });
 });
 
 report();
