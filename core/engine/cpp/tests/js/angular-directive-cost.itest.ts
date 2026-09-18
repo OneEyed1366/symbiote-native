@@ -38,6 +38,28 @@
 // AND THE FIRST THREE RUNS OF THIS FILE READ THAT ROW AS 49.6, 30.0 AND 13.6 ms, before it grew a
 // resolution bar and rotated its arm order. Four rounds and a fixed order were not enough.
 //
+// THE ~3 us OF INJECTIONS IS NOT COLLECTABLE, and three arms say so rather than one argument. Only
+// `Renderer2` could leave the element directive at all — `ElementRef` is genuinely per-element, and
+// `ChangeDetectorRef` is what `wrapCallback` marks a view with, so dropping it would silently
+// reinstate a device bug `change-detection-flush.ts` records at length. Both ways of finding the
+// renderer without injecting it were built here and priced against `minimal`, which is what ships:
+//
+//   proposal, weakmap     8.5 / 7.0 / -6.0 ms     one `set` per element, one `get` per ngOnChanges
+//   proposal, node slot   5.6 / 9.1 / -2.5 ms     a symbol property on the node instead
+//
+// Both flip sign across runs and land inside the bar in most of them. A lookup on this runtime costs
+// about what the injection it replaces costs, so the saving is spent on collecting it. Do not rebuild
+// either one without a reason this file does not already contain.
+//
+// `setters` instead of `ngOnChanges` is the same verdict for the same reason: 13.3 / 11.8 / 0.3 ms,
+// two of three inside the bar. Under vitest in dev mode it read reliably WORSE, which is a third
+// runtime giving a third answer to one question.
+//
+// SO WHAT IS LEFT IS STRUCTURAL: ~5.5 us to match and instantiate a directive per element and feed
+// its inputs, which is Angular's own and not reachable from here, plus ~3 us of injections that
+// cannot be collected. The next idea has to remove the directive from the RUNTIME rather than make
+// it cheaper — it exists for ngtsc's template checker, which is a compile-time job.
+//
 // ONE PROP PER ELEMENT AND NOTHING ELSE, deliberately. `[testID]` is declared by `ViewElement`, so
 // the directive arm CLAIMS it and forwards it out of `ngOnChanges`, while the bare arm lets it reach
 // `Renderer2.setProperty` directly. One write per element either way — which is what makes the two
@@ -171,8 +193,145 @@ class MinimalElement implements OnChanges {
   }
 }
 
+// The same three injections and the same one forward, written as a SETTER. Angular writes straight
+// through it and never builds a `SimpleChanges` — `usesOnChanges` is absent from the declaration
+// entirely — so `minimal` against this one prices the lifecycle rather than the forwarding.
+//
+// Under vitest, in dev mode, setters read reliably WORSE; in prod mode there the two were within
+// noise. Neither of those is this runtime, which is the whole reason the arm is repeated here.
+@Directive({ selector: 'setter-tag', standalone: true })
+class SetterElement {
+  private readonly renderer = inject(Renderer2);
+  private readonly host = inject(ElementRef);
+  protected readonly detector = inject(ChangeDetectorRef);
+
+  @Input() set testID(value: string | undefined) {
+    this.renderer.setProperty(this.host.nativeElement, 'testID', value);
+  }
+}
+
+// THE PROPOSED SHAPE, priced before it is built. Today's `SymbioteElement` injects three things;
+// `Renderer2` is the only one that can leave, because `ElementRef` is genuinely per-element and
+// `ChangeDetectorRef` is what `wrapCallback` marks a view with — dropping that would silently
+// reinstate a device bug `change-detection-flush.ts` records at length.
+//
+// So the renderer would come from a WeakMap the adapter's own `createElement` fills. That map is not
+// free: a `set` per element on the create path and a `get` per `ngOnChanges`, on a runtime where an
+// injection costs ~1.4 us. This arm is the A/B — `minimal` is what ships, this is what would replace
+// it — rather than a guess about which is dearer.
+const rendererForNode = new WeakMap<object, Renderer2>();
+
+@Directive({ selector: 'map-lookup-tag', standalone: true })
+class MapLookupElement implements OnChanges {
+  private readonly host = inject(ElementRef);
+  protected readonly detector = inject(ChangeDetectorRef);
+  @Input() testID?: string;
+
+  // ONE SET AND ONE GET PER ELEMENT, which is what the real design costs. The real one fills the map
+  // in the renderer's own `createElement`; filling it here puts the same two operations on the same
+  // per-element path, and a map nothing fills would have measured a MISS rather than the design.
+  constructor() {
+    const node: unknown = this.host.nativeElement;
+    if (
+      typeof node === 'object' &&
+      node !== null &&
+      sharedRenderer !== undefined
+    )
+      rendererForNode.set(node, sharedRenderer);
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    const node: unknown = this.host.nativeElement;
+    if (typeof node !== 'object' || node === null) return;
+    const renderer = rendererForNode.get(node);
+    for (const name of Object.keys(changes))
+      renderer?.setProperty(node, name, changes[name]?.currentValue);
+  }
+}
+
+// THE SAME PROPOSAL, with the map replaced by a SYMBOL PROPERTY on the node. A WeakMap `get` on this
+// runtime turned out to cost about what an injection costs, so the question becomes whether a plain
+// property read is cheaper — and whether giving every node an extra property slows the engine's own
+// paths by changing the object's shape. Both halves are visible here: this arm against `minimal`,
+// and every other arm as the control.
+const RENDERER_SLOT = Symbol('renderer');
+
+// NOT `instanceof Renderer2`. The adapter's renderer implements that abstract class's surface
+// without extending it, so the first spelling of the arm below narrowed to nothing, forwarded
+// nothing, and reported `setProps=2` against every other arm's 10 002 — caught by the census on the
+// first run, which is the entire reason this file prints it before it reads a clock.
+interface IPropWriter {
+  setProperty(node: unknown, name: string, value: unknown): void;
+}
+
+function isPropWriter(value: unknown): value is IPropWriter {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof Reflect.get(value, 'setProperty') === 'function'
+  );
+}
+
+@Directive({ selector: 'slot-tag', standalone: true })
+class SlotElement implements OnChanges {
+  private readonly host = inject(ElementRef);
+  protected readonly detector = inject(ChangeDetectorRef);
+  @Input() testID?: string;
+
+  constructor() {
+    const node: unknown = this.host.nativeElement;
+    if (typeof node === 'object' && node !== null)
+      Reflect.set(node, RENDERER_SLOT, sharedRenderer);
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    const node: unknown = this.host.nativeElement;
+    if (typeof node !== 'object' || node === null) return;
+    const renderer: unknown = Reflect.get(node, RENDERER_SLOT);
+    if (!isPropWriter(renderer)) return;
+    for (const name of Object.keys(changes))
+      renderer.setProperty(node, name, changes[name]?.currentValue);
+  }
+}
+
 const ladderTemplate = (tag: string): string =>
   `<view>@for (item of items; track item) { <${tag} [testID]="item"></${tag}> }</view>`;
+
+@Component({
+  selector: 'setter-arm',
+  standalone: true,
+  imports: [SetterElement],
+  template: ladderTemplate('setter-tag'),
+})
+class SetterArm {
+  readonly items = ITEMS;
+}
+
+@Component({
+  selector: 'map-lookup-arm',
+  standalone: true,
+  imports: [MapLookupElement],
+  template: ladderTemplate('map-lookup-tag'),
+})
+class MapLookupArm {
+  readonly items = ITEMS;
+  constructor() {
+    captureRenderer();
+  }
+}
+
+@Component({
+  selector: 'slot-arm',
+  standalone: true,
+  imports: [SlotElement],
+  template: ladderTemplate('slot-tag'),
+})
+class SlotArm {
+  readonly items = ITEMS;
+  constructor() {
+    captureRenderer();
+  }
+}
 
 @Component({
   selector: 'one-inject-arm',
@@ -235,6 +394,9 @@ describe('what a matched element directive costs on JavaScriptCore', () => {
       ['bare', BareArm],
       ['1-inject', OneInjectArm],
       ['minimal', MinimalArm],
+      ['setters', SetterArm],
+      ['map-look', MapLookupArm],
+      ['slot', SlotArm],
       ['full', DirectiveArm],
     ];
     const samples = new Map<string, IArmReading[]>();
@@ -324,6 +486,9 @@ describe('what a matched element directive costs on JavaScriptCore', () => {
         '',
         `a directive at all    ${verdict('1-inject', 'bare')}`,
         `two more injections   ${verdict('minimal', '1-inject')}`,
+        `ngOnChanges, not set  ${verdict('minimal', 'setters')}`,
+        `proposal, weakmap     ${verdict('minimal', 'map-look')}`,
+        `proposal, node slot   ${verdict('minimal', 'slot')}`,
         `279 inputs, not 1     ${verdict('full', 'minimal')}`,
       ].join('\n'),
     );
