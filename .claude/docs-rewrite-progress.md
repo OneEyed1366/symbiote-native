@@ -1,5 +1,24 @@
 # Docs rewrite for the C++ buffer architecture — progress tracker
 
+## Sixth pass — sample full-read of a package README caught what grep couldn't
+
+Per the "spot-check a random sample rather than re-grep" guidance below: read
+`packages/local-auth/README.md` in full (not just grep) and found a real stale claim grep would
+never catch: "No canary demo screen exists yet for Svelte/Solid" — but
+`examples/expo-svelte/screens/LocalAuthScreen.svelte` (220 lines) and
+`examples/expo-solid/screens/LocalAuthScreen.tsx` (260 lines) both exist and are real, substantial
+screens. **The reason the earlier grep sweeps missed this: the phrase is "exists **yet**", not
+"**not** yet"** — my grep pattern was `not yet`, which doesn't match "X yet" phrased the other way
+around. Fixed the README to list all six Expo canaries.
+
+Checked the same "no demo screen for Svelte/Solid" shape across the other 14 packages that
+mention "demo screen" — found no other instances (`grep -ln "Svelte/Solid" packages/*/README.md`
+turned up 6 files, all with unrelated/accurate uses). This looks like it was a one-off, not
+systemic — but it's a reminder that **grep-based sweeps have a real false-negative rate; an actual
+read catches things a keyword pattern can't anticipate.** If continuing with the "sample a few
+package READMEs by reading them fully" approach, expect roughly this hit rate (1 real finding per
+~1 full README read so far) and keep doing it rather than trusting exhausted grep patterns.
+
 ## State as of the 6th pass — read this first
 
 The high-signal work is done: every place that described the retired JS-only engine as current
