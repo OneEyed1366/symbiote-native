@@ -6,7 +6,7 @@
 
 ### Want to ship a real native iOS/Android app, but you don't write React? Today you can't.
 
-**Beta** · iOS + Android · React + Vue + Angular + Svelte + Solid · one native core, N framework adapters
+**Stable** · iOS + Android · React + Vue + Angular + Svelte + Solid · one native core, N framework adapters
 
 [**Docs**](https://docs.symbiote-native.dev) · [Why SymbioteNative](#why-not-nativescript-lynx-or-just-react-native) · [Benchmarks](#how-fast-against-stock-react-native) · [Architecture](#how-it-works) · [Testing](#testing) · [Milestones](#milestones) · [React adapter](./adapters/react) · [Vue adapter](./adapters/vue) · [Angular adapter](./adapters/angular) · [Svelte adapter](./adapters/svelte) · [Solid adapter](./adapters/solid)
 
@@ -36,7 +36,9 @@ core, N thin adapters.
 
 > The shape is a shared retained tree plus a thin per-framework reconciler — the same pattern
 > that already drives a terminal layout engine across five UI frameworks, retargeted here from
-> ANSI terminal output to native iOS/Android views.
+> ANSI terminal output to native iOS/Android views. The tree itself lives in C++ now (it did not
+> always — see [How It Works](#how-it-works)); every framework still talks to it through the same
+> four-call mutation API.
 
 ---
 
@@ -109,8 +111,11 @@ three `View`, three `Text`, three raw text nodes and a `TextInput` — so a run 
 iOS 26.5 simulator, Release, 1 000 rows, all mounted. Lower is better; the ratio is ours over
 stock, so **below 1.00 means faster than stock React Native**. Bold marks a row we win.
 
-> **These are the released packages**, and an engine rework in progress moves them — see
-> [below](#the-engine-rework-in-progress).
+> **These numbers are the last full on-device measurement, taken on the JS-engine architecture
+> (published as `0.1.x`).** The retained tree has since moved into C++ (this is now what ships —
+> see [How It Works](#how-it-works)), which changes this table; a fresh on-device run for the C++
+> engine hasn't happened yet. The best available read on the new engine is the headless comparison
+> [below](#the-c-engine-headless-so-far), which is a real measurement but not this same device table.
 
 | Operation      | stock RN |             Solid |            Svelte |               Vue |             React |          Angular |
 | -------------- | -------: | ----------------: | ----------------: | ----------------: | ----------------: | ---------------: |
@@ -123,34 +128,39 @@ stock, so **below 1.00 means faster than stock React Native**. Bold marks a row 
 | Select row     |      7.3 |   **5.5 · 0.75x** |      14.7 · 2.01x |       8.4 · 1.15x |       7.9 · 1.08x |     10.5 · 1.44x |
 | Clear          |     10.7 |   **9.1 · 0.85x** |      12.6 · 1.18x |      14.1 · 1.32x |   **8.7 · 0.81x** |     44.2 · 4.13x |
 
-### The engine rework in progress
+### The C++ engine, headless, so far
 
-The retained tree is moving out of JavaScript and into C++: adapters emit a command buffer and the
-tree lives on the native side. It is not released, and **it changes the table above** — measured
-headless on that branch, `Create` regressed across every adapter while update-shaped rows improved.
+The retained tree moved out of JavaScript and into C++: adapters build a command buffer and
+`SymbioteTree` applies it against the tree on the native side, once per commit instead of once
+per mutation. **This is the architecture that ships now** — the table above is what it replaced.
+It moves the numbers, and not in one direction: measured headless, create-shaped operations got
+_more_ expensive while update-shaped operations got _much_ cheaper.
 
 The same eight operations, the same 1 000-row screen, run headless through all six renderers in one
-sitting (ms; ratio is ours / stock):
+sitting (ms; ratio is ours / stock — JavaScriptCore, not Hermes, a test host rather than a real
+Fabric pipeline, so read this as the columns compared to each other on one ruler, not as a stand-in
+for the device table above):
 
 | 1 000 rows | stock RN | React |   Vue | Solid | Svelte | Angular |
 | ---------- | -------: | ----: | ----: | ----: | -----: | ------: |
-| Create     |     91.6 | 115.2 | 143.6 | 107.7 |  124.3 |   265.2 |
-| Replace    |    102.0 | 118.8 | 162.4 | 115.2 |  137.0 |   301.8 |
-| Partial    |     11.7 |   9.2 |  12.0 |   7.8 |    9.9 |    11.3 |
-| Select     |     13.0 |  13.5 |  11.1 |  14.3 |   12.3 |    14.8 |
-| Swap       |     16.0 |  23.5 |   4.2 |   4.5 |    5.4 |     7.3 |
-| Remove     |     18.7 |   4.5 |   3.5 |   4.0 |    4.7 |     7.2 |
-| Append     |    125.4 | 116.9 | 149.1 | 117.3 |  136.4 |   283.8 |
-| Clear      |      9.0 |  10.9 |  35.4 | 394.9 |   21.4 |    43.6 |
+| Create     |     93.4 | 114.4 | 131.7 |  99.9 |  114.9 |   253.9 |
+| Replace    |    101.5 | 117.2 | 152.8 | 110.9 |  127.1 |   283.2 |
+| Partial    |     11.3 |  10.4 |  12.3 |   7.3 |    8.2 |    10.2 |
+| Select     |     12.9 |  13.8 |  12.9 |  15.4 |   11.8 |    19.3 |
+| Swap       |     15.5 |  22.4 |   5.1 |   5.5 |    5.0 |     8.3 |
+| Remove     |     16.8 |   4.1 |   4.5 |   8.2 |    4.4 |     8.0 |
+| Append     |    122.5 | 117.0 | 142.0 | 105.9 |  121.1 |   271.3 |
+| Clear      |     10.0 |  11.1 |  41.0 | 409.1 |   19.1 |    44.1 |
 
-So the three adapters that beat stock on `Create` today — Solid, Svelte and Vue — do not beat it on
-that branch yet, while `Swap` and `Remove` are 3-5x wins for every non-React adapter. Solid's `Clear`
-is a known outlier under investigation; the engine is 3% of it. That work is why the branch exists
-and is not finished.
+`Create` and `Append` are the two rows every adapter regressed on against this same headless
+baseline taken on the old JS engine — moving the retained tree to C++ did not, by itself, pay for
+the crossing it removed. `Swap` and `Remove` moved the other way for every non-React adapter,
+2-4x over where they stood before. Solid's `Clear` at 409.1ms is a known, reproduced outlier
+still under investigation; the engine itself accounts for about 3% of that number.
 
-These are **headless** figures and not the device's: JavaScriptCore rather than Hermes, a test host
-rather than a real Fabric pipeline. They are a sound comparison of the columns against each other,
-taken on one ruler; the released table above remains the device-measured one.
+Until a fresh on-device run exists, don't read either table as "the current benchmark" on its
+own — the device table above is accurate for a release that no longer ships, and the headless
+table above is accurate for what ships now but isn't the same instrument.
 
 ---
 
@@ -160,10 +170,11 @@ taken on one ruler; the released table above remains the device-measured one.
 Vue · Svelte · Solid · Angular · React     thin reconciler / createRenderer per framework
         │  insert / remove / setProp / commit
         ▼
-@symbiote-native/engine : retained shadow-tree + diff→childSet + event normalization
-        │  ALL clone-on-write lives HERE, in one place
+@symbiote-native/engine (JS)  : translates each call into a command-buffer op — no retained
+        │                       tree in JS; one JSI crossing per commit, not per op
         ▼
-nativeFabricUIManager   createNode · cloneNodeWithNewProps · appendChildToSet · completeRoot
+SymbioteTree (C++)  : the retained tree, clone-on-write commit, tag-keyed platform rules
+        │  createNode · cloneNodeWithNewProps · appendChildToSet · completeRoot
         ▼
 stock react-native : Fabric C++ · JSI · Yoga · RCTFabricSurface       ← never forked
 ```
@@ -171,17 +182,33 @@ stock react-native : Fabric C++ · JSI · Yoga · RCTFabricSurface       ← nev
 The hard part is that Vue/Svelte/Solid/Angular **mutate** nodes in place
 (`el.setAttribute`), while Fabric is **persistent** — every change clones the node with
 new props and atomically commits a new child set. That mutation→clone-on-write translation
-lives **once**, in `@symbiote-native/engine` — adapters see only a four-call mutation API, and
-a persistence bug is fixed once, for every framework.
+lives **once**, in the engine — adapters see only a four-call mutation API, and a persistence
+bug is fixed once, for every framework. **It used to live in TypeScript; it now lives in C++**
+(`SymbioteTree.cpp`), reached from JS through one buffered crossing per commit instead of one
+call per mutation. Same seam adapters talk to, cheaper on the other side of it.
 
 <details>
-<summary><b>Details</b> — data flow, events, bootstrap, what stays stock</summary>
+<summary><b>Details</b> — data flow, tag rules, events, bootstrap, what stays stock</summary>
 
 **One update.** Framework reactivity fires → the adapter calls `engine.setProp / insert /
-remove` on a retained node → the engine marks it dirty → on flush, the engine walks the dirty path,
-clones changed nodes with new props, builds a new childSet, and calls
-`completeRoot(rootTag, childSet)` → Fabric C++ diffs old vs new shadow tree → native views
-update.
+remove` on a retained node handle → the JS engine appends an op to the current commit's
+buffer instead of touching a tree itself → on flush, the whole buffer crosses into C++ in one
+JSI call → `SymbioteTree` applies the ops against the retained tree, clones the nodes that
+changed, builds a new childSet, and calls `completeRoot(rootTag, childSet)` → Fabric C++
+diffs old vs new shadow tree → native views update.
+
+**Platform-parity rules moved into the same C++ tree, tag by tag.** React Native's own
+components carry a mountain of small, framework-agnostic behavior in their JS bodies —
+`Pressable`'s `disabled` folding into `accessibilityState`, `Switch`'s different prop names
+per platform, a `<Text>`'s default `ellipsizeMode`, `id` aliasing to `nativeID`, ARIA prop
+aliases, and more. That used to mean either every adapter re-implemented it, or one framework
+(React, via RN's own component) got it for free and the rest didn't. Each node now carries the
+Fabric tag it was created with (`view`, `pressable`, `switch`, `text-input`, …), and a rule
+keyed on that tag runs once in C++ for whichever adapter committed the node — no JS crossing,
+no per-framework port. What's left in JS is state that is genuinely the app's: gesture/press
+machines, the controlled-input handshake, and anything only the bundler knows (like resolving
+a `require()`'d image asset to a URI), because those either run at gesture rate and call back
+into app code, or need information a native rule has no way to reach.
 
 **Events fall out of the seam — they are not a separate subsystem.** At `createNode` time
 the adapter passes an `instanceHandle`; Fabric hands that same handle back when an event
@@ -196,7 +223,9 @@ the initial child set.
 
 **What stays stock RN.** Fabric C++, JSI, Yoga, the iOS/Android host, `RCTFabricSurface`,
 native modules. None of it is forked or patched — `react-native` is an ordinary dependency.
-The only thing SymbioteNative replaces is the JS renderer.
+The only thing SymbioteNative replaces is the JS renderer, and the C++ addition above sits
+beside Fabric, not inside it — it is our own code linked into the app, never a patch to RN's
+sources.
 
 </details>
 
@@ -312,7 +341,7 @@ README and full per-adapter usage examples.
 ## Status
 
 > [!NOTE]
-> **Beta, but the API is settled.** The thesis is proven _five times over_: React Native's
+> **Stable API, native core rewritten underneath.** The thesis is proven _five times over_: React Native's
 > renderer is extracted, and **five** frameworks — React, Vue 3, Angular, Svelte, and Solid — drive
 > the same untouched framework-agnostic core on iOS + Android, with RN's own renderer never in the path.
 > Every adapter (and the shared core packages under it) ships to npm at `0.1.x`, so you can add one
@@ -420,7 +449,8 @@ localizable.
 
 ```
 core/
-  engine/      @symbiote-native/engine     — retained tree + clone-on-write commit engine + events
+  engine/      @symbiote-native/engine     — JS command-buffer shim over the C++ retained tree
+               (cpp/)                      — SymbioteTree: the retained tree + clone-on-write commit + tag-keyed platform rules + events
   components/  @symbiote-native/components  — framework-agnostic component logic (state + render), shared by every adapter
 adapters/
   react/       @symbiote-native/react      — react-reconciler host config (mutation mode) + primitives
@@ -486,8 +516,9 @@ decision, not a drift:
 
 - **The native core is never forked.** `react-native` is a dependency; only the JS renderer
   is replaced.
-- **All clone-on-write lives in `@symbiote-native/engine`.** Adapters never reimplement the
-  persistence dance.
+- **All clone-on-write lives in the engine's C++ tree (`SymbioteTree.cpp`).** Adapters never
+  reimplement the persistence dance, and neither does the platform-parity layer — a rule keyed
+  on a node's Fabric tag runs once for every adapter, not once per adapter.
 - **Adapters stay thin.** Layout, commit batching, event normalization, and ViewConfig
   handling all live in the engine.
 - **Layout is stock Yoga.** Taffy is out of scope — touching the C++ layout node
@@ -513,7 +544,7 @@ Angular break, the failure isolates to _that adapter_ — not the native stack u
 
 **Can I use it today?** The packages are on npm — you can `npm install @symbiote-native/react` (or
 `vue` / `angular` / `svelte` / `solid`) into an existing RN app today, see [Try It In Your Own
-App](#try-it-in-your-own-app). It's still beta, but the API is settled — there's no `create-symbiote` scaffolder yet,
+App](#try-it-in-your-own-app). The API is settled and stable — there's no `create-symbiote` scaffolder yet,
 so Metro/CocoaPods wiring follows the example apps rather than one command. The thesis is proven —
 **five** frameworks (React, Vue 3, Angular, Svelte, and Solid) drive the agnostic core on iOS + Android with RN's renderer
 never in the path. You can read the architecture, run the `vitest` suite and the `Detox` journeys,

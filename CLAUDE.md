@@ -38,10 +38,13 @@ core is never touched.**
 Vue · Svelte · Solid · Angular · React        thin reconciler + descriptor→element bridge
         │  insert / remove / setProp / commit
         ▼
-@symbiote-native/engine : retained shadow-tree + diff→childSet + event normalization
-        │  ALL clone-on-write lives HERE, in one place
+@symbiote-native/engine (JS) : command buffer, one JSI crossing per commit — no retained tree in JS
+        │
         ▼
-nativeFabricUIManager  (createNode / cloneNodeWithNewProps / appendChildToSet / completeRoot)
+SymbioteTree (C++, core/engine/cpp) : the retained tree + clone-on-write commit + tag-keyed
+        │  platform-parity rules (SymbioteFabricProps.cpp) + event normalization — ALL of it HERE
+        ▼
+Fabric's UIManager  (createNode / cloneNodeWithNewProps / appendChildToSet / completeRoot)
         ▼
 stock react-native : Fabric C++ · JSI · Yoga · RCTFabricSurface     ← never forked
 ```

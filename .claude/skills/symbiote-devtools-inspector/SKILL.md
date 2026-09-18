@@ -133,8 +133,8 @@ would violate keeping the engine dependency-light.
 - **Tree sync is a full snapshot on every post-commit, no diffing.** Simple,
   always correct, dev-only (never runs when `WITH_ROZENITE` is unset).
   Building a second diff engine here would duplicate the clone-on-write
-  diffing already centralized once in `commit.ts` — rejected per
-  `<clone_on_write_lives_in_engine>`; revisit only if a real perf problem is
+  diffing already centralized once, now in `SymbioteTree` (`core/engine/cpp`)
+  — rejected per `<clone_on_write_lives_in_engine>`; revisit only if a real perf problem is
   MEASURED on a large tree, not preemptively — see `symbiote-perf-measurement`
   for how to actually take that measurement instead of guessing.
 - **Tree push is lazy, gated on panel subscription.** The app-side

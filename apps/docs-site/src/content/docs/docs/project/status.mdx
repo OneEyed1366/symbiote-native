@@ -47,9 +47,10 @@ and the shared core packages.
 
 ## Core status
 
-- `@symbiote-native/engine` — retained tree, Fabric commit path, style/runtime
-  utilities, native events, and the shared `AppRegistry` core every adapter
-  wraps.
+- `@symbiote-native/engine` — the JS command-buffer shim over `SymbioteTree`, the retained tree
+  and Fabric commit path now implemented in C++ (`core/engine/cpp`), plus style/runtime
+  utilities, native events, and the shared `AppRegistry` core every adapter wraps. On-device
+  benchmark numbers for the C++ tree are still pending — see the [roadmap](/docs/project/roadmap/).
 - `@symbiote-native/css-parser` — build-time compiler for plain CSS, CSS Modules, and
   SCSS/Sass, Less, and Stylus preprocessor sources, resolved at runtime
   through a class registry shared by React, Vue, Angular, Svelte, and Solid. Also ships a
