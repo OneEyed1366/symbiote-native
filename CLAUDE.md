@@ -2515,6 +2515,37 @@ name changed: Solid's `withStableKeys` widening (its `spread` has no removal pas
 undefined can leave its key standing) is now watched on `aria-label`, **the key the spread actually
 holds** — the better place for it.
 
+**ONE CALLER CONVERTED, AND THE COUNT I GAVE FOR THE REST WAS WRONG.** After the call left the
+builder, this section said the remaining JS fold was "one Svelte file, 4 uses". That was a census of
+`pickAccessibilityProps` — the wrapper — not of `resolveAccessibilityProps`, which is what actually
+folds. Counted properly: **~15 runtime callers across all five adapters and the slider package**
+(Modal, KeyboardAvoidingView, VirtualizedList, Image, Slider). Measuring the wrapper and reporting
+the number as the rule's is the same mistake as reading a call site instead of a call graph.
+
+The Svelte list wrapper did convert, Red-Green: a new case in `flat-list.smoke.test.ts` asserts an
+`aria-label` survives the component hop to the committed `RCTScrollView`, which **failed first**
+because the pick folded it. It forwards the aria half RAW now and the engine folds once at the leaf.
+
+**The key list is DERIVED, which is the part that generalises.** Adding fifteen hand-written
+`if (props['aria-…'])` lines would have traded one mirror for another — a second copy of the alias
+list, the exact thing `ARIA_ALIAS_KEYS`' own comment says goes stale one member at a time. The loop
+reads that exported list instead, so the wrapper gains a new alias the day the engine does.
+
+**It needed `ARIA_ALIAS_KEYS` narrowed from `readonly string[]` to `as const`**, because a `string`
+cannot index a prop type and this repo forbids `as`. That is a strict improvement rather than a
+concession: the members are literals now, so the engine's list and `IAriaProps` CHECK EACH OTHER —
+a name in one that is not a key of the other stops compiling at the use site instead of going
+quietly unforwarded. (`Object.assign(picked, {[key]: value})` rather than `picked[key] = value`:
+the key is a union correlated with its value type, which TypeScript cannot follow across a loop, and
+this is the spelling that stays sound without a cast.)
+
+**WHAT IS NOT DONE, stated plainly rather than implied by the commit.** The other ~15 callers still
+fold in JS, so the codebase is MIXED: one path forwards raw, the rest fold first. That is not a
+correctness problem — folding is idempotent and the engine folds whatever reaches it — but it is a
+half-migration and should be read as one. Not all of the rest are mechanical either:
+`adapters/react/src/components/modal/index.ts:94` DESTRUCTURES the folded result by canonical name,
+so it genuinely reads what the fold produces and cannot simply forward raw.
+
 **Two findings fell out that had nothing to do with the port:**
 
 - **React's `aria-fold-double-pass.test.tsx` never tested a double pass.** Its subject is real on
