@@ -313,6 +313,31 @@ describe('the rules that only an Android build compiles', () => {
   // this is the arm that pins the half a compile-time branch made unreachable from the other one.
   // The iOS NEGATIVE is `scroll-content-payload.itest.ts`, "lets a snapping iOS scroller collapse
   // its children" — the two are twins and neither means much alone.
+  // why: `pagingEnabled` INVERTS between the platforms, which is the rarest shape in this file — iOS
+  // needs it OFF for snapToInterval/snapToOffsets to work and Android needs it ON
+  // (`ScrollView.js:1810-1821`, and the comment there says so in both directions). So the two arms
+  // assert opposite answers to the same bag, and neither is meaningful without the other: the iOS
+  // twin is `scroll-view-payload.itest.ts`, "drops paging on iOS when the app also asks for
+  // snapping". An app that sets only `snapToInterval` gets no snapping at all on Android without it.
+  it('turns paging ON for a snapping scroller', () => {
+    expect(
+      commitOne('RCTScrollView', 'scroll-view', { snapToInterval: 100 })
+        .pagingEnabled,
+    ).toBe(true);
+    expect(
+      commitOne('RCTScrollView', 'scroll-view', { snapToOffsets: [0, 100] })
+        .pagingEnabled,
+    ).toBe(true);
+    // The app's own request still stands on its own, and a scroller asking for neither says so.
+    expect(
+      commitOne('RCTScrollView', 'scroll-view', { pagingEnabled: true })
+        .pagingEnabled,
+    ).toBe(true);
+    expect(commitOne('RCTScrollView', 'scroll-view', {}).pagingEnabled).toBe(
+      false,
+    );
+  });
+
   it('stops a snapping scroller collapsing its content children', () => {
     const surface = createSurface(ROOT_TAG);
     const owner: ISymbioteNode = createElement(

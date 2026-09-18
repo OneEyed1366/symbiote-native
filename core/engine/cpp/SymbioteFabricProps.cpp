@@ -1080,6 +1080,35 @@ dynamic foldScrollViewProps(const dynamic &props, bool isHorizontal, bool isWrap
   out.erase("stickyHeaderIndices");
   out.erase("invertStickyHeaders");
 
+  // ONE AUTHORED PROP OVER TWO INCOMPATIBLE NATIVE MEANINGS, which is why the expression INVERTS
+  // between the platforms (`ScrollView.js:1810-1821`). Read the native sides before touching it —
+  // the JS is a normalisation and says nothing about why:
+  //
+  //   iOS      snapping is RN's OWN code, in the `scrollViewWillEndDragging:` delegate, rewriting
+  //            `targetContentOffset` (`RCTScrollView.m:732,813`). `pagingEnabled` is UIKit's
+  //            property on UIScrollView — a COMPETING implementation that decides the offset
+  //            itself, so RN turns it off to let its own snap code run.
+  //   Android  `mPagingEnabled` is the GATE on the snap code: `fling()` reaches `flingAndSnap()`
+  //            only through it (`ReactScrollView.java:804`), and the snap props are read INSIDE
+  //            that (`:1071`). Without paging on, `snapToInterval` is read by nothing.
+  //
+  // NOT A PORT — no JS of ours ever did this, on either platform. `pagingEnabled` was forwarded raw
+  // while all three props sat in the public prop surface, so the failure was silent on both sides:
+  // every prop reached Fabric, nothing errored, and the scroller did the other thing. An iOS app
+  // pairing `pagingEnabled` with `snapToInterval` got paging and no snapping; an Android app that
+  // set only `snapToInterval` got neither.
+  //
+  // Resolved on EVERY scroll view rather than only when it changes something, as RN does: leaving
+  // the key absent would let a `true` from a previous commit stand after the app added a snap prop.
+  const bool snaps = props.get_ptr("snapToInterval") != nullptr ||
+      props.get_ptr("snapToOffsets") != nullptr;
+  const bool asksPaging = boolAt(props, "pagingEnabled").value_or(false);
+#ifdef ANDROID
+  out["pagingEnabled"] = asksPaging || snaps;
+#else
+  out["pagingEnabled"] = asksPaging && !snaps;
+#endif
+
   // `normal` / `fast` are RN's two names for a platform constant (`ScrollView.js`'s
   // `decelerationRate` prop); a number passes through as itself. The values are iOS's and Android's
   // own, so this is the one branch here that a component name cannot decide — on iOS BOTH tags are

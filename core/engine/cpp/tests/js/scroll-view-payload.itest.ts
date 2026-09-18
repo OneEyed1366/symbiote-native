@@ -153,6 +153,30 @@ describe('what a scroll view sends native', () => {
     expect(payload.invertStickyHeaders).toBe(undefined);
   });
 
+  // why: `pagingEnabled` and the two snap props FIGHT on iOS — native honours one or the other, so
+  // RN sends `pagingEnabled === true && snapToInterval == null && snapToOffsets == null`
+  // (`ScrollView.js:1810-1821`). Forwarded raw, an app that sets both gets paging and NO snapping,
+  // silently: every prop reaches Fabric, nothing errors, and the scroller just does the other thing.
+  it('drops paging on iOS when the app also asks for snapping', () => {
+    expect(vertical({ pagingEnabled: true }).payload.pagingEnabled).toBe(true);
+    expect(
+      vertical({ pagingEnabled: true, snapToInterval: 100 }).payload
+        .pagingEnabled,
+    ).toBe(false);
+    expect(
+      vertical({ pagingEnabled: true, snapToOffsets: [0, 100] }).payload
+        .pagingEnabled,
+    ).toBe(false);
+  });
+
+  // why: THE OTHER SIDE of the same expression, and it is a `=== true` rather than a truthiness
+  // check — RN resolves the key on EVERY scroll view, so a scroller that never mentions paging still
+  // states it. Absent would let a stale `true` stand from a previous commit.
+  it('states paging as false when the app never asked for it', () => {
+    expect(vertical({}).payload.pagingEnabled).toBe(false);
+    expect(vertical({ snapToInterval: 100 }).payload.pagingEnabled).toBe(false);
+  });
+
   // why: THE PRICE, and it is ZERO for the whole primitive as of 2026-09-18 — both nodes.
   //
   // This assertion read `1` for one iteration, with a comment saying the content node's fold could

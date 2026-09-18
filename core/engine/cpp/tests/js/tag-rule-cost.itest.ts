@@ -410,6 +410,13 @@ registerHostBehavior('scroll-view-in-js', {
     delete out.invertStickyHeaders;
     if (props.decelerationRate === 'normal') out.decelerationRate = 0.998;
     else if (props.decelerationRate === 'fast') out.decelerationRate = 0.99;
+    // The iOS half of the paging/snapping expression, since this build is the iOS one. Resolved on
+    // every scroll view, as the rule does — the twin has to spell that out or `expectSamePayload`
+    // refuses to time the two arms, which is how this line came to be written.
+    out.pagingEnabled =
+      props.pagingEnabled === true &&
+      props.snapToInterval === undefined &&
+      props.snapToOffsets === undefined;
     return out;
   },
 });
