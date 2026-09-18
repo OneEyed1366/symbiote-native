@@ -24,35 +24,42 @@
 // it was supposed to capture stayed `undefined`. The one survivor is the setter row, whose pair
 // happens to agree at 30 001.
 //
-// EVERY FIGURE BELOW IS A DEV-MODE ANGULAR FIGURE, and that is not a caveat this file can remove.
-// It runs under vitest, which defines no `__DEV__`, so `mount()`'s `settleAngularDevMode` never
-// fires and `initNgDevMode` leaves Angular's assertions armed — including the branch that makes an
-// injection expensive in the first place (`di.ts:525` builds a `new NodeInjector` and emits two
-// profiler events PER INJECTION). Turning that off moved the real arm 292 -> 234 ms, so the
-// per-injection cost this file measures is LARGER than what a release bundle pays. The shape of
-// each finding survives; the size does not, and nothing here should be quoted as a device figure.
+// IT RUNS IN PROD MODE, and it has to, because that is what ships. Vitest defines no `__DEV__`, so
+// `mount()`'s `settleAngularDevMode` never fires here and `initNgDevMode` would leave Angular's
+// assertions armed — including the branch that makes an injection expensive in the first place
+// (`di.ts:525` builds a `new NodeInjector` and emits two profiler events PER INJECTION). This file
+// calls `enableProdMode()` itself, at module load, before any arm is built.
+//
+// Every figure below was re-taken after that. The DEV-mode ones this file used to publish were
+// roughly twice as large, and the same switch moved the real arm 292 -> 234 ms
+// (`angular-elements-suite.itest.ts`) — so a directive cost quoted off the old numbers is a cost
+// nobody pays any more.
 //
 // WHAT IT ANSWERS NOW, at 10 000 elements, every row read only against a pair whose census agrees:
 //
-//   one injection         ~4.2 us/element. `minimal` against `one-inject` reads 76-97 ms over TWO of
-//                         them across nine runs, always outside the bar, censuses agreeing at
-//                         30 001/30 002. THREE is ~12.6 us/element — roughly half of what a
-//                         directive-shaped element costs, and the whole remaining lever here.
-//   ngOnChanges           SETTERS ARE WORSE, -4.8 to -20.5 ms over nine runs, census agreeing at
-//                         30 001. Unchanged by the correction, and the opposite direction from the
-//                         rewrite once proposed here.
-//   forwarding a prop     UNRESOLVED, and recorded as that rather than rounded to "free". Twenty
-//                         thousand extra writes read anywhere from -32 ms to +0.5 across nine runs —
-//                         the negative half is impossible as work, so what that row measures is the
-//                         instrument, not the write path. Not positional: rotating the arm order
-//                         changed nothing. Whatever it is, the write path is not LARGE.
-//   a directive at all    NO LONGER MEASURED — `bare` and `inert` cannot be compared, and making
-//                         them comparable means a template with no static attribute, which is a
-//                         different file's question.
+//   two injections        NOTHING. 0.2 / 0.6 / 0.8 ms across three runs, INSIDE the bar every time,
+//                         censuses agreeing at 30 001/30 002. In dev mode the same pair read 76-97
+//                         ms and was published here as "the whole remaining lever"; the lever was
+//                         the assertions, not the injections. Dropping `Renderer2` and
+//                         `ChangeDetectorRef` off the element directive would buy nothing.
+//   one injection         2.0-4.2 ms, outside the bar — but it carries `ngOnChanges` with it, since
+//                         `inert` has no lifecycle at all. Not separable by the arms in this file.
+//   ngOnChanges           NO LONGER SETTLED: 3.2 / 0.2 / 2.3 ms, and the middle run is inside its
+//                         own bar. In dev mode setters were reliably WORSE; in prod the two spellings
+//                         are within noise of each other. The old finding does not survive the switch.
+//   a directive at all    NO VERDICT — `bare` and `inert` cannot be compared, and making them
+//                         comparable means a template with no static attribute.
 //
-// The cross-check that makes the injection figure trustworthy is arithmetic rather than a repeat:
-// `no-forward - inert` is one injection plus `ngOnChanges` at 71.6 ms, and `minimal - inert` minus
-// the two-injection delta lands at 71.5. Two paths to the same number through different arms.
+// AND THE WHOLE FILE NOW DISAGREES WITH THE ARM IT WAS BUILT TO AIM, BY ~7x. `minimal` against
+// `bare` is ~1.0 us/element here, while `angular-elements-suite.itest.ts` against
+// `angular-suite.itest.ts` is 227.6 - 158.2 = 69 ms over 10 000 elements, i.e. ~6.9 us. Same
+// question, two instruments, one order of magnitude apart.
+//
+// The suspect is the RUNTIME: vitest is V8 and the itest harness is JavaScriptCore. Until that is
+// settled, size a directive change on the ITEST arm and use this file for SHAPE only — which of two
+// spellings is dearer, not by how much. (Their censuses also differ: the itest arm carries
+// `unchanged=3000` where the bare one carries 0, so part of that 69 ms is redundant writes rather
+// than directives.)
 //
 // THE CONTROL PAIR WAS NEVER ENOUGH, and that is the root of every reversal in this file's history.
 // It answers "how far apart do two IDENTICAL arms land in ONE run" — a real question, and not the
@@ -91,6 +98,7 @@ import {
   ElementRef,
   Input,
   Renderer2,
+  enableProdMode,
   inject,
   signal,
   type OnChanges,
@@ -110,6 +118,12 @@ import { ViewElement } from './elements';
 // scheduling rather than by the work, so it grows far slower than the signal does; the floor is what
 // says whether that worked, and it is printed for exactly that reason.
 const ELEMENTS = 10000;
+
+// BEFORE ANY ARM IS DEFINED, because a component definition reads the flag when it is built and a
+// directive reads it on every injection. Vitest isolates per file, so this settles Angular for this
+// process alone.
+enableProdMode();
+
 const fabric = installRecordingFabric();
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
