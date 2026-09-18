@@ -852,7 +852,23 @@ dynamic foldTouchableHighlightUnderlay(
     const dynamic &props,
     const dynamic &authored,
     const ISelf &self) {
-  if (!self.underlayShown || !self.hasAnyPressListener) return props;
+  // RN's snapshot affordance (`TouchableHighlight.js:61,189,284-286`): it paints the underlay with no
+  // gesture, and `_hideUnderlay` returns early on it, so the pin LATCHES. Both halves are this one
+  // expression — a rule that ignores the live bit needs nothing from the machine to stay latched.
+  //
+  // IT BYPASSES THE PRESS-HANDLER GATE, and that asymmetry is upstream's rather than an oversight.
+  // `_showUnderlay` checks `_hasPressHandler` (`:271`), but the INITIAL state is
+  // `testOnly_pressed === true ? this._createExtraStyles() : null` with no such check — so a
+  // decorative control still snapshots pressed, which is what a snapshot of one needs. Reproducing
+  // the gate here would look more consistent and be wrong.
+  //
+  // READ OFF `authored`, which matters here rather than being a habit: this runs after
+  // `foldPressableProps`, which strips the name (`kPressableMachineKeys`) so it never reaches
+  // Fabric. Read from the bag it would already be gone. Trap A, in the form where the rule that
+  // erases a key and the rule that uses it are two different rules.
+  const bool forced = boolAt(authored, "testOnly_pressed").value_or(false);
+  if (!forced && (!self.underlayShown || !self.hasAnyPressListener))
+    return props;
 
   dynamic underlay = dynamic::object();
   const dynamic *color = authored.get_ptr("underlayColor");
@@ -1560,7 +1576,11 @@ dynamic foldButtonProps(
  * `hitSlop` is deliberately NOT here and belongs to the same prop family — it is a real native View
  * prop Fabric reads. `pressRetentionOffset` beside it is not.
  */
-const std::array<const char *, 9> kPressableMachineKeys = {
+const std::array<const char *, 10> kPressableMachineKeys = {
+    // RN's snapshot affordance (`Pressable.js:151,222`, `TouchableHighlight.js:61`). A JS-side
+    // testing prop that no ViewConfig declares — listed here rather than erased by the one rule that
+    // READS it, because all four tags carry the prop and only one paints from it.
+    "testOnly_pressed",
     // Consumed below and replaced by the resolved `nativeBackgroundAndroid` /
     // `nativeForegroundAndroid`; the raw config is not a native prop.
     "android_ripple",

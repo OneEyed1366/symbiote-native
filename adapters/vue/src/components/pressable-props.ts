@@ -49,6 +49,10 @@ export interface IPressableProps extends IAccessibilityProps, IAriaProps {
   focusable?: boolean;
   cancelable?: boolean;
   hitSlop?: IRectOffset;
+  // RN's snapshot affordance (`Pressable.js:151`, `TouchableHighlight.js:61`): render the control in
+  // its pressed state with no gesture, so a test can capture it. Consumed by the engine and stripped
+  // before the payload — no ViewConfig declares it.
+  testOnly_pressed?: boolean;
   pressRetentionOffset?: IRectOffset;
   unstable_pressDelay?: number;
   // RN's Pressability minPressDuration floor. Readable rather than private: a tag has no internal

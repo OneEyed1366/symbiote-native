@@ -34,7 +34,10 @@
 // a browser keeps it too. `core/components/src/behaviors/touchable-highlight.test.ts` still owns
 // every one of those cases and none of them moved.
 
-import { registerTouchableHighlightBehavior } from '@symbiote-native/components';
+import {
+  registerPressableBehavior,
+  registerTouchableHighlightBehavior,
+} from '@symbiote-native/components';
 
 import {
   committedPayloadOf,
@@ -58,6 +61,7 @@ const DEFAULT_CHILD_OPACITY = 0.85;
 let nextRootTag = 8800;
 
 registerTouchableHighlightBehavior();
+registerPressableBehavior();
 
 const TOUCH: ISymbioteEvent = {
   nativeEvent: { pageX: 0, pageY: 0, locationX: 0, locationY: 0 },
@@ -268,6 +272,107 @@ describe('what a pressed touchable-highlight sends native', () => {
 
     expect(payload.underlayColor).toBe(undefined);
     expect(payload.activeOpacity).toBe(undefined);
+  });
+
+  // why: `testOnly_pressed` is RN's documented way to snapshot a pressed control
+  // (`TouchableHighlight.js:61, 189`), and we supported it NOWHERE until 2026-09-18 — a real
+  // `<adapters_reach_full_feature_parity>` gap, found while reading the vendor for the underlay port
+  // and deliberately left to its own commit so the port stayed a pure move.
+  //
+  // It is a PROP, so the rule reads it like any other and the gap closes for every adapter at once.
+  it('paints from testOnly_pressed with no gesture at all', () => {
+    const payload = touchable({
+      underlayColor: '#ff0000',
+      activeOpacity: 0.25,
+      testOnly_pressed: true,
+    }).payload();
+
+    expect(payload.backgroundColor).toBe(0xff_ff_00_00);
+    expect(payload.opacity).toBe(0.25);
+  });
+
+  // why: THE ASYMMETRY IS UPSTREAM'S AND IT IS EASY TO MISS. `_showUnderlay` gates on
+  // `_hasPressHandler` (`:271`), but the INITIAL state does not — `state.extraStyles` is
+  // `testOnly_pressed === true ? this._createExtraStyles() : null` (`:187-190`), with no such check.
+  // So a decorative TouchableHighlight with no callbacks still snapshots pressed, which is what a
+  // snapshot test of a disabled-looking control needs. Reproducing the gate here would look more
+  // consistent and be wrong.
+  it('paints from testOnly_pressed even with no press handler', () => {
+    const payload = touchable(
+      { underlayColor: '#ff0000', testOnly_pressed: true },
+      { withPressHandler: false },
+    ).payload();
+
+    expect(payload.backgroundColor).toBe(0xff_ff_00_00);
+  });
+
+  // why: `_hideUnderlay` returns early on `testOnly_pressed` (`:284-286`), so the underlay LATCHES —
+  // a full gesture must not clear it. Without this the snapshot is stable only until something
+  // touches the control, which is precisely when a test would look.
+  it('latches the underlay on across a whole gesture', async () => {
+    const subject = touchable({
+      underlayColor: '#ff0000',
+      testOnly_pressed: true,
+    });
+    expect(subject.pressIn().backgroundColor).toBe(0xff_ff_00_00);
+
+    subject.pressOut();
+    await new Promise(resolve => setTimeout(resolve, 250));
+
+    expect(subject.payload().backgroundColor).toBe(0xff_ff_00_00);
+  });
+
+  // why: no ViewConfig declares it — it is a JS-side testing affordance, not a native prop — so it
+  // must be stripped like the two feedback props beside it.
+  it('sends testOnly_pressed nowhere near native', () => {
+    const payload = touchable({ testOnly_pressed: true }).payload();
+
+    expect(payload.testOnly_pressed).toBe(undefined);
+  });
+
+  // why: PRESSABLE'S HALF OF THE SAME PROP, and it is a different mechanism rather than the same one
+  // on another tag. TouchableHighlight PAINTS from it, so a C++ rule serves it; Pressable SEEDS its
+  // pressed state (`Pressable.js:222`, `usePressState(testOnly_pressed === true)`), which selects
+  // `activeStyle` and any `:active` class — resolution that lives in JS because a class name resolves
+  // against a JS registry. So the behavior seeds it and `setNodePressed` does the rest.
+  //
+  // SEEDED, not tracked, exactly as upstream: `usePressState`'s argument is an initial value, so a
+  // later change of the prop does not re-seed there either. Matching that is the point.
+  it('seeds a pressable pressed state from testOnly_pressed', () => {
+    const rootTag = (nextRootTag += 1);
+    const surface = createSurface(rootTag);
+    const node: ISymbioteNode = createElement('RCTView', false, 'pressable');
+    routeProp(node, 'style', { opacity: 1 });
+    routeProp(node, 'activeStyle', { opacity: 0.4 });
+    routeProp(node, 'testOnly_pressed', true);
+    surface.appendChild(node);
+    surface.commit();
+    mounted();
+    // The seed lands in `attachAfterCommit`, so the pressed style is committed on the NEXT pass —
+    // one commit later than a paint rule would be, which is the honest cost of reading a prop from a
+    // hook that runs after props exist. A test flushes; a human never sees the first frame.
+    surface.commit();
+    mounted();
+
+    expect(committedPayloadOf(node)?.opacity).toBe(0.4);
+    expect(committedPayloadOf(node)?.testOnly_pressed).toBe(undefined);
+  });
+
+  // why: the control for the case above. Without it, a rule that simply always took `activeStyle`
+  // would pass — and every pressable on every screen would render permanently pressed.
+  it('leaves a pressable unpressed without the prop', () => {
+    const rootTag = (nextRootTag += 1);
+    const surface = createSurface(rootTag);
+    const node: ISymbioteNode = createElement('RCTView', false, 'pressable');
+    routeProp(node, 'style', { opacity: 1 });
+    routeProp(node, 'activeStyle', { opacity: 0.4 });
+    surface.appendChild(node);
+    surface.commit();
+    mounted();
+    surface.commit();
+    mounted();
+
+    expect(committedPayloadOf(node)?.opacity).toBe(1);
   });
 
   // why: the bit goes BACK. The hold timer is JS's and runs past release, so this drives `press` then

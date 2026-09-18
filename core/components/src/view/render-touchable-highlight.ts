@@ -34,6 +34,10 @@ export interface ITouchableHighlightUnderlayView {
   hasPressHandler: boolean;
   underlayColor?: string;
   activeOpacity?: number;
+  // RN's snapshot affordance (`Pressable.js:151`, `TouchableHighlight.js:61`): render the control in
+  // its pressed state with no gesture, so a test can capture it. Consumed by the engine and stripped
+  // before the payload — no ViewConfig declares it.
+  testOnly_pressed?: boolean;
 }
 
 // undefined = paint nothing extra, which is RN's `extraStyles: null` state.

@@ -1608,6 +1608,29 @@ export function routeProp(
     pushClassStyle(node, parts);
     return;
   }
+  // RN's snapshot affordance (`Pressable.js:222` seeds `usePressState` with it): render the control
+  // pressed with no gesture. It selects `activeStyle` and any `:active` class, which is exactly what
+  // `isPressed` already decides — so it belongs beside `activeStyle` rather than in a behavior.
+  //
+  // HERE RATHER THAN IN `attachAfterCommit`, and the census caught the difference. A behavior hook
+  // reading this prop costs a post-commit WAITER on every pressable in the app — a real boundary
+  // crossing per node, which `adapters/solid/src/crossing-and-payload-census.probe.test.tsx` budgets
+  // at two and which went to six. This branch crosses nothing: it is one string compare on a write
+  // that already reached the tail of `routeProp`, and it lands on the FIRST commit rather than the
+  // second. A JS compare is not a crossing, and weighing it as one is what sent the first attempt to
+  // the wrong seam.
+  //
+  // TouchableHighlight's half of the same prop is NOT here: it PAINTS an underlay, so it is a rule
+  // in `SymbioteFabricProps.cpp`. Two mechanisms, one prop name, because that is what upstream has.
+  // A SIDE EFFECT AND A PASSTHROUGH, not a consume, and the difference is load-bearing in both
+  // directions. The pressed state is set here; the prop ALSO goes on to `node.props`, because
+  // TouchableHighlight's rule reads it off the authored bag to paint its underlay
+  // (`foldTouchableHighlightUnderlay`). Returning early — the first spelling — left that rule blind
+  // and turned three of its cases red. Keeping it out of the PAYLOAD is a separate job and already
+  // done, by `kPressableMachineKeys` in `SymbioteFabricProps.cpp`.
+  //
+  // The same shape `GATED_EVENT_PROPS` uses above: act, then let the write continue.
+  if (key === 'testOnly_pressed') setNodePressed(node, resolved === true);
   if (isOnEventName(key)) {
     // A native-driven `Animated.event` needs the native module as well as the listener map, and
     // registers under the PROP name — see `bindAnimatedEvent`, which no-ops for anything else.

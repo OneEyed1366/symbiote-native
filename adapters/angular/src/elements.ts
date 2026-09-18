@@ -268,6 +268,9 @@ export class PressableElement extends SymbioteElement {
   pressRetentionOffset?: IAngularPressableProps['pressRetentionOffset'];
   @Input() unstable_pressDelay?: IAngularPressableProps['unstable_pressDelay'];
   @Input() android_ripple?: IAngularPressableProps['android_ripple'];
+  // ON THE BASE, so both touchables inherit it — the prop is Pressable's AND
+  // TouchableHighlight's upstream, and they extend this rather than repeat its surface.
+  @Input() testOnly_pressed?: IAngularPressableProps['testOnly_pressed'];
   @Input()
   android_disableSound?: IAngularPressableProps['android_disableSound'];
   @Input() hasTVPreferredFocus?: IAngularPressableProps['hasTVPreferredFocus'];

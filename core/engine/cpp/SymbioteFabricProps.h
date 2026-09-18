@@ -40,11 +40,24 @@ namespace symbiote {
  * fold's RULE was three ordinary inputs and one bit, so the bit crosses (`OP_SET_UNDERLAY_SHOWN`) and
  * the rule is `foldTouchableHighlightUnderlay` below.
  *
- * WHAT SEPARATES THE TWO IS RATE, not liveness. `shown` flips twice a tap, so a bit per flip is
- * cheaper than a fold per commit. `translateY` moves every frame while a finger drags, so the same
- * arrangement would be an op per frame to save a fold per frame — no trade at all. **"Live JS state"
- * on its own does not settle a fold's home; ask how often it changes against how often the node
- * commits.**
+ * THAT PARAGRAPH FIRST SAID THE DIFFERENCE WAS RATE — "`translateY` moves every frame while a finger
+ * drags" — AND IT IS WRONG, checked against the vendor an hour later. The value this fold commits is
+ * the DEBOUNCED one (`ScrollViewStickyHeader.js:144-159`, 15 ms on Android and 64 ms on iOS); the
+ * per-frame half rides an Animated graph and never passes through a fold at all. So sticky commits
+ * at roughly the rate a bit would cross, and rate does not separate them.
+ *
+ * WHAT ACTUALLY KEEPS IT HERE is that its fold is the DECLARATIVE HALF OF A PAIR. The smooth pin is
+ * an `AnimatedProps` leaf built in JS carrying `{transform, zIndex}`, written imperatively to the
+ * same node, and the fold carries the same `zIndex` so an imperative write cannot drop it
+ * (`behaviors/scroll-view/sticky.ts`). Move the fold's copy to a rule and the constant exists in C++
+ * AND in that props map — a real mirror, with a real reason, which is the shape this migration
+ * deletes rather than creates. The leaf is JS because `Animated` is; the fold is JS because the leaf
+ * is.
+ *
+ * So the open question is not "port the fold" but "should the sticky pin be native at all" — which is
+ * what a browser does (`position: sticky` is the engine's, with no page-side animated value) and is a
+ * project rather than a port. Recorded here so the next reader does not re-derive the rate argument
+ * and act on it.
  *
  * So a fold that is a property of the tag moves here; a fold that is a property of the instance
  * stays a JS closure and this side calls it. `SymbioteTree` supplies the wrapper; the cost is one
