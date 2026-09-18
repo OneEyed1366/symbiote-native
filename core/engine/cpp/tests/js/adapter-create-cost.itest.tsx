@@ -66,22 +66,34 @@
 // engine through a renderer of the same shape and thinness, and it lands at +31.3. Whatever is
 // generic about "a per-adapter renderer over this engine" is priced there.
 //
-// Bounding our side from the other direction, by inspection rather than by a clock: `setProperty`
-// adds an `isSurface` check, a `flushStyling` that reads two fields and returns, one counter
-// increment, one gated no-op, and a `requestCommit` that early-returns on a boolean after the very
-// first call of a turn (`surface.ts:181`). None of that is microseconds.
+// BOTH OF THOSE PARAGRAPHS WERE SUPERSEDED THE SAME DAY, and the 87 ms itself with them. Two
+// instruments landed that the text above says are impossible or unnecessary; each contradicted it.
 //
-// WHAT WOULD SETTLE IT is an arm with a no-op `RendererFactory2` — Angular's machinery running with
-// the host doing nothing — and `mount` does not allow that factory to be swapped. Worth building
-// only if the answer would change a decision; on this evidence it would not, because the residual
-// belongs to a framework this adapter consumes rather than implements.
+// FIRST, THE 87 ms WAS ~25 ms OF ANGULAR'S OWN COMPILER. Angular JIT-compiles a template on its
+// first mount, every arm here uses a component class of its own, and only one of them warmed up. On
+// device the adapter ships AOT, so that cost exists in this harness and nowhere the number is meant
+// to predict. Warmed, the delta over the engine-direct floor is 57-61 ms against React's 21-22 —
+// still the largest of the three reconcilers, and not the 4.7x the cold reading claimed. Every
+// Angular figure this file published before 2026-09-18 carries it; `warmAngular` is the fix.
 //
-// THE PER-ROW COMPONENT IS ~26-40 us AN INSTANCE, NOT 81, and the difference is the same dev switch.
-// `CLAUDE.md` carries 81 us from a device A/B that inlined the row and re-ran; that predates
-// `settleAngularDevMode`. Measured here in one process, both spellings, census identical on every
-// run (nodes=10003, created=10002, setProps=13003): 25.6 / 30.3 / 38.1 / 39.7 us. One run read
-// 108.3 with both arms at three times their usual wall, which is a busy machine rather than a
-// finding — the arms are re-run rather than averaged for exactly that reason.
+// SECOND, THE NO-OP FACTORY WAS BUILDABLE AFTER ALL — `SymbioteRenderer` is exported, so its
+// PROTOTYPE can be patched for one arm and restored in a `finally`, which needs no seam in `mount`.
+// It says Angular's machinery with the host doing nothing is 23-29 ms of a ~134 ms create. The
+// paragraph above declined to build it on the grounds that the answer would not change a decision;
+// it changed two, because it is what made the compiler visible and what bounded our own share.
+//
+// AND THE INSPECTION BOUND WAS RIGHT FOR THE WRONG REASON — "none of that is microseconds" happens
+// to hold, but it was a guess dressed as an argument, and a third arm settles it with a clock:
+// `createElement` and `appendChild` replaced by the leanest spelling that still builds the identical
+// tree cost 3.5 / -2.4 / -0.6 ms against the real pair. Zero. The counters, the alias lookup, the
+// anchor probe, the `isDebug` reads, the text-placement assert, `toPublicInstance` and the commit
+// request are together unmeasurable, so there is nothing left to cut in the structural path.
+//
+// THE PER-ROW COMPONENT READS 13-42 us AN INSTANCE ACROSS RUNS and therefore carries no verdict at
+// one sample. An earlier reading of this file published 21.9 as a finding; that method was
+// contaminated by the compiler, but the VALUE sits inside the warm spread, so what is corrected is
+// the confidence and not the number. The bound survives: it is well under `CLAUDE.md`'s 81 us, which
+// was taken on device with dev mode on.
 //
 // A REGISTERED COMPOSED COMPONENT COSTS ONE ANCHOR PER INSTANCE and that half IS ours:
 // `rendererCreates` reads 11 002 against the inlined arm's 10 002. It does not reach the commit
@@ -97,6 +109,7 @@ import { CUSTOM_ELEMENTS_SCHEMA, Component, Input } from '@angular/core';
 import { h as vh, mount as mountVue } from '@symbiote-native/vue';
 import {
   SYMBIOTE_ELEMENTS,
+  SymbioteRenderer,
   mount as mountAngular,
   readAngularProfile,
   registerComposedComponent,
@@ -111,8 +124,10 @@ import {
   readSurfaceTelemetry,
   registerRules,
   routeProp,
+  SymbioteSurface,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
+import { descriptorFor } from '@symbiote-native/components';
 import { flushOps } from '@symbiote-native/engine/tree-host';
 import { mount } from '@symbiote-native/react';
 
@@ -800,6 +815,40 @@ describe('what a reconciler adds to a create', () => {
     expect(nodes).toBe(engineArm.nodes);
   });
 
+  // ANGULAR JIT-COMPILES A TEMPLATE ON ITS FIRST MOUNT, and every arm below uses a component class
+  // of its own — so an arm that mounts cold charges its own one-time compile to the create it is
+  // timing. Neither of the other reconcilers has an analogue, and neither does the device: the
+  // adapter ships AOT (`@angular/compiler-cli/linker/babel`), so this cost exists in this harness
+  // and nowhere the numbers are meant to predict. One discarded mount puts the clock on the
+  // compiled template.
+  //
+  // It was worth ~25 ms on the ten-node row, which is a quarter of the arm and larger than any
+  // optimisation this file has priced: the ladder arm read 163.9 ms cold against the split case's
+  // 130-141 ms for the SAME component, and the split case was the only one that warmed up. Every
+  // Angular figure this file published before 2026-09-18 carries it, including the 92.5 ms delta
+  // over the engine-direct floor — read that one as ~63 ms.
+  //
+  // The cross-arm CHANNEL deltas were contaminated more subtly: both sides paid a compile, so it
+  // cancels only to the extent that two different templates cost the same to compile, which nothing
+  // guaranteed.
+  // IT MUST COMMIT, and leaving that out is not a slower warm-up but a wrong NEXT arm: an uncommitted
+  // mount's writes stay pending and land in whatever commits next. The structure case caught it by
+  // its census — its engine arm read `setProps` 2004 against the 1002 it builds, exactly the warm
+  // mount's own — which is the census-before-milliseconds rule paying for itself on this file's own
+  // instrument rather than on a measurement.
+  function warmAngular(component: typeof AngularCreateArm): void {
+    unmountAngular(ROOT_TAG);
+    const surface = mountAngular(ROOT_TAG, component);
+    flushTimers();
+    surface.commit();
+    mounted();
+    // AND IT MUST DRAIN BOTH LEDGERS, for the same reason it must commit: the surface's counters
+    // survive an `unmountAngular`, so a warm mount's 1 002 `setProps` are still standing when the
+    // next arm reads them as its own.
+    readSurfaceTelemetry(ROOT_TAG);
+    readAngularProfile();
+  }
+
   // why: the six-column ruler puts Angular's BARE arm at ~15.8 us per node against Solid's 9.5 and
   // stock's 8.9 — a gap the same size as what a matched directive costs, and one nobody has split
   // since Angular's dev mode was turned off. Everything measured about this adapter before that
@@ -811,6 +860,7 @@ describe('what a reconciler adds to a create', () => {
     // down ten thousand nodes of Angular is not free — left inside the timed region it lands on the
     // NEXT arm's wall. The propless arm at the end of this file read 176.7 ms against the bound
     // arm's 157.1, which is impossible as work and was entirely this.
+    warmAngular(AngularCreateArm);
     unmountAngular(ROOT_TAG);
     // Zeroed, so what follows is this mount's alone.
     readAngularProfile();
@@ -870,7 +920,14 @@ describe('what a reconciler adds to a create', () => {
   // pays seven renderer calls a row where any other binding pays one. If that is where the time is,
   // then claiming `[style]` as a directive input is worth what the directive costs, and the two
   // findings have to be read together rather than separately.
+  //
+  // IT READ 36.2 ms COLD AND IS 12.6-14.0 ms WARM — the channel is real and a third of what this
+  // case first published. Both arms compiled a template inside their own clock, and the compiles did
+  // not cancel: the ladder arm's landed on Angular's side of the subtraction and this one's came off
+  // it. A shared cost only cancels when the two sides pay the SAME amount of it, which two different
+  // templates never guarantee.
   it('prices angular style bindings against the same objects on a plain prop', () => {
+    warmAngular(AngularStyleChannelArm);
     unmountAngular(ROOT_TAG);
     readAngularProfile();
     const startedAt = performance.now();
@@ -929,11 +986,199 @@ describe('what a reconciler adds to a create', () => {
     expect(committedTags().length).toBe(10_003);
   });
 
+  // why: THE SPLIT THIS FILE HAS DEFERRED THREE TIMES — how much of Angular's 87 ms is OUR renderer
+  // and how much is Angular's own template execution. The header has bounded our side by inspection
+  // and by the Vue row, and twice concluded "the residual is Angular's". That conclusion was reached
+  // the same way the injection conclusion was, and that one reversed the moment it was measured on
+  // the right runtime.
+  //
+  // `SymbioteRenderer` is exported, so its PROTOTYPE can be emptied for one arm and put back — no
+  // `mount` seam, no production change. Angular then runs its whole machinery and the host does
+  // nothing, which is the arm the header says would settle it.
+  //
+  // WHAT THIS ARM IS NOT: a workload. It commits no tree, so its census is empty by construction and
+  // every oracle in this file would refuse it. It is read for ONE number — the wall — and only as a
+  // lower bound on Angular's own share. The repo has taken exactly this shape before, in
+  // `stock-swap-cost`'s no-op `insertBefore`, with the same caveat attached.
+  it('bounds how much of the angular delta is the renderer rather than angular', () => {
+    const patched = [
+      'createElement',
+      'createComment',
+      'createText',
+      'appendChild',
+      'insertBefore',
+      'removeChild',
+      'setProperty',
+      'setAttribute',
+      'setStyle',
+      'addClass',
+      'removeClass',
+      'setValue',
+      // THE READS TOO, and leaving them out is what the first spelling got wrong: Angular asks the
+      // renderer where a node's parent and next sibling are, and those answers come from the ENGINE
+      // — which has never heard of the bare `{}` a no-op `createElement` hands back. It failed with
+      // `parentOf: names a node this batch never created`, which reads as an engine bug and is not.
+      'parentNode',
+      'nextSibling',
+      'destroyNode',
+    ] as const;
+    const prototype: Record<string, unknown> = SymbioteRenderer.prototype;
+    const original = new Map<string, unknown>();
+    for (const name of patched) original.set(name, prototype[name]);
+
+    // A WARM-UP MOUNT BEFORE ANY CLOCK. Angular JIT-compiles a component's template on first use,
+    // and whichever arm runs first pays it — which would be the real arm here, inflating exactly the
+    // number this case is about. One discarded mount puts both arms on the compiled template.
+    unmountAngular(ROOT_TAG);
+    mountAngular(ROOT_TAG, AngularCreateArm);
+    flushTimers();
+    mounted();
+
+    const timeReal = (): { wall: number; nodes: number } => {
+      unmountAngular(ROOT_TAG);
+      const startedAt = performance.now();
+      const surface = mountAngular(ROOT_TAG, AngularCreateArm);
+      flushTimers();
+      surface.commit();
+      const wall = performance.now() - startedAt;
+      mounted();
+      return { wall, nodes: committedTags().length };
+    };
+
+    const before = timeReal();
+    const realWall = before.wall;
+    const realNodes = before.nodes;
+
+    // A fresh object per create, because Angular passes the result straight back into the other
+    // methods and a `undefined` host node throws before the template finishes.
+    for (const name of patched) {
+      prototype[name] =
+        name === 'createElement' ||
+        name === 'createComment' ||
+        name === 'createText'
+          ? (): object => ({})
+          : name === 'parentNode' || name === 'nextSibling'
+            ? (): null => null
+            : (): void => {};
+    }
+    const noopWall = ((): number => {
+      try {
+        unmountAngular(ROOT_TAG);
+        const noopStartedAt = performance.now();
+        const noopSurface = mountAngular(ROOT_TAG, AngularCreateArm);
+        flushTimers();
+        noopSurface.commit();
+        return performance.now() - noopStartedAt;
+      } finally {
+        for (const name of patched) prototype[name] = original.get(name);
+      }
+    })();
+
+    // AND THE WRITE HALF ON ITS OWN. Only the prop-writing methods are emptied, so the tree is still
+    // built correctly and only its props are missing — which makes this the one PARTIAL no-op that
+    // holds together (emptying `createElement` alone hands a bare `{}` to a real `appendChild`).
+    // Real minus this is what every prop write costs end to end, ours and the engine's together.
+    const writeMethods = [
+      'setProperty',
+      'setAttribute',
+      'setStyle',
+      'addClass',
+      'removeClass',
+      'setValue',
+    ] as const;
+    for (const name of writeMethods) prototype[name] = (): void => {};
+    const writelessWall = ((): number => {
+      try {
+        unmountAngular(ROOT_TAG);
+        const startedAt = performance.now();
+        const surface = mountAngular(ROOT_TAG, AngularCreateArm);
+        flushTimers();
+        surface.commit();
+        const wall = performance.now() - startedAt;
+        mounted();
+        return wall;
+      } finally {
+        for (const name of writeMethods) prototype[name] = original.get(name);
+      }
+    })();
+
+    // AND THE STRUCTURAL HALF AGAINST ITS OWN FLOOR. `createElement` and `appendChild` are replaced
+    // by the LEANEST spelling that still builds the identical tree — resolve the descriptor, call the
+    // engine — so what the subtraction names is everything else those two methods do: the counters,
+    // the alias lookup, the anchor-registry probe, the `isDebug` reads, the text-placement assert,
+    // `toPublicInstance`, and the commit request. The tree is still correct, so the census is still
+    // an oracle, which is what makes this a bisect rather than another no-op arm.
+    //
+    // Arrow functions on purpose: the lean pair takes no `this`, so neither one can reach the
+    // renderer's private surface — and skipping `requestCommit` is not a hole, because this case
+    // commits explicitly and the scheduler's cost is part of what is being priced.
+    const structural = ['createElement', 'appendChild'] as const;
+    const lean = ((): { wall: number; nodes: number } => {
+      try {
+        prototype.createElement = (name: string): ISymbioteNode => {
+          const descriptor = descriptorFor(name);
+          return createElement(descriptor.component, descriptor.isText, name);
+        };
+        prototype.appendChild = (
+          parent: ISymbioteNode | SymbioteSurface | null,
+          child: ISymbioteNode,
+        ): void => {
+          if (parent === null) return;
+          if (parent instanceof SymbioteSurface) parent.appendChild(child);
+          else appendChild(parent, child);
+        };
+        unmountAngular(ROOT_TAG);
+        const startedAt = performance.now();
+        const surface = mountAngular(ROOT_TAG, AngularCreateArm);
+        flushTimers();
+        surface.commit();
+        const wall = performance.now() - startedAt;
+        mounted();
+        return { wall, nodes: committedTags().length };
+      } finally {
+        for (const name of structural) prototype[name] = original.get(name);
+      }
+    })();
+
+    // THE SECOND REAL READING IS THE CONTROL, and it is what says the middle arm was not simply
+    // running on a warmer machine: the real arm is measured on BOTH sides of the no-op one, and a
+    // gap between them is drift this case cannot see past.
+    const after = timeReal();
+    print(
+      `DEBUG renderer-split real=${realWall.toFixed(1)} / ${after.wall.toFixed(1)} ms ` +
+        `nodes=${realNodes} · host-does-nothing=${noopWall.toFixed(1)} ms · ` +
+        `ours+engine=${(Math.min(realWall, after.wall) - noopWall).toFixed(1)} ms · ` +
+        `structure-only=${writelessWall.toFixed(1)} ms · ` +
+        `all-prop-writes=${(Math.min(realWall, after.wall) - writelessWall).toFixed(1)} ms · ` +
+        `lean-structure=${lean.wall.toFixed(1)} ms · ` +
+        `our-structural-extras=${(Math.min(realWall, after.wall) - lean.wall).toFixed(1)} ms`,
+    );
+
+    // THE ONLY ORACLE AVAILABLE, and it is about the REAL arm: the no-op arm has no tree to assert.
+    // What this checks is that the prototype came back — a leaked no-op would make every later case
+    // in this file commit nothing while still passing its own clock.
+    expect(realNodes).toBe(10_003);
+    expect(after.nodes).toBe(10_003);
+    // The lean arm's own oracle: a stripped `createElement` that built a DIFFERENT tree would price
+    // a different workload, and a bare count is what catches it. The no-op arm has none to give.
+    expect(lean.nodes).toBe(10_003);
+  });
+
   // why: `CLAUDE.md` prices a per-row COMPONENT at ~81 us per instance — 81 ms on this row — and
   // that figure was taken on device with Angular's dev mode on, like every other pre-2026-09-18
   // measurement of this adapter. Both bench arms and the device screen write the row that way, so
   // if it is still 81 ms it is the single largest piece of Angular's remaining cost; if it is not,
   // a number the project plans around has expired. One process, both spellings, same tree.
+  //
+  // WARMED, THIS ROW CARRIES NO VERDICT AT ONE SAMPLE — 13.3 / 22.7 / 32.7 / 42.4 us across four
+  // consecutive runs, a threefold spread. Both arms mount an unwarmed component otherwise, and the
+  // INLINED one's template is the heavier to compile (the row's markup sits inside its `@for`), so
+  // the cold subtraction took a bigger compile off the cheaper side; warming removes that bias
+  // without narrowing the spread, which is a property of the quantity rather than of the fix.
+  //
+  // So the earlier 21.9 us reading here is NOT refuted as a value — it sits inside the warm spread —
+  // only its method was. What the row settles is a bound: the instance is well under `CLAUDE.md`'s
+  // 81 us, which was taken on device with dev mode on. Quoting a figure off it needs best-of-N.
   it('prices a per-row component against the same row inlined', () => {
     registerComposedComponent('BenchRowArm');
     const arms: readonly (readonly [string, typeof AngularCreateArm])[] = [
@@ -942,6 +1187,7 @@ describe('what a reconciler adds to a create', () => {
     ];
     const walls = new Map<string, number>();
     for (const [name, component] of arms) {
+      warmAngular(component);
       unmountAngular(ROOT_TAG);
       const startedAt = performance.now();
       const surface = mountAngular(ROOT_TAG, component);
@@ -1010,6 +1256,7 @@ describe('what a reconciler adds to a create', () => {
     const walls = new Map<string, number>();
     const writes = new Map<string, number>();
     for (const [name, component] of arms) {
+      warmAngular(component);
       unmountAngular(ROOT_TAG);
       readAngularProfile();
       const startedAt = performance.now();
@@ -1059,7 +1306,14 @@ describe('what a reconciler adds to a create', () => {
   // thousand elements, or Angular evaluating thirteen thousand bindings, and those want different
   // fixes. Neither arm binds anything, so the delta between them is Angular's structural overhead
   // alone — and the delta from each arm to its bound twin is what a binding costs on that side.
+  //
+  // WARMED, THIS ROW STOPPED CARRYING A VERDICT, and that is the honest reading rather than a
+  // regression. Cold it reported a steady 38.7 ms because the compile dominated it; warmed it reads
+  // 7.3 and 20.7 ms on consecutive runs, a spread wider than the quantity. What the pair still
+  // settles is an upper bound — Angular's structural overhead is small next to its 57-61 ms total,
+  // which is what rules structure out as the place to look. Quoting a figure off it needs best-of-N.
   it('prices the same tree with nothing bound, engine and angular', () => {
+    warmAngular(AngularStructureArm);
     unmountAngular(ROOT_TAG);
     const surface = createSurface(ROOT_TAG);
     const engineStartedAt = performance.now();
