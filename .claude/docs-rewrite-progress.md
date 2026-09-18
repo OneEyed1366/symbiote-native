@@ -1,5 +1,28 @@
 # Docs rewrite for the C++ buffer architecture — progress tracker
 
+## State as of the 6th pass — read this first
+
+The high-signal work is done: every place that described the retired JS-only engine as current
+is fixed (pass 1-2), plus real factual drift the same sweep surfaced along the way — stale npm
+version/package-count numbers, a stale milestone status, and a real internal contradiction about
+Solid's device-verification status that existed in 5 separate files (passes 3-5, the last one
+corrected directly by the user: **all 5 adapters are device-verified, full stop**).
+
+Quick sanity checks this pass (no changes needed, all confirmed accurate): no `reanimated`
+package exists (matches `M5.3: planned`), no `create-symbiote` scaffolder exists (matches the DX
+row), all 6 `examples/*` have an `android/` directory (matches "Android at canary parity").
+
+**If resuming: don't keep re-deriving scope from zero.** The remaining ~130 unfixed files are
+mostly narrow, low-traffic, and were already spot-checked clean (see passes 1-2's per-group
+sweeps). Further passes have sharply diminishing returns per grep — pick ONE of:
+(a) a genuine prose/structure quality pass against Diátaxis on the highest-traffic pages
+(README, quick-start, index) rather than more fact-hunting, or
+(b) spot-check a random sample of the long-tail package READMEs rather than grepping for the same
+patterns again, or
+(c) if truly nothing new turns up in two consecutive passes, say so plainly instead of manufacturing
+smaller and smaller findings to justify continuing.
+
+
 Task: every tracked `.md`/`.mdx` file in this repo must describe the current architecture
 (retained tree + platform-parity rules now in C++, `core/engine/cpp/SymbioteTree.cpp` +
 `SymbioteFabricProps.cpp`, JS side reduced to a command buffer) accurately — this branch is
