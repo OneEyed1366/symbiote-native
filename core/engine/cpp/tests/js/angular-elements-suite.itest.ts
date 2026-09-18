@@ -17,6 +17,30 @@
 // keeps an arm from paying for its neighbour's warm-up.
 //
 // RUN ON `build-release` (`pnpm run bench:itest`).
+//
+// AND RUN THE ARMS ONE AT A TIME when the numbers are meant to be compared. `pnpm run bench:itest`
+// fills `availableParallelism()` slots, so seven suites contend: measured 2026-09-18, the same
+// sitting read stock 107.4 / ng-elements 264.9 in one parallel run and stock 88.6 / ng-elements
+// 234.5 sequentially. The RATIO survives that and the absolute numbers do not, so a figure quoted
+// off a parallel run is not on the same ruler as one quoted off a sequential one.
+//
+// ONE RULER, sequential, one process per arm, `build-release`, 2026-09-18 — AFTER `mount()` began
+// turning Angular's dev mode off in a release bundle (`render/index.ts`, `settleAngularDevMode`):
+//
+//              stock  react    vue  solid svelte  angular  ng-elements
+//   create      88.6  103.6  138.1   94.7  104.7    147.9        234.5
+//   replace     99.8  111.6  151.9  108.0  123.2    161.9        246.9
+//   append     123.2  112.9  141.5  106.9  116.8    149.5        235.6
+//
+// Both Angular arms moved with that one change, because both mount through the same function:
+// ng-elements ~292 -> ~234 and the bare arm ~178 -> ~148, census byte-identical on both
+// (created=10000 setProps=10000 unchanged=3000 nodes=10003) and walk/apply/fabric/layout unmoved.
+// So ng-elements is 2.65x stock where it was 3.19x, and the whole delta is pass 1.
+//
+// WHAT IS LEFT is the 86.6 ms between the two Angular arms — the directives themselves, ~8.7 us per
+// element. `adapters/angular/src/directive-shape-cost.probe.test.ts` takes that apart, but read its
+// caveat first: it runs under vitest, where Angular's dev mode is still ON, so its per-injection
+// figure is a dev-mode one and is larger than what this arm now pays.
 
 import '@angular/compiler';
 import { Component, Input, signal } from '@angular/core';

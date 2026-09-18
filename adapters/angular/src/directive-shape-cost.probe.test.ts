@@ -24,6 +24,14 @@
 // it was supposed to capture stayed `undefined`. The one survivor is the setter row, whose pair
 // happens to agree at 30 001.
 //
+// EVERY FIGURE BELOW IS A DEV-MODE ANGULAR FIGURE, and that is not a caveat this file can remove.
+// It runs under vitest, which defines no `__DEV__`, so `mount()`'s `settleAngularDevMode` never
+// fires and `initNgDevMode` leaves Angular's assertions armed — including the branch that makes an
+// injection expensive in the first place (`di.ts:525` builds a `new NodeInjector` and emits two
+// profiler events PER INJECTION). Turning that off moved the real arm 292 -> 234 ms, so the
+// per-injection cost this file measures is LARGER than what a release bundle pays. The shape of
+// each finding survives; the size does not, and nothing here should be quoted as a device figure.
+//
 // WHAT IT ANSWERS NOW, at 10 000 elements, every row read only against a pair whose census agrees:
 //
 //   one injection         ~4.2 us/element. `minimal` against `one-inject` reads 76-97 ms over TWO of
