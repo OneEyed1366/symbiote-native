@@ -30,6 +30,7 @@
 import {
   registerButtonBehavior,
   registerPressableBehavior,
+  registerTextInputBehavior,
   registerTouchableNativeFeedbackBehavior,
 } from '@symbiote-native/components';
 
@@ -50,6 +51,9 @@ const ROOT_TAG = 1;
 registerPressableBehavior();
 registerButtonBehavior();
 registerTouchableNativeFeedbackBehavior();
+registerTextInputBehavior();
+
+const SINGLELINE = 'RCTSinglelineTextInputView';
 
 function commitOne(
   viewName: string,
@@ -265,6 +269,40 @@ describe('the rules that only an Android build compiles', () => {
     // Neither name may reach Fabric raw: no ViewConfig declares them, so a leak is silent.
     expect(payload?.background).toBe(undefined);
     expect(payload?.useForeground).toBe(undefined);
+  });
+
+  // why: `underlineColorAndroid` defaults to `'transparent'` HERE and is emitted nowhere else
+  // (F-76): iOS's `RCTSinglelineTextInputView` ViewConfig does not declare it, so RN's own payload
+  // builder filters it out and we must not spend a wire slot on it. The iOS twin asserts its
+  // ABSENCE (`text-input-payload.itest.ts`, "sends no alias and no android-only key"); this is the
+  // half that had no home until the arm existed.
+  it('defaults a text input underline to transparent', () => {
+    const payload = commitOne(SINGLELINE, 'text-input', { text: 'input 0' });
+
+    expect(payload.underlineColorAndroid).toBe(0x00_00_00_00);
+  });
+
+  // why: the default must not be hardcoded PAST an explicit choice — a designer who wants the
+  // underline back must be able to ask for it. The `??` is the whole rule and a port that wrote
+  // unconditionally would pass the case above and fail only on a device.
+  it('lets an authored underline colour win', () => {
+    const payload = commitOne(SINGLELINE, 'text-input', {
+      underlineColorAndroid: '#00ff00',
+    });
+
+    expect(payload.underlineColorAndroid).toBe(0xff_00_ff_00);
+  });
+
+  // why: `search` is the ONE `inputMode` token RN resolves per platform (TextInput.js:815-825) —
+  // iOS has a dedicated search keyboard whose return key is a magnifier and Android has none, so it
+  // falls back to the default. Every other token is platform-invariant and asserted on the iOS arm;
+  // this is the only row where the two builds must disagree, which is what makes it worth an arm.
+  it('falls the search keyboard back to the default', () => {
+    const payload = commitOne(SINGLELINE, 'text-input', {
+      inputMode: 'search',
+    });
+
+    expect(payload.keyboardType).toBe('default');
   });
 });
 
