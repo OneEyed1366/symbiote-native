@@ -2488,6 +2488,45 @@ nothing else reached them, and it cuts this way here. What is still arguably wro
 builder's CALL to it, which puts a platform rule back in the headless payload; removing that costs
 **27 cases across 16 files**, measured, so it is its own piece with its own argument.
 
+**THE CALL WENT ANYWAY, the same day, and the headless builder now holds NO platform rule at all.**
+The distinction above still stands — the FUNCTION stays, because `pickAccessibilityProps` folds a bag
+and then picks fields BY NAME, which it cannot do from a bag holding only `aria-label`. What was
+wrong was the payload builder calling it. 27 cases across 16 files, as measured.
+
+**IT DRAGGED A WRITE-ONLY FIELD OUT WITH IT, which is the part worth generalising.**
+`node.hasAriaAlias` existed to let the builder skip the fold on the ~99% of nodes carrying no alias,
+and `routeProp` maintained it with an `isAriaAliasKey(key)` on EVERY prop write — the hottest path in
+the engine, 13 000 writes on one benchmark create. With the fold gone nothing read it, and nothing
+would have noticed: a write-only field type-checks, tests green, and reads as load-bearing to the
+next person maintaining that line. **A field with a cost and no reader is worse than a slow one.**
+The field, both writers and `isAriaAliasKey` itself all went; the C++ recomputes the gate from the
+bag it already holds, which its own comment had said all along.
+
+Structurally inert on the bench suite — `setProps` 13000/9000/10000/10000/10000, `created=10000
+cloned=2 nodes=10003`, `folds=0`, every counter byte-identical. **No timing verdict and none is
+expected**: a boolean check over 13 000 writes is microseconds against a 150-400 ms create, and that
+sitting's wall clock swung ±60% in both directions between runs.
+
+**THE RE-AIM HAS ONE SHAPE ACROSS ALL 16 FILES, and it is sharper than what it replaced**: assert the
+AUTHORED, hyphenated key arrives. That is not a consolation claim — the rule reads `aria-label`
+literally, so a compiler that camelised or dropped it ends accessibility in silence, and Svelte's
+really does lowercase every static attribute name. Two cases kept their full force with only the key
+name changed: Solid's `withStableKeys` widening (its `spread` has no removal pass, so a prop going
+undefined can leave its key standing) is now watched on `aria-label`, **the key the spread actually
+holds** — the better place for it.
+
+**Two findings fell out that had nothing to do with the port:**
+
+- **React's `aria-fold-double-pass.test.tsx` never tested a double pass.** Its subject is real on
+  device — a wrapper folds, then the C++ rule folds again — but both of its cases mounted a BARE
+  `<view>`, which has no wrapper, so pass 1 never ran. Green for two passes while exercising one.
+  The claim moved to `aria-payload.itest.ts`, where both passes exist; it holds by CONSTRUCTION,
+  because pass 1 blanks its aliases and `recordSetProp` ERASES a key written `undefined` rather than
+  storing a null, so the gate sees them genuinely absent.
+- **Five Solid component files carried the same case copied**, each asserting the engine's rule
+  through a different component. One claim, five copies, and the `why:` on each said the fold happens
+  "in JS" — which had been false since the port.
+
 **Three things the writing of that file taught, none of which came from reading the rule:**
 
 - **A case can assert an inner rule while never satisfying the OUTER gate.** "Replaces the state
