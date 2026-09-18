@@ -6,9 +6,18 @@ with React Native's own renderer never in the path. It is the [`examples/vue-sfc
 app rewritten JSX-for-template — **same native shell, same engine, same components, only the
 authoring differs**. Together the two examples show the Vue slice is template-agnostic.
 
+The app boots into the `@symbiote-native/navigation` demo suite: `Menu` is the initial route, and
+its first row pushes into `Canary`, the "every `@symbiote-native/vue` primitive" screen this
+example started life as (its own former content, unchanged, just relocated once the app grew a
+real `Menu`).
+
 ```
 index.js          registers a RUNNABLE with RN's AppRegistry → mounts the Vue app via @symbiote-native/vue
-App.tsx           a Vue counter, authored as a defineComponent whose setup() returns a JSX render fn
+App.tsx           the native stack navigator, authored as a defineComponent whose setup() returns a JSX render fn
+routes.ts         route-name constants, shared by every registration and every push()
+navigation-lines.ts  the wayfinding palette (LINE_COLOR / ROUTE_LINE_INFO)
+navigation-linking.ts  the deep-link config, shared by the root wiring and the DeepLinking demo
+screens/          21 screens — CanaryScreen plus the tour stops and their nested children
 babel.config.js   @vue/babel-plugin-jsx compiles the JSX → @vue/runtime-core createVNode (before RN's React-JSX transform)
 metro.config.js   aliases 'vue' → @vue/runtime-core; pins one react + one runtime-core (no custom transformer)
 ```
@@ -27,16 +36,8 @@ a babel concern:
   `'vue'`→runtime-core string rewrite), so the app and the adapter share **one** Vue runtime —
   reactivity is a singleton, two copies would silently fail to react.
 
-So `<view onResponderRelease={onTap}>` compiles to `createVNode('view', { onResponderRelease: onTap })`;
-that `onX` key lands in `patchProp` → `routeProp` exactly as the SFC's `@responder-release` did.
-
-This exercises the same structural reconciler paths as the SFC: a `? :` ternary mounts/unmounts
-the spinner (Vue comment placeholder → our anchor node), `.map()` diffs a keyed list (Vue
-Fragment → empty-text anchors + engine `insertBefore` / `removeChild`), and a `computed` derives
-reactive text. The tap is the raw responder protocol (`onStartShouldSetResponder` +
-`onResponderRelease`), not `Pressable`. `ActivityIndicator` is the first `@symbiote-native/components`
-component — its render fn is shared verbatim with React; Vue supplies only the `descriptorToVue`
-bridge.
+So `<view onPress={onTap}>` compiles to `createVNode('view', { onPress: onTap })`; that `onX` key
+lands in `patchProp` → `routeProp` exactly as the SFC's `@press` does.
 
 Editing `babel.config.js` or `metro.config.js` needs a Metro cache reset
 (`npm start -- --reset-cache`); editing `App.tsx` does not.
@@ -54,9 +55,10 @@ npm run android
 # diagnostic logs:  DEBUG=1 npm start -- --reset-cache   (then run ios/android)
 ```
 
-Tap the box → the counter increments and a keyed row is prepended; the second box toggles the
-spinner. Every tap re-enters Vue's reactivity, which recommits through `@symbiote-native/engine` into
-Fabric — RN's renderer never involved.
+From the `Menu` screen, push into `Canary` and tap the counter card — that tap re-enters Vue's
+reactivity, which recommits through `@symbiote-native/engine` into Fabric, RN's renderer never
+involved. The other menu rows reach the navigator demos, the benchmark screen, and the style
+showcase.
 
 ## Note — shares the canary's native shell
 
