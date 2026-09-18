@@ -114,6 +114,7 @@ export {
 export {
   setTreeHost,
   treeHost,
+  registerBeforeFlush,
   readCommitProfile,
   readSurfaceTelemetry,
   setNativeDebug,

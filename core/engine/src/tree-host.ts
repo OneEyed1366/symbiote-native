@@ -232,7 +232,53 @@ export function treeHost(): ITreeHost | undefined {
  * `OP_COMMIT` reaches Fabric, and one is recorded solely by `commitSurfaceOps` below, immediately
  * before its own drain.
  */
+/**
+ * Adapters that COALESCE writes, given the last moment to record what they are holding.
+ *
+ * An adapter cannot always publish a write the instant its framework hands it over. Angular's
+ * styling engine has no whole-value call — `ɵɵstyleMap` delivers one key per `Renderer2.setStyle`
+ * — so the renderer accumulates the run and writes RN's one `style` prop once. That accumulator has
+ * to be emptied before anything can observe the tree, and the adapter cannot know when that is: a
+ * read and a commit both arrive from elsewhere.
+ *
+ * Both of them come through `flushOps`, which is what makes this the right seam and a cheap one — it
+ * is the single door in front of every drain, `commit` included.
+ *
+ * NOT A COMMIT HOOK. It fires before every read as well, so a listener must be idempotent and must
+ * do nothing when it holds nothing. It runs BEFORE the `hasPendingOps` check on purpose: a listener
+ * holding a write has ops that are not in the buffer yet, so an empty buffer is no reason to skip it.
+ */
+const beforeFlush = new Set<() => void>();
+
+export function registerBeforeFlush(listener: () => void): () => void {
+  beforeFlush.add(listener);
+  return () => beforeFlush.delete(listener);
+}
+
+// A listener records ops, and `routeProp` can reach a read on the way — which would re-enter here
+// and ask the same listener for what it has already handed over. One flag rather than per-listener
+// bookkeeping: the whole set is being drained, and re-entering any of it is the same mistake.
+let settling = false;
+
+/**
+ * Collect what the listeners are holding, WITHOUT draining.
+ *
+ * Separate from `flushOps` because a read may legitimately decide it needs no drain — `parentOf`
+ * skips one for a node whose placement is not pending — and skipping the drain must not also skip
+ * asking. A held write is still a write, and a reader that cannot see it is reading a stale tree.
+ */
+export function settleBeforeFlush(): void {
+  if (settling || beforeFlush.size === 0) return;
+  settling = true;
+  try {
+    for (const listener of beforeFlush) listener();
+  } finally {
+    settling = false;
+  }
+}
+
 export function flushOps(): void {
+  settleBeforeFlush();
   if (host === undefined || !hasPendingOps()) return;
   host.applyOps(takeBatch());
 }

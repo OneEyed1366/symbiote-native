@@ -35,7 +35,7 @@
 // calls `parentNode` exactly where its TNode/LView does not know. Pushing this into the adapters
 // would build three JS trees instead of the one being removed.
 
-import { flushOps, treeHost } from './tree-host';
+import { flushOps, settleBeforeFlush, treeHost } from './tree-host';
 import { hasPendingPlacement } from './mutation-buffer';
 import {
   functionPropOf,
@@ -70,6 +70,10 @@ const NO_CHILDREN: readonly ISymbioteNode[] = [];
  * exactly ONE of those reads was about a node the batch had touched.
  */
 export function parentOf(node: ISymbioteNode): ISymbioteNode | undefined {
+  // Asked FIRST and outside the gate: an adapter holding a coalesced write has ops that are not in
+  // the buffer yet, so the gate cannot judge this node until they are. A listener that re-places
+  // this very node lands it in `hasPendingPlacement` below, which is then read after the fact.
+  settleBeforeFlush();
   if (hasPendingPlacement(node)) flushOps();
   const parent = treeHost()?.parentOf(node);
   // A runtime guard, not a cast: the host stores handles as bare objects, and the brand is what says
