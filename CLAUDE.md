@@ -1887,6 +1887,33 @@ evidence of flakiness, it is evidence that something threw** — and "passes alo
 points at shared filesystem state, not at a build. Its corollary, learned here: **a race you closed
 is not the same claim as a test that stopped failing.** Say which one you have.
 
+**AND THE FIX WAS NEVER SWEPT — four more walks carried it, found by asking the repo rather than by
+waiting for the next failure (2026-09-18).** A different file went red the next day
+(`tests/dlog-argument-budget.test.ts`, again with no assertion in the message), which is what
+prompted the question. One line answers it, and it is worth keeping as the query:
+
+```
+\grep -rln "readdirSync" tests core adapters --include="*.ts" | \grep -v "/build/" |
+  while read f; do \grep -q "statSync" "$f" && ! \grep -q "withFileTypes" "$f" && echo "RACY: $f"; done
+```
+
+Five files, of which four were genuinely the pattern and now carry `withFileTypes`.
+**The fifth is the instructive one and was deliberately LEFT ALONE**:
+`adapters/svelte/src/host-tag-invariants.test.ts` already wraps its `statSync` in a
+`try`/`continue`, so it is race-proof by a different route — and it FOLLOWS symlinks on purpose,
+for a broken link inside `examples/svelte/ios/Pods`. `dirent.isDirectory()` is FALSE for a symlink,
+so converting it would have started collecting a broken `*.svelte` link instead of skipping it. **A
+mechanical sweep of a pattern is wrong wherever the pattern is load-bearing** — read what each
+`statSync` is FOR before replacing it.
+
+Two things this sweep settles about the shape itself. The window is a property of the WALK, not of
+the directory: `tests/build-output-has-no-orphans.test.ts` walks `build/**`, where no
+`.smoke-compiled-*` ever lands, and it is fixed anyway, because a walk that can throw ENOENT on an
+entry it was about to discard has no reason to. And **the second window — `readFileSync` on a listed
+path — cannot be collapsed into one syscall**, so it takes the labelled rethrow instead, the same
+treatment `load-time-registration.test.ts` gives its own `parse()`. Swallowing it would turn a count
+this guard exists to make into a quietly smaller one.
+
 ### The engine can WARN now — `SymbioteDebug.h`, and it was ScrollView's blocker
 
 Until 2026-09-18 the only channel out of `core/engine/cpp` was `throw jsi::JSError`: a rule could
@@ -2312,6 +2339,30 @@ And three tests were quietly measuring one thing twice. Each ran an `id` case ov
 `foldHostBag`-folded, because the adapters renamed in three different places; with one place left,
 `foldHostBag` returns its input and the two arms became one bag mounted twice. **A loop whose arms
 have converged reports agreement with itself** — collapsed rather than left green.
+
+### `foldHostBag` is GONE, and the deletion needed the break-test its own predecessor prescribed
+
+With the aliases moved to `routeProp`, the function's other half was `HOST_PRIMITIVES[*].defaults` —
+nineteen entries seeding a bag before it was written. It read as a leftover, and the section above
+had just established that reading-as-a-leftover is not a finding: **ask what it REACHES.**
+
+So the same instrument was used, and it answered the other way this time. Emptying `defaults` and
+running the whole itest suite produced **zero failures**, and the behavioural claim it looked like it
+was making turned out to live somewhere else entirely —
+`core/engine/cpp/tests/js/committed-payload.itest.ts:89`, "shows a text node the platform defaults no
+adapter writes", which commits an `RCTText` with `{}` and asserts `ellipsizeMode === 'tail'` and
+`allowFontScaling === true`. That is `applyTextDefaults` in the payload builder, which took over the
+job the day the seed was deleted from three adapters. The fold's copy had been dead since.
+
+**One fixture looked like the instrument and was not**, which is the trap worth naming: a Text arm
+whose bag authors both keys explicitly cannot go red when a DEFAULT disappears, however loudly it
+mentions them. An unchanged counter is evidence only once you have checked the fixture could have
+moved it.
+
+Four files and 664 lines went: the function, its tests, the Svelte shim's copy, React's host-config
+call, Angular's `textDefaultFor`, the `defaults`/`IFoldOp` half of `host-primitives.cjs`, and two
+package subpaths. **Seven implementations of the alias, then the bag fold itself — the whole
+mechanism, not just its users.**
 
 ### A derived node's tag never reached C++ — and ActivityIndicator is the first primitive at ZERO folds
 
