@@ -285,6 +285,30 @@ Lesson: after fixing a status word in the obvious places, re-grep the exact word
 than trusting the first sweep's file list — a comparison table is a place the same fact gets
 restated in a form the first search didn't anticipate.
 
+## Eighteenth pass — adapter-count self-consistency check finds a real cluster
+
+Following the pass-17 method (re-grep a specific fact globally instead of trusting the original
+file list), grepped for `\bfour adapters?\b` and `Vue/Svelte/Angular\b` (no Solid) across all
+tracked docs. Found `.claude/skills/symbiote-devtools-inspector/SKILL.md` genuinely omitted Solid
+in **6 separate places** — frontmatter `description` (twice: the trigger context and the trigger
+phrase list) plus 4 body mentions ("4 adapters", "React/Vue/Angular" parity-check step,
+"Vue/Svelte/Angular mutate the engine's retained tree", "Vue/Svelte/Angular apps" cosmetic
+limitation, "React, Vue, Svelte, Angular) is driving the engine"). This skill was written before
+Solid existed as the 5th adapter and was never swept for the addition — a real, if lower-stakes
+(internal skill doc, not public docs), instance of the "docs don't lie about the code" mandate.
+Fixed all 6 to include Solid where the underlying technical claim (no react-reconciler, no Fiber
+tree, framework-agnostic engine hook) is equally true of Solid as of the other three.
+
+Checked the other 8 skills for the same pattern (`Vue/Svelte/Angular` without Solid,
+`React/Vue/Angular` without Svelte+Solid) — one other hit
+(`symbiote-third-party-native-view/SKILL.md`) was a false positive, already correctly says
+"Vue/Angular/Svelte/Solid" and my regex just matched a substring.
+
+**Method note, now proven twice:** after any fix that touches "how many X" or "which N things",
+re-grep the underlying fact (the count, or the enumerated list) across the WHOLE tracked set, not
+just the files the original investigation touched. Both pass 17 and this pass found real
+additional instances this way that the original targeted work had missed.
+
 ## State as of the 6th pass — read this first
 
 The high-signal work is done: every place that described the retired JS-only engine as current
