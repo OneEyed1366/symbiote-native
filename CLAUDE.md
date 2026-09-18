@@ -762,10 +762,14 @@ porting ANY further RN module by hand.**
 > platform-split rule: a compile-time branch is only testable in a build that compiles it. Closing it
 > means an Android arm of the test host, not a mock.
 >
-> **CLOSED LATER THE SAME DAY — the arm exists.** `pnpm run test:android`, and the ripple's dict, its
-> foreground slot and its null colour are asserted on the committed payload there. See "The test host
-> has an ANDROID ARM now". `underlineColorAndroid` and the `search` keyboard split are still open, but
-> they are now a fixture to write rather than a device to find.
+> **CLOSED LATER THE SAME DAY — the arm exists, and all three gaps are now written.** `pnpm run
+> test:android`, and the ripple's dict, its foreground slot and its null colour are asserted on the
+> committed payload there. See "The test host has an ANDROID ARM now". `underlineColorAndroid` (its
+> default AND that an authored value beats it) and the `search` keyboard split followed within the
+> hour — three cases, each BREAK-TESTED by flipping its branch in `SymbioteFabricProps.cpp` and
+> confirming it went red alone, because a guard that has never failed is one you are only hoping
+> works. The iOS arm already asserted both NEGATIVES (`underlineColorAndroid` absent, `search` ->
+> `web-search`), so the two arms are twins rather than one side of a split.
 >
 > ### The THIRD port — `switch` — and the first whose authored names are ALL invented (2026-09-18)
 >
@@ -1728,10 +1732,16 @@ both nodes**. Its two halves are why it was the right one: the row direction is 
 content node's OWN tag (portable all along), and `collapsableChildren` comes from
 `maintainVisibleContentPosition` / `snapToAlignment`, which stay on the scroller.
 
-**The boundary did not move, only the reading of it.** A rule may read the parent's PROPS —
+**The boundary did not move, only the reading of it.** A rule may read another node's PROPS —
 declarative, present at commit time. It cannot read live JS state (`stickyFold`'s `translateY`) or
 anything a framework computes per render. That is the browser model's own line: a UA rule sees the
 tree, not the application's closures.
+
+**AND "ANOTHER NODE" MEANT "AN ANCESTOR" FOR A DAY LONGER THAN IT SHOULD HAVE.** This paragraph said
+"the parent's PROPS", and three separate notes then cited direction as if it were the boundary —
+ScrollView's Android wrap reads DOWNWARD and was recorded as unportable three times over. Nothing in
+the argument above mentions a direction: the tree is in C++, so any node is a pointer hop. See "A
+rule may read its CHILD".
 
 **This list used to carry a third entry — an owned LISTENER — and it was wrong.** See the section
 below: a listener is two facts wearing one word, and only one of them is the application's.
@@ -1821,23 +1831,27 @@ the better place for these assertions; for this class of bug it is the ONLY plac
 with the false-green rule already on this page: an assertion can be in the wrong harness and green
 for years.
 
-### A mirror that cannot be removed is made LOUD — the scroll base style, held by a test
+### A mirror that cannot be removed is made LOUD — SUPERSEDED, it could be removed after all
 
-`SCROLL_VIEW_BASE_{VERTICAL,HORIZONTAL}` exists in C++ (`foldScrollViewProps`) AND in JS
-(`render-scroll-view.ts`), and both are needed. Android's RefreshControl path does not go through the
-rule: RN wraps the scroll view and splits the app's style across two boxes with the base composed
-onto BOTH (`ScrollView.js:1854-1863` — "the ScrollView still needs the baseStyle to be scrollable").
-That split reads the OWNER's style from the WRAPPER's fold, one node reading another, so it is
-composition and stays in JS — which needs the value.
+`SCROLL_VIEW_BASE_{VERTICAL,HORIZONTAL}` existed in C++ (`foldScrollViewProps`) AND in JS
+(`render-scroll-view.ts`), and this section argued both were needed: Android's RefreshControl path
+does not go through the rule, because RN wraps the scroll view and splits the app's style across two
+boxes with the base composed onto BOTH (`ScrollView.js:1854-1863`) — and "that split reads the
+OWNER's style from the WRAPPER's fold, one node reading another, so it is composition and stays in
+JS". `scroll-view-base-parity.itest.ts` held the two copies in step, break-tested by flipping the C++
+`flexGrow` to 2 and watching both rows go red.
 
-`core/engine/cpp/tests/js/scroll-view-base-parity.itest.ts` commits a scroll view of each axis and
-compares the committed payload against the JS objects key by key. It works because the itest harness
-sees both sides in one process. **Verified by breaking it on purpose** — flipping the C++ `flexGrow`
-to 2 turned both rows red naming the key, then reverted. A guard that has never failed is one you are
-only hoping works.
+**THE PREMISE WAS THE SAME ONE `ownerProps` HAD ALREADY FALSIFIED IN THE OTHER DIRECTION, and it
+took a day to notice.** "One node reading another" is not a reason to stay in JS — it is the exact
+thing `ownerProps` was built for. What was actually true is narrower: this read goes DOWN, and every
+seam the engine had went UP. `IFirstChild` closed that, the split moved, and the JS copy, the field
+that carried it (`IScrollIntrinsics.scrollViewBaseStyle`, read by nobody) and this test all went with
+it — the orphan shape again. See "A rule may read its CHILD".
 
-Without it the two paths diverge only on an Android device with a RefreshControl attached, which is
-the narrowest possible place to find out.
+**The lesson that outlives the mirror: a guard written to hold two copies in step is also the thing
+that makes deleting one SAFE, and it should be re-read as a candidate for deletion every time its
+subject moves.** This one was cited three times as proof the JS copy was permanent. It was proof of
+nothing except that the two agreed.
 
 ### A test that "flakes" in the full run and passes alone — read the walk before blaming the build
 
@@ -2063,6 +2077,81 @@ running the break-test found out.
 And two dead JS legs went with the port: both clone-folds read `stringOr(source.id) ?? stringOr(
 source.nativeID)` where `source` is the owner's NODE props, which `routeProp` had already resolved
 that morning. **A second opinion about precedence, kept alive by nothing.**
+
+### A rule may read its CHILD — `IFirstChild`, and the last structural blocker goes (2026-09-18)
+
+Every seam before this one reads UP: `ownerProps` (the parent's props), `IOwner.tagName` (the
+descendant rule), `IAncestorLookup` (the nearest tagged ancestor). ScrollView's Android RefreshControl
+wrap needs the other direction and was recorded as unportable in three separate places for it.
+
+An Android ScrollView holds exactly ONE child, so a sibling refresh control is an `addViewAt` crash
+rather than a layout mistake. RN inverts the tree — `AndroidSwipeRefreshLayout` WRAPS the scroll view
+— and splits the app's style across the two boxes, layout on the wrapper's frame and visual on the
+scroller, with the axis base composed onto BOTH (`ScrollView.js:1854-1863`). **The wrapper is the
+scroll view's PARENT and needs the scroll view's AUTHORED style.**
+
+**IT IS NOT A NEW KIND OF CLAIM, which is the whole reason it was affordable.** `ownerProps`' own
+argument — the tree lives in C++, so reading another node costs a pointer hop rather than a closure
+and a crossing — never mentioned a direction. Upstream builds this parent FROM its child
+(`cloneElement(refreshControl, {style: outer}, scrollView)`), so "derived from what it contains" is
+RN's shape rather than one invented here; a UA has the same, in `:has()` and in a table frame that
+has always followed its cells.
+
+**THE DIRTY PATH IS THE HALF THAT IS NOT FREE, AND IT ALREADY EXISTED.** A rule runs when ITS node is
+dirty, so a wrapper reading its child re-derives only if a write to that child marks the wrapper —
+which `routeProp` does through its `node.wrapper` branch under `slotDerived`. Without it the wrapper
+freezes at its mount frame while the scroller visibly restyles inside it. `slotDerived: ['style']`
+was already there for the JS fold and is now load-bearing for the engine's rule; the seam did not
+change the requirement.
+
+**TOPOLOGY GATES BOTH HALVES, NOT `#ifdef ANDROID`** — iOS claims the refresh control BESIDE the
+content, so a scroll view is never one's child there and neither branch can fire however the host was
+compiled. Strictly better than a compile-time split for the reason `Switch`/`AndroidSwitch` already
+showed, and it is why the fixture runs on the ORDINARY test host: the behaviour under test is a tree
+shape, and a tree shape is reachable on any build. (`index.android` is imported by PATH, exactly as
+`wrap-android.test.ts` does — the platform FILE is still Metro's choice and the harness resolves iOS.)
+
+**FIRST child rather than a list, deliberately.** The only shape that needs this is a wrapper, and a
+wrapper has one. A rule surveying N children would be reading the tree rather than deriving from it,
+which is the line this seam should not cross.
+
+**IT COSTS NOTHING, and that had to be measured rather than assumed, because `firstChildOf` runs for
+EVERY node in the walk** — unlike `IAncestorLookup`, which is a callback nothing pays for until a
+rule asks. Two instruments:
+
+```
+ tag-rule-cost, native walk, 3 runs   every one of the eleven rows inside its own prior spread
+ adapter-create-cost, best-of-5       68.2 ms with the read · 68.2 ms without   walk 25.3 · 25.5
+```
+
+The create arm's own spread is 68.2-89.3 — about 20% — so **only the MINIMUM carries anything**, and
+the A/B was run in one sitting with the call replaced by `IFirstChild{}` and the binary rebuilt. The
+first attempt at that arm silently measured nothing: `-Werror` rejected the now-unused function, the
+build failed, and five runs went to the STALE binary. A build that fails is a measurement that did
+not happen — read the compiler's exit, not the numbers that follow it.
+
+**WHAT WENT WITH THE PORT is more than the two folds.** `splitLayoutProps` and `splitScrollViewStyle`
+(and RN's twenty-eight-key layout partition) left `scroll-view-commands.ts`; `SCROLL_VIEW_BASE_*` and
+`IScrollIntrinsics.scrollViewBaseStyle` left `render-scroll-view.ts` with the parity test that held
+them; and `IHostBehavior.onWrapChange` — whose own doc said "neither node can work that out alone" —
+left the engine with its only implementor. **A hook that exists to work around a missing seam should
+be deleted when the seam lands, not left to misdirect the next reader.**
+
+**ScrollView is now at ZERO crossings on all three of its nodes** — scroller, content view and
+wrapper — which no other composed primitive of this size has reached.
+
+**THE TEST MIGRATION HAD THE GROUP LESSON IN ITS SHARPEST FORM YET.** `wrap-android.test.ts`'s
+style-split `describe` held three cases. TWO went red on the move, honestly. The THIRD — "stops
+splitting the style when the wrap goes away" — went on PASSING, because with no rule in that host
+there is no split to stop, so an unwrapped owner carries its whole style whatever the engine does. It
+would have stayed green forever and meant nothing. **A case whose subject is a fold cannot stay
+behind beside the twins that failed**; the whole group moves. Same shape ActivityIndicator's "OMITS
+colour entirely" case had, and the second time this migration has had to delete a case that was
+GREEN.
+
+What stays in that file is what the JS host is authoritative for and the itest is not: the TOPOLOGY —
+who ends up whose parent, that the owner keeps its identity across a wrap, that removing the
+RefreshControl puts it back.
 
 ### `id` -> `nativeID` had SEVEN implementations, and the one in C++ was the wrong seam (2026-09-18)
 
