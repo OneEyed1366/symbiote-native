@@ -15,14 +15,44 @@
 // same ten-node row through the same calls an adapter would end up making, so subtracting it leaves
 // the reconciler: fibers, props diffing, and whatever each adapter does per element.
 //
-// React only, and deliberately: it is the heaviest reconciler in the repo and the one whose host
-// config is closest to what the other four do through their own seams. A per-adapter sweep is a
-// bigger fixture and belongs in its own file if this one shows the delta is worth chasing.
+// It began as React only. Vue joined it, and ANGULAR joined on 2026-09-18 because the six-column
+// ruler puts its bare arm at ~15.8 us per node against Solid's 9.5 — a gap the same size as what a
+// matched element directive costs, and one nobody had split since Angular's dev mode was turned off
+// (`render/index.ts`, `settleAngularDevMode`). Every earlier split of this adapter carried the
+// assertions that switch enables, so none of them is evidence any more.
+//
+// ONE SITTING, `build-release`, identical committed trees (nodes=10003, created=10002 on all four):
+//
+//              wall    walk   apply    over the direct arm
+//   engine      75.3   26.5    47.4    —
+//   react       88.6   24.9    42.1    +13.3
+//   vue        106.6   26.9    48.9    +31.3
+//   angular    162.4   25.9    47.1    +87.0
+//
+// THE ENGINE'S OWN HALVES DO NOT MOVE between the four, which is what makes the deltas attributable
+// at all: whatever Angular costs, it does not cost it in the engine. `setProps` reads 12003 for
+// react and 13003 for BOTH vue and angular, so Angular is not generating extra writes either.
+//
+// AND IT IS NOT THE NUMBER OF TRIPS INTO OUR RENDERER. `readAngularProfile` counts 17 001 renderer
+// calls against ~12 000 writes reaching the engine — the ~4 000 difference is the styling run
+// coalescing a row's `setStyle` calls into one — while React's host config is the same order. Forty
+// per cent more calls does not make 6.5x.
+//
+// So the 87 ms is Angular's own template execution plus whatever our `Renderer2` methods do inside
+// those 17 001 calls, and THAT split is the open question. It needs an arm with a no-op
+// `RendererFactory2` — Angular's machinery running with the host doing nothing — which `mount` does
+// not currently allow to be swapped.
 //
 // RUN ON `build-release` (`pnpm run bench:itest`).
 
 import { createElement as h } from 'react';
+import '@angular/compiler';
+import { CUSTOM_ELEMENTS_SCHEMA, Component } from '@angular/core';
 import { h as vh, mount as mountVue } from '@symbiote-native/vue';
+import {
+  mount as mountAngular,
+  readAngularProfile,
+} from '@symbiote-native/angular';
 
 import {
   appendChild,
@@ -96,6 +126,46 @@ function vueRow(id: number): ReturnType<typeof vh> {
     vh('view', { style: CELL_STYLE }, [label('x')]),
     vh('text-input', { style: INPUT_STYLE, text: `input ${id}` }),
   ]);
+}
+
+/**
+ * The same ten-node row through Angular, as BARE TAGS.
+ *
+ * Bare rather than through the element directives, because this file's question is what a
+ * RECONCILER adds over the engine's own API — and a matched directive is a separate ~9 us per
+ * element that `angular-directive-cost.itest.ts` already prices on its own ladder. Mixing the two
+ * would make this arm's delta unattributable between them.
+ *
+ * `@for` over a tiny template, not a thousand rows written out: Angular JIT-compiles a component's
+ * template on first use, and a written-out template puts that compile inside the timed region.
+ */
+@Component({
+  selector: 'angular-create-arm',
+  standalone: true,
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
+  template: `<view [style]="rootStyle">
+    @for (id of ids; track id) {
+      <view [style]="rowStyle" [testID]="'row-' + id">
+        <text ellipsizeMode="tail" [allowFontScaling]="true">{{ id }}</text>
+        <view [style]="cellStyle"
+          ><text ellipsizeMode="tail" [allowFontScaling]="true"
+            >row {{ id }}</text
+          ></view
+        >
+        <view [style]="cellStyle"
+          ><text ellipsizeMode="tail" [allowFontScaling]="true">x</text></view
+        >
+        <text-input [style]="inputStyle" [text]="'input ' + id"></text-input>
+      </view>
+    }
+  </view>`,
+})
+class AngularCreateArm {
+  readonly ids = Array.from({ length: ROWS }, (_unused, id) => id);
+  readonly rootStyle = { flex: 1 };
+  readonly rowStyle = ROW_STYLE;
+  readonly cellStyle = CELL_STYLE;
+  readonly inputStyle = INPUT_STYLE;
 }
 
 /** The same row, built the way the engine's own API is called — no reconciler above it. */
@@ -428,6 +498,64 @@ describe('what a reconciler adds to a create', () => {
     // THE ORACLE, again before any millisecond means anything. Vue spells the text input with its
     // own intrinsic tag, so the node counts agreeing is what says the two built the same screen.
     print(`DEBUG nodes: engine=${engineArm.nodes} vue=${nodes}`);
+    expect(nodes).toBe(engineArm.nodes);
+  });
+
+  // why: the six-column ruler puts Angular's BARE arm at ~15.8 us per node against Solid's 9.5 and
+  // stock's 8.9 — a gap the same size as what a matched directive costs, and one nobody has split
+  // since Angular's dev mode was turned off. Everything measured about this adapter before that
+  // switch carried the assertions it enables, so the old "27% our renderer / 64% Angular's own"
+  // split is not evidence any more. This arm reads it against the same engine-direct floor the other
+  // two reconcilers are read against.
+  it('builds the same 1 000 rows through the Angular adapter', () => {
+    // Zeroed, so what follows is this mount's alone.
+    readAngularProfile();
+    const startedAt = performance.now();
+    const surface = mountAngular(ROOT_TAG, AngularCreateArm);
+    flushTimers();
+    surface.commit();
+    const wall = performance.now() - startedAt;
+    mounted();
+
+    const telemetry = readSurfaceTelemetry(ROOT_TAG);
+    const nodes = committedTags().length;
+    print(
+      `DEBUG angular wall=${wall.toFixed(1)} walk=${(telemetry?.walkMs ?? 0).toFixed(1)} ` +
+        `apply=${(telemetry?.applyMs ?? 0).toFixed(1)} nodes=${nodes} ` +
+        `created=${telemetry?.nodesCreated ?? 0} cloned=${telemetry?.nodesCloned ?? 0} ` +
+        `reused=${telemetry?.nodesReused ?? 0}`,
+    );
+    print(
+      `DEBUG angular walk split: props=${(telemetry?.propsMs ?? 0).toFixed(1)} ` +
+        `foldLookup=${(telemetry?.foldLookupMs ?? 0).toFixed(1)} ` +
+        `folds=${telemetry?.foldsFound ?? 0} ` +
+        `createNode=${(telemetry?.createNodeMs ?? 0).toFixed(1)} ` +
+        `appendChild=${(telemetry?.appendChildMs ?? 0).toFixed(1)} ` +
+        `setProps=${telemetry?.setProps ?? 0} values=${telemetry?.valueEntries ?? 0}`,
+    );
+    printApplySplit('angular', telemetry);
+
+    // HOW OFTEN ANGULAR ENTERS OUR RENDERER AT ALL, which is the half a wall-clock cannot separate.
+    // `setProps` above counts what reaches the ENGINE — and the styling run coalesces a whole row's
+    // `setStyle` calls into one of those, so a per-key styling path is invisible there and visible
+    // here. `rendererWrites` counts every `setProperty` / `setStyle` / `setAttribute` / `setValue`.
+    const profile = readAngularProfile();
+    print(
+      `DEBUG angular renderer calls: writes=${profile.rendererWrites} ` +
+        `created=${profile.nodesCreated} inserted=${profile.nodesInserted}`,
+    );
+
+    if (engineArm === undefined || reactArm === undefined) {
+      throw new Error('an earlier arm did not run');
+    }
+    print(
+      `DEBUG angular over the direct arm: ${(wall - engineArm.wall).toFixed(1)} ms · ` +
+        `react=${(reactArm.wall - engineArm.wall).toFixed(1)} ms`,
+    );
+
+    // THE ORACLE. Angular's `@for` carries an anchor per row in the DOM shim, which is not a
+    // committed node — so the committed count must still land exactly on the other arms'.
+    print(`DEBUG nodes: engine=${engineArm.nodes} angular=${nodes}`);
     expect(nodes).toBe(engineArm.nodes);
   });
 
