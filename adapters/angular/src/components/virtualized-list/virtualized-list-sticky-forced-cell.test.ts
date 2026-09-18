@@ -104,6 +104,20 @@ function renderedRows(handle: ISymbioteNode): string[] {
   return found;
 }
 
+// The intrinsic TAG of the CELL holding the given testID — the cell is the node the list stamps,
+// and the projected content is its direct child, so the tag is read off the parent of the match.
+// `tagName` is what the host was TOLD, which is the only durable locator for a node whose platform
+// props are a rule in `SymbioteFabricProps.cpp` rather than anything visible in a payload.
+function cellTagFor(handle: ISymbioteNode, testID: string): string | undefined {
+  for (const child of childrenOf(handle)) {
+    if (testIdOf(child) === testID)
+      return fabric.find(one => one.handle === handle)?.tagName;
+    const found = cellTagFor(child, testID);
+    if (found !== undefined) return found;
+  }
+  return undefined;
+}
+
 // Ancestor depth below the scroll view of the first node carrying the given testID, or undefined
 // when absent. Only the DIFFERENCE between two depths is read, so the origin does not matter —
 // what matters is that both are measured from the same one. Used to detect the extra
@@ -179,27 +193,74 @@ describe('VirtualizedList force-mounts the sticky header below the window', () =
   });
 
   // why: the forced cell is a SEPARATE render branch from the windowed `@for` loop (index.ts
-  // template), so it is not automatically covered by ScrollView's sticky-wrapping nodeTransform —
-  // that wrapping has to be proven explicitly for the forced branch too, or a force-mounted header
-  // would render unstyled/unpinned even though the fix above keeps it merely present.
-  it('wraps the forced cell in the sticky-header projection, same as an in-window sticky cell', async () => {
+  // template), so nothing makes it sticky automatically — that has to be proven for the forced
+  // branch too, or a force-mounted header renders unpinned even though the fix above keeps it
+  // merely present.
+  //
+  // THE WITNESS CHANGED WITH THE MECHANISM, 2026-09-18. It used to read `forcedDepth ===
+  // windowedDepth + 1`: the list drove `stickyHeaderIndices`, the behavior synthesized a wrapper,
+  // and that extra host node was the only observable difference. The index form is gone (it cannot
+  // survive windowing — see "pins by tag" below), so there is no extra node and the depths are now
+  // EQUAL. The claim is unchanged and is asserted directly instead of through a side effect: both
+  // cells carry the tag, and the forced one is nested no deeper than an ordinary cell.
+  it('gives the forced cell the sticky-header tag, same as an in-window sticky cell', async () => {
     mount(ROOT_TAG, StickyForcedCellHost);
     await tick();
     await tick();
 
     await scrollPastSection();
 
-    // Angular's ScrollView doesn't forward stickyHeaderIndices as a prop on the native scroll
-    // node — it auto-wraps the projected child at that position (projection.ts's
-    // reconcileStickyRecords) in an extra host node, exactly as an in-window sticky cell is
-    // wrapped. Prove the forced cell gets the SAME treatment structurally: it must sit one
-    // ancestor level deeper than an ordinary windowed cell (row-5, not sticky), because the
-    // sticky wrapper interposes between the ScrollView content and the cell.
     const scroll = findScrollView().handle;
-    const forcedDepth = depthOf(scroll, 'row-0');
-    const windowedDepth = depthOf(scroll, 'row-5');
-    expect(forcedDepth, 'forced sticky cell (row-0) found').toBeDefined();
-    expect(windowedDepth, 'ordinary windowed cell (row-5) found').toBeDefined();
-    expect(forcedDepth).toBe((windowedDepth ?? 0) + 1);
+
+    expect(cellTagFor(scroll, 'row-0'), 'the forced sticky cell pins').toBe(
+      'sticky-header',
+    );
+    // `''`, not `'view'`: the host records a tag only for a node a BEHAVIOR attached to, and a
+    // plain view registers none. That is the correct witness for "this cell does not pin" — the
+    // tag is not sprayed on every cell — and it is the same empty string a `<view>` would carry.
+    expect(
+      cellTagFor(scroll, 'row-5'),
+      'an ordinary windowed cell does not pin',
+    ).toBe('');
+
+    // And no wrapper interposes any more: the two branches nest identically, which is what made
+    // the old depth assertion a sound proxy in the first place.
+    expect(depthOf(scroll, 'row-0')).toBe(depthOf(scroll, 'row-5'));
+  });
+
+  // why: A WINDOWED list cannot drive sticky headers by INDEX. `stickyHeaderIndices` numbers the
+  // scroll view's PAINT children, so the behavior synthesizes a wrapper around child N — but a
+  // windowed list paints a header, a spacer and a slice, so the positions move every time the
+  // window slides and the reconciler re-wraps a different child each pass.
+  //
+  // Device-diagnosed 2026-09-18 on examples/angular and examples/vue, sticky path B. The Vue log
+  // measured all three symptoms: a wrapper's height grew 988 -> 1976 -> 2964, one WHOLE SECTION
+  // swallowed per slide; the wrapped cell's own `onLayout` then reported y RELATIVE to the wrapper
+  // (`cell 136 measured length=28 offset=0`), poisoning the list's offset table; and
+  // `nextHeaderLayoutY` wandered. The header pins for half a section and then stops, permanently.
+  //
+  // React and Svelte never had it — their lists name the `sticky-header` TAG on the cell, which
+  // pins by DOCUMENT order and survives windowing. Angular and Vue were the only two left on the
+  // index form, and they are the only two that broke.
+  //
+  // TWO-SIDED ON PURPOSE. "A sticky-header tag was committed" alone goes green while the index
+  // form ALSO runs (its synthesized wrappers carry that very tag — measured, not assumed).
+  // "No indices reached the scroll view" alone goes green on a list that dropped sticky support.
+  it('pins by tag and hands the scroll view no sticky indices', async () => {
+    mount(ROOT_TAG, StickyForcedCellHost);
+    await tick();
+    await tick();
+    await scrollPastSection();
+
+    const tagged = fabric.findAll(one => one.tagName === 'sticky-header');
+
+    expect(
+      tagged.length,
+      'the sticky cells commit under the tag',
+    ).toBeGreaterThan(0);
+    expect(
+      findScrollView().props.stickyHeaderIndices,
+      'the index form is gone — nothing asks the behavior to synthesize a wrapper',
+    ).toBe(undefined);
   });
 });

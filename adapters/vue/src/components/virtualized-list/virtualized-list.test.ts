@@ -487,6 +487,47 @@ describe('Vue VirtualizedList sticky header force-mount', () => {
       'the other sticky index (not the nearest one below the window) is not force-mounted',
     ).toBe(false);
   });
+
+  // why: A WINDOWED list cannot drive sticky headers by INDEX. `stickyHeaderIndices` numbers the
+  // scroll view's own paint children, so the behavior synthesizes a wrapper around child N — but a
+  // windowed list paints a header, a spacer and a slice, so the positions have to be recomputed
+  // every time the window slides, and the reconciler then re-wraps a different child each pass.
+  //
+  // Device-diagnosed 2026-09-18 on examples/vue, sticky path B, and the log measured all three
+  // symptoms: a wrapper's height grew 988 -> 1976 -> 2964, i.e. one WHOLE SECTION swallowed per
+  // slide (988 = a 28pt header plus 32 rows of 30); the wrapped cell's own `onLayout` then reports
+  // y RELATIVE to the wrapper (`cell 136 measured length=28 offset=0`), which poisons the list's
+  // offset table; and `nextHeaderLayoutY` wanders (2004 -> 2962 -> 1044 -> 2032 -> 4880). The
+  // header pins for half a section and then stops, permanently.
+  //
+  // React and Svelte never had it because their lists name the `sticky-header` TAG on the cell,
+  // which pins by DOCUMENT order and survives windowing. Vue and Angular were the only two left on
+  // the index form, and they are the only two that broke.
+  //
+  // TWO-SIDED ON PURPOSE. "A sticky-header tag was committed" alone would go green on a list that
+  // still ALSO drives the index form; "the scroll view was given no indices" alone would go green
+  // on a list that dropped sticky support altogether. The pair is what pins the swap.
+  it('pins by tag and hands the scroll view no sticky indices', async () => {
+    mount(ROOT_TAG, makeStickyList());
+    await tick();
+    fabric.fireEvent(findScrollView().instanceHandle, 'topLayout', {
+      layout: { x: 0, y: 0, width: 320, height: STICKY_VIEWPORT },
+    });
+    await tick();
+
+    let stickyTags = 0;
+    live.walkLive(live.appRoot(), node => {
+      if (node.tagName === 'sticky-header') stickyTags += 1;
+    });
+
+    expect(stickyTags, 'the sticky cells commit under the tag').toBeGreaterThan(
+      0,
+    );
+    expect(
+      findScrollView().props.stickyHeaderIndices,
+      'the index form is gone — nothing asks the behavior to synthesize a wrapper',
+    ).toBe(undefined);
+  });
 });
 
 // A list whose data is the reactive mvcpData ref, so a unit can prepend rows and trigger the MVCP
