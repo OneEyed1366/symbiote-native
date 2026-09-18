@@ -2206,10 +2206,9 @@ The ruler did move ~5% across every row in the same sitting, INCLUDING `image`, 
 which this change cannot reach. That is a built-in control: a uniform shift across untouched rows is
 machine state, and no row carries a verdict at that size.
 
-**ONE PARITY GAP FOUND AND NOT FIXED HERE.** `testOnly_pressed` (`TouchableHighlight.js:189`) forces
-the underlay on for snapshot tests and we support it nowhere — a real `<adapters_reach_full_feature_parity>`
-gap. Deliberately left for its own commit: a port is a MOVE, and folding a behaviour change into one
-makes both unattributable.
+**ONE PARITY GAP FOUND HERE AND CLOSED IN THE NEXT COMMIT** — `testOnly_pressed`, which we supported
+nowhere. Deliberately deferred rather than folded in: a port is a MOVE, and mixing a behaviour change
+into one makes both unattributable. See "One prop, two mechanisms" below.
 
 **The test migration split cleanly for once, and the reason is worth keeping.** Every case asking WHEN
 the underlay shows survived on a new witness — the recorded bit, which the recording host takes from
@@ -2224,6 +2223,48 @@ its wiring reaches the machine and that the app's props reach the node, which is
 `readSurfaceTelemetry`, which answers about the LAST commit — so the cost assertion read 0 while the
 `print` on the line above showed 1, and passed. **An assertion that reads its subject twice is not
 asserting about the same thing twice.** Captured at commit now.
+
+### One prop, two mechanisms — `testOnly_pressed`, and a budget test that caught the wrong seam
+
+RN's snapshot affordance, supported nowhere here until 2026-09-18 and found by reading the vendor for
+the underlay port. It is one prop NAME over two unrelated mechanisms, and treating it as one thing is
+how it would have been got wrong:
+
+```
+ TouchableHighlight  PAINTS an underlay with no gesture, and `_hideUnderlay` returns early on it
+                     so the pin LATCHES              ->  a C++ rule, off the authored bag
+ Pressable           SEEDS the pressed state, which selects `activeStyle` and any `:active` class
+                     (`usePressState(testOnly_pressed === true)`)  ->  JS, where the class registry is
+```
+
+**THE ASYMMETRY IN UPSTREAM IS EASY TO "FIX" AND MUST NOT BE.** `_showUnderlay` gates on
+`_hasPressHandler` (`TouchableHighlight.js:271`), but the INITIAL state does not — `:187-190` is a
+bare ternary with no such check — so a decorative highlight with no callbacks still snapshots pressed.
+That is what a snapshot of one needs. Reproducing the gate would look more consistent and be wrong.
+
+**THE FIRST SEAM WAS WRONG AND A BUDGET TEST SAID SO, in the one currency that matters.** Pressable's
+half went into `attachAfterCommit`, because `attach` runs at `createElement` before any prop is
+routed. That costs a post-commit WAITER on every pressable in the app:
+`adapters/solid/src/crossing-and-payload-census.probe.test.tsx` budgets crossings per
+behaviour-carrying node at two and reported **six**.
+
+The reasoning that put it there is the reusable mistake: the alternative was a string compare in
+`routeProp`, and that was rejected as "the hottest path in the engine, for a testing prop". **A JS
+compare is not a boundary crossing, and weighing it as one picks the seam that actually costs
+something.** In `routeProp` it costs one comparison on a write that already reached the tail, lands on
+the FIRST commit rather than the second, and crosses nothing.
+
+**AND IT IS A SIDE EFFECT PLUS A PASSTHROUGH, not a consume.** The first spelling returned early;
+that kept the prop out of `node.props`, so TouchableHighlight's rule — which reads the AUTHORED bag —
+went blind and three of its cases went red. Setting the state and letting the write continue is the
+shape `GATED_EVENT_PROPS` already uses. Keeping the name out of the PAYLOAD is a separate job done by
+`kPressableMachineKeys`, and **break-testing that strip fires two cases**, one of them the Pressable
+case that has nothing to do with the underlay — a leaked prop no ViewConfig declares is otherwise
+silent.
+
+**The type surface is part of the feature**, eleven declarations across five adapters plus Angular's
+`PressableElement` base. Svelte's `canonical-prop-names` audit failed until its shim list learned the
+name, which is what that guard is for: a prop an app cannot spell is not shipped.
 
 ### `id` -> `nativeID` had SEVEN implementations, and the one in C++ was the wrong seam (2026-09-18)
 
