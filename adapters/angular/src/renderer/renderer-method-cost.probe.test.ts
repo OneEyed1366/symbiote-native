@@ -28,6 +28,7 @@ import { fileURLToPath } from 'node:url';
 
 import { mount, unmount } from '../render';
 import { registerComposedComponent } from '../anchor-host-registry';
+import { SYMBIOTE_ELEMENTS } from '../elements';
 import { SymbioteRenderer } from './index';
 
 const ROOT_TAG = 963;
@@ -81,6 +82,55 @@ registerComposedComponent('ProbeRow');
   `,
 })
 class ProbeList {
+  readonly rows = signal<IRow[]>(
+    Array.from({ length: ROWS }, (_unused, at) => ({
+      id: at,
+      label: `row ${at}`,
+    })),
+  );
+}
+
+// THE SAME TREE, WRITTEN THE WAY A REAL SCREEN WRITES IT. `examples/angular`'s benchmark row imports
+// `SYMBIOTE_ELEMENTS`, so each tag matches a `@Directive` and Angular instantiates one per element.
+// The bare-tag rows above match nothing and instantiate none — which makes them the cheaper shape,
+// and means neither this probe's first arm nor the headless bench arm carries what the device does.
+@Component({
+  selector: 'ProbeDirectiveRow',
+  standalone: true,
+  imports: [SYMBIOTE_ELEMENTS],
+  template: `
+    <view [style]="rowStyle" [testID]="'row-' + row.id">
+      <text ellipsizeMode="tail">{{ row.id }}</text>
+      <view [style]="cellStyle"
+        ><text ellipsizeMode="tail">{{ row.label }}</text></view
+      >
+      <view [style]="cellStyle"><text ellipsizeMode="tail">x</text></view>
+      <text-input [style]="inputStyle" [value]="row.label"></text-input>
+    </view>
+  `,
+})
+class ProbeDirectiveRow {
+  @Input({ required: true }) row!: IRow;
+  readonly rowStyle = ROW_STYLE;
+  readonly cellStyle = CELL_STYLE;
+  readonly inputStyle = INPUT_STYLE;
+}
+
+registerComposedComponent('ProbeDirectiveRow');
+
+@Component({
+  selector: 'probe-directive-list',
+  standalone: true,
+  imports: [ProbeDirectiveRow, SYMBIOTE_ELEMENTS],
+  template: `
+    <view testID="list">
+      @for (row of rows(); track row.id) {
+        <ProbeDirectiveRow [row]="row" />
+      }
+    </view>
+  `,
+})
+class ProbeDirectiveList {
   readonly rows = signal<IRow[]>(
     Array.from({ length: ROWS }, (_unused, at) => ({
       id: at,
@@ -152,6 +202,55 @@ function instrument(): {
   };
 }
 
+/** One arm: mount `component`, timed, with the renderer and the engine's apply taken out. */
+async function measure(
+  component: unknown,
+  rootTag: number,
+): Promise<{
+  readonly wall: number;
+  readonly ours: number;
+  readonly applyMs: number;
+  readonly calls: number;
+  readonly rows: (readonly [string, ITally])[];
+}> {
+  const probe = instrument();
+  // The ENGINE's half has to be taken out separately or it lands in Angular's share: `applyOps` runs
+  // from the commit microtask, which is inside the awaited window and outside every renderer method.
+  // A two-way split reads as "Angular's machinery" for work that is ours.
+  const base = treeHost();
+  if (base === undefined) throw new Error('no host installed');
+  let applyMs = 0;
+  setTreeHost({
+    ...base,
+    applyOps: batch => {
+      const startedAt = performance.now();
+      base.applyOps(batch);
+      applyMs += performance.now() - startedAt;
+    },
+  });
+
+  const startedAt = performance.now();
+  mount(rootTag, component);
+  await tick();
+  const wall = performance.now() - startedAt;
+
+  probe.restore();
+  setTreeHost(base);
+  unmount(rootTag);
+  fabric.reset();
+
+  const rows = [...probe.byMethod.entries()]
+    .filter(([, tally]) => tally.calls > 0)
+    .sort((left, right) => right[1].ms - left[1].ms);
+  return {
+    wall,
+    applyMs,
+    ours: rows.reduce((total, [, tally]) => total + tally.ms, 0),
+    calls: rows.reduce((total, [, tally]) => total + tally.calls, 0),
+    rows,
+  };
+}
+
 describe('an angular create, split between the renderer and angular', () => {
   it('prices every Renderer2 method the adapter implements', async () => {
     const probe = instrument();
@@ -214,5 +313,40 @@ describe('an angular create, split between the renderer and angular', () => {
     unmount(ROOT_TAG);
     fabric.reset();
     expect(calls).toBeGreaterThan(0);
+  });
+
+  // why: THE SHAPE THE DEVICE ACTUALLY RUNS. A real screen imports `SYMBIOTE_ELEMENTS`, so every tag
+  // matches a `@Directive` and Angular instantiates one per element; a bare tag under
+  // `CUSTOM_ELEMENTS_SCHEMA` matches nothing and instantiates none. The headless bench arm and the
+  // first case above are both the bare shape, so neither carries what a device pays — and the base
+  // directive declares 279 `@Input()`s, which under `target: ES2022` are real class FIELDS defined
+  // on every instance.
+  //
+  // Two arms in one sitting, same tree, same node count, only the spelling of the tags between them.
+  it('prices the directive shape a real screen writes against the bare one', async () => {
+    const bare = await measure(ProbeList, ROOT_TAG);
+    const directives = await measure(ProbeDirectiveList, ROOT_TAG + 1);
+
+    writeFileSync(
+      fileURLToPath(
+        new URL(
+          '../../../../.docs/angular-directive-cost.txt',
+          import.meta.url,
+        ),
+      ),
+      `${[
+        `a ${ROWS}-row create, the same tree written two ways`,
+        '',
+        `${'arm'.padStart(14)}${'wall'.padStart(9)}${'renderer'.padStart(10)}${'apply'.padStart(8)}${"angular's".padStart(11)}${'calls'.padStart(9)}`,
+        `${'bare tags'.padStart(14)}${bare.wall.toFixed(1).padStart(9)}${bare.ours.toFixed(1).padStart(10)}${bare.applyMs.toFixed(1).padStart(8)}${(bare.wall - bare.ours - bare.applyMs).toFixed(1).padStart(11)}${String(bare.calls).padStart(9)}`,
+        `${'directives'.padStart(14)}${directives.wall.toFixed(1).padStart(9)}${directives.ours.toFixed(1).padStart(10)}${directives.applyMs.toFixed(1).padStart(8)}${(directives.wall - directives.ours - directives.applyMs).toFixed(1).padStart(11)}${String(directives.calls).padStart(9)}`,
+        '',
+        `the directives cost ${(directives.wall - bare.wall).toFixed(1)} ms on ${ROWS} rows`,
+        '',
+      ].join('\n')}\n`,
+    );
+
+    expect(bare.calls).toBeGreaterThan(0);
+    expect(directives.calls).toBeGreaterThan(0);
   });
 });
