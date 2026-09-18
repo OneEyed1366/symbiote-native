@@ -281,10 +281,14 @@ describe('what one benchmark row actually commits', () => {
         ],
       ),
       // `submitBehavior` left this census when TextInput's prop resolution moved into the engine
-      // (`foldTextInputAliases`, `SymbioteFabricProps.cpp`) — this probe reads the TypeScript
-      // builder's payload, which no longer carries a copy of that rule. The two left are the
-      // MACHINE's, which is still JS: the acknowledged event count and the controlled text.
-    ).toEqual(['mostRecentEventCount', 'text']);
+      // (`foldTextInputAliases`), and on 2026-09-18 `text` became `value` for exactly the same
+      // reason: the `value -> text` fold is `foldTextInputValue` in `SymbioteFabricProps.cpp` now,
+      // and this probe reads the TypeScript builder's payload, which carries no copy of it.
+      //
+      // The COUNT is unchanged and that is the point of the row — two keys before, two keys after.
+      // Both are the MACHINE's, which is still JS: the acknowledged event count, and the controlled
+      // value under the name the machine itself writes.
+    ).toEqual(['mostRecentEventCount', 'value']);
     unmount(ROOT_TAG + 21);
   });
 });

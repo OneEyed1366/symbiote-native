@@ -132,12 +132,15 @@ function mountModel(options: {
 describe('v-model on a text-input tag', () => {
   // The two halves of a two-way binding, asserted separately because one can work without the
   // other: the value going down is a prop write, the text coming back is the machine's fold.
-  it('sends the model value down as the committed text', async () => {
+  it('sends the model value down to the committed input', async () => {
     mountModel({ initial: 'start', withDirective: true });
     await tick();
 
-    // `value` -> `text` is the engine's own fold in fabricProps, so the payload names `text`.
-    expect(committedProps()).toMatchObject({ text: 'start' });
+    // `value`, not `text`. The `value -> text` fold moved to `SymbioteFabricProps.cpp` on
+    // 2026-09-18 and this harness's payload comes from the TypeScript builder, which holds no copy
+    // of it — `core/engine/cpp/tests/js/text-input-payload.itest.ts` asserts the fold. What the
+    // directive is responsible for is the value arriving at all, which is what this reads.
+    expect(committedProps()).toMatchObject({ value: 'start' });
   });
 
   it('assigns the typed text back into the model', async () => {
@@ -147,7 +150,7 @@ describe('v-model on a text-input tag', () => {
     await harness.type('typed');
 
     expect(harness.model.value).toBe('typed');
-    expect(committedProps()).toMatchObject({ text: 'typed' });
+    expect(committedProps()).toMatchObject({ value: 'typed' });
   });
 
   // THE CONTROL. Same tree, no directive — the exact shape that shipped before this shim. It must
@@ -160,7 +163,11 @@ describe('v-model on a text-input tag', () => {
     await harness.type('typed');
 
     expect(harness.model.value).toBe('start');
-    expect(committedProps()?.text).toBeUndefined();
+    // Moved from `text` to `value` WITH its two positives, and that grouping is the point: `text` is
+    // now absent from every payload this harness builds, so a control still reading it would pass
+    // forever and stop controlling anything. Without the directive nothing writes `value` either,
+    // so the arm still discriminates.
+    expect(committedProps()?.value).toBeUndefined();
   });
 
   // On the COMPONENT path the wrapper emits `valueChange` AND `update:modelValue`, so an app may

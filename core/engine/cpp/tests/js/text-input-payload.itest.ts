@@ -295,15 +295,16 @@ describe('what a text input sends native, resolved by the engine', () => {
     expect(payload.value).toBe(undefined);
   });
 
-  // why: the rule is gated on the COMPONENT and not on the prop name, because `value` is also a prop
-  // of Switch and Slider — a name-keyed fold would write a bogus `text` onto both. Asserted from a
-  // view, which declares no `value` at all: if the gate ever keys on the prop, this is where it
-  // shows, and on device it would be a `text` prop on something that is not a text input.
+  // why: THE CONTROL, and the reason the fold is keyed on the COMPONENT rather than on the prop
+  // name — `value` is an ordinary prop of Switch and Slider, and a name-keyed fold would write a
+  // bogus `text` onto both. Travelled from `core/engine/src/__tests__/text-input-value-fold.test.ts`,
+  // which could only ever assert it against the headless builder's copy of the rule.
+  //
+  // A Switch rather than a view, which is the stronger subject: a view declares no `value` at all,
+  // so it cannot tell a component-keyed rule from one that simply found nothing to do.
   it('does not touch value on a component that is not a text input', () => {
-    const payload = commit('RCTView', 'view', {
-      value: 'not a text input',
-    }).payload;
-    expect(payload.value).toBe('not a text input');
+    const payload = commit('Switch', 'switch-probe', { value: true }).payload;
+    expect(payload.value).toBe(true);
     expect(payload.text).toBe(undefined);
   });
 

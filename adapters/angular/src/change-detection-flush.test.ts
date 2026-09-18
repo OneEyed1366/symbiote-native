@@ -125,7 +125,10 @@ describe('an engine behavior reads the app value back, not the pre-event one', (
     await settle();
 
     expect(commandNames()).not.toContain('setTextAndSelection');
-    expect(committed('flush-input').payload.text).toBe('A');
+    // `value`: the fold into RN's private `text` prop is the engine's rule now
+    // (`foldTextInputValue`), which this harness's payload builder holds no copy of. The claim is
+    // that the app's post-event value is what got committed, and that reads off either name.
+    expect(committed('flush-input').payload.value).toBe('A');
   });
 
   it('never snaps a switch back off after the app accepted the toggle', async () => {

@@ -79,33 +79,39 @@ function type(
 
 describe('Solid TextInput on the engine', () => {
   describe('Positive', () => {
-    // why: there is NO `value` Fabric prop — RN folds value/defaultValue into the private `text`
-    // prop plus a `mostRecentEventCount` counter. Sending `value` instead would reach a native view
-    // that ignores it, and the field would simply never paint.
-    it('folds value into the private text prop on the singleline intrinsic', async () => {
+    // why: the `value -> text` FOLD left this file on 2026-09-18, the same way `inputMode` did (see
+    // the note further down) — there is no `value` Fabric prop, RN rides the controlled value as the
+    // private `text`, and that rule is `foldTextInputValue` in `SymbioteFabricProps.cpp` now. This
+    // harness builds payloads through the TypeScript `fabricProps`, which holds no copy of it, so
+    // `text` is asserted in `core/engine/cpp/tests/js/text-input-payload.itest.ts`.
+    //
+    // What is this adapter's is the pair below: the authored value reaches the engine, and the
+    // MACHINE — the controlled-value handshake, which stays in JS by design — starts its event
+    // counter at zero. That counter is the half no engine rule can supply.
+    it('hands the authored value to the engine with the count at zero', async () => {
       mount(ROOT_TAG, () => <text-input value="hello" />);
       await tick();
 
       const payload = committedInput().payload;
-      expect(payload.text).toBe('hello');
+      expect(payload.value).toBe('hello');
       expect(payload.mostRecentEventCount).toBe(0);
-      expect('value' in payload).toBe(false);
     });
 
     // why: `multiline` picks a DIFFERENT native view class, not a prop on the same one — getting it
-    // wrong gives a single-line field that silently refuses newlines.
+    // wrong gives a single-line field that silently refuses newlines. The view NAME is the whole
+    // claim, and it is also what the engine keys its own fold on.
     it('renders the multiline intrinsic when multiline is set', async () => {
       mount(ROOT_TAG, () => <text-input-multiline value="two lines" />);
       await tick();
-      expect(committedInput(MULTILINE_VIEW).payload.text).toBe('two lines');
+      expect(committedInput(MULTILINE_VIEW).payload.value).toBe('two lines');
     });
 
-    // why: defaultValue is the uncontrolled seed — value wins when both are set (RN's foldText), so
-    // an input with only a defaultValue must still paint it.
-    it('falls back to defaultValue when value is absent', async () => {
+    // why: defaultValue is the uncontrolled seed, and this adapter must FORWARD it rather than
+    // resolve it — which of the two wins is RN's rule and the engine's, asserted where that runs.
+    it('forwards an uncontrolled defaultValue', async () => {
       mount(ROOT_TAG, () => <text-input defaultValue="seed" />);
       await tick();
-      expect(committedInput().payload.text).toBe('seed');
+      expect(committedInput().payload.defaultValue).toBe('seed');
     });
 
     // why: RN's own aliases are folded in JS and are INERT at the native layer — forwarding
@@ -186,7 +192,9 @@ describe('Solid TextInput on the engine', () => {
 
       expect(seen).toBe('ab');
       expect(rawCount).toBe(1);
-      expect(committedInput().payload.text).toBe('ab');
+      // `value`, not `text`: the settled controlled value is what the MACHINE produces, and turning
+      // it into the private `text` prop is the engine's rule (see the first case in this file).
+      expect(committedInput().payload.value).toBe('ab');
       expect(committedInput().payload.mostRecentEventCount).toBe(1);
     });
 
@@ -252,7 +260,7 @@ describe('Solid TextInput on the engine', () => {
       type('ab', 1);
       await tick();
 
-      expect(committedInput().payload.text).toBe('ab');
+      expect(committedInput().payload.value).toBe('ab');
       expect(fabric.commands).toHaveLength(0);
     });
 
@@ -275,7 +283,7 @@ describe('Solid TextInput on the engine', () => {
       setValue('b');
       await tick();
 
-      expect(committedInput().payload.text).toBe('b');
+      expect(committedInput().payload.value).toBe('b');
       expect(fabric.commands).toHaveLength(1);
       expect(fabric.commands[0]?.args).toEqual([
         0,
@@ -419,26 +427,23 @@ describe('Solid TextInput on the engine', () => {
       expect(fabric.commands[2]?.args).toEqual([3, '', 0, 0]);
     });
 
-    // why: the JS-only props must not reach Fabric. defaultValue and inputMode are folded away in
-    // JS (into `text` and `keyboardType`) and are dead weight — or worse, an unknown prop — at the
-    // native layer; onValueChange is plain JS, not a ViewConfig event, and a function on the prop
-    // bag crashes Android's folly::dynamic serializer the moment it tries to stringify it. (The
-    // engine also drops function props at the commit boundary — fabric-props.ts — so this last
-    // assertion pins a contract two layers hold, not this adapter alone.)
-    it('never forwards the JS-only props onto the native prop bag', async () => {
+    // why: a FUNCTION must never reach the native prop bag. `onValueChange` is plain JS, not a
+    // ViewConfig event, and a function on the bag crashes Android's `folly::dynamic` serializer the
+    // moment it tries to stringify it. Dropped at the commit boundary by the payload builder, which
+    // is a contract both builders hold rather than this adapter alone.
+    it('never forwards a function onto the native prop bag', async () => {
       mount(ROOT_TAG, () => (
         <text-input value="a" defaultValue="seed" onValueChange={() => {}} />
       ));
       await tick();
 
-      const payload = committedInput().payload;
-      expect('onValueChange' in payload).toBe(false);
-      expect('defaultValue' in payload).toBe(false);
-      // `inputMode` used to be asserted here too. It is stripped by the ENGINE now
-      // (`foldTextInputAliases`, `SymbioteFabricProps.cpp`), which this harness's payload cannot
-      // see, so the assertion moved with the rule —
-      // `core/engine/cpp/tests/js/text-input-payload.itest.ts`. The two left are still this layer's:
-      // a function prop and `defaultValue` are dropped by the TypeScript builder.
+      expect('onValueChange' in committedInput().payload).toBe(false);
+      // `inputMode` used to be asserted here, then `defaultValue` joined it (2026-09-18). Both are
+      // stripped by the ENGINE now — `foldTextInputAliases` and `foldTextInputValue` in
+      // `SymbioteFabricProps.cpp` — which this harness's payload cannot see, so both assertions
+      // moved with their rules to `core/engine/cpp/tests/js/text-input-payload.itest.ts`. The
+      // function is the one that is still this layer's, because dropping it is not a platform rule
+      // about text inputs but a property of building a payload at all.
     });
 
     // A runtime multiline flip is NOT covered: single- and multiline are different native views,

@@ -17,9 +17,14 @@
 // with everything green — not hypothetical: it is how a disabled `touchable-highlight` shipped
 // `focusable: true`.
 //
-// ONE breaks the rule and is the next thing to move: `foldTextInputValue`, below, with its own note
-// on why it did not travel with the defaults. Everything else here is the framework-agnostic half —
-// colour processing, the style hoist, the aria fold, a node's own `payloadFold`.
+// NONE IS LEFT, as of 2026-09-18. The two component-keyed ones went in that order — RN's Text
+// defaults first, then `value ?? defaultValue -> text` — separately and on purpose, because they had
+// different test topologies and one commit removing both could not be attributed to either.
+//
+// What is here is the framework-agnostic half: colour processing, the style hoist, the aria fold,
+// and a node's own `payloadFold`. So a text input's payload here carries `value` where the device's
+// carries `text`, and a text node's is missing two keys. That asymmetry is the harness working as
+// designed — do not close it by adding a rule back.
 
 import { foldAriaProps } from './accessibility-props';
 import type { IFabricProps } from './fabric';
@@ -203,52 +208,6 @@ function addStyle(out: Record<string, unknown>, style: unknown): void {
 //
 // GATED ON THE COMPONENT, NOT ON THE PROP. `value` is also a prop of `Switch` and `Slider`; a fold
 // keyed on the prop name would write a bogus `text` onto both. Two string comparisons rather than a
-// Set lookup — this runs per node per commit, and the set has exactly two members.
-//
-// The engine may hold this because both views are in `BUILTIN_COMPONENTS`, whose hand-tuned tables
-// (`view-config.ts`'s TEXT_INPUT_EVENTS, commit's COLOR_PROPS) already live here for the same
-// reason. Routing it through `registerComponent` was tried first and is WRONG: `resolve()`
-// short-circuits every builtin to EMPTY, so the registration would have been accepted and never
-// applied.
-const SINGLELINE_TEXT_INPUT = 'RCTSinglelineTextInputView';
-const MULTILINE_TEXT_INPUT = 'RCTMultilineTextInputView';
-
-/**
- * THE ONE PLATFORM RULE STILL MIRRORED HERE, and it is next rather than fine.
- *
- * Its twin is `foldTextInputValue` in `SymbioteFabricProps.cpp`, and the header above says why that
- * is a hazard: a vitest over this copy cannot see the device one. The gap was real until 2026-09-18
- * — `defaultValue` appeared in no itest at all — and is closed by
- * `core/engine/cpp/tests/js/text-input-payload.itest.ts`, which now pins the precedence, the
- * erasure, the explicit-`text` case, the component gate and the multiline tag against the payload a
- * commit actually sent. So the device rule is tested where it runs; what is left is the duplication.
- *
- * It did NOT go with the Text defaults because the two have different test topologies and deleting
- * both in one change makes neither attributable. The defaults were 15 cases, every one a claim about
- * the PLATFORM. This is ~32, and most are TextInput MACHINE tests — the controlled-value handshake,
- * which deliberately stays in JS — that merely use `payload.text` as their observable. Re-aiming
- * those at what they are actually about is its own piece of work, not a mechanical sweep.
- */
-function foldTextInputValue(
-  props: Record<string, unknown>,
-): Record<string, unknown> {
-  const hasValue = props.value !== undefined;
-  const hasDefault = props.defaultValue !== undefined;
-  if (!hasValue && !hasDefault) return props;
-
-  const folded: Record<string, unknown> = { ...props };
-  // `value` WINS over `defaultValue`. An explicit `text` is left alone: that is the component path,
-  // where the wrapper already folded, and re-folding there would let a stale `value` overwrite what
-  // the wrapper computed.
-  if (folded.text === undefined) {
-    folded.text = hasValue ? props.value : props.defaultValue;
-  }
-  // Blanked, not deleted: `fabricProps` skips undefined, and neither name is a real Fabric prop.
-  folded.value = undefined;
-  folded.defaultValue = undefined;
-  return folded;
-}
-
 export function fabricProps(
   node: ISymbioteNode,
   nodeProps: Readonly<Record<string, unknown>>,
@@ -317,11 +276,7 @@ export function fabricProps(
   //
   // So a text node's payload here is missing two keys the device's carries. That is a PROPERTY of
   // this harness rather than a gap in it — do not close it by adding the rule back.
-  const props =
-    node.component === SINGLELINE_TEXT_INPUT ||
-    node.component === MULTILINE_TEXT_INPUT
-      ? foldTextInputValue(behaviorFolded)
-      : behaviorFolded;
+  const props = behaviorFolded;
   // Hoisted out of the loop: one cached lookup per node per commit, not one per key.
   const alreadyProcessed = configProcessedKeys(node.component);
   for (const key of Object.keys(props)) {

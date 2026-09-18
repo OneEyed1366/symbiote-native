@@ -74,6 +74,10 @@ describe('a controlled text input under the vue renderer', () => {
     unmount(ROOT_TAG);
 
     expect(committed).toBeDefined();
-    expect(committed?.payload.text).toBe('changed by the app');
+    // `value`, not `text`: the fold into RN's private `text` prop is the engine's rule now
+    // (`foldTextInputValue`, `SymbioteFabricProps.cpp`), and this harness's payload comes from the
+    // TypeScript builder, which holds no copy of it. What this file is about — the app's own value
+    // surviving the machine's beat — reads the same off either name.
+    expect(committed?.payload.value).toBe('changed by the app');
   });
 });

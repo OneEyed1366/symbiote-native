@@ -287,6 +287,9 @@ describe('v-model on a hand-written element', () => {
       '/sfc-model-payload.vue',
     );
     const node = subject(await mountArm(evaluate(code)));
-    expect(node.payload.text).toBe('a');
+    // `value`, not `text`: the fold is the engine's rule now (`foldTextInputValue`), which this
+    // harness's TypeScript payload builder deliberately holds no copy of. The claim here is that the
+    // SFC compiler's `v-model` output reaches the payload at all.
+    expect(node.payload.value).toBe('a');
   });
 });
