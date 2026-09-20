@@ -36,6 +36,7 @@ import {
   ChangeDetectorRef,
   Directive,
   ElementRef,
+  ErrorHandler,
   EventEmitter,
   Input,
   Output,
@@ -268,12 +269,37 @@ abstract class ReadBackElement extends SymbioteElement implements OnDestroy {
   // ITS OWN, now that the base has none. Three tags reach this class, so the injection is paid where
   // it is read instead of on every element of a screen.
   private readonly detector = inject(ChangeDetectorRef);
+  private readonly errorHandler = inject(ErrorHandler);
 
   constructor() {
     super();
     const node: unknown = this.host.nativeElement;
     if (typeof node === 'object' && node !== null) {
-      registerViewFlush(node, () => this.detector.detectChanges());
+      registerViewFlush(node, () => this.flush());
+    }
+  }
+
+  // REPORTED, NOT RETHROWN, and it is Angular's own contract rather than a swallow. Every other
+  // change detection in an app runs inside `ApplicationRef.tick()`, which catches and hands the
+  // error to `ErrorHandler` — `render/index.ts` provides `SymbioteErrorHandler` for exactly that,
+  // after an unprovided token once turned every async tick exception into a hard crash. This flush
+  // is the ONE change detection that runs outside that boundary: the engine calls it from inside a
+  // native event dispatch, where a throw has nowhere to go but `RCTFatal`.
+  //
+  // Device-diagnosed 2026-09-20 on ApiPlaygroundScreen. `PlaygroundLifecycleLogger` emits from
+  // `ngDoCheck`/`ngAfterContentChecked`/`ngAfterViewChecked` and the screen's handler writes a
+  // signal its own template reads, so the view re-dirties itself on every pass and
+  // `detectChangesInViewWhileDirty` throws NG0103 after MAXIMUM_REFRESH_RERUNS. The scheduler's own
+  // ticks were already hitting it and reporting it quietly; the first KEYSTROKE took the same throw
+  // through here and killed the app — `Terminating app due to uncaught exception
+  // 'RCTFatalException: Unhandled JS Exception: Error: NG0103'`, with no redbox because Release has
+  // none. So the app bug is the app's, and a flush that turns a reported error into a fatal one is
+  // ours: a keystroke must not be stricter than a tick.
+  private flush(): void {
+    try {
+      this.detector.detectChanges();
+    } catch (error: unknown) {
+      this.errorHandler.handleError(error);
     }
   }
 
