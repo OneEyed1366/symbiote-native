@@ -1,8 +1,9 @@
 // Angular's AOT pipeline needs ONE Metro-side accommodation beyond the plain css-parser
 // transformer: ngc mirrors this app's whole source tree into its own outDir (see
 // tsconfig.angular.base.json's `outDir` convention, "build/angular" by default) but only ever
-// compiles .ts — a relative non-script import (`import './App.css'`, `require('./assets/logo.png')`)
-// survives untouched in the compiled .js, still pointing at the ORIGINAL source location, which
+// compiles .ts — a relative non-script import (`import './App.css'`, a bundled asset require such
+// as `./assets/logo.png`) survives untouched in the compiled .js, still pointing at the ORIGINAL
+// source location, which
 // ngc never copies there. Metro resolves that relative specifier against the COMPILED file's own
 // location (<outDir>/...), so without this it 404s on a file that was never created there — a
 // device-diagnosed 2026-09-18 case: `Unable to resolve module ./assets/react-native-logo.png`

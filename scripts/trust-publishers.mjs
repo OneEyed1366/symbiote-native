@@ -172,7 +172,10 @@ for (const { name, dir } of entries) {
     execFileSync(
       'npm',
       [
-        ...REGISTRY,
+        // REGISTRY must come AFTER the package positional — `npm --registry=... trust github
+        // <name>` makes npm's parser reject <name> as "Unknown positional argument", verified
+        // against npm 11.18.0. Every other npm call in this file already puts it last; this one
+        // didn't, which is the bug.
         'trust',
         'github',
         name,
@@ -182,6 +185,7 @@ for (const { name, dir } of entries) {
         repo,
         '--allow-publish',
         '--yes',
+        ...REGISTRY,
       ],
       // stderr is piped so a 409 can be told apart from a real failure; stdout still
       // inherits, keeping npm's own auth prompts interactive.

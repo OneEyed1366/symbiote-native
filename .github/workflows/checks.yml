@@ -116,7 +116,24 @@ jobs:
       # each app, and creates iOS + Android Metro production bundles.
       - run: pnpm run prepublish-build
 
+      # Dependency cache, not build-output cache (build output is per-run by design — the whole
+      # point of this matrix is a FRESH tarball install every time). Each of the 5 frameworks gets
+      # an isolated npm cache dir under this root (check-packed-consumer-bundles.mjs's
+      # npmCacheDirFor) — sharing one dir across concurrent `npm install`s throws ENOTEMPTY on
+      # npm's cacache. Without this, every framework re-downloads the entire RN toolchain from the
+      # registry on every run; measured 2026-09-14 install dominates each framework's 300s+ wall
+      # time. Keyed on the example manifests since that's what pins the installed versions (no
+      # lockfile survives — see rewriteInternalDependencies).
+      - uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/npm-consumer-cache
+          key: npm-consumer-cache-${{ hashFiles('examples/*/package.json') }}
+          restore-keys: |
+            npm-consumer-cache-
+
       - run: pnpm run check:bundle-isolation
+        env:
+          SYMBIOTE_NPM_CACHE_ROOT: ${{ runner.temp }}/npm-consumer-cache
 
   # Records that this tree passed, so the NEXT push/PR carrying the identical tree (a merge/squash/
   # rebase commit is the common case) hits the gate above instead of re-running everything. Only
