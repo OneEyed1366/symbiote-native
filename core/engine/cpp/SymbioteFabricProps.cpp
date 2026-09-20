@@ -872,8 +872,16 @@ dynamic foldTouchableHighlightUnderlay(
 
   dynamic underlay = dynamic::object();
   const dynamic *color = authored.get_ptr("underlayColor");
+  // PRESENCE, not truthiness, and the difference is a feature rather than a nicety. Upstream is
+  // `underlayColor === undefined ? 'black' : underlayColor` (`TouchableHighlight.js:261-265`) — a
+  // STRICT check, so `underlayColor={null}` travels through and suppresses the tint. That is how an
+  // app says "this control responds, but not with a colour". The `!isNull()` that used to be here
+  // collapsed it onto the default and painted black on exactly the control that asked for none.
+  //
+  // Its NEIGHBOUR is deliberately not like this: the opacity is `activeOpacity ?? 0.85` (`:260`), so
+  // null there really does mean absent. Two defaults, two spellings, both upstream's.
   underlay["backgroundColor"] =
-      color != nullptr && !color->isNull() ? *color : dynamic(kHighlightUnderlayColor);
+      color != nullptr ? *color : dynamic(kHighlightUnderlayColor);
 
   dynamic composed = dynamic::array();
   const dynamic *style = props.get_ptr("style");

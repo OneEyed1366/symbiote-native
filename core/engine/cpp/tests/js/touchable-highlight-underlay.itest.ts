@@ -306,6 +306,42 @@ describe('what a pressed touchable-highlight sends native', () => {
     expect(child.opacity).toBe(0.25);
   });
 
+  // why: RN'S TWO DEFAULTS ARE NOT SYMMETRIC, and reading the vendor is the only way to find out.
+  // The opacity is `activeOpacity ?? 0.85` (`TouchableHighlight.js:260`) — `??`, so null counts as
+  // absent. The colour is `underlayColor === undefined ? 'black' : underlayColor` (`:261-265`) — a
+  // STRICT undefined check, so an explicit null travels through and paints nothing.
+  //
+  // That asymmetry is the whole feature: `underlayColor={null}` is how an app says "this control
+  // responds, but not with a tint". Collapsing null onto the default takes that away and paints
+  // black on exactly the control that asked for no colour — the loudest possible wrong answer.
+  it('lets an underlayColor of null suppress the tint', () => {
+    const { owner, child } = touchableWithChild({
+      underlayColor: null,
+      activeOpacity: 0.25,
+    }).pressIn();
+
+    // ABSENT rather than an explicit null, and that is the engine's normalisation rather than a
+    // weaker assertion: RN puts `{backgroundColor: null}` in the style, Fabric reads a null colour
+    // as the default, and the payload builder drops the key instead of carrying it. Same
+    // instruction, one fewer key on the wire.
+    expect(owner.backgroundColor).toBe(undefined);
+    // The other half still runs: null suppresses the COLOUR, not the feedback.
+    expect(child.opacity).toBe(0.25);
+  });
+
+  // why: the control for the case above, and it is the one that keeps the fix honest. `??` on the
+  // opacity means null there is NOT the same instruction — it falls back like an absent value does,
+  // so a symmetrical "null means nothing" reading would be wrong on this half.
+  it('treats a null activeOpacity as absent, unlike the colour', () => {
+    const { owner, child } = touchableWithChild({
+      underlayColor: '#ff0000',
+      activeOpacity: null,
+    }).pressIn();
+
+    expect(owner.backgroundColor).toBe(0xff_ff_00_00);
+    expect(child.opacity).toBe(DEFAULT_CHILD_OPACITY);
+  });
+
   // why: THE ASYMMETRY IS UPSTREAM'S AND IT IS EASY TO MISS. `_showUnderlay` gates on
   // `_hasPressHandler` (`:271`), but the INITIAL state does not — `state.extraStyles` is
   // `testOnly_pressed === true ? this._createExtraStyles() : null` (`:187-190`), with no such check.
@@ -524,14 +560,9 @@ describe('where the two halves of the underlay land', () => {
   });
 });
 
-// NOT ASSERTED HERE, and left out on purpose rather than missed. RN's two defaults are not
-// symmetric: `activeOpacity ?? 0.85` (`:260`) treats null as absent, while the underlay is
-// `underlayColor === undefined ? 'black' : underlayColor` (`:261-265`) — a STRICT undefined check,
-// so `underlayColor: null` yields null and paints nothing. `foldTouchableHighlightUnderlay` reads
-// `!color->isNull()` and hands back `'black'` for that input, which diverges.
-//
-// It is real, it is PRE-EXISTING, and it belongs to the owner's half rather than to the split. A
-// case for it here would make one red run answer two questions and the fix unattributable — the
-// same reason the JS two-node split was reverted in its merge instead of being carried.
+// THE ASYMMETRIC DEFAULTS ARE ASSERTED NOW — `lets an underlayColor of null suppress the tint` and
+// its control above. This note used to record them as a known divergence found while reading the
+// vendor for the split and deliberately deferred, so that one red run answered one question. It did,
+// the split landed, and the divergence closed in the commit after it.
 
 report();
