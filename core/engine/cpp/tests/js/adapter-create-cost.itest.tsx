@@ -176,7 +176,7 @@ function reactRow(
     label(String(id)),
     h('view', { style: CELL_STYLE }, label(`row ${id}`)),
     h('view', { style: CELL_STYLE }, label('x')),
-    h('textinput', { style: INPUT_STYLE, text: `input ${id}` }),
+    h('text-input', { style: INPUT_STYLE, text: `input ${id}` }),
   );
 }
 

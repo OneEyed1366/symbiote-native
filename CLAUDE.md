@@ -1709,6 +1709,31 @@ copies the props bag to seed an absent default, so every `<Text>` that does not 
 `allowFontScaling` — which is nearly all of them — allocates a copy. Three thousand of them on this
 screen cost 0.8-5.4 ms of ~116, inside the spread of the arm it is compared against.
 
+**PARTIALLY SUPERSEDED 2026-09-18 — the React arm's row had the wrong text-input tag, and the
+absolute numbers above need a fresh full re-measurement, not a patched-in delta.** `reactRow` wrote
+`h('textinput', …)` — no hyphen — which is not a registered intrinsic
+(`core/components/src/component-names/index.ios.ts` only knows `'text-input'`), so it fell through
+`descriptorFor`'s "raw Fabric view name" branch and committed a node literally named `textinput`.
+No tag match means no `attachHostBehavior` call, so the row's TextInput never got
+`core/components/src/behaviors/text-input.ts`'s machine — specifically its `attach()`-time
+`setProp(node, 'mostRecentEventCount', …)` seed. Vue's sibling `vueRow` already spelled it
+`'text-input'` correctly (line 97 of the same file) and has carried the real cost all along; this
+was a one-sided gap between the two arms in this file, not a Vue-vs-React finding.
+
+Confirmed on the device-adjacent symptom first: the *published* device table already showed
+`WRITES 17037/16000` for React — that number came from `examples/react`'s real `<TextInput>`
+component, a different code path, and was never affected by this bug. Only this ITEST FIXTURE's own
+row was wrong.
+
+Fixed (`h('text-input', …)`, three files: this one, `react-suite.itest.tsx`,
+`adapter-swap-cost.itest.tsx`). Isolated before/after on this exact codebase, tag spelling the only
+variable, three runs each: **delta 21.8 ms (buggy) → 27.2 ms (fixed) on this file's own reconciler
+column — the fix's own clean contribution is +5.4 ms (+25% relative).** Both numbers sit well below
+the documented 45-48 ms above, so most of that gap is unattributed drift from other engine work
+since this paragraph was written, not this bug. **Do not read 45-48 ms, 58%, or 1.6-1.7x as current
+without re-running this file fresh** — they need a full re-measurement on today's engine, not a
+patch to the old figures.
+
 ### A fold is charged for EXISTING, not for what it does — the one that did nothing cost 10.7 us/node
 
 Four tag rules priced on one ruler, `build-release`, three runs, a thousand nodes per commit

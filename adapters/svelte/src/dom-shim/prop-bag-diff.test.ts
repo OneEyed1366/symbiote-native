@@ -56,10 +56,19 @@ function liveRoot(): ShimElement {
 
 // The LIVE tree, never the recording's own `find()` — a hit there is the node as it was CREATED
 // and would report the original bag forever.
-function committedPropsOf(testID: string): Record<string, unknown> {
+//
+// `accessibilityLabel` disambiguates two committed nodes that (deliberately, in the clone-isolation
+// test below) share the same `testID` — `find` would otherwise report whichever one it hits first.
+function committedPropsOf(
+  testID: string,
+  accessibilityLabel?: string,
+): Record<string, unknown> {
   const hit = live.findLive(
     live.appRoot(),
-    node => node.payload.testID === testID,
+    node =>
+      node.payload.testID === testID &&
+      (accessibilityLabel === undefined ||
+        node.payload.accessibilityLabel === accessibilityLabel),
   );
   if (hit === undefined) throw new Error(`no committed node testID=${testID}`);
   return hit.payload;
@@ -80,6 +89,31 @@ describe('the shim prop bag', () => {
     await tick();
     // Fabric spells "back to the default" as an explicit null, not a missing key.
     expect(committedPropsOf('bag').accessibilityLabel ?? null).toBeNull();
+  });
+
+  // why: `writeBagKey` is a candidate for copy-on-write (skip the `{...doorBag}` spread when this
+  // element is the sole owner of its door bag). A COW that forgets to mark a bag SHARED the moment
+  // it crosses a `cloneNode` would let a write to one clone's door mutate every sibling clone's
+  // committed props in place — this pins the isolation any such optimization must preserve.
+  it('a write to one clone does not leak into a sibling clone through a shared door bag', async () => {
+    const root = liveRoot();
+    const master = new ShimElement('view');
+    master.setAttribute('testID', 'shared');
+    const cloneA = master.cloneNode();
+    cloneA.setAttribute('accessibilityLabel', 'A');
+    const cloneB = master.cloneNode();
+    cloneB.setAttribute('accessibilityLabel', 'B');
+    root.appendChild(cloneA);
+    root.appendChild(cloneB);
+    await tick();
+    expect(committedPropsOf('shared', 'A').testID).toBe('shared');
+    expect(committedPropsOf('shared', 'B').testID).toBe('shared');
+
+    cloneA.setAttribute('testID', 'a-only');
+    await tick();
+    expect(committedPropsOf('a-only', 'A').testID).toBe('a-only');
+    // cloneB must still read the value it inherited from the master, not "a-only".
+    expect(committedPropsOf('shared', 'B').testID).toBe('shared');
   });
 
   // why: `attributes` is lazy, so the whole set/get/remove path runs against a map that may not
