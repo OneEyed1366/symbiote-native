@@ -182,6 +182,20 @@ jobs:
       # `bundle-isolation` gets away with it because both of its uses are on STEPS.
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: 2G
+      # WHY THE TWO ARMS DID NOT SHARE A SINGLE OBJECT ON THE FIRST RUN. This build is Debug (asserts
+      # are the point of it), so every compile carries `-g`, and ccache hashes the WORKING DIRECTORY
+      # by default because debug info embeds it. `build/` and `build-android/` are two directories,
+      # so the Android arm missed on all ~700 objects and paid a second cold compile: 193 s to run a
+      # single fixture. `hash_dir=false` is what makes them one cache; `base_dir` collapses the
+      # absolute paths that differ between the two build trees for the same reason.
+      #
+      # The debug info then names whichever directory compiled first. That is a debugger's problem
+      # and this binary is never opened in one — CI reads its stdout.
+      CCACHE_NOHASHDIR: 'true'
+      CCACHE_BASEDIR: ${{ github.workspace }}
+      # `include_file_mtime` / `include_file_ctime`: `pnpm install` rewrites the mtime of every
+      # ReactCommon header on every run, and their content is what actually decides the answer.
+      CCACHE_SLOPPINESS: include_file_mtime,include_file_ctime,time_macros
       HOMEBREW_NO_AUTO_UPDATE: 1
       HOMEBREW_NO_INSTALL_CLEANUP: 1
     steps:
@@ -210,15 +224,23 @@ jobs:
           restore-keys: |
             itest-ccache-${{ runner.os }}-
 
+      - run: ccache --zero-stats
+
       - run: pnpm run test:itest
 
-      # The Android arm in the SAME job, deliberately. It recompiles exactly one translation unit
-      # (`SymbioteFabricProps.cpp`, with `-DANDROID`) and links; every other object is byte-identical
-      # to the arm above, so it lands on ccache hits. On its own runner it would pay the whole cold
-      # compile again to re-verify twelve `#ifdef` sites. What it covers is real and reachable
+      # The Android arm in the SAME job, deliberately, and the sharing is the whole argument: it
+      # recompiles exactly one translation unit (`SymbioteFabricProps.cpp`, with `-DANDROID`) and
+      # links, so every other object is the one the step above just compiled. Two runners would each
+      # pay a cold ReactCommon build; one runner pays it once. What this arm covers is reachable
       # nowhere else headlessly: `android_ripple`, `underlineColorAndroid`, `decelerationRate`'s
       # constants, Button's uppercase label and its Material style.
       - run: pnpm run test:android
+
+      # A hit rate is a COUNTER, and this job's cost has already been misread once without one —
+      # 193 s of Android build looked like "the second arm is expensive" when it was ccache missing
+      # on every object. Read this before changing anything about the caching above.
+      - if: always()
+        run: ccache --show-stats --verbose
 
   # ONE RUNNER PER ARM. The script has always run its arms concurrently, but six `npm install`s of
   # the RN toolchain plus twelve Metro production bundles shared two vCPUs, so "concurrent" cost
