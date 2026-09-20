@@ -17,7 +17,21 @@
 //
 // @vue/babel-plugin-jsx is OUR dependency and require() resolves relative to this file, so the app
 // declares no extra devDependency — same reasoning as ./metro-css-parser.cjs.
-
+//
+// `optimize: true` defaults ON, an app may override it. The plugin's own README calls it
+// experimental ("the optimized code may skip certain re-renders... we strongly recommend thorough
+// testing") because it generates PatchFlags/dynamicProps from JSX's syntax alone, without the
+// template compiler's data-flow analysis. `.vue` SFCs get the equivalent from `@vue/compiler-sfc`
+// unconditionally already (`metro-vue-transformer.cjs`) — this closes the same gap for TSX, which
+// had none. `vue-row-component-shape-cost.itest.ts` measured why it matters: a stateful component
+// re-render pays for `hasPropsChanged`'s full `Object.keys(nextProps)` walk on every patch, even
+// when nothing changed; a patchFlag lets Vue check only the flagged dynamic keys instead.
+// Correctness (a changed prop still recommits, a conditional branch still flips, a keyed list still
+// reorders, and — the shape that actually matters here — a child COMPONENT still re-renders when a
+// nested prop field changes) is pinned in `optimize-flag-safety.test.ts`, including the exact
+// stateful-row shape the itest above measures; that file also confirms a measurable, reproducible
+// JS-side speedup on the identical partial-relabel pattern. NOT verified on-device/Hermes — only
+// headless, through this adapter's real renderer.
 const vueJsx = require('@vue/babel-plugin-jsx');
 
 // An intrinsic the renderer resolves through descriptorFor, never a Vue component — including one
@@ -35,6 +49,8 @@ module.exports = function symbioteVueJsx(options = {}) {
     [
       vueJsx,
       {
+        // A default an app may override — see the file-level comment above for what backs it.
+        optimize: true,
         ...options,
         // Last, deliberately: an app may pass other @vue/babel-plugin-jsx options through, but
         // overriding this one silently produces output this adapter cannot render.
