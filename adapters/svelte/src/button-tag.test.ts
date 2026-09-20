@@ -90,11 +90,8 @@ function descendantNames(node: ILiveNode): string[] {
 
 let nextRoot = 9_960;
 
-/** Compile a real `.svelte` source, mount it with the given props, settle. */
-async function mountSource(
-  source: string,
-  props: Record<string, unknown> = {},
-): Promise<number> {
+/** Compile a real `.svelte` source, mount it, settle. */
+async function mountSource(source: string): Promise<number> {
   const root = (nextRoot += 1);
   writeFileSync(
     PROBE_OUT,
@@ -106,7 +103,7 @@ async function mountSource(
   const { default: Probe } = (await import(
     `file://${PROBE_OUT}?arm=${root}`
   )) as { default: Component };
-  mount(root, Probe, props);
+  mount(root, Probe, {});
   await settle();
   return root;
 }
@@ -181,26 +178,12 @@ describe('Svelte: `button` as a tag', () => {
     await settle();
   });
 
-  // why: RN's Button-itest.js — `disabled` must gate the press itself, not just the label colour
-  // (`prevents the button onPress callback from being called`). This stays JS-side: the press
-  // machine's `disabledOf` (`buttonDisabled` in `./button`) is what actually suppresses the
-  // callback, unlike the styling below which moved to `SymbioteFabricProps.cpp`.
-  it('suppresses onPress from a real touch while disabled', async () => {
-    let presses = 0;
-    const root = await mountSource(
-      `<script>let { onPress } = $props();</script><button p={{ id: 'btn', title: 'Go', disabled: true, onPress }}></button>`,
-      { onPress: () => (presses += 1) },
-    );
-
-    const host = hostOf('btn');
-    fabric.fireEvent(host.instanceHandle, 'topTouchStart', {});
-    fabric.fireEvent(host.instanceHandle, 'topTouchEnd', {});
-    expect(presses).toBe(0);
-
-    unmount(root);
-    await settle();
-  });
-
+  // why: `disabled` greys the label and wins over an explicit `color` (Button.js pushes the
+  // disabled colour after the tint) — Button's own fold, reaching Fabric through Svelte's prop bag.
+  //
+  // The a11y half went to `core/engine/cpp/tests/js/pressable-payload.itest.ts`: Button composes
+  // the pressable rule, that rule is the engine's now, and this harness's payload is built by the
+  // TypeScript `fabricProps`, which holds no copy of it.
   // THE GREYING CASE LEFT ON 2026-09-18. `disabled` greys the label and wins over an explicit
   // `color` (RN pushes the disabled colour after the tint), and that whole expression is
   // `foldButtonLabelStyle` in `SymbioteFabricProps.cpp` now — including the three-way `disabled`

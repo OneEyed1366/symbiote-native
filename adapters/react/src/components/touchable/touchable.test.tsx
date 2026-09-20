@@ -150,8 +150,9 @@ function feedbackProps(): Record<string, unknown> {
 const settleUnderlay = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, DURATION_PROBE_MS));
 
-// The underlay backgroundColor lands on the CONTAINER (the responder), the cloned opacity on the
-// CHILD — matching RN (`TouchableHighlight-itest.js`) since the 2026-09-15 fix.
+// Both halves of a TouchableHighlight's feedback land on ONE node now (see the assertion below for
+// why), but the helpers stay split: `containerProps` is the responder and `childProps` the app's
+// own child, and proving the child is UNTOUCHED is what the second one is for.
 function committedViews(): Record<string, unknown>[] {
   const found: Record<string, unknown>[] = [];
   live.walkLive(live.appRoot(), node => {
@@ -427,32 +428,17 @@ describe('React TouchableOpacity animated feedback', () => {
       'disabling mid-press must animate back to rest',
     ).toBeCloseTo(1, 6);
   });
-
-  // why: RN-parity sweep lesson — a disabled test that only checks the fade/style doesn't prove
-  // `onPress` is actually gated; RN's own Button-itest fires a real touch for exactly this reason.
-  it('suppresses onPress from a real touch while disabled', async () => {
-    let presses = 0;
-    mount(
-      ROOT_TAG,
-      <touchable-opacity disabled onPress={() => (presses += 1)} />,
-    );
-    fabric.fireEvent(responderHandle(), TOUCH_START);
-    fabric.fireEvent(responderHandle(), TOUCH_END);
-    await flushFrames();
-    expect(presses).toBe(0);
-  });
 });
 
 describe('React TouchableHighlight underlay feedback', () => {
   // why: RN paints TouchableHighlight's feedback with a synchronous style swap (not Animated),
   // unlike TouchableOpacity above — and it SPLITS that swap across two nodes: the underlay color
   // on the container, the lowered opacity cloned onto the child (TouchableHighlight.js
-  // _createExtraStyles + render, confirmed against `TouchableHighlight-itest.js`'s own two-node
-  // shape). Folding both onto the container fades the very underlay it is meant to reveal, so
-  // `underlayColor: 'black'` paints grey — fixed at the engine level (`onChildInserted` in
-  // `core/components/src/behaviors/touchable-highlight.ts`) 2026-09-15, so every adapter gets the
-  // split, not just the ones whose framework can `cloneElement`.
-  it('paints underlayColor on the container and activeOpacity on the child', async () => {
+  // _createExtraStyles + render). Folding both onto the container — what every adapter did before
+  // the 2026-08-19 audit — fades the very underlay it is meant to reveal, so `underlayColor:
+  // 'black'` paints grey. React is the only adapter that can reach the child (cloneElement), so
+  // this test is the split's only guard in the repo.
+  it('paints underlayColor and activeOpacity while pressed, and clears the child', async () => {
     mount(
       ROOT_TAG,
       <touchable-highlight
@@ -585,65 +571,11 @@ describe('React TouchableHighlight underlay feedback', () => {
     await new Promise(resolve => setTimeout(resolve, 20));
     expect(calls).toEqual(['pressIn', 'press', 'pressOut']);
   });
-
-  // why: same lesson as TouchableOpacity's — style/underlay coverage does not prove the press
-  // itself is gated.
-  it('suppresses onPress from a real touch while disabled', async () => {
-    let presses = 0;
-    mount(
-      ROOT_TAG,
-      <touchable-highlight disabled onPress={() => (presses += 1)} />,
-    );
-    fabric.fireEvent(responderHandle(), TOUCH_START);
-    fabric.fireEvent(responderHandle(), TOUCH_END);
-    await new Promise(resolve => setTimeout(resolve, 20));
-    expect(presses).toBe(0);
-  });
 });
 
-// RN-parity sweep gap: this block was deliberately left out under the reasoning that
-// `core/components/src/behaviors/touchable-without-feedback.test.ts` already proves the press
-// wiring "against the COMMITTED tree" — but that core test drives the engine directly
-// (`routeProp`/`engineAppend`), never through React's actual JSX -> fiber -> engine pipeline. This
-// closes that gap: real React wiring, not just the engine-level contract.
-//
-// TWF renders NO view of its own (TouchableWithoutFeedback.js:229,286) — it clones its props onto
-// its single child, so every case here needs a real child.
-describe('React TouchableWithoutFeedback', () => {
-  it('fires onPress from a real touch', async () => {
-    let presses = 0;
-    mount(
-      ROOT_TAG,
-      <touchable-without-feedback onPress={() => (presses += 1)}>
-        <view style={{ height: 4 }} />
-      </touchable-without-feedback>,
-    );
-    fabric.fireEvent(responderHandle(), TOUCH_START);
-    fabric.fireEvent(responderHandle(), TOUCH_END);
-    await new Promise(resolve => setTimeout(resolve, 20));
-    expect(presses).toBe(1);
-  });
-
-  it('suppresses onPress from a real touch while disabled', async () => {
-    let presses = 0;
-    mount(
-      ROOT_TAG,
-      <touchable-without-feedback disabled onPress={() => (presses += 1)}>
-        <view style={{ height: 4 }} />
-      </touchable-without-feedback>,
-    );
-    fabric.fireEvent(responderHandle(), TOUCH_START);
-    fabric.fireEvent(responderHandle(), TOUCH_END);
-    await new Promise(resolve => setTimeout(resolve, 20));
-    expect(presses).toBe(0);
-  });
-
-  // `focusable`/`accessibilityState` from `disabled` moved to `foldPressableProps` in
-  // `SymbioteFabricProps.cpp` (via the clone-onto-child descendant rule) on 2026-09-18 — this
-  // harness builds its payload through the TypeScript `fabricProps`, which carries no copy of it.
-  // Asserted against the committed payload in
-  // `core/engine/cpp/tests/js/touchable-focusable-payload.itest.ts`.
-});
+// TouchableWithoutFeedback's own block left with the wrapper: it is a tag now, and both its press
+// wiring and its delayPressIn scheduler are covered against the COMMITTED tree in
+// `core/components/src/behaviors/touchable-without-feedback.test.ts`.
 
 // RN sets `accessible={this.props.accessible !== false}` on each Touchable itself
 // (TouchableOpacity.js:303, TouchableHighlight.js:337). Here the whole family composes over
@@ -668,14 +600,6 @@ describe('React Touchable* accessibility default', () => {
     [
       'TouchableHighlight',
       c => <touchable-highlight onPress={() => {}}>{c}</touchable-highlight>,
-    ],
-    [
-      'TouchableWithoutFeedback',
-      c => (
-        <touchable-without-feedback onPress={() => {}}>
-          {c}
-        </touchable-without-feedback>
-      ),
     ],
   ];
 

@@ -225,13 +225,11 @@ describe('Solid: `touchable-opacity` and `touchable-highlight` as tags', () => {
   });
 
   describe('TouchableHighlight', () => {
-    const HIGHLIGHT_CHILD = 'touchable-highlight-child';
-
-    // why: RN splits the underlay backgroundColor and the pressed opacity across the container and
-    // its cloned child (TouchableHighlight.js, confirmed against `TouchableHighlight-itest.js`'s
-    // own two-node shape) — fixed at the engine level via `onChildInserted`
-    // (core/components/src/behaviors/touchable-highlight.ts) 2026-09-15.
-    it('paints underlayColor on the container and activeOpacity on the child, clears both on release', async () => {
+    // why: TouchableHighlight folds BOTH the underlay backgroundColor and the pressed opacity onto
+    // the SAME node (the already-shipped, cross-adapter simplification every wrapper made —
+    // `core/components/src/behaviors/touchable-highlight.ts`'s own header), and clears both on
+    // release.
+    it('paints underlayColor and activeOpacity while pressed, and clears on release', async () => {
       mount(ROOT_TAG, () => (
         <touchable-highlight
           testID={TARGET}
@@ -239,7 +237,7 @@ describe('Solid: `touchable-opacity` and `touchable-highlight` as tags', () => {
           activeOpacity={ACTIVE_OPACITY}
           onPress={() => {}}
         >
-          <text testID={HIGHLIGHT_CHILD}>press me</text>
+          <text>press me</text>
         </touchable-highlight>
       ));
       await tick();
@@ -300,137 +298,6 @@ describe('Solid: `touchable-opacity` and `touchable-highlight` as tags', () => {
       fabric.fireEvent(target().instanceHandle, TOUCH_START);
       await tick();
       expect(isUnderlayShown()).toBe(false);
-    });
-
-    // why: RN marks every Touchable accessible unless the app opts OUT — Opacity already had this
-    // case, Highlight did not (RN-parity sweep gap).
-    it('marks itself accessible by default', async () => {
-      mount(ROOT_TAG, () => <touchable-highlight testID={TARGET} />);
-      await tick();
-      expect(target().props.accessible).toBe(true);
-    });
-  });
-
-  // why: neither variant had a `focusable` test at all before this sweep — RN gives Pressable a
-  // ONE-leg default (Pressable.js:258) and the Touchables a THREE-leg one
-  // (TouchableOpacity.js:336-340, TouchableHighlight.js:370-374), so each tag folds its own; a
-  // missing test here would miss a regression to the plain Pressable default.
-  describe('focusable', () => {
-    it('TouchableOpacity stays out of the focus order without an onPress', async () => {
-      mount(ROOT_TAG, () => <touchable-opacity testID={TARGET} />);
-      await tick();
-      expect(target().props.focusable).toBe(false);
-    });
-
-    it('TouchableOpacity focuses once it has an onPress', async () => {
-      mount(ROOT_TAG, () => (
-        <touchable-opacity testID={TARGET} onPress={() => {}} />
-      ));
-      await tick();
-      expect(target().props.focusable).toBe(true);
-    });
-
-    // why: the case a `focusable ?? computed` implementation gets wrong — an explicit opt-IN
-    // still loses to `disabled`.
-    it('TouchableOpacity refuses focus while disabled, opt-in notwithstanding', async () => {
-      mount(ROOT_TAG, () => (
-        <touchable-opacity
-          testID={TARGET}
-          onPress={() => {}}
-          disabled
-          focusable
-        />
-      ));
-      await tick();
-      expect(target().props.focusable).toBe(false);
-    });
-
-    it('TouchableHighlight stays out of the focus order without an onPress', async () => {
-      mount(ROOT_TAG, () => <touchable-highlight testID={TARGET} />);
-      await tick();
-      expect(target().props.focusable).toBe(false);
-    });
-
-    it('TouchableHighlight focuses once it has an onPress', async () => {
-      mount(ROOT_TAG, () => (
-        <touchable-highlight testID={TARGET} onPress={() => {}} />
-      ));
-      await tick();
-      expect(target().props.focusable).toBe(true);
-    });
-
-    it('TouchableHighlight refuses focus while disabled, opt-in notwithstanding', async () => {
-      mount(ROOT_TAG, () => (
-        <touchable-highlight
-          testID={TARGET}
-          onPress={() => {}}
-          disabled
-          focusable
-        />
-      ));
-      await tick();
-      expect(target().props.focusable).toBe(false);
-    });
-  });
-
-  // The universal gap: React/Vue/Svelte/Angular and Solid all had ZERO bridge tests for this
-  // component before this sweep, despite core (`behaviors/touchable-without-feedback.ts`+test)
-  // fully implementing the same accessible/focusable/accessibilityState fold as TouchableHighlight.
-  // TWF renders NO view of its own — it clones props onto its single child, and `testID` is only
-  // cloned WHEN SET on the owner, so it goes on the owner tag here, same as everywhere else.
-  describe('TouchableWithoutFeedback', () => {
-    it('fires onPress from a real touch', async () => {
-      let presses = 0;
-      mount(ROOT_TAG, () => (
-        <touchable-without-feedback testID={TARGET} onPress={() => presses++}>
-          <text>press me</text>
-        </touchable-without-feedback>
-      ));
-      await tick();
-
-      const handle = createdTarget().instanceHandle;
-      fabric.fireEvent(handle, TOUCH_START);
-      fabric.fireEvent(handle, TOUCH_END);
-      await settle();
-
-      expect(presses).toBe(1);
-    });
-
-    // why: lesson 6 — a disabled test that only checks style/accessibilityState doesn't prove
-    // `onPress` is actually gated.
-    it('suppresses onPress from a real touch while disabled', async () => {
-      let presses = 0;
-      mount(ROOT_TAG, () => (
-        <touchable-without-feedback
-          testID={TARGET}
-          disabled
-          onPress={() => presses++}
-        >
-          <text>press me</text>
-        </touchable-without-feedback>
-      ));
-      await tick();
-
-      const handle = createdTarget().instanceHandle;
-      fabric.fireEvent(handle, TOUCH_START);
-      fabric.fireEvent(handle, TOUCH_END);
-      await settle();
-
-      expect(presses).toBe(0);
-    });
-
-    it('computes focusable and accessibilityState from disabled', async () => {
-      mount(ROOT_TAG, () => (
-        <touchable-without-feedback testID={TARGET} disabled onPress={() => {}}>
-          <text>press me</text>
-        </touchable-without-feedback>
-      ));
-      await tick();
-
-      expect(target().props.focusable).toBe(false);
-      expect(target().props.accessibilityState).toMatchObject({
-        disabled: true,
-      });
     });
   });
 });

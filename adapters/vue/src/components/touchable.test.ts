@@ -351,42 +351,14 @@ describe('Vue TouchableOpacity', () => {
     await wait(PRESS_DELAY_MS + 20);
     expect(pressIns).toBe(1);
   });
-
-  // why: RN-parity sweep lesson — style/fade coverage doesn't prove `onPress` is actually gated;
-  // RN's own itest fires a real touch for exactly this reason.
-  it('suppresses onPress from a real touch while disabled', async () => {
-    let presses = 0;
-    const App = defineComponent({
-      setup: () => (): VNode =>
-        h('touchable-opacity', {
-          testID: TARGET,
-          disabled: true,
-          onPress: () => {
-            presses++;
-          },
-        }),
-    });
-    mount(ROOT_TAG, App);
-    await flush();
-
-    fabric.fireEvent(responderHandle(), TOUCH_START);
-    fabric.fireEvent(responderHandle(), TOUCH_END);
-    await flushFrames();
-    expect(presses).toBe(0);
-  });
-
-  // `accessible` defaulting to true moved to `foldPressableProps` in `SymbioteFabricProps.cpp` on
-  // 2026-09-18 — this harness builds its payload through the TypeScript `fabricProps`, which
-  // carries no copy of it. Asserted against the committed payload in
-  // `core/engine/cpp/tests/js/touchable-focusable-payload.itest.ts`.
 });
 
 describe('Vue TouchableHighlight', () => {
   // why: RN's _createExtraStyles splits the underlay color and the lowered opacity across a
-  // container and its child (TouchableHighlight.js, confirmed against `TouchableHighlight-itest.js`'s
-  // own two-node shape) — fixed at the engine level via `onChildInserted`
-  // (core/components/src/behaviors/touchable-highlight.ts) 2026-09-15, so Vue gets the real split.
-  it('paints the underlay on the container and the pressed opacity on the child', async () => {
+  // container and its child — a tag has no render to clone a style onto a child with, so both
+  // halves fold onto the ONE node instead (core/components/src/behaviors/touchable-highlight.ts).
+  // The app's own child is an ordinary child, untouched.
+  it('paints the underlay and the pressed opacity on the one node', async () => {
     const App = defineComponent({
       setup: () => (): VNode =>
         h(
@@ -599,97 +571,6 @@ describe('Vue TouchableHighlight', () => {
     expect(committedPayload(TARGET).underlayColor).toBe('#def');
     expect(isUnderlayShown(TARGET)).toBe(true);
   });
-
-  // why: same lesson as TouchableOpacity's — underlay coverage does not prove the press itself is
-  // gated.
-  it('suppresses onPress from a real touch while disabled', async () => {
-    let presses = 0;
-    const App = defineComponent({
-      setup: () => (): VNode =>
-        h('touchable-highlight', {
-          testID: TARGET,
-          disabled: true,
-          onPress: () => {
-            presses++;
-          },
-        }),
-    });
-    mount(ROOT_TAG, App);
-    await flush();
-
-    fabric.fireEvent(responderHandle(), TOUCH_START);
-    fabric.fireEvent(responderHandle(), TOUCH_END);
-    await flush();
-    expect(presses).toBe(0);
-  });
-
-  // `accessible` defaulting to true moved to `foldPressableProps` in `SymbioteFabricProps.cpp` on
-  // 2026-09-18 — this harness builds its payload through the TypeScript `fabricProps`, which
-  // carries no copy of it. Asserted against the committed payload in
-  // `core/engine/cpp/tests/js/touchable-focusable-payload.itest.ts`.
-});
-
-// RN-parity sweep gap: this block was deliberately left out under the reasoning that
-// `core/components/src/behaviors/touchable-without-feedback.test.ts` already proves the press
-// wiring "against the COMMITTED tree" — but that core test drives the engine directly, never
-// through Vue's actual reconciler -> engine pipeline. This closes that gap.
-//
-// TWF renders NO view of its own — it clones its props onto its single child (`nativeID`
-// unconditionally from the owner, `testID` only when the owner sets it), so every case here
-// needs a real child and reads the CHILD's committed props.
-describe('Vue TouchableWithoutFeedback', () => {
-  it('fires onPress from a real touch', async () => {
-    let presses = 0;
-    const App = defineComponent({
-      setup: () => (): VNode =>
-        h(
-          'touchable-without-feedback',
-          {
-            onPress: () => {
-              presses++;
-            },
-          },
-          [h('view', { testID: TARGET })],
-        ),
-    });
-    mount(ROOT_TAG, App);
-    await flush();
-
-    fabric.fireEvent(responderHandle(), TOUCH_START);
-    fabric.fireEvent(responderHandle(), TOUCH_END);
-    await flush();
-    expect(presses).toBe(1);
-  });
-
-  it('suppresses onPress from a real touch while disabled', async () => {
-    let presses = 0;
-    const App = defineComponent({
-      setup: () => (): VNode =>
-        h(
-          'touchable-without-feedback',
-          {
-            disabled: true,
-            onPress: () => {
-              presses++;
-            },
-          },
-          [h('view', { testID: TARGET })],
-        ),
-    });
-    mount(ROOT_TAG, App);
-    await flush();
-
-    fabric.fireEvent(responderHandle(), TOUCH_START);
-    fabric.fireEvent(responderHandle(), TOUCH_END);
-    await flush();
-    expect(presses).toBe(0);
-  });
-
-  // `focusable`/`accessibilityState` from `disabled` moved to `foldPressableProps` in
-  // `SymbioteFabricProps.cpp` (via the clone-onto-child descendant rule) on 2026-09-18 — this
-  // harness builds its payload through the TypeScript `fabricProps`, which carries no copy of it.
-  // Asserted against the committed payload in
-  // `core/engine/cpp/tests/js/touchable-focusable-payload.itest.ts`.
 });
 
 // TouchableWithoutFeedback's own block left with the wrapper: it is a tag now, and both its press

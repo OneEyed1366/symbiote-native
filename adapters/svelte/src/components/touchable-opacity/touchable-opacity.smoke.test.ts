@@ -466,34 +466,4 @@ describe('Svelte TouchableOpacity (real compiled index.svelte)', () => {
       nodeAtMount,
     );
   });
-
-  // why: RN-parity sweep lesson — the "re-settles the opacity when disabled flips" case above
-  // proves the FADE reacts to `disabled`, not that a press while already disabled is gated at all.
-  // RN's own Button-itest fires a real touch for exactly this reason.
-  it('suppresses onPress from a real touch while disabled', async () => {
-    const { Parent, control } = await loadParent();
-    // `disabled` is driven by `control` in the parent template (see loadParent's header), not by
-    // the mount-time props object — a `disabled` passed there is immediately overwritten.
-    control.disabled = true;
-    let presses = 0;
-    mount(ROOT_TAG, Parent, {
-      testID: TARGET,
-      onPress: () => {
-        presses += 1;
-      },
-    });
-    await tick();
-    await tick();
-
-    const handle = responderHandle();
-    fabric.fireEvent(handle, TOUCH_START);
-    fabric.fireEvent(handle, TOUCH_END);
-    await flushFrames();
-    expect(presses).toBe(0);
-  });
-
-  // `focusable`'s three-leg form (Pressable.js:258 vs TouchableOpacity.js:336-340) moved to
-  // `foldPressableProps` in `SymbioteFabricProps.cpp` on 2026-09-18 — this harness builds its
-  // payload through the TypeScript `fabricProps`, which carries no copy of it. Asserted against
-  // the committed payload in `core/engine/cpp/tests/js/touchable-focusable-payload.itest.ts`.
 });

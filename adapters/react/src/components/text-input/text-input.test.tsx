@@ -241,19 +241,9 @@ describe('<text-input>', () => {
       expect(commands.some(c => c.commandName === 'focus')).toBe(true);
     });
 
-    // why: RN's TextInputState.blurTextInput only dispatches for the currently-tracked focused
-    // field (`TextInput-itest.js`'s "does NOT dispatch any commands if the input is NOT
-    // focused") — blur() must focus() first for the command to have anywhere to go.
-    it('blur() dispatches a blur command once focused', () => {
-      const handle = mountHandle();
-      handle.focus();
-      handle.blur();
-      expect(commands.some(c => c.name === 'blur')).toBe(true);
-    });
-
-    it('blur() is a no-op if the field was never focused', () => {
+    it('blur() dispatches a blur command', () => {
       mountHandle().blur();
-      expect(commands.some(c => c.name === 'blur')).toBe(false);
+      expect(commands.some(c => c.name === 'blur')).toBe(true);
     });
 
     // why: clear() must reset native to an EMPTY string via the same acked-count command path

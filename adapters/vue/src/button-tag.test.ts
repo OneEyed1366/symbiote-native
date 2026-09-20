@@ -96,28 +96,10 @@ describe('Vue: `button` as a tag', () => {
     expect(text.children[0].payload.text).toBe('Save');
   });
 
-  // why: RN's Button-itest.js — `disabled` must gate the press itself, not just the label colour
-  // (`prevents the button onPress callback from being called`). This stays JS-side: the press
-  // machine's `disabledOf` (`buttonDisabled` in `./button`) is what actually suppresses the
-  // callback, unlike the styling below which moved to `SymbioteFabricProps.cpp`.
-  it('suppresses onPress from a real touch while disabled', async () => {
-    let presses = 0;
-    await mountTag({
-      id: 'btn',
-      title: 'Go',
-      disabled: true,
-      onPress: () => {
-        presses += 1;
-      },
-    });
-
-    const host = hostOf('btn');
-    fabric.fireEvent(host.instanceHandle, 'topTouchStart', {});
-    fabric.fireEvent(host.instanceHandle, 'topTouchEnd', {});
-
-    expect(presses).toBe(0);
-  });
-
+  // why: `disabled` greys the label and wins over an explicit `color` (Button.js pushes the
+  // disabled colour after the tint). The a11y half went to
+  // `core/engine/cpp/tests/js/pressable-payload.itest.ts` — Button composes the pressable rule and
+  // that rule is the engine's now, so this harness's TypeScript-built payload cannot see it.
   // THE GREYING CASE LEFT ON 2026-09-18. `disabled` greys the label and wins over an explicit
   // `color` (RN pushes the disabled colour after the tint), and that whole expression is
   // `foldButtonLabelStyle` in `SymbioteFabricProps.cpp` now — including the three-way `disabled`

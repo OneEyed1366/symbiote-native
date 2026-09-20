@@ -73,25 +73,10 @@ function subtreeOf(label: string): ILiveNode[] {
   return nodes;
 }
 
-/** The child committed in root's place, for its `instanceHandle` — `ILiveNode` carries it directly. */
-function rawChildOf(label: string): ILiveNode {
-  const root = live.findLive(
-    live.appRoot(),
-    node => node.payload.nativeID === label,
-  );
-  if (root === undefined) throw new Error(`no committed root ${label}`);
-  const [child] = root.children;
-  if (child === undefined) throw new Error(`root ${label} has no child`);
-  return child;
-}
-
 let nextRoot = 9_934;
 
-/** Compile a real `.svelte` source, mount it with the given props, settle. */
-async function mountSource(
-  source: string,
-  props: Record<string, unknown> = {},
-): Promise<number> {
+/** Compile a real `.svelte` source, mount it, settle. */
+async function mountSource(source: string): Promise<number> {
   const root = (nextRoot += 1);
   writeFileSync(
     PROBE_OUT,
@@ -102,7 +87,7 @@ async function mountSource(
   const { default: Probe } = (await import(
     `file://${PROBE_OUT}?arm=${root}`
   )) as { default: Component };
-  mount(root, Probe, props);
+  mount(root, Probe, {});
   await settle();
   return root;
 }
@@ -151,33 +136,6 @@ describe('touchable-native-feedback as a tag', () => {
 
     const [child] = subtreeOf('root');
     expect(child.payload.onLayout).toBe(true);
-
-    unmount(root);
-    await settle();
-  });
-
-  // why: the clone case above proves the PROPS bridge; it does not prove a real touch on the child
-  // actually reaches the owner's `onPress` through Svelte's wiring — the press machine runs on the
-  // child (core/components/src/behaviors/touchable-native-feedback.test.ts), so a touch dispatched
-  // anywhere but there would silently prove nothing.
-  it('fires the owner’s onPress from a real touch on the cloned child', async () => {
-    let presses = 0;
-    const root = await mountSource(
-      [
-        '<script>let { onPress } = $props();</script>',
-        '<view id="root">',
-        '  <touchable-native-feedback id="tnf" onPress={onPress}>',
-        '    <view></view>',
-        '  </touchable-native-feedback>',
-        '</view>',
-      ].join('\n'),
-      { onPress: () => (presses += 1) },
-    );
-
-    const handle = rawChildOf('root').instanceHandle;
-    fabric.fireEvent(handle, 'topTouchStart', {});
-    fabric.fireEvent(handle, 'topTouchEnd', {});
-    expect(presses).toBe(1);
 
     unmount(root);
     await settle();

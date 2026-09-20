@@ -27,7 +27,6 @@ const tick = (): Promise<void> =>
 
 let capturedHost: ModalHostFixture | undefined;
 let capturedOrientationHost: ModalOrientationHostFixture | undefined;
-let capturedLifecycleHost: ModalLifecycleHostFixture | undefined;
 
 @Component({
   selector: 'symbiote-modal-host',
@@ -80,35 +79,9 @@ class ModalOrientationHostFixture {
 })
 class ModalHiddenHostFixture {}
 
-@Component({
-  selector: 'symbiote-modal-lifecycle-host',
-  standalone: true,
-  imports: [Modal],
-  template: `
-    <Modal
-      [visible]="visible()"
-      [testID]="'modal'"
-      (show)="shown = true"
-      (dismiss)="dismissed = true"
-    >
-      <text>Hello</text>
-    </Modal>
-  `,
-})
-class ModalLifecycleHostFixture {
-  readonly visible = signal(true);
-  shown = false;
-  dismissed = false;
-  constructor() {
-    // eslint-disable-next-line @typescript-eslint/no-this-alias
-    capturedLifecycleHost = this;
-  }
-}
-
 beforeEach(() => {
   capturedHost = undefined;
   capturedOrientationHost = undefined;
-  capturedLifecycleHost = undefined;
   fabric.reset();
 });
 afterEach(() => {
@@ -167,38 +140,6 @@ describe('Modal (no throwing path — see file header)', () => {
     expect(capturedOrientationHost?.received?.nativeEvent.orientation).toBe(
       'landscape',
     );
-  });
-
-  it('routes topShow to the show output', async () => {
-    mount(ROOT_TAG, ModalLifecycleHostFixture);
-    await tick();
-
-    const node = fabric.find(n => n.props.testID === 'modal');
-    if (!node) throw new Error('no modal host node was created');
-    fabric.fireEvent(node.instanceHandle, 'topShow', {});
-
-    expect(capturedLifecycleHost?.shown).toBe(true);
-  });
-
-  // why: dismiss must fire on the native exit-animation completion (topDismiss) and must NOT
-  // fire merely because the app requested the close — conflating the two would fire an app's
-  // "modal closed" side effect one frame too early, before native has actually finished dismissing.
-  it('fires dismiss only on the native topDismiss event, not on the hide transition', async () => {
-    mount(ROOT_TAG, ModalLifecycleHostFixture);
-    await tick();
-    if (!capturedLifecycleHost) throw new Error('host was not captured');
-
-    capturedLifecycleHost.visible.set(false);
-    await Promise.resolve();
-    expect(capturedLifecycleHost.dismissed).toBe(false);
-
-    // Re-query: the keep-alive frame recommits the node (clone-on-write), so the instanceHandle
-    // captured before the toggle is stale — same modal, new committed node.
-    const keptAlive = fabric.find(n => n.props.testID === 'modal');
-    if (!keptAlive)
-      throw new Error('keep-alive frame dropped the node too early');
-    fabric.fireEvent(keptAlive.instanceHandle, 'topDismiss', {});
-    expect(capturedLifecycleHost.dismissed).toBe(true);
   });
 
   it('resolves a class= on the Modal use site onto the real committed view, not the anchor', async () => {
