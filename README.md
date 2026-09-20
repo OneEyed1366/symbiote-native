@@ -47,15 +47,15 @@ more work than moving your screens into a fresh project, and it is not a path we
 `react-native` stays **your app's own top-level dependency**. SymbioteNative never hides it, it only
 replaces the JS renderer driving it.
 
-One line in the build differs per framework, and the CLI writes it for you:
+What each framework needs in the build differs, and the CLI writes it for you:
 
-| Framework                     | Package                    | What it adds to the build                                                                        |
-| ----------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------ |
-| [React](./adapters/react)     | `@symbiote-native/react`   | nothing, plain Metro                                                                             |
-| [Vue 3](./adapters/vue)       | `@symbiote-native/vue`     | a Metro transformer for `.vue` SFCs; TSX needs none                                              |
-| [Angular](./adapters/angular) | `@symbiote-native/angular` | `ngc --watch` beside Metro, since AOT compiles separately. Needs `@angular/core` >= 20, zoneless |
-| [Svelte](./adapters/svelte)   | `@symbiote-native/svelte`  | a Metro transformer for `.svelte`                                                                |
-| [Solid](./adapters/solid)     | `@symbiote-native/solid`   | its `babel-preset` listed **last** in Metro's presets                                            |
+| Framework                     | Package                    | What it adds to the build                                                                                                                                                 |
+| ----------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [React](./adapters/react)     | `@symbiote-native/react`   | nothing, plain Metro                                                                                                                                                      |
+| [Vue 3](./adapters/vue)       | `@symbiote-native/vue`     | its `babel-jsx` pair for TSX; a Metro transformer as well for `.vue` SFCs                                                                                                 |
+| [Angular](./adapters/angular) | `@symbiote-native/angular` | the most wiring of the five: `ngc --watch` beside Metro, its `metro-config`, and its `babel-linker` plus `babel-register-composed`. Needs `@angular/core` >= 20, zoneless |
+| [Svelte](./adapters/svelte)   | `@symbiote-native/svelte`  | a Metro transformer for `.svelte`                                                                                                                                         |
+| [Solid](./adapters/solid)     | `@symbiote-native/solid`   | its `babel-preset` listed **last** in Metro's presets                                                                                                                     |
 
 Every adapter is [on npm](https://www.npmjs.com/org/symbiote-native) at `2.0.x`, and the scope
 publishes **37 packages** in all. Beyond the five adapters and the shared core, 27 companion
@@ -124,9 +124,9 @@ production scale. Each answer gives up something structural.
 |                    | Whose native layer                   | Frameworks shipping today            | What it costs you                                                      |
 | ------------------ | ------------------------------------ | ------------------------------------ | ---------------------------------------------------------------------- |
 | **React Native**   | Meta's Fabric / Yoga / Hermes        | React only                           | React lock-in                                                          |
-| **NativeScript**   | its own runtime and bindings         | Angular; Vue and Svelte are stale    | leaving RN's ecosystem, and uneven framework support                   |
-| **Hippy**          | its own C++ DOM and layout engine    | React, Vue                           | leaving RN's ecosystem for Tencent's                                   |
-| **Lynx**           | its own engine (PrimJS, dual-thread) | ReactLynx only                       | a year-old ecosystem, mostly hand-written bridging                     |
+| **NativeScript**   | its own runtime and bindings         | Angular and Vue; Svelte is stale     | leaving RN's ecosystem, and uneven framework support                   |
+| **Hippy**          | its own C++ DOM and layout engine    | React; its Vue packages are stale    | leaving RN's ecosystem for Tencent's                                   |
+| **Lynx**           | its own engine (PrimJS, dual-thread) | ReactLynx only                       | an 18-month-old ecosystem, mostly hand-written bridging                |
 | **SymbioteNative** | **stock, unforked React Native**     | React, Vue 3, Angular, Svelte, Solid | Angular is our slowest adapter; ecosystem packages are wrapped by hand |
 
 As far as we have verified, SymbioteNative is the only one reusing React Native's own unforked
@@ -151,12 +151,17 @@ Three costs:
 <details>
 <summary>Evidence behind that table, with dates</summary>
 
-- **NativeScript** - core last commit Aug 14 2026, releases every 2-4 weeks. `@nativescript/angular`
-  21.0.0 (Jan 2026) is active; Vue has been quiet since `3.0.2` in Oct 2025; Svelte's community fork
-  stalled in Dec 2025 and the original `svelte-native` has not shipped since Nov 2024.
-- **Hippy** - React and Vue both officially supported, shipping in QQ, QQ Music and Tencent News,
-  releases through Aug 2025.
-- **Lynx** - launched Mar 2025. Vue support is an unfinished community prototype.
+Latest npm releases, read from the registry on 2026-09-20:
+
+- **NativeScript** is healthy on two of three. `@nativescript/core` 9.1.2 (Sep 16 2026),
+  `@nativescript/angular` 22.0.1 (Aug 24 2026), and `nativescript-vue` 3.1.2 (Sep 15 2026) after
+  four releases in the preceding month. Only Svelte is stale: `svelte-native` 1.0.29 has not
+  shipped since Nov 7 2024.
+- **Hippy** ships React actively, `@hippy/react` 3.3.5 (Aug 4 2026), in QQ, QQ Music and Tencent
+  News. Its Vue packages are the stale half: `@hippy/vue` and `@hippy/vue-next` both sit at 3.3.2
+  from Feb 17 2025.
+- **Lynx** launched Mar 2025 and moves fast, `@lynx-js/react` 0.126.1 (Sep 11 2026). There is no
+  Vue package under the scope; Vue support is an unfinished community prototype.
 
 The wrapping cost has one mechanism behind it: a library's JS component calls React hooks in its own
 body, so under a non-React adapter the dispatcher is null and it throws. The _native view_ is
@@ -171,8 +176,8 @@ without importing the library's React component.
 
 React Native's own components carry a mountain of small, framework-agnostic behavior inside their JS
 bodies. `Pressable` folds `disabled` into `accessibilityState`. `Switch` uses different native prop
-names per platform. A `<Text>` defaults its `ellipsizeMode`, `id` aliases to `nativeID`, ARIA
-aliases resolve, `TouchableHighlight` paints an underlay.
+names per platform. A `<Text>` defaults its `ellipsizeMode`, `Image` resolves `srcSet` over `src`
+over `source`, ARIA aliases resolve, `TouchableHighlight` paints an underlay.
 
 Get any of it wrong and a control is announced incorrectly to a screen reader, or paints nothing.
 Ported per adapter, that is five copies of every rule, drifting apart one release at a time.
@@ -210,7 +215,8 @@ is the only thing it is for.
 
 **What is measured.** The [js-framework-benchmark](https://github.com/krausest/js-framework-benchmark)
 operation list, the same one web frameworks are ranked with. Each row builds ten native views (three
-`View`, three `Text`, three raw text nodes, a `TextInput`), so a run commits a 10 001-node tree.
+`View`, three `Text`, three raw text nodes, a `TextInput`), so a run commits just over 10 000 nodes:
+10 002 for stock, 10 003 for an adapter, which mounts one container view of its own.
 
 **How it is kept honest.**
 
@@ -312,8 +318,9 @@ stock react-native : Fabric C++ / JSI / Yoga / RCTFabricSurface       <- never f
 
 The hard part is that Vue, Svelte, Solid and Angular **mutate** nodes in place (`el.setAttribute`),
 while Fabric is **persistent**: every change clones the node with new props and atomically commits a
-new child set. That translation lives **once**, in the engine, so adapters see only a four-call
-mutation API and a persistence bug is fixed once for every framework.
+new child set. That translation lives **once**, in the engine, so adapters see only a small mutation
+API (`createNode`, `appendChild`, `insertBefore`, `removeChild`, `setProp`, commit) and a
+persistence bug is fixed once for every framework.
 
 <details>
 <summary>One update end to end, plus events, bootstrap, and what stays stock</summary>
