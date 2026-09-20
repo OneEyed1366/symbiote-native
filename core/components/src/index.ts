@@ -162,7 +162,9 @@ export type { IModalState, IModalAction } from './state/modal';
 // KeyboardAvoidingView: pure inset/behavior math; the adapter owns the Keyboard subscription.
 export {
   computeInset,
+  configureKeyboardAvoidingAnimation,
   keyboardAvoidingEventNamesFor,
+  readKeyboardAnimationTiming,
   readPrefersCrossFadeTransitions,
   readKeyboardFrame,
   readLayoutFrame,
@@ -171,6 +173,7 @@ export {
 } from './view/render-keyboard-avoiding-view';
 export type {
   IComputeInsetOptions,
+  IKeyboardAnimationTiming,
   IKeyboardAvoidingBehavior,
   IKeyboardAvoidingEventNames,
   IMeasuredFrame,
@@ -312,11 +315,9 @@ export type {
 export {
   DEFAULT_WINDOW_SIZE,
   DEFAULT_INITIAL_NUM_TO_RENDER,
-  DEFAULT_END_REACHED_THRESHOLD,
   DEFAULT_MAX_TO_RENDER_PER_BATCH,
   DEFAULT_UPDATE_CELLS_BATCHING_PERIOD,
   DEFAULT_VIEW_AREA_COVERAGE_PERCENT_THRESHOLD,
-  DEFAULT_START_REACHED_THRESHOLD,
   FIRST_INDEX,
   EMPTY_OFFSET,
   NO_INDEX,
@@ -329,7 +330,6 @@ export {
   buildOffsets,
   computeWindow,
   throttleWindow,
-  visiblePercent,
   isCellViewable,
   offsetForIndex,
   averageMeasuredLength,

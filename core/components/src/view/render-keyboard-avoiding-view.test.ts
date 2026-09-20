@@ -11,9 +11,11 @@
 // No Negative group: nothing in this module throws. Malformed native payloads are answered with
 // `undefined` / a zero inset — a Positive outcome named "ignores …", not an invented throw.
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   computeInset,
+  configureKeyboardAvoidingAnimation,
+  readKeyboardAnimationTiming,
   readPrefersCrossFadeTransitions,
   keyboardAvoidingEventNamesFor,
   readKeyboardFrame,
@@ -263,6 +265,90 @@ describe('resolveKeyboardAvoidingLayout (Positive — behavior to structure)', (
       kind: 'wrapper',
       wrapperStyle: undefined,
     });
+  });
+});
+
+describe("readKeyboardAnimationTiming (Positive — the keyboard event's own transition curve)", () => {
+  it('reads duration and easing off a well-formed payload', () => {
+    expect(
+      readKeyboardAnimationTiming({
+        duration: 250,
+        easing: 'keyboard',
+        endCoordinates: { screenY: 500, height: 300 },
+      }),
+    ).toEqual({ duration: 250, easing: 'keyboard' });
+  });
+
+  it.each([
+    ['a non-record payload', 'nope'],
+    ['a missing duration', { easing: 'keyboard' }],
+    ['a non-string easing', { duration: 250, easing: 7 }],
+  ])('ignores %s', (_label, payload) => {
+    expect(readKeyboardAnimationTiming(payload)).toBeUndefined();
+  });
+});
+
+describe('configureKeyboardAvoidingAnimation (Positive — RN KeyboardAvoidingView.js:169-179)', () => {
+  // why: RN's own gate is `enabled && duration && easing` — all three, not just a defined event.
+  it("arms the next commit with the event's duration and easing type", () => {
+    const configure = vi.fn();
+    configureKeyboardAvoidingAnimation(
+      { duration: 250, easing: 'keyboard' },
+      true,
+      configure,
+    );
+    expect(configure).toHaveBeenCalledWith({
+      duration: 250,
+      update: { duration: 250, type: 'keyboard' },
+    });
+  });
+
+  // why: "We have to pass the duration equal to minimal accepted duration defined here:
+  // RCTLayoutAnimation.m" — RN's own comment, `KeyboardAvoidingView.js:172-173`.
+  it('floors a too-short duration to the native minimum', () => {
+    const configure = vi.fn();
+    configureKeyboardAvoidingAnimation(
+      { duration: 5, easing: 'keyboard' },
+      true,
+      configure,
+    );
+    expect(configure).toHaveBeenCalledWith({
+      duration: 10,
+      update: { duration: 10, type: 'keyboard' },
+    });
+  });
+
+  it('coerces an unknown easing name to the "keyboard" type, matching LayoutAnimation.Types[easing] || "keyboard"', () => {
+    const configure = vi.fn();
+    configureKeyboardAvoidingAnimation(
+      { duration: 250, easing: 'not-a-real-curve' },
+      true,
+      configure,
+    );
+    expect(configure).toHaveBeenCalledWith({
+      duration: 250,
+      update: { duration: 250, type: 'keyboard' },
+    });
+  });
+
+  it('never configures while the view is disabled', () => {
+    const configure = vi.fn();
+    configureKeyboardAvoidingAnimation(
+      { duration: 250, easing: 'keyboard' },
+      false,
+      configure,
+    );
+    expect(configure).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['no timing at all', undefined],
+    ['a zero duration', { duration: 0, easing: 'keyboard' }],
+    ['an empty easing', { duration: 250, easing: '' }],
+  ])('never configures with %s (Android carries neither)', (_label, timing) => {
+    const configure = vi.fn();
+    configureKeyboardAvoidingAnimation(timing, true, configure);
+    expect(configure).not.toHaveBeenCalled();
   });
 });
 

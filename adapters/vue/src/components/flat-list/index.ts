@@ -304,7 +304,8 @@ export const FlatList = defineComponent(
           getItem: (_source: unknown, index: number): IRow<ItemT> =>
             rows[index],
           getItemCount: (): number => rows.length,
-          keyExtractor: rowKeyExtractor,
+          keyExtractor: (row: IRow<ItemT>): string =>
+            rowKeyExtractor(row, keyExtractor),
           onEndReached: endReached,
           onStartReached: startReached,
           onRefresh: refresh,

@@ -250,6 +250,28 @@ describe('what an image background’s inner image sends native', () => {
     expect(committedPayloadOf(image)?.height).toBe(240);
   });
 
+  // why: `ImageBackground.js:67,76,82` destructures `importantForAccessibility` out of props and
+  // reapplies it explicitly to BOTH the wrapper (:76) and the image (:82) — one accessibility
+  // subtree, so both halves must agree on whether it is hidden. `IMAGE_BACKGROUND_HOST_PROPS` keeps
+  // it on the owner now (`image-background.test.ts`), so this reads it back off `ownerProps`, the
+  // same seam the box proxy already uses.
+  it('derives importantForAccessibility from the owner, matching vendor', () => {
+    const payload = commit({
+      source: { uri: 'http://x/a.png' },
+      importantForAccessibility: 'no-hide-descendants',
+    }).payload;
+
+    expect(payload.importantForAccessibility).toBe('no-hide-descendants');
+  });
+
+  // why: RN never applies a value it was not given — an ImageBackground with no
+  // `importantForAccessibility` must not invent one on the image any more than on the owner.
+  it('writes nothing when the owner never authored importantForAccessibility', () => {
+    const payload = commit({ source: { uri: 'http://x/a.png' } }).payload;
+
+    expect(payload.importantForAccessibility).toBe(undefined);
+  });
+
   // why: THE PRICE. ImageBackground is now zero trips on both nodes — the owner shed its fold when
   // the Smart Invert opt-out moved, and this is the other one.
   it('costs no trip into JS for either node', () => {

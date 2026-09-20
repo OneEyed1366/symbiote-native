@@ -52,6 +52,11 @@ interface ICallbackCase {
   // it alone — and that distinction is exactly the one `onValueChange` fell through, so the table
   // states it per row rather than assuming every callback is a pass-through.
   expected: (payload: ISymbioteEvent) => readonly unknown[];
+  // Fired before `nativeEvent`, for a row whose machine REFUSES to fire in isolation — `pressOut`
+  // with no matching `pressIn` is deliberately a no-op (`state/pressable.ts`'s `deactivate` returns
+  // early when nothing activated it), which is the real invariant the machine enforces, not a gap
+  // in this table.
+  arm?: (node: ISymbioteNode) => void;
 }
 
 const passthrough = (
@@ -68,6 +73,15 @@ const CALLBACK_CASES: Record<string, ICallbackCase> = {
   // with `text` carried on it as a field, mutated in place by `Object.assign` — never a second
   // `(text, event)` argument (Svelte's `target_handler` crashes on a bare-string sole argument).
   onValueChange: {
+    nativeEvent: 'change',
+    payload: { nativeEvent: { text: 'typed', eventCount: 4 } },
+    expected: payload => [payload],
+  },
+  // TextInput.js:506 — `props.onChangeText(currentText)`, off the SAME change event as
+  // `onValueChange`. RN's real signature takes the bare string; ours carries it as a FIELD on the
+  // event instead, for the identical Svelte-safety reason `onValueChange` does
+  // (`host-tag-invariants.test.ts`).
+  onChangeText: {
     nativeEvent: 'change',
     payload: { nativeEvent: { text: 'typed', eventCount: 4 } },
     expected: payload => [payload],
@@ -90,6 +104,23 @@ const CALLBACK_CASES: Record<string, ICallbackCase> = {
   onContentSizeChange: passthrough('contentSizeChange', {
     contentSize: { width: 120, height: 40 },
   }),
+  // TextInput.js's own `usePressability` — forwarded to the app exactly as the machine hands them
+  // to `config.onPress`/`onPressIn`/`onPressOut`, no fold. `onPress` ALSO triggers the machine's
+  // Android touch-sound path (`Pressability.js:754`, `onPress != null` — always true here, since
+  // the refine's wrapper is unconditional, matching vendor's own always-present config.onPress) —
+  // not this row's concern, covered by `pressable-sound.test.ts`.
+  onPress: passthrough('press', {}),
+  onPressIn: passthrough('pressIn', {}),
+  onPressOut: {
+    ...passthrough('pressOut', {}),
+    // `minPressDuration: 0` collapses the deactivation floor to synchronous, so `finish()` runs
+    // inline instead of on a real timer this test does not advance. A prior `pressIn` is what
+    // arms `deactivate` at all — see the `arm` field's own doc.
+    arm: node => {
+      routeProp(node, 'minPressDuration', 0);
+      listenerOf(node, 'pressIn')({ nativeEvent: {} });
+    },
+  },
 };
 
 function makeTextInput(): ISymbioteNode {
@@ -140,6 +171,7 @@ describe('TextInput callbacks on the tag', () => {
       const handler = vi.fn();
       routeProp(node, name, handler);
       mount(node);
+      testCase.arm?.(node);
 
       listenerOf(node, testCase.nativeEvent)(testCase.payload);
 

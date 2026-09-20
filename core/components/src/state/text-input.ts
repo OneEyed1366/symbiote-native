@@ -21,6 +21,7 @@ import type {
   ITextStyle,
 } from '@symbiote-native/engine';
 import type { IAccessibilityProps, IAriaProps } from '../accessibility-props';
+import type { IRectOffset } from './pressable';
 
 export type IInputMode =
   'none' | 'text' | 'decimal' | 'numeric' | 'tel' | 'search' | 'email' | 'url';
@@ -144,11 +145,26 @@ export type ITextInputProps = IAccessibilityProps &
     // view above the keyboard while the input is focused. Forwarded via passthrough.
     inputAccessoryViewID?: string;
     style?: ITextStyle;
+    // TextInput.js's own `usePressability` — the same Pressability class every Touchable uses,
+    // wired so a tap inside an authored `hitSlop` but outside the native view's focus zone still
+    // focuses the input. `onPress`/`onPressIn`/`onPressOut` are forwarded to the app exactly as
+    // authored; `onPress` additionally focuses the input when `editable !== false`.
+    hitSlop?: IRectOffset;
+    onPress?: ITextInputEventHandler;
+    onPressIn?: ITextInputEventHandler;
+    onPressOut?: ITextInputEventHandler;
 
     // Fires once per native change with the event, `text` carried on it (e.g. alongside
     // `nativeEvent.eventCount`/`target`) — one argument, always a real object; see
     // `ITextInputChangeEvent`.
     onValueChange?: (event: ITextInputChangeEvent) => void;
+    // TextInput.js:506 — `props.onChangeText(currentText)`, called right alongside `onChange` on
+    // the SAME native change event. RN's real signature takes the bare STRING; ours cannot — an
+    // individual `on*` attribute on a host tag compiles through Svelte's `target_handler`, which
+    // always calls with exactly one argument, a real object (`host-tag-invariants.test.ts`, and the
+    // identical reason `onValueChange` carries `text` as a FIELD rather than a second argument). So
+    // `text` rides on the event exactly like `onValueChange` does — same object, same field.
+    onChangeText?: (event: ITextInputChangeEvent) => void;
     onFocus?: ITextInputEventHandler;
     onBlur?: ITextInputEventHandler;
     onEndEditing?: ITextInputEventHandler;
@@ -179,6 +195,7 @@ type ITextInputOwnCallback = Exclude<
 
 const TEXT_INPUT_CALLBACKS: Record<ITextInputOwnCallback, true> = {
   onValueChange: true,
+  onChangeText: true,
   onFocus: true,
   onBlur: true,
   onEndEditing: true,
@@ -186,6 +203,9 @@ const TEXT_INPUT_CALLBACKS: Record<ITextInputOwnCallback, true> = {
   onKeyPress: true,
   onSelectionChange: true,
   onContentSizeChange: true,
+  onPress: true,
+  onPressIn: true,
+  onPressOut: true,
 };
 
 export const TEXT_INPUT_CALLBACK_NAMES: readonly string[] =

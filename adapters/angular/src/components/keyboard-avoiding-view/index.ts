@@ -26,7 +26,9 @@ import {
 } from '@angular/core';
 import {
   computeInset,
+  configureKeyboardAvoidingAnimation,
   keyboardAvoidingEventNamesFor,
+  readKeyboardAnimationTiming,
   readKeyboardFrame,
   readLayoutFrame,
   readPrefersCrossFadeTransitions,
@@ -227,6 +229,12 @@ export class KeyboardAvoidingView
       previousInset: this.inset,
       prefersCrossFadeTransitions: this.prefersCrossFadeTransitions,
     });
+    // RN's `_updateBottomIfNecessary` skips the animation when the inset did not change.
+    if (next !== this.inset)
+      configureKeyboardAvoidingAnimation(
+        readKeyboardAnimationTiming(payload),
+        this.enabled !== false,
+      );
     dlog(`KeyboardAvoidingView show -> inset ${next}`);
     this.inset = next;
     this.changeDetector.markForCheck();

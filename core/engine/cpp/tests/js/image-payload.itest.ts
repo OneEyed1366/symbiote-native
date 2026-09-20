@@ -243,6 +243,20 @@ describe('what an image sends native, resolved by the engine', () => {
     expect(payload.accessible).toBe(undefined);
   });
 
+  // why: `Image.ios.js`/`Image.android.js`'s real formula is `accessible = ariaHidden !== true &&
+  // (alt !== undefined ? true : props.accessible)` — an explicit `aria-hidden` overrides `alt`'s
+  // own accessible-true, not the other way round. An app pairing `alt` (for other consumers) with
+  // `aria-hidden` to deliberately exclude the image must still get an inaccessible image.
+  it('lets aria-hidden override the accessible-true that alt would otherwise force', () => {
+    const payload = commit({
+      src: 'https://a/1.png',
+      alt: 'decorative',
+      'aria-hidden': true,
+    }).payload;
+
+    expect(payload.accessible).toBe(false);
+  });
+
   // why: RN accepts `resizeMode` and `tintColor` as STYLE keys as well as props. Reading only the
   // prop drops a style that authors legitimately write.
   it('reads resizeMode and tintColor out of the style', () => {
@@ -286,6 +300,22 @@ describe('what an image sends native, resolved by the engine', () => {
 
     expect(payload.loadingIndicatorSrc).toBe('https://a/spinner.gif');
     expect(payload.loadingIndicatorSource).toBe(undefined);
+  });
+
+  // why: ImageViewNativeComponent.js:138 — `defaultSource: { process: resolveAssetSource }`, the
+  // SINGULAR resolver, unlike `source` (which the JS component itself normalizes to an array before
+  // any prop reaches native — the ViewConfig declares it bare `true`). The engine's own resolver
+  // wraps every source-shaped prop into an array uniformly (`image-source-write.ts`, "one shape to
+  // reason about"), so `defaultSource` needs the SAME downstream unwrap `loadingIndicatorSource`
+  // already gets, or a native view manager expecting a map receives an array and paints nothing.
+  it('unwraps defaultSource to the bare object native expects', () => {
+    const payload = commit({
+      src: 'https://a/1.png',
+      defaultSource: { uri: 'https://a/placeholder.png' },
+    }).payload;
+
+    expect(payload.defaultSource).toEqual({ uri: 'https://a/placeholder.png' });
+    expect(Array.isArray(payload.defaultSource)).toBe(false);
   });
 
   // why: the consumed W3C names are not Fabric props. Leaving one in the payload is how a reader

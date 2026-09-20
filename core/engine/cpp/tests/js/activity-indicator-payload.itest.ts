@@ -164,6 +164,24 @@ describe('what the native spinner sends', () => {
     expect(spinner(ANDROID_SPINNER, {}).payload.color).toBe(undefined);
   });
 
+  // why: `ActivityIndicator.js:100-103`'s `androidProps = {styleAttr: 'Normal', indeterminate:
+  // true}` is spread onto the native view UNCONDITIONALLY, on Android only — neither key has a
+  // JS-side gate or an app-facing prop. `AndroidProgressBarNativeComponent`'s own spec declares
+  // `indeterminate: boolean` with NO codegen default (unlike `animating`, which has one), so a
+  // native view built with the key never set has whatever Java's own field default is — and vendor
+  // never once omits it, which is the tell that the native default is not what an app wants here.
+  // Without this, Android's spinner risks rendering as a plain (likely empty, non-spinning)
+  // determinate progress bar instead of the loading indicator every other platform shows.
+  it('sends styleAttr and indeterminate on Android, and neither on iOS', () => {
+    const android = spinner(ANDROID_SPINNER, {}).payload;
+    expect(android.styleAttr).toBe('Normal');
+    expect(android.indeterminate).toBe(true);
+
+    const ios = spinner(IOS_SPINNER, {}).payload;
+    expect(ios.styleAttr).toBe(undefined);
+    expect(ios.indeterminate).toBe(undefined);
+  });
+
   // why: an explicit colour wins on both platforms — the default is a fallback, not an override.
   it('lets an explicit colour through on either platform', () => {
     expect(spinner(IOS_SPINNER, { color: '#ff0000' }).payload.color).toBe(

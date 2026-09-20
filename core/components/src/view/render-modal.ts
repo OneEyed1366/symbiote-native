@@ -8,6 +8,7 @@
 
 import {
   dlog,
+  I18nManager,
   type IStyleProp,
   type IViewStyle,
 } from '@symbiote-native/engine';
@@ -40,8 +41,11 @@ export interface IModalOrientationChangeEvent {
 // (ModalHostViewComponentDescriptor sets the node size to screenSize). An absolute container with
 // only top/left would collapse to its content instead. The backdrop color is layered on at render
 // time so transparent/backdropColor win.
-const CONTAINER_STYLE: Readonly<IViewStyle> = {
-  left: 0,
+//
+// `[side]` is NOT always 'left' — vendor computes it once at module load from
+// `I18nManager.getConstants().isRTL` (`Modal.js:372`: `isRTL ? 'right' : 'left'`), so a modal in an
+// RTL layout pins its container to the RIGHT edge. `renderModal`'s own `isRTL` parameter supplies it.
+const CONTAINER_STYLE_BASE: Readonly<Omit<IViewStyle, 'left' | 'right'>> = {
   top: 0,
   flex: 1,
 };
@@ -81,7 +85,13 @@ export type IModalViewProps = {
   passthrough: Record<string, unknown>;
 };
 
-export function renderModal(view: IModalViewProps): IDescriptor {
+// `isRTL` is injectable purely for testability, the same shape `computeInset`'s `os` option
+// takes: `I18nManager`'s constants are resolved once at module load with no setter, so a test
+// exercising the RTL branch cannot toggle the real module and must pass the value in.
+export function renderModal(
+  view: IModalViewProps,
+  isRTL: boolean = I18nManager.isRTL,
+): IDescriptor {
   // Only override backgroundColor when transparent or backdropColor are explicitly set, so these
   // Modal-specific props take precedence over the generic style prop (Modal.js: containerStyles
   // composed LAST in [styles.container, props.style, containerStyles]).
@@ -93,7 +103,11 @@ export function renderModal(view: IModalViewProps): IDescriptor {
         : {};
 
   const containerStyle: IStyleProp<IViewStyle> = [
-    { ...CONTAINER_STYLE, backgroundColor: OPAQUE_BACKDROP },
+    {
+      ...CONTAINER_STYLE_BASE,
+      ...(isRTL ? { right: 0 } : { left: 0 }),
+      backgroundColor: OPAQUE_BACKDROP,
+    },
     view.style,
     backdropOverride,
   ];

@@ -16,6 +16,7 @@ import type {
 import {
   recordAppendChild,
   recordCreateAnchor,
+  recordCreateVoid,
   noteHostSideChange,
   recordCreateElement,
   recordCreateRawText,
@@ -60,6 +61,8 @@ import { configPayloadFold } from './registry';
 import { resolveStructuredStyle } from './structured-style';
 import {
   IMAGE_SOURCE_PROPS,
+  IMAGE_LOAD_EVENT_NAMES,
+  anyImageLoadEventListenerWired,
   resolveImageSourceProp,
 } from './image-source-write';
 // A cycle, deliberately: `imperative.ts` imports this module for the node shape, and the prototype
@@ -178,6 +181,10 @@ export interface ISymbioteNode {
    * Set once at `createElement`, by `attachHostBehavior`, for the behavior that declares it.
    */
   resolvesImageSources: boolean;
+  // Flips `id`/`nativeID` precedence to nativeID-over-id, for the one behavior that needs it
+  // (TouchableWithoutFeedback — see `routeIdAlias`). Set once at `createElement`, by
+  // `attachHostBehavior`, for the behavior that declares it.
+  nativeIdWinsOverId: boolean;
   // The payload fold this node's host behavior supplied, or undefined for the ~all of them that
   // have none. Set once at `createElement`, never per write, and read by `fabricProps` at the one
   // point where the whole bag is known.
@@ -317,6 +324,7 @@ class SymbioteNode implements ISymbioteNode {
   declare listeners: Map<string, IListener> | undefined;
   declare hasCommitHook: boolean;
   declare resolvesImageSources: boolean;
+  declare nativeIdWinsOverId: boolean;
   declare styleParts: IClassStyleParts | undefined;
   declare payloadFold: IPayloadFold | undefined;
   declare childHost: ISymbioteNode | undefined;
@@ -337,6 +345,9 @@ class SymbioteNode implements ISymbioteNode {
     this.hasCommitHook = false;
     // Same again; `attachHostBehavior` raises it for the one behavior that declares it, Image's.
     this.resolvesImageSources = false;
+    // Same again; `attachHostBehavior` raises it for the one behavior that declares it,
+    // TouchableWithoutFeedback's.
+    this.nativeIdWinsOverId = false;
     this.styleParts = undefined;
     // Assigned here for the same hidden-class reason as `hasAriaAlias` above; `attachHostBehavior`
     // overwrites it a few lines later for the rare node that has a behavior.
@@ -440,6 +451,12 @@ export function createElement(
   // now, not a name the commit walk reads, so the name alone would give the host an ordinary
   // element called `#anchor` — one that really paints.
   if (component === ANCHOR_COMPONENT) recordCreateAnchor(node);
+  // A primitive whose ENTIRE subtree must vanish on this platform (`input-accessory-view` on
+  // Android, `InputAccessoryView.js`'s `return null`) resolves to the void component the same way —
+  // through `descriptorFor`'s per-platform component-name table, never a per-call branch here. An
+  // anchor hoists its children into Fabric in its place; a void node contributes neither itself nor
+  // them.
+  else if (component === VOID_COMPONENT) recordCreateVoid(node);
   // `instanceHandle` is the node itself: it round-trips through Fabric unchanged and comes back as
   // the event target, and the BRAND below is how the event handler confirms it is one of ours.
   else recordCreateElement(node, component, isText, node);
@@ -527,6 +544,18 @@ export const ANCHOR_COMPONENT = '#anchor';
 export function createAnchor(): ISymbioteNode {
   const node = new SymbioteNode(ANCHOR_COMPONENT, false);
   recordCreateAnchor(node);
+  return node;
+}
+
+// The sentinel a primitive resolves to when its ENTIRE subtree must vanish from Fabric on this
+// platform — `input-accessory-view` on Android, mirroring `InputAccessoryView.js`'s `return null`.
+// Unlike `ANCHOR_COMPONENT`, whose node hoists its children up in its own place, a void node's
+// children never reach Fabric either: the commit walk stops at it, recursively.
+export const VOID_COMPONENT = '#void';
+
+export function createVoid(): ISymbioteNode {
+  const node = new SymbioteNode(VOID_COMPONENT, false);
+  recordCreateVoid(node);
   return node;
 }
 
@@ -905,6 +934,17 @@ export function setEventListener(
   const flagProp = GATED_EVENT_PROPS.get(name);
   if (flagProp !== undefined)
     setProp(node, flagProp, isHandler ? true : undefined);
+  // `onLoad`/`onLoadStart`/`onLoadEnd`/`onError` are real Fabric events on `RCTImageView`
+  // (`view-config.ts`), so they land here rather than in `writeProp` — see
+  // `image-source-write.ts` for why Android's `shouldNotifyLoadEvents` has to be synthesized
+  // from the listener map instead of from a stashed function value.
+  if (node.resolvesImageSources && IMAGE_LOAD_EVENT_NAMES.has(name)) {
+    setProp(
+      node,
+      'shouldNotifyLoadEvents',
+      anyImageLoadEventListenerWired(node.listeners) ? true : undefined,
+    );
+  }
 }
 
 // `/^on[A-Z]/` spelled out, because this runs on EVERY prop write and a regex is the one guard in
@@ -1449,29 +1489,31 @@ const ID_ALIAS_TO = 'nativeID';
  * The authored `nativeID` is REMEMBERED rather than discarded, so clearing the `id` hands the slot
  * back instead of latching. A framework that unsets a prop between renders must get the other
  * source back.
+ *
+ * PRECEDENCE ITSELF IS PER-COMPONENT. `View.js`'s `id ?? nativeID` is the default (`idWins` below),
+ * but `TouchableWithoutFeedback.js`'s clone composes that and then runs a `PASSTHROUGH_PROPS` loop
+ * that unconditionally overwrites `nativeID` with the raw authored value when set (`:279-282`) — an
+ * app authoring both ends up with `nativeID` winning there. `node.nativeIdWinsOverId`, set by
+ * `attachHostBehavior` for the one behavior that declares it, flips which side wins.
  */
 const idAliased = new WeakMap<
   ISymbioteNode,
-  { fromId: boolean; authored: unknown }
+  { idValue: unknown; nativeIdValue: unknown }
 >();
 
 function routeIdAlias(node: ISymbioteNode, key: string, value: unknown): void {
-  const state = idAliased.get(node) ?? { fromId: false, authored: undefined };
-
-  if (key === ID_ALIAS_FROM) {
-    state.fromId = value !== undefined;
-    idAliased.set(node, state);
-    // Falling back to the authored `nativeID` rather than to undefined is what makes the clear a
-    // release and not an erase.
-    setProp(node, ID_ALIAS_TO, value ?? state.authored);
-    return;
-  }
-
-  state.authored = value;
+  const state = idAliased.get(node) ?? {
+    idValue: undefined,
+    nativeIdValue: undefined,
+  };
+  if (key === ID_ALIAS_FROM) state.idValue = value;
+  else state.nativeIdValue = value;
   idAliased.set(node, state);
-  // An `id` outranks this write, so the value is kept for a later release and not published.
-  if (state.fromId) return;
-  setProp(node, ID_ALIAS_TO, value);
+
+  const published = node.nativeIdWinsOverId
+    ? (state.nativeIdValue ?? state.idValue)
+    : (state.idValue ?? state.nativeIdValue);
+  setProp(node, ID_ALIAS_TO, published);
 }
 
 export function routeProp(

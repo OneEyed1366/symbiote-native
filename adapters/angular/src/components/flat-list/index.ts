@@ -516,7 +516,8 @@ export class FlatList<ItemT = unknown>
   // ---- multi-column data adaptation (the virtualized stream is rows) ----
   getRow = (_data: unknown, index: number): IRow<ItemT> => this.rows[index];
   getRowCount = (_data: unknown): number => this.rows.length;
-  rowKey = (row: IRow<ItemT>, _index: number): string => rowKeyExtractor(row);
+  rowKey = (row: IRow<ItemT>, _index: number): string =>
+    rowKeyExtractor(row, this.keyExtractor);
 
   // Viewability over rows expands back to per-item tokens, so the caller sees item-level
   // visibility, not row-level (shared expandRowViewability), matching Vue.

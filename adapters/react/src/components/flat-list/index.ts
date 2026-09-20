@@ -214,7 +214,8 @@ export function FlatList<ItemT>(
     getItem: (_source: unknown, index: number): IRow<ItemT> => rows[index],
     getItemCount: (): number => rows.length,
     renderItem: renderRow,
-    keyExtractor: rowKeyExtractor,
+    keyExtractor: (row: IRow<ItemT>): string =>
+      rowKeyExtractor(row, keyExtractor),
     onViewableItemsChanged: rowOnViewableItemsChanged,
     viewabilityConfigCallbackPairs: rowViewabilityPairs,
     ItemSeparatorComponent: rowSeparatorComponent,

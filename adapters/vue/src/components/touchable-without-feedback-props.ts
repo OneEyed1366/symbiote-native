@@ -14,4 +14,8 @@ import type { IPressTimingProps } from '@symbiote-native/components';
 import type { IPressableProps } from './pressable-props';
 
 export type ITouchableWithoutFeedbackProps = Omit<IPressableProps, 'style'> &
-  IPressTimingProps;
+  IPressTimingProps & {
+    // TouchableWithoutFeedback.js:199 — forwarded to Pressability as `android_disableSound`.
+    // Named differently from Pressable's own `android_disableSound`, matching vendor.
+    touchSoundDisabled?: boolean;
+  };

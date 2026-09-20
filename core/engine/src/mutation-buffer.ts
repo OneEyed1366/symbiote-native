@@ -122,6 +122,18 @@ export const OP_SET_OWNED_LISTENER = 11; // [slot, name, present]
 export const OP_SET_UNDERLAY_SHOWN = 12; // [slot, shown]
 
 /**
+ * A VOID node: commits nothing of its own AND does not hoist its children into Fabric either —
+ * unlike an anchor, which hoists. `[slot]`.
+ *
+ * `InputAccessoryView.js` renders `null` on Android: the whole component, children included,
+ * contributes nothing to the host tree. An anchor cannot express that — it exists precisely to hand
+ * its children up in its own place — so a node whose entire subtree must vanish from Fabric needs
+ * its own kind. Everything else about it (the retained JS tree, `appendChild`, adapter bookkeeping)
+ * is unaffected; only the commit walk treats it as contributing zero Fabric nodes, recursively.
+ */
+export const OP_CREATE_VOID = 13; // [slot]
+
+/**
  * A `setProp` whose value slot is this DELETES the key.
  *
  * `undefined` cannot carry it: `null` is a legitimate Fabric prop value meaning "reset to the
@@ -436,6 +448,11 @@ export function recordCreateRawText(handle: object, text: string): void {
 export function recordCreateAnchor(handle: object): void {
   placementPending.add(handle);
   push(OP_CREATE_ANCHOR, slotOf(handle));
+}
+
+export function recordCreateVoid(handle: object): void {
+  placementPending.add(handle);
+  push(OP_CREATE_VOID, slotOf(handle));
 }
 
 export function recordAppendChild(parent: object, child: object): void {

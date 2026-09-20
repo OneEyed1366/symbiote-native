@@ -90,6 +90,10 @@
     };
   }
 
+  const rowKeyForRow = $derived(
+    (row: IRow<ItemT>): string => rowKeyExtractor(row, props.keyExtractor),
+  );
+
   const rowOnViewableItemsChanged = $derived.by(() => {
     const onChanged = props.onViewableItemsChanged;
     if (onChanged === undefined) return undefined;
@@ -251,7 +255,7 @@
     header={props.header}
     footer={props.footer}
     empty={props.empty}
-    keyExtractor={rowKeyExtractor}
+    keyExtractor={rowKeyForRow}
     getItemLayout={props.getItemLayout}
     horizontal={props.horizontal}
     inverted={props.inverted}

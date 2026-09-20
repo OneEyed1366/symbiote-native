@@ -119,10 +119,11 @@ function numberOr(value: unknown, fallback: number): number {
 // TNF's: the passthrough half is copied only when SET (`:281`), and the C++ rule keeps that split
 // rather than collapsing the two into one.
 //
-// One quirk of upstream's that is deliberately still not reproduced: `:280-284`'s passthrough loop
+// One quirk of upstream's that IS reproduced, and it is NOT free: `:280-284`'s passthrough loop
 // re-assigns a set `nativeID` over the `id` it just resolved, so an explicit `nativeID` wins here
-// where TNF's `id` does. `routeProp` settles the two names into one on the way in, so by the time
-// any rule runs there is nothing left to disagree about.
+// where TNF's `id` does. `routeProp` settles the two names into one value before any rule runs, so
+// getting this right needed the collapse itself to know which of the two components it is running
+// for — `node.nativeIdWinsOverId`, set only by this behavior's registration, flips it.
 //
 // Contract: `core/engine/cpp/tests/js/clone-onto-child-payload.itest.ts`.
 
@@ -287,6 +288,9 @@ export function registerTouchableWithoutFeedbackBehavior(): void {
     // the child (`attachPressMachine`'s `source`) and by the trampolines above.
     ownedListeners: [...PRESS_LISTENERS, ...FORWARDED_LISTENERS],
     slotDerived: SLOT_DERIVED,
+    // TouchableWithoutFeedback.js's clone overwrites `nativeID` with the raw authored value
+    // (`:279-282`), the reverse of every other component's `id ?? nativeID` — see `routeIdAlias`.
+    nativeIdWinsOverId: true,
   };
   registerHostBehavior(TOUCHABLE_WITHOUT_FEEDBACK_TAG, behavior);
 }

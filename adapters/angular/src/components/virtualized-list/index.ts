@@ -44,10 +44,8 @@ import {
   type OnDestroy,
 } from '@angular/core';
 import {
-  DEFAULT_END_REACHED_THRESHOLD,
   DEFAULT_INITIAL_NUM_TO_RENDER,
   DEFAULT_MAX_TO_RENDER_PER_BATCH,
-  DEFAULT_START_REACHED_THRESHOLD,
   DEFAULT_UPDATE_CELLS_BATCHING_PERIOD,
   DEFAULT_WINDOW_SIZE,
   EMPTY_OFFSET,
@@ -795,11 +793,11 @@ export class VirtualizedList<ItemT = unknown>
       this.updateCellsBatchingPeriod ?? DEFAULT_UPDATE_CELLS_BATCHING_PERIOD
     );
   }
-  private get onEndReachedThresholdValue(): number {
-    return this.onEndReachedThreshold ?? DEFAULT_END_REACHED_THRESHOLD;
+  private get onEndReachedThresholdValue(): number | undefined {
+    return this.onEndReachedThreshold;
   }
-  private get onStartReachedThresholdValue(): number {
-    return this.onStartReachedThreshold ?? DEFAULT_START_REACHED_THRESHOLD;
+  private get onStartReachedThresholdValue(): number | undefined {
+    return this.onStartReachedThreshold;
   }
 
   // onScroll stays a plain callback bag key (an Animated.event(...) target must be able to flow
@@ -978,7 +976,12 @@ export class VirtualizedList<ItemT = unknown>
           const info = effect.info;
           const map = effect.map;
           const fire = (): void => {
-            for (const pair of pairs) pair.onViewableItemsChanged(info);
+            for (const pair of pairs) {
+              pair.onViewableItemsChanged({
+                ...info,
+                viewabilityConfig: pair.viewabilityConfig,
+              });
+            }
             this.dispatch({ kind: 'viewable-fired', map });
           };
           if (this.viewableTimer !== null) {

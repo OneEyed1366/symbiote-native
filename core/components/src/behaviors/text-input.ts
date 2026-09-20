@@ -4,8 +4,10 @@
 // WHAT A `TextInput` COMPONENT ACTUALLY DOES, and why none of it needs a framework. It holds three
 // mirrors of native state (the acknowledged event count, the last text native reported, whether the
 // input is focused), it commands text back down when the app's `value` diverges from that mirror,
-// it fires `focus` once at mount when `autoFocus` is set, and it exposes five imperative methods.
-// The TEMPLATE reads none of it — which is the whole tier-2 test. Every framework was paying an
+// it fires `focus` once at mount when `autoFocus` is set, it composes a small press machine so a
+// tap focuses the input (`TextInput.js`'s own `usePressability` — FOUND MISSING 2026-09-20, since
+// nothing here wired ANY press listener at all), and it exposes five imperative methods. The
+// TEMPLATE reads none of it — which is the whole tier-2 test. Every framework was paying an
 // instance for a machine that only ever needed a per-node home.
 //
 // WHY IT NEEDED A NEW ENGINE HOOK AND `Pressable` DID NOT. A press machine is driven entirely by
@@ -36,6 +38,12 @@ import {
   type ISymbioteEvent,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
+
+import {
+  attachPressMachine,
+  detachPressMachine,
+  type IPressConfigRefinement,
+} from './pressable';
 
 import {
   eventCountFromChange,
@@ -72,18 +80,24 @@ interface IBehaviorState {
    * The comparison is therefore decided before it is made: a string `value` equals the mirror it
    * just set, and a non-string one fails `shouldCommandText`'s own narrowing. So the first beat
    * cannot command, and the read it makes to prove that is a host crossing per input per create.
+   *
+   * TEXT ONLY — `afterCommit` no longer lets this skip the SELECTION half. See `lastNativeSelection`.
    */
   isMirrorFreshlySeeded: boolean;
+  /**
+   * What native last acknowledged for the caret, mirroring `TextInput.js`'s own
+   * `lastNativeSelectionState`, seeded at the SENTINEL rather than left absent — a real selection
+   * always differs from it, so an authored `selection` moves the caret on the very first commit,
+   * with no preceding value write at all (`TextInput.js`'s `useTextInputStateSynchronization`,
+   * whose own `lastNativeSelection` starts at `{start:-1,end:-1}` for the identical reason).
+   */
+  lastNativeSelection: { start: number; end: number };
 }
 
 const states = new WeakMap<ISymbioteNode, IBehaviorState>();
 
 function stateOf(node: ISymbioteNode): IBehaviorState | undefined {
   return states.get(node);
-}
-
-function stringProp(node: ISymbioteNode, key: string): string | undefined {
-  return stringFrom(propOf(node, key));
 }
 
 /** The same narrowing, for a value already in hand — see `attachAfterCommit`'s single read. */
@@ -191,14 +205,31 @@ function onChange(node: ISymbioteNode, event: ISymbioteEvent): void {
   const state = stateOf(node);
   if (state === undefined) return;
 
+  // TextInput.js:502-518's `_onChange` — `onChange` first, THEN `onChangeText`, UNCONDITIONALLY on
+  // every native change, and only THEN the mirrors ("This must happen last", vendor's own comment
+  // on the count). Ours used to run backwards: the mirror first, then `onChangeText`, with the real
+  // `onChange` called dead last — an app with side effects observable across `onChange` and
+  // `onChangeText` saw them in the opposite order from a real device.
+  callAppListener(node, 'change', event);
+
   const text = textFromChange(event);
   if (text !== undefined) {
-    // Ordering matches the component path exactly: record the mirror, then hand the app its text.
-    state.lastNativeText = text;
+    // TextInput.js:506 — fired right alongside `onChange`, off the same event, `text` riding on it
+    // as a field for the same reason `onValueChange` does. Read directly rather than owned/stashed:
+    // like `onValueChange`, it is not a Fabric event name, so nothing routes it and nothing native
+    // could overwrite it.
+    const onChangeText = propOf(node, 'onChangeText');
+    if (typeof onChangeText === 'function') {
+      onChangeText(Object.assign(event, { text }));
+    }
+    // `onValueChange` has no vendor counterpart — it is our own repair for the fold the component
+    // wrapper used to do — so its position relative to `onChangeText` carries no vendor constraint.
     callValueChange(node, text, event);
+    // The mirror, after both callbacks, matching vendor's own ordering.
+    state.lastNativeText = text;
   }
-  // Ordering: record the text first, then the count, so the acknowledged count never runs ahead of
-  // the text it stands for. A count without its text makes the next controlled write echo an
+  // Ordering: record the text mirror before the count, so the acknowledged count never runs ahead
+  // of the text it stands for. A count without its text makes the next controlled write echo an
   // acknowledgement native has not actually given.
   const count = eventCountFromChange(event);
   if (count !== undefined) {
@@ -209,8 +240,6 @@ function onChange(node: ISymbioteNode, event: ISymbioteEvent): void {
     setProp(node, 'mostRecentEventCount', count);
     requestCommitFor(node);
   }
-
-  callAppListener(node, 'change', event);
 }
 
 function onFocus(node: ISymbioteNode, event: ISymbioteEvent): void {
@@ -228,12 +257,95 @@ function onBlur(node: ISymbioteNode, event: ISymbioteEvent): void {
   callAppListener(node, 'blur', event);
 }
 
+// The out-of-commit half of the same check `afterCommit` runs on every commit: given the mirror
+// already updated from a real native report, send the authored `selection` back down if it still
+// disagrees. Kept separate from `afterCommit`'s own combined text+selection dispatch rather than
+// shared with it — this path has no `freshlySeeded`/text-divergence concept, and folding the two
+// would risk a double command on a commit where both diverge at once.
+function correctSelectionIfNeeded(
+  node: ISymbioteNode,
+  state: IBehaviorState,
+): void {
+  const props = propsOf(node);
+  const { start, end } = selectionOf(props.selection);
+  const selectionAuthored = start !== SELECTION_NONE || end !== SELECTION_NONE;
+  if (
+    !selectionAuthored ||
+    (state.lastNativeSelection.start === start &&
+      state.lastNativeSelection.end === end)
+  ) {
+    return;
+  }
+  const text = foldText(
+    stringFrom(props.value),
+    stringFrom(props.defaultValue),
+  );
+  dlog(
+    `TextInput behavior: setTextAndSelection (selection-change snap-back) count=${state.mostRecentEventCount}`,
+  );
+  dispatchViewCommand(node, 'setTextAndSelection', [
+    state.mostRecentEventCount,
+    text,
+    start,
+    end,
+  ]);
+  state.lastNativeSelection = { start, end };
+}
+
+// TextInput.js:522-533 — `_onSelectionChange` forwards to the app FIRST, then folds the REAL native
+// position into `lastNativeSelection`, whichever way the caret moved (a controlled write we sent
+// ourselves, or the user dragging it). That update alone is what schedules React's next render,
+// which is what re-runs the divergence check with the freshly-updated mirror. We have no render to
+// ride, so `correctSelectionIfNeeded` is called directly, right after the mirror moves — same shape
+// as `refresh-control.ts`'s own re-check after a native report.
+function onSelectionChange(node: ISymbioteNode, event: ISymbioteEvent): void {
+  callAppListener(node, 'selectionChange', event);
+  const state = stateOf(node);
+  if (state === undefined) return;
+  const native = selectionOf(event.nativeEvent.selection);
+  if (native.start === SELECTION_NONE && native.end === SELECTION_NONE) return;
+  state.lastNativeSelection = native;
+  correctSelectionIfNeeded(node, state);
+}
+
+// `TextInput.js`'s own `usePressability(config)` — the same Pressability class every Touchable
+// uses, wired for exactly one reason: `onPress` calls `inputRef.current.focus()` when
+// `editable !== false`, so a tap landing inside an authored `hitSlop` but outside the native
+// view's own focus zone still focuses the input. `onPressIn`/`onPressOut` need NO wrapping here —
+// `configFor`'s defaults already forward them raw, which is exactly what upstream does
+// (`onPressIn, onPressOut` destructured straight into the config with no wrapper function).
+const focusOnPress: IPressConfigRefinement = (node, config) => ({
+  ...config,
+  onPress(event) {
+    config.onPress?.(event);
+    if (propOf(node, 'editable') !== false) {
+      dlog('TextInput behavior: press -> focus command');
+      dispatchViewCommand(node, 'focus', []);
+    }
+  },
+});
+
+// One node holds exactly one press machine (`./pressable`'s own constraint), so these join
+// TextInput's existing 'change'/'focus'/'blur' owned names rather than replacing them — none of
+// the six collide with those three.
+const PRESS_LISTENERS: readonly string[] = [
+  'press',
+  'pressIn',
+  'pressOut',
+  'pressMove',
+  'longPress',
+  'startShouldSetResponder',
+  'responderMove',
+  'responderTerminationRequest',
+];
+
 function attach(node: ISymbioteNode): void {
   states.set(node, {
     mostRecentEventCount: INITIAL_EVENT_COUNT,
     lastNativeText: undefined,
     isFocused: false,
     isMirrorFreshlySeeded: false,
+    lastNativeSelection: { start: SELECTION_NONE, end: SELECTION_NONE },
   });
   // The mirror's seed has to reach the PAYLOAD too, not just this state object. The wrappers handed
   // the count over on every render, so an input committed the key at create; the behavior used to
@@ -246,6 +358,10 @@ function attach(node: ISymbioteNode): void {
   setBehaviorListener(node, 'change', event => onChange(node, event));
   setBehaviorListener(node, 'focus', event => onFocus(node, event));
   setBehaviorListener(node, 'blur', event => onBlur(node, event));
+  setBehaviorListener(node, 'selectionChange', event =>
+    onSelectionChange(node, event),
+  );
+  attachPressMachine(node, { refine: focusOnPress });
 }
 
 // The first commit is the earliest point where the node has BOTH its props and a Fabric tag. The
@@ -280,33 +396,50 @@ function attachAfterCommit(node: ISymbioteNode): void {
 function afterCommit(node: ISymbioteNode): void {
   const state = stateOf(node);
   if (state === undefined) return;
-  // The seed ran on this same commit, so the comparison below is already decided — see
-  // `isMirrorFreshlySeeded`. Cleared here rather than in the seed, because this is the beat it
-  // covers and the next one must read for real.
-  if (state.isMirrorFreshlySeeded) {
-    state.isMirrorFreshlySeeded = false;
-    return;
-  }
+  // The seed ran on this same commit, so the TEXT comparison below is already decided — see
+  // `isMirrorFreshlySeeded`. SELECTION is not seeded by anything, so it is checked regardless: an
+  // authored `selection` must move the caret on this very commit, matching `TextInput.js`'s own
+  // sentinel-seeded `lastNativeSelection`.
+  const freshlySeeded = state.isMirrorFreshlySeeded;
+  if (freshlySeeded) state.isMirrorFreshlySeeded = false;
 
-  const value = stringProp(node, 'value');
-  if (!shouldCommandText(state.lastNativeText, value)) return;
+  // ONE crossing for the whole bag, not three — `attachAfterCommit`'s own reasoning: `propOf` per
+  // key is a JSI read per key, and this runs on every commit a text input is dirty in.
+  const props = propsOf(node);
+  const value = stringFrom(props.value);
+  const textDiverged =
+    !freshlySeeded && shouldCommandText(state.lastNativeText, value);
 
   // `selection` is `{ start, end? }` when present. SELECTION_NONE (-1) is RN's "leave the cursor
   // where native put it" sentinel, so an absent selection must not be read as position 0 — that
-  // would jump the caret to the front of the field on every controlled write.
-  const { start, end } = selectionOf(propOf(node, 'selection'));
+  // would jump the caret to the front of the field on every controlled write. `lastNativeSelection`
+  // is seeded at the same sentinel, so a real selection always "diverges" from it until this behavior
+  // has actually sent one.
+  const { start, end } = selectionOf(props.selection);
+  const selectionAuthored = start !== SELECTION_NONE || end !== SELECTION_NONE;
+  const selectionDiverged =
+    selectionAuthored &&
+    (state.lastNativeSelection.start !== start ||
+      state.lastNativeSelection.end !== end);
+
+  if (!textDiverged && !selectionDiverged) return;
+
+  // `TextInput.js`'s own `text` — `value ?? defaultValue`, sent verbatim whichever half diverged,
+  // never the raw `value` alone: an uncontrolled input moving only its caret has no `value` to send.
+  const text = foldText(value, stringFrom(props.defaultValue));
 
   dlog(
     `TextInput behavior: setTextAndSelection count=${state.mostRecentEventCount} ` +
-      `text=${JSON.stringify(value)}`,
+      `text=${JSON.stringify(text)}`,
   );
   dispatchViewCommand(node, 'setTextAndSelection', [
     state.mostRecentEventCount,
-    value,
+    text,
     start,
     end,
   ]);
-  state.lastNativeText = value;
+  if (textDiverged) state.lastNativeText = value;
+  if (selectionDiverged) state.lastNativeSelection = { start, end };
 }
 
 function detach(node: ISymbioteNode): void {
@@ -315,6 +448,7 @@ function detach(node: ISymbioteNode): void {
   // no-ops when this node isn't the currently-focused one.
   blurTextInput(node);
   states.delete(node);
+  detachPressMachine(node);
 }
 
 /**
@@ -387,9 +521,16 @@ export function registerTextInputBehavior(): void {
     attachAfterCommit,
     afterCommit,
     detach,
-    // The three the machine needs as INPUTS. Without the stash the app's own `onChange` would
-    // evict the machine from the very event the controlled handshake runs on.
-    ownedListeners: ['change', 'focus', 'blur'],
+    // The three the change/focus/blur machine needs as INPUTS, plus the press family the
+    // tap-to-focus machine composes. Without the stash the app's own `onChange` would evict the
+    // machine from the very event the controlled handshake runs on.
+    ownedListeners: [
+      'change',
+      'focus',
+      'blur',
+      'selectionChange',
+      ...PRESS_LISTENERS,
+    ],
   };
   registerHostBehavior(TEXT_INPUT_TAG, behavior);
   registerHostBehavior(TEXT_INPUT_MULTILINE_TAG, behavior);

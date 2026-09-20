@@ -10,9 +10,21 @@
 // node plus its measure call). The rest (the timers, the geometry, the suppression flags,
 // the decision of when each callback fires) is here, shared by every adapter.
 
-import { dlog, type ISymbioteEvent } from '@symbiote-native/engine';
+import {
+  dlog,
+  Platform,
+  SoundManager,
+  type ISymbioteEvent,
+} from '@symbiote-native/engine';
 
 export const DEFAULT_DELAY_LONG_PRESS_MS = 500;
+// Pressability.js's DEFAULT_LONG_PRESS_DEACTIVATION_DISTANCE. A SEPARATE, smaller radius than
+// `pressRetentionOffset`/`hitSlop`: any move past it cancels a pending long press even while the
+// finger is still well inside the retention rect — real presses jitter a few px, long-press must
+// not fire mid-scroll. Vendor exposes it only as a rare static override
+// (`Pressability.setLongPressDeactivationDistance`, used by e.g. gesture libraries), never as a
+// per-component prop, so it stays a plain constant here rather than a config field.
+export const LONG_PRESS_DEACTIVATION_DISTANCE = 10;
 // Pressability's default active-visual floor for a plain Pressable. Touchable* overrides this to 0.
 export const DEFAULT_MIN_PRESS_DURATION_MS = 130;
 // RN's default extra slop kept around a press once it is active, before a drift fires pressOut.
@@ -159,6 +171,11 @@ export interface IPressRuntime {
   pressDelayCancel: (() => void) | undefined;
   pressOutCancel: (() => void) | undefined;
   pressOrigin: { x: number; y: number } | undefined;
+  // Where the finger was when the press last ACTIVATED (Pressability.js's `_touchActivatePosition`,
+  // set in `_activate`) — distinct from `pressOrigin`, which is the raw touch-down point. A drift
+  // re-activation moves this, so the long-press jitter check below is always measured from the
+  // most recent activation, not from the original touch-down.
+  activatePosition: { x: number; y: number } | undefined;
   driftedOut: boolean;
   region: IResponderRegion | undefined;
   // Logical Pressability state, separate from the visible `pressed` cell: deactivation becomes
@@ -180,6 +197,7 @@ export function createPressRuntime(): IPressRuntime {
     pressDelayCancel: undefined,
     pressOutCancel: undefined,
     pressOrigin: undefined,
+    activatePosition: undefined,
     driftedOut: false,
     region: undefined,
     active: false,
@@ -252,7 +270,16 @@ export interface IPressMachineConfig {
   minPressDuration?: number;
   hitSlop?: IRectOffset;
   pressRetentionOffset?: IRectOffset;
+  // Pressability.js:749-757 — gates the Android system touch-sound feedback, read at RELEASE time
+  // rather than baked into the handler, so a late prop change takes effect on the next press.
+  android_disableSound?: boolean;
 }
+
+// TODO(rn-parity, low priority): `Pressable.js` also has `onHoverIn`/`onHoverOut`,
+// `delayHoverIn`/`delayHoverOut`, driven by `onMouseEnter`/`onMouseLeave` — no equivalent exists in
+// `IPressMachineConfig` or anywhere in this file. Deliberately not implemented: hover requires a
+// pointer/mouse device, which neither iOS nor Android touch delivers — same class as the TV
+// (`Platform.isTV`) focus/blur gap already recorded for the Touchables.
 
 export interface IPressHandlers {
   handlePressIn: IPressHandler;
@@ -302,6 +329,7 @@ export function createPressHandlers(
     delayLongPress,
     unstable_pressDelay,
     minPressDuration = DEFAULT_MIN_PRESS_DURATION_MS,
+    android_disableSound,
   } = config;
 
   // Per-edge offsets for the measured-rect retention test (RN's hitSlop + pressRectOffset).
@@ -316,6 +344,18 @@ export function createPressHandlers(
 
   // True iff the touch still belongs to the active press: against the measured rect when we have
   // one (the RN-faithful path), else the symmetric radius fallback.
+  //
+  // TODO(rn-parity): `Pressability.js`'s `onResponderMove` (:489-493) returns right after the
+  // app's `onPressMove`, before any drift/long-press-jitter check, whenever the region is not yet
+  // measured — vendor treats "no measurement yet" as "do nothing until one arrives." The radius
+  // fallback below diverges: it judges drift/jitter on synthetic geometry instead of waiting.
+  // Confirmed unreachable on a real device (`Tree::measure` in `SymbioteTree.cpp` is a synchronous
+  // JSI call, so the region is always populated before `handleResponderMove` can fire), so the
+  // fallback only ever fires in this codebase's own test harness, which wires
+  // `getMeasureFn: () => undefined` everywhere (`state/pressable.test.ts:84` and every touchable
+  // test built on it). A real fix needs a synchronous mock-measure harness under 11+ existing
+  // drift/retention/long-press call sites across `pressable.test.ts`, `touchable-opacity.test.ts`
+  // and `render-pressable.test.ts`, not a one-line guard — see the audit skill for the finding.
   function isWithinRetention(point: { x: number; y: number }): boolean {
     const region = runtime.region;
     if (region !== undefined) {
@@ -340,23 +380,34 @@ export function createPressHandlers(
     cancelRuntimeTimer(runtime, 'pressOutCancel');
   }
 
+  // Pressability.js arms this ONCE, at RESPONDER_GRANT, and a drift out/back-in never re-arms it
+  // (`onResponderMove` only ever CANCELS via `_cancelLongPressDelayTimeout`, permanently, for the
+  // rest of the gesture). Splitting it out of `activate()` is what makes that possible: `activate`
+  // itself runs again on every drift-back-in, and used to re-arm a fresh full-duration timer each
+  // time, which is wrong on two counts — it can resurrect a long press the finger already
+  // disqualified, and if it never left, it's simply the same timer restarted for no reason.
+  function armLongPress(event: ISymbioteEvent): void {
+    if (!onLongPress) return;
+    runtime.longPressCancel = host.schedule(() => {
+      runtime.longPressCancel = undefined;
+      if (runtime.disposed || !runtime.active || runtime.driftedOut) return;
+      runtime.longPressFired = true;
+      dlog('Pressable longPress timer fired');
+      onLongPress(event);
+    }, delayLongPress + unstable_pressDelay);
+  }
+
   function activate(event: ISymbioteEvent): void {
     if (runtime.disposed || runtime.active || runtime.driftedOut) return;
     // A new grant or drift-back-in supersedes a delayed out from the previous active interval.
     clearPressOut();
     runtime.active = true;
     runtime.activatedAt = host.now();
+    // Pressability.js's `_activate`: the jitter check below reads from here, re-set on every
+    // (re)activation — including a drift-back-in re-arm, matching vendor exactly.
+    runtime.activatePosition = readPoint(event);
     dlog('Pressable pressIn');
     host.setPressed(true);
-    if (!runtime.longPressFired && onLongPress) {
-      runtime.longPressCancel = host.schedule(() => {
-        runtime.longPressCancel = undefined;
-        if (runtime.disposed || !runtime.active || runtime.driftedOut) return;
-        runtime.longPressFired = true;
-        dlog('Pressable longPress timer fired');
-        onLongPress(event);
-      }, delayLongPress);
-    }
     onPressIn?.(event);
   }
 
@@ -413,6 +464,11 @@ export function createPressHandlers(
       runtime.pressOrigin = readPoint(event);
       runtime.driftedOut = false;
       measureRegion(runtime, host.getMeasureFn());
+      // Armed at GRANT, unconditionally — before the `unstable_pressDelay` branch below, which only
+      // defers the PRESSED VISUAL. `delayLongPress` already has `unstable_pressDelay` baked out of
+      // its default (`configFor`), so adding it back here is what keeps the long-press threshold at
+      // a constant time-from-touch-down regardless of how long the visual is deferred.
+      armLongPress(event);
       if (unstable_pressDelay > 0) {
         dlog(`Pressable pressIn deferred ${unstable_pressDelay}ms`);
         runtime.pressDelayCancel = host.schedule(() => {
@@ -450,6 +506,14 @@ export function createPressHandlers(
         dlog('Pressable press suppressed by prior longPress');
         return;
       }
+      // Pressability.js:754-756 — Android only, and only when onPress is actually about to fire.
+      if (
+        onPress !== undefined &&
+        Platform.OS === 'android' &&
+        android_disableSound !== true
+      ) {
+        SoundManager.playTouchSound();
+      }
       onPress?.(event);
     },
     handleResponderMove(event: ISymbioteEvent): void {
@@ -457,6 +521,17 @@ export function createPressHandlers(
       onPressMove?.(event);
       const here = readPoint(event);
       if (!here) return;
+      // Pressability.js:502-508 — checked BEFORE the retention-region branch below, and
+      // independent of it: a long press must not fire on a jitter, even one well inside the
+      // broader retention rect that keeps the press itself alive.
+      const activatePosition = runtime.activatePosition;
+      if (activatePosition !== undefined) {
+        const distance = Math.hypot(
+          activatePosition.x - here.x,
+          activatePosition.y - here.y,
+        );
+        if (distance > LONG_PRESS_DEACTIVATION_DISTANCE) clearLongPress();
+      }
       if (!isWithinRetention(here)) {
         if (!runtime.driftedOut) {
           dlog('Pressable drifted past retention region — deactivating');

@@ -182,7 +182,9 @@ export interface IParallelConfig {
 }
 
 export function parallel(
-  animations: ICompositeAnimation[],
+  // `| undefined` entries: `AnimatedImplementation.js`'s `parallelImpl` treats a falsy array
+  // entry (e.g. `cond && timing(...)`) as already-finished rather than crashing.
+  animations: (ICompositeAnimation | undefined)[],
   config?: IParallelConfig,
 ): ICompositeAnimation {
   let doneCount = 0;
@@ -210,20 +212,24 @@ export function parallel(
             result.stop();
           }
         };
-        animation.start(cb, isLooping);
+        if (animation === undefined) {
+          cb({ finished: true });
+        } else {
+          animation.start(cb, isLooping);
+        }
       });
     },
 
     stop(): void {
       animations.forEach((animation, idx) => {
-        if (!hasEnded[idx]) animation.stop();
+        if (!hasEnded[idx]) animation?.stop();
         hasEnded[idx] = true;
       });
     },
 
     reset(): void {
       animations.forEach((animation, idx) => {
-        animation.reset();
+        animation?.reset();
         hasEnded[idx] = false;
         doneCount = 0;
       });
@@ -298,6 +304,12 @@ export interface ILoopAnimationConfig {
   resetBeforeIteration?: boolean;
 }
 
+// TODO(rn-parity, low priority): vendor's `loopImpl`/`sequenceImpl`/`parallelImpl` each throw
+// ("Loops run using the native driver cannot contain Animated.X animations") from a
+// `_startNativeLoop` reachable only by nesting `loop(loop(...))` around a native-driven leaf. Ours
+// has no such throw: the nesting silently falls back to the JS restart loop instead of erroring.
+// Judged non-actionable (misuse-detection guard, no runtime-visible effect for a correct caller,
+// same class as the `numColumns` invariant) — see the audit skill for the full reasoning.
 export function loop(
   animation: ICompositeAnimation,
   config: ILoopAnimationConfig = {},

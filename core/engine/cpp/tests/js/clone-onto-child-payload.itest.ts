@@ -208,6 +208,20 @@ describe('what the owner clones onto its child', () => {
     expect(child.nativeID).toBe('from-id');
   });
 
+  // why: TouchableWithoutFeedback.js's own clone is NOT `id ?? nativeID` — it composes
+  // `nativeID: props.id ?? props.nativeID` and THEN runs a `PASSTHROUGH_PROPS` loop (:279-282)
+  // that includes `nativeID` and unconditionally overwrites it with the raw authored value when
+  // set (:280 `props[prop] !== undefined`). So an app authoring BOTH ends up with `nativeID`
+  // winning here, the opposite of TouchableNativeFeedback's `id` above.
+  it('lands the owner’s nativeID on the without-feedback child, with nativeID winning', () => {
+    const { child } = withoutFeedback({
+      id: 'losing',
+      nativeID: 'from-native-id',
+    });
+
+    expect(child.nativeID).toBe('from-native-id');
+  });
+
   // why: NO RIPPLE OFF ANDROID. `getBackgroundProp` returns null there (`:402`), and the rule's
   // Android half is `#ifdef ANDROID` — so this host, which is not Android, must write neither slot.
   // The positive half of that branch is NOT reachable here and is recorded as the gap it is: a

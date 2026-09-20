@@ -223,7 +223,9 @@ export function FlatList<ItemT>(props: IFlatListProps<ItemT>): JSX.Element {
         }
         getItemCount={(): number => rows().length}
         renderItem={renderRow}
-        keyExtractor={rowKeyExtractor}
+        keyExtractor={(row: IRow<ItemT>): string =>
+          rowKeyExtractor(row, props.keyExtractor)
+        }
         ItemSeparatorComponent={rowSeparatorComponent()}
         onViewableItemsChanged={rowViewability()}
         viewabilityConfigCallbackPairs={rowViewabilityPairs()}

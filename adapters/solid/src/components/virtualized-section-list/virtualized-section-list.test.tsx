@@ -1013,12 +1013,19 @@ describe('Solid VirtualizedSectionList on the engine', () => {
     });
 
     // why: a prepended section is the structural change a section list actually gets (a new day, a
-    // new group), and it moves every later row's position in the flattened stream. Rows are keyed,
-    // so the ones that survive must MOVE and re-prop rather than be rebuilt — and, because each
-    // row's subtree is built once for the entry KIND it was created with, a row must never end up
-    // holding an entry of a different kind, or a header would paint an item's content.
+    // new group), and it moves every later row's position in the flattened stream.
+    // `VirtualizedSectionList.js`'s own row key is `(section.key ?? sectionIndex):itemKey` — so a
+    // row survives a prepend and MOVES rather than rebuilds only when its section carries a stable
+    // `key` of its own; without one, RN's default falls back to the section's POSITION and the
+    // shift is indistinguishable from every row in it being new, in real RN as much as here. Each
+    // row's subtree is also built once for the entry KIND it was created with, so a row must never
+    // end up holding an entry of a different kind, or a header would paint an item's content.
     it('keeps its rows when a whole section is prepended', async () => {
-      const [sections, setSections] = createSignal(SECTIONS);
+      const keyedSections = SECTIONS.map(section => ({
+        ...section,
+        key: section.title,
+      }));
+      const [sections, setSections] = createSignal(keyedSections);
       mount(ROOT_TAG, () => (
         <VirtualizedSectionList<IRow>
           sections={sections()}
@@ -1032,8 +1039,12 @@ describe('Solid VirtualizedSectionList on the engine', () => {
       await settleViewport();
 
       setSections([
-        { title: 'Section Z', data: [{ id: 9, label: 'row-z0' }] },
-        ...SECTIONS,
+        {
+          title: 'Section Z',
+          key: 'Section Z',
+          data: [{ id: 9, label: 'row-z0' }],
+        },
+        ...keyedSections,
       ]);
       await tick();
 

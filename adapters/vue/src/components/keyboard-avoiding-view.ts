@@ -28,7 +28,9 @@ import {
 } from '@symbiote-native/engine';
 import {
   computeInset,
+  configureKeyboardAvoidingAnimation,
   keyboardAvoidingEventNamesFor,
+  readKeyboardAnimationTiming,
   readKeyboardFrame,
   readPrefersCrossFadeTransitions,
   readLayoutFrame,
@@ -119,14 +121,21 @@ export const KeyboardAvoidingView = defineComponent<
 
     const onShow = (payload: unknown): void => {
       const keyboard = readKeyboardFrame(payload);
+      const previousInset = inset.value;
       const next = computeInset(frame, keyboard, verticalOffset(), {
         behavior: asBehavior(currentAttrs().behavior),
         // The inset CURRENTLY applied (RN's this.state.bottom), read live off the reactive cell:
         // in 'height' mode the wrapper is shrunk by it, so the next onLayout under-reports the
         // frame by exactly that much and core adds it back.
-        previousInset: inset.value,
+        previousInset,
         prefersCrossFadeTransitions,
       });
+      // RN's `_updateBottomIfNecessary` skips the animation when the inset did not change.
+      if (next !== previousInset)
+        configureKeyboardAvoidingAnimation(
+          readKeyboardAnimationTiming(payload),
+          currentAttrs().enabled !== false,
+        );
       dlog(`KeyboardAvoidingView show -> inset ${next}`);
       inset.value = next;
     };

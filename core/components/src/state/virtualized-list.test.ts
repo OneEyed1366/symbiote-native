@@ -16,7 +16,6 @@ import {
   buildOffsets,
   computeWindow,
   throttleWindow,
-  visiblePercent,
   isCellViewable,
   offsetForIndex,
   averageMeasuredLength,
@@ -28,7 +27,6 @@ import {
   diffViewable,
   maxMinimumViewTime,
   NO_INDEX,
-  DEFAULT_VIEW_AREA_COVERAGE_PERCENT_THRESHOLD,
   type ICellLayout,
   type IViewToken,
   type IViewabilityConfigCallbackPair,
@@ -204,8 +202,20 @@ describe('resolveItemKey', () => {
   it('uses the keyExtractor when provided', () => {
     expect(resolveItemKey({ id: 'a' }, 3, item => item.id)).toBe('a');
   });
-  it('falls back to the stringified index', () => {
-    expect(resolveItemKey({ id: 'a' }, 3, undefined)).toBe('3');
+  // why: VirtualizeUtils.js:248 — the real RN default is `item.key ?? item.id ?? String(index)`,
+  // not a bare index. Most apps never pass `keyExtractor` and rely on this to keep list identity
+  // stable across inserts/removes; falling straight to the index silently breaks that for them.
+  it('falls back to item.key when no keyExtractor is given', () => {
+    expect(resolveItemKey({ key: 'k', id: 'a' }, 3, undefined)).toBe('k');
+  });
+  it('falls back to item.id when there is no item.key', () => {
+    expect(resolveItemKey({ id: 'a' }, 3, undefined)).toBe('a');
+  });
+  it('falls back to the stringified index when the item has neither', () => {
+    expect(resolveItemKey({ label: 'a' }, 3, undefined)).toBe('3');
+  });
+  it('falls back to the stringified index for a non-object item', () => {
+    expect(resolveItemKey('a', 3, undefined)).toBe('3');
   });
 });
 
@@ -679,64 +689,89 @@ describe('throttleWindow', () => {
   });
 });
 
-describe('visiblePercent', () => {
-  it('reports 0 for a zero-length cell', () => {
-    expect(visiblePercent(100, 0, 0, 500)).toBe(0);
-  });
-
-  it('reports 100 when the cell is fully inside the viewport', () => {
-    expect(visiblePercent(100, 50, 0, 500)).toBe(100);
-  });
-
-  // why: viewability is a FRACTION of the cell's own box that is visible — a cell straddling
-  // the viewport edge is genuinely partially viewable, not simply in-or-out.
-  it('reports the overlapping fraction for a cell straddling the viewport edge', () => {
-    // cell [450, 550), viewport [0, 500): 50 of 100px visible.
-    expect(visiblePercent(450, 100, 0, 500)).toBe(50);
-  });
-
-  it('reports 0 for a cell entirely outside the viewport', () => {
-    expect(visiblePercent(1000, 100, 0, 500)).toBe(0);
-  });
-});
-
 describe('isCellViewable', () => {
-  // why: itemVisiblePercentThreshold takes precedence over the area threshold when both would
-  // otherwise apply (RN's documented precedence) — mixing them up flips which cells report.
-  it('honors itemVisiblePercentThreshold over the area threshold when both are set', () => {
+  // why: `ViewabilityHelper.js`'s `computeViewableItems` checks `viewAreaCoveragePercentThreshold
+  // != null` FIRST to decide the mode — area wins whenever it is set, itemVisiblePercentThreshold
+  // only when it is not. The old code checked item-threshold first, backwards from vendor.
+  it('honors viewAreaCoveragePercentThreshold over an item threshold when both are set', () => {
+    // cell [0,100) fully visible in viewport 500 -> area% = 100/500*100 = 20, item% = 100.
+    // A failing item threshold proves area actually won, since item alone would also pass.
     expect(
-      isCellViewable(60, {
-        itemVisiblePercentThreshold: 50,
-        viewAreaCoveragePercentThreshold: 90,
+      isCellViewable(0, 100, 0, 500, {
+        viewAreaCoveragePercentThreshold: 10,
+        itemVisiblePercentThreshold: 99,
       }),
     ).toBe(true);
   });
 
   it('rejects a cell below itemVisiblePercentThreshold', () => {
-    expect(isCellViewable(40, { itemVisiblePercentThreshold: 50 })).toBe(false);
+    // cell [0,100) at scroll 60 in viewport 500: 40 of 100px visible -> item% = 40.
+    expect(
+      isCellViewable(0, 100, 60, 500, { itemVisiblePercentThreshold: 50 }),
+    ).toBe(false);
   });
 
-  it('falls back to viewAreaCoveragePercentThreshold when no item threshold is set', () => {
-    expect(isCellViewable(30, { viewAreaCoveragePercentThreshold: 20 })).toBe(
-      true,
-    );
-    expect(isCellViewable(10, { viewAreaCoveragePercentThreshold: 20 })).toBe(
-      false,
-    );
+  // why: THE core bug — `viewAreaCoveragePercentThreshold` is a fraction of the VIEWPORT, never
+  // of the cell's own length. A cell clipped by the viewport edge must be judged by how much of
+  // the VIEWPORT it fills, not how much of ITSELF is visible — the two diverge sharply when the
+  // cell is much shorter than the viewport, and the cell must stay clear of the entirely-visible
+  // shortcut (below) to actually exercise the percent math.
+  it('measures viewAreaCoveragePercentThreshold against the viewport, not the cell', () => {
+    // cell [480,530) clipped by viewport 500 -> 20px visible.
+    // area% (viewport-relative) = 20/500*100 = 4; item% (cell-relative) would be 20/50*100 = 40.
+    expect(
+      isCellViewable(480, 50, 0, 500, { viewAreaCoveragePercentThreshold: 10 }),
+    ).toBe(false);
+    expect(
+      isCellViewable(480, 50, 0, 500, { viewAreaCoveragePercentThreshold: 3 }),
+    ).toBe(true);
   });
 
-  // why: a cell exactly filling the viewport must count as viewable even against a stricter
-  // area threshold — RN's `percent >= 100` escape hatch on top of the coverage comparison.
-  it('always counts a fully visible cell as viewable regardless of the area threshold', () => {
-    expect(isCellViewable(100, { viewAreaCoveragePercentThreshold: 150 })).toBe(
-      true,
-    );
+  // why: RN's own `_isEntirelyVisible` shortcut — a cell wholly inside the viewport is viewable
+  // in EITHER mode regardless of how small its share of the viewport is.
+  it('always counts an entirely visible cell as viewable, whatever the area threshold', () => {
+    expect(
+      isCellViewable(100, 50, 0, 500, {
+        viewAreaCoveragePercentThreshold: 90,
+      }),
+    ).toBe(true);
+  });
+
+  // why: RN compares with `>=`, never `>` — a cell sitting exactly at the threshold must clear
+  // it, not fall just short.
+  it('includes a cell sitting exactly at the threshold (RN uses >=, not >)', () => {
+    // cell [400,600), viewport [0,500): 100 of 500 viewport px visible -> area% = 20 exactly.
+    expect(
+      isCellViewable(400, 200, 0, 500, {
+        viewAreaCoveragePercentThreshold: 20,
+      }),
+    ).toBe(true);
   });
 
   it('uses the documented zero default when no threshold is configured at all', () => {
-    expect(isCellViewable(0, {})).toBe(false);
+    expect(isCellViewable(0, 100, 1000, 500, {})).toBe(false);
+    expect(isCellViewable(400, 200, 0, 500, {})).toBe(true);
+  });
+
+  // why: a cell with no overlap at all must never read as viewable, however low the threshold —
+  // RN's caller loop never even calls `_isViewable` for such a cell.
+  it('rejects a cell with no overlap at all, even at threshold 0', () => {
     expect(
-      isCellViewable(DEFAULT_VIEW_AREA_COVERAGE_PERCENT_THRESHOLD + 1, {}),
+      isCellViewable(1000, 100, 0, 500, {
+        viewAreaCoveragePercentThreshold: 0,
+      }),
+    ).toBe(false);
+  });
+
+  // why: vendor's `_isEntirelyVisible` is `top >= 0 && bottom <= viewportHeight && bottom > top` —
+  // a zero-length cell (no measurement yet) satisfies the first two clauses but never the third,
+  // so it must fall through to the percent math (0 visible pixels) rather than short-circuit true.
+  it('does not treat a zero-length cell as entirely visible', () => {
+    expect(
+      isCellViewable(100, 0, 0, 500, { viewAreaCoveragePercentThreshold: 1 }),
+    ).toBe(false);
+    expect(
+      isCellViewable(100, 0, 0, 500, { viewAreaCoveragePercentThreshold: 0 }),
     ).toBe(true);
   });
 });
@@ -843,6 +878,43 @@ describe('computeEndReached / computeStartReached', () => {
   it('floors a sub-epsilon start distance to exactly 0', () => {
     expect(computeStartReached(0.0002, 500, 1).distanceFromStart).toBe(0);
   });
+
+  // why: `VirtualizedList.js`'s `_maybeCallOnEdgeReached` — when the app gives NO
+  // onEndReachedThreshold/onStartReachedThreshold, the callback-firing threshold is a flat
+  // `DEFAULT_THRESHOLD_PX = 2` (pixels), never `2 * viewportLength`. That "2" is a DIFFERENT
+  // RN default (`onEndReachedThresholdOrDefault`'s `?? 2`, a multiplier used only for internal
+  // windowing) that this engine does not otherwise consume — conflating the two meant the
+  // no-threshold-given case fired `onEndReached` a full 2 screens early.
+  it('defaults an unset end threshold to 2px, not 2 viewport-lengths', () => {
+    expect(computeEndReached(1000, 495, 500, undefined)).toEqual({
+      distanceFromEnd: 5,
+      withinThreshold: false,
+    });
+    expect(computeEndReached(1000, 497, 500, undefined)).toEqual({
+      distanceFromEnd: 3,
+      withinThreshold: false,
+    });
+    expect(computeEndReached(1000, 498, 500, undefined)).toEqual({
+      distanceFromEnd: 2,
+      withinThreshold: true,
+    });
+  });
+
+  it('defaults an unset start threshold to 2px, not 2 viewport-lengths', () => {
+    expect(computeStartReached(3, 500, undefined)).toEqual({
+      distanceFromStart: 3,
+      withinThreshold: false,
+    });
+    expect(computeStartReached(2, 500, undefined)).toEqual({
+      distanceFromStart: 2,
+      withinThreshold: true,
+    });
+  });
+
+  it('still treats a given threshold as a viewport-length multiple when unset is not the case', () => {
+    // total 1000, viewport 500 at offset 400 -> distanceFromEnd = 100; explicit threshold 1 -> 500.
+    expect(computeEndReached(1000, 400, 500, 1).withinThreshold).toBe(true);
+  });
 });
 
 describe('buildViewabilityPairs', () => {
@@ -881,7 +953,7 @@ describe('computeViewableSet', () => {
   const getItem = (_source: unknown, index: number): string => data[index];
 
   function pairsWith(
-    config: Parameters<typeof isCellViewable>[1],
+    config: Parameters<typeof isCellViewable>[4],
   ): IViewabilityConfigCallbackPair<string>[] {
     return [{ viewabilityConfig: config, onViewableItemsChanged: () => {} }];
   }

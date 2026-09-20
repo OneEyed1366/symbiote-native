@@ -218,6 +218,25 @@ describe('the ImageBackground behavior — where a prop lands', () => {
     expect(image.payload.id).toBeUndefined();
     expect(host.payload.nativeID).toBeUndefined();
   });
+
+  // why: `ImageBackground.js:67,76` destructures `importantForAccessibility` OUT of `...props`
+  // before the spread reaches the image, and reapplies it explicitly to the WRAPPER
+  // (`importantForAccessibility={importantForAccessibility}`, :76) as well as the image (:82). So,
+  // unlike every other prop in this describe block, it belongs to the host, not to the spread — the
+  // opposite of what `IMAGE_BACKGROUND_HOST_PROPS` said before this fix (the image derives its own
+  // copy from the owner in `foldImageBackgroundImageProps`, asserted in
+  // `image-background-image-payload.itest.ts`).
+  it('keeps importantForAccessibility on the host rather than the image spread', () => {
+    mount(
+      makeImageBackground({
+        source: SOURCE,
+        importantForAccessibility: 'no-hide-descendants',
+      }),
+    );
+
+    const { host } = subtree();
+    expect(host.payload.importantForAccessibility).toBe('no-hide-descendants');
+  });
 });
 
 // THE DERIVED STYLE ITSELF LEFT THIS FILE ON 2026-09-18 — the absolute fill, the proxied box, and

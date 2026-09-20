@@ -162,6 +162,8 @@ describe('what the fold-only touchables send native', () => {
       onHideUnderlay: () => {},
       delayPressIn: 10,
       delayPressOut: 20,
+      touchSoundDisabled: true,
+      rejectResponderTermination: true,
     }).payload;
 
     for (const consumed of [
@@ -171,6 +173,8 @@ describe('what the fold-only touchables send native', () => {
       'onHideUnderlay',
       'delayPressIn',
       'delayPressOut',
+      'touchSoundDisabled',
+      'rejectResponderTermination',
     ]) {
       expect(payload[consumed]).toBe(undefined);
     }
@@ -258,6 +262,23 @@ describe('what an input accessory view sends native', () => {
     expect(
       accessory({ backgroundColor: 0xff_00_00_ff }).payload.backgroundColor,
     ).toBe(0xff_00_00_ff);
+  });
+
+  // why: `InputAccessoryView.js`'s `styles.container = {position: 'absolute'}`, composed as
+  // `[props.style, styles.container]` — the PLATFORM's half LAST, so it wins over whatever the app
+  // wrote. Every InputAccessoryView ever rendered is positioned absolutely; nothing here is
+  // per-instance, which is what makes it the tag's rule rather than composition.
+  it('positions itself absolutely, unconditionally', () => {
+    expect(accessory({}).payload.position).toBe('absolute');
+  });
+
+  // why: the ORDER is the whole point of the fixed-last placement above — an app cannot opt out of
+  // the absolute positioning by authoring its own `position`, matching upstream's array order
+  // exactly.
+  it('overrides an authored position, matching the platform default winning last', () => {
+    expect(
+      accessory({ style: { position: 'relative' } }).payload.position,
+    ).toBe('absolute');
   });
 });
 

@@ -383,6 +383,11 @@ describe('Solid TextInput on the engine', () => {
 
     // why: a controlled write must carry the caller's selection rather than the -1 sentinel, or the
     // caret jumps to wherever native left it on every programmatic edit.
+    //
+    // TWO commands, not one: `selection` authored alongside `value` at MOUNT already diverges from
+    // the engine's own sentinel-seeded `lastNativeSelection` (matching `TextInput.js`'s own
+    // `lastNativeSelection` starting at `{start:-1,end:-1}`), so mounting fires its own
+    // `[0, 'a', 2, 4]` before `setValue` ever runs.
     it('carries an explicit selection into the controlled write', async () => {
       const [value, setValue] = createSignal('a');
       mount(ROOT_TAG, () => (
@@ -390,10 +395,13 @@ describe('Solid TextInput on the engine', () => {
       ));
       await tick();
 
+      expect(fabric.commands[0]?.args).toEqual([0, 'a', 2, 4]);
+
       setValue('abcd');
       await tick();
 
-      expect(fabric.commands[0]?.args).toEqual([0, 'abcd', 2, 4]);
+      expect(fabric.commands).toHaveLength(2);
+      expect(fabric.commands[1]?.args).toEqual([0, 'abcd', 2, 4]);
     });
 
     // why: the imperative half of RN's public API. clear/setSelection go down the SAME stale-safe

@@ -106,6 +106,7 @@ const flush = (): Promise<void> => Promise.resolve();
 
 afterEach(() => {
   clearHostBehaviors();
+  vi.useRealTimers();
   // Clears `commands` too, which every case here counts.
   fabric.reset();
 });
@@ -176,6 +177,23 @@ describe('text input host behavior', () => {
     expect(onValueChange.mock.calls[0][0]).toMatchObject({ text: 'ab' });
   });
 
+  // why: `TextInput.js:504-506`'s `_onChange` calls `props.onChange(event)` BEFORE
+  // `props.onChangeText(currentText)`, always — an app with side effects observable across both
+  // (a shared counter, a log) sees that exact order on a real device. Ours used to call the real
+  // `onChange` dead last, after `onChangeText` and after `onValueChange`.
+  it('calls onChange before onChangeText, matching vendor order', () => {
+    registerTextInputBehavior();
+    const node = makeTextInput();
+    mount(node);
+    const order: string[] = [];
+    routeProp(node, 'onChange', () => order.push('onChange'));
+    routeProp(node, 'onChangeText', () => order.push('onChangeText'));
+
+    listenerOf(node, 'change')(changeEvent('ab', NATIVE_EVENT_COUNT));
+
+    expect(order).toEqual(['onChange', 'onChangeText']);
+  });
+
   // The negative half, and it is not decoration: `textFromChange` returns undefined for a payload
   // with no `text`, and a callback fired with `undefined` would let an app write undefined into its
   // own state on every stray event. The component path has the same guard.
@@ -240,19 +258,82 @@ describe('text input host behavior', () => {
     ]);
   });
 
+  // Two commands now, not one: mounting with `selection` authored fires its OWN caret-only command
+  // (see "moves the caret on mount from selection alone" above), and `commitValue` fires a second
+  // for the text — the selection having already settled at {2,2} on the first, so it does not
+  // diverge again on the second.
   it('sends an explicit selection, defaulting end to start', () => {
     registerTextInputBehavior();
     const node = makeTextInput();
     routeProp(node, 'selection', { start: 2 });
     const surface = mount(node);
 
+    expect(commandsNamed('setTextAndSelection')[0].args).toEqual([
+      0,
+      undefined,
+      2,
+      2,
+    ]);
+
     commitValue(surface, node, 'abcdef');
 
-    expect(commandsNamed('setTextAndSelection')[0].args).toEqual([
+    expect(commandsNamed('setTextAndSelection')).toHaveLength(2);
+    expect(commandsNamed('setTextAndSelection')[1].args).toEqual([
       0,
       'abcdef',
       2,
       2,
+    ]);
+  });
+
+  // TextInput.js's `useTextInputStateSynchronization`: `lastNativeSelection` starts at the sentinel
+  // `{start:-1,end:-1}`, distinct from any real selection — so an authored `selection` fires the
+  // command on the very FIRST commit, with no preceding value write and no `commitValue` at all.
+  // This host used to gate the whole first `afterCommit` behind `isMirrorFreshlySeeded`, which
+  // skipped the selection check along with the (correctly skipped) text one — an uncontrolled input
+  // with only a `selection` prop never moved the caret on mount.
+  it('moves the caret on mount from selection alone, with no value ever written', () => {
+    registerTextInputBehavior();
+    const node = makeTextInput();
+    routeProp(node, 'selection', { start: 0, end: 4 });
+    mount(node);
+
+    expect(commandsNamed('setTextAndSelection')).toHaveLength(1);
+    expect(commandsNamed('setTextAndSelection')[0].args).toEqual([
+      0,
+      undefined,
+      0,
+      4,
+    ]);
+  });
+
+  // TextInput.js's `_onSelectionChange` (:522-533) updates `lastNativeSelection` from the REAL
+  // native event too, not only from a controlled write this behavior itself sent — so a caret the
+  // user drags away from a still-unchanged controlled `selection` prop gets snapped straight back on
+  // the very next render (`setLastNativeSelection` schedules one). Without that update our own
+  // mirror stays frozen at whatever we last commanded, so a user-driven move away from a controlled
+  // position was never caught: the mirror and the (unchanged) authored prop kept "agreeing" while
+  // native quietly drifted.
+  it('snaps a controlled selection back after the user drags the caret away', () => {
+    registerTextInputBehavior();
+    const node = makeTextInput();
+    routeProp(node, 'selection', { start: 5, end: 5 });
+    mount(node);
+    expect(commandsNamed('setTextAndSelection')).toHaveLength(1);
+
+    listenerOf(
+      node,
+      'selectionChange',
+    )({
+      nativeEvent: { selection: { start: 10, end: 10 } },
+    });
+
+    expect(commandsNamed('setTextAndSelection')).toHaveLength(2);
+    expect(commandsNamed('setTextAndSelection')[1].args).toEqual([
+      0,
+      undefined,
+      5,
+      5,
     ]);
   });
 
@@ -444,5 +525,74 @@ describe('text input host behavior', () => {
     const plain = createElement(TEXT_INPUT_VIEW_NAME);
 
     expect(plain.listeners?.get('change')).toBeUndefined();
+  });
+
+  // why: `TextInput.js`'s own `usePressability(config)` — the same Pressability class every
+  // Touchable uses — wraps the input for exactly one reason: `onPress` calls
+  // `inputRef.current.focus()` when `editable !== false`, so a tap that lands inside the input's
+  // hitSlop but outside the native view's own focus zone (padding, a hitSlop grown past the
+  // rendered box) still focuses it. `onPressIn`/`onPressOut` are forwarded RAW, with no wrapping.
+  // We wired NONE of it — no press listeners at all — so a tap inside an authored `hitSlop` but
+  // outside the native box would silently fail to focus, and `onPress`/`onPressIn`/`onPressOut`
+  // on a TextInput would just be inert props.
+  describe('tap-to-focus (TextInput.js usePressability)', () => {
+    function press(node: ISymbioteNode): void {
+      listenerOf(node, 'pressIn')(EMPTY_EVENT);
+      listenerOf(node, 'startShouldSetResponder')(EMPTY_EVENT);
+      listenerOf(node, 'press')(EMPTY_EVENT);
+      listenerOf(node, 'pressOut')(EMPTY_EVENT);
+    }
+
+    it('focuses the input on press when editable', () => {
+      registerTextInputBehavior();
+      const onPress = vi.fn();
+      const node = makeTextInput();
+      routeProp(node, 'onPress', onPress);
+      mount(node);
+
+      press(node);
+
+      expect(onPress).toHaveBeenCalledTimes(1);
+      expect(commandsNamed('focus')).toHaveLength(1);
+    });
+
+    // TextInput.js: `if (editable !== false) { inputRef.current.focus(); }` — the app's own
+    // onPress still fires either way, only the auto-focus is gated.
+    it('does not auto-focus when editable is false, but still calls onPress', () => {
+      registerTextInputBehavior();
+      const onPress = vi.fn();
+      const node = makeTextInput();
+      routeProp(node, 'onPress', onPress);
+      routeProp(node, 'editable', false);
+      mount(node);
+
+      press(node);
+
+      expect(onPress).toHaveBeenCalledTimes(1);
+      expect(commandsNamed('focus')).toHaveLength(0);
+    });
+
+    // No `minPressDuration` override here — unlike the Touchables, which pass 0 to bypass
+    // Pressability's ~130ms deactivation floor, TextInput's own config leaves it unset, so
+    // `onPressOut` waits for the same floor our shared machine defaults to
+    // (`DEFAULT_MIN_PRESS_DURATION_MS`).
+    it('forwards onPressIn and onPressOut raw, with no wrapping', async () => {
+      vi.useFakeTimers();
+      registerTextInputBehavior();
+      const onPressIn = vi.fn();
+      const onPressOut = vi.fn();
+      const node = makeTextInput();
+      routeProp(node, 'onPressIn', onPressIn);
+      routeProp(node, 'onPressOut', onPressOut);
+      mount(node);
+
+      listenerOf(node, 'pressIn')(EMPTY_EVENT);
+      listenerOf(node, 'startShouldSetResponder')(EMPTY_EVENT);
+      listenerOf(node, 'pressOut')(EMPTY_EVENT);
+      await vi.advanceTimersByTimeAsync(130);
+
+      expect(onPressIn).toHaveBeenCalledTimes(1);
+      expect(onPressOut).toHaveBeenCalledTimes(1);
+    });
   });
 });

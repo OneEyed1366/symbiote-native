@@ -111,3 +111,64 @@ describe('an image tag resolves its sources on the way in', () => {
     ).toEqual({ uri: 'http://x/1.png' });
   });
 });
+
+// why: `ReactImageView.setShouldNotifyLoadEvents` — Android's `downloadListener` stays `null`
+// until this prop is `true`, so `onLoadStart`/`onLoad`/`onLoadEnd`/`onError` NEVER fire on Android
+// without it, whatever the app wires (`ReactImageView.kt`). `Image.android.js` sets it whenever any
+// one of the four is authored; iOS never sets it at all (its native side has no such gate). A
+// function prop cannot cross the JSI wire as a value (`node.ts`'s `functionProps` stash), so this
+// has to be a boolean the write path synthesizes — the same shape `GATED_EVENT_PROPS` uses for
+// `onLayout`, applied to a name no host behavior owns.
+describe('an image tag reports whether native should notify load events', () => {
+  it('sets shouldNotifyLoadEvents when any load callback is authored', () => {
+    expect(
+      commitTag('image', { onLoad: () => {} }).shouldNotifyLoadEvents,
+    ).toBe(true);
+  });
+
+  it('leaves it unset when no load callback is authored', () => {
+    expect(
+      commitTag('image', { source: { uri: 'http://x/1.png' } })
+        .shouldNotifyLoadEvents,
+    ).toBe(undefined);
+  });
+
+  it('stays true while at least one of the four remains wired', () => {
+    fabric.reset();
+    const node: ISymbioteNode = createElement('RCTImageView', false, 'image');
+    routeProp(node, 'testID', TEST_ID);
+    routeProp(node, 'onLoadStart', () => {});
+    routeProp(node, 'onError', () => {});
+    const surface = createSurface((nextRootTag += 1));
+    surface.appendChild(node);
+    surface.commit();
+
+    routeProp(node, 'onLoadStart', undefined);
+    surface.commit();
+
+    const found = live.findLive(
+      live.appRoot(),
+      candidate => candidate.payload.testID === TEST_ID,
+    );
+    expect(found?.props.shouldNotifyLoadEvents).toBe(true);
+  });
+
+  it('clears once the last load callback is removed', () => {
+    fabric.reset();
+    const node: ISymbioteNode = createElement('RCTImageView', false, 'image');
+    routeProp(node, 'testID', TEST_ID);
+    routeProp(node, 'onLoad', () => {});
+    const surface = createSurface((nextRootTag += 1));
+    surface.appendChild(node);
+    surface.commit();
+
+    routeProp(node, 'onLoad', undefined);
+    surface.commit();
+
+    const found = live.findLive(
+      live.appRoot(),
+      candidate => candidate.payload.testID === TEST_ID,
+    );
+    expect(found?.props.shouldNotifyLoadEvents).toBe(undefined);
+  });
+});

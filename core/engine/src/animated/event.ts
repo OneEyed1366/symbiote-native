@@ -78,6 +78,12 @@ function collectMappedValues(
   }
 }
 
+// TODO(rn-parity, low priority): vendor's `AnimatedEvent.js` has `validateMapping`, a
+// `__DEV__`-only check that throws when an event's actual shape doesn't match the argMapping
+// structure. We have no equivalent — `extractAtPath` below silently no-ops on a mismatch instead.
+// Judged non-actionable (misuse-detection guard, no runtime-visible effect for a correct mapping,
+// same class as the `numColumns` invariant) — see the audit skill for the full reasoning.
+
 // Pull the numeric field at `path` out of one event argument. Returns undefined
 // when the path is absent or the leaf is not a number, so a malformed event is a
 // no-op rather than a throw inside an event dispatch.

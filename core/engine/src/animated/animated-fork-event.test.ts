@@ -10,10 +10,30 @@
 import { describe, expect, it } from 'vitest';
 import {
   AnimatedValue,
+  AnimatedValueXY,
   event,
   forkEvent,
   unforkEvent,
 } from '@symbiote-native/engine';
+
+describe('Animated.event onto an AnimatedValueXY leaf — Positive', () => {
+  // why: `AnimatedEvent.js`'s `traverse` special-cases `recMapping instanceof AnimatedValueXY`,
+  // driving both axes from one nested event field (e.g. a pan responder's
+  // `{nativeEvent: {translation: pan}}`) rather than requiring `{translation: {x: pan.x, y:
+  // pan.y}}`. Our AnimatedValueXY is explicitly NOT an AnimatedNode (`value-xy.ts`'s own header),
+  // so this only works if the generic object-walk in `collectMappedValues` happens to reach `x`/
+  // `y` as plain enumerable properties — an implementation coincidence, not a deliberate case, and
+  // untested until now.
+  it('drives both axes from a single AnimatedValueXY mapped directly onto a nested event field', () => {
+    const pan = new AnimatedValueXY();
+    const handler = event([{ nativeEvent: { translation: pan } }]);
+
+    handler({ nativeEvent: { translation: { x: 5, y: 9 } } });
+
+    expect(pan.x.__getValue()).toBe(5);
+    expect(pan.y.__getValue()).toBe(9);
+  });
+});
 
 describe('forkEvent / unforkEvent — Positive', () => {
   // why: with no existing handler, the new listener simply BECOMES the handler — the degenerate

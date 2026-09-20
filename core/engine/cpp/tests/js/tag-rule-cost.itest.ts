@@ -175,7 +175,14 @@ function pressableFoldInJs(
 registerHostBehavior('pressable-in-js', {
   attach(): void {},
   detach(): void {},
-  foldPayload: pressableFoldInJs,
+  foldPayload(props: Readonly<Record<string, unknown>>) {
+    const out = pressableFoldInJs(props);
+    // `Pressable.js:340` — unconditional on the BARE tag only, matching `foldPressableProps`'s
+    // `isBarePressable` branch. Composed here rather than inside `pressableFoldInJs`, which
+    // `button-in-js` also calls and must not inherit it.
+    out.collapsable = false;
+    return out;
+  },
 });
 
 const stringOf = (value: unknown): string | undefined =>
@@ -311,12 +318,10 @@ registerHostBehavior('image-background-image', {
   resolvesImageSources: true,
 });
 
-// THE ODD ONE OUT, and it is here precisely because it is odd: `input-accessory-view`'s native arm
-// runs NO rule at all. Its fold was deleted rather than ported — read end to end it split the bag
-// into consumed/passthrough and reassembled it unchanged — so this arm prices a REMOVAL, and the
-// price of a fold that does nothing is the same trip a fold that does something pays. That is the
-// finding: the crossing is charged for the trip, not for the work, so a no-op fold is the worst
-// value in the file.
+// `input-accessory-view`'s native arm forces `{position: 'absolute'}` under the authored style
+// (`foldInputAccessoryViewProps` — RN docks the view above the keyboard, so it must not lay out
+// wherever the app placed it in the tree). The twin has to compose the same, or `expectSamePayload`
+// refuses to time the pair — exactly what caught this fixture going stale when the rule was ported.
 registerHostBehavior('input-accessory-view-in-js', {
   attach(): void {},
   detach(): void {},
@@ -327,12 +332,16 @@ registerHostBehavior('input-accessory-view-in-js', {
       if (!consumed.has(key)) out[key] = props[key];
     }
     const style = props.style;
-    out.style =
+    const authoredStyle =
       typeof style !== 'object' || style === null
         ? undefined
         : Array.isArray(style)
           ? style
           : { ...style };
+    out.style =
+      authoredStyle === undefined
+        ? [{ position: 'absolute' }]
+        : [authoredStyle, { position: 'absolute' }];
     const nativeID = stringOf(props.nativeID);
     if (nativeID !== undefined) out.nativeID = nativeID;
     const background = stringOf(props.backgroundColor);

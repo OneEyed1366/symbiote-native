@@ -293,6 +293,14 @@ describe('React FlatList multi-column composition (Positive)', () => {
       numColumns: COLUMN_COUNT,
       keyExtractor: (item: IRow) => `mc-${item.id}`,
       ItemSeparatorComponent: RowSeparator,
+      // A row needs real, non-zero geometry for viewability math to have anything to measure —
+      // an unmeasured (zero-length) row is never "entirely visible" (RN's own shortcut requires
+      // bottom > top), so without this every row here reads as not viewable.
+      getItemLayout: (_data: unknown, index: number) => ({
+        length: ITEM_HEIGHT,
+        offset: ITEM_HEIGHT * index,
+        index,
+      }),
       viewabilityConfig: { itemVisiblePercentThreshold: 0 },
       onViewableItemsChanged: (info: IViewableItemsChangedInfo<IRow>) => {
         viewableReports.push(info);

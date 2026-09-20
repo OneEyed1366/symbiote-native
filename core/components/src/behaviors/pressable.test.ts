@@ -299,6 +299,61 @@ describe('pressable host behavior', () => {
     expect(plain.listeners?.get('startShouldSetResponder')).toBeUndefined();
   });
 
+  // why: `Pressability.js:479` returns `blockNativeResponder === true` from `onResponderGrant`,
+  // which is what stops a ScrollView above a claimed Pressable from stealing the gesture mid-drag.
+  // Wired through `propOf(source, 'blockNativeResponder')`, the same live-read seam `cancelable`
+  // already uses, so a real mount (not just the unit-level `buildPressableListeners` call) proves
+  // the prop actually reaches the listener the engine dispatches to on grant.
+  it('answers responderGrant from an authored blockNativeResponder', () => {
+    registerPressableBehavior();
+    const node = makePressable();
+    routeProp(node, 'blockNativeResponder', true);
+    mount(node);
+
+    touchWithoutClaiming(node);
+
+    expect(listenerOf(node, 'responderGrant')(TOUCH)).toBe(true);
+  });
+
+  it('answers responderGrant false when blockNativeResponder is unset', () => {
+    registerPressableBehavior();
+    const node = makePressable();
+    mount(node);
+
+    touchWithoutClaiming(node);
+
+    expect(listenerOf(node, 'responderGrant')(TOUCH)).toBe(false);
+  });
+
+  // why: `TouchableOpacity.js:186`/`TouchableHighlight.js:194`/`TouchableNativeFeedback.js:217` all
+  // derive Pressability's `cancelable` from `rejectResponderTermination` (`cancelable:
+  // !this.props.rejectResponderTermination`) — Pressable itself is the ONLY one of the family with a
+  // `cancelable` prop of its own (`Pressable.js:41`). `rebuild()` read only `cancelable`, so every
+  // Touchable's `rejectResponderTermination` was a completely dead prop: a Touchable asking to keep
+  // its gesture through a parent ScrollView's steal attempt silently kept yielding it.
+  it('derives cancelable from rejectResponderTermination when cancelable is not authored', () => {
+    registerPressableBehavior();
+    const node = makePressable();
+    routeProp(node, 'rejectResponderTermination', true);
+    mount(node);
+
+    touchWithoutClaiming(node);
+
+    expect(listenerOf(node, 'responderTerminationRequest')(TOUCH)).toBe(false);
+  });
+
+  it('lets an explicit cancelable win over rejectResponderTermination', () => {
+    registerPressableBehavior();
+    const node = makePressable();
+    routeProp(node, 'rejectResponderTermination', true);
+    routeProp(node, 'cancelable', true);
+    mount(node);
+
+    touchWithoutClaiming(node);
+
+    expect(listenerOf(node, 'responderTerminationRequest')(TOUCH)).toBe(true);
+  });
+
   it('cancels its timers when the node is swept away', () => {
     vi.useFakeTimers();
     registerPressableBehavior();
@@ -316,6 +371,27 @@ describe('pressable host behavior', () => {
 
     // A long-press timer that survives its node fires into a tree that no longer exists.
     expect(onLongPress).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  // `configFor`'s compensation: `delayLongPress` left unset resolves to `500 - unstable_pressDelay`
+  // (Pressability.js:471-474), so the actual threshold from touch-down stays a constant 500ms
+  // however long `unstable_pressDelay` defers the pressed visual — not 500ms ADDED on top of it.
+  it('holds the long-press threshold at 500ms from touch-down, not 500ms after unstable_pressDelay', () => {
+    vi.useFakeTimers();
+    registerPressableBehavior();
+    const onLongPress = vi.fn();
+    const node = makePressable();
+    routeProp(node, 'onLongPress', onLongPress);
+    routeProp(node, 'unstable_pressDelay', 200);
+    mount(node);
+
+    press(node);
+    vi.advanceTimersByTime(499);
+    expect(onLongPress).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(1);
+    expect(onLongPress).toHaveBeenCalledTimes(1);
     vi.useRealTimers();
   });
 });

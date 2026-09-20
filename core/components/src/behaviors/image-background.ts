@@ -18,9 +18,11 @@
 // importantForAccessibility, ...props` and spreads `...props` onto the Image
 // (`ImageBackground.js:62-81`), so the set that moves is OPEN — every event, every accessibility
 // prop, `testID`, `id`, whatever an app writes next — and only a complement can express it.
-// `IMAGE_BACKGROUND_HOST_PROPS` is the short list that stays behind, and it is shorter than RN's:
-// `importantForAccessibility` rides to the image alone, which is what all five wrappers did, so the
-// tag commits what they committed. The divergence from RN predates all of it.
+// `IMAGE_BACKGROUND_HOST_PROPS` is that complement, and `importantForAccessibility` is IN it despite
+// never being part of the spread: RN reapplies it explicitly to both nodes (`:76,82`), so it stays on
+// the owner here too and the image gets its own copy derived from `ownerProps` (FIXED 2026-09-20 —
+// it used to redirect to the image alone and never reach the owner at all, which the module's own
+// comment rationalized as "the divergence from RN predates all of it").
 //
 // WHAT THE IMAGE'S FOLD OWES. Everything on the image arrives as a real prop write, so its payload
 // is built by the shared `foldImagePayload` like any other `image`. Two things cannot arrive that
@@ -47,13 +49,20 @@ export const IMAGE_BACKGROUND_IMAGE_TAG = 'image-background-image';
 
 // The props RN keeps on the wrapper View (`ImageBackground.js:74-78`), plus the two spellings of a
 // class name — `routeProp`'s slot redirect runs above its own class branch, so an unlisted `class`
-// would style the image instead of the box.
-const IMAGE_BACKGROUND_HOST_PROPS = ['style', 'class', 'className'];
+// would style the image instead of the box. `importantForAccessibility` stays too: RN destructures
+// it out of `...props` and reapplies it explicitly to BOTH the wrapper (:76) and the image (:82), so
+// it is never part of the spread — the engine derives the image's own copy from this node
+// (`foldImageBackgroundImageProps` in `SymbioteFabricProps.cpp`), the same seam the box proxy uses.
+const IMAGE_BACKGROUND_HOST_PROPS = [
+  'style',
+  'class',
+  'className',
+  'importantForAccessibility',
+];
 
-// The owner props the image's payload is derived from. Only `style`, because a class name is
-// published INTO `node.props.style` by `pushClassStyle` — so a `class` write arrives here spelled
-// `style` and the proxied width/height follow a class-declared box as well as an inline one.
-const IMAGE_BACKGROUND_SLOT_DERIVED = ['style'];
+// The owner props the image's payload is derived from. `importantForAccessibility` joins `style`
+// for the reason above: a late write to either must re-fold the image, not just the box.
+const IMAGE_BACKGROUND_SLOT_DERIVED = ['style', 'importantForAccessibility'];
 
 // `imageStyle` is the wrapper's own name for the image's `style`. A bare class NAME is a legal
 // value for it — every adapter's wrapper resolved one — and `routeProp` routes a string landing on

@@ -10,6 +10,7 @@ import {
   createAnchor,
   createElement,
   createSurface,
+  createVoid,
   insertBefore,
   removeChild,
   setNodeComponent,
@@ -41,6 +42,25 @@ describe('the tree rules, through the engine', () => {
     surface.commit();
 
     expect(committedShape()).toBe('RootView(View(View()View()View()View()))');
+  });
+
+  // why: `InputAccessoryView` renders `null` on Android (`InputAccessoryView.js`) — the WHOLE
+  // component, children included, contributes nothing. Unlike an anchor, a void node must not hoist
+  // its children either, or the toolbar content an app wrapped in it would still paint, just
+  // unparented from the accessory view.
+  it('a void node contributes neither itself nor its children', () => {
+    const surface = createSurface(1);
+    const before = view('before');
+    const voidNode = createVoid();
+    const after = view('after');
+    appendChild(voidNode, view('inside-one'));
+    appendChild(voidNode, view('inside-two'));
+    surface.appendChild(before);
+    surface.appendChild(voidNode);
+    surface.appendChild(after);
+    surface.commit();
+
+    expect(committedShape()).toBe('RootView(View(View()View()))');
   });
 
   // why: `insertBefore` has to land at the named position. A list that inserts at the head is the

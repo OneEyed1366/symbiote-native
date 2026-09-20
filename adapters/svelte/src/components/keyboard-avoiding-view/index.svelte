@@ -30,7 +30,9 @@
   import type { ShimElement } from '../../dom-shim';
   import {
     computeInset,
+    configureKeyboardAvoidingAnimation,
     keyboardAvoidingEventNamesFor,
+    readKeyboardAnimationTiming,
     readPrefersCrossFadeTransitions,
     readKeyboardFrame,
     readLayoutFrame,
@@ -68,11 +70,18 @@
     // was built: Svelte compiles a destructured prop into a live getter, so a `behavior` changed
     // after mount reaches the math on the next event, and 'height' mode feeds back the inset
     // CURRENTLY applied (RN's this.state.bottom) to cancel the shrink its own wrapper caused.
+    const previousInset = inset;
     const next = computeInset(frame, keyboard, keyboardVerticalOffset, {
       behavior,
-      previousInset: inset,
+      previousInset,
       prefersCrossFadeTransitions,
     });
+    // RN's `_updateBottomIfNecessary` skips the animation when the inset did not change.
+    if (next !== previousInset)
+      configureKeyboardAvoidingAnimation(
+        readKeyboardAnimationTiming(payload),
+        enabled,
+      );
     dlog(`KeyboardAvoidingView show -> inset ${next}`);
     inset = next;
   }

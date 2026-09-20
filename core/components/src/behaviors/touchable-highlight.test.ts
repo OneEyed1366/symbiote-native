@@ -218,6 +218,35 @@ describe('touchable-highlight host behavior', () => {
     expect(onHideUnderlay).toHaveBeenCalledTimes(1);
   });
 
+  // why: `_hideUnderlay` returns EARLY on `testOnly_pressed === true`, BEFORE the `_hasPressHandler`
+  // check and before `onHideUnderlay` (`TouchableHighlight.js:284-286`) — so a snapshot-pinned
+  // control must never fire that callback, however many real gestures pass through it while pinned.
+  // `_showUnderlay` carries no such guard, so `onShowUnderlay` still fires normally. The engine's
+  // C++ payload rule already latches the VISUAL underlay on `testOnly_pressed`
+  // (`touchable-highlight-underlay.itest.ts`, "latches the underlay on across a whole gesture") —
+  // this is the JS-side callback half of the same affordance, which that itest cannot see because
+  // its harness carries no `onHideUnderlay` prop.
+  it('never fires onHideUnderlay while testOnly_pressed pins the control', async () => {
+    vi.useFakeTimers();
+    const onHideUnderlay = vi.fn();
+    registerTouchableHighlightBehavior();
+    const node = makeTouchable();
+    routeProp(node, 'testID', TEST_ID);
+    routeProp(node, 'delayPressOut', 0);
+    routeProp(node, 'onPress', () => {});
+    routeProp(node, 'onHideUnderlay', onHideUnderlay);
+    routeProp(node, 'testOnly_pressed', true);
+    mount(node);
+    await settle();
+
+    pressIn(node);
+    listenerOf(node, 'press')(TOUCH);
+    listenerOf(node, 'pressOut')(TOUCH);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(onHideUnderlay).not.toHaveBeenCalled();
+  });
+
   it('still calls the app own press callbacks the underlay machine is spliced in front of', async () => {
     const onPress = vi.fn();
     const onPressIn = vi.fn();

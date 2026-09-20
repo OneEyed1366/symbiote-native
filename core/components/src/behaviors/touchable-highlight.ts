@@ -42,6 +42,12 @@
 //
 // REGISTRATION IS THE HAZARD, not the machine — see `./pressable` for why each adapter's entry does
 // a bare `import './register';` that the barrel does not re-export.
+//
+// TODO(rn-parity, low priority): `TouchableHighlight.js:206-232` also gates the underlay show/hide
+// on `onFocus`/`onBlur` (TV remote) and skips its own press-triggered show/hide-after-delay
+// entirely when `Platform.isTV`. Neither is wired here. Deliberately not implemented — dead on
+// every device this project targets (no tvOS build). Audit skill, "Found, NOT fixed: TV
+// (Platform.isTV) focus/blur feedback on TouchableOpacity/Highlight".
 
 import {
   markPropsDirty,
@@ -112,6 +118,7 @@ const refine: IPressConfigRefinement = (node, config) => {
     {
       delayPressOut: numberOr(propOf(node, 'delayPressOut'), 0),
       hasPressHandler,
+      testOnlyPressed: propOf(node, 'testOnly_pressed') === true,
       schedule: (callback, ms) => {
         const id = setTimeout(() => {
           state.timers.delete(id);

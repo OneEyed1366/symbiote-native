@@ -15,6 +15,24 @@
 // `./sticky`, because a `<StickyHeader>` is a CHILD and the three props above are functions of
 // whether one registered.
 //
+// TODO(rn-parity): `keyboardShouldPersistTaps` is a type-only prop everywhere — no capture-phase
+// responder negotiation exists to eat a tap-elsewhere and dismiss the keyboard
+// (`ScrollView.js:1360-1590`). Needs a `TextInputState.isTextInput`-equivalent, capture-phase
+// `startShouldSetResponder`/`responderTerminationRequest` wiring on this tag (the same seam
+// `Switch`/`Pressable` already use), and an `_isAnimating()`/momentum signal from the scroll
+// machine. Full scope and the reusable infra already in place: audit skill, "Found, NOT fixed:
+// ScrollView's keyboardShouldPersistTaps".
+//
+// TODO(rn-parity): `stickyHeaderHiddenOnScroll` is completely absent — no prop surface, no state,
+// no adapter wiring (`grep -rn "stickyHeaderHiddenOnScroll\|hiddenOnScroll"` returns zero hits).
+// Vendor composes an `Animated.diffClamp` over the scroll delta and adds it to the ordinary sticky
+// translateY (`ScrollViewStickyHeader.js:39,84-103`). Needs a new running clamped-offset state
+// ADDED to `STICKY_TRANSLATE_PROP` (our sticky pin is a discrete debounced number, not a live
+// `Animated` composition), and the fix touches `reduceSticky`
+// (`state/sticky-header-reducer.ts`) — the shared decision function every adapter's own sticky
+// component plus Angular's projection controller also run — not just this file. Audit skill,
+// "Found, NOT fixed: ScrollView's stickyHeaderHiddenOnScroll".
+//
 // WHAT A COMPOSED PRIMITIVE COSTS TODAY. Every adapter's ScrollView wrapper builds the same two
 // nodes: `selectScrollIntrinsics` picks a scroll intrinsic and a content intrinsic, and the
 // wrapper's body nests `<content>{children}</content>` inside `<scroll>`. That body is a framework

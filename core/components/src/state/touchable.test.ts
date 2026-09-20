@@ -360,6 +360,7 @@ describe('the TouchableHighlight underlay machine', () => {
       {
         delayPressOut: 0,
         hasPressHandler: true,
+        testOnlyPressed: false,
         schedule: clock.schedule,
         ...over,
       },
@@ -431,5 +432,21 @@ describe('the TouchableHighlight underlay machine', () => {
 
     clock.advance(100);
     expect(log.includes('hide'), 'no hide may land').toBe(false);
+  });
+
+  // why: `_hideUnderlay` returns EARLY on `testOnly_pressed === true`, before the press-handler
+  // check and before `onHideUnderlay` (`TouchableHighlight.js:284-286`) — a snapshot-pinned control
+  // must never un-pin or notify, however many real gestures pass through it. `_showUnderlay` carries
+  // no such guard, so a show still fires normally.
+  it('never hides or notifies once testOnlyPressed pins the control', () => {
+    const clock = makeClock();
+    const { handlers, log } = makeUnderlay(clock, { testOnlyPressed: true });
+
+    handlers.handlePressIn(makeEvent());
+    handlers.handlePress(makeEvent());
+    clock.advance(1);
+    handlers.handlePressOut(makeEvent());
+
+    expect(log).toEqual(['show', 'onShow', 'show', 'onShow']);
   });
 });

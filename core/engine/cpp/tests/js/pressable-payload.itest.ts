@@ -166,6 +166,8 @@ describe('what a pressable sends native, resolved by the engine', () => {
       delayHoverIn: 10,
       delayHoverOut: 20,
       android_ripple: { color: '#ff0000' },
+      android_disableSound: true,
+      blockNativeResponder: true,
     }).payload;
     print(`payload keys: ${Object.keys(payload).sort().join(' ')}`);
 
@@ -179,6 +181,8 @@ describe('what a pressable sends native, resolved by the engine', () => {
       'delayHoverIn',
       'delayHoverOut',
       'android_ripple',
+      'android_disableSound',
+      'blockNativeResponder',
     ]) {
       expect(payload[key]).toBe(undefined);
     }
@@ -211,6 +215,14 @@ describe('what a pressable sends native, resolved by the engine', () => {
   it('is focusable unless the app opts out', () => {
     expect(pressable({}).payload.focusable).toBe(true);
     expect(pressable({ focusable: false }).payload.focusable).toBe(false);
+  });
+
+  // why: `Pressable.js:340` renders its View with `collapsable={false}`, unconditionally — a plain
+  // View with no distinguishing paint props is Yoga's to flatten out of the native tree, which a
+  // touch target cannot survive. `usePressability`'s responder wiring is invisible to that decision,
+  // so the flag is the only thing standing between an unstyled Pressable and a dropped touch target.
+  it('stays out of Yoga flattening, unconditionally', () => {
+    expect(pressable({}).payload.collapsable).toBe(false);
   });
 
   // why: the whole reason there are TWO focusable formulas rather than one. Pressable's has no

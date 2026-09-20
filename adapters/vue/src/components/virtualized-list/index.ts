@@ -41,10 +41,8 @@ import {
   type VNode,
 } from '@vue/runtime-core';
 import {
-  DEFAULT_END_REACHED_THRESHOLD,
   DEFAULT_INITIAL_NUM_TO_RENDER,
   DEFAULT_MAX_TO_RENDER_PER_BATCH,
-  DEFAULT_START_REACHED_THRESHOLD,
   DEFAULT_UPDATE_CELLS_BATCHING_PERIOD,
   DEFAULT_WINDOW_SIZE,
   EMPTY_OFFSET,
@@ -251,9 +249,9 @@ interface INarrowedProps<ItemT> {
   horizontal: boolean;
   inverted: boolean;
   onEndReached?: (info: { distanceFromEnd: number }) => void;
-  onEndReachedThreshold: number;
+  onEndReachedThreshold?: number;
   onStartReached?: (info: { distanceFromStart: number }) => void;
-  onStartReachedThreshold: number;
+  onStartReachedThreshold?: number;
   onRefresh?: () => void;
   refreshing: boolean;
   progressViewOffset?: number;
@@ -416,18 +414,18 @@ export const VirtualizedList = defineComponent(
           ? (info: { distanceFromEnd: number }): void =>
               emit('endReached', info)
           : undefined,
-        onEndReachedThreshold: asNumber(
-          props.onEndReachedThreshold,
-          DEFAULT_END_REACHED_THRESHOLD,
-        ),
+        onEndReachedThreshold:
+          typeof props.onEndReachedThreshold === 'number'
+            ? props.onEndReachedThreshold
+            : undefined,
         onStartReached: listens('onStartReached')
           ? (info: { distanceFromStart: number }): void =>
               emit('startReached', info)
           : undefined,
-        onStartReachedThreshold: asNumber(
-          props.onStartReachedThreshold,
-          DEFAULT_START_REACHED_THRESHOLD,
-        ),
+        onStartReachedThreshold:
+          typeof props.onStartReachedThreshold === 'number'
+            ? props.onStartReachedThreshold
+            : undefined,
         onRefresh: listens('onRefresh')
           ? (): void => emit('refresh')
           : undefined,
@@ -564,7 +562,12 @@ export const VirtualizedList = defineComponent(
             const info = effect.info;
             const map = effect.map;
             const fire = (): void => {
-              for (const pair of pairs) pair.onViewableItemsChanged(info);
+              for (const pair of pairs) {
+                pair.onViewableItemsChanged({
+                  ...info,
+                  viewabilityConfig: pair.viewabilityConfig,
+                });
+              }
               dispatch({ kind: 'viewable-fired', map });
             };
             if (viewableTimer !== null) {

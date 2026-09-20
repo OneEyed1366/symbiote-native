@@ -809,13 +809,20 @@ bool usesTouchableFocusableRule(const std::string &tagName) {
  * Two are FUNCTIONS. A callback reaching a native prop bag is not a cosmetic leak; it is a value no
  * ViewConfig declares, crossing for a view that will never call it.
  */
-const std::array<const char *, 6> kTouchableFeedbackKeys = {
+const std::array<const char *, 8> kTouchableFeedbackKeys = {
     "activeOpacity",
     "underlayColor",
     "onShowUnderlay",
     "onHideUnderlay",
     "delayPressIn",
     "delayPressOut",
+    // `TouchableHighlight.js:205` forwards this to Pressability as `android_disableSound`
+    // (`kPressableMachineKeys` strips that name); the authored name itself never reaches a view.
+    "touchSoundDisabled",
+    // `TouchableOpacity.js:186`/`TouchableHighlight.js:194` forward this to Pressability as
+    // `cancelable` (`kPressableMachineKeys` strips that name); the authored name itself is never
+    // one of the props either component passes to the View it renders.
+    "rejectResponderTermination",
 };
 
 /**
@@ -1267,6 +1274,12 @@ dynamic foldImageBackgroundProps(const dynamic &props) {
  *
  * `imageStyle` arrives as this node's own `style` (the behavior's `slotProps` renames it) and is
  * composed LAST, so a caller beats both the fill and the proxy.
+ *
+ * ALSO CARRIES `importantForAccessibility` DOWN FROM THE OWNER (`ImageBackground.js:67,76,82`
+ * destructures it out of `...props` and reapplies it explicitly to BOTH the wrapper and the image —
+ * one accessibility subtree, so both halves must agree). `IMAGE_BACKGROUND_HOST_PROPS` keeps the
+ * authored value on the owner; this is the image's half of the same rule, read the same way the box
+ * proxy already reads `ownerProps`.
  */
 dynamic foldImageBackgroundImageProps(
     const dynamic &props,
@@ -1296,6 +1309,12 @@ dynamic foldImageBackgroundImageProps(
 
   dynamic out = props;
   out["style"] = std::move(composed);
+
+  const dynamic *important = ownerProps == nullptr
+      ? nullptr
+      : ownerProps->get_ptr("importantForAccessibility");
+  if (important != nullptr) out["importantForAccessibility"] = *important;
+
   return out;
 }
 
@@ -1332,6 +1351,30 @@ dynamic foldActivityIndicatorProps(const dynamic &props) {
   dynamic composed = dynamic::array(std::move(container));
   const dynamic *authored = props.get_ptr("style");
   if (authored != nullptr) composed.push_back(*authored);
+  out["style"] = std::move(composed);
+  return out;
+}
+
+/**
+ * `InputAccessoryView.js`'s `styles.container = {position: 'absolute'}`, composed as
+ * `[props.style, styles.container]` — the platform's half LAST, so it wins over whatever the app
+ * wrote. Every InputAccessoryView ever rendered is positioned absolutely; nothing here is
+ * per-instance, which is what makes it the tag's rule and not composition.
+ *
+ * Only ever reached on iOS: the Android tag resolves to `VOID_COMPONENT`
+ * (`component-names/index.android.ts`) and never reaches a payload build at all, so this needs no
+ * platform gate of its own.
+ */
+dynamic foldInputAccessoryViewProps(const dynamic &props) {
+  dynamic container = dynamic::object();
+  container["position"] = "absolute";
+
+  dynamic composed = dynamic::array();
+  const dynamic *authored = props.get_ptr("style");
+  if (authored != nullptr) composed.push_back(*authored);
+  composed.push_back(std::move(container));
+
+  dynamic out = props;
   out["style"] = std::move(composed);
   return out;
 }
@@ -1440,6 +1483,16 @@ dynamic foldActivityIndicatorSpinnerProps(
   if (color == nullptr || !color->isString()) {
     if (isAndroidProgressBar) out.erase("color");
     else out["color"] = kSpinnerIosDefaultColor;
+  }
+
+  // `ActivityIndicator.js:100-103`'s `androidProps = {styleAttr: 'Normal', indeterminate: true}`,
+  // spread onto the native view unconditionally, Android only — neither key is app-facing.
+  // `AndroidProgressBarNativeComponent`'s `indeterminate: boolean` carries no codegen default
+  // (unlike `animating`), so an unset key falls back to whatever Java's own field default is, not
+  // to a spinning loader.
+  if (isAndroidProgressBar) {
+    out["styleAttr"] = "Normal";
+    out["indeterminate"] = true;
   }
   return out;
 }
@@ -1662,7 +1715,10 @@ dynamic foldButtonProps(
     out["importantForAccessibility"] = "no-hide-descendants";
   }
 
-  const dynamic *sound = props.get_ptr("touchSoundDisabled");
+  // AUTHORED, not `props` — `foldPressableProps` already ran `kTouchableFeedbackKeys` over `props`
+  // (button is one of the three tags that rule covers), which erases `touchSoundDisabled` before
+  // this ever sees it. Trap A again: a fold reading a key an earlier rule strips reads it gone.
+  const dynamic *sound = authored.get_ptr("touchSoundDisabled");
   if (sound != nullptr) {
     out["android_disableSound"] = *sound;
     out.erase("touchSoundDisabled");
@@ -1721,7 +1777,7 @@ dynamic foldButtonProps(
  * `hitSlop` is deliberately NOT here and belongs to the same prop family — it is a real native View
  * prop Fabric reads. `pressRetentionOffset` beside it is not.
  */
-const std::array<const char *, 10> kPressableMachineKeys = {
+const std::array<const char *, 12> kPressableMachineKeys = {
     // RN's snapshot affordance (`Pressable.js:151,222`, `TouchableHighlight.js:61`). A JS-side
     // testing prop that no ViewConfig declares — listed here rather than erased by the one rule that
     // READS it, because all four tags carry the prop and only one paints from it.
@@ -1737,6 +1793,13 @@ const std::array<const char *, 10> kPressableMachineKeys = {
     "pressRetentionOffset",
     "delayHoverIn",
     "delayHoverOut",
+    // Pressability.js:749-757 — gates a JS-side `SoundManager.playTouchSound()` call at release
+    // time. No ViewConfig declares it; it never reaches a native view on any platform.
+    "android_disableSound",
+    // Pressability.js:479 — read by `onResponderGrant`'s return value alone. Pressable.js
+    // destructures it out of props before spreading the rest onto the View, so it never reaches a
+    // native view upstream either.
+    "blockNativeResponder",
 };
 
 /**
@@ -1785,13 +1848,20 @@ void applyAndroidRipple(dynamic &out, const dynamic &config) {
  *         Touchable composing this tag has already resolved its own three-leg formula and passes the
  *         answer down as `focusable`, which `!== false` leaves alone — that is how the two compose
  *         without either knowing about the other.
+ *   :340  `collapsable={false}`, unconditional, on the BARE `Pressable` only. TouchableOpacity gets
+ *         the same value already, but from a DIFFERENT mechanism — binding its Animated opacity
+ *         (`touchable-opacity.ts`'s `setAnimatedBehaviorStyle` at attach) forces it as a side effect,
+ *         matching RN's own natively-driven Animated views. `isBarePressable` covers the one tag
+ *         that has neither an Animated binding nor this line: a plain Pressable with no fade.
  */
 dynamic foldPressableProps(
     const dynamic &props,
     bool isTouchableFeedback,
     bool isTouchableFocusable,
-    bool hasPressListener) {
+    bool hasPressListener,
+    bool isBarePressable) {
   dynamic out = props;
+  if (isBarePressable) out["collapsable"] = false;
 
   // Read BEFORE the machine keys are erased, and `!= null` rather than truthiness: an explicit
   // `disabled: false` is a real announcement, so it is presence and not value that decides.
@@ -2122,7 +2192,7 @@ dynamic resolveImageSources(const dynamic &props) {
  * instead, the same seam and the same argument as `structured-style.ts`. By the time this runs, the
  * bag already holds resolved sources.
  */
-dynamic foldImageProps(const dynamic &props) {
+dynamic foldImageProps(const dynamic &props, bool ariaHiddenIsTrue) {
   dynamic out = props;
   out["source"] = resolveImageSources(props);
 
@@ -2152,16 +2222,24 @@ dynamic foldImageProps(const dynamic &props) {
     if (fromStyle != nullptr) out["tintColor"] = *fromStyle;
   }
 
-  // `alt` is the accessibility text (Image.ios.js / Image.android.js): it sets the label AND marks
-  // the image accessible, which is what puts it in the reader's order at all. An explicit label
-  // wins; an image with NO alt is left out of the order entirely, since a decorative image
-  // announcing itself is noise a screen-reader user cannot skip.
+  // `alt` is the accessibility text: it sets the label AND marks the image accessible, which is
+  // what puts it in the reader's order at all. An explicit label wins; an image with NO alt is
+  // left out of the order entirely, since a decorative image announcing itself is noise a
+  // screen-reader user cannot skip. The two platforms diverge on `aria-hidden`, though: iOS's
+  // formula is `ariaHidden !== true && (alt !== undefined ? true : props.accessible)`
+  // (`Image.ios.js`) — an explicit `aria-hidden` overrides alt's own accessible-true. Android's
+  // `alt` sets `accessible = true` unconditionally (`Image.android.js:272-273`); `aria-hidden`
+  // there only ever reaches `importantForAccessibility` (:295-297), never `accessible`.
   const std::string *alt = stringAt(props, "alt");
   if (alt != nullptr) {
     if (out.get_ptr("accessibilityLabel") == nullptr) {
       out["accessibilityLabel"] = *alt;
     }
+#ifdef ANDROID
     out["accessible"] = true;
+#else
+    out["accessible"] = !ariaHiddenIsTrue;
+#endif
   }
 
   // Android's loading indicator is a bare uri STRING under a different name, not the array shape
@@ -2171,6 +2249,17 @@ dynamic foldImageProps(const dynamic &props) {
       indicator->at(0).isObject()) {
     const std::string *uri = stringAt(indicator->at(0), "uri");
     if (uri != nullptr) out["loadingIndicatorSrc"] = *uri;
+  }
+
+  // ImageViewNativeComponent.js:138 — `defaultSource: { process: resolveAssetSource }`, the
+  // SINGULAR resolver, unlike `source` (which the JS component itself normalizes to an array
+  // before any prop reaches native). The engine's own resolver wraps every source-shaped prop into
+  // an array uniformly (`image-source-write.ts`), so this name alone needs unwrapping back to the
+  // bare object native's view manager expects — a `ReadableArray` where it wants a `ReadableMap`.
+  const dynamic *defaultSource = props.get_ptr("defaultSource");
+  if (defaultSource != nullptr && defaultSource->isArray() &&
+      defaultSource->size() > 0) {
+    out["defaultSource"] = defaultSource->at(0);
   }
 
   for (const char *key : kImageConsumedKeys) out.erase(key);
@@ -2226,17 +2315,24 @@ dynamic foldSwitchProps(const dynamic &props, bool isAndroidSwitch) {
         authoredState != nullptr && authoredState->isObject()
         ? boolAt(*authoredState, "disabled")
         : std::nullopt;
-    const bool isDisabled = disabled.value_or(stateDisabled.value_or(false));
-    out["enabled"] = !isDisabled;
+    // `_disabled = disabled ?? accessibilityState?.disabled` (`:232-233`) — stays UNDEFINED, not
+    // `false`, when neither is authored. Collapsing straight to a bool here (as an earlier version
+    // did) made `enabled` come out right but broke the write-back check below for the commonest
+    // case: an ordinary switch with no `disabled` and no `accessibilityState` at all.
+    const std::optional<bool> resolvedDisabled =
+        disabled.has_value() ? disabled : stateDisabled;
+    out["enabled"] = resolvedDisabled.value_or(false) != true;
     out.erase("disabled");
 
-    // `:235-238` — the resolved answer is written BACK, so the screen reader and the view agree.
-    // Merged rather than replaced: an authored `busy` survives.
-    if (stateDisabled != isDisabled) {
+    // `:235-238` — `_disabled !== accessibilityState?.disabled`. With NEITHER authored both sides
+    // are undefined and RN sends no `accessibilityState` at all; inventing `{disabled: false}` here
+    // would be a payload a device never produces. Merged rather than replaced when it DOES differ —
+    // an authored `busy` survives.
+    if (resolvedDisabled != stateDisabled) {
       dynamic state = authoredState != nullptr && authoredState->isObject()
           ? *authoredState
           : dynamic::object();
-      state["disabled"] = isDisabled;
+      state["disabled"] = *resolvedDisabled;
       out["accessibilityState"] = std::move(state);
     }
 
@@ -2351,7 +2447,8 @@ dynamic fabricProps(
         *bag,
         usesTouchableFeedbackRule(tagName),
         usesTouchableFocusableRule(tagName),
-        self.hasPressListener);
+        self.hasPressListener,
+        tagName == "pressable");
     // The UNDERLAY, layered over the touchable's own rule and only on the one tag that has one. It
     // runs AFTER `foldPressableProps` deliberately: that rule strips `underlayColor` and
     // `activeOpacity`, so this reads them off the AUTHORED bag — Trap A, the same correction every
@@ -2364,7 +2461,12 @@ dynamic fabricProps(
       tagResolved = foldButtonProps(tagResolved, props, self.hasPressListener);
     bag = &tagResolved;
   } else if (tagName == "image" || tagName == "image-background-image") {
-    tagResolved = foldImageProps(*bag);
+    // `aria-hidden` read off the RAW, pre-aria-fold `props`: by the time `*bag` reaches here the
+    // aria fold has already erased the key in favour of `accessibilityElementsHidden`, and vendor's
+    // own accessible formula (`Image.ios.js`/`Image.android.js`) keys specifically on `aria-hidden`
+    // (the W3C name), not on whatever `accessibilityElementsHidden` an app may have set directly.
+    tagResolved =
+        foldImageProps(*bag, boolAt(props, "aria-hidden").value_or(false));
     // The background's inner image is an image PLUS a fill, and the order is the recorded
     // divergence from RN preserved exactly: the image rule folds this node's own `width`/`height`
     // props under its style FIRST, and the box proxied from the owner layers over that. RN nests it
@@ -2411,6 +2513,9 @@ dynamic fabricProps(
     // `AndroidSwitch` are two native components with two prop surfaces, and the name is already
     // here. It also makes both halves reachable from one test build.
     tagResolved = foldSwitchProps(*bag, component == kAndroidSwitchComponent);
+    bag = &tagResolved;
+  } else if (tagName == "input-accessory-view") {
+    tagResolved = foldInputAccessoryViewProps(*bag);
     bag = &tagResolved;
   }
 

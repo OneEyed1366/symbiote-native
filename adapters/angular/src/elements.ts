@@ -332,6 +332,8 @@ export class ViewElement extends SymbioteElement {}
 export class PressableElement extends SymbioteElement {
   @Input() disabled?: IAngularPressableProps['disabled'];
   @Input() cancelable?: IAngularPressableProps['cancelable'];
+  @Input()
+  blockNativeResponder?: IAngularPressableProps['blockNativeResponder'];
   @Input() delayLongPress?: IAngularPressableProps['delayLongPress'];
   @Input() delayHoverIn?: IAngularPressableProps['delayHoverIn'];
   @Input() delayHoverOut?: IAngularPressableProps['delayHoverOut'];
@@ -375,6 +377,8 @@ export class TouchableHighlightElement extends PressableElement {
   @Input() delayPressIn?: number;
   @Input() delayPressOut?: number;
   @Input() minPressDuration?: number;
+  // TouchableHighlight.js:205 — forwarded to Pressability as `android_disableSound`.
+  @Input() touchSoundDisabled?: boolean;
 }
 
 // RN's TouchableNativeFeedback is a Pressable that CLONES onto its single child instead of
@@ -385,6 +389,8 @@ export class TouchableHighlightElement extends PressableElement {
 export class TouchableNativeFeedbackElement extends PressableElement {
   @Input() background?: INativeFeedbackBackground;
   @Input() useForeground?: boolean;
+  // TouchableNativeFeedback.js:228 — forwarded to Pressability as `android_disableSound`.
+  @Input() touchSoundDisabled?: boolean;
 }
 
 // RN's TouchableWithoutFeedback clones onto its single child the same way
@@ -396,6 +402,8 @@ export class TouchableWithoutFeedbackElement extends PressableElement {
   @Input() delayPressIn?: number;
   @Input() delayPressOut?: number;
   @Input() minPressDuration?: number;
+  // TouchableWithoutFeedback.js:199 — forwarded to Pressability as `android_disableSound`.
+  @Input() touchSoundDisabled?: boolean;
 }
 
 // RN's Button IS a TouchableOpacity (Button.js:384), and the behavior builds the view and the
@@ -655,6 +663,7 @@ export class TextInputElement extends ValueChangeElement {
   @Input() textContentType?: ITextInputProps['textContentType'];
   @Input() underlineColorAndroid?: ITextInputProps['underlineColorAndroid'];
   @Input() onValueChange?: ITextInputProps['onValueChange'];
+  @Input() onChangeText?: ITextInputProps['onChangeText'];
   @Input() onContentSizeChange?: ITextInputProps['onContentSizeChange'];
   @Input() onEndEditing?: ITextInputProps['onEndEditing'];
   @Input() onKeyPress?: ITextInputProps['onKeyPress'];

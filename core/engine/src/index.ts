@@ -13,6 +13,12 @@ export {
   // (TouchableNativeFeedback.js:339) — rather than being converted after the fact.
   ANCHOR_COMPONENT,
   isAnchor,
+  createVoid,
+  // The component name of a node whose ENTIRE subtree the commit walk drops — unlike
+  // `ANCHOR_COMPONENT`, which hoists its children up in its place, a void node contributes neither
+  // itself nor them. For a primitive whose whole component renders nothing on this platform —
+  // `input-accessory-view` on Android, `InputAccessoryView.js`'s `return null`.
+  VOID_COMPONENT,
   appendChild,
   insertBefore,
   removeChild,
@@ -388,6 +394,7 @@ export { Linking } from './linking';
 export type { IUrlEvent } from './linking';
 export { Vibration } from './vibration';
 export { ToastAndroid } from './toast-android';
+export { SoundManager } from './sound-manager';
 export { Settings } from './settings';
 export { I18nManager } from './i18n-manager';
 export type { II18nManagerConstants } from './i18n-manager';

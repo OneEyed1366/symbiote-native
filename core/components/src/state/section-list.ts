@@ -5,11 +5,26 @@
 // is pure transform - every adapter reuses it; the adapter supplies only the per-entry
 // element creation (renderSectionHeader / renderItem / etc.) and the ref wiring.
 
+import { defaultKeyExtractor } from './virtualized-list';
 import type { IScrollRoutingHandle } from './scroll-routing-handle';
 
 export interface ISection<ItemT> {
   title: string;
   data: readonly ItemT[];
+  // A stable identity for this section (`VirtualizedSectionList.js`'s `section.key`), used ahead
+  // of its position for the header/footer/item keys below. Falls back to the section's index when
+  // absent, exactly like an item's own key falls back to its index.
+  key?: string;
+  // Overrides the list-wide `keyExtractor` for this section's own items
+  // (`VirtualizedSectionList.js:305` — `section.keyExtractor || keyExtractor || defaultKeyExtractor`).
+  // Method-shorthand, not a property of function type: `ISection<ItemT>` flows into Angular's
+  // generic template-context types (`directives.ts`'s `IVSectionContext`), and a property-typed
+  // callback is checked CONTRAVARIANTLY under `strictFunctionTypes`, which made `ISection<unknown>`
+  // (what Angular's template type-checker substitutes when proving a directive generic-safe) fail
+  // to assign to `ISection<ItemT>` — a real ngtsc compile error, not a template-authoring one.
+  // Method shorthand is checked bivariantly instead, which is what every other generic template
+  // context in this adapter relies on.
+  keyExtractor?(item: ItemT, index: number): string;
 }
 
 // A flattened entry is a section header, an item, a section footer, or a between-sections
@@ -76,17 +91,29 @@ export function unwrapEntryItem<ItemT>(
   return entry !== undefined && entry.kind === 'item' ? entry.item : undefined;
 }
 
+// RN's own section-relative key (`VirtualizedSectionList.js`'s `_subExtractor`): the section's
+// own `key` when given, else its position — never the flat entry index, which is `entry`'s own
+// but is not the SECTION's identity.
+function sectionKeyPart(
+  section: { key?: string },
+  sectionIndex: number,
+): string {
+  return section.key ?? String(sectionIndex);
+}
+
 export function sectionEntryKey<ItemT>(
   entry: ISectionEntry<ItemT>,
   index: number,
   keyExtractor?: (item: ItemT, index: number) => string,
 ): string {
-  if (entry.kind === 'header') return `section-${entry.sectionIndex}`;
-  if (entry.kind === 'footer') return `section-${entry.sectionIndex}:footer`;
   if (entry.kind === 'section-separator')
     return `section-${entry.sectionIndex}:separator`;
-  if (keyExtractor) return keyExtractor(entry.item, entry.itemIndex);
-  return `entry-${index}`;
+  const sectionKey = sectionKeyPart(entry.section, entry.sectionIndex);
+  if (entry.kind === 'header') return `${sectionKey}:header`;
+  if (entry.kind === 'footer') return `${sectionKey}:footer`;
+  const resolve =
+    entry.section.keyExtractor ?? keyExtractor ?? defaultKeyExtractor;
+  return `${sectionKey}:${resolve(entry.item, entry.itemIndex)}`;
 }
 
 // RN's itemIndex is offset by 1 so itemIndex 0 targets the header and itemIndex >= 1

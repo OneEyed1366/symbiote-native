@@ -78,6 +78,9 @@ export type ISymbioteIntrinsic =
   // the `pressable` reason — the behavior registry is keyed by tag, and registering the
   // sticky machine under RCTView would put it on every View in the app.
   | 'sticky-header'
+  // iOS: a real `RCTInputAccessoryView`. Android: `InputAccessoryView.js` renders `null` — the
+  // whole component, children included — so the Android table resolves this to the engine's VOID
+  // component instead of a Fabric view, matching vendor exactly.
   | 'input-accessory-view';
 
 // The one shared shape behind every adapter's intrinsic-element type table (React's and Solid's

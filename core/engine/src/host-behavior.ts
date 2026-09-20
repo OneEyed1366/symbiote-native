@@ -302,6 +302,11 @@ export interface IHostBehavior {
    * boolean read on the node, not a call into a behavior.
    */
   readonly resolvesImageSources?: boolean;
+  /**
+   * Flips `id`/`nativeID` precedence to nativeID-over-id — TouchableWithoutFeedback's, and only
+   * its. See `routeIdAlias` in `node.ts` for why the flip exists and which vendor file demands it.
+   */
+  readonly nativeIdWinsOverId?: boolean;
 }
 
 const behaviors = new Map<string, IHostBehavior>();
@@ -533,6 +538,7 @@ export function attachHostBehavior(node: ISymbioteNode, tag: string): void {
   // BEFORE `attach` and before any prop is routed, which is the whole point: it changes how a
   // WRITE is stored, so a source written to this node must never arrive ahead of it.
   if (behavior.resolvesImageSources === true) node.resolvesImageSources = true;
+  if (behavior.nativeIdWinsOverId === true) node.nativeIdWinsOverId = true;
   // A field rather than a lookup at payload-build time: `fabricProps` runs per node per commit and
   // must not pay a Map probe to discover that almost nothing has a fold.
   node.payloadFold = behavior.foldPayload;

@@ -204,6 +204,17 @@ describe('what a switch sends native, resolved by the engine', () => {
     expect(payload.disabled).toBe(undefined);
   });
 
+  // why: `Switch.js:235-238` — `_accessibilityState` is built only when `_disabled !==
+  // accessibilityState?.disabled`. With NEITHER `disabled` nor `accessibilityState` authored, both
+  // sides of that comparison are `undefined` — `undefined !== undefined` is FALSE — so RN sends NO
+  // `accessibilityState` at all. Inventing `{disabled: false}` here would be a payload a real
+  // device never produces for the commonest case: an ordinary, unadorned Android switch.
+  it('sends no accessibilityState when neither disabled nor a11y state was authored', () => {
+    expect(commitAndroid({ value: true }).payload.accessibilityState).toBe(
+      undefined,
+    );
+  });
+
   // why: `Switch.js:232` — `disabled != null ? disabled : accessibilityState?.disabled`. The a11y
   // state is the FALLBACK, so an app that only spells `accessibilityState.disabled` still gets a
   // switch that cannot be toggled, and an explicit `disabled` still wins over it.

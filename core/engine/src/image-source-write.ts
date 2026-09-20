@@ -39,3 +39,30 @@ export function resolveImageSourceProp(value: unknown): unknown {
   const resolved = resolveImageSource(value);
   return Array.isArray(resolved) ? resolved : [resolved];
 }
+
+// `ReactImageView.setShouldNotifyLoadEvents` (Android) — `downloadListener` stays `null`, and
+// none of these four ever fires, until this prop is `true`. `Image.android.js` sets it whenever
+// ANY one of them is authored; iOS's native side has no such gate and never sets it.
+//
+// These four are real Fabric events (`view-config.ts`'s `COMPONENT_EVENTS.RCTImageView`), so
+// `routeProp` diverts them through `setEventListener`/`node.listeners`, never through `writeProp`
+// — unlike an ordinary function prop, they never reach the `functionProps` stash. Named here in
+// LISTENER form (post `listenerName()`: `onLoad` -> `load`), which is what `node.listeners` keys
+// on. Same shape `GATED_EVENT_PROPS` uses for `onLayout`, applied to a name no host behavior owns.
+export const IMAGE_LOAD_EVENT_NAMES: ReadonlySet<string> = new Set([
+  'loadStart',
+  'load',
+  'loadEnd',
+  'error',
+]);
+
+/** Whether at least one of the four still has a listener installed on the node. */
+export function anyImageLoadEventListenerWired(
+  listeners: ReadonlyMap<string, unknown> | undefined,
+): boolean {
+  if (listeners === undefined) return false;
+  for (const name of IMAGE_LOAD_EVENT_NAMES) {
+    if (listeners.has(name)) return true;
+  }
+  return false;
+}

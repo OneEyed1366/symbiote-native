@@ -120,6 +120,16 @@ function onChange(node: ISymbioteNode, event: ISymbioteEvent): void {
   );
   states.set(node, switchReducer(state, { type: 'native-reported', value }));
 
+  // Switch.js:201-207's `handleChange` — `onChange` first, THEN `onValueChange`, always. An app
+  // with side effects observable across both (a shared counter, a log) sees that exact order on a
+  // real device.
+  //
+  // `onChange` is a raw `change` listener authored directly on the bare tag — not part of any
+  // adapter's public surface today, but `change` is the name this behavior's own dispatcher owns
+  // (`ownedListeners` below), so one is stashed rather than silently evicting the machine.
+  const rawListener = appListenerFor(node, 'change');
+  if (typeof rawListener === 'function') rawListener(event);
+
   // `onValueChange` is not a Fabric event — it is a fold the component wrapper does over the raw
   // `change` payload (same class as TextInput's `onValueChange`, `text-input.ts`'s
   // `callValueChange`), so it lands on the node as a plain prop key rather than through
@@ -132,20 +142,31 @@ function onChange(node: ISymbioteNode, event: ISymbioteEvent): void {
     listener(changeEvent);
   }
 
-  // A raw `change` listener authored directly on the bare tag — not part of any adapter's public
-  // surface today, but `change` is the name this behavior's own dispatcher owns
-  // (`ownedListeners` below), so one is stashed rather than silently evicting the machine.
-  const rawListener = appListenerFor(node, 'change');
-  if (typeof rawListener === 'function') rawListener(event);
-
   // See the module header: deferred so an ACCEPTING app's own state update has a turn of the
   // microtask queue to write the node first.
   queueMicrotask(() => evaluateSnapBack(node));
 }
 
+// Switch.js:238-239,288-289 — unconditional on both platforms, never a function of any prop: a
+// switch always claims the responder and never yields it, so its own native drag-to-toggle cannot
+// be stolen mid-gesture by a parent ScrollView's own responder negotiation.
+function alwaysClaimsResponder(): boolean {
+  return true;
+}
+
+function neverYieldsResponder(): boolean {
+  return false;
+}
+
 function attach(node: ISymbioteNode): void {
   states.set(node, createInitialSwitchState());
   setBehaviorListener(node, 'change', event => onChange(node, event));
+  setBehaviorListener(node, 'startShouldSetResponder', alwaysClaimsResponder);
+  setBehaviorListener(
+    node,
+    'responderTerminationRequest',
+    neverYieldsResponder,
+  );
 }
 
 function detach(node: ISymbioteNode): void {

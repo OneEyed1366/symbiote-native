@@ -182,13 +182,20 @@ describe('who crosses the boundary on a create', () => {
     );
 
     // A BUDGET PER BEHAVIOUR-CARRYING NODE, which on this row is the `<text-input>`. Everything
-    // here crosses for one of two reasons — the behavior's setup reading its own props, or the
-    // commit asking whether a node has a Fabric tag yet.
+    // here crosses for one of three reasons — the behavior's setup reading its own props, the
+    // commit asking whether a node has a Fabric tag yet, or `afterCommit`'s own `propsOf` read.
+    //
+    // 2 -> 3: `afterCommit` used to return before touching a single prop on the CREATE commit —
+    // `isMirrorFreshlySeeded` short-circuited it before any `propOf`/`propsOf` call at all. It no
+    // longer can: `selection` must be checked on that same commit too (an authored `selection`
+    // moves the caret on mount, matching `TextInput.js`'s own sentinel-seeded `lastNativeSelection`
+    // — see `text-input.ts`'s `afterCommit`), so the create commit now pays the one `propsOf` read
+    // every other commit already paid.
     const rows = 10;
     const perInput = Object.entries(sites)
       .filter(([key]) => !key.includes('teardown'))
       .reduce((total, [, count]) => total + count, 0);
-    expect(perInput / rows).toBeLessThanOrEqual(2);
+    expect(perInput / rows).toBeLessThanOrEqual(3);
   });
 });
 

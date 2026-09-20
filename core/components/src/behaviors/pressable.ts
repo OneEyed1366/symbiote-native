@@ -198,17 +198,28 @@ function callbackAt(
 // cosmetic: `delayLongPress` and `hitSlop` are ordinary props that `fabricProps` drops as unknown
 // keys, while `onPress` and friends are OWNED event names that never reach the props at all.
 function configFor(node: ISymbioteNode): IPressMachineConfig {
+  const unstablePressDelay = numberOr(propOf(node, 'unstable_pressDelay'), 0);
   return {
     onPress: callbackAt(node, 'press'),
     onPressIn: callbackAt(node, 'pressIn'),
     onPressOut: callbackAt(node, 'pressOut'),
     onPressMove: callbackAt(node, 'pressMove'),
     onLongPress: callbackAt(node, 'longPress'),
-    delayLongPress: numberOr(
-      propOf(node, 'delayLongPress'),
-      DEFAULT_DELAY_LONG_PRESS_MS,
+    // Pressability.js:471-474 — `normalizeDelay(authored, 10, DEFAULT_LONG_PRESS_DELAY_MS -
+    // delayPressIn)`. The subtraction applies only to the FALLBACK, never to an authored value —
+    // it exists so the long-press threshold, timed from the grant that also arms
+    // `unstable_pressDelay`, lands at a constant 500ms from touch-down by default, not
+    // 500ms + unstable_pressDelay. See `createPressHandlers`'s `handlePressIn` for the other half
+    // (the timer must be ARMED at grant, not after the pressDelay fires, or this compensation
+    // does nothing).
+    delayLongPress: Math.max(
+      10,
+      numberOr(
+        propOf(node, 'delayLongPress'),
+        DEFAULT_DELAY_LONG_PRESS_MS - unstablePressDelay,
+      ),
     ),
-    unstable_pressDelay: numberOr(propOf(node, 'unstable_pressDelay'), 0),
+    unstable_pressDelay: unstablePressDelay,
     // RN's Touchables own the deactivation floor in their OWN machine and hand Pressability
     // `minPressDuration: 0` (TouchableOpacity.js:195). While they were wrappers they passed it as
     // an internal input; on the tag there is nowhere else to say it, so the floor has to be a
@@ -219,6 +230,16 @@ function configFor(node: ISymbioteNode): IPressMachineConfig {
     ),
     hitSlop: asRectOffset(propOf(node, 'hitSlop')),
     pressRetentionOffset: asRectOffset(propOf(node, 'pressRetentionOffset')),
+    // Pressable.js's own name is `android_disableSound`; every composed touchable (Highlight,
+    // NativeFeedback, WithoutFeedback, Button) instead forwards vendor's `touchSoundDisabled` to
+    // this same config field (`TouchableHighlight.js:205`, `TouchableWithoutFeedback.js:199`,
+    // `TouchableNativeFeedback.js:228`). `node` here is whichever tag AUTHORS the prop — itself for
+    // a plain pressable/highlight/button, the owner for a clone-onto-child touchable, since
+    // `configFor` is always called with that source — so reading both names off it resolves
+    // correctly for every composition without a per-tag override.
+    android_disableSound:
+      booleanOr(propOf(node, 'android_disableSound')) ??
+      booleanOr(propOf(node, 'touchSoundDisabled')),
   };
 }
 
@@ -249,11 +270,23 @@ function rebuild(node: ISymbioteNode, state: IBehaviorState): void {
       : state.disabledOf(sourceProps);
   state.listeners = buildPressableListeners(handlers, {
     disabled: disabled === true ? true : undefined,
-    cancelable:
-      typeof propOf(source, 'cancelable') === 'boolean'
-        ? propOf(source, 'cancelable') === true
-        : undefined,
+    cancelable: resolveCancelable(source),
+    blockNativeResponder: propOf(source, 'blockNativeResponder') === true,
   });
+}
+
+// Pressable is the only member of the family with a `cancelable` prop of its own (`Pressable.js:41`).
+// TouchableOpacity/TouchableHighlight/TouchableNativeFeedback instead expose `rejectResponderTermination`
+// and derive `cancelable: !this.props.rejectResponderTermination` internally
+// (`TouchableOpacity.js:186`, `TouchableHighlight.js:194`, `TouchableNativeFeedback.js:217`) — every
+// composed touchable shares this `rebuild()`, so without this the authored name never reached the
+// machine and every Touchable silently kept the RN native default (yield the responder) regardless of
+// what the app asked for. An explicit `cancelable` still wins, matching Pressable's own precedence.
+function resolveCancelable(source: ISymbioteNode): boolean | undefined {
+  const cancelable = propOf(source, 'cancelable');
+  if (typeof cancelable === 'boolean') return cancelable;
+  const reject = propOf(source, 'rejectResponderTermination');
+  return typeof reject === 'boolean' ? !reject : undefined;
 }
 
 // WHICHEVER EVENT OPENS THE GESTURE REBUILDS, and pinning that to one name was a real bug.
@@ -304,6 +337,7 @@ const KEY_BY_EVENT: ReadonlyMap<string, string> = new Map([
   ['startShouldSetResponder', 'onStartShouldSetResponder'],
   ['responderMove', 'onResponderMove'],
   ['responderTerminationRequest', 'onResponderTerminationRequest'],
+  ['responderGrant', 'onResponderGrant'],
 ]);
 
 function installListeners(node: ISymbioteNode, state: IBehaviorState): void {
@@ -444,6 +478,7 @@ export function createPressBehavior(
       'startShouldSetResponder',
       'responderMove',
       'responderTerminationRequest',
+      'responderGrant',
     ],
   };
 }

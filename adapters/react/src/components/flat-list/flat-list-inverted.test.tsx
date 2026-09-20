@@ -213,5 +213,14 @@ describe('React FlatList inverted + waitForInteraction on the engine (Positive)'
     // The window at offset 80, 400px viewport, 40px rows => rows ~2..11 fully visible.
     const labelsAfter = new Set(viewableAfter.map(token => token.item.label));
     expect(labelsAfter.has('row-3'), 'row-3 viewable after scroll').toBe(true);
+
+    // why: `ViewabilityHelper.js`'s `_onUpdateSync` (:308-312) hands back the triggering pair's
+    // own `viewabilityConfig` on every call — an app sharing one callback across several
+    // `viewabilityConfigCallbackPairs` reads it to tell which config fired.
+    const lastReport = viewableReports[viewableReports.length - 1];
+    expect(lastReport.viewabilityConfig).toEqual({
+      itemVisiblePercentThreshold: 50,
+      waitForInteraction: true,
+    });
   });
 });

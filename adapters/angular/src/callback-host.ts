@@ -61,6 +61,7 @@ const CALLBACK_INPUTS = [
   'onAccessibilityEscape',
   'onAccessibilityTap',
   'onBlur',
+  'onChangeText',
   'onContentSizeChange',
   'onEndEditing',
   'onError',
@@ -115,7 +116,7 @@ const CALLBACK_INPUTS = [
  */
 export const CALLBACK_ATTRIBUTE_SELECTOR =
   '[onAccessibilityAction],[onAccessibilityEscape],[onAccessibilityTap],[onBlur],' +
-  '[onContentSizeChange],[onEndEditing],[onError],[onFocus],[onHoverIn],[onHoverOut],' +
+  '[onChangeText],[onContentSizeChange],[onEndEditing],[onError],[onFocus],[onHoverIn],[onHoverOut],' +
   '[onKeyPress],[onLayout],[onLoad],[onLoadEnd],[onLoadStart],[onLongPress],[onMagicTap],' +
   '[onMomentumScrollBegin],[onMomentumScrollEnd],[onMoveShouldSetResponder],' +
   '[onMoveShouldSetResponderCapture],[onPartialLoad],[onPress],[onPressIn],[onPressMove],' +

@@ -68,6 +68,7 @@ constexpr int32_t kOpSetComponent = 9;
 constexpr int32_t kOpSetTag = 10;
 constexpr int32_t kOpSetOwnedListener = 11;
 constexpr int32_t kOpSetUnderlayShown = 12;
+constexpr int32_t kOpCreateVoid = 13;
 
 // The owned listener names any platform rule reads, one bit each — see `Node::pressListeners`.
 // `press` is deliberately bit 0 so the `focusable` question is the cheapest of the two.
@@ -85,6 +86,10 @@ uint8_t pressListenerBit(const std::string &name) {
 constexpr int32_t kKindElement = 0;
 constexpr int32_t kKindRawText = 1;
 constexpr int32_t kKindAnchor = 2;
+// A node whose entire subtree contributes nothing to Fabric — unlike an anchor, which hoists its
+// children up in its own place, a void node's children never reach `appendRenderable` either. See
+// `OP_CREATE_VOID` (mutation-buffer.ts) for why: `InputAccessoryView.js` renders `null` on Android.
+constexpr int32_t kKindVoid = 3;
 
 // A `setProp` whose value slot is this DELETES the key. `null` cannot carry it: null is a legitimate
 // Fabric value meaning "reset to the default", and a merge-based clone needs the two distinguished.
@@ -1126,6 +1131,14 @@ void appendRenderable(
     node.pathDirty = false;
     return;
   }
+  if (node.kind == kKindVoid) {
+    // Unlike an anchor, a void node's children are NOT recursed into — they contribute nothing,
+    // recursively, which is the whole point (`InputAccessoryView.js`'s Android `return null`). Its
+    // own flags clear the same way an anchor's do, so `materialize` never sees it either.
+    node.selfDirty = false;
+    node.pathDirty = false;
+    return;
+  }
   if (isEmptyRawText(node)) {
     node.selfDirty = false;
     node.pathDirty = false;
@@ -1176,6 +1189,9 @@ void collectRenderableOwners(Node &node, std::vector<Node *> &owners) {
       collectRenderableOwners(*child, owners);
       continue;
     }
+    // A void node contributes no owners of its own AND none of its children's — the same asymmetry
+    // with the anchor branch above as `appendRenderable`'s.
+    if (child->kind == kKindVoid) continue;
     if (isEmptyRawText(*child)) continue;
     owners.push_back(child.get());
   }
@@ -1628,6 +1644,12 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
       case kOpCreateAnchor: {
         auto node = std::make_shared<Node>();
         node->kind = kKindAnchor;
+        publish(ops[at + 1], std::move(node));
+        break;
+      }
+      case kOpCreateVoid: {
+        auto node = std::make_shared<Node>();
+        node->kind = kKindVoid;
         publish(ops[at + 1], std::move(node));
         break;
       }

@@ -40,10 +40,8 @@
 
 <script lang="ts" generics="ItemT">
   import {
-    DEFAULT_END_REACHED_THRESHOLD,
     DEFAULT_INITIAL_NUM_TO_RENDER,
     DEFAULT_MAX_TO_RENDER_PER_BATCH,
-    DEFAULT_START_REACHED_THRESHOLD,
     DEFAULT_UPDATE_CELLS_BATCHING_PERIOD,
     DEFAULT_WINDOW_SIZE,
     EMPTY_OFFSET,
@@ -128,11 +126,9 @@
       horizontal: props.horizontal === true,
       inverted: props.inverted === true,
       onEndReached: props.onEndReached,
-      onEndReachedThreshold:
-        props.onEndReachedThreshold ?? DEFAULT_END_REACHED_THRESHOLD,
+      onEndReachedThreshold: props.onEndReachedThreshold,
       onStartReached: props.onStartReached,
-      onStartReachedThreshold:
-        props.onStartReachedThreshold ?? DEFAULT_START_REACHED_THRESHOLD,
+      onStartReachedThreshold: props.onStartReachedThreshold,
       onRefresh: props.onRefresh,
       refreshing: props.refreshing,
       progressViewOffset: props.progressViewOffset,
@@ -252,7 +248,12 @@
           const info = effect.info;
           const map = effect.map;
           const fire = (): void => {
-            for (const pair of pairs) pair.onViewableItemsChanged(info);
+            for (const pair of pairs) {
+              pair.onViewableItemsChanged({
+                ...info,
+                viewabilityConfig: pair.viewabilityConfig,
+              });
+            }
             dispatch({ kind: 'viewable-fired', map });
           };
           if (viewableTimer !== null) {

@@ -85,7 +85,11 @@ export function isTerminationAllowed(cancelable: boolean | undefined): boolean {
 // listener asserting one.
 export function buildPressableListeners(
   handlers: IPressHandlers,
-  options: { disabled?: boolean; cancelable?: boolean },
+  options: {
+    disabled?: boolean;
+    cancelable?: boolean;
+    blockNativeResponder?: boolean;
+  },
 ): Record<string, unknown> {
   if (shouldSuppressPress(options.disabled)) {
     dlog('Pressable disabled — listeners suppressed');
@@ -97,6 +101,10 @@ export function buildPressableListeners(
     onPressOut: handlers.handlePressOut,
     onStartShouldSetResponder: () => shouldClaimResponder(options.disabled),
     onResponderMove: handlers.handleResponderMove,
+    // Pressability.js:479 — returned from onResponderGrant unconditionally, so native learns
+    // whether to stand down the moment the gesture is claimed. Unset resolves to false, matching
+    // the engine's own fallback for an absent listener (`events/index.ts`).
+    onResponderGrant: () => options.blockNativeResponder === true,
   };
   if (options.cancelable !== undefined) {
     listeners.onResponderTerminationRequest = () =>

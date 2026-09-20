@@ -27,6 +27,9 @@ export interface ITouchableOpacityProps extends ITouchableBaseProps {
 export interface ITouchableHighlightProps extends ITouchableBaseProps {
   activeOpacity?: number;
   underlayColor?: string;
+  // TouchableHighlight.js:205 — forwarded to Pressability as `android_disableSound`. Named
+  // differently from Pressable's own `android_disableSound`, matching vendor.
+  touchSoundDisabled?: boolean;
   // RN's snapshot affordance (`Pressable.js:151`, `TouchableHighlight.js:61`): render the control in
   // its pressed state with no gesture, so a test can capture it. Consumed by the engine and stripped
   // before the payload — no ViewConfig declares it.

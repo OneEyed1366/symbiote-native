@@ -11,4 +11,7 @@ export type ITouchableNativeFeedbackProps = Omit<
   background?: INativeFeedbackBackground;
   useForeground?: boolean;
   children?: Snippet;
+  // TouchableNativeFeedback.js:228 — forwarded to Pressability as `android_disableSound`. Named
+  // differently from Pressable's own `android_disableSound`, matching vendor.
+  touchSoundDisabled?: boolean;
 };

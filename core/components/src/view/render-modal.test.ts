@@ -116,3 +116,40 @@ describe('renderModal — passthrough and explicit fields', () => {
     expect(withoutThem.props.hardwareAccelerated).toBe(undefined);
   });
 });
+
+const BASE_VIEW: IModalViewProps = { passthrough: {} };
+
+function containerBaseStyle(isRTL?: boolean): Record<string, unknown> {
+  const root = renderModal(BASE_VIEW, isRTL);
+  const [container] = root.children;
+  if (typeof container === 'string') throw new Error('container is text');
+  const style = container.props.style;
+  if (!Array.isArray(style)) throw new Error('container style is not an array');
+  const [base] = style as readonly unknown[];
+  if (typeof base !== 'object' || base === null)
+    throw new Error('container base style is not an object');
+  return base as Record<string, unknown>;
+}
+
+describe('renderModal container side (Positive — Modal.js:372)', () => {
+  // why: `const side = I18nManager.getConstants().isRTL ? 'right' : 'left'` — vendor pins the
+  // container to the edge matching the layout direction, not always the left.
+  it('pins the container to the left outside RTL', () => {
+    const base = containerBaseStyle(false);
+    expect(base.left).toBe(0);
+    expect(base).not.toHaveProperty('right');
+  });
+
+  it('pins the container to the right under RTL', () => {
+    const base = containerBaseStyle(true);
+    expect(base.right).toBe(0);
+    expect(base).not.toHaveProperty('left');
+  });
+
+  it('defaults to the real I18nManager reading when isRTL is not passed', () => {
+    // The headless I18nManager module resolves to its DEFAULT_CONSTANTS (isRTL: false) with no
+    // native module linked, so the default parameter must match the left-pinned case.
+    const base = containerBaseStyle();
+    expect(base.left).toBe(0);
+  });
+});

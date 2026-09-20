@@ -136,6 +136,55 @@ describe('touchable-opacity host behavior', () => {
     expect(committedPropsOf(TEST_ID).opacity).toBe(0.6);
   });
 
+  // why: `TouchableOpacity.js:215-220` picks the fade duration from WHERE the press-in came from —
+  // 0ms for an ordinary grant, 150ms for a drift-out/drift-back-in reactivation
+  // (`RESPONDER_INACTIVE_PRESS_OUT -> RESPONDER_ACTIVE_PRESS_IN`, driven by `onResponderMove`). Our
+  // press machine (`state/pressable.ts`'s `handleResponderMove`) already re-`activate()`s on a
+  // drift-back-in; this pins that the reactivation still eases in over 150ms rather than snapping.
+  it('eases back in over 150ms on a drift-out/drift-back-in reactivation, not instantly', async () => {
+    vi.useFakeTimers();
+    registerTouchableOpacityBehavior();
+    const node = makeTouchable();
+    routeProp(node, 'testID', TEST_ID);
+    routeProp(node, 'style', { opacity: 0.6 });
+    mount(node);
+    await settle();
+
+    pressIn(node);
+    await settle();
+    expect(committedPropsOf(TEST_ID).opacity).toBe(DEFAULT_ACTIVE_OPACITY);
+
+    // Drift outside the retention region — deactivates, fading back to the resting opacity.
+    // `type: 'responderMove'` matches what the real engine dispatch sets
+    // (`events/index.ts`'s `bubble`/`callOwnListener`, both `type: listenerName`).
+    listenerOf(
+      node,
+      'responderMove',
+    )({
+      type: 'responderMove',
+      nativeEvent: { pageX: 100, pageY: 0 },
+    } as ISymbioteEvent);
+    await settle();
+    expect(committedPropsOf(TEST_ID).opacity).toBe(0.6);
+
+    // Drift back inside — reactivates. A 150ms ease has NOT reached the active opacity 30ms in.
+    listenerOf(
+      node,
+      'responderMove',
+    )({
+      type: 'responderMove',
+      nativeEvent: { pageX: 10, pageY: 0 },
+    } as ISymbioteEvent);
+    await vi.advanceTimersByTimeAsync(30);
+    await Promise.resolve();
+    const midway = committedPropsOf(TEST_ID).opacity;
+    expect(midway).not.toBe(DEFAULT_ACTIVE_OPACITY);
+    expect(midway).not.toBe(0.6);
+
+    await settle();
+    expect(committedPropsOf(TEST_ID).opacity).toBe(DEFAULT_ACTIVE_OPACITY);
+  });
+
   it('still calls the app callbacks the fade is spliced in front of', async () => {
     vi.useFakeTimers();
     registerTouchableOpacityBehavior();
@@ -154,6 +203,47 @@ describe('touchable-opacity host behavior', () => {
 
     expect(onPressIn).toHaveBeenCalledTimes(1);
     expect(onPressOut).toHaveBeenCalledTimes(1);
+  });
+
+  // TouchableOpacity.js:187-190 — `disabled ?? aria-disabled ?? accessibilityState?.disabled`. The
+  // standalone tag never passed a resolver to the press machine, so only the raw `disabled` prop
+  // gated a press: an app disabling through `accessibilityState` alone (a real a11y pattern) kept
+  // pressing. `./button` already threads the same three-way answer through its own composed
+  // touchable; this tag never wired its own copy.
+  it('suppresses press when only accessibilityState.disabled is set', async () => {
+    vi.useFakeTimers();
+    registerTouchableOpacityBehavior();
+    const onPress = vi.fn();
+    const node = makeTouchable();
+    routeProp(node, 'testID', TEST_ID);
+    routeProp(node, 'onPress', onPress);
+    routeProp(node, 'accessibilityState', { disabled: true });
+    mount(node);
+
+    pressIn(node);
+    listenerOf(node, 'press')(TOUCH);
+    listenerOf(node, 'pressOut')(TOUCH);
+    await settle();
+
+    expect(onPress).toHaveBeenCalledTimes(0);
+  });
+
+  it('suppresses press when only aria-disabled is set', async () => {
+    vi.useFakeTimers();
+    registerTouchableOpacityBehavior();
+    const onPress = vi.fn();
+    const node = makeTouchable();
+    routeProp(node, 'testID', TEST_ID);
+    routeProp(node, 'onPress', onPress);
+    routeProp(node, 'aria-disabled', true);
+    mount(node);
+
+    pressIn(node);
+    listenerOf(node, 'press')(TOUCH);
+    listenerOf(node, 'pressOut')(TOUCH);
+    await settle();
+
+    expect(onPress).toHaveBeenCalledTimes(0);
   });
 
   // The feedback loop this design exists to avoid. A fade frame merges onto `node.props.style`, so

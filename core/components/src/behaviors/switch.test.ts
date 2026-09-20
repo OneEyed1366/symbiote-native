@@ -205,4 +205,41 @@ describe('switch host behavior', () => {
       isText: false,
     });
   });
+
+  // why: `Switch.js:201-207`'s `handleChange` calls `onChange?.(event)` BEFORE
+  // `onValueChange?.(event.nativeEvent.value)`, always — an app with side effects observable across
+  // both handlers (a shared counter, a log) sees them run in that order on real RN. Ours called
+  // `onValueChange` first.
+  it('calls onChange before onValueChange, matching vendor order', () => {
+    registerSwitchBehavior();
+    const node = makeSwitch();
+    routeProp(node, 'value', false);
+    mount(node);
+    const order: string[] = [];
+    routeProp(node, 'onChange', () => order.push('onChange'));
+    routeProp(node, 'onValueChange', () => order.push('onValueChange'));
+
+    listenerOf(node, 'change')(changeEvent(node, true));
+
+    expect(order).toEqual(['onChange', 'onValueChange']);
+  });
+
+  // why: `Switch.js:238-239,288-289` sets `onStartShouldSetResponder={returnsTrue}` and
+  // `onResponderTerminationRequest={returnsFalse}` UNCONDITIONALLY, on BOTH platforms — a switch
+  // always claims the gesture and never yields it, so a parent ScrollView's own responder
+  // negotiation cannot steal a drag-to-toggle mid-gesture. Without this our engine wires no claim
+  // at all, so a Switch nested in a ScrollView could lose the touch to the scroll the moment the
+  // finger moves.
+  it('always claims the responder and never yields it, on both platforms', () => {
+    registerSwitchBehavior();
+    const node = makeSwitch();
+    mount(node);
+
+    expect(
+      listenerOf(node, 'startShouldSetResponder')(changeEvent(node, true)),
+    ).toBe(true);
+    expect(
+      listenerOf(node, 'responderTerminationRequest')(changeEvent(node, true)),
+    ).toBe(false);
+  });
 });

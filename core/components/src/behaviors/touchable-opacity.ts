@@ -18,6 +18,13 @@
 //
 // REGISTRATION IS THE HAZARD, not the machine — see `./pressable` for why each adapter's entry
 // does a bare `import './register';` that the barrel does not re-export.
+//
+// TODO(rn-parity, low priority): `TouchableOpacity.js:197-220` gates the active/inactive opacity
+// fade on `onFocus`/`onBlur` too (TV remote focus fires the same fade `onPress` triggers). Neither
+// name is wired into the feedback machine here; they pass through as ordinary, un-intercepted
+// event props. Deliberately not implemented — dead on every device this project targets (no tvOS
+// build, no example app; iOS/Android are the only targets). Audit skill, "Found, NOT fixed: TV
+// (Platform.isTV) focus/blur feedback on TouchableOpacity/Highlight".
 
 import {
   AnimatedMock,
@@ -49,6 +56,7 @@ import {
   createTouchableFeedbackHandlers,
   createTouchableFeedbackRuntime,
   DEFAULT_ACTIVE_OPACITY,
+  OPACITY_ACTIVE_DURATION_MS,
   OPACITY_ACTIVE_GRANT_DURATION_MS,
   OPACITY_INACTIVE_DURATION_MS,
   RESTING_OPACITY,
@@ -139,9 +147,15 @@ const refine: IPressConfigRefinement = (node, config) => {
     state.runtime,
     {
       activate(event: ISymbioteEvent): void {
-        // 0, not 150 (TouchableOpacity.js:215-220): the duration is chosen by where the press-in
-        // came from, and every pressIn our engine produces is the grant-equivalent.
-        fadeTo(state, activeOpacity, OPACITY_ACTIVE_GRANT_DURATION_MS);
+        // TouchableOpacity.js:215-220 picks the duration from WHERE the press-in came from: our
+        // engine's own 'pressIn' event (an ordinary grant, or its delayed replay) is the 0ms leg;
+        // a drift-out/drift-back-in reactivation arrives as 'responderMove'
+        // (`state/pressable.ts`'s `handleResponderMove`) and gets the 150ms ease-back-in instead.
+        const duration =
+          event.type === 'responderMove'
+            ? OPACITY_ACTIVE_DURATION_MS
+            : OPACITY_ACTIVE_GRANT_DURATION_MS;
+        fadeTo(state, activeOpacity, duration);
         config.onPressIn?.(event);
       },
       deactivate(event: ISymbioteEvent): void {
@@ -217,10 +231,23 @@ export function createTouchableOpacityBehavior(
       const previous = state.settled;
       state.settled = { disabled, resting };
       if (previous === undefined) {
-        // RN's `Animated.View` carries `{opacity: anim}` in its style from the FIRST render, so a
-        // resting Touchable commits the key too — a tag that published nothing until the first
-        // press would differ from every wrapper on mount. Set rather than animate: this is the
-        // mount, and RN re-settles on componentDidUpdate only.
+        // NOT vendor parity, despite this comment's old claim: `TouchableOpacity-itest.js` ("does
+        // not render explicit opacity when using default") proves a resting, untouched
+        // TouchableOpacity commits no `opacity` key at all. Vendor's native-animated leaf is a
+        // separate channel from the ordinary style diff, so forcing non-flattening never implies
+        // publishing a value. Ours publishes anyway: `setAnimatedBehaviorStyle`/`bindAnimatedValue`
+        // (`host-binding.ts`) force `collapsable: false` and resolve+write the leaf's value in the
+        // SAME call. Untangling that is a change to shared animation infrastructure, not a one-line
+        // fix here — deferred, see the audit skill. Set rather than animate: this is the mount, and
+        // RN re-settles on componentDidUpdate only.
+        //
+        // TODO(rn-parity): skip this initial publish when `resting === RESTING_OPACITY` (1, Fabric's
+        // own opacity default) and no authored `style.opacity` needs another route to Fabric, so a
+        // resting default TouchableOpacity commits no `opacity` key — matching vendor. Needs
+        // `bindAnimatedValue`/`host-binding.ts` to separate "force collapsable:false" from "publish
+        // the leaf's value" (shared by every animated-behavior consumer, not just this tag), plus a
+        // new test for the untouched-default case (no existing case in touchable-opacity.test.ts
+        // covers it — every case authors an explicit style.opacity first).
         state.opacity.setValue(resting);
         return;
       }
