@@ -150,6 +150,71 @@ jobs:
 
       - run: pnpm run test
 
+  # THE ONE JOB THAT COMMITS INTO THE ENGINE THAT SHIPS. `pnpm test` drives a fake
+  # `nativeFabricUIManager`; this one builds ReactCommon for the host and evaluates every
+  # `*.itest.ts` inside a real JSI runtime against the real `SymbioteTree`, which is the only place
+  # a payload rule, a tag-keyed fold or a `react_native_assert` can be observed at all.
+  #
+  # macOS is not a preference and `ubuntu-latest` is not a cheaper variant of this job — it is a
+  # machine where it does not build. `symbiote_tester` links `-framework JavaScriptCore` (Hermes
+  # would have to be fetched and built; JSC ships with the OS and RN already carries its JSI
+  # binding), and the CMakeLists sources folly/glog/fmt/boost from Homebrew rather than from the
+  # third-party tree gradle fetches for Android.
+  #
+  # `googletest` comes from brew so `find_package(GTest)` hits and the build skips a FetchContent
+  # clone; `fast_float` is fetched either way, pinned to RN's own tag.
+  itest:
+    name: Engine itest
+    needs: gate
+    if: needs.gate.outputs.cache-hit != 'true'
+    runs-on: macos-15
+    timeout-minutes: 60
+    env:
+      # The cmake invocations live in package.json, not here, so the launcher is set through the
+      # environment — CMake reads `CMAKE_<LANG>_COMPILER_LAUNCHER` as the cache variable's default.
+      # A cold build compiles some sixty ReactCommon modules; nothing else in this file is cold for
+      # minutes, which is what makes the cache worth having.
+      CMAKE_CXX_COMPILER_LAUNCHER: ccache
+      CCACHE_DIR: ${{ runner.temp }}/ccache
+      CCACHE_MAXSIZE: 2G
+      HOMEBREW_NO_AUTO_UPDATE: 1
+      HOMEBREW_NO_INSTALL_CLEANUP: 1
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # Not for the JS half alone: the CMakeLists resolves `react-native/package.json` to find the
+      # ReactCommon it must compile, and fails its configure step without an install.
+      - run: pnpm install --frozen-lockfile
+
+      - run: brew install --quiet ccache folly glog fmt double-conversion gflags boost googletest
+
+      # Keyed per run so every build saves a fresh entry and the restore-key picks up the newest
+      # one — the ordinary rolling-ccache shape. A miss costs the cold ReactCommon compile and
+      # nothing else; it can never make a result wrong, only slow.
+      - uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/ccache
+          key: itest-ccache-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            itest-ccache-${{ runner.os }}-
+
+      - run: pnpm run test:itest
+
+      # The Android arm in the SAME job, deliberately. It recompiles exactly one translation unit
+      # (`SymbioteFabricProps.cpp`, with `-DANDROID`) and links; every other object is byte-identical
+      # to the arm above, so it lands on ccache hits. On its own runner it would pay the whole cold
+      # compile again to re-verify twelve `#ifdef` sites. What it covers is real and reachable
+      # nowhere else headlessly: `android_ripple`, `underlineColorAndroid`, `decelerationRate`'s
+      # constants, Button's uppercase label and its Material style.
+      - run: pnpm run test:android
+
   # ONE RUNNER PER ARM. The script has always run its arms concurrently, but six `npm install`s of
   # the RN toolchain plus twelve Metro production bundles shared two vCPUs, so "concurrent" cost
   # 10-12 minutes of wall clock. A real matrix turns that into the slowest single arm (angular, which
@@ -220,13 +285,14 @@ jobs:
   # both states is what keeps a docs commit from re-running lint/typecheck/test forever after.
   mark-passed:
     name: Mark tree as passed
-    needs: [gate, lint, typecheck, test, bundle-isolation]
+    needs: [gate, lint, typecheck, test, itest, bundle-isolation]
     if: >
       always() &&
       needs.gate.outputs.cache-hit != 'true' &&
       needs.lint.result == 'success' &&
       needs.typecheck.result == 'success' &&
       needs.test.result == 'success' &&
+      needs.itest.result == 'success' &&
       (needs['bundle-isolation'].result == 'success' ||
       needs['bundle-isolation'].result == 'skipped')
     runs-on: ubuntu-latest
