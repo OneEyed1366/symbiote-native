@@ -38,6 +38,9 @@ Targets **Solid 1.9**, deliberately not 2.0 (RC as of 2026-08): 2.0 moved the pa
 
 ## Wiring an app
 
+`npx @symbiote-native/cli new --framework solid` sets up everything below for a new app; wiring it
+into an existing one still follows the manual steps here.
+
 `babel.config.js` — the preset ships preconfigured, so the app can't get `moduleName` or `generate`
 wrong:
 
