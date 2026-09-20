@@ -194,8 +194,13 @@ export class ShimElement extends ShimElementBase {
     // COW: reuse `doorBag` in place only while this element is its SOLE owner (never cloned since
     // its last write) — `cloneNode` clears the flag on both sides the instant a bag becomes shared
     // (§ above). A fresh `{}` is `own`ed immediately: nothing else can reach it yet.
-    const owned = this.ownsDoorBag && this.doorBag !== undefined;
-    const door: IShimPropBag = owned ? this.doorBag : { ...this.doorBag };
+    // Narrowed through a LOCAL, not through `owned`: TypeScript discards an aliased condition
+    // whose operands include a mutable property (`this.ownsDoorBag`), so the `!== undefined` leg
+    // never reached `this.doorBag` at the use site and this line did not compile.
+    const reusable =
+      this.doorBag !== undefined && this.ownsDoorBag ? this.doorBag : undefined;
+    const owned = reusable !== undefined;
+    const door: IShimPropBag = reusable ?? { ...this.doorBag };
     this.ownsDoorBag = true;
     const prevValue = door[name];
     if (value === undefined) delete door[name];
