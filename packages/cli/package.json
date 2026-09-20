@@ -1,0 +1,49 @@
+{
+  "name": "@symbiote-native/cli",
+  "version": "0.0.1",
+  "description": "Scaffold a new SymbioteNative app (React/Vue/Angular/Solid/Svelte, bare React Native, optional Expo-modules autolinking), or wire SymbioteNative into an existing bare RN app — the `@symbiote-native/cli new` companion to the manual steps in the root README's \"Try It In Your Own App\".",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OneEyed1366/symbiote-native.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli#readme",
+  "bugs": {
+    "url": "https://github.com/OneEyed1366/symbiote-native/issues"
+  },
+  "author": "Andrey Prokopenko <psevdoproger@gmail.com>",
+  "type": "module",
+  "engines": {
+    "node": ">=22.11.0"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "bin": {
+    "symbiote-native-cli": "bundle.js"
+  },
+  "files": [
+    "bundle.js",
+    "templates"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "typecheck": "tsc --build",
+    "dev": "tsc --build && node build/index.js",
+    "build": "rolldown -c build.config.ts",
+    "format": "prettier --write \"src/**/*.ts\""
+  },
+  "devDependencies": {
+    "@clack/prompts": "catalog:",
+    "@types/node": "catalog:",
+    "picocolors": "catalog:",
+    "rolldown": "catalog:",
+    "typescript": "catalog:"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "scripts": {
+    "pretypecheck": "css-dts .",
+    "typecheck": "svelte-check --tsconfig ./tsconfig.typecheck.json --threshold error"
+  },
+  "devDependencies": {
+    "@react-native/typescript-config": "0.86.0",
+    "@types/react": "^19.2.0",
+    "typescript": "~6.0.0",
+    "svelte-check": "^4.0.0"
+  }
+}

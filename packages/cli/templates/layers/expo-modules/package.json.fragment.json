@@ -1,0 +1,9 @@
+{
+  "scripts": {
+    "postinstall": "symbiote-expo-link"
+  },
+  "dependencies": {
+    "expo": "57.0.14",
+    "@symbiote-native/expo-modules-link": "latest"
+  }
+}

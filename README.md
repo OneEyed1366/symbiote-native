@@ -52,7 +52,7 @@ native UI at real production scale - but each option gives up something structur
 | **NativeScript**     | Its own runtime + bindings, maintained by nstudio (core last commit Aug 14, 2026, releases every 2-4 weeks) | Angular active (`@nativescript/angular` 21.0.0, Jan 2026); Vue quiet since `3.0.2` in Oct 2025; Svelte's community fork stalled since Dec 2025, and the original `svelte-native` package hasn't shipped since Nov 2024 | Its own, real but a fraction of RN's                                  | Leave RN's ecosystem, and framework support quality varies sharply by which one you pick     |
 | **Hippy** (Tencent)  | Its own C++ DOM + its own Flex layout engine, maintained by Tencent                                         | React and Vue, both officially supported, shipping in QQ, QQ Music, and Tencent News (releases through Aug 2025)                                                                                                       | Its own, real production scale but a separate ecosystem from RN's     | Leave RN's ecosystem for Tencent's, solid Vue support but on their roadmap                   |
 | **Lynx** (ByteDance) | Its own new engine (PrimJS, dual-thread), launched March 2025                                               | ReactLynx is the only framework that actually ships; Vue support is an unfinished community prototype                                                                                                                  | Minimal, most integrations mean hand-written native bridging          | A year-old ecosystem, and "framework-agnostic" is still a roadmap item, not what ships today |
-| **SymbioteNative**   | **Stock, unforked React Native**, Meta keeps maintaining it, you keep upstream merges                       | React, Vue 3, Angular, Svelte, Solid all shipping today                                                                                                                                                                | RN's own, inherited at the native-view level                          | Beta, also there is no `create-symbiote` scaffolder **yet**                                  |
+| **SymbioteNative**   | **Stock, unforked React Native**, Meta keeps maintaining it, you keep upstream merges                       | React, Vue 3, Angular, Svelte, Solid all shipping today                                                                                                                                                                | RN's own, inherited at the native-view level                          | Beta; `@symbiote-native/cli new` scaffolds new apps, wiring into an existing one is still manual   |
 
 NativeScript and Hippy each prove multi-framework native UI works at real scale, carrying
 their own native runtime alone. Lynx, a year into its own new engine, still ships React
@@ -252,10 +252,12 @@ npm install @symbiote-native/solid react-native solid-js
 ```
 
 `react-native` (and `react`/`vue`/`@angular/core`/`svelte`/`solid-js`) stay **your app's own top-level dependencies** —
-SymbioteNative never hides them, it only replaces the JS renderer that drives them. There's no
-`create-symbiote` scaffolder yet, so the Metro config and the `index.js` entry seam
-(`registerRunnable`, not `registerComponent`) aren't generated for you — copy them from the matching
-example app, per the adapter's own README:
+SymbioteNative never hides them, it only replaces the JS renderer that drives them. For a **new**
+app, `npx @symbiote-native/cli new my-app --framework <react|vue|angular|solid|svelte>` generates
+all of this for you — see [`packages/cli`](./packages/cli). Wiring SymbioteNative into an
+**existing** app (`@symbiote-native/cli add`) isn't automated yet, so the Metro config and the
+`index.js` entry seam (`registerRunnable`, not `registerComponent`) still need copying from the
+matching example app, per the adapter's own README:
 
 - **[`adapters/react`](./adapters/react)** — plain Metro, no extra build step.
 - **[`adapters/vue`](./adapters/vue)** — TSX needs nothing extra; SFC adds a Metro transformer for `.vue` files.
@@ -286,7 +288,8 @@ README and full per-adapter usage examples.
 > Every adapter (and the shared core packages under it) ships to npm at `0.1.x`, so you can add one
 > to an existing RN app today — see [Try It In Your Own App](#try-it-in-your-own-app). All five run
 > on device and are on the landing-page switcher, in day-to-day use. What's still catching up: the long-tail prop surface keeps widening, automated
-> device coverage is just coming online, and the `create-symbiote` scaffolder doesn't exist yet, so wiring Metro/CocoaPods follows
+> device coverage is just coming online, and `@symbiote-native/cli` covers **new** apps
+> (`npx @symbiote-native/cli new`) but not yet wiring into an **existing** one — `add` still follows
 > the example apps rather than one command. iOS stays the reference surface; Android is at canary
 > parity.
 
@@ -372,7 +375,7 @@ framework adapter.
 | **M6** | **Svelte adapter**                               | a DOM-shim adapter over stock compiled Svelte output driving the engine's mutation API — third non-React framework, full component parity                                                                                                                                                                                                             | ✅ done    |
 | **M7** | Solid adapter                                    | `solid-js/universal`'s `createRenderer` on the validated core, fourth non-React framework with full component parity (`createPortal`/`createTunnel`/`Animated`/`AppRegistry`), running on device and on the landing-page switcher                                                                                                                     | ✅ done    |
 | **M8** | Web _(stretch)_                                  | the same trees rendered to the web as a default platform target                                                                                                                                                                                                                                                                                       | 💭 maybe   |
-| **DX** | `create-symbiote` scaffolder                     | pins `react-native` + `react` at the app root so your app code imports only `@symbiote-native/*`, never `react-native`                                                                                                                                                                                                                                | ⏳ planned |
+| **DX** | `@symbiote-native/cli` scaffolder                     | pins `react-native` + `react` at the app root so your app code imports only `@symbiote-native/*`, never `react-native`                                                                                                                                                                                                                                | ⏳ planned |
 
 **End goal:** each framework — Vue, Angular, Svelte, Solid, React — can render native iOS and
 Android apps the same way React Native does today, off one untouched native core, **with
@@ -481,8 +484,9 @@ Angular break, the failure isolates to _that adapter_ — not the native stack u
 
 **Can I use it today?** The packages are on npm — you can `npm install @symbiote-native/react` (or
 `vue` / `angular` / `svelte` / `solid`) into an existing RN app today, see [Try It In Your Own
-App](#try-it-in-your-own-app). It's still beta, but the API is settled — there's no `create-symbiote` scaffolder yet,
-so Metro/CocoaPods wiring follows the example apps rather than one command. The thesis is proven —
+App](#try-it-in-your-own-app). It's still beta, but the API is settled — `npx @symbiote-native/cli new`
+scaffolds a fresh app; wiring into an existing one (`add`) isn't automated yet, so Metro/CocoaPods
+wiring there follows the example apps rather than one command. The thesis is proven —
 **five** frameworks (React, Vue 3, Angular, Svelte, and Solid) drive the agnostic core on iOS + Android with RN's renderer
 never in the path. You can read the architecture, run the `vitest` suite and the `Detox` journeys,
 drive any of the five canaries, and follow the milestones.

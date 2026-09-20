@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "@symbiote-native/system-ui": "latest"
+  }
+}

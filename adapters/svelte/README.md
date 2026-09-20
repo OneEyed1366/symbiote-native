@@ -29,9 +29,9 @@ npm install @symbiote-native/svelte react-native svelte
 
 `react-native` and `svelte` stay your app's own top-level dependencies — this package only
 replaces the JS renderer that drives them. Every component is a `.svelte` SFC — there's no TSX
-alternative the way Vue offers — so the Metro wiring below isn't optional. There's no
-`create-symbiote` scaffolder yet, so it comes from [`examples/svelte`](../../examples/svelte)
-rather than a generator:
+alternative the way Vue offers — so the Metro wiring below isn't optional. `npx @symbiote-native/cli new`
+sets this up for a new app; wiring it into an existing one still follows
+[`examples/svelte`](../../examples/svelte) rather than a generator:
 
 - `metro.config.js` — point `babelTransformerPath` at
   `@symbiote-native/svelte/metro-svelte-transformer` (compiles `.svelte` on the way into the

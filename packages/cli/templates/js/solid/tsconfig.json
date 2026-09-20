@@ -1,0 +1,11 @@
+{
+  "extends": "@react-native/typescript-config",
+  "compilerOptions": {
+    "types": ["node"],
+    "jsx": "preserve",
+    "jsxImportSource": "@symbiote-native/solid",
+    "plugins": [{ "name": "@symbiote-native/css-parser/typescript-plugin" }]
+  },
+  "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": ["**/node_modules", "**/Pods", "e2e"]
+}

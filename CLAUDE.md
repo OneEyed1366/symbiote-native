@@ -66,7 +66,7 @@ The adapter facade hides only **imports** — app _code_ names only `@symbiote-n
 the app _manifest_ still pins `react-native`. Do NOT try to make RN a hidden /
 transitive dependency to keep it out of the app's `package.json`: modern Expo
 autolinking would resolve it, but it forfeits version-pinning and breaks pnpm
-isolated installs — an ecosystem anti-pattern. The future `create-symbiote`
+isolated installs — an ecosystem anti-pattern. The future `@symbiote-native/cli`
 scaffolder owns the top-level pin so the developer never writes it by hand.
 </react_native_is_an_explicit_top_level_peer>
 

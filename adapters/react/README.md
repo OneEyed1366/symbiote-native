@@ -27,7 +27,7 @@ npm install @symbiote-native/react react-native react
 ```
 
 `react-native` and `react` stay your app's own top-level dependencies — SymbioteNative doesn't hide
-them, it only replaces the JS renderer that drives them. There's no `create-symbiote` scaffolder
+them, it only replaces the JS renderer that drives them. There's no `@symbiote-native/cli` scaffolder
 yet, so the Metro config and the `index.js` entry seam below come from
 [`examples/react`](../../examples/react) rather than a generator.
 

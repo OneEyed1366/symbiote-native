@@ -1,0 +1,109 @@
+:root {
+  --ink: #0b1622;
+  --paper: #13243a;
+  --mist: #41506a;
+  --chalk: #cbd5e1;
+  --chalk-bright: #ffffff;
+  --brand: #61dafb;
+}
+
+.screen {
+  flex: 1;
+  background-color: var(--ink);
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  padding: 24px 32px;
+}
+
+.brand-logo {
+  height: 64px;
+  aspect-ratio: 1.0977;
+}
+
+.title {
+  color: var(--chalk-bright);
+  font-size: 22px;
+  font-weight: bold;
+  text-align: center;
+}
+
+.subtitle {
+  color: var(--chalk);
+  font-size: 14px;
+  text-align: center;
+}
+
+.counter-card {
+  align-items: center;
+  gap: 4px;
+  padding: 20px 28px;
+  border-radius: 16px;
+  background-color: var(--paper);
+}
+
+.counter-label {
+  color: var(--mist);
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+
+.counter-value {
+  color: var(--brand);
+  font-size: 32px;
+  font-weight: bold;
+}
+
+.button-row {
+  flex-direction: row;
+  gap: 12px;
+}
+
+.button-primary {
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  padding: 14px 22px;
+  background-color: var(--brand);
+}
+
+.button-secondary {
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  padding: 14px 22px;
+  border-width: 1.5px;
+  border-color: var(--mist);
+}
+
+.button-primary-text {
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: bold;
+}
+
+.button-secondary-text {
+  color: var(--chalk-bright);
+  font-size: 15px;
+  font-weight: bold;
+}
+
+.details-card {
+  align-items: center;
+  gap: 10px;
+  padding: 24px;
+  border-radius: 16px;
+  background-color: var(--paper);
+}
+
+.details-title {
+  color: var(--chalk-bright);
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.details-body {
+  color: var(--chalk);
+  font-size: 14px;
+  text-align: center;
+}

@@ -27,8 +27,8 @@ npm install @symbiote-native/vue react-native vue
 `react-native` and `vue` stay your app's own top-level dependencies — this package only replaces
 the JS renderer that drives them. **TSX** needs nothing beyond the install above; **SFC**
 additionally needs a Metro transformer for `.vue` files (see
-[`examples/vue-sfc`](../../examples/vue-sfc)'s `metro.config.js`), since there's no
-`create-symbiote` scaffolder yet to wire it for you.
+[`examples/vue-sfc`](../../examples/vue-sfc)'s `metro.config.js`) — `npx @symbiote-native/cli new`
+wires this for a new app; an existing app still needs it copied in by hand.
 
 ---
 
