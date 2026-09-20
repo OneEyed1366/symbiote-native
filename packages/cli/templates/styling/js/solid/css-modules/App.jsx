@@ -5,11 +5,35 @@ export default function App() {
   const [count, setCount] = createSignal(0);
 
   return (
-    <view class={styles.container}>
-      <text>Welcome to SymbioteNative!</text>
-      <pressable onPress={() => setCount((value) => value + 1)}>
-        <text>Taps: {count()}</text>
+    <safe-area-view class={styles['screen']}>
+      <view class={styles['brand-row']}>
+        <image
+          class={`${styles['brand-logo']} ${styles['brand-logo-react']}`}
+          resizeMode="contain"
+          source={require('./assets/react-native-logo.png')}
+        />
+        <image
+          class={styles['plus-icon']}
+          resizeMode="contain"
+          source={require('./assets/plus-icon.png')}
+        />
+        <image
+          class={`${styles['brand-logo']} ${styles['brand-logo-solid']}`}
+          resizeMode="contain"
+          source={require('./assets/solid-logo.png')}
+        />
+      </view>
+      <text class={styles['title']}>Welcome to SymbioteNative!</text>
+      <text class={styles['subtitle']}>Framework-agnostic React Native, driven by Solid.</text>
+
+      <view class={styles['counter-card']}>
+        <text class={styles['counter-label']}>TAPS</text>
+        <text class={styles['counter-value']}>{count()}</text>
+      </view>
+
+      <pressable class={styles['button-primary']} onPress={() => setCount((value) => value + 1)}>
+        <text class={styles['button-primary-text']}>Tap me</text>
       </pressable>
-    </view>
+    </safe-area-view>
   );
 }

@@ -1,0 +1,78 @@
+.screen {
+  flex: 1;
+  background-color: #0b1622;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  padding: 24px 32px;
+}
+
+.brand-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 28px;
+}
+
+.brand-logo {
+  height: 64px;
+}
+
+.brand-logo-react {
+  aspect-ratio: 1.0977;
+}
+
+.brand-logo-svelte {
+  aspect-ratio: 0.8359;
+}
+
+.plus-icon {
+  width: 48px;
+  height: 48px;
+}
+
+.title {
+  color: #ffffff;
+  font-size: 22px;
+  font-weight: bold;
+  text-align: center;
+}
+
+.subtitle {
+  color: #cbd5e1;
+  font-size: 14px;
+  text-align: center;
+}
+
+.counter-card {
+  align-items: center;
+  gap: 4px;
+  padding: 20px 28px;
+  border-radius: 16px;
+  background-color: #13243a;
+}
+
+.counter-label {
+  color: #41506a;
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+
+.counter-value {
+  color: #ff3e00;
+  font-size: 32px;
+  font-weight: bold;
+}
+
+.button-primary {
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  padding: 14px 22px;
+  background-color: #ff3e00;
+}
+
+.button-primary-text {
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: bold;
+}
