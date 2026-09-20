@@ -875,8 +875,47 @@ dynamic foldTouchableHighlightUnderlay(
   underlay["backgroundColor"] =
       color != nullptr && !color->isNull() ? *color : dynamic(kHighlightUnderlayColor);
 
+  dynamic composed = dynamic::array();
+  const dynamic *style = props.get_ptr("style");
+  if (style != nullptr) composed.push_back(*style);
+  composed.push_back(std::move(underlay));
+
+  dynamic out = props;
+  out["style"] = std::move(composed);
+  return out;
+}
+
+/**
+ * The OTHER half of the underlay — `{opacity}` on the touchable's single child.
+ *
+ * A DESCENDANT RULE, keyed on the owner's tag, and the direction is what makes it possible at all.
+ * `IFirstChild` reads DOWN and cannot serve this: a rule returns the payload of the node it runs on,
+ * so it can never write onto a child. The child reads UP instead, the way the clone-onto-child port
+ * already does — and the field it needs, `underlayShown`, had to join `IOwner` because it lives in
+ * `ISelf`, which is the node's OWN state and says nothing about a parent.
+ *
+ * WHY TWO NODES AT ALL, since every adapter shipped one and this file's other rule kept that: an
+ * `opacity` beside the underlay's `backgroundColor` fades the underlay ITSELF, so `underlayColor:
+ * 'black'` painted grey. RN never puts them together — `_createExtraStyles` builds the pair
+ * (`TouchableHighlight.js:258-266`) and the render applies each to its own box (`:358-361` for the
+ * container, `:379-383` for `cloneElement`). One is the whole population of children there,
+ * `React.Children.only` (`:306`).
+ *
+ * THE GATE IS THE OWNER'S, repeated rather than shared, because the two rules run on two nodes and
+ * neither can see the other's answer: `testOnly_pressed` latches with no gesture and bypasses the
+ * press-handler check, exactly as upstream's initial state does (`:189-190`). Read off the OWNER's
+ * props, since this node's own bag has neither.
+ *
+ * COMPOSES OVER, matching `:379-383` — a child that spells its own `opacity` still dims. Reversed,
+ * any child with an explicit opacity would sit there visibly unresponsive to touch.
+ */
+dynamic foldTouchableHighlightChild(const dynamic &props, const IOwner &owner) {
+  if (owner.props == nullptr) return props;
+  const bool forced = boolAt(*owner.props, "testOnly_pressed").value_or(false);
+  if (!forced && (!owner.underlayShown || !owner.hasAnyPressListener)) return props;
+
   dynamic child = dynamic::object();
-  const dynamic *opacity = authored.get_ptr("activeOpacity");
+  const dynamic *opacity = owner.props->get_ptr("activeOpacity");
   child["opacity"] = opacity != nullptr && opacity->isNumber()
       ? *opacity
       : dynamic(kHighlightChildOpacity);
@@ -884,7 +923,6 @@ dynamic foldTouchableHighlightUnderlay(
   dynamic composed = dynamic::array();
   const dynamic *style = props.get_ptr("style");
   if (style != nullptr) composed.push_back(*style);
-  composed.push_back(std::move(underlay));
   composed.push_back(std::move(child));
 
   dynamic out = props;
@@ -2379,6 +2417,14 @@ dynamic fabricProps(
   if (usesCloneOntoChildRule(owner.tagName)) {
     ownerResolved = foldCloneOntoChild(
         *bag, owner, std::strcmp(owner.tagName, "touchable-native-feedback") == 0);
+    bag = &ownerResolved;
+  } else if (
+      owner.tagName != nullptr &&
+      std::strcmp(owner.tagName, "touchable-highlight") == 0) {
+    // The underlay's second half. `else if` rather than a second `if`: the two clone-onto-child tags
+    // and this one are different owners, so no node can match both, and an independent branch would
+    // buy a second `strcmp` on the hot path for a case that cannot happen.
+    ownerResolved = foldTouchableHighlightChild(*bag, owner);
     bag = &ownerResolved;
   }
 

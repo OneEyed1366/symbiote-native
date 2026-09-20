@@ -152,6 +152,12 @@ struct IOwner {
   const folly::dynamic *props = nullptr;
   const char *tagName = nullptr;
   bool hasPressListener = false;
+  // TouchableHighlight's two halves land on TWO nodes — background on the container, opacity on the
+  // single child (`TouchableHighlight.js:358-361, 379-383`) — so the child's rule needs the owner's
+  // feedback state, which is `ISelf`'s and therefore unreachable from down here without these. Same
+  // argument `hasPressListener` above already makes: a parent's bit, read one hop up.
+  bool underlayShown = false;
+  bool hasAnyPressListener = false;
 };
 
 /**

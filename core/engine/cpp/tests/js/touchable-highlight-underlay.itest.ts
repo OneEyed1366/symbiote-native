@@ -40,6 +40,7 @@ import {
 } from '@symbiote-native/components';
 
 import {
+  appendChild,
   committedPayloadOf,
   createElement,
   createSurface,
@@ -57,6 +58,8 @@ const TAG = 'touchable-highlight';
 // RN's own two defaults, `TouchableHighlight.js:258-268`.
 const DEFAULT_UNDERLAY = 'black';
 const DEFAULT_CHILD_OPACITY = 0.85;
+
+type IPayload = Readonly<Record<string, unknown>>;
 
 let nextRootTag = 8800;
 
@@ -156,18 +159,26 @@ describe('what a pressed touchable-highlight sends native', () => {
     expect(payload.opacity).toBe(undefined);
   });
 
-  // why: RN composes BOTH halves onto the one node here — the underlay's background and the child's
-  // opacity — which is the single-node simplification every adapter already shipped
-  // (`behaviors/touchable-highlight.ts`'s header). `#ff0000` is processed to an int by the payload
-  // builder, which is the proof it travelled as a real colour prop rather than a passthrough string.
+  // why: both halves land in one gesture, each on ITS OWN node — the underlay's background on the
+  // container, the opacity on the single child, exactly as `_createExtraStyles` splits them
+  // (`TouchableHighlight.js:258-266`) and the render applies them (`:358-361`, `:379-383`).
+  // `#ff0000` is processed to an int by the payload builder, which is the proof it travelled as a
+  // real colour prop rather than a passthrough string.
+  //
+  // THIS CASE ASSERTED THE ONE-NODE SHAPE until the split landed, and it was GREEN doing it: it read
+  // `payload.opacity` off the owner and called that "dims the child". Nothing was wrong with the
+  // case — its subject was the simplification every adapter shipped, and when that stopped being the
+  // behavior the case had to say the new thing rather than be deleted for having described the old.
   it('paints the underlay and dims the child while pressed', () => {
-    const payload = touchable({
+    const { owner, child } = touchableWithChild({
       underlayColor: '#ff0000',
       activeOpacity: 0.25,
     }).pressIn();
 
-    expect(payload.backgroundColor).toBe(0xff_ff_00_00);
-    expect(payload.opacity).toBe(0.25);
+    expect(owner.backgroundColor).toBe(0xff_ff_00_00);
+    // The half that was the defect: opacity here would fade the colour on the line above.
+    expect(owner.opacity).toBe(undefined);
+    expect(child.opacity).toBe(0.25);
   });
 
   // why: RN's own defaults, and they are the platform's rather than any app's — `'black'` and
@@ -175,10 +186,11 @@ describe('what a pressed touchable-highlight sends native', () => {
   // rule that forgot them would paint nothing on the commonest spelling of all, `<TouchableHighlight
   // onPress={...}>` with no styling props at all.
   it('falls back to the underlay and opacity RN itself picks', () => {
-    const payload = touchable().pressIn();
+    const { owner, child } = touchableWithChild().pressIn();
 
-    expect(payload.backgroundColor).toBe(0xff_00_00_00);
-    expect(payload.opacity).toBe(DEFAULT_CHILD_OPACITY);
+    expect(owner.backgroundColor).toBe(0xff_00_00_00);
+    // On the CHILD since the split — the default is unchanged, only the node it lands on.
+    expect(child.opacity).toBe(DEFAULT_CHILD_OPACITY);
     print(`DEBUG defaults are ${DEFAULT_UNDERLAY} / ${DEFAULT_CHILD_OPACITY}`);
   });
 
@@ -281,14 +293,17 @@ describe('what a pressed touchable-highlight sends native', () => {
   //
   // It is a PROP, so the rule reads it like any other and the gap closes for every adapter at once.
   it('paints from testOnly_pressed with no gesture at all', () => {
-    const payload = touchable({
+    const { owner, child } = touchableWithChild({
       underlayColor: '#ff0000',
       activeOpacity: 0.25,
       testOnly_pressed: true,
-    }).payload();
+    }).settle();
 
-    expect(payload.backgroundColor).toBe(0xff_ff_00_00);
-    expect(payload.opacity).toBe(0.25);
+    expect(owner.backgroundColor).toBe(0xff_ff_00_00);
+    // BOTH nodes latch, which is the half a childless fixture could not have shown: the child's rule
+    // reads the same prop off its OWNER, so a snapshot that only pinned the container would leave
+    // the very thing the affordance exists to photograph — the dimmed content — undimmed.
+    expect(child.opacity).toBe(0.25);
   });
 
   // why: THE ASYMMETRY IS UPSTREAM'S AND IT IS EASY TO MISS. `_showUnderlay` gates on
@@ -391,5 +406,132 @@ describe('what a pressed touchable-highlight sends native', () => {
     expect(payload.opacity).toBe(undefined);
   });
 });
+
+// A mounted `<touchable-highlight>` WITH the one child RN clones onto, driven the same way — the
+// underlay is a function of a real gesture and faking the bit would test the fixture. The only
+// addition is the node the opacity is supposed to land on, and reading ITS payload separately.
+function touchableWithChild(props: Readonly<Record<string, unknown>> = {}): {
+  readonly childNode: ISymbioteNode;
+  readonly settle: () => { owner: IPayload; child: IPayload };
+  readonly pressIn: () => { owner: IPayload; child: IPayload };
+} {
+  const rootTag = (nextRootTag += 1);
+  const surface = createSurface(rootTag);
+  const owner: ISymbioteNode = createElement(TOUCHABLE, false, TAG);
+  for (const [name, value] of Object.entries(props))
+    routeProp(owner, name, value);
+  setEventListener(owner, 'press', () => {});
+  // NO TAG on the child, which is the point rather than a shortcut: an app writes a plain `<view>`
+  // in there, so whatever reaches it has to come from its OWNER, not from a rule of its own.
+  const child: ISymbioteNode = createElement('RCTView', false);
+  appendChild(owner, child);
+  surface.appendChild(owner);
+
+  const settle = (): { owner: IPayload; child: IPayload } => {
+    surface.commit();
+    mounted();
+    const ownerPayload = committedPayloadOf(owner);
+    const childPayload = committedPayloadOf(child);
+    if (ownerPayload === undefined || childPayload === undefined)
+      throw new Error('the pair committed nothing');
+    return { owner: ownerPayload, child: childPayload };
+  };
+  settle();
+
+  const fire = (name: string): void => {
+    const listener = owner.listeners?.get(name);
+    if (listener === undefined)
+      throw new Error(`no "${name}" listener — the behavior did not attach`);
+    listener(TOUCH);
+  };
+
+  return {
+    childNode: child,
+    settle,
+    pressIn: () => {
+      fire('pressIn');
+      fire('startShouldSetResponder');
+      return settle();
+    },
+  };
+}
+
+// RED ON PURPOSE as of this commit — the rule composes both halves onto the OWNER, so every case
+// below fails until the split lands. They are the contract, written first.
+//
+// WHY THE SPLIT IS THE CORRECT SHAPE AND THE SINGLE NODE IS A BUG, not a taste difference: `opacity`
+// on the same node as the underlay's `backgroundColor` fades the underlay ITSELF, so
+// `underlayColor: 'black'` paints grey. Read against the vendor, RN keeps them on two nodes and
+// never on one — `_createExtraStyles` (`TouchableHighlight.js:258-266`) builds the pair, and the
+// render applies each to its own box:
+//
+//   :358-361   style={compose(props.style, extraStyles?.underlay)}    the container — background
+//   :379-383   cloneElement(child, {style: compose(child.props.style, extraStyles?.child)})
+//
+// `React.Children.only` (`:306`) is why "the first child" is the whole population and a list would
+// be the wrong seam. Both compose OVER the authored style, so a child that spells its own `opacity`
+// loses to the feedback one — that ordering is upstream's and this file pins it.
+//
+// THE SEAM IS THE DESCENDANT RULE, and naming it right matters because the obvious answer is wrong.
+// `IFirstChild` reads DOWN and cannot help: a rule returns the payload of the node it runs on, so it
+// cannot write onto a child — the child's payload comes from the child's own `fabricProps` call. The
+// child reads UP instead, off `IOwner.tagName`, exactly as the clone-onto-child port does. What is
+// missing is one field: `underlayShown` lives in `ISelf`, the node's OWN state, and `IOwner` carries
+// only `{props, tagName, hasPressListener}` — so a child cannot learn its owner's underlay is up.
+// `IOwner`'s own header already prescribes this for the neighbouring bit: "`hasPressListener` is the
+// parent's bit, not the node's ... read one hop up instead of on self."
+describe('where the two halves of the underlay land', () => {
+  // why: the control, and it has to come first — a rule that painted the child unconditionally would
+  // satisfy both cases below and tint every view inside every TouchableHighlight on the screen.
+  it('leaves both nodes alone before a finger lands', () => {
+    const { owner, child } = touchableWithChild({
+      underlayColor: '#ff0000',
+      activeOpacity: 0.25,
+    }).settle();
+
+    expect(owner.backgroundColor).toBe(undefined);
+    expect(owner.opacity).toBe(undefined);
+    expect(child.opacity).toBe(undefined);
+  });
+
+  // The positive both halves share lives in `paints the underlay and dims the child while pressed`
+  // above — the case that used to assert the one-node shape. Repeating it here would be a second
+  // copy of one claim, not a second claim.
+
+  // why: RN's default reaches the child too, and it is the platform's rather than any app's
+  // (`TouchableHighlight.js:258-268`). A rule that only honoured an authored value would leave the
+  // commonest spelling of all — `<TouchableHighlight>` with no props — undimmed.
+  it('falls back to the platform child opacity', () => {
+    const { child } = touchableWithChild({
+      underlayColor: '#ff0000',
+    }).pressIn();
+
+    expect(child.opacity).toBe(DEFAULT_CHILD_OPACITY);
+  });
+
+  // why: the COMPOSE ORDER, read off the vendor rather than guessed — `:379-383` puts the feedback
+  // opacity after the child's own, so a child that spells `opacity: 1` still dims. Without this the
+  // obvious implementation (compose under, so the app "wins") passes every case above and leaves any
+  // child with an explicit opacity visibly unresponsive.
+  it('beats an opacity the child wrote itself', () => {
+    const subject = touchableWithChild({
+      underlayColor: '#ff0000',
+      activeOpacity: 0.25,
+    });
+    routeProp(subject.childNode, 'style', { opacity: 1 });
+
+    expect(subject.pressIn().child.opacity).toBe(0.25);
+  });
+});
+
+// NOT ASSERTED HERE, and left out on purpose rather than missed. RN's two defaults are not
+// symmetric: `activeOpacity ?? 0.85` (`:260`) treats null as absent, while the underlay is
+// `underlayColor === undefined ? 'black' : underlayColor` (`:261-265`) — a STRICT undefined check,
+// so `underlayColor: null` yields null and paints nothing. `foldTouchableHighlightUnderlay` reads
+// `!color->isNull()` and hands back `'black'` for that input, which diverges.
+//
+// It is real, it is PRE-EXISTING, and it belongs to the owner's half rather than to the split. A
+// case for it here would make one red run answer two questions and the fix unattributable — the
+// same reason the JS two-node split was reverted in its merge instead of being carried.
 
 report();

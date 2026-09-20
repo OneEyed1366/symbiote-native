@@ -1012,7 +1012,9 @@ IOwner ownerOf(const Node &node) {
   return IOwner{
       &node.parent->props,
       node.parent->tagName.c_str(),
-      (node.parent->pressListeners & kPressListenerPress) != 0};
+      (node.parent->pressListeners & kPressListenerPress) != 0,
+      node.parent->underlayShown,
+      node.parent->pressListeners != 0};
 }
 
 /** The node's own non-prop bits, unpacked from the mask the ops maintain. See `ISelf`. */
@@ -1807,6 +1809,18 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
         if (node->underlayShown == shown) break;
         node->underlayShown = shown;
         markDirty(*node);
+        // AND THE CHILD, because this bit drives a rule on BOTH nodes: the container takes the
+        // background and the child takes the opacity (`foldTouchableHighlightChild`). A descendant
+        // rule runs when ITS node is dirty, so without this the child would freeze in its unpressed
+        // shape and never dim — the hazard `ownerProps` already carries for ScrollView's content.
+        //
+        // FIRST child and no walk: RN takes `React.Children.only` (`TouchableHighlight.js:306`), so
+        // one is the whole population rather than a simplification. Twice per tap, not per frame.
+        if (!node->children.empty()) {
+          compactChildren(*node);
+          if (!node->children.empty() && node->children.front() != nullptr)
+            markDirty(*node->children.front());
+        }
         break;
       }
       case kOpSetText: {
