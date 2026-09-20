@@ -227,7 +227,7 @@ function ApplicationScreen() {
 
 There's no per-instance service to `inject()` in the Angular case — every function is a plain
 free function off the core package, called straight from the constructor (or, on Solid, straight
-from the component body). All five examples mirror the real canary demo screens —
+from the component body). All six examples mirror the real canary demo screens —
 `examples/expo-react/screens/ApplicationScreen.tsx`,
 `examples/expo-vue-sfc/screens/ApplicationScreen.vue`,
 `examples/expo-vue-tsx/screens/ApplicationScreen.tsx`,

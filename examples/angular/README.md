@@ -3,9 +3,9 @@
 An Angular app driving the framework-agnostic
 `@symbiote-native/engine` core through `@symbiote-native/angular`'s `Renderer2`/`RendererFactory2`,
 with React Native's own renderer never in the path. It targets the same canary surface as
-[`examples/react`](../react) and the Vue examples, standalone components, zoneless change
-detection. See the [Angular adapter README](../../adapters/angular) for the full surface and the
-AOT pipeline this build script drives.
+[`examples/react`](../react) and the other framework examples, standalone components, zoneless
+change detection. See the [Angular adapter README](../../adapters/angular) for the full surface
+and the AOT pipeline this build script drives.
 
 The app imports its standalone host intrinsics and composed components from the public
 `@symbiote-native/angular` surface, then `ngc` compiles the app against the adapter's partial-Ivy
@@ -41,6 +41,6 @@ pnpm e2e:test:ios              # run the canary journeys on the iOS simulator
 
 ## Note — its own native shell
 
-Unlike the Vue examples (which copy `examples/react`'s native projects verbatim),
-`examples/angular` has its **own** separate `ios`/`android` native project, so it can run
-side-by-side with the other canaries on the same simulator without conflicting.
+Unlike the other examples (Vue, Svelte, and Solid all copy `examples/react`'s native projects
+verbatim), `examples/angular` has its **own** separate `ios`/`android` native project, so it can
+run side-by-side with the other canaries on the same simulator without conflicting.

@@ -1,12 +1,21 @@
 # @symbiote-native/engine
 
-The **retained shadow-tree engine** at the bottom of [SymbioteNative](../../README.md) — the one
-package every framework adapter (`@symbiote-native/react`, `@symbiote-native/vue`, `@symbiote-native/angular`, …)
-drives, and the only place the mutation→clone-on-write translation into React Native's Fabric
-exists. It holds a retained, mutable tree of nodes that an adapter mutates cheaply
-(`appendChild` / `setProp` / `removeChild` …), then on commit diffs that tree against Fabric's
-current one, clones only what changed, and calls `completeRoot` — the persistent, clone-on-write
-dance Fabric requires, done **once**, for every framework.
+The package at the bottom of [SymbioteNative](../../README.md) that every framework adapter
+(`@symbiote-native/react`, `@symbiote-native/vue`, `@symbiote-native/angular`, …) drives, and the
+only place the mutation→clone-on-write translation into React Native's Fabric exists. **The
+retained tree itself lives in C++ now**, in `cpp/SymbioteTree.cpp`, reached through this package's
+`src/` — a node handle returned to JS is a thin reference into that native tree, not a JS object
+holding the tree's state.
+
+An adapter still mutates a node cheaply (`appendChild` / `setProp` / `removeChild` …), but each
+call now appends an op to the current commit's buffer instead of touching a tree directly. On
+commit, the whole buffer crosses into C++ in **one** JSI call; `SymbioteTree` applies the ops
+against the retained tree, clones only what changed, resolves the platform-parity rules keyed on
+each node's Fabric tag (`cpp/SymbioteFabricProps.cpp` — RN's own component-level behavior, like
+`Pressable`'s `disabled` fold or a `<Text>`'s default `ellipsizeMode`, ported once instead of per
+adapter), and calls into Fabric's C++ `UIManager` directly to commit — the persistent,
+clone-on-write dance Fabric requires, done **once**, for every framework, with one crossing per
+commit instead of one per mutation.
 
 > New to SymbioteNative? The [root README](../../README.md) has the architecture and the one fact it
 > rests on — React is just _one client_ of `nativeFabricUIManager`. This package is what sits
@@ -123,9 +132,11 @@ before a tag is guaranteed to exist.
 
 - It does not know about React, Vue, Angular, JSX, templates, or reactivity — an adapter maps its
   own framework idioms onto this API, never the other way around.
-- It does not touch Fabric C++, JSI, or Yoga directly — it calls `nativeFabricUIManager`
-  (`createNode` / `cloneNodeWithNewProps` / `appendChildToSet` / `completeRoot`), the same
-  framework-agnostic seam React's own renderer uses.
+- The JS side (`src/`) does not touch Fabric, JSI, or Yoga directly — it only builds the
+  command buffer and hands it to `SymbioteTree` in one crossing. That C++ tree is the layer
+  that actually calls Fabric's `UIManager` (`createNode` / `cloneNodeWithNewProps` /
+  `appendChildToSet` / `completeRoot`), the same framework-agnostic seam React's own renderer
+  uses further up, from JS, through `nativeFabricUIManager`.
 - It is not a component library — visual components (Switch, Modal, the lists, …) live in
   [`@symbiote-native/components`](../components), built on top of this package's `Descriptor`-free
   mutation API.
@@ -145,3 +156,17 @@ before a tag is guaranteed to exist.
 pnpm test              # vitest, from the workspace root — headless, against a fake Fabric slot
 DEBUG=1 pnpm test       # same, with diagnostic logs on
 ```
+
+That covers the JS side (`src/`) against a fake `nativeFabricUIManager`. `SymbioteTree` itself
+(`cpp/`) has its own test tiers, run from the workspace root:
+
+```bash
+pnpm test:cpp           # gtest unit tests over SymbioteTree, asserts on — the build every PR runs
+pnpm test:itest         # the JS-driven correctness suite (core/engine/cpp/tests/js/*.itest.ts*),
+                         # a real six-adapter integration harness against the C++ tree, asserts on
+pnpm bench:itest        # the same itest harness, Release build (NDEBUG + -O) — for timings, never asserts
+pnpm test:android       # test:itest built with -DSYMBIOTE_PLATFORM_ANDROID=ON, for the #ifdef ANDROID rules
+```
+
+Never read `test:itest`'s timings — that build has asserts on and is measurably slower than what
+ships; use `bench:itest` for anything you intend to quote a millisecond from.

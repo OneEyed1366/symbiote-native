@@ -107,7 +107,7 @@ onMounted(() => hide());
 ```
 
 ```ts
-// Angular — examples/angular/App.ts
+// Angular — examples/angular/src/App.ts
 import { hide } from '@symbiote-native/splash-screen/angular';
 // call once from the root component's constructor/ngOnInit.
 ```
