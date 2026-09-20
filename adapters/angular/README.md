@@ -89,7 +89,8 @@ reference canaries, standalone components, zoneless change detection.
 ## Parity — and the one gap
 
 Angular reaches the same 21+ primitives, runtime modules, `Animated` on both drivers, gestures,
-accessibility, and the `VirtualizedList` family as React and Vue. That parity is **structural, not
+accessibility, and the `VirtualizedList` family as React and Vue, verified on-device on iOS and
+Android. That parity is **structural, not
 hand-copied**: the component logic (state machines + render functions) is written **once** in
 `@symbiote-native/components`, and Angular supplies only its lifecycle (`Renderer2` + zoneless change
 detection + the descriptor→`createElement` bridge).

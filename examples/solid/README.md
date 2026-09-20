@@ -5,9 +5,8 @@ through `@symbiote-native/engine`, with React's renderer nowhere in the path.
 
 `App.tsx` composes the native stack navigator (`@symbiote-native/navigation/solid`) over the demo
 screens: Menu is the initial route, Canary the every-primitive surface, plus the animated, list,
-hooks, tabs, drawer, deep-linking, header-options and API-playground stops. See
-`symbiote-new-adapter` §7 for the layer order the adapter is built in, and the adapter's own README
-for current status.
+hooks, tabs, drawer, deep-linking, header-options and API-playground stops. See the adapter's own
+[README](../../adapters/solid/README.md) for current status.
 
 > This canary predates `@symbiote-native/cli` and is for in-repo development. To start a new app,
 > use `npx @symbiote-native/cli new --framework solid` instead.
@@ -39,16 +38,16 @@ or `babel.config.js` needs it, editing a `.tsx` file does not.
 - **`metro.config.js`** — no Solid transformer needed (that is the point of a Babel-preset-based
   framework); only the framework-agnostic stylesheet transformer, plus
   `unstable_forceFullRefreshPatterns: [/\.tsx$/]` because react-refresh misreads a compiled Solid
-  component as a React one. It deliberately does NOT touch `unstable_conditionNames` — the file
-  explains why, with the resolution actually traced through Metro's source.
+  component as a React one. It deliberately does NOT set `unstable_conditionNames` — Metro's own
+  default condition set never resolves into `solid-js`'s SSR export branch, so there's nothing to
+  route around; the file's own comment traces the resolution through Metro's source.
 - **`App.css`** — styling by class, the convention across every canary;
   `@symbiote-native/css-parser` compiles it at build time and the engine's `routeProp` resolves
   `class` against the registry, exactly as it does for React's `className` and Vue's `class`.
 - **`tsconfig.json`'s `jsxImportSource: "@symbiote-native/solid"`** — the whole of this app's JSX
   typing setup. The adapter ships its own `./jsx-runtime` namespace, so there is no `solid-env.d.ts`
   and no `/// <reference types>` line, `<div>` is a compile error rather than a device failure, and
-  JSX children are actually type-checked (under solid-js's own namespace they are not — see
-  `.claude/rules/solid-jsx-namespace.md`).
+  JSX children are actually type-checked (under solid-js's own namespace they are not).
 
 ## Checks
 

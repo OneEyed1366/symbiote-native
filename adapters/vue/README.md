@@ -102,7 +102,8 @@ the demo above is the first one running on the iOS simulator:
 ## Parity — and the one gap
 
 Both adapters reach the same primitives, runtime modules, `Animated` on both drivers, gestures,
-accessibility, and the `VirtualizedList` family. That parity is **structural, not hand-copied**: the
+accessibility, and the `VirtualizedList` family, verified on-device on iOS and Android. That
+parity is **structural, not hand-copied**: the
 component logic (state machines + render functions) is written **once** in `@symbiote-native/components`,
 and each adapter supplies only its lifecycle (Vue's `ref`/`watch` + the descriptor→`h()` bridge).
 
