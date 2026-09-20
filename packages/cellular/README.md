@@ -17,6 +17,10 @@ depends on) — every function is hand-ported into this package's own `core/`.
 npm install @symbiote-native/cellular
 ```
 
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --cellular` (or
+`add --cellular` in an existing app) installs and wires this for you — see
+[`@symbiote-native/cli`](../cli).
+
 Depends on `expo-cellular` and `expo-modules-core` directly (regular dependencies, pinned to
 exact versions — never a caret range, since this package's `core/` is hand-ported against one
 specific native API shape and a newer resolve could silently drift the two apart). Never install

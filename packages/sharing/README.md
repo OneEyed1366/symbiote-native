@@ -36,6 +36,10 @@ Everything below describes the outgoing half.
 npm install @symbiote-native/sharing
 ```
 
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --sharing` (or
+`add --sharing` in an existing app) installs and wires this for you — see
+[`@symbiote-native/cli`](../cli).
+
 `expo-sharing` and `expo-modules-core` come along as regular, pinned dependencies — never install
 either yourself, and never add the `expo` meta-package to this project (it bundles its own
 Metro/Babel pipeline that conflicts with this project's own).

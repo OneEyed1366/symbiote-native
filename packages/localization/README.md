@@ -16,6 +16,10 @@ depended on directly and never the `expo` meta-package, why the upstream JS is h
 npm install @symbiote-native/localization
 ```
 
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --localization` (or
+`add --localization` in an existing app) installs and wires this for you — see
+[`@symbiote-native/cli`](../cli).
+
 Depends on `expo-localization` and `expo-modules-core` directly (regular dependencies, pinned to
 exact versions — never a caret range, since this package's `core/` is hand-ported against one
 specific native API shape and a newer resolve could silently drift the two apart). Never install
