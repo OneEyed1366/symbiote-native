@@ -175,7 +175,12 @@ jobs:
       # A cold build compiles some sixty ReactCommon modules; nothing else in this file is cold for
       # minutes, which is what makes the cache worth having.
       CMAKE_CXX_COMPILER_LAUNCHER: ccache
-      CCACHE_DIR: ${{ runner.temp }}/ccache
+      # NOT `runner.temp`, which is what `bundle-isolation` below uses — that context does not exist
+      # at JOB level (github / needs / strategy / matrix / vars / inputs only), and naming it here
+      # does not fail the job, it rejects the whole WORKFLOW FILE: run 35568194451 reported "this run
+      # likely failed because of a workflow file issue" with zero jobs and no annotation to read.
+      # `bundle-isolation` gets away with it because both of its uses are on STEPS.
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: 2G
       HOMEBREW_NO_AUTO_UPDATE: 1
       HOMEBREW_NO_INSTALL_CLEANUP: 1
@@ -200,7 +205,7 @@ jobs:
       # nothing else; it can never make a result wrong, only slow.
       - uses: actions/cache@v4
         with:
-          path: ${{ runner.temp }}/ccache
+          path: ${{ github.workspace }}/.ccache
           key: itest-ccache-${{ runner.os }}-${{ github.sha }}
           restore-keys: |
             itest-ccache-${{ runner.os }}-
