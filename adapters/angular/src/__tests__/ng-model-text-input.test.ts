@@ -12,11 +12,15 @@
 // — which the renderer WRAPS since 2026-09-18, so a blur now runs a synchronous `detectChanges()`
 // from inside the native dispatch.
 //
-// WHAT THIS HARNESS DOES NOT SEE, said plainly rather than implied by a green run: the device
-// reported a hard crash on the first keystroke on 2026-09-20 and all three cases below pass. So
-// either the cause is above the adapter (the JIT compiler vitest runs is not the linked AOT
-// artifact Metro ships — `style-input-aot.test.ts` §header) or it is native. This file pins the
-// path; it is not evidence that the path is whole.
+// THE DEVICE CRASH OF 2026-09-20 IS THE LAST CASE, and the first four are what it took to find it.
+// Each one adds a slice of ApiPlaygroundScreen — its surrounding bindings, then its effects and
+// queries — and each one stayed GREEN. What finally reproduced is none of those: a child emitting
+// from `ngDoCheck`/`ngAfterContentChecked`/`ngAfterViewChecked` into a parent signal the parent's
+// own template reads. So the crash was never about the text input; the keystroke is only the first
+// thing on that screen that asks for a SYNCHRONOUS flush.
+//
+// The four green arms are kept rather than deleted. They are the record of where the fault is NOT,
+// and they are the only coverage this binding has.
 import '@angular/compiler';
 import {
   ChangeDetectorRef,
