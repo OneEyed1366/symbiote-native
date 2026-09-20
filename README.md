@@ -308,6 +308,13 @@ npm install @symbiote-native/vue react-native vue
 
 # Angular (>=20, for stable zoneless change detection)
 npm install @symbiote-native/angular react-native @angular/core
+- **Angular is the slowest of the five.** 1.62x stock on a create-shaped row where Solid is 1.04x.
+  The numbers and what is responsible for them are [below](#how-fast-against-stock-react-native).
+- **Ecosystem packages are wrapped by hand, one at a time.** The _native view_ comes for free,
+  through the same ViewConfig path as our own primitives, with zero SymbioteNative metadata. The JS
+  surface around it does not, because a library's own component body is React internally. So each
+  package gets a thin agnostic wrapper written here: no native code, no forking, a few hundred
+  lines. Cheap per package, but manual, so the covered surface grows one library at a time.
 
 # Svelte
 npm install @symbiote-native/svelte react-native svelte
