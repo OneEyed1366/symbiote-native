@@ -17,6 +17,7 @@ export const ROUTE_NAME = {
   ApiPlayground: 'ApiPlayground',
   Benchmark: 'Benchmark',
   StyleShowcase: 'StyleShowcase',
+  JsiNavigationCost: 'JsiNavigationCost',
 } as const;
 
 export type IRouteName = (typeof ROUTE_NAME)[keyof typeof ROUTE_NAME];

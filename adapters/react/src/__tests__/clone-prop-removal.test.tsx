@@ -1,187 +1,26 @@
-// Regression for a clone-on-write bug only a Fabric-FAITHFUL slot reveals: real Fabric's
-// `cloneNodeWithNewProps` MERGES the raw diff onto the node's existing props (a null value
-// resets a prop), so a prop that simply disappears between commits keeps its stale value
-// unless the engine explicitly sends it as null. This file keeps a PURPOSE-BUILT merge slot
-// rather than the shared `installFabric()` harness, whose REPLACE semantics would hide the
-// bug (a naive replace makes the test vacuously green, which is why the bug shipped).
-// The engine's `diffProps` emits `{ opacity: null }` on release, so after the merge a
-// Pressable whose pressed style sets opacity:0.2 fully drops opacity on release.
+// SKIPPED, not deleted — migrated to a real-engine itest.
+//
+// This used to be a regression for a clone-on-write bug that only a Fabric-FAITHFUL prop MERGE
+// reveals: real Fabric's `cloneNodeWithNewProps` merges the raw diff onto a node's existing
+// props, so a folded key that simply stops appearing inside `style` between two commits (not an
+// explicit `setProp(..., undefined)`) must still reach the clone as an explicit null, or the
+// stale value survives. The file kept a purpose-built merge slot for exactly that reason —
+// `installFabric()`'s TypeScript mirror used REPLACE semantics, which would make the test
+// vacuously green (why the bug shipped in the first place).
+//
+// The mirror is gone (`.docs/mirror-elimination.md`). `installRecordingFabric()` is not a
+// substitute here: its host intercepts the mutation-buffer wire (raw, un-folded `style` objects)
+// BEFORE the engine ever reaches `SymbioteFabricProps.cpp`'s `diffProps` — the fold-and-merge
+// this test is actually about happens entirely in C++, downstream of where that host sits. So the
+// claim was ported to the real engine instead:
+// `core/engine/cpp/tests/js/style-key-removal.itest.ts`, driven by the real
+// `symbiote_tester` C++ binary through `scripts/run-itests.mjs`. That test was verified RED
+// against a deliberately-broken `diffProps` (the vanished-key-resend loop commented out) and
+// GREEN once restored, so it is a real, non-tautological proof of the exact behavior this file
+// used to characterize — see its own header for the full story.
 
-import { createElement, useState, type ReactElement } from 'react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { DEFAULT_MIN_PRESS_DURATION_MS } from '@symbiote-native/components';
-import { mount, unmount } from '@symbiote-native/react';
-
-interface IFakeNode {
-  viewName: string;
-  props: Record<string, unknown>;
-  children: IFakeNode[];
-  instanceHandle: unknown;
-}
-
-let committed: IFakeNode[] = [];
-let eventHandler:
-  | ((handle: unknown, type: string, event: Record<string, unknown>) => void)
-  | undefined;
-
-// Fabric-faithful merge: raw props layer onto the node's current props; a null value
-// resets that prop to its default (modelled here as removal).
-function mergeProps(
-  base: Record<string, unknown>,
-  raw: Record<string, unknown>,
-): Record<string, unknown> {
-  const out: Record<string, unknown> = { ...base };
-  for (const [key, value] of Object.entries(raw)) {
-    if (value === null) delete out[key];
-    else out[key] = value;
-  }
-  return out;
-}
-
-const slot = {
-  createNode: (
-    _t: number,
-    viewName: string,
-    _r: number,
-    props: Record<string, unknown>,
-    instanceHandle: unknown,
-  ): IFakeNode => ({
-    viewName,
-    props: { ...props },
-    children: [],
-    instanceHandle,
-  }),
-  cloneNodeWithNewProps: (
-    node: IFakeNode,
-    raw: Record<string, unknown>,
-  ): IFakeNode => ({
-    ...node,
-    props: mergeProps(node.props, raw),
-    children: [...node.children],
-  }),
-  cloneNodeWithNewChildren: (node: IFakeNode): IFakeNode => ({
-    ...node,
-    children: [],
-  }),
-  cloneNodeWithNewChildrenAndProps: (
-    node: IFakeNode,
-    raw: Record<string, unknown>,
-  ): IFakeNode => ({
-    ...node,
-    props: mergeProps(node.props, raw),
-    children: [],
-  }),
-  createChildSet: (): IFakeNode[] => [],
-  appendChild: (parent: IFakeNode, child: IFakeNode): IFakeNode => {
-    parent.children.push(child);
-    return parent;
-  },
-  appendChildToSet: (childSet: IFakeNode[], child: IFakeNode): void => {
-    childSet.push(child);
-  },
-  completeRoot: (_r: number, childSet: IFakeNode[]): void => {
-    committed = childSet;
-  },
-  registerEventHandler: (
-    handler: (
-      handle: unknown,
-      type: string,
-      event: Record<string, unknown>,
-    ) => void,
-  ): void => {
-    eventHandler = handler;
-  },
-  dispatchCommand: (): void => {},
-};
-Object.assign(globalThis, { nativeFabricUIManager: slot });
-
-const TEST_ID = 'btn';
-const ACTIVE_OPACITY = 0.2;
-const ROOT_TAG = 310;
-
-function App(): ReactElement {
-  // onPress mounts a sibling subtree, mirroring "open a Modal on press", the case where
-  // the bug showed up on device (the button stayed dim after the modal opened).
-  const [open, setOpen] = useState(false);
-  return createElement(
-    'view',
-    null,
-    createElement(
-      'pressable',
-      {
-        testID: TEST_ID,
-        onPress: () => setOpen(true),
-        // pressed -> dim; released -> NO opacity key at all (TouchableOpacity's shape).
-        style: ({ pressed }: { pressed: boolean }) =>
-          pressed ? { opacity: ACTIVE_OPACITY } : {},
-      },
-      createElement('text', null, 'tap'),
-    ),
-    open
-      ? createElement('view', null, createElement('text', null, 'opened'))
-      : null,
-  );
-}
-
-function findByTestId(nodes: IFakeNode[], id: string): IFakeNode | undefined {
-  for (const node of nodes) {
-    if (node.props.testID === id) return node;
-    const found = findByTestId(node.children, id);
-    if (found) return found;
-  }
-  return undefined;
-}
-
-beforeEach(() => {
-  vi.useFakeTimers();
-  committed = [];
-});
-afterEach(() => {
-  unmount(ROOT_TAG);
-  vi.useRealTimers();
-});
+import { describe, it } from 'vitest';
 
 describe('clone-on-write prop removal', () => {
-  // Positive only: this is a regression on the commit's merge semantics, not a guard clause —
-  // there is no invalid input here to reject.
-  describe('Positive', () => {
-    // why: `diffProps` sending `{ opacity: null }` must survive a Fabric-faithful MERGE (not
-    // the shared harness's replace) — a merge slot is the only way this bug is observable at all.
-    // The press flip is coalesced onto a MICROTASK now — the machine calls `setNodePressed` and
-    // asks for a commit rather than re-rendering, where the wrapper flipped React state and rode
-    // the renderer's own forced sync flush. So each read is preceded by `settle()`. Fake timers do
-    // not fake microtasks, so the two mix: `settle` turns the queue, `advanceTimersByTime` moves
-    // the 130 ms floor.
-    it('sets opacity on press and fully resets it on release', async () => {
-      const settle = (): Promise<void> => Promise.resolve();
-      mount(ROOT_TAG, createElement(App));
-
-      expect(eventHandler, 'an event handler was registered').toBeDefined();
-      const button = findByTestId(committed, TEST_ID);
-      expect(button, 'the button is in the committed tree').toBeDefined();
-      const handle = button!.instanceHandle;
-
-      eventHandler!(handle, 'topTouchStart', {});
-      await settle();
-      expect(findByTestId(committed, TEST_ID)?.props.opacity).toBe(
-        ACTIVE_OPACITY,
-      );
-
-      eventHandler!(handle, 'topTouchEnd', {});
-      await settle();
-      // Plain Pressable follows RN's 130ms active-duration floor, so the prop remains during the
-      // floor and must then be GONE (reset), not stuck at 0.2 after the Fabric merge.
-      expect(findByTestId(committed, TEST_ID)?.props.opacity).toBe(
-        ACTIVE_OPACITY,
-      );
-      vi.advanceTimersByTime(DEFAULT_MIN_PRESS_DURATION_MS - 1);
-      await settle();
-      expect(findByTestId(committed, TEST_ID)?.props.opacity).toBe(
-        ACTIVE_OPACITY,
-      );
-      vi.advanceTimersByTime(1);
-      await settle();
-      expect(findByTestId(committed, TEST_ID)?.props.opacity).toBeUndefined();
-    });
-  });
+  it.skip('sets opacity on press and fully resets it on release', () => {});
 });

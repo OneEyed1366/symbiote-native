@@ -94,8 +94,9 @@ let ruleEpoch = 0;
 const resolvedCache = new Map<string, IResolvedStyle>();
 
 // Bounded so a screen generating unique class strings at runtime cannot grow it without limit.
-// Overflow drops everything rather than evicting one entry: the cache is a warm-up optimization,
-// not a working set, and an LRU's bookkeeping costs more than the rebuild it saves.
+// Overflow evicts ONE entry at random — see `memoise` for why random and not the obvious
+// alternatives. It used to drop everything, which turned a working set one entry too wide into a
+// total miss on every lookup.
 const RESOLVED_CACHE_LIMIT = 512;
 
 // The pressed variant, keyed by the SAME authored string. Separate from `resolvedCache` so the two
@@ -127,7 +128,51 @@ let hasActiveRules = false;
 // per commit, and only the second one is hot.
 function invalidateResolved(): void {
   resolvedCache.clear();
+  resolvedKeys.length = 0;
   activeCache.clear();
+  activeKeys.length = 0;
+}
+
+// The victim pool for the two caches below — a plain array of the keys each holds, so a random
+// eviction is an index rather than a scan. This is the entire bookkeeping cost of the policy, and
+// it is less than FIFO's would be: nothing about recency or order is tracked.
+const resolvedKeys: string[] = [];
+const activeKeys: string[] = [];
+
+/**
+ * Memoise, evicting a RANDOM entry when full.
+ *
+ * WHY RANDOM, since it looks arbitrary next to the obvious answers. The policy this replaced dropped
+ * the whole cache on overflow, and the reflex repair — evict the oldest — is no better on the access
+ * pattern that actually hurts. A working set slightly WIDER than the cache, walked in order, is
+ * Belady's worst case: FIFO and LRU each evict exactly the entry the next lookup wants, so both miss
+ * on every single access, exactly as the full clear did. Measured on a 512-entry cache cycling 513
+ * distinct class strings: clear 0%, FIFO 0%, random 94.7% (`cache-cliff.probe.test.ts`).
+ *
+ * Random also answers the objection that ruled LRU out here — it needs LESS bookkeeping, not more.
+ * There is no recency to maintain; a key array and a swap-remove is the whole of it.
+ *
+ * The cache stays a pure memo of a pure function either way, so which entries survive changes only
+ * which lookups pay the rebuild. `invalidateResolved` still drops everything when the cascade moves,
+ * because then nothing resolved earlier is true any more.
+ */
+function memoise(
+  cache: Map<string, IResolvedStyle>,
+  keys: string[],
+  key: string,
+  value: IResolvedStyle,
+): void {
+  if (cache.size >= RESOLVED_CACHE_LIMIT) {
+    const victimAt = Math.floor(Math.random() * keys.length);
+    const victim = keys[victimAt];
+    if (victim !== undefined) {
+      cache.delete(victim);
+      const last = keys.pop();
+      if (last !== undefined && victimAt < keys.length) keys[victimAt] = last;
+    }
+  }
+  cache.set(key, value);
+  keys.push(key);
 }
 
 export function registerRules(rules: readonly IStyleRule[]): void {
@@ -191,8 +236,23 @@ export function canonicalClassName(
     : className;
 }
 
+/**
+ * The one object every "this class styles nothing" answer hands back.
+ *
+ * A FRESH `{}` was the previous answer, and it quietly cost two things. `isAlreadyPublished`
+ * compares slot 0 with `Object.is`, so a node whose class is absent or matches no rule republished
+ * its whole style — and re-dirtied itself — on every class or style write, which is precisely the
+ * storm that guard exists to stop; and `pushClassStyle` had no way to tell "resolved to nothing"
+ * from "resolved to something", so the empty result crossed the wire as a real value.
+ *
+ * Frozen because it is now shared by every such node in the app: a caller that mutated the result
+ * used to corrupt one node's style and would now corrupt all of them. No caller does — every one
+ * spreads it — and freezing is what keeps that true.
+ */
+export const EMPTY_STYLE: IResolvedStyle = Object.freeze({});
+
 export function resolveClassName(className: IClassNameValue): IResolvedStyle {
-  if (!className) return {};
+  if (!className) return EMPTY_STYLE;
 
   if (typeof className === 'object' && !Array.isArray(className)) {
     return className;
@@ -213,8 +273,7 @@ export function resolveClassName(className: IClassNameValue): IResolvedStyle {
 
   const resolved = resolveClassString(className);
 
-  if (resolvedCache.size >= RESOLVED_CACHE_LIMIT) resolvedCache.clear();
-  resolvedCache.set(className, resolved);
+  memoise(resolvedCache, resolvedKeys, className, resolved);
 
   return resolved;
 }
@@ -246,17 +305,16 @@ export function resolveActiveClassName(
   const resolved =
     parts.length === 0 ? {} : (matchRules([...parts, STATE_TOKEN]) ?? {});
 
-  if (activeCache.size >= RESOLVED_CACHE_LIMIT) activeCache.clear();
-  activeCache.set(className, resolved);
+  memoise(activeCache, activeKeys, className, resolved);
 
   return resolved;
 }
 
 function resolveClassString(className: string): IResolvedStyle {
   const parts = className.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return {};
+  if (parts.length === 0) return EMPTY_STYLE;
 
-  return matchRules(parts) ?? {};
+  return matchRules(parts) ?? EMPTY_STYLE;
 }
 
 // `derivedTokens` counts the rule's tokens the element does NOT literally carry — the ones it

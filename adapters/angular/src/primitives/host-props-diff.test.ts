@@ -14,7 +14,10 @@
 import '@angular/compiler';
 import { Component, signal } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../render';
 import { SymbioteRenderer } from '../renderer';
@@ -22,7 +25,8 @@ import { ViewHost as View, SymbioteHostPropsDirective } from '../primitives';
 
 const ROOT_TAG = 993;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 
 const flush = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
@@ -96,10 +100,11 @@ function host(): DiffHost {
   return mounted;
 }
 
-function committedProbe(): IFakeNode {
-  const found = fabric.committed
-    .flatMap(node => node.children)
-    .find(node => node.props.testID === 'diff-probe');
+function committedProbe() {
+  const found = live.findLive(
+    live.appRoot(),
+    node => node.payload.testID === 'diff-probe',
+  );
   if (found === undefined) throw new Error('probe node was never committed');
   return found;
 }
@@ -140,7 +145,7 @@ describe('SymbioteHostPropsDirective per-key diff', () => {
     host().includesHint.set(true);
     await flush();
     expect(
-      committedProbe().props.accessibilityLabel,
+      committedProbe().payload.accessibilityLabel,
       'the label must reach the node first',
     ).toBe('labelled');
 
@@ -152,7 +157,12 @@ describe('SymbioteHostPropsDirective per-key diff', () => {
       probe.writes().filter(write => write.key === 'accessibilityLabel'),
       'a value going back to unset must be written so the engine deletes it',
     ).toEqual([{ key: 'accessibilityLabel', value: undefined }]);
-    expect(committedProbe().props.accessibilityLabel).toBeNull();
+    // The op stream spells a removed key with `NO_VALUE`, which the recording obeys by deleting
+    // it — the key's ABSENCE is proof a clearing op was sent (`.docs/mirror-elimination.md`,
+    // "RESOLVED: the `onLayout === null` decision").
+    expect(Object.hasOwn(committedProbe().payload, 'accessibilityLabel')).toBe(
+      false,
+    );
   });
 
   // why: the key SET is not fixed across pushes (resolveAccessibilityProps returns two different
@@ -164,7 +174,7 @@ describe('SymbioteHostPropsDirective per-key diff', () => {
     host().includesHint.set(true);
     await flush();
     expect(
-      committedProbe().props.accessibilityHint,
+      committedProbe().payload.accessibilityHint,
       'accessibilityHint must reach the node first',
     ).toBe('hint');
 
@@ -176,6 +186,8 @@ describe('SymbioteHostPropsDirective per-key diff', () => {
       probe.writes().filter(write => write.key === 'accessibilityHint'),
       'a key that disappears from the bag must be cleared explicitly',
     ).toEqual([{ key: 'accessibilityHint', value: undefined }]);
-    expect(committedProbe().props.accessibilityHint).toBeNull();
+    expect(Object.hasOwn(committedProbe().payload, 'accessibilityHint')).toBe(
+      false,
+    );
   });
 });

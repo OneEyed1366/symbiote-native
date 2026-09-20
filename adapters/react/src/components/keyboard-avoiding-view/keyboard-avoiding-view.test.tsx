@@ -31,7 +31,11 @@
 import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { KeyboardAvoidingView, mount, unmount } from '@symbiote-native/react';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 290;
 
@@ -120,7 +124,8 @@ function App(
   );
 }
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 beforeEach(() => {
   fabric.reset();
   keyboardAdded = 0;
@@ -130,9 +135,9 @@ beforeEach(() => {
 afterEach(() => unmount(ROOT_TAG));
 
 // The current committed wrapper (the outer RCTView KeyboardAvoidingView renders).
-// Re-read after each commit since clone-on-write hands back new nodes.
-function currentWrapper(): IFakeNode {
-  const wrapper = fabric.appRoot().children[0];
+// Re-read after each commit — a live node's payload is always the current one.
+function currentWrapper(): ILiveNode {
+  const wrapper = live.nodeOf(live.appRoot()).children[0];
   expect(wrapper, 'an RCTView wrapper sits under the root').toBeDefined();
   expect(wrapper.viewName).toBe('RCTView');
   return wrapper;
@@ -182,14 +187,14 @@ describe('KeyboardAvoidingView', () => {
       fabric.fireEvent(currentWrapper().instanceHandle, 'topLayout', {
         layout: WRAPPER_FRAME,
       });
-      const before = currentWrapper().props.paddingBottom;
+      const before = currentWrapper().payload.paddingBottom;
       expect(before === undefined || before === 0).toBe(true);
 
       showKeyboard(hub);
-      expect(currentWrapper().props.paddingBottom).toBe(EXPECTED_INSET);
+      expect(currentWrapper().payload.paddingBottom).toBe(EXPECTED_INSET);
 
       hideKeyboard(hub);
-      expect(currentWrapper().props.paddingBottom).toBe(0);
+      expect(currentWrapper().payload.paddingBottom).toBe(0);
     });
 
     // why: 'position' is the only behavior that NESTS content in an inner view pushed up by
@@ -207,10 +212,10 @@ describe('KeyboardAvoidingView', () => {
       const inner = currentWrapper().children[0];
       expect(inner, 'position mode nests an inner RCTView').toBeDefined();
       expect(inner.viewName).toBe('RCTView');
-      expect(inner.props.bottom).toBe(0);
+      expect(inner.payload.bottom).toBe(0);
 
       showKeyboard(hub);
-      expect(currentWrapper().children[0].props.bottom).toBe(EXPECTED_INSET);
+      expect(currentWrapper().children[0].payload.bottom).toBe(EXPECTED_INSET);
     });
 
     // why: 'height' only shrinks the wrapper (height = initialHeight - inset, flex collapsed
@@ -225,23 +230,23 @@ describe('KeyboardAvoidingView', () => {
       // Keyboard shows before any layout was measured: initialHeight is still undefined, so
       // the guard must hold the wrapper untouched rather than compute a bogus height.
       showKeyboard(hub);
-      expect(currentWrapper().props.height).toBeUndefined();
+      expect(currentWrapper().payload.height).toBeUndefined();
 
       hideKeyboard(hub);
       fabric.fireEvent(currentWrapper().instanceHandle, 'topLayout', {
         layout: WRAPPER_FRAME,
       });
       showKeyboard(hub);
-      expect(currentWrapper().props.height).toBe(
+      expect(currentWrapper().payload.height).toBe(
         SCREEN_HEIGHT - EXPECTED_INSET,
       );
-      expect(currentWrapper().props.flex).toBe(0);
+      expect(currentWrapper().payload.flex).toBe(0);
 
       // Once removed, a previously-present prop clones through as an explicit `null` (the
       // engine's native-removal signal), not `undefined` — that distinction is the engine's
       // own contract, not this component's; either way means "no longer applied".
       hideKeyboard(hub);
-      const height = currentWrapper().props.height;
+      const height = currentWrapper().payload.height;
       expect(height === undefined || height === null).toBe(true);
     });
 
@@ -258,13 +263,13 @@ describe('KeyboardAvoidingView', () => {
       measureWrapper(SCREEN_HEIGHT);
       showKeyboard(hub);
       const shrunkHeight = SCREEN_HEIGHT - EXPECTED_INSET;
-      expect(currentWrapper().props.height).toBe(shrunkHeight);
+      expect(currentWrapper().payload.height).toBe(shrunkHeight);
 
       // Native re-lays out the now-shorter wrapper, then the keyboard reports its frame again.
       measureWrapper(shrunkHeight);
       showKeyboard(hub);
-      expect(currentWrapper().props.height).toBe(shrunkHeight);
-      expect(currentWrapper().props.flex).toBe(0);
+      expect(currentWrapper().payload.height).toBe(shrunkHeight);
+      expect(currentWrapper().payload.flex).toBe(0);
     });
 
     // why: an unset `behavior` (RN allows it — defaults to no-op on iOS in RN itself, here
@@ -277,9 +282,9 @@ describe('KeyboardAvoidingView', () => {
         layout: WRAPPER_FRAME,
       });
       showKeyboard(hub);
-      expect(currentWrapper().props.paddingBottom).toBeUndefined();
-      expect(currentWrapper().props.height).toBeUndefined();
-      expect(currentWrapper().props.flex).toBe(1);
+      expect(currentWrapper().payload.paddingBottom).toBeUndefined();
+      expect(currentWrapper().payload.height).toBeUndefined();
+      expect(currentWrapper().payload.flex).toBe(1);
     });
   });
 
@@ -294,7 +299,7 @@ describe('KeyboardAvoidingView', () => {
         layout: WRAPPER_FRAME,
       });
       showKeyboard(hub);
-      const padding = currentWrapper().props.paddingBottom;
+      const padding = currentWrapper().payload.paddingBottom;
       expect(padding === undefined || padding === 0).toBe(true);
     });
 
@@ -313,7 +318,7 @@ describe('KeyboardAvoidingView', () => {
         layout: WRAPPER_FRAME,
       });
       showKeyboard(hub);
-      expect(currentWrapper().props.paddingBottom).toBe(
+      expect(currentWrapper().payload.paddingBottom).toBe(
         EXPECTED_INSET + OFFSET,
       );
     });
@@ -332,12 +337,12 @@ describe('KeyboardAvoidingView', () => {
       hub.emit(SHOW_EVENT, {
         endCoordinates: { height: KEYBOARD_HEIGHT, screenY: KEYBOARD_SCREEN_Y },
       });
-      expect(currentWrapper().props.paddingBottom).toBe(EXPECTED_INSET);
+      expect(currentWrapper().payload.paddingBottom).toBe(EXPECTED_INSET);
 
       hub.emit(HIDE_EVENT, {
         endCoordinates: { height: 0, screenY: SCREEN_HEIGHT },
       });
-      expect(currentWrapper().props.paddingBottom).toBe(0);
+      expect(currentWrapper().payload.paddingBottom).toBe(0);
     });
 
     // why: keyboardDidChangeFrame is the listener RN's own comment warns against — with an
@@ -357,7 +362,7 @@ describe('KeyboardAvoidingView', () => {
       hub.emit('keyboardWillChangeFrame', frame);
       hub.emit('keyboardDidShow', frame);
 
-      const padding = currentWrapper().props.paddingBottom;
+      const padding = currentWrapper().payload.paddingBottom;
       expect(padding === undefined || padding === 0).toBe(true);
     });
   });
@@ -376,7 +381,7 @@ describe('KeyboardAvoidingView', () => {
       measureWrapper(SCREEN_HEIGHT);
 
       showKeyboard(hub, 0);
-      const padding = currentWrapper().props.paddingBottom;
+      const padding = currentWrapper().payload.paddingBottom;
       expect(padding === undefined || padding === 0).toBe(true);
     });
 
@@ -390,7 +395,7 @@ describe('KeyboardAvoidingView', () => {
       measureWrapper(SCREEN_HEIGHT);
 
       showKeyboard(hub, 0);
-      expect(currentWrapper().props.paddingBottom).toBe(
+      expect(currentWrapper().payload.paddingBottom).toBe(
         FRAME_Y + SCREEN_HEIGHT,
       );
     });
@@ -421,7 +426,7 @@ describe('KeyboardAvoidingView', () => {
       mount(ROOT_TAG, <App behavior="padding" />);
       const hub = deviceHub!;
       showKeyboard(hub);
-      const padding = currentWrapper().props.paddingBottom;
+      const padding = currentWrapper().payload.paddingBottom;
       expect(padding === undefined || padding === 0).toBe(true);
     });
 
@@ -436,7 +441,7 @@ describe('KeyboardAvoidingView', () => {
         layout: WRAPPER_FRAME,
       });
       hub.emit(SHOW_EVENT, { duration: 250, easing: 'keyboard' });
-      const padding = currentWrapper().props.paddingBottom;
+      const padding = currentWrapper().payload.paddingBottom;
       expect(padding === undefined || padding === 0).toBe(true);
     });
   });

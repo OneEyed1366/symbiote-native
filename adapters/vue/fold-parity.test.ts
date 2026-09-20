@@ -1,14 +1,17 @@
-// The runtime folds (`id` -> `nativeID`, RN's two Text defaults) asserted on EVERY Vue path that
-// can reach a host node: the component wrapper, the SFC transformer's lowered output, and the
-// JSX/TSX plugin's lowered output.
+// What reaches a host node asserted on EVERY Vue path that can produce one: a hand-written `h()`,
+// the SFC compiler's output, and the JSX/TSX plugin's.
 //
-// WHY THIS FILE EXISTS. A lowered element inherits nothing the wrapper used to do — defaults,
-// aliases, bug folds. Angular lost both Text defaults AND `id` -> `nativeID` exactly that way:
-// silently, on every app, visible only on a device. Vue applies both folds in the RENDERER
-// (`PROP_ALIASES` and `TEXT_DEFAULTS` in src/renderer/index.ts) rather than in a transform,
-// specifically because that layer sits under all four Vue paths at once. This file is the proof of
-// that claim rather than a restatement of it — the placement argument is sound and would stay
-// sound while a fold quietly stopped running.
+// WHY THIS FILE EXISTS. A tag inherits nothing a component wrapper used to do — defaults, aliases,
+// bag folds. Angular lost both Text defaults AND `id` -> `nativeID` exactly that way: silently, on
+// every app, visible only on a device.
+//
+// BOTH OF THOSE FOLDS HAVE SINCE LEFT THIS ADAPTER, on 2026-09-18, and the file's subject moved with
+// them rather than expiring. Vue used to apply them in the RENDERER (`PROP_ALIASES` and
+// `TEXT_DEFAULTS`), on the argument that the renderer sits under all three paths at once. That
+// argument was right and the engine is a layer lower still: `routeProp` resolves the alias for every
+// adapter and `foldTextDefaults` supplies the defaults off the component name. So what three
+// compilers can still disagree about is not the folding — it is WHICH KEYS AND VALUES each one hands
+// over at all, which is what the cases below pin.
 //
 // WHY THE ORACLE IS THE COMMITTED PAYLOAD, KEY BY KEY. A count agrees for the wrong reasons: two
 // payloads of equal size can differ in which keys they carry, and a whole day was lost to a
@@ -22,10 +25,9 @@
 // assertions catch different things and neither is redundant: cross-arm catches a fold that a
 // transform breaks for one path only, absolute catches a fold that stops running for everyone.
 //
-// WHY BOTH TRANSFORMS, RUN SEPARATELY. Vue is the only adapter with two lowering paths, and they
-// cannot share plumbing: `@vue/compiler-sfc` hands a transform an expression as SOURCE TEXT while
-// the JSX path holds a Babel AST. `lowering-parity.test.ts` covers whether they agree on WHAT to
-// lower; this file covers whether a lowered element still carries what the wrapper did.
+// WHY BOTH COMPILERS, RUN SEPARATELY. Vue is the only adapter with two of them, and they cannot
+// share plumbing: `@vue/compiler-sfc` hands an expression over as SOURCE TEXT while the JSX path
+// holds a Babel AST.
 
 import { describe, expect, it } from 'vitest';
 import ts from 'typescript';
@@ -39,9 +41,10 @@ import { mount, unmount } from '@symbiote-native/vue';
 // unregistered tag would commit a bare view with the raw props still on it.
 import './src/register';
 import {
-  installFabric,
+  createLiveTree,
+  installRecordingFabric,
   waitUntil,
-  type IFakeNode,
+  type ILiveNode,
 } from '@symbiote-native/test-utils';
 import * as runtimeHelpers from './src/runtime-helpers';
 import { defineComponent, h, nextTick, ref } from './src/runtime-helpers';
@@ -54,7 +57,8 @@ const {
   metroVueTransformer;
 
 const ROOT_TAG = 9911;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 
 // The mutable prop the post-mount case drives. A module-level ref rather than a component-local
 // one so all three arms read the SAME source and the test can write it from outside.
@@ -127,17 +131,15 @@ export default defineComponent({ setup() { return () => ${body}; } });`,
   return evaluate(result?.code ?? '');
 }
 
-/** Every committed node's payload, in tree order, minus RN's synthetic AppContainer. */
+/** Every committed node's payload, in tree order, minus the surface's own box-none root. */
 function committedPayloads(): Array<Record<string, unknown>> {
   const out: Array<Record<string, unknown>> = [];
-  const walk = (nodes: readonly IFakeNode[]): void => {
-    for (const node of nodes) {
-      out.push(node.props);
-      walk(node.children);
-    }
+  const walk = (node: ILiveNode): void => {
+    out.push(node.payload);
+    for (const child of node.children) walk(child);
   };
-  walk(fabric.committed);
-  return out.slice(1);
+  for (const child of live.nodeOf(live.appRoot()).children) walk(child);
+  return out;
 }
 
 async function render(
@@ -146,7 +148,7 @@ async function render(
   fabric.reset();
   clearGlobalStyles();
   mount(ROOT_TAG, component);
-  await waitUntil(() => fabric.counts.completeRoot > 0, 'the Vue commit');
+  await waitUntil(() => fabric.commits > 0, 'the Vue commit');
   const payloads = committedPayloads();
   unmount(ROOT_TAG);
   return payloads;
@@ -192,34 +194,38 @@ const CASES: readonly IFoldCase[] = [
     sfc: '<pressable id="p" />',
     jsx: '<pressable id="p" />',
     handWritten: () => h('pressable', { id: 'p' }),
-    // `accessible` (Pressable.js:252) and `focusable` (Pressable.js:258) are RN's own defaults;
-    // this previously pinned their absence, i.e. a divergence from RN that every adapter shared.
-    // `focusable` is the ONE-leg Pressable form — a Touchable* resolves its own three-leg version
-    // (TouchableOpacity.js:336-340) and hands the answer down as this prop.
-    expected: [{ nativeID: 'p', accessible: true, focusable: true }],
+    // `accessible` (Pressable.js:252) and `focusable` (:258) are NOT listed, and their absence here
+    // means something different from what it meant before: they are the engine's rule now
+    // (`foldPressableProps`), and this file compares payloads built by the TypeScript
+    // `fabricProps`, which holds no copy of it. Their values are asserted in
+    // `core/engine/cpp/tests/js/pressable-payload.itest.ts`.
+    //
+    // Which costs this row nothing, because what it asks is PARITY between three Vue paths — the
+    // engine applies its rule to all three identically or to none of them, so it cannot be the
+    // thing that makes them differ.
+    expected: [{ nativeID: 'p' }],
   },
   {
-    // The aria/role fold, which the engine now applies in `fabricProps` — the one point that sees
-    // the whole bag on both commit paths. Native reads only the `accessibility*` names, so the
-    // proof is that the aliases are CONSUMED, not merely accompanied: a payload carrying both is
-    // the failure this case exists to catch, and full-payload equality states that without a
-    // separate "not.toHaveProperty" per alias.
-    what: 'role and aria-label fold into accessibility* and leave no alias behind',
+    // The aria/role FOLD is the device's rule (`foldAriaProps`, `SymbioteFabricProps.cpp`) and this
+    // harness holds no copy of it, so what three Vue compilers can still disagree about is the
+    // SPELLING that reaches the engine. That is the load-bearing half: the rule reads `aria-label`
+    // literally, so a compiler that camelised or dropped it ends accessibility in silence.
+    what: 'role and a hyphenated aria key reach the engine identically on every path',
     sfc: '<view role="button" aria-label="x" />',
     jsx: '<view role="button" aria-label="x" />',
     handWritten: () => h('view', { role: 'button', 'aria-label': 'x' }),
-    expected: [{ accessibilityRole: 'button', accessibilityLabel: 'x' }],
+    expected: [{ role: 'button', 'aria-label': 'x' }],
   },
   {
-    // RULE ONE — for a scalar, the explicit prop WINS and the alias only fills a hole.
+    // BOTH KEYS MUST ARRIVE, and this case is the one where the three arms genuinely differ in
+    // spelling: the SFC writes `accessibility-label` (kebab), JSX writes `accessibilityLabel`
+    // (camel), and they must converge — that is `normalizeVueAttrKey`, which is still this
+    // adapter's. The aria key beside it must NOT be normalised the same way, because the engine's
+    // rule reads the hyphenated form literally. One case, two opposite requirements.
     //
-    // This is also the double-fold case. `resolveAccessibilityProps` (the wrapper's fold) now
-    // delegates to the same `foldAriaProps` the engine runs in `fabricProps`, so the component arm
-    // passes through it TWICE. That must be a no-op: pass 1 blanks every alias, so pass 2 finds
-    // nothing and hands the bag back. A second pass that re-derived from the aliases would
-    // overwrite 'explicit' with 'alias' here — and only on the wrapper arm, which is why the arms
-    // are compared to each other and not just to `expected`.
-    what: 'an explicit accessibilityLabel beats aria-label, and survives a second fold',
+    // Which of the two WINS is the rule's business and is asserted in `aria-payload.itest.ts`; it
+    // cannot even be expressed here, and a bag missing either side would make it unanswerable.
+    what: 'a kebab prop and a hyphenated alias both arrive, each spelled its own way',
     sfc: '<view accessibility-label="explicit" aria-label="alias" />',
     jsx: '<view accessibilityLabel="explicit" aria-label="alias" />',
     handWritten: () =>
@@ -227,16 +233,17 @@ const CASES: readonly IFoldCase[] = [
         accessibilityLabel: 'explicit',
         'aria-label': 'alias',
       }),
-    expected: [{ accessibilityLabel: 'explicit' }],
+    expected: [{ accessibilityLabel: 'explicit', 'aria-label': 'alias' }],
   },
   {
-    // RULE TWO — inside a composite the polarity INVERTS: the alias wins PER FIELD, and the
-    // composite is rebuilt as a fresh literal rather than merged. `checked` comes from the alias
-    // even though an explicit `accessibilityState` set it, while `busy` survives from the explicit
-    // object. An adapter that copied rule one "by analogy" collapses the two into one rule and
-    // yields `checked: false` — with every component-level test still green, because the wrapper
-    // path happens to agree.
-    what: 'aria-checked wins per field inside an explicit accessibilityState',
+    // A COMPOSITE has to survive as an object through all three compilers, alongside the alias that
+    // will be folded into it. The SFC spells both as BINDINGS (`:accessibility-state`,
+    // `:aria-checked`) where JSX spells them as expressions, so this is the arm where a compiler
+    // could flatten the object or stringify the boolean.
+    //
+    // Which side wins per field — the alias, inverting the scalar rule above — is the engine's and
+    // is asserted in `aria-payload.itest.ts`.
+    what: 'a composite and its alias survive all three compilers, shapes intact',
     sfc: '<view :accessibility-state="{ checked: false, busy: true }" :aria-checked="true" />',
     // Hyphenated in JSX too, deliberately: RN's public prop IS `aria-checked` and the camelCase
     // spelling is only View.js's own destructuring alias, so `ariaChecked={true}` would be a key
@@ -249,13 +256,8 @@ const CASES: readonly IFoldCase[] = [
       }),
     expected: [
       {
-        accessibilityState: {
-          busy: true,
-          checked: true,
-          disabled: undefined,
-          expanded: undefined,
-          selected: undefined,
-        },
+        accessibilityState: { checked: false, busy: true },
+        'aria-checked': true,
       },
     ],
   },
@@ -273,26 +275,26 @@ const CASES: readonly IFoldCase[] = [
     expected: [{ nativeID: 'x', testID: 't' }],
   },
   {
-    what: "RN's two Text defaults on a bare text",
+    // RN's two Text defaults used to be the point of this case, and they left the renderer on
+    // 2026-09-18 — the rule is `foldTextDefaults` in `SymbioteFabricProps.cpp`, keyed on the
+    // component, and this harness holds no copy of it. What the case pins now is that NO arm adds a
+    // key of its own, which is the thing three compilers can still disagree about.
+    what: 'a bare text lands an empty payload on every path',
     sfc: '<text>hi</text>',
     jsx: '<text>hi</text>',
     // An ARRAY child, never a slot function: an element ignores slot children and renders nothing.
     handWritten: () => h('text', null, ['hi']),
-    expected: [
-      { ellipsizeMode: 'tail', allowFontScaling: true },
-      { text: 'hi' },
-    ],
+    expected: [{}, { text: 'hi' }],
   },
   {
-    // `notFalse`, not `nullish`: only a literal false opts out, and the key is emitted either way.
+    // `false` is the value a compiler is most likely to lose — a path that treats falsy as absent
+    // drops it, and the engine then correctly defaults it back to `true`, so the bug is invisible
+    // anywhere the rule runs. Carrying an `id` alongside keeps the alias fold in the same arm.
     what: 'an explicit allowFontScaling=false beside an id',
     sfc: '<text id="t" :allow-font-scaling="false">hi</text>',
     jsx: '<text id="t" allowFontScaling={false}>hi</text>',
     handWritten: () => h('text', { id: 't', allowFontScaling: false }, ['hi']),
-    expected: [
-      { ellipsizeMode: 'tail', allowFontScaling: false, nativeID: 't' },
-      { text: 'hi' },
-    ],
+    expected: [{ allowFontScaling: false, nativeID: 't' }, { text: 'hi' }],
   },
 ];
 
@@ -319,9 +321,9 @@ describe('every Vue path folds id and the Text defaults identically', () => {
     );
   });
 
-  // The update path, not the mount path: `patchProp` is where both folds actually live, and a
-  // transform that folded at compile time would cover the first write and not this one.
-  it('folds a prop written after mount, on both lowered paths', async () => {
+  // The update path, not the mount path: `patchProp` is where both folds actually live, and a fold
+  // applied at compile time would cover the first write and not this one.
+  it('folds a prop written after mount, on every path', async () => {
     const arms: ReadonlyArray<readonly [string, Component]> = [
       [
         'hand-written',
@@ -338,7 +340,7 @@ describe('every Vue path folds id and the Text defaults identically', () => {
       fabric.reset();
       clearGlobalStyles();
       mount(ROOT_TAG, component);
-      await waitUntil(() => fabric.counts.completeRoot > 0, `${label} mount`);
+      await waitUntil(() => fabric.commits > 0, `${label} mount`);
       expect(committedPayloads(), `${label} on mount`).toEqual([
         { nativeID: 'before' },
       ]);

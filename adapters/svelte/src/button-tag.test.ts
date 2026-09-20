@@ -21,7 +21,11 @@ import { compile } from 'svelte/compiler';
 import { rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
-import { installFabric } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 
 // SIDE-EFFECT IMPORT: the behavior is what builds the subtree and runs the press machine. An app
 // reaches it through the package barrel; a test importing the renderer directly does not.
@@ -33,7 +37,8 @@ if (globalThis.window === undefined)
 if (globalThis.navigator === undefined)
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 
 // Named for this suite alone — two suites sharing a compiled artifact race under a full run
 // (`.claude/rules/smoke-compiled-artifact-collisions.md`).
@@ -49,10 +54,6 @@ const COMPILE_OPTIONS = {
 
 // RN Button.js's iOS label look, owned by `buttonTextStyle` in @symbiote-native/components. MARGIN,
 // not padding (Button.js:409) — the label pushes the button's edges outward instead of insetting.
-const DEFAULT_BLUE = '#007AFF';
-const DISABLED_GREY = '#cdcdcd';
-const LABEL_FONT_SIZE = 18;
-const LABEL_MARGIN = 8;
 
 // The composed TouchableOpacity fade is a real Animated.timing, and the engine's JS driver reads
 // requestAnimationFrame off the HOST at call time, throwing when it is absent. A setTimeout-backed
@@ -68,39 +69,23 @@ const settle = async (): Promise<void> => {
   await tick();
 };
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
-
-interface ICommitted {
-  readonly viewName: unknown;
-  readonly props: Record<string, unknown>;
-  readonly children: readonly ICommitted[];
-  readonly instanceHandle: unknown;
-}
-
-function asCommitted(value: unknown): ICommitted | undefined {
-  if (!isRecord(value) || !isRecord(value.props)) return undefined;
-  const children = Array.isArray(value.children) ? value.children : [];
-  return {
-    viewName: value.viewName,
-    props: value.props,
-    children: children.flatMap(child => asCommitted(child) ?? []),
-    instanceHandle: value.instanceHandle,
-  };
-}
-
-function flatten(nodes: readonly ICommitted[]): ICommitted[] {
-  return nodes.flatMap(node => [node, ...flatten(node.children)]);
-}
-
 /** The committed host, found by the `nativeID` its `id` folded into. */
-function hostOf(label: string): ICommitted {
-  const tree = fabric
-    .appRoot()
-    .children.flatMap(node => asCommitted(node) ?? []);
-  const host = flatten(tree).find(node => node.props.nativeID === label);
+function hostOf(label: string): ILiveNode {
+  const host = live.findLive(
+    live.appRoot(),
+    node => node.payload.nativeID === label,
+  );
   if (host === undefined) throw new Error(`no committed host ${label}`);
   return host;
+}
+
+/** Every descendant's view name, pre-order — the shape of what the behavior built. */
+function descendantNames(node: ILiveNode): string[] {
+  const names: string[] = [];
+  for (const child of node.children) {
+    live.walkLive(child.handle, one => names.push(one.viewName));
+  }
+  return names;
 }
 
 let nextRoot = 9_960;
@@ -173,47 +158,33 @@ describe('Svelte: `button` as a tag', () => {
     // the branch is the behavior's, not this adapter's.
     const host = hostOf('btn');
     expect(host.viewName).toBe('RCTView');
-    expect(host.props.accessibilityRole).toBe('button');
-    expect(flatten(host.children).map(node => node.viewName)).toEqual([
-      'RCTView',
-      'RCTText',
-      'RCTRawText',
-    ]);
+    // The role is `foldButtonProps`'s in the engine now, which this host's TypeScript `fabricProps`
+    // does not carry — `core/engine/cpp/tests/js/button-payload.itest.ts`. This case is about the
+    // SUBTREE SHAPE either way.
+    expect(descendantNames(host)).toEqual(['RCTView', 'RCTText', 'RCTRawText']);
 
     const [view] = host.children;
     const [text] = view.children;
-    expect(text.props.color).toBe(DEFAULT_BLUE);
-    expect(text.props.fontSize).toBe(LABEL_FONT_SIZE);
-    expect(text.props.margin).toBe(LABEL_MARGIN);
-    // RN's Text.js defaults, which a hand-written host tag inherits from nothing — without them a
-    // long label clips mid-word instead of ellipsising, on device only.
-    expect(text.props.ellipsizeMode).toBe('tail');
-    expect(text.children[0].props.text).toBe('Save');
-
-    unmount(root);
-    await settle();
-  });
-
-  // why: `disabled` greys the label and wins over an explicit `color` (Button.js pushes the
-  // disabled colour after the tint), and it lands on the a11y state so a screen reader announces
-  // it. Both are the behavior's folds reaching Fabric through Svelte's own prop bag.
-  it('greys the label over an explicit color and announces itself disabled', async () => {
-    const root = await mountSource(
-      `<button p={{ id: 'btn', title: 'Go', color: '#ff0000', disabled: true }}></button>`,
-    );
-
-    const host = hostOf('btn');
-    const state = host.props.accessibilityState;
-    expect(isRecord(state) && state.disabled).toBe(true);
-    expect(host.children[0].children[0].props.color).toBe(DISABLED_GREY);
+    // The label's STYLE left on 2026-09-18 — `foldButtonLabelStyle` in `SymbioteFabricProps.cpp`,
+    // reached off the label text's own tag and reading the button through `IAncestorLookup`. This
+    // harness builds its payload through the TypeScript `fabricProps`, which carries no copy of the
+    // tag rules, so the base blue and the margin are `core/engine/cpp/tests/js/
+    // button-derived-payload.itest.ts`'s now. The SUBTREE SHAPE, which is what this adapter
+    // contributes, is what stays.
+    //
+    // RN's two Text DEFAULTS left the same way on 2026-09-18, for the same reason one layer along:
+    // five copies of the rule collapsed into the engine's `foldTextDefaults`, so this harness no
+    // longer applies them. `button-derived-payload.itest.ts` reads them off the label's real payload.
+    expect(text.children[0].payload.text).toBe('Save');
 
     unmount(root);
     await settle();
   });
 
   // why: RN's Button-itest.js — `disabled` must gate the press itself, not just the label colour
-  // (`prevents the button onPress callback from being called`). Styling proves the fold reached
-  // the accessibilityState; a real touch is the only thing that proves it reached the responder.
+  // (`prevents the button onPress callback from being called`). This stays JS-side: the press
+  // machine's `disabledOf` (`buttonDisabled` in `./button`) is what actually suppresses the
+  // callback, unlike the styling below which moved to `SymbioteFabricProps.cpp`.
   it('suppresses onPress from a real touch while disabled', async () => {
     let presses = 0;
     const root = await mountSource(
@@ -229,4 +200,14 @@ describe('Svelte: `button` as a tag', () => {
     unmount(root);
     await settle();
   });
+
+  // THE GREYING CASE LEFT ON 2026-09-18. `disabled` greys the label and wins over an explicit
+  // `color` (RN pushes the disabled colour after the tint), and that whole expression is
+  // `foldButtonLabelStyle` in `SymbioteFabricProps.cpp` now — including the three-way `disabled`
+  // resolution it shares with the button's `focusable`. It is asserted against the committed payload
+  // in `core/engine/cpp/tests/js/button-derived-payload.itest.ts`, with the aria-disabled arm beside
+  // it.
+  //
+  // Nothing about THIS adapter went with it: its part is driving the tag so the subtree exists at
+  // all, which the case above holds.
 });

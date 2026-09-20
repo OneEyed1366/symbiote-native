@@ -231,7 +231,7 @@ export class CryptoScreen {
 
 There's no per-instance service to `inject()` in the Angular case — every function is a plain
 free function off the core package, called straight from the component body (or the constructor,
-on Angular). All five examples mirror the real canary demo screens —
+on Angular). All six examples mirror the real canary demo screens —
 `examples/expo-react/screens/CryptoScreen.tsx`, `examples/expo-vue-sfc/screens/CryptoScreen.vue`,
 `examples/expo-vue-tsx/screens/CryptoScreen.tsx`, `examples/expo-svelte/screens/CryptoScreen.svelte`,
 `examples/expo-solid/screens/CryptoScreen.tsx`, `examples/expo-angular/src/screens/CryptoScreen.ts`.

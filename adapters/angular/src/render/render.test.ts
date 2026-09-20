@@ -6,18 +6,35 @@
 import '@angular/compiler';
 import { Component, resource } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import type { ISymbioteNode } from '@symbiote-native/engine';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 import { mount, unmount } from './index';
 
 const ROOT_TAG = 808;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 const drainAngularAndCommit = async (): Promise<void> => {
   await tick();
   await tick();
 };
+
+// Rooted at the SURFACE this case's own `mount()` returned, not `live.appRoot()` — several cases
+// re-mount the SAME rootTag without an intervening reset, and `appRoot()` (a single box-none
+// lookup over the CREATION log) would then answer with whichever surface's root it saw FIRST, not
+// the one this mount just built (`.docs/mirror-elimination.md`, "`appRoot()` is a trap in any file
+// that opens a surface per case" — the same trap, triggered by a re-mount instead of a fresh one).
+// The old mirror's `serialize` took the root's own children (an array); the live tree's takes one
+// root, so joining each top-level child's serialization with no separator reproduces the same
+// string.
+function serializedApp(roots: readonly ISymbioteNode[]): string {
+  return roots.map(root => live.serialize(root)).join('');
+}
 
 class TestView {}
 Component({
@@ -140,23 +157,27 @@ describe('Angular mount', () => {
   // blank tree rather than an error anyone sees. Assert the tree, not the absence of a throw:
   // the symptom was silence.
   it('renders a component that calls resource(), whose TransferState probes the document', async () => {
-    mount(ROOT_TAG, ResourceComponent);
+    const surface = mount(ROOT_TAG, ResourceComponent);
     await tick();
 
-    expect(fabric.serialize(fabric.appRoot().children)).toBe(
+    expect(serializedApp(surface.children)).toBe(
       'RCTText(RCTRawText "resource mounted")',
     );
   });
 
   it('bootstraps a standalone component into a committed Fabric tree', async () => {
-    mount(ROOT_TAG, SmokeComponent);
+    const surface = mount(ROOT_TAG, SmokeComponent);
     await tick();
 
-    const root = fabric.appRoot();
-    expect(fabric.serialize(root.children)).toBe(
+    expect(serializedApp(surface.children)).toBe(
       'RCTView(RCTText(RCTRawText "Hello Angular")RCTView(RCTText(RCTRawText "tapped 0×")))',
     );
-    expect(root.children[0]?.props).toMatchObject({ padding: 12 });
+    const outer = surface.children[0];
+    expect(
+      outer === undefined ? undefined : live.nodeOf(outer).payload,
+    ).toMatchObject({
+      padding: 12,
+    });
   });
 
   // why: mount() provides the real ChangeDetectionSchedulerImpl + zoneless bundle (render.ts's
@@ -165,7 +186,7 @@ describe('Angular mount', () => {
   // native-event -> markForCheck -> repaint loop working end to end, not just that the
   // scheduler is wired.
   it('runs Angular change detection after a native press and recommits text', async () => {
-    mount(ROOT_TAG, SmokeComponent);
+    const surface = mount(ROOT_TAG, SmokeComponent);
     await tick();
 
     const counter = fabric.find(node => node.props.testID === 'counter');
@@ -175,9 +196,7 @@ describe('Angular mount', () => {
     fabric.fireEvent(counter?.instanceHandle, 'topTouchEnd');
     await drainAngularAndCommit();
 
-    expect(fabric.serialize(fabric.appRoot().children)).toContain(
-      'RCTRawText "tapped 1×"',
-    );
+    expect(serializedApp(surface.children)).toContain('RCTRawText "tapped 1×"');
   });
 
   // why: see the file-level comment above CounterChild/UnrelatedSiblingChild — a real
@@ -186,7 +205,7 @@ describe('Angular mount', () => {
   // the whole tree (defeating the point of the zoneless scheduler swap).
   it('does not re-check a sibling child component on a press inside a different child', async () => {
     unrelatedRenderCount = 0;
-    mount(ROOT_TAG, TargetedComponent);
+    const surface = mount(ROOT_TAG, TargetedComponent);
     await tick();
 
     const afterFirstPaint = unrelatedRenderCount;
@@ -197,9 +216,7 @@ describe('Angular mount', () => {
     fabric.fireEvent(counter?.instanceHandle, 'topTouchEnd');
     await drainAngularAndCommit();
 
-    expect(fabric.serialize(fabric.appRoot().children)).toContain(
-      'RCTRawText "tapped 1×"',
-    );
+    expect(serializedApp(surface.children)).toContain('RCTRawText "tapped 1×"');
     // UnrelatedSiblingChild has no dirty descendant of its own, so it must not be re-checked
     // just because CounterChild (a completely separate branch) got pressed. This does NOT prove
     // the root's own template stays untouched — the root's template still re-runs on every
@@ -212,12 +229,12 @@ describe('Angular mount', () => {
   // initialProps` through it too (modules/app-registry/index.ts), so a regression here breaks
   // every app that passes launch params. Untested before this rewrite.
   it('applies IMountOptions.initialProps to the root component via setInput', async () => {
-    mount(ROOT_TAG, InitialPropsComponent, {
+    const surface = mount(ROOT_TAG, InitialPropsComponent, {
       initialProps: { greeting: 'from native' },
     });
     await tick();
 
-    expect(fabric.serialize(fabric.appRoot().children)).toContain(
+    expect(serializedApp(surface.children)).toContain(
       'RCTRawText "from native"',
     );
   });
@@ -229,22 +246,18 @@ describe('Angular mount', () => {
   // ever silently no-oped, the previous app's incremented state would survive into the "fresh"
   // remount instead of the new instance starting from its own initial state.
   it('tears down a stale app before re-mounting the same live rootTag', async () => {
-    mount(ROOT_TAG, SmokeComponent);
+    const first = mount(ROOT_TAG, SmokeComponent);
     await tick();
     const counter = fabric.find(node => node.props.testID === 'counter');
     fabric.fireEvent(counter?.instanceHandle, 'topTouchStart');
     fabric.fireEvent(counter?.instanceHandle, 'topTouchEnd');
     await drainAngularAndCommit();
-    expect(fabric.serialize(fabric.appRoot().children)).toContain(
-      'RCTRawText "tapped 1×"',
-    );
+    expect(serializedApp(first.children)).toContain('RCTRawText "tapped 1×"');
 
     // Re-mount the SAME rootTag WITHOUT an intervening unmount() call.
-    mount(ROOT_TAG, SmokeComponent);
+    const second = mount(ROOT_TAG, SmokeComponent);
     await tick();
-    expect(fabric.serialize(fabric.appRoot().children)).toContain(
-      'RCTRawText "tapped 0×"',
-    );
+    expect(serializedApp(second.children)).toContain('RCTRawText "tapped 0×"');
   });
 
   // why: `global.RN$stopSurface` is the JSI hook C++ calls to stop a Fabric surface (render.ts's
@@ -253,23 +266,19 @@ describe('Angular mount', () => {
   // `teardown()` as the public `unmount` export, proven the same way as the previous test: a
   // fresh re-mount on the stopped rootTag must start from initial state, not resume the old app.
   it('global.RN$stopSurface tears down the surface exactly like unmount()', async () => {
-    mount(ROOT_TAG, SmokeComponent);
+    const first = mount(ROOT_TAG, SmokeComponent);
     await tick();
     const counter = fabric.find(node => node.props.testID === 'counter');
     fabric.fireEvent(counter?.instanceHandle, 'topTouchStart');
     fabric.fireEvent(counter?.instanceHandle, 'topTouchEnd');
     await drainAngularAndCommit();
-    expect(fabric.serialize(fabric.appRoot().children)).toContain(
-      'RCTRawText "tapped 1×"',
-    );
+    expect(serializedApp(first.children)).toContain('RCTRawText "tapped 1×"');
 
     expect(globalThis.RN$stopSurface).toBeTypeOf('function');
     globalThis.RN$stopSurface?.(ROOT_TAG);
 
-    mount(ROOT_TAG, SmokeComponent);
+    const second = mount(ROOT_TAG, SmokeComponent);
     await tick();
-    expect(fabric.serialize(fabric.appRoot().children)).toContain(
-      'RCTRawText "tapped 0×"',
-    );
+    expect(serializedApp(second.children)).toContain('RCTRawText "tapped 0×"');
   });
 });

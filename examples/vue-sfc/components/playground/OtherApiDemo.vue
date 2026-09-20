@@ -130,13 +130,8 @@ const asyncLoadTriggered = ref(false);
     <RenderVNode :node="baseVNode" />
     <RenderVNode :node="clonedVNode" />
     <RenderVNode :node="fragmentVNode" />
-    <text
-      class="note-text"
-      testID="other-is-vnode"
-    >
-      {{
-        `isVNode(baseVNode)=${isVNodeCheck}`
-      }}
+    <text class="note-text" testID="other-is-vnode">
+      {{ `isVNode(baseVNode)=${isVNodeCheck}` }}
     </text>
 
     <text class="note-text">
@@ -152,8 +147,8 @@ const asyncLoadTriggered = ref(false);
     <RenderVNode :node="directedVNode" />
 
     <text class="note-text">
-      defineAsyncComponent — loadingComponent → resolved component, with a
-      150ms delay before the loader shows
+      defineAsyncComponent — loadingComponent → resolved component, with a 150ms
+      delay before the loader shows
     </text>
     <ActionButton
       testID="other-load-async"
@@ -161,10 +156,7 @@ const asyncLoadTriggered = ref(false);
       :onPress="() => (asyncLoadTriggered = true)"
       color="#f5a623"
     />
-    <component
-      :is="AsyncWidget"
-      v-if="asyncLoadTriggered"
-    />
+    <component :is="AsyncWidget" v-if="asyncLoadTriggered" />
 
     <text class="note-text">
       withModifiers() — programmatic form, the .stop modifier bound by hand
@@ -176,23 +168,13 @@ const asyncLoadTriggered = ref(false);
       class="chip"
       :onPress="onModifierPress"
     >
-      <text class="chip-text">
-        press (wrapped in withModifiers)
-      </text>
+      <text class="chip-text"> press (wrapped in withModifiers) </text>
     </pressable>
-    <text
-      class="note-text"
-      testID="other-modifier-log"
-    >
-      {{
-        modifierLog.join(' · ') || '(not pressed yet)'
-      }}
+    <text class="note-text" testID="other-modifier-log">
+      {{ modifierLog.join(' · ') || '(not pressed yet)' }}
     </text>
 
-    <text
-      class="note-text"
-      testID="other-css-module-gap"
-    >
+    <text class="note-text" testID="other-css-module-gap">
       useCssModule() — real function now, but unreachable here: this project's
       &lt;style module&gt; compiler emits a plain `$style` const, not the
       `__cssModules` instance option this function reads (see the file header

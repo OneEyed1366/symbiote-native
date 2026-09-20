@@ -12,7 +12,7 @@ import type { Component } from 'svelte';
 // The .svelte-free subpath — the main barrel re-exports real .svelte component sources, which
 // vitest's plain (svelte-plugin-free) test transform cannot parse.
 import { mount, unmount } from '@symbiote-native/svelte/native-view-bridge';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import { PermissionStatus, type PermissionResponse } from '../../core';
 // The real Metro pipeline's own .svelte.ts compile step (TS-strip + compileModule), reused here so
 // this test exercises the actual shipped compile path.
@@ -64,7 +64,7 @@ const ROOT_TAG = 91_640;
 const PROBE_OUT = join(__dirname, '.smoke-compiled-use-permissions-probe.mjs');
 const RUNE_OUT = join(__dirname, '.smoke-compiled-use-permissions.svelte.mjs');
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 
 beforeEach(() => {
   fabric.reset();

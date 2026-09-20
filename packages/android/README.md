@@ -48,10 +48,12 @@ Android app adds `@symbiote-native/android` as an ordinary dependency (`react-na
 declares its Android `sourceDir` and the `SymbioteAndroidPackage` import/instance), and RN's
 Gradle autolinking picks it up automatically. There is nothing to import from JS: the modules
 are consumed transparently through `@symbiote-native/engine`'s existing `Keyboard` and `Settings`
-wrappers — re-exported by the React, Vue and Angular adapters alike — which simply find a real
-native module on Android where they previously found none.
+wrappers — re-exported by every adapter (React, Vue, Angular, Svelte, and Solid) alike — which
+simply find a real native module on Android where they previously found none.
 
 ## Where it's wired
 
-See [`adapters/react/README.md`](../../adapters/react/README.md#android) — the Android canary
-in `examples/react` links this package for its emulator run (`npm run android`).
+Every example app's Android build links this package for its emulator run (`npm run android`) —
+`examples/react`, `examples/vue-sfc`, `examples/vue-tsx`, `examples/angular`, `examples/svelte`,
+and `examples/solid` all declare it as a dependency. See
+[`adapters/react/README.md`](../../adapters/react/README.md#android) for the reference wiring.

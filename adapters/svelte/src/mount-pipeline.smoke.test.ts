@@ -15,7 +15,10 @@ import { compile } from 'svelte/compiler';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
-import { installFabric } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 import { mount, unmount } from './render';
 
 // RN's own bootstrap (setUpGlobals.js / setUpNavigator.js, verified against
@@ -41,9 +44,23 @@ const ROOT_TAG = 91_001;
 // with nothing wrong in either file's own logic.
 const TMP_DIR = join(__dirname, '../build/__smoke__/mount-pipeline');
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
+
+// `currentAppRoot()` answers the FIRST box-none surface in the creation log, which is right for
+// every test but the remount ones below: re-mounting the same rootTag tears down the old surface
+// and creates a brand new one, so the log holds two matches and the stale one would still win.
+// Those two tests need the CURRENT surface, so they read the last match instead.
+function currentAppRoot(): ReturnType<typeof live.appRoot> {
+  const matches = fabric.findAll(
+    node => node.props.pointerEvents === 'box-none',
+  );
+  const last = matches.at(-1);
+  if (last === undefined) throw new Error('no app root was created');
+  return last.handle;
+}
 
 beforeEach(() => {
   fabric.reset();
@@ -91,9 +108,9 @@ describe('mount (real compiled output, real fake-Fabric)', () => {
       await tick();
       await tick();
 
-      const root = fabric.appRoot();
-      expect(fabric.serialize([root])).toContain('RCTText');
-      expect(fabric.serialize([root])).toContain('RCTRawText "hello"');
+      const root = currentAppRoot();
+      expect(live.serialize(root)).toContain('RCTText');
+      expect(live.serialize(root)).toContain('RCTRawText "hello"');
     });
 
     it('reacts to a $state mutation (self-driven via $effect) and re-commits', async () => {
@@ -114,7 +131,7 @@ describe('mount (real compiled output, real fake-Fabric)', () => {
       await tick();
       await tick();
       await tick();
-      expect(fabric.serialize([fabric.appRoot()])).toContain(
+      expect(live.serialize(currentAppRoot())).toContain(
         'RCTRawText "count 1"',
       );
     });
@@ -141,8 +158,8 @@ describe('mount (real compiled output, real fake-Fabric)', () => {
       // The engine's flattenStyle/fabricProps step hoists flex onto the top-level Fabric
       // prop bag (not nested under `style`) — the same shape every other layout prop lands
       // in once it reaches nativeFabricUIManager.
-      const wrapper = fabric.appRoot().children[0];
-      expect(wrapper.props.flex).toBe(1);
+      const wrapper = live.nodeOf(currentAppRoot()).children[0];
+      expect(wrapper.payload.flex).toBe(1);
     });
 
     it('re-mounting the same rootTag tears down the previous app before mounting the new one', async () => {
@@ -157,9 +174,7 @@ describe('mount (real compiled output, real fake-Fabric)', () => {
       mount(ROOT_TAG, Hello);
       await tick();
       await tick();
-      expect(fabric.serialize([fabric.appRoot()])).toContain(
-        'RCTRawText "hello"',
-      );
+      expect(live.serialize(currentAppRoot())).toContain('RCTRawText "hello"');
 
       const Goodbye = await compileComponent(
         '<text p={{}}>goodbye</text>',
@@ -169,7 +184,7 @@ describe('mount (real compiled output, real fake-Fabric)', () => {
       await tick();
       await tick();
 
-      const serialized = fabric.serialize([fabric.appRoot()]);
+      const serialized = live.serialize(currentAppRoot());
       expect(serialized).toContain('RCTRawText "goodbye"');
       expect(serialized).not.toContain('hello');
     });
@@ -203,7 +218,7 @@ describe('mount (real compiled output, real fake-Fabric)', () => {
       await tick();
       await tick();
 
-      const serialized = fabric.serialize([fabric.appRoot()]);
+      const serialized = live.serialize(currentAppRoot());
       expect(serialized).toContain('RCTRawText "goodbye"');
       expect(serialized).not.toContain('hello');
     });

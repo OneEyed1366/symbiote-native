@@ -6,14 +6,16 @@
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '@symbiote-native/react';
-import { installFabric } from '@symbiote-native/test-utils';
+// A RECORDING host: the node is found by its authored `testID` and the touch is aimed at the
+// `instanceHandle` the ops named. Responder negotiation runs in JS, above any commit rule.
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 160;
 const TOUCH_START = 'topTouchStart';
 const TOUCH_MOVE = 'topTouchMove';
 const TOUCH_END = 'topTouchEnd';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 

@@ -1,6 +1,6 @@
 ---
 name: symbiote-devtools-inspector
-description: "Read before investigating why React Native DevTools' Components/Profiler tabs show nothing (\"Loading React Element Tree...\", \"Profiling not supported\") for a Symbiote example on a non-React adapter (Vue/Svelte/Angular), before attempting to hook `__REACT_DEVTOOLS_GLOBAL_HOOK__` from a non-React adapter, or before scoping a devtools/inspector feature for SymbioteNative. Records a confirmed (2026-08, file:line-cited) research finding: React DevTools' Components tree, Profiler, and click-to-select highlight are Fiber-only, not protocol-based — every entry point requires objects produced by React's own commit bookkeeping, not a satisfiable interface, and the Components/Profiler tabs are statically registered in RN's debugger-frontend with no way to hide them short of forking it (out of scope, same reasoning as native_core_is_untouched). Also records the viable alternative: a Rozenite (callstackincubator/rozenite) plugin exposing @symbiote-native/engine's own retained tree as a custom DevTools panel, framework-agnostic across all adapters, with a scoped v0 plan. Status: scoped, not implemented. Trigger on 'devtools doesn't show components', 'Loading React Element Tree', 'Profiling not supported', 'can we get Vue/Svelte/Angular devtools support', 'React DevTools for non-React renderer', 'Rozenite plugin', 'custom devtools panel'."
+description: "Read before investigating why React Native DevTools' Components/Profiler tabs show nothing (\"Loading React Element Tree...\", \"Profiling not supported\") for a Symbiote example on a non-React adapter (Vue/Svelte/Angular/Solid), before attempting to hook `__REACT_DEVTOOLS_GLOBAL_HOOK__` from a non-React adapter, or before scoping a devtools/inspector feature for SymbioteNative. Records a confirmed (2026-08, file:line-cited) research finding: React DevTools' Components tree, Profiler, and click-to-select highlight are Fiber-only, not protocol-based — every entry point requires objects produced by React's own commit bookkeeping, not a satisfiable interface, and the Components/Profiler tabs are statically registered in RN's debugger-frontend with no way to hide them short of forking it (out of scope, same reasoning as native_core_is_untouched). Also records the viable alternative: a Rozenite (callstackincubator/rozenite) plugin exposing @symbiote-native/engine's own retained tree as a custom DevTools panel, framework-agnostic across all adapters, with a scoped v0 plan. Status: scoped, not implemented. Trigger on 'devtools doesn't show components', 'Loading React Element Tree', 'Profiling not supported', 'can we get Vue/Svelte/Angular/Solid devtools support', 'React DevTools for non-React renderer', 'Rozenite plugin', 'custom devtools panel'."
 ---
 
 # React Native DevTools for non-React adapters
@@ -17,7 +17,7 @@ DevTools all trace back to the same gate: `getInspectorDataForViewAtPoint.js`
 elementinspector/getInspectorDataForViewAtPoint.js`) iterates
 `window.__REACT_DEVTOOLS_GLOBAL_HOOK__.renderers` — populated ONLY by
 `hook.inject(rendererConfig)`, which only `react-reconciler`-based renderers
-call. Only `@symbiote-native/react` does this; Vue/Svelte/Angular mutate the
+call. Only `@symbiote-native/react` does this; Vue/Svelte/Angular/Solid mutate the
 engine's retained tree directly and never touch a Fiber tree, so `renderers`
 stays empty for them.
 
@@ -58,7 +58,7 @@ capability-negotiation protocol (`TargetCapabilityFlags`,
 `supportsMultipleDebuggers` — nothing about renderer presence. So even after
 building the alternative below, these two stock tabs will permanently sit
 next to it showing "Loading React Element Tree…" / "Profiling not supported"
-for Vue/Svelte/Angular apps — an undismissable cosmetic limitation, not a bug
+for Vue/Svelte/Angular/Solid apps — an undismissable cosmetic limitation, not a bug
 we can fix without forking `debugger-frontend` (out of scope, same
 anti-fork reasoning as `<native_core_is_untouched>` in the root CLAUDE.md).
 
@@ -81,7 +81,7 @@ Key mechanics (rozenite.dev docs, `plugin-development/overview` +
   `export default function setupPlugin(client) { client.onMessage(...);
   client.send(...) }` — confirmed safe to hang directly off
   `@symbiote-native/engine` internals regardless of which adapter (React,
-  Vue, Svelte, Angular) is driving the engine.
+  Vue, Angular, Svelte, Solid) is driving the engine.
 - Wiring: `withRozenite(mergeConfig(...), {enabled: ...})` in
   `metro.config.js`. Originally spiked behind an explicit `WITH_ROZENITE=true`
   env var (opt-in, mirroring the `DEBUG` log flag); changed 2026-08-16 to
@@ -133,8 +133,8 @@ would violate keeping the engine dependency-light.
 - **Tree sync is a full snapshot on every post-commit, no diffing.** Simple,
   always correct, dev-only (never runs when `WITH_ROZENITE` is unset).
   Building a second diff engine here would duplicate the clone-on-write
-  diffing already centralized once in `commit.ts` — rejected per
-  `<clone_on_write_lives_in_engine>`; revisit only if a real perf problem is
+  diffing already centralized once, now in `SymbioteTree` (`core/engine/cpp`)
+  — rejected per `<clone_on_write_lives_in_engine>`; revisit only if a real perf problem is
   MEASURED on a large tree, not preemptively — see `symbiote-perf-measurement`
   for how to actually take that measurement instead of guessing.
 - **Tree push is lazy, gated on panel subscription.** The app-side
@@ -165,7 +165,7 @@ would violate keeping the engine dependency-light.
   built and smoke-tested. It graduates to a real published
   `@symbiote-native/devtools` (via `symbiote-release-publishing` conventions
   — changesets, semver, peerDependency ranges) ONLY once parity is proven
-  across all 4 adapters (React/Vue/Svelte/Angular), never after a single
+  across all 5 adapters (React/Vue/Angular/Svelte/Solid), never after a single
   adapter's smoke test — same P0 bar as
   `<adapters_reach_full_feature_parity>` applies to this feature too, not
   just to visual components.
@@ -251,11 +251,11 @@ would violate keeping the engine dependency-light.
    actually renders a tree this time, not just that the tab appears. No
    flag needed — on by default; use `--dev false`/a release build
    specifically to confirm it's ABSENT there.
-5. Prove structural parity: repeat on React/Vue/Angular examples — expect
-   ZERO adapter-specific code beyond each example's own `metro.config.js`/
-   `index.js` wiring (same `withRozenite`/`__DEV__` pattern as Svelte's),
-   since the whole design lives in the engine.
-6. Only once parity is proven on all 4 adapters → publish
+5. Prove structural parity: repeat on React/Vue/Angular/Solid examples —
+   expect ZERO adapter-specific code beyond each example's own
+   `metro.config.js`/`index.js` wiring (same `withRozenite`/`__DEV__`
+   pattern as Svelte's), since the whole design lives in the engine.
+6. Only once parity is proven on all 5 adapters → publish
    `@symbiote-native/devtools` for real, per `symbiote-release-publishing`.
 7. Fast-follow (separate task, not v0): highlight-on-select via a temporary
    engine-level `View` node + `measureInWindow` — verify first that a

@@ -1,20 +1,26 @@
-// RN's `role` / `aria-*` fold must reach the committed payload identically down both spellings an
-// app can now write: attributes on the bare tag, and one `p={{…}}` bag.
+// RN's `role` / `aria-*` keys must reach the engine identically down both spellings an app can now
+// write: attributes on the bare tag, and one `p={{…}}` bag.
 //
-// The fold itself lives in the ENGINE (`core/engine/src/accessibility-props.ts`, called from
-// `fabricProps`), i.e. BELOW this adapter. That placement is what this file is checking from above:
-// anything that renamed or reshaped one of those keys on the way down would leave the fold looking
-// at a bag it does not recognise, and the failure is silent — accessibility simply stops, on
-// device, with every suite green.
+// The FOLD is the device's rule (`foldAriaProps`, `SymbioteFabricProps.cpp`) and this harness holds
+// no copy of it, so what this file asserts is the half above it — which was always the half that
+// made it a Svelte file rather than an engine one. **The rule reads the hyphenated name literally**,
+// so anything that renamed or reshaped a key on the way down leaves it looking at a bag it does not
+// recognise, and the failure is silent: accessibility simply stops, on device, with every suite
+// green. Svelte's compiler lowercases every static attribute name, which makes that a live hazard
+// here and not a theoretical one.
 //
-// It had a THIRD arm until the wrappers were deleted (a lowered `<View>` and the `View.svelte` that
-// refused). Both are gone; the two arms left are the two an app has.
+// The rule's own eleven cases: `core/engine/cpp/tests/js/aria-payload.itest.ts`.
+//
+// It had a THIRD arm until the wrappers were deleted; the two left are the two an app has.
 import { afterAll, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
 import { rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
-import { installFabric } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 import './register';
 import { mount, unmount } from './render';
 
@@ -23,7 +29,8 @@ if (globalThis.window === undefined)
 if (globalThis.navigator === undefined)
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 
 const SRC_DIR = __dirname;
 const PROBE_OUT = join(SRC_DIR, '.smoke-compiled-aria-probe.mjs');
@@ -42,42 +49,29 @@ const settle = async (): Promise<void> => {
   await tick();
 };
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
-
-function committedProps(testID: string): Record<string, unknown> {
-  const walk = (
-    nodes: readonly unknown[],
-  ): Record<string, unknown> | undefined => {
-    for (const node of nodes) {
-      if (!isRecord(node)) continue;
-      const props = node.props;
-      if (isRecord(props) && props.testID === testID) return props;
-      const children = node.children;
-      if (Array.isArray(children)) {
-        const hit = walk(children);
-        if (hit !== undefined) return hit;
-      }
-    }
-    return undefined;
-  };
-  const found = walk(fabric.appRoot().children);
+// The payload is what the engine is handed, so the search key and the assertions both read it.
+function committedPayload(testID: string): Record<string, unknown> {
+  const found = live.findLive(
+    live.appRoot(),
+    node => node.payload.testID === testID,
+  );
   if (found === undefined)
     throw new Error(`no committed node carries testID ${testID}`);
-  return found;
+  return found.payload;
 }
 
-// Mount AND read in one call. `fabric.appRoot()` is the CURRENT root, so mounting two arms and then
-// reading both finds only the last — the first version of this file did exactly that and threw `no
-// committed node carries testID …`, which is the harness failing loudly rather than an arm
-// disagreeing. Each arm is now read while it is the live tree.
+// Mount AND read in one call, with the recording cleared first. `appRoot()` searches the CREATION
+// log, so mounting two arms and then reading both finds the FIRST arm's surface for each — the
+// mirror-tree version of this file had the same trap from the other end (it kept only the LAST
+// root) and threw `no committed node carries testID …`. Each arm is read while it is the only tree.
 async function mountAndRead(
   source: string,
   rootTag: number,
   testID: string,
 ): Promise<Record<string, unknown>> {
+  fabric.reset();
   await mountSource(source, rootTag);
-  const props = committedProps(testID);
+  const props = committedPayload(testID);
   unmount(rootTag);
   return props;
 }
@@ -124,16 +118,13 @@ describe('the aria/role fold reaches Fabric on both spellings', () => {
     };
 
     for (const [arm, props] of Object.entries(arms)) {
-      // BOTH SIDES, and neither half is sufficient alone: the value must have arrived THROUGH the
-      // fold, and the raw key must be gone because the fold consumed it rather than because
-      // something camelised it on the way down. A missing `aria-label` reads the same under both.
-      expect(props.accessibilityRole, `${arm} role`).toBe('button');
-      expect(props.accessibilityLabel, `${arm} label`).toBe('close');
-      expect(props, `${arm} drops role`).not.toHaveProperty('role');
-      expect(props, `${arm} drops aria-label`).not.toHaveProperty('aria-label');
-      // The camelised spellings are what a rewrite would produce if it normalised the key: the
-      // engine reads the HYPHENATED form literally (`bag['aria-label']`), so a camelised key is
-      // invisible to the fold and would be committed raw.
+      // The engine reads the HYPHENATED form literally (`bag["aria-label"]`), so the authored
+      // spelling IS the contract — a camelised key is invisible to the rule and would commit raw.
+      // Svelte is the adapter where this is a live hazard rather than a theoretical one: its
+      // compiler lowercases every static attribute name (`fix_attribute_casing`), which is the
+      // whole reason `canonical-prop-names.ts` exists.
+      expect(props.role, `${arm} role`).toBe('button');
+      expect(props['aria-label'], `${arm} label`).toBe('close');
       expect(props, `${arm} never camelises`).not.toHaveProperty('ariaLabel');
       expect(props, `${arm} never camelises`).not.toHaveProperty('ariaChecked');
     }
@@ -163,25 +154,35 @@ describe('the aria/role fold reaches Fabric on both spellings', () => {
     };
 
     for (const [arm, props] of Object.entries(arms)) {
+      // Both halves must ARRIVE, under both spellings — which of them wins is the engine's rule and
+      // it cannot apply a precedence to a bag missing one side. The composite has to survive as an
+      // OBJECT through a `p={{…}}` bag as well as through an attribute, which is the half a bag arm
+      // is here to catch.
       expect(props.accessibilityState, `${arm} state`).toMatchObject({
-        checked: true,
+        checked: false,
         busy: true,
       });
+      expect(props['aria-checked'], `${arm} alias`).toBe(true);
     }
   });
 
   // A QUOTED aria attribute is a STRING in every one of these templates — `aria-checked="true"`
-  // yields `'true'`, not `true` — and the engine's fold does no coercion (`ariaChecked ?? …`). So
-  // the committed `accessibilityState.checked` is the string, which is not what RN's native side
-  // expects (boolean | 'mixed'). Recorded as an assertion rather than a comment so the day someone
-  // adds coercion, this fails and says where the decision was made.
+  // yields `'true'`, not `true` — and nothing anywhere coerces it: not this adapter, and not the
+  // engine's rule, which reads the value through as-is. So what eventually lands in
+  // `accessibilityState.checked` is the string, which is not what RN's native side expects
+  // (boolean | 'mixed').
+  //
+  // Asserted at THIS layer now rather than on the folded composite: the string is produced here, by
+  // the template, and that is the fact this file can still see. The consequence downstream — that
+  // the rule passes it along uncoerced — belongs to the rule and is pinned beside it. Recorded as an
+  // assertion rather than a comment so the day someone adds coercion, one of the two fails and says
+  // which layer made the decision.
   it('passes a quoted aria value through UNCOERCED, string and all', async () => {
     const props = await mountAndRead(
       attributeArm('quoted-attributes', `aria-checked="true"`),
       9_107,
       'quoted-attributes',
     );
-    const state = props.accessibilityState;
-    expect(isRecord(state) ? state.checked : undefined).toBe('true');
+    expect(props['aria-checked']).toBe('true');
   });
 });

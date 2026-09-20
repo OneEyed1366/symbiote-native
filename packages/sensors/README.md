@@ -133,9 +133,10 @@ export class SensorsScreen {
 }
 ```
 
-The examples above mirror the real canary demo screens —
+The examples above mirror the real canary demo screens, which exist for all six Expo canaries —
 `examples/expo-react/screens/SensorsScreen.tsx`, `examples/expo-vue-sfc/screens/SensorsScreen.vue`,
-`examples/expo-vue-tsx/screens/SensorsScreen.tsx`, `examples/expo-angular/src/screens/SensorsScreen.ts`.
+`examples/expo-vue-tsx/screens/SensorsScreen.tsx`, `examples/expo-svelte/screens/SensorsScreen.svelte`,
+`examples/expo-solid/screens/SensorsScreen.tsx`, `examples/expo-angular/src/screens/SensorsScreen.ts`.
 
 Every hook/composable/rune/primitive/`connect()` takes an optional `updateIntervalMs` and returns
 `null` until the first native reading arrives — check `isAvailableAsync()` separately if you need

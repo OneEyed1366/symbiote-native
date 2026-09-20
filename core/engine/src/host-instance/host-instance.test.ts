@@ -5,11 +5,9 @@
 // driven end to end to prove it reaches the engine's commit layer with the node's CURRENT
 // committed handle, and degrades to a silent no-op (never throws) when the node isn't committed.
 //
-// The fake Fabric slot from @symbiote-native/test-utils only implements the mutation/dispatch
-// half (createNode/dispatchCommand/...); measure/measureInWindow/measureLayout aren't part of
-// it, so this file extends the installed global slot with them -- the actual native-module
-// call boundary the task's mocking rule points at, same idea as stubbing __turboModuleProxy
-// in the other engine module tests, just for a different global.
+// measure/measureInWindow/measureLayout reach the engine's own treeHost().measure(...) rather
+// than the global Fabric slot, so the recording host's own methods are grafted directly (the
+// same object treeHost() returns) instead of the global slot other engine module tests stub.
 //
 // toPublicInstance never throws: every grafted method degrades to a documented no-op (dlog +
 // return) when its target node (or measureLayout's relative node) isn't committed. So there is
@@ -22,7 +20,10 @@ import {
   toPublicInstance,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 77;
 const METHOD_NAMES = [
@@ -34,14 +35,11 @@ const METHOD_NAMES = [
   'blur',
 ] as const;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 
 function methodOf(node: ISymbioteNode, name: string): unknown {
   return Reflect.get(node, name);
-}
-
-function appView(): IFakeNode {
-  return fabric.appRoot().children[0];
 }
 
 // Mount + commit a fresh public instance as the app's single child, so commit.ts's
@@ -57,13 +55,10 @@ function mountCommitted(): ReturnType<typeof toPublicInstance> {
 
 beforeEach(() => {
   fabric.reset();
-  const slot = globalThis.nativeFabricUIManager;
-  if (slot) {
-    slot.measure = (_node, callback) => callback(1, 2, 30, 40, 5, 6);
-    slot.measureInWindow = (_node, callback) => callback(10, 20, 30, 40);
-    slot.measureLayout = (_node, _relativeToNode, _onFail, onSuccess) =>
-      onSuccess(1, 2, 30, 40);
-  }
+  fabric.measure = (_handle, callback) => callback(1, 2, 30, 40, 5, 6);
+  fabric.measureInWindow = (_handle, callback) => callback(10, 20, 30, 40);
+  fabric.measureLayout = (_handle, _relativeTo, _onFail, onSuccess) =>
+    onSuccess(1, 2, 30, 40);
 });
 
 describe('toPublicInstance', () => {
@@ -120,7 +115,7 @@ describe('toPublicInstance', () => {
       // Coalesced with every other write made in this task; it lands at the microtask boundary,
       // still well before the frame paints. This is the ref-facing half of that contract.
       await Promise.resolve();
-      expect(appView().props.nativeID).toBe('grafted');
+      expect(live.nodeOf(instance).payload.nativeID).toBe('grafted');
     });
 
     // why: a ref call before the node is ever committed (e.g. an effect racing the

@@ -15,7 +15,11 @@
 
 import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 // SIDE-EFFECT IMPORT: registerTouchableOpacityBehavior / registerTouchableHighlightBehavior build
 // the fade/underlay machines these tags run on.
 import './register';
@@ -28,7 +32,8 @@ const TOUCH_END = 'topTouchEnd';
 const ACTIVE_OPACITY = 0.3;
 const UNDERLAY = '#101010';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 
 // The commit is a microtask, so a case that never runs the fake clock still needs one drain. Real
 // timers are faked for the whole suite (below), so this must not be a `setTimeout` tick.
@@ -87,27 +92,29 @@ afterEach(() => {
   Reflect.deleteProperty(globalThis, 'cancelAnimationFrame');
 });
 
-function committed(predicate: (node: IFakeNode) => boolean): IFakeNode {
-  let found: IFakeNode | undefined;
-  const walk = (nodes: IFakeNode[]): void => {
-    for (const node of nodes) {
-      if (found === undefined && predicate(node)) found = node;
-      walk(node.children);
-    }
-  };
-  walk(fabric.committed);
+function committed(predicate: (node: ILiveNode) => boolean): ILiveNode {
+  const found = live.findLive(live.appRoot(), predicate);
   if (found === undefined) throw new Error('no committed node matched');
   return found;
 }
 
-function target(): IFakeNode {
-  return committed(node => node.props.testID === TARGET);
+function target(): ILiveNode {
+  return committed(node => node.payload.testID === TARGET);
 }
 
-function createdTarget(): IFakeNode {
-  const node = fabric.find(n => n.props.testID === TARGET);
-  if (node === undefined) throw new Error(`no node created testID=${TARGET}`);
-  return node;
+// TouchableHighlight's underlay is `foldTouchableHighlightUnderlay` in the engine since 2026-09-18,
+// and this host builds payloads through the TypeScript `fabricProps`, which carries no copy of the
+// tag rules — so the painted colour is not readable here. The BIT is (`OP_SET_UNDERLAY_SHOWN`), and
+// it is what these cases actually claim: that SOLID's renderer reaches the machine. What a showing
+// underlay looks like is asserted on a real payload in
+// `core/engine/cpp/tests/js/touchable-highlight-underlay.itest.ts`.
+//
+// Located by TAG rather than by testID: a `<touchable-highlight>` commits as a plain `RCTView`, so
+// the tag is the only exact locator.
+function isUnderlayShown(): boolean {
+  const node = fabric.find(n => n.tagName === 'touchable-highlight');
+  if (node === undefined) throw new Error('no touchable-highlight was created');
+  return node.underlayShown;
 }
 
 describe('Solid: `touchable-opacity` and `touchable-highlight` as tags', () => {
@@ -122,11 +129,11 @@ describe('Solid: `touchable-opacity` and `touchable-highlight` as tags', () => {
         </touchable-opacity>
       ));
       await tick();
-      expect(target().props.opacity).toBe(1);
+      expect(target().payload.opacity).toBe(1);
 
-      fabric.fireEvent(createdTarget().instanceHandle, TOUCH_START);
+      fabric.fireEvent(target().instanceHandle, TOUCH_START);
       await tick();
-      expect(target().props.opacity).toBe(ACTIVE_OPACITY);
+      expect(target().payload.opacity).toBe(ACTIVE_OPACITY);
     });
 
     // why: release fades back to the STYLE's own opacity (not a hard 1) over 250ms — proving the
@@ -143,13 +150,13 @@ describe('Solid: `touchable-opacity` and `touchable-highlight` as tags', () => {
       ));
       await tick();
 
-      const handle = createdTarget().instanceHandle;
+      const handle = target().instanceHandle;
       fabric.fireEvent(handle, TOUCH_START);
       await tick();
       fabric.fireEvent(handle, TOUCH_END);
       await settle();
 
-      expect(target().props.opacity).toBe(0.8);
+      expect(target().payload.opacity).toBe(0.8);
     });
 
     // why: onPress/onPressIn/onPressOut are the app's own callbacks — the fade must not swallow
@@ -168,7 +175,7 @@ describe('Solid: `touchable-opacity` and `touchable-highlight` as tags', () => {
       ));
       await tick();
 
-      const handle = createdTarget().instanceHandle;
+      const handle = target().instanceHandle;
       fabric.fireEvent(handle, TOUCH_START);
       await tick();
       fabric.fireEvent(handle, TOUCH_END);
@@ -179,12 +186,16 @@ describe('Solid: `touchable-opacity` and `touchable-highlight` as tags', () => {
       expect(pressOuts).toBe(1);
     });
 
-    // why: RN marks every Touchable accessible unless the app opts OUT — a missing default silently
-    // drops a screen reader's ability to find the control.
-    it('marks itself accessible by default', async () => {
+    // why: the tag reaches a committed node at all, which is the half this host can still answer.
+    // `accessible !== false` itself is `foldPressableProps` in the engine now
+    // (`SymbioteFabricProps.cpp`) and this host builds payloads through the TypeScript `fabricProps`,
+    // which carries no copy of the tag rules — asserting the default here would fail for the right
+    // reason today and pass for the wrong one the moment someone mirrored it back into JS. The
+    // default is proven in `core/engine/cpp/tests/js/touchable-payload.itest.ts`.
+    it('commits a node for the bare tag', async () => {
       mount(ROOT_TAG, () => <touchable-opacity testID={TARGET} />);
       await tick();
-      expect(target().props.accessible).toBe(true);
+      expect(target().payload.testID).toBe(TARGET);
     });
 
     // why: Solid tags are reactive per-prop, unlike the old wrapper's memo — a later prop change
@@ -195,23 +206,21 @@ describe('Solid: `touchable-opacity` and `touchable-highlight` as tags', () => {
         <touchable-opacity testID={TARGET} activeOpacity={active()} />
       ));
       await tick();
-      const createdAtMount = fabric.counts.createNode;
+      const handleAtMount = target().handle;
 
-      fabric.fireEvent(createdTarget().instanceHandle, TOUCH_START);
+      fabric.fireEvent(target().instanceHandle, TOUCH_START);
       await tick();
-      expect(target().props.opacity).toBe(0.2);
+      expect(target().payload.opacity).toBe(0.2);
 
-      fabric.fireEvent(createdTarget().instanceHandle, TOUCH_END);
+      fabric.fireEvent(target().instanceHandle, TOUCH_END);
       await settle();
       setActive(0.6);
       await tick();
 
-      fabric.fireEvent(createdTarget().instanceHandle, TOUCH_START);
+      fabric.fireEvent(target().instanceHandle, TOUCH_START);
       await tick();
-      expect(target().props.opacity).toBe(0.6);
-      expect(fabric.counts.createNode, 'the node kept its identity').toBe(
-        createdAtMount,
-      );
+      expect(target().payload.opacity).toBe(0.6);
+      expect(target().handle, 'the node kept its identity').toBe(handleAtMount);
     });
   });
 
@@ -234,25 +243,22 @@ describe('Solid: `touchable-opacity` and `touchable-highlight` as tags', () => {
         </touchable-highlight>
       ));
       await tick();
-      expect(target().props.backgroundColor).not.toBe(UNDERLAY);
+      expect(isUnderlayShown()).toBe(false);
 
-      const handle = createdTarget().instanceHandle;
+      const handle = target().instanceHandle;
       fabric.fireEvent(handle, TOUCH_START);
       await tick();
-      expect(target().props.backgroundColor).toBe(UNDERLAY);
-      expect(target().props.opacity).toBeUndefined();
-      expect(
-        committed(node => node.props.testID === HIGHLIGHT_CHILD).props.opacity,
-      ).toBe(ACTIVE_OPACITY);
+      expect(isUnderlayShown()).toBe(true);
+      // Both feedback props reached the node, which is Solid's half; what the engine's rule makes of
+      // them is the itest's.
+      expect(target().payload.underlayColor).toBe(UNDERLAY);
+      expect(target().payload.activeOpacity).toBe(ACTIVE_OPACITY);
 
       // The release re-shows before scheduling the hide, and the hide is a TIMER even at
       // delayPressOut: 0 (RN holds the underlay past a fast tap) — settle() drains it.
       fabric.fireEvent(handle, TOUCH_END);
       await settle();
-      expect(target().props.backgroundColor).not.toBe(UNDERLAY);
-      expect(
-        committed(node => node.props.testID === HIGHLIGHT_CHILD).props.opacity,
-      ).not.toBe(ACTIVE_OPACITY);
+      expect(isUnderlayShown()).toBe(false);
     });
 
     // why: `handlePressIn` shows on grant and `handlePress` re-affirms it before scheduling the
@@ -273,7 +279,7 @@ describe('Solid: `touchable-opacity` and `touchable-highlight` as tags', () => {
       ));
       await tick();
 
-      const handle = createdTarget().instanceHandle;
+      const handle = target().instanceHandle;
       fabric.fireEvent(handle, TOUCH_START);
       await tick();
       fabric.fireEvent(handle, TOUCH_END);
@@ -291,9 +297,9 @@ describe('Solid: `touchable-opacity` and `touchable-highlight` as tags', () => {
       ));
       await tick();
 
-      fabric.fireEvent(createdTarget().instanceHandle, TOUCH_START);
+      fabric.fireEvent(target().instanceHandle, TOUCH_START);
       await tick();
-      expect(target().props.backgroundColor).not.toBe(UNDERLAY);
+      expect(isUnderlayShown()).toBe(false);
     });
 
     // why: RN marks every Touchable accessible unless the app opts OUT — Opacity already had this

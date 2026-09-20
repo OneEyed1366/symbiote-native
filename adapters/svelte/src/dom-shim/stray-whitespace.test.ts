@@ -12,7 +12,10 @@ import { compile } from 'svelte/compiler';
 import { rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 import { mount, unmount } from '../render';
 
 if (globalThis.window === undefined)
@@ -22,7 +25,8 @@ if (globalThis.navigator === undefined) {
 }
 
 const ROOT_TAG = 91_741;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -53,18 +57,14 @@ async function load(source: string): Promise<Component> {
   return component;
 }
 
-// The LIVE tree: fabric.find() reads the creation log, which never reflects a later clone
+// The LIVE tree: the recording reads as a creation log, which never reflects a later clone
 // (symbiote-engine-core §8).
 function rawTexts(): string[] {
   const out: string[] = [];
-  const walk = (nodes: readonly IFakeNode[]): void => {
-    for (const node of nodes) {
-      if (node.viewName.includes('RawText'))
-        out.push(String(node.props.text ?? ''));
-      walk(node.children);
-    }
-  };
-  walk(fabric.committed);
+  live.walkLive(live.appRoot(), node => {
+    if (node.viewName.includes('RawText'))
+      out.push(String(node.payload.text ?? ''));
+  });
   return out;
 }
 

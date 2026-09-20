@@ -90,6 +90,37 @@ module.exports = {
 };
 ```
 
+## Primitives are plain intrinsic tags — `<view>`/`<text>`/`<pressable>`, no component involved
+
+An app writes the lowercase tags directly (`view`, `text`, `pressable`, …) — `babel-preset-solid`'s
+own `isComponent` check already treats a lowercase name as an element, so JSX compiles straight to
+`createElement`/`setProp` calls against `symbiote-view` etc., no import and nothing to opt into.
+Nothing rewrites the source on the way there, so this adapter carries no Babel plugin of its own.
+
+## `./renderer` is a compiler target, not a convenience export
+
+`babel-preset-solid` with `generate: 'universal'` rewrites JSX into direct calls imported from the
+`moduleName` it was given. So `src/renderer.ts` exports eleven specific names because generated code
+imports them; dropping one breaks bundling with a module-not-found on an import nobody wrote. The
+list (`createElement`, `createTextNode`, `insertNode`, `insert`, `setProp`, `use`, `effect`, `memo`,
+`createComponent`, `spread`, `mergeProps`) was verified by compiling representative JSX, not read off
+the docs.
+
+## Three things the universal runtime does that the seam has to answer correctly
+
+Each is a one-line decision in `src/renderer.ts` with a real failure behind it — the comments there
+cite the runtime line that forces them.
+
+1. **`createTextNode('')` is a placeholder, not content.** The runtime parks an empty text node where
+   a dynamic expression will go. An empty `RCTRawText` genuinely paints in Fabric, so an empty string
+   maps to an engine anchor instead (skipped by the commit walk).
+2. **`isTextNode` must answer "can I write a string into this", not "did `createTextNode` make it".**
+   The runtime asks it about that placeholder anchor; answering `true` sends it to write text into a
+   node that never reaches Fabric.
+3. **Anchors stay visible to `getFirstChild`/`getNextSibling`.** The runtime re-derives positions
+   through those lookups, so hiding a node it inserted itself desyncs its bookkeeping from the tree.
+   Anchors are invisible to Fabric, not to traversal.
+
 `tsconfig.json` points `jsxImportSource` at this package — the whole typing setup, no
 `solid-env.d.ts`, no per-file pragma:
 

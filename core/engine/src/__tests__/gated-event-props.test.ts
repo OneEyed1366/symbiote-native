@@ -8,7 +8,10 @@
 // committed payload, which is what native actually reads, and it is the assertion that would have
 // caught the five gates the engine shipped without (onTextLayout + the four accessibility ones).
 import { describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 import {
   createElement,
   createSurface,
@@ -17,7 +20,10 @@ import {
   type ISymbioteNode,
 } from '../index';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+// The gate is a PAYLOAD fact — the engine raises the flag on the way into what Fabric is handed,
+// not onto the author's prop bag — so every read below is `.payload`.
+const live = createLiveTree(fabric);
 
 // [event name after listenerName, payload key, the view the gate belongs to]
 const GATES: ReadonlyArray<readonly [string, string, string]> = [
@@ -37,7 +43,9 @@ function commitOne(build: (node: ISymbioteNode) => void, view: string) {
   build(node);
   surface.appendChild(node);
   surface.commit();
-  return { surface, committed: fabric.appRoot().children[0] };
+  // The node itself, not a lookup from a root: this file builds a fresh surface per case and
+  // already holds the node it committed, so there is nothing to search for.
+  return { surface, committed: live.nodeOf(node) };
 }
 
 // The gate is a payload fact, and there is no input that makes raising one throw — an unknown
@@ -52,7 +60,7 @@ describe('Fabric boolean event gates reach the committed payload', () => {
         view,
       );
 
-      expect(committed.props[flagProp]).toBe(true);
+      expect(committed.payload[flagProp]).toBe(true);
     },
   );
 
@@ -70,7 +78,7 @@ describe('Fabric boolean event gates reach the committed payload', () => {
         view,
       );
 
-      expect(committed.props[flagProp]).toBe(true);
+      expect(committed.payload[flagProp]).toBe(true);
     },
   );
 
@@ -85,12 +93,12 @@ describe('Fabric boolean event gates reach the committed payload', () => {
       setEventListener(node, event, () => {});
       surface.appendChild(node);
       surface.commit();
-      expect(fabric.appRoot().children[0].props[flagProp]).toBe(true);
+      expect(live.nodeOf(node).payload[flagProp]).toBe(true);
 
       setEventListener(node, event, undefined);
       surface.commit();
 
-      expect(fabric.appRoot().children[0].props[flagProp] ?? null).toBeNull();
+      expect(live.nodeOf(node).payload[flagProp] ?? null).toBeNull();
     },
   );
 
@@ -105,7 +113,7 @@ describe('Fabric boolean event gates reach the committed payload', () => {
     }, 'RCTView');
 
     expect(
-      Object.keys(committed.props).filter(key => key.startsWith('on')),
+      Object.keys(committed.payload).filter(key => key.startsWith('on')),
     ).toEqual([]);
   });
 });

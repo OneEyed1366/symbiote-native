@@ -9,13 +9,13 @@ import '@angular/compiler';
 import { Component } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { clearGlobalStyles } from '@symbiote-native/engine';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../../render';
 import { KeyboardAvoidingView } from './index';
 
 const ROOT_TAG = 917;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 
 // ngOnInit subscribes to the Keyboard module unconditionally, which requires a bridgeless native
 // event hub to be present (core/engine/src/native-events.ts) — same minimal fake
@@ -54,20 +54,10 @@ class KeyboardAvoidingViewOneSubscriberFixture {
   onAction(): void {}
 }
 
-function committedNode(testID: string): IFakeNode | undefined {
-  const visit = (node: IFakeNode): IFakeNode | undefined => {
-    if (node.props.testID === testID) return node;
-    for (const child of node.children) {
-      const found = visit(child);
-      if (found) return found;
-    }
-    return undefined;
-  };
-  for (const root of fabric.committed) {
-    const found = visit(root);
-    if (found) return found;
-  }
-  return undefined;
+// The recording host mutates a node's props IN PLACE (no clone-on-write), so `fabric.find`
+// reflects a gate flag set after mount just as well as one set at creation.
+function committedProps(testID: string): Record<string, unknown> | undefined {
+  return fabric.find(node => node.props.testID === testID)?.props;
 }
 
 beforeEach(() => {
@@ -83,7 +73,7 @@ describe('KeyboardAvoidingView accessibility gate', () => {
     mount(ROOT_TAG, KeyboardAvoidingViewNoSubscriberFixture);
     await new Promise<void>(resolve => setTimeout(resolve, 0));
 
-    const props = committedNode('kav')?.props;
+    const props = committedProps('kav');
     expect(props?.onLayout).toBe(true);
     expect(props?.onAccessibilityAction ?? null).toBeNull();
     expect(props?.onAccessibilityTap ?? null).toBeNull();
@@ -95,7 +85,7 @@ describe('KeyboardAvoidingView accessibility gate', () => {
     mount(ROOT_TAG, KeyboardAvoidingViewOneSubscriberFixture);
     await new Promise<void>(resolve => setTimeout(resolve, 0));
 
-    const props = committedNode('kav')?.props;
+    const props = committedProps('kav');
     expect(props?.onAccessibilityAction).toBe(true);
     expect(props?.onLayout).toBe(true);
     expect(props?.onAccessibilityTap ?? null).toBeNull();

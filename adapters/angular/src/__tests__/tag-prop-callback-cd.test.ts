@@ -15,14 +15,15 @@
 import '@angular/compiler';
 import { Component } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import { childrenOf, propsOf } from '@symbiote-native/engine';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 
 import '../register';
 import { mount, unmount } from '../render';
 import { SYMBIOTE_ELEMENTS } from '../elements';
 
 const ROOT_TAG = 9482;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -44,22 +45,15 @@ class TagPropCdHost {
   };
 }
 
-function findCommitted(
-  predicate: (node: IFakeNode) => boolean,
-): IFakeNode | undefined {
-  const stack = [...fabric.committed];
-  while (stack.length > 0) {
-    const node = stack.pop();
-    if (node === undefined) continue;
-    if (predicate(node)) return node;
-    stack.push(...node.children);
-  }
-  return undefined;
-}
-
+// The recording host mutates a node's props IN PLACE (no clone-on-write), so `fabric.find`
+// reflects a mutation made after mount just as well as one made at creation.
 function readout(): string | undefined {
-  const raw = findCommitted(n => n.props.testID === 'readout')?.children[0];
-  return typeof raw?.props.text === 'string' ? raw.props.text : undefined;
+  const node = fabric.find(n => n.props.testID === 'readout');
+  if (node === undefined) return undefined;
+  const [rawText] = childrenOf(node.handle);
+  if (rawText === undefined) return undefined;
+  const text = propsOf(rawText).text;
+  return typeof text === 'string' ? text : undefined;
 }
 
 // The stable event target: identity survives clone-on-write.

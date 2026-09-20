@@ -10,9 +10,9 @@
 import { describe, expect, it } from 'vitest';
 import { AnimatedValue, AnimatedMock } from '@symbiote-native/engine';
 import type { IEndResult } from '@symbiote-native/engine';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 
-installFabric();
+installRecordingFabric();
 
 describe('AnimatedMock — Positive (every animation resolves synchronously)', () => {
   it('timing jumps to toValue synchronously and fires the callback exactly once', () => {

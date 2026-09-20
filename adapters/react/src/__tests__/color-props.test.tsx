@@ -7,7 +7,10 @@ import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '@symbiote-native/react';
 import { setColorProcessor } from '@symbiote-native/engine';
-import { installFabric } from '@symbiote-native/test-utils';
+// A RECORDING host, and every read is of the PAYLOAD: a colour key arrives inside `style` and only
+// becomes a top-level processed value on the way into the payload, which is exactly what this file
+// is about. The node's own prop bag still holds the author's style object.
+import { installRecordingFabric, payloadOf } from '@symbiote-native/test-utils';
 
 // A real RN processColor turns 'red' into a platform int; this sentinel int proves the
 // key passed through processValue (COLOR_PROPS.has(key)) rather than reaching Fabric raw.
@@ -31,7 +34,7 @@ function App(): ReactElement {
   return <view style={style} />;
 }
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 beforeEach(() => {
   fabric.reset();
   setColorProcessor(() => PROCESSED_COLOR);
@@ -54,16 +57,19 @@ describe('COLOR_PROPS processing', () => {
 
       // The app's View is the RCTView carrying a color key, not the synthetic root.
       const view = fabric.find(
-        n => n.viewName === 'RCTView' && COLOR_KEYS.some(k => k in n.props),
+        n =>
+          n.viewName === 'RCTView' &&
+          COLOR_KEYS.some(k => k in payloadOf(n.handle)),
       );
       expect(view, 'a styled RCTView was committed').toBeDefined();
 
+      const payload = payloadOf(view!.handle);
       for (const key of COLOR_KEYS) {
         expect(
-          view!.props[key],
+          payload[key],
           `"${key}" must not reach Fabric as the raw string`,
         ).not.toBe('red');
-        expect(view!.props[key], `"${key}" must be the processed int`).toBe(
+        expect(payload[key], `"${key}" must be the processed int`).toBe(
           PROCESSED_COLOR,
         );
       }

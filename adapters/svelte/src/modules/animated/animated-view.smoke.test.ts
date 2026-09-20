@@ -25,7 +25,11 @@ import { rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
 import { AnimatedValue } from '@symbiote-native/engine';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 import { mount, unmount } from '../../render';
 
 if (globalThis.window === undefined)
@@ -37,34 +41,20 @@ if (globalThis.navigator === undefined) {
 // false throughout, so this exercises the plain JS-driven fallback exclusively.
 globalThis.nativeModuleProxy = undefined;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const ROOT_TAG = 91_103;
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
-// fabric.find() walks the CREATION log, which never reflects a later clone's props
-// (svelte-adapter-dom-shim skill §15's documented gotcha) — a live-value assertion must
-// instead walk the currently COMMITTED tree, same as activity-indicator.smoke.test.ts's
-// findLive. Filtering on viewName==='RCTView' alone is not enough to identify OUR node:
-// root-element.ts's own mount target is ITSELF an unlabeled `view` (RCTView, {}
-// props), sitting between the AppContainer and our View's real host node — so the search
-// must key on a prop only our own View carries (testID), not the generic viewName.
-function findLive(
-  node: IFakeNode,
-  predicate: (n: IFakeNode) => boolean,
-): IFakeNode | undefined {
-  if (predicate(node)) return node;
-  for (const child of node.children) {
-    const found = findLive(child, predicate);
-    if (found !== undefined) return found;
-  }
-  return undefined;
-}
-
-function appView(): IFakeNode {
-  const node = findLive(
-    fabric.appRoot(),
-    n => n.props.testID === 'animated-box',
+// Filtering on viewName==='RCTView' alone is not enough to identify OUR node: root-element.ts's
+// own mount target is ITSELF an unlabeled `view` (RCTView, {} props), sitting between the
+// AppContainer and our View's real host node — so the search must key on a prop only our own
+// View carries (testID), not the generic viewName.
+function appView(): ILiveNode {
+  const node = live.findLive(
+    live.appRoot(),
+    n => n.payload.testID === 'animated-box',
   );
   if (node === undefined)
     throw new Error('no node with testID="animated-box" committed');
@@ -120,7 +110,8 @@ describe('Animated.View (real compiled source) JS-driven path (Positive)', () =>
     await tick();
 
     expect(appView().viewName).toBe('RCTView');
-    expect(appView().props.opacity).toBe(0.25);
+    // opacity travels through the style slot, so it only shows up in the flattened payload.
+    expect(appView().payload.opacity).toBe(0.25);
   });
 
   // why: this is the everyday (non-native-driver) path every Animated consumer hits before opting
@@ -138,6 +129,6 @@ describe('Animated.View (real compiled source) JS-driven path (Positive)', () =>
     opacity.setValue(0.75);
     await tick();
 
-    expect(appView().props.opacity).toBe(0.75);
+    expect(appView().payload.opacity).toBe(0.75);
   });
 });

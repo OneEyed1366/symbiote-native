@@ -13,7 +13,7 @@
 import { createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount } from '@symbiote-native/react';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import { useGyroscope } from './index';
 import type { IGyroscopeMeasurement } from '../../../core';
 
@@ -45,7 +45,7 @@ function Probe(props: { updateIntervalMs?: number }): ReactElement {
   return createElement('view');
 }
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 
 beforeEach(() => {
   fabric.reset();

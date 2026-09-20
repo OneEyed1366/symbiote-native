@@ -10,7 +10,11 @@
 import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '@symbiote-native/react';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 
 const NATIVE_ID = 'accessory-1';
 const BACKGROUND_COLOR = '#eee';
@@ -31,12 +35,16 @@ function App(): ReactElement {
   );
 }
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-function accessoryNode(): IFakeNode {
-  const node = fabric.find(n => n.viewName === 'RCTInputAccessoryView');
+function accessoryNode(): ILiveNode {
+  const node = live.findLive(
+    live.appRoot(),
+    n => n.viewName === 'RCTInputAccessoryView',
+  );
   expect(node, 'an RCTInputAccessoryView was created').toBeDefined();
   return node!;
 }
@@ -49,9 +57,9 @@ describe('InputAccessoryView', () => {
     it('mounts a real RCTInputAccessoryView carrying nativeID, backgroundColor, and flattened style', () => {
       mount(ROOT_TAG, <App />);
       const accessory = accessoryNode();
-      expect(accessory.props.nativeID).toBe(NATIVE_ID);
-      expect(accessory.props.backgroundColor).toBe(BACKGROUND_COLOR);
-      expect(accessory.props.flex).toBe(1);
+      expect(accessory.payload.nativeID).toBe(NATIVE_ID);
+      expect(accessory.payload.backgroundColor).toBe(BACKGROUND_COLOR);
+      expect(accessory.payload.flex).toBe(1);
     });
 
     // why: the fold builds no structural children of its own, so the caller's <text> must be the
@@ -69,12 +77,13 @@ describe('InputAccessoryView', () => {
     // somewhere along its own path when both are mounted together.
     it('keeps the nativeID <-> inputAccessoryViewID docking pair intact across both', () => {
       mount(ROOT_TAG, <App />);
-      const input = fabric.find(
+      const input = live.findLive(
+        live.appRoot(),
         n => n.viewName === 'RCTSinglelineTextInputView',
       );
       expect(input, 'a TextInput was created').toBeDefined();
-      expect(input!.props.inputAccessoryViewID).toBe(
-        accessoryNode().props.nativeID,
+      expect(input!.payload.inputAccessoryViewID).toBe(
+        accessoryNode().payload.nativeID,
       );
     });
   });

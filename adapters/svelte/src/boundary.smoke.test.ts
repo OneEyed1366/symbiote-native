@@ -18,7 +18,11 @@ import { compile } from 'svelte/compiler';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 import { mount, unmount } from './render';
 
 // RN sets both before any app code runs (setUpGlobals.js / setUpNavigator.js); a bare vitest
@@ -33,7 +37,8 @@ const ROOT_TAG = 91_302;
 const TMP_DIR = join(__dirname, '../build/__boundary_smoke__');
 const CHILD_MODULE = 'throwing-child.mjs';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -94,14 +99,18 @@ async function compileComponent(
 // mounted component (skill §15). Reading children off `fabric.appRoot()` rather than
 // `fabric.find()` is deliberate: find() walks the creation log and would still report a subtree
 // the boundary has since torn down.
-function appChildren(): IFakeNode[] {
-  const wrapper = fabric.appRoot().children[0];
+function appChildren(): ILiveNode[] {
+  const wrapper = live.nodeOf(live.appRoot()).children[0];
   expect(wrapper, 'the root wrapper view committed').toBeDefined();
   return wrapper?.children ?? [];
 }
 
 function testIds(): Array<unknown> {
   return appChildren().map(child => child.props.testID);
+}
+
+function serialize(nodes: readonly ILiveNode[]): string {
+  return nodes.map(node => live.serialize(node.handle)).join('');
 }
 
 type IThrowControl = {
@@ -164,7 +173,7 @@ describe('<svelte:boundary> (real compiled output, real fake-Fabric)', () => {
       // Exactly one child: the boundary itself must contribute NO native node of its own, and its
       // anchor must stay an engine anchor the commit walk skips.
       expect(testIds()).toEqual(['child']);
-      expect(fabric.serialize(appChildren())).toBe(
+      expect(serialize(appChildren())).toBe(
         'RCTView(RCTText(RCTRawText "ok"))',
       );
     });
@@ -196,7 +205,7 @@ describe('<svelte:boundary> (real compiled output, real fake-Fabric)', () => {
       await tick();
       await tick();
 
-      const listChildren = (): IFakeNode[] => appChildren()[0]?.children ?? [];
+      const listChildren = (): ILiveNode[] => appChildren()[0]?.children ?? [];
       expect(listChildren().map(child => child.props.testID)).toEqual([
         'a',
         'b',
@@ -214,7 +223,7 @@ describe('<svelte:boundary> (real compiled output, real fake-Fabric)', () => {
         'd',
         'a',
       ]);
-      expect(fabric.serialize(listChildren())).toBe(
+      expect(serialize(listChildren())).toBe(
         'RCTView(RCTText(RCTRawText "c"))RCTView(RCTText(RCTRawText "d"))RCTView(RCTText(RCTRawText "a"))',
       );
     });
@@ -253,7 +262,7 @@ describe('<svelte:boundary> (real compiled output, real fake-Fabric)', () => {
 
       // The child's own subtree must be fully gone, not merely hidden behind the failed snippet.
       expect(testIds()).toEqual(['failed']);
-      expect(fabric.serialize(appChildren())).toBe(
+      expect(serialize(appChildren())).toBe(
         'RCTView(RCTText(RCTRawText "child exploded"))',
       );
     });
@@ -293,7 +302,7 @@ describe('<svelte:boundary> (real compiled output, real fake-Fabric)', () => {
       // Back to exactly the child — the failed subtree must be torn down, and re-rendering the
       // children must not leave a second copy behind.
       expect(testIds()).toEqual(['child']);
-      expect(fabric.serialize(appChildren())).toBe(
+      expect(serialize(appChildren())).toBe(
         'RCTView(RCTText(RCTRawText "ok"))',
       );
     });

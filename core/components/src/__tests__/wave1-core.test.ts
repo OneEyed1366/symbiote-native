@@ -9,7 +9,6 @@
 import { describe, expect, it } from 'vitest';
 import { flattenStyle } from '@symbiote-native/engine';
 import type { IDescriptor, IDescriptorChild } from '../descriptor';
-import { renderInputAccessoryView } from '../view/render-input-accessory-view';
 import { renderModal } from '../view/render-modal';
 import {
   createInitialModalState,
@@ -27,39 +26,11 @@ function asDescriptor(child: IDescriptorChild | undefined): IDescriptor {
 // to describe is built by the behavior. Its coverage moved to
 // `behaviors/image-background.test.ts`, which asserts the COMMITTED tree rather than a descriptor.
 
-describe('renderInputAccessoryView', () => {
-  const style = { flex: 1 };
-  const host = renderInputAccessoryView({
-    nativeID: 'kbd-bar',
-    backgroundColor: '#eee',
-    style,
-    passthrough: { testID: 'iav', accessibilityLabel: 'bar' },
-  });
-
-  it('hosts a input-accessory-view forwarding its props', () => {
-    expect(host.type).toBe('input-accessory-view');
-    expect(host.props.nativeID).toBe('kbd-bar');
-    expect(host.props.backgroundColor).toBe('#eee');
-    expect(host.props.style).toBe(style);
-  });
-
-  it('merges passthrough and injects no structural children (the adapter adds user children)', () => {
-    expect(host.props.testID).toBe('iav');
-    expect(host.props.accessibilityLabel).toBe('bar');
-    expect(host.children).toHaveLength(0);
-  });
-
-  // ABSENT, not present-and-undefined, and the difference is load-bearing rather than tidy.
-  // `nativeID` has an alias source: the wrapper leaves `id` in passthrough and the renderer renames
-  // it, so a `nativeID: undefined` emitted here is written AFTER that rename and deletes it. The
-  // keys were briefly made unconditional on the reasoning that `setProp` collapses undefined to
-  // absent — true, and exactly what makes the write destructive instead of inert.
-  it('omits nativeID and backgroundColor when undefined', () => {
-    const bare = renderInputAccessoryView({ passthrough: {} });
-    expect('nativeID' in bare.props).toBe(false);
-    expect('backgroundColor' in bare.props).toBe(false);
-  });
-});
+// InputAccessoryView left this file the same way, and for a blunter reason: `mapInputAccessoryViewProps`
+// took the bag apart and reassembled it unchanged, so it was deleted rather than moved. The tag
+// commits the same payload with no fold at all — `core/engine/cpp/tests/js/touchable-payload.itest.ts`
+// — and the `undefined`-guard trap these cases existed to pin is recorded in
+// `view/render-input-accessory-view.ts`, where it can still be read by whoever reintroduces an alias.
 
 describe('renderModal', () => {
   it('builds a modal host with the default attributes', () => {

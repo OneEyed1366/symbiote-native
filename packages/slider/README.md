@@ -122,7 +122,7 @@ import { Slider } from '@symbiote-native/slider/solid';
 ```
 
 ```ts
-// Angular — examples/angular/App.ts
+// Angular — examples/angular/src/App.ts
 import { Slider } from '@symbiote-native/slider/angular';
 // ... Slider added to the component's `imports`, used the same way in its template.
 ```

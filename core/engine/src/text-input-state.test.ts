@@ -3,7 +3,7 @@
 // checking `TextInput-itest.js`'s focus()/blur()/isFocused() describe blocks against this module.
 import { afterEach, describe, expect, it } from 'vitest';
 import { appendChild, createElement, createSurface, routeProp } from './index';
-import { installFabric } from '../../test-utils/src/index';
+import { installRecordingFabric } from '../../test-utils/src/index';
 import {
   blurTextInput,
   currentlyFocusedInput,
@@ -12,7 +12,7 @@ import {
   setInputFocused,
 } from './text-input-state';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 let nextRootTag = 9900;
 
 function mountNode() {
@@ -27,7 +27,7 @@ function mountNode() {
 
 function commandNames(): string[] {
   return fabric.commands
-    .filter(entry => entry.node.viewName === 'AndroidTextInput')
+    .filter(entry => entry.viewName === 'AndroidTextInput')
     .map(entry => entry.commandName);
 }
 

@@ -1,10 +1,10 @@
-// An app-authored bare tag, compiled by the REAL Svelte compiler with the lowering preprocessor
-// OUT of the pipeline, mounted, and read off the committed Fabric tree.
+// An app-authored bare tag, compiled by the REAL Svelte compiler, mounted, and read off the
+// committed Fabric tree.
 //
-// `bare-tag-parity.test.ts` compares the wrapper against the `p={{…}}` bag the transform builds,
-// and `dom-shim/bare-tag-props.test.ts` drives `ShimElement` by hand. Neither answers the question
-// that decides whether the transform can be deleted: does ordinary per-attribute markup —
-// `<view testID="x" style={s} class="card" onPress={fn}>` — survive Svelte's own codegen.
+// `bare-tag-parity.test.ts` works on the `p={{…}}` bag and `dom-shim/bare-tag-props.test.ts` drives
+// `ShimElement` by hand. Neither answers the question an app actually asks: does ordinary
+// per-attribute markup — `<view testID="x" style={s} class="card" onPress={fn}>` — survive Svelte's
+// own codegen.
 //
 // It does not take one path. Measured against svelte@5.56.8 with the shipping options
 // (`{fragments:'tree', css:'external', generate:'client'}`), an attribute reaches the shim through
@@ -28,13 +28,21 @@
 // `get_setters` finds a real prototype setter — which it does only because `customElements.get()`
 // returns something truthy. See those two files for the mechanism; the last two `it`s below are
 // what pin it.
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
 import { rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
-import { installFabric } from '@symbiote-native/test-utils';
-import { registerRules } from '@symbiote-native/engine';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
+import {
+  isSymbioteNode,
+  propOf,
+  registerRules,
+  type ISymbioteNode,
+} from '@symbiote-native/engine';
 import './register';
 import { mount, unmount } from './render';
 
@@ -43,7 +51,14 @@ if (globalThis.window === undefined)
 if (globalThis.navigator === undefined)
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
+
+// Each `it` mounts its own surface under a fresh root tag with no shared reset in the original
+// suite — `installFabric`'s `appRoot()` tolerated that because `committed` only ever held the
+// live test's root. The recording host's creation log does not forget on its own, so `appRoot()`
+// (a `find` over that log) would keep answering with the FIRST surface ever created without this.
+beforeEach(() => fabric.reset());
 
 // Named for this suite alone — two suites sharing a compiled artifact race under a full run
 // (`.claude/rules/smoke-compiled-artifact-collisions.md`).
@@ -65,51 +80,40 @@ const settle = async (): Promise<void> => {
   await tick();
 };
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
-
 // Every arm labels its node with `id`, which the primitive fold turns into `nativeID`, rather than
 // with `testID`. On a tag whose name is not also an SVG element the compiler lowercases even a
 // DYNAMIC attribute name, so `testID` arrives as `testid` and a testID-keyed locator silently finds
 // nothing — a missing node reads as a broken fix. `id` is already lowercase everywhere.
-function findByLabel(
-  nodes: readonly unknown[],
-  label: string,
-): Record<string, unknown> | undefined {
-  for (const node of nodes) {
-    if (!isRecord(node)) continue;
-    const props = node.props;
-    if (isRecord(props) && props.nativeID === label) return props;
-    const children = node.children;
-    if (Array.isArray(children)) {
-      const hit = findByLabel(children, label);
-      if (hit !== undefined) return hit;
-    }
-  }
-  return undefined;
-}
 
-/** The committed props of the labelled node. */
+/** The committed payload of the labelled node — what the engine would hand the renderer for it. */
 function committedProps(label: string): Record<string, unknown> {
-  const hit = findByLabel(fabric.appRoot().children, label);
+  const hit = live.findLive(
+    live.appRoot(),
+    node => node.props.nativeID === label,
+  );
   if (hit === undefined) throw new Error(`no committed node labelled ${label}`);
-  return hit;
+  return hit.payload;
 }
 
-/** The ENGINE node behind it — where a listener lands, which no payload shows. */
-function engineNodeFor(label: string): Record<string, unknown> {
-  const found = fabric.find(node => {
-    const handle = node.instanceHandle;
-    return isRecord(handle) && isRecord(handle.props)
-      ? handle.props.nativeID === label
-      : false;
-  });
+/**
+ * The ENGINE node behind it — where a listener lands, which no payload shows.
+ *
+ * The label is asked of the HOST (`propOf`), not read off a field: JS holds no props now, and
+ * `instanceHandle` is the node itself.
+ */
+function engineNodeFor(label: string): ISymbioteNode {
+  const found = fabric.find(
+    node =>
+      isSymbioteNode(node.instanceHandle) &&
+      propOf(node.instanceHandle, 'nativeID') === label,
+  );
   const handle = found?.instanceHandle;
-  if (!isRecord(handle)) throw new Error(`no engine node labelled ${label}`);
+  if (!isSymbioteNode(handle))
+    throw new Error(`no engine node labelled ${label}`);
   return handle;
 }
 
-/** Compile a real `.svelte` source with NO lowering preprocessor, mount it, settle. */
+/** Compile a real `.svelte` source, mount it, settle. */
 async function mountSource(source: string, rootTag: number): Promise<void> {
   writeFileSync(
     PROBE_OUT,
@@ -379,10 +383,9 @@ describe('a callback prop a behavior reads off node.props', () => {
     );
 
     const node = engineNodeFor('cb');
-    const props = node.props;
     expect(
-      isRecord(props) && typeof props.onValueChange === 'function',
-      'the behavior reads this key off node.props',
+      typeof propOf(node, 'onValueChange') === 'function',
+      'the behavior reads this key off the node, not the listener stash',
     ).toBe(true);
 
     // The control: a name the ViewConfig DOES declare still becomes a listener, so this is not a

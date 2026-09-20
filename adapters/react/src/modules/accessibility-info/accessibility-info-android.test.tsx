@@ -10,27 +10,13 @@ import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount, findNodeHandle } from '@symbiote-native/react';
 import { AccessibilityInfo } from '../../../../../core/engine/src/accessibility-info/index.android';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 
-interface IAccessibilityCall {
-  node: IFakeNode;
-  eventType: string;
-}
-const a11yEvents: IAccessibilityCall[] = [];
-
-const fabric = installFabric();
-{
-  const slot: unknown = Reflect.get(globalThis, 'nativeFabricUIManager');
-  if (typeof slot !== 'object' || slot === null) {
-    throw new Error('installFabric did not install a slot');
-  }
-  Object.assign(slot, {
-    sendAccessibilityEvent(node: IFakeNode, eventType: string): void {
-      a11yEvents.push({ node, eventType });
-    },
-    dispatchCommand(): void {},
-  });
-}
+// The a11y event sink needed a hand-written slot override under the stand-in. The recording host
+// records it natively — `sendAccessibilityEvent` is one of the three imperative calls it keeps,
+// because each of them carries a request the ENGINE made rather than an answer a platform gave.
+const fabric = installRecordingFabric();
+const a11yEvents = fabric.accessibilityEvents;
 
 const ROOT_TAG = 7;
 
@@ -42,6 +28,10 @@ function lastEvent(): IAccessibilityCall {
 
 let box: unknown;
 let boxTag: number;
+// The ENGINE NODE behind the ref. What the a11y event names is a node, and the record carries that
+// node's handle — comparing handles is the claim directly, where comparing tags was the stand-in's
+// way of spelling it.
+let boxHandle: unknown;
 
 beforeEach(() => {
   fabric.reset();
@@ -64,6 +54,18 @@ beforeEach(() => {
   if (typeof tag !== 'number')
     throw new Error('findNodeHandle(ref) returned no tag');
   boxTag = tag;
+  // `props.style` is `[baseStyle, explicitStyle]` — `routeProp`'s published pair, not the raw
+  // object the JSX passed. The authored `{width, height}` lives in slot 1.
+  function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null;
+  }
+  const recorded = fabric.find(node => {
+    const style = node.props.style;
+    const explicitStyle = Array.isArray(style) ? style[1] : undefined;
+    return isRecord(explicitStyle) && explicitStyle.width === 10;
+  });
+  if (recorded === undefined) throw new Error('the box was never created');
+  boxHandle = recorded.handle;
 });
 afterEach(() => unmount(ROOT_TAG));
 
@@ -71,14 +73,14 @@ describe('AccessibilityInfo (Android)', () => {
   it("sendAccessibilityEvent('focus') routes the committed node + string through the slot", () => {
     AccessibilityInfo.sendAccessibilityEvent(box, 'focus');
     const call = lastEvent();
-    expect(call.node.tag).toBe(boxTag);
+    expect(call.handle).toBe(boxHandle);
     expect(call.eventType).toBe('focus');
   });
 
   it('the STRING eventType passes through unmapped (no int translation)', () => {
     AccessibilityInfo.sendAccessibilityEvent(box, 'click');
     const click = lastEvent();
-    expect(click.node.tag).toBe(boxTag);
+    expect(click.handle).toBe(boxHandle);
     expect(click.eventType).toBe('click');
 
     AccessibilityInfo.sendAccessibilityEvent(box, 'windowStateChange');

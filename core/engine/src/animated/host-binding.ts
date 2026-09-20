@@ -35,6 +35,7 @@ import {
   type IAnimatedLeafLifecycle,
 } from './leaf-lifecycle';
 import { setProp, type ISymbioteNode } from '../node';
+import { propOf, subtreesOf } from '../host-access';
 
 type IBinding = {
   // The animated props by name, RAW — each value still holds its AnimatedNode, because that is
@@ -137,7 +138,7 @@ function withBehaviorStyle(node: ISymbioteNode, style: unknown): unknown {
 /**
  * Give a node a behavior-owned animated style layer, or drop it by passing `undefined`.
  *
- * The seam a lowered `TouchableOpacity` needs: RN runs its press fade from an `Animated.View` whose
+ * The seam `<touchable-opacity>` needs: RN runs its press fade from an `Animated.View` whose
  * style is `[props.style, {opacity: anim}]` (TouchableOpacity.js:302), and a tag has no such
  * wrapper. The layer is bound to the leaf, never folded into `node.props.style` — so the behavior
  * can still read the AUTHOR's resting opacity back without seeing its own fade.
@@ -153,7 +154,7 @@ export function setAnimatedBehaviorStyle(
   }
   // Re-register against the style standing right now, so the pair the leaf holds is always
   // (author, layer) whichever of the two moved last.
-  bindAnimatedValue(node, 'style', node.props.style);
+  bindAnimatedValue(node, 'style', propOf(node, 'style'));
 }
 
 /**
@@ -294,9 +295,23 @@ export function detachAnimatedProps(node: ISymbioteNode): void {
  */
 export function reattachAnimatedProps(node: ISymbioteNode): void {
   if (!parked.has(node)) return;
+  // FLAT, one host read for the whole subtree — the twin of `reattachSubtree` in `host-behavior.ts`,
+  // which was converted when the teardown sweep turned out to be paying a JSI crossing per node.
+  // This one was missed then. It is reached far less often (the guard above is a WeakSet miss for
+  // every node of a freshly built tree) but costs the same per node when it does run, and a parked
+  // subtree is a whole screen's worth in the case it exists for — Svelte parking live nodes
+  // offscreen across commits.
+  //
+  // The recursion stopped at an unparked node where this skips it and carries on; the two agree
+  // because `parked` is filled by `detachAnimatedProps` over a whole detached subtree, so a node in
+  // it has its descendants in it.
+  for (const each of subtreesOf([node])) reattachOneAnimated(each);
+}
+
+function reattachOneAnimated(node: ISymbioteNode): void {
+  if (!parked.has(node)) return;
   parked.delete(node);
   const binding = bindings.get(node);
   if (binding !== undefined) reconcile(node, binding);
   reattachAnimatedEvents(node);
-  for (const child of node.children) reattachAnimatedProps(child);
 }

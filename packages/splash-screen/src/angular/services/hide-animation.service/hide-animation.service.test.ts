@@ -15,7 +15,7 @@ import { Component, inject, signal, type Signal } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount } from '@symbiote-native/angular';
 import { flattenStyle } from '@symbiote-native/engine';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import type { IImageSourceProp } from '@symbiote-native/components';
 import { hide as mockedHide } from 'react-native-bootsplash';
 import type {
@@ -44,7 +44,7 @@ const registeredNativeModules: Record<string, unknown> = {
 };
 
 const ROOT_TAG = 940;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 const settle = async (): Promise<void> => {

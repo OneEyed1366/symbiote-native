@@ -26,7 +26,7 @@ import { join } from 'node:path';
 import { compile } from 'svelte/compiler';
 import type { Component } from 'svelte';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import type { ISymbioteNode } from '@symbiote-native/engine';
 import '../register';
 import { mount } from '../render';
@@ -37,7 +37,7 @@ if (globalThis.window === undefined)
 if (globalThis.navigator === undefined)
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 
-installFabric();
+installRecordingFabric();
 const ROOT_TAG = 9702;
 // `-for-<consumer>` per .claude/rules/smoke-compiled-artifact-collisions.md: no other suite may
 // share this path, and a probe copied from this header must rename it too.

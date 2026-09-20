@@ -53,37 +53,24 @@
 // bare `import './register';` that the barrel does not re-export. Registered by ALL FIVE adapters
 // since 2026-09-09, in the same commit that deleted the five wrappers, which is what makes it safe:
 // while a wrapper still built its own Pressable + feedback View, registering would have left every
-// TouchableNativeFeedback with two responders. There is no `-managed` twin and none is possible —
-// this tag commits no node, so a second spelling would have nothing to name.
+// TouchableNativeFeedback with two responders.
 
 import {
-  ARIA_ALIAS_KEYS,
+  SLOT_DERIVED_ALL,
   appListenerFor,
   dispatchViewCommand,
-  foldAriaProps,
   markPropsDirty,
   Platform,
   registerHostBehavior,
   requestCommitFor,
   setBehaviorListener,
   type IHostBehavior,
-  type IPayloadFold,
   type ISymbioteEvent,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
 
-import {
-  resolveDisabledAccessibilityState,
-  resolveTouchableFocusable,
-} from '../view/render-pressable';
 import { resolveButtonDisabled } from '../view/render-button';
 import {
-  backgroundProps,
-  selectableBackground,
-  type INativeFeedbackBackground,
-} from '../view/render-touchable-native-feedback';
-import {
-  accessibleUnlessOptedOut,
   asAccessibilityState,
   attachPressMachine,
   booleanOr,
@@ -110,54 +97,20 @@ const touchableNativeFeedbackDisabled: IDisabledResolver = props =>
 // Read once, like `./button`'s: the platform cannot change under a running app.
 const IS_ANDROID = Platform.OS === 'android';
 
-// TouchableNativeFeedback.js:349-390, verbatim and in RN's own order. A CLOSED list, not a
-// passthrough: RN clones exactly these and nothing else, so a prop it does not name stays behind.
-// `accessibilityState`, `accessible`, `focusable` and `nativeID` are cloned too and are computed
-// below; `onLayout` and `onAccessibilityAction` are cloned as LISTENERS and forwarded by
-// `FORWARDED_LISTENERS`.
-const CLONED_PROPS: readonly string[] = [
-  'accessibilityHint',
-  'accessibilityLanguage',
-  'accessibilityLabel',
-  'accessibilityRole',
-  'accessibilityActions',
-  'accessibilityValue',
-  'importantForAccessibility',
-  'accessibilityViewIsModal',
-  'accessibilityLiveRegion',
-  'accessibilityElementsHidden',
-  'hasTVPreferredFocus',
-  'hitSlop',
-  'nextFocusDown',
-  'nextFocusForward',
-  'nextFocusLeft',
-  'nextFocusRight',
-  'nextFocusUp',
-  'testID',
-];
-
-// Owner props the cloned payload is COMPUTED from, on top of the verbatim list above. `focusable`
-// also derives from the `press` LISTENER, which is not a prop and is handled by
-// `onOwnedListenerChange` — a listener flip dirties no payload by itself.
-const DERIVED_FROM: readonly string[] = [
-  'background',
-  'useForeground',
-  'accessible',
-  'accessibilityState',
-  'disabled',
-  'focusable',
-  'id',
-  'nativeID',
-];
-
-// Every owner name the child's payload reads. Without it the clone is correct at mount and frozen
-// forever after: `markPropsDirty` bubbles UP, so an owner write never reaches the child on its own.
-// The aria half comes off the engine's own list rather than a second copy of it.
-const SLOT_DERIVED: readonly string[] = [
-  ...CLONED_PROPS,
-  ...DERIVED_FROM,
-  ...ARIA_ALIAS_KEYS,
-];
+// WHAT THE OWNER'S WRITES DIRTY, and it is EVERY name rather than a list of thirty.
+//
+// RN's clone list (`TouchableNativeFeedback.js:349-390`) lived here until 2026-09-18 as
+// `CLONED_PROPS` + `DERIVED_FROM` + `ARIA_ALIAS_KEYS`, feeding `slotDerived`. The clone itself is
+// `foldCloneOntoChild` in `SymbioteFabricProps.cpp`, so the list had stopped being the rule and
+// become a MIRROR of `kNativeFeedbackClonedKeys` — two lists that must agree, failing silently (the
+// clone goes stale on the one prop a list forgot) when they drift.
+//
+// `SLOT_DERIVED_ALL` is both the honest spelling and the cheaper one to keep: a `cloneElement` owner
+// re-clones on every render whatever changed, so it never derived its slot from a NAMED set in the
+// first place. The cost is a false dirty on an owner prop the clone does not carry, and for this tag
+// that is nearly empty — its owner is an anchor whose props reach Fabric nowhere else, so every name
+// it holds is either cloned or consumed by the press machine.
+const SLOT_DERIVED: readonly string[] = [SLOT_DERIVED_ALL];
 
 // The two RN clones as EVENTS rather than props (:386-387). Owned, so the app's callback stashes on
 // the owner and a trampoline installed on the child reads it at dispatch time — which keeps a fresh
@@ -182,34 +135,11 @@ const PRESS_LISTENERS: readonly string[] = [
   'responderTerminationRequest',
 ];
 
-function stringOr(value: unknown): string | undefined {
-  return typeof value === 'string' ? value : undefined;
-}
-
-// The background dicts our own factories produce, narrowed on the discriminant rather than cast.
-// Anything else reads as "not supplied", which is RN's `background === undefined` branch.
-function asFeedbackBackground(
-  value: unknown,
-): INativeFeedbackBackground | undefined {
-  if (typeof value !== 'object' || value === null) return undefined;
-  const type = Reflect.get(value, 'type');
-  if (type !== 'ThemeAttrAndroid' && type !== 'RippleAndroid') return undefined;
-  const attribute = Reflect.get(value, 'attribute');
-  const rippleRadius = Reflect.get(value, 'rippleRadius');
-  const radius = typeof rippleRadius === 'number' ? rippleRadius : undefined;
-  if (type === 'ThemeAttrAndroid') {
-    return attribute === 'selectableItemBackgroundBorderless'
-      ? { type, attribute, rippleRadius: radius }
-      : { type, attribute: 'selectableItemBackground', rippleRadius: radius };
-  }
-  const color = Reflect.get(value, 'color');
-  return {
-    type,
-    color: typeof color === 'string' ? color : null,
-    borderless: Reflect.get(value, 'borderless') === true,
-    rippleRadius: radius,
-  };
-}
+// `asFeedbackBackground` went with the fold, and `backgroundProps` — the slot pick it fed — followed
+// on 2026-09-18 as the orphan it had become. The first narrowed the app's `background` dict on its
+// discriminant; the C++ rule asks only whether the value is an OBJECT and copies it into the slot,
+// because the four factories that produce it (`render-touchable-native-feedback.ts`) are ours and
+// the payload is not a place to re-validate what a typed factory already built.
 
 // TouchableNativeFeedback.js:280 — `locationX ?? 0`. The bag is raw Fabric payload, so guard.
 function hotspotAt(nativeEvent: Record<string, unknown>, key: string): number {
@@ -266,63 +196,17 @@ export const nativeFeedbackRefinement: IPressConfigRefinement = (
   };
 };
 
-/**
- * `cloneElement(element, {…})` as a payload fold: the child's own props first, the owner's clone
- * list over them.
- *
- * OVERWRITING WITH `undefined` IS DELIBERATE and is RN's behaviour, not an accident of the spread.
- * React's `cloneElement` assigns every key of its config, so a TNF with no `accessibilityLabel`
- * clears the child's; `fabricProps` skips undefined values, which reproduces that exactly.
- *
- * Pure, as `IPayloadFold` requires — the owner is read, never written.
- */
-function cloneFold(owner: ISymbioteNode, inner: IPayloadFold | undefined) {
-  return (
-    props: Readonly<Record<string, unknown>>,
-  ): Record<string, unknown> => {
-    const next: Record<string, unknown> = {
-      ...(inner === undefined ? props : inner(props)),
-    };
-    // The owner's aria props are on the OWNER, so the engine's own fold at `fabricProps` — which
-    // reads the node being committed — never sees them. Run it here over the source bag instead of
-    // restating any of `:349-390`'s aria half; `hasAriaAlias` is the same sticky gate `fabricProps`
-    // uses, and the fold returns its input by identity when there is nothing to do.
-    const source = owner.hasAriaAlias
-      ? foldAriaProps(owner.props)
-      : owner.props;
-    for (const key of CLONED_PROPS) next[key] = source[key];
+// `cloneFold` LEFT THIS FILE ON 2026-09-18 — it is `foldCloneOntoChild` in
+// `SymbioteFabricProps.cpp`, and the seam it needed is the first rule keyed on the PARENT'S tag
+// rather than on the node's own (`IOwner`). The child of a TNF is whatever the app wrote, usually a
+// plain `<view>` with no tag at all, so nothing self-keyed could ever have reached it.
+//
+// What it cost to have had here: one JSI round trip per touchable per commit over an eighteen-key
+// bag, and `tag-rule-cost.itest.ts` prices a fold by what it MARSHALS rather than by what it does.
+//
+// Contract: `core/engine/cpp/tests/js/clone-onto-child-payload.itest.ts`.
 
-    // :369-372. `onPress` is an OWNED name, so it lives in the stash and never in `props`.
-    const disabled = booleanOr(source.disabled);
-    next.accessible = accessibleUnlessOptedOut(source);
-    next.focusable = resolveTouchableFocusable(
-      booleanOr(source.focusable),
-      appListenerFor(owner, 'press') !== undefined,
-      disabled,
-    );
-    // :373. RN gives `id` unconditional priority over `nativeID`.
-    next.nativeID = stringOr(source.id) ?? stringOr(source.nativeID);
-    // :318-323 folded by the engine above, then :324-330: an explicit `disabled` overrides the
-    // aria/accessibilityState answer. Same helper every wrapper calls, so both paths agree.
-    next.accessibilityState = resolveDisabledAccessibilityState(
-      asAccessibilityState(source.accessibilityState),
-      disabled,
-    );
-    // :343-348 + :402. `getBackgroundProp` returns null off Android, so nothing is spread there.
-    if (IS_ANDROID) {
-      Object.assign(
-        next,
-        backgroundProps(
-          asFeedbackBackground(source.background) ?? selectableBackground(),
-          source.useForeground === true,
-        ),
-      );
-    }
-    return next;
-  };
-}
-
-// Not RN's own list: RN drops these by never cloning them, and a lowered tag has no clone to omit
+// Not RN's own list: RN drops these by never cloning them, and a tag has no clone to omit
 // them from — they would ride into the child's payload as keys no ViewConfig declares. Same strip
 // `./pressable`'s fold does for the machine-only half, applied to the owner's bag instead.
 //
@@ -387,9 +271,10 @@ function onChildInserted(node: ISymbioteNode, child: ISymbioteNode): void {
   // `childHost` (node.ts), so this only runs when a framework inserts without removing first.
   if (previous !== undefined) detachPressMachine(previous);
   node.childHost = child;
-  child.payloadFold = cloneFold(node, child.payloadFold);
   // The owner's props were very likely written BEFORE this child existed (React and Solid set props
-  // at createInstance), so the fold owes a run even though nothing was written since.
+  // at createInstance), so the CLONE owes a run even though nothing was written since. Still owed
+  // now that the rule is in C++ and no fold is chained here: the rule runs on the child's commit,
+  // and a child nothing dirtied has no commit.
   markPropsDirty(child);
   arm(node, child);
 }

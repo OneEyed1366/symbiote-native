@@ -2,17 +2,21 @@
 // that leaves every test green and every button dead on device, so both get their own case:
 // the machine must be built AFTER props exist (not at attach, where node.props is `{}`), and the
 // pressed state must reach the style registry rather than the framework.
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // Relative rather than by package name: `core/components` does not declare test-utils, and adding
 // a workspace devDependency would need a `pnpm install` across a tree other sessions are working
 // in. A test-only import path costs nobody anything.
-import { installFabric, type IFakeNode } from '../../../test-utils/src/index';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '../../../test-utils/src/index';
 import {
   appendChild,
   clearGlobalStyles,
   clearHostBehaviors,
   createElement,
   createSurface,
+  propOf,
   registerRules,
   removeChild,
   routeProp,
@@ -22,7 +26,8 @@ import {
 } from '@symbiote-native/engine';
 import { PRESSABLE_TAG, registerPressableBehavior } from './pressable';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 let nextRootTag = 5000;
 
 // A pressable resolves to a plain view — there is no native pressable component. Which is exactly
@@ -61,22 +66,21 @@ function makePressable(): ISymbioteNode {
   return createElement(PRESSABLE_VIEW_NAME, false, PRESSABLE_TAG);
 }
 
+// Slot 0 of the published `[classStyle, explicitStyle]` pair, read back out of the HOST — the
+// engine keeps no props, so `propOf` is what a node's own style slot is now.
+function classStyleOf(node: ISymbioteNode): unknown {
+  const style = propOf(node, 'style');
+  return Array.isArray(style) ? style[0] : undefined;
+}
+
 // By testID, never by viewName: the committed tree carries container nodes of the same view name,
-// and a pressable's is `RCTView` like everything else.
+// and a pressable's is `RCTView` like everything else. Reads the PAYLOAD (`fabricProps`'s output),
+// not the authored bag — `opacity`/`focusable` are folds, never props the app wrote.
 function committedPropsOf(
   testID: string,
 ): Readonly<Record<string, unknown>> | undefined {
-  const walk = (
-    nodes: readonly IFakeNode[],
-  ): Readonly<Record<string, unknown>> | undefined => {
-    for (const node of nodes) {
-      if (node.props.testID === testID) return node.props;
-      const hit = walk(node.children);
-      if (hit !== undefined) return hit;
-    }
-    return undefined;
-  };
-  return walk(fabric.appRoot().children);
+  return live.findLive(live.appRoot(), node => node.payload.testID === testID)
+    ?.payload;
 }
 
 const TOUCH: ISymbioteEvent = {
@@ -99,6 +103,12 @@ function press(node: ISymbioteNode): void {
 function touchWithoutClaiming(node: ISymbioteNode): void {
   listenerOf(node, 'pressIn')(TOUCH);
 }
+
+beforeEach(() => {
+  // Every case opens its OWN surface, and `appRoot()` searches the CREATION log, so without this
+  // it answers with an earlier case's root for every case after the first.
+  fabric.reset();
+});
 
 afterEach(() => {
   clearHostBehaviors();
@@ -140,15 +150,11 @@ describe('pressable host behavior', () => {
     routeProp(node, 'class', 'btn');
     mount(node);
 
-    const style = node.props.style;
-    expect(Array.isArray(style) ? style[0] : undefined).toEqual({ opacity: 1 });
+    expect(classStyleOf(node)).toEqual({ opacity: 1 });
 
     press(node);
 
-    const pressedStyle = node.props.style;
-    expect(Array.isArray(pressedStyle) ? pressedStyle[0] : undefined).toEqual({
-      opacity: 0.6,
-    });
+    expect(classStyleOf(node)).toEqual({ opacity: 0.6 });
   });
 
   // What `ownedListeners` buys, stated as behaviour rather than as structure. `press`/`pressIn`/
@@ -217,10 +223,7 @@ describe('pressable host behavior', () => {
     touchWithoutClaiming(node);
 
     expect(onPressIn).toHaveBeenCalledTimes(1);
-    const style = node.props.style;
-    expect(Array.isArray(style) ? style[0] : undefined).toEqual({
-      opacity: 0.6,
-    });
+    expect(classStyleOf(node)).toEqual({ opacity: 0.6 });
   });
 
   // The other half of the gesture-open flag: it has to be CLEARED at the end, or the second gesture
@@ -251,8 +254,8 @@ describe('pressable host behavior', () => {
 
   // Dirtying is not publishing. A press arrives from a native event, outside every renderer
   // mutation path, so unless the behavior asks for one nothing ever commits — the node holds the
-  // pressed style and the screen keeps the unpressed one. Asserting `node.props.style` cannot see
-  // this: `pushClassStyle` writes that synchronously whether or not a commit follows.
+  // pressed style and the screen keeps the unpressed one. Asserting the node's own style slot
+  // cannot see this: `pushClassStyle` writes that synchronously whether or not a commit follows.
   it('commits the pressed style, not just dirties the node', async () => {
     registerRules([
       {
@@ -276,32 +279,15 @@ describe('pressable host behavior', () => {
     });
   });
 
-  // Pressable.js:258, and the whole reason there are TWO formulas rather than one. RN's Pressable
-  // has no press-handler and no disabled leg — a disabled Pressable with no callback stays in the
-  // focus order — so collapsing it onto the Touchable* formula would silently drop it out.
-  it('stays focusable while disabled and handler-less, and opts out only on a literal false', () => {
-    registerPressableBehavior();
-    const node = makePressable();
-    routeProp(node, 'testID', TEST_ID);
-    routeProp(node, 'disabled', true);
-    const surface = mount(node);
-
-    expect(committedPropsOf(TEST_ID)?.focusable).toBe(true);
-
-    routeProp(node, 'focusable', false);
-    surface.commit();
-    expect(committedPropsOf(TEST_ID)?.focusable).toBe(false);
-  });
-
-  // The control for the pair above: unregistered, nothing computes `focusable`, so neither reading
-  // can be an engine default.
-  it('writes no focusable when the behavior is not registered', () => {
-    const node = makePressable();
-    routeProp(node, 'testID', TEST_ID);
-    mount(node);
-
-    expect(committedPropsOf(TEST_ID)?.focusable).toBeUndefined();
-  });
+  // THE FOCUSABLE PAIR MOVED, with its control:
+  // `core/engine/cpp/tests/js/pressable-payload.itest.ts`. Pressable.js:258 is the engine's rule
+  // now (`foldPressableProps`), and this harness commits through the TypeScript `fabricProps`,
+  // which holds no copy of it — so a case left here would read a payload built by the wrong
+  // implementation, which is worse than no case at all.
+  //
+  // What it was pinning is intact there: a disabled, handler-less Pressable STAYS focusable (the
+  // formula has no disabled leg, unlike the Touchable* one), an explicit `false` opts out, and a
+  // tag with no behavior grows neither key.
 
   // The other half of keying by tag, and the reason the fix is not "register under the Fabric
   // name": a pressable IS an RCTView, so a Fabric-keyed registry would give the press machine to

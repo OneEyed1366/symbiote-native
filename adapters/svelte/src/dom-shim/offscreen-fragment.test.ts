@@ -14,7 +14,10 @@
 // spec and is worth pinning on its own.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 import {
   createSurface,
   disposeRoot,
@@ -34,7 +37,8 @@ if (globalThis.navigator === undefined) {
 
 const ROOT_TAG = 91_304;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -65,8 +69,8 @@ function markerView(testID: string): ShimElement {
 
 // AppContainer -> root wrapper -> whatever the test attached.
 function rootWrapperChildIds(): Array<unknown> {
-  const wrapper = fabric.appRoot().children[0];
-  return (wrapper?.children ?? []).map(child => child.props.testID);
+  const wrapper = live.nodeOf(live.appRoot()).children[0];
+  return (wrapper?.children ?? []).map(child => child.payload.testID);
 }
 
 // Positive-only: ShimNode's mutation API (appendChild/insertBefore/removeChild/fragment.append)

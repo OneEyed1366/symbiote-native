@@ -1,4 +1,3 @@
-
 type ICaveatNoteProps = {
   children: string;
   testID?: string;

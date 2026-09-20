@@ -32,9 +32,7 @@ const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.DeepLinking];
     <view class="section">
       <view :class="`line-tag line-tag-${lineInfo.line}`">
         <text class="line-tag-text">
-          {{
-            `${lineInfo.code} · ${lineInfo.label}`
-          }}
+          {{ `${lineInfo.code} · ${lineInfo.label}` }}
         </text>
       </view>
       <view class="hero-card">
@@ -42,14 +40,10 @@ const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.DeepLinking];
           class="hero-badge"
           :style="{ backgroundColor: LINE_COLOR.routing }"
         >
-          <text class="hero-badge-text">
-            DL
-          </text>
+          <text class="hero-badge-text"> DL </text>
         </view>
         <view class="hero-copy">
-          <text class="hero-title">
-            Deep linking
-          </text>
+          <text class="hero-title"> Deep linking </text>
           <text class="hero-body">
             A typed URL resolved to a route through resolveRouteFromUrl, the
             same path a real deep link or push notification would take.
@@ -57,12 +51,10 @@ const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.DeepLinking];
         </view>
       </view>
       <text class="info-text">
-        prefixes: symbiotecanaryvuesfc:// ·
-        https://canary.symbiote-native.dev
+        prefixes: symbiotecanaryvuesfc:// · https://canary.symbiote-native.dev
       </text>
       <text class="note-text">
-        Details → details/:id · HeaderOptions → header-options · TabsDemo →
-        tabs
+        Details → details/:id · HeaderOptions → header-options · TabsDemo → tabs
       </text>
       <text-input
         v-model="url"
@@ -78,13 +70,8 @@ const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.DeepLinking];
         :color="LINE_COLOR.routing"
       />
       <view class="parity-list">
-        <text
-          testID="deep-link-result"
-          class="list-row-text"
-        >
-          {{
-            resolved ?? 'tap Resolve to see the parsed route'
-          }}
+        <text testID="deep-link-result" class="list-row-text">
+          {{ resolved ?? 'tap Resolve to see the parsed route' }}
         </text>
       </view>
     </view>

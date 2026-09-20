@@ -104,12 +104,8 @@ function lineInfoFor(route: ITourRouteName) {
       content-container-style="scroll-content"
     >
       <view class="menu-hero">
-        <text class="menu-eyebrow">
-          NAVIGATION DEMO SUITE
-        </text>
-        <text class="menu-hero-title">
-          Twelve stops along the stack
-        </text>
+        <text class="menu-eyebrow"> NAVIGATION DEMO SUITE </text>
+        <text class="menu-hero-title"> Twelve stops along the stack </text>
         <text class="menu-hero-subtitle">
           Ten rows drive a different line of @symbiote-native/navigation —
           Primitives, Presentation, Structure, Introspection, Routing — on a
@@ -128,9 +124,7 @@ function lineInfoFor(route: ITourRouteName) {
       >
         <view :class="`menu-badge menu-badge-${lineInfoFor(item.route).line}`">
           <text class="menu-badge-text">
-            {{
-              lineInfoFor(item.route).code
-            }}
+            {{ lineInfoFor(item.route).code }}
           </text>
         </view>
         <view class="menu-row-copy">

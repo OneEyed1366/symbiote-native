@@ -15,7 +15,7 @@
 //     the view with zero JS per event.
 
 import { dlog } from '../debug';
-import { getNativeTag, whenCommitted } from '../commit';
+import { getNativeTag, whenCommitted } from '../imperative';
 import { isSymbioteNode, type ISymbioteNode } from '../node';
 import { AnimatedNode, flushValue } from './graph';
 import {

@@ -10,7 +10,7 @@
 import { defineComponent, h } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount } from '@symbiote-native/vue';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import { useKeepAwake } from './index';
 
 const ROOT_TAG = 9954;
@@ -35,7 +35,7 @@ vi.mock('../../../core/keep-awake', () => ({
   deactivateKeepAwake: (tag: string) => deactivateKeepAwakeMock(tag),
 }));
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 
 beforeEach(() => {
   fabric.reset();

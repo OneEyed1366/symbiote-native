@@ -3,5 +3,11 @@
   "compilerOptions": {
     "types": ["jest", "detox", "node"]
   },
-  "include": ["**/*.ts"]
+  "include": ["**/*.ts"],
+  // `exclude` is INHERITED, and its entries resolve against the config that DECLARED them — so a
+  // parent excluding `"e2e"` lands that entry on THIS directory and leaves this project with zero
+  // inputs (TS18003). Not hypothetical: examples/svelte shipped that way, so its Detox specs had no
+  // project for an editor to resolve them through and ts-jest's `tsconfig: <rootDir>/tsconfig.json`
+  // pointed at an empty one. Restating exclude here makes the project independent of the parent's.
+  "exclude": ["node_modules"]
 }

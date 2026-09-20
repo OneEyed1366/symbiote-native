@@ -4,12 +4,15 @@
 // 1. A key that DISAPPEARS from the prop bag must be routed as `undefined` so the committed node
 //    resets it. Every other test only ever adds or changes a key, so `applyBagDiff`'s second pass
 //    could be deleted outright with nothing red.
-// 2. `attributes` is allocated lazily (a lowered primitive carries everything in the bag and never
+// 2. `attributes` is allocated lazily (a bag-carrying element puts everything in `p` and never
 //    touches it), which makes the attribute API itself worth pinning — `getAttribute` could be
 //    hard-coded to `null` and nothing failed.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 import {
   createSurface,
   disposeRoot,
@@ -27,7 +30,8 @@ if (globalThis.navigator === undefined) {
 
 const ROOT_TAG = 91_318;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -50,31 +54,24 @@ function liveRoot(): ShimElement {
   return createRootShimElement(surface);
 }
 
-// The LIVE committed tree, never `fabric.find()` — a search hit is the pre-clone node and would
-// report the original bag forever.
-function committedPropsOf(testID: string): Record<string, unknown> {
-  const walk = (
-    nodes: ReadonlyArray<{
-      props: Record<string, unknown>;
-      children: ReadonlyArray<unknown>;
-    }>,
-  ): Record<string, unknown> | undefined => {
-    for (const node of nodes) {
-      if (node.props.testID === testID) return node.props;
-      const nested = node.children;
-      const hit = walk(
-        nested.filter(
-          (child): child is { props: Record<string, unknown>; children: [] } =>
-            typeof child === 'object' && child !== null,
-        ),
-      );
-      if (hit !== undefined) return hit;
-    }
-    return undefined;
-  };
-  const hit = walk(fabric.appRoot().children);
+// The LIVE tree, never the recording's own `find()` — a hit there is the node as it was CREATED
+// and would report the original bag forever.
+//
+// `accessibilityLabel` disambiguates two committed nodes that (deliberately, in the clone-isolation
+// test below) share the same `testID` — `find` would otherwise report whichever one it hits first.
+function committedPropsOf(
+  testID: string,
+  accessibilityLabel?: string,
+): Record<string, unknown> {
+  const hit = live.findLive(
+    live.appRoot(),
+    node =>
+      node.payload.testID === testID &&
+      (accessibilityLabel === undefined ||
+        node.payload.accessibilityLabel === accessibilityLabel),
+  );
   if (hit === undefined) throw new Error(`no committed node testID=${testID}`);
-  return hit;
+  return hit.payload;
 }
 
 describe('the shim prop bag', () => {
@@ -92,6 +89,31 @@ describe('the shim prop bag', () => {
     await tick();
     // Fabric spells "back to the default" as an explicit null, not a missing key.
     expect(committedPropsOf('bag').accessibilityLabel ?? null).toBeNull();
+  });
+
+  // why: `writeBagKey` is a candidate for copy-on-write (skip the `{...doorBag}` spread when this
+  // element is the sole owner of its door bag). A COW that forgets to mark a bag SHARED the moment
+  // it crosses a `cloneNode` would let a write to one clone's door mutate every sibling clone's
+  // committed props in place — this pins the isolation any such optimization must preserve.
+  it('a write to one clone does not leak into a sibling clone through a shared door bag', async () => {
+    const root = liveRoot();
+    const master = new ShimElement('view');
+    master.setAttribute('testID', 'shared');
+    const cloneA = master.cloneNode();
+    cloneA.setAttribute('accessibilityLabel', 'A');
+    const cloneB = master.cloneNode();
+    cloneB.setAttribute('accessibilityLabel', 'B');
+    root.appendChild(cloneA);
+    root.appendChild(cloneB);
+    await tick();
+    expect(committedPropsOf('shared', 'A').testID).toBe('shared');
+    expect(committedPropsOf('shared', 'B').testID).toBe('shared');
+
+    cloneA.setAttribute('testID', 'a-only');
+    await tick();
+    expect(committedPropsOf('a-only', 'A').testID).toBe('a-only');
+    // cloneB must still read the value it inherited from the master, not "a-only".
+    expect(committedPropsOf('shared', 'B').testID).toBe('shared');
   });
 
   // why: `attributes` is lazy, so the whole set/get/remove path runs against a map that may not

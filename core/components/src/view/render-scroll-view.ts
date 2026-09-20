@@ -6,7 +6,6 @@
 // helpers from prepareScrollView. What diverges per platform, and how a RefreshControl
 // integrates, stays in the adapter's .ios/.android files.
 
-import { Platform } from '@symbiote-native/engine';
 import type {
   IStyleProp,
   ISymbioteEvent,
@@ -25,50 +24,33 @@ export function readLayoutDimension(
   return readLayoutField(event, key);
 }
 
-// 'normal'/'fast' resolve to DIFFERENT friction constants per platform: RN's
-// processDecelerationRate.js Platform.select()s them: iOS glides longer (0.998/0.99),
-// Android sooner (0.985/0.9). Hardcoding the iOS pair made Android momentum scroll
-// glide far too long on 'fast'. This is the file's one Platform read: the header's
-// "no Platform.OS" rule governs component-intrinsic selection, not a value transform
-// RN itself platform-branches. `default` mirrors iOS so any non-ios/android host stays
-// defined (select would otherwise yield undefined). Numeric rates pass through unchanged.
-export function resolveDecelerationRate(
-  rate: 'normal' | 'fast' | number,
-): number {
-  if (typeof rate === 'number') return rate;
-  // select() types as `number | undefined`; the always-present `default` makes the
-  // `??` fallback unreachable, but it narrows the return to a plain `number` (no cast).
-  if (rate === 'normal')
-    return (
-      Platform.select({ ios: 0.998, android: 0.985, default: 0.998 }) ?? 0.998
-    );
-  return Platform.select({ ios: 0.99, android: 0.9, default: 0.99 }) ?? 0.99;
-}
+// 'normal'/'fast' resolve to DIFFERENT friction constants per platform — RN's
+// `processDecelerationRate.js` `Platform.select()`s them: iOS glides longer (0.998/0.99), Android
+// sooner (0.985/0.9). Hardcoding the iOS pair once made Android momentum scroll glide far too long
+// on 'fast', which is why the pair is worth naming even now that it lives elsewhere.
+//
+// `resolveDecelerationRate` WAS HERE and is gone (2026-09-18): the rule is `foldScrollViewProps` in
+// `SymbioteFabricProps.cpp`, and after the port nothing called this but its own unit test — the
+// mirror shape this migration keeps turning up, green forever and consulted by nothing on a device.
+//
+// Its four constants went with it and are `#ifdef ANDROID` there rather than `Platform.select`'d,
+// because on iOS both scroll tags resolve to `RCTScrollView` and a component name cannot tell the
+// platforms apart. That puts the Android pair outside headless reach, which is recorded at the rule.
 
-// RN applies a base style to the scroll-view NODE itself, per axis (ScrollView.js
-// styles.baseHorizontal/baseVertical). Two parts carry weight:
-//   - `overflow: 'scroll'`: clips content to the scroll view's frame. On iOS Fabric the
-//     node only clips when this is set; without it a fixed-height ScrollView lets its
-//     content bleed out over siblings (Android's native ViewGroup clips regardless, which
-//     is why the bug showed only on iOS). RN sets it on BOTH axes, so we do too.
-//   - `flexDirection: 'row'` (horizontal only): makes the single content child a MAIN-axis
-//     item, so Yoga sizes it to its content width and the view overflows and scrolls.
-//     Without it the content is a CROSS-axis item, stretched to the viewport, nothing to
-//     scroll. Vertical keeps the default `column`.
-// Both axes match RN's baseHorizontal/baseVertical exactly. Composed UNDER the user style,
-// so an explicit value still wins.
-export const SCROLL_VIEW_BASE_HORIZONTAL: IViewStyle = {
-  flexGrow: 1,
-  flexShrink: 1,
-  flexDirection: 'row',
-  overflow: 'scroll',
-};
-export const SCROLL_VIEW_BASE_VERTICAL: IViewStyle = {
-  flexGrow: 1,
-  flexShrink: 1,
-  flexDirection: 'column',
-  overflow: 'scroll',
-};
+// THE PER-AXIS BASE STYLE LEFT THIS FILE ON 2026-09-18 and is `scrollViewBaseStyle` in
+// `SymbioteFabricProps.cpp` alone. RN applies it to the scroll-view NODE per axis
+// (`ScrollView.js` `styles.baseHorizontal`/`baseVertical`) and two parts carry weight:
+// `overflow: 'scroll'`, which is what makes an iOS Fabric node clip its content to its own frame at
+// all, and the horizontal `flexDirection: 'row'`, which makes the single content child a MAIN-axis
+// item so Yoga sizes it to its content width and there is something to scroll.
+//
+// It had a JS copy until then, held by `scroll-view-base-parity.itest.ts` because the Android
+// RefreshControl wrap's style split ran in JS and needed the value. The split moved with it, so the
+// copy had no reader left but the guard asserting it — the orphan shape this migration keeps
+// turning up — and both went together. `IScrollIntrinsics` lost its `scrollViewBaseStyle` field for
+// the same reason: `selectScrollIntrinsics`'s one remaining caller
+// (`adapters/solid/.../virtualized-list`) reads the intrinsic NAMES and the content style, and its
+// own comment already records that the base composition is the behavior's.
 
 // The per-axis selection: the outer scroll-view intrinsic and its content intrinsic (the name
 // table maps each to the right Fabric component per platform: on Android horizontal resolves
@@ -78,7 +60,6 @@ export const SCROLL_VIEW_BASE_VERTICAL: IViewStyle = {
 export type IScrollIntrinsics = {
   scrollViewIntrinsic: ISymbioteIntrinsic;
   contentIntrinsic: ISymbioteIntrinsic;
-  scrollViewBaseStyle: IViewStyle;
   contentStyle: IStyleProp<IViewStyle>;
 };
 
@@ -95,10 +76,6 @@ export function selectScrollIntrinsics(
   const contentIntrinsic: ISymbioteIntrinsic = isHorizontal
     ? 'horizontal-scroll-content'
     : 'scroll-content';
-  const scrollViewBaseStyle = isHorizontal
-    ? SCROLL_VIEW_BASE_HORIZONTAL
-    : SCROLL_VIEW_BASE_VERTICAL;
-
   const contentStyle: IStyleProp<IViewStyle> = isHorizontal
     ? [contentContainerStyle, { flexDirection: 'row' }]
     : contentContainerStyle;
@@ -106,7 +83,6 @@ export function selectScrollIntrinsics(
   return {
     scrollViewIntrinsic,
     contentIntrinsic,
-    scrollViewBaseStyle,
     contentStyle,
   };
 }
@@ -156,10 +132,9 @@ export interface IScrollForwarding {
 // collapsableChildren={false} on the content container (ScrollView.js:1731 `preserveChildren`).
 // No-op on iOS.
 //
-// Named and exported rather than inlined because the LOWERED path needs the same answer from a
-// different place — the host behavior's slot fold, which has the owner's raw props and none of the
-// sticky inputs `resolveScrollForwarding` also takes. A second inline copy would be invisible to
-// `tests/lowered-primitive-fold-parity.test.ts`, whose oracle is shared value IMPORTS.
+// Named and exported rather than inlined because the host behavior's slot fold needs the same
+// answer from a different place — it has the owner's raw props and none of the sticky inputs
+// `resolveScrollForwarding` also takes. One exported function is what keeps the two from drifting.
 export function preservesContentChildren(
   maintainVisibleContentPosition: unknown,
   snapToAlignment: unknown,

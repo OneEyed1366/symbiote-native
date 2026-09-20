@@ -36,6 +36,7 @@ import {
   ChangeDetectorRef,
   Directive,
   ElementRef,
+  ErrorHandler,
   EventEmitter,
   Input,
   Output,
@@ -52,10 +53,12 @@ import type {
 import { NG_VALUE_ACCESSOR, type ControlValueAccessor } from '@angular/forms';
 import { VALUE_CHANGE_EVENT } from './renderer/value-change';
 import {
-  createCallbackWrapper,
   registerViewFlush,
   unregisterViewFlush,
 } from './change-detection-flush';
+import { SymbioteCallbackHost } from './callback-host';
+import { withholdFromRuntimeMatching } from './runtime-matching';
+import { SymbioteStyleHost } from './style-host';
 import type {
   IActivityIndicatorProps,
   IImageProps,
@@ -89,21 +92,25 @@ import type { IAngularScrollViewProps } from './components/scroll-view-props';
  * — so without this loop a bare tag commits nothing at all. It stays generic on purpose: per-prop
  * forwarding code is a component wrapper by another name, which is what this migration removes.
  * `renderer.setProperty` lands in the adapter's own renderer, which routes the value through the
- * engine's `routeProp` and applies the `id` -> `nativeID` and `symbioteStyle` -> `style` aliases.
+ * engine's `routeProp` and applies the `id` -> `nativeID` alias.
  */
 @Directive()
 export abstract class SymbioteElement implements OnChanges {
   private readonly renderer = inject(Renderer2);
   protected readonly host = inject(ElementRef);
-  protected readonly detector = inject(ChangeDetectorRef);
 
-  // An `onX` PROP is called by the engine, so Angular is never told it fired. Shared with the
-  // component path's `SymbioteHostPropsDirective`, which has the identical deficit — see
-  // `createCallbackWrapper`.
-  private readonly wrapCallback = createCallbackWrapper(
-    this.detector,
-    this.host.nativeElement,
-  );
+  // NO `ChangeDetectorRef` HERE, and its absence is the point. This class is instantiated once per
+  // ELEMENT, so injecting one cost ~1.0-2.4 us on every tag of a screen to serve the few that carry
+  // an `on*` prop — ten thousand `ViewRef`s on a thousand-row create, read by none of them
+  // (`core/engine/cpp/tests/js/angular-directive-cost.itest.ts`). `SymbioteCallbackHost` owns one and
+  // MATCHES on the callback attributes instead, registering it against the node; `markViewFor` is how
+  // the wrapper reaches it. The inputs did not move, so nothing about this file's public surface did.
+
+  // THE `on*` WRAPPER LEFT THIS CLASS on 2026-09-18, for `SymbioteRenderer.setProperty`. Most of
+  // these directives are withheld from runtime matching now (`./runtime-matching`), so a binding
+  // reaches the renderer through `ɵɵproperty` without passing through any directive — a wrapper that
+  // lives here would simply stop running. The renderer is reached by every path, which is the home it
+  // should have had.
 
   @Input() testID?: IElementProps['testID'];
   @Input() nativeID?: IElementProps['nativeID'];
@@ -183,7 +190,6 @@ export abstract class SymbioteElement implements OnChanges {
   @Input() shouldRasterizeIOS?: IElementProps['shouldRasterizeIOS'];
   @Input()
   needsOffscreenAlphaCompositing?: IElementProps['needsOffscreenAlphaCompositing'];
-  @Input() symbioteStyle?: IElementProps['symbioteStyle'];
   // Declared, and the reason is the one `element-props.ts` used to give for NOT declaring it —
   // reversed by measurement. `[style]` on an element with no directive input reaches Angular's own
   // CSS styling engine (`ɵɵstyleMap`), which cannot represent an RN StyleProp: an ARRAY decomposes
@@ -205,6 +211,25 @@ export abstract class SymbioteElement implements OnChanges {
   // in what commits.
   @Input() style?: IElementProps['style'];
 
+  /**
+   * Declared so Angular SHADOWS the `[class]` binding into it instead of decomposing the string.
+   *
+   * A styling binding goes to a directive input when the directive declares that exact public name
+   * — `setShadowStylingInputFlags` sets `hasClassInput`/`hasStyleInput` off the input map, and
+   * `checkStylingMap` then hands the whole value over and never calls the renderer per key
+   * (`view/directives.ts`, `instructions/styling.ts`). `style` has been declared here all along and
+   * is shadowed; `class` was not, so every `[class]` reached the renderer one TOKEN at a time — on
+   * the element-directive path as much as the bare one. Measured at ~3.3 us per class binding
+   * (`adapter-create-cost.itest.ts`, "prices the class channel"), on the channel every example app
+   * uses for its static look.
+   *
+   * `[class.foo]` and `[ngClass]` are NOT shadowed and keep arriving as `addClass`, so a node can
+   * now be told its classes both ways at once; the renderer unions the two sources
+   * (`classStringFor`). Typed as a string rather than RN's `className`, because that is what
+   * `ɵɵclassMap` hands over after it concatenates any static `class=` prefix.
+   */
+  @Input() class?: string;
+
   // The flat-bag spelling of the events below. `(press)` and `[onPress]` are both supported and
   // land in the same place; an app that already holds a handler bag binds the props.
   @Input() onPress?: IElementProps['onPress'];
@@ -221,7 +246,9 @@ export abstract class SymbioteElement implements OnChanges {
       this.renderer.setProperty(
         this.host.nativeElement,
         name,
-        this.wrapCallback(name, changes[name]?.currentValue),
+        // Unwrapped on purpose: `SymbioteRenderer.setProperty` is where an `on*` value is wrapped
+        // now, and it is the call this line makes.
+        changes[name]?.currentValue,
       );
     }
   }
@@ -239,11 +266,40 @@ export abstract class SymbioteElement implements OnChanges {
  */
 @Directive()
 abstract class ReadBackElement extends SymbioteElement implements OnDestroy {
+  // ITS OWN, now that the base has none. Three tags reach this class, so the injection is paid where
+  // it is read instead of on every element of a screen.
+  private readonly detector = inject(ChangeDetectorRef);
+  private readonly errorHandler = inject(ErrorHandler);
+
   constructor() {
     super();
     const node: unknown = this.host.nativeElement;
     if (typeof node === 'object' && node !== null) {
-      registerViewFlush(node, () => this.detector.detectChanges());
+      registerViewFlush(node, () => this.flush());
+    }
+  }
+
+  // REPORTED, NOT RETHROWN, and it is Angular's own contract rather than a swallow. Every other
+  // change detection in an app runs inside `ApplicationRef.tick()`, which catches and hands the
+  // error to `ErrorHandler` — `render/index.ts` provides `SymbioteErrorHandler` for exactly that,
+  // after an unprovided token once turned every async tick exception into a hard crash. This flush
+  // is the ONE change detection that runs outside that boundary: the engine calls it from inside a
+  // native event dispatch, where a throw has nowhere to go but `RCTFatal`.
+  //
+  // Device-diagnosed 2026-09-20 on ApiPlaygroundScreen. `PlaygroundLifecycleLogger` emits from
+  // `ngDoCheck`/`ngAfterContentChecked`/`ngAfterViewChecked` and the screen's handler writes a
+  // signal its own template reads, so the view re-dirties itself on every pass and
+  // `detectChangesInViewWhileDirty` throws NG0103 after MAXIMUM_REFRESH_RERUNS. The scheduler's own
+  // ticks were already hitting it and reporting it quietly; the first KEYSTROKE took the same throw
+  // through here and killed the app — `Terminating app due to uncaught exception
+  // 'RCTFatalException: Unhandled JS Exception: Error: NG0103'`, with no redbox because Release has
+  // none. So the app bug is the app's, and a flush that turns a reported error into a fatal one is
+  // ours: a keystroke must not be stricter than a tick.
+  private flush(): void {
+    try {
+      this.detector.detectChanges();
+    } catch (error: unknown) {
+      this.errorHandler.handleError(error);
     }
   }
 
@@ -253,10 +309,26 @@ abstract class ReadBackElement extends SymbioteElement implements OnDestroy {
   }
 }
 
-@Directive({ selector: 'view', standalone: true })
+// BOTH SPELLINGS ON THE SEVEN DASHLESS TAGS, and it is a correctness fix rather than a convenience.
+//
+// The renderer has always mapped `symbiote-view` onto `view` (`PRIMITIVE_SELECTOR_ALIAS`), because
+// `CUSTOM_ELEMENTS_SCHEMA` admits an unknown element only when the name carries a hyphen — so the
+// hyphenated form is the spelling an app WITHOUT these directives has to use. It is the same tag and
+// commits the same node.
+//
+// It was not the same tag HERE. A selector of `view` alone meant an app that imports
+// `SYMBIOTE_ELEMENTS` and writes `<symbiote-view>` matched nothing: no type check on its props, no
+// declared inputs, none of `SymbioteElement`'s forwarding or callback wrapping — silently, with the
+// tree still looking right. Measured, that shape also ran ~8.6 us per element FASTER, which is what
+// made it look like an optimization instead of a hole (`angular-directive-cost.itest.ts`).
+//
+// Only the seven dashless tags need it: `hyphenatedIntrinsicAliases` skips any tag that already
+// carries a dash, so `symbiote-scroll-view` resolves nowhere on either side and the two halves agree
+// already.
+@Directive({ selector: 'view, symbiote-view', standalone: true })
 export class ViewElement extends SymbioteElement {}
 
-@Directive({ selector: 'pressable', standalone: true })
+@Directive({ selector: 'pressable, symbiote-pressable', standalone: true })
 export class PressableElement extends SymbioteElement {
   @Input() disabled?: IAngularPressableProps['disabled'];
   @Input() cancelable?: IAngularPressableProps['cancelable'];
@@ -269,6 +341,9 @@ export class PressableElement extends SymbioteElement {
   pressRetentionOffset?: IAngularPressableProps['pressRetentionOffset'];
   @Input() unstable_pressDelay?: IAngularPressableProps['unstable_pressDelay'];
   @Input() android_ripple?: IAngularPressableProps['android_ripple'];
+  // ON THE BASE, so both touchables inherit it — the prop is Pressable's AND
+  // TouchableHighlight's upstream, and they extend this rather than repeat its surface.
+  @Input() testOnly_pressed?: IAngularPressableProps['testOnly_pressed'];
   @Input()
   android_disableSound?: IAngularPressableProps['android_disableSound'];
   @Input() hasTVPreferredFocus?: IAngularPressableProps['hasTVPreferredFocus'];
@@ -326,14 +401,14 @@ export class TouchableWithoutFeedbackElement extends PressableElement {
 // RN's Button IS a TouchableOpacity (Button.js:384), and the behavior builds the view and the
 // label under it — so the tag takes the touchable's surface plus the four props Button owns. There
 // is no `style`: RN's Button has no such prop, and the label/background come from `color`.
-@Directive({ selector: 'button', standalone: true })
+@Directive({ selector: 'button, symbiote-button', standalone: true })
 export class ButtonElement extends TouchableOpacityElement {
   @Input() title?: string;
   @Input() color?: string;
   @Input() touchSoundDisabled?: boolean;
 }
 
-@Directive({ selector: 'text', standalone: true })
+@Directive({ selector: 'text, symbiote-text', standalone: true })
 export class TextElement extends SymbioteElement {
   // Narrows the inherited input to a TEXT style so `fontSize`/`fontWeight` type-check here. The
   // initializer is what TS2612 asks for to accept a redeclaration as deliberate; `declare` would
@@ -350,7 +425,7 @@ export class TextElement extends SymbioteElement {
   @Input() disabled?: ITextElementProps['disabled'];
 }
 
-@Directive({ selector: 'image', standalone: true })
+@Directive({ selector: 'image, symbiote-image', standalone: true })
 export class ImageElement extends SymbioteElement {
   @Input() source?: IImageProps['source'];
   @Input() src?: IImageProps['src'];
@@ -499,7 +574,7 @@ export class HorizontalScrollContentElement extends SymbioteElement {}
  * obvious reading is wrong: the file header's "an `@Output` CONSUMES the binding" holds for a
  * COMPONENT, and an element is the other case — Angular attaches the renderer listener for the
  * event as well, so `Renderer2.listen` still runs and the engine still hears the change. Measured
- * under JIT by deleting this whole hook: every case in `lowered-two-way-value.test.ts` stayed
+ * under JIT by deleting this whole hook: every case in `renderer/two-way-value.test.ts` stayed
  * green, delivery included, and exactly ONCE (nothing double-fires when both paths exist).
  *
  * It is kept because the measurement is JIT-only and this adapter has a recorded case of JIT and
@@ -604,16 +679,7 @@ export class TextInputElement extends ValueChangeElement {
 @Directive({ selector: 'text-input-multiline', standalone: true })
 export class MultilineTextInputElement extends TextInputElement {}
 
-// The COMPONENT path's spelling of the pair above — same native views, a tag the behavior registry
-// deliberately does not carry (`component-names/shared.ts`). Declared so the tag alphabet is
-// complete; an app writes the plain name.
-@Directive({ selector: 'text-input-managed', standalone: true })
-export class ManagedTextInputElement extends TextInputElement {}
-
-@Directive({ selector: 'text-input-multiline-managed', standalone: true })
-export class ManagedMultilineTextInputElement extends TextInputElement {}
-
-@Directive({ selector: 'switch', standalone: true })
+@Directive({ selector: 'switch, symbiote-switch', standalone: true })
 export class SwitchElement extends ValueChangeElement {
   @Input() value?: ISwitchProps['value'];
   @Input() disabled?: ISwitchProps['disabled'];
@@ -634,9 +700,6 @@ export class SwitchElement extends ValueChangeElement {
     if (typeof value === 'boolean') this.valueChange.emit(value);
   }
 }
-
-@Directive({ selector: 'switch-managed', standalone: true })
-export class ManagedSwitchElement extends SwitchElement {}
 
 /**
  * `[(ngModel)]` / `formControlName` on a `<text-input>` or a `<switch>`.
@@ -677,6 +740,21 @@ abstract class SymbioteValueAccessor
       this.host.nativeElement,
       VALUE_CHANGE_EVENT,
       (value: unknown) => {
+        // THE HALF THE DOM DOES FOR FREE, and without it a controlled input undoes every
+        // keystroke. `<text-input>`'s behavior re-commands the native text whenever `props.value`
+        // disagrees with what native last reported — that is what makes it controlled — and the
+        // read-back flush exists so the app's new value is on the node by the time the commit runs.
+        // @angular/forms does not reach the node in that window: `NgModel.ngOnChanges` defers
+        // `_updateValue` through `resolvedPromise.then`, so `writeValue` lands a MICROTASK after
+        // the flush, and the commit in between still reads the value from before the keystroke.
+        //
+        // In a browser there is nothing to do here: `input.value` already holds what the user
+        // typed. `node.props.value` is the same slot, and nothing else writes it — so the accessor
+        // mirrors it, which is the shape rather than a workaround. A later `writeValue` still wins,
+        // so an app that transforms or refuses the value keeps doing so, one microtask on.
+        //
+        // Device-reported 2026-09-20: every character snapped the field back to its mounted text.
+        this.setProp('value', value);
         fn(value);
       },
     );
@@ -716,8 +794,7 @@ export class TextInputValueAccessor extends SymbioteValueAccessor {
 }
 
 @Directive({
-  selector:
-    'switch[ngModel], switch[formControl], switch[formControlName], switch-managed[ngModel], switch-managed[formControl], switch-managed[formControlName]',
+  selector: 'switch[ngModel], switch[formControl], switch[formControlName]',
   standalone: true,
   providers: [
     {
@@ -753,7 +830,7 @@ export class ActivityIndicatorSpinnerElement extends ActivityIndicatorElement {}
 @Directive({ selector: 'safe-area-view', standalone: true })
 export class SafeAreaViewElement extends SymbioteElement {}
 
-@Directive({ selector: 'modal', standalone: true })
+@Directive({ selector: 'modal, symbiote-modal', standalone: true })
 export class ModalElement extends SymbioteElement {
   @Input() visible?: IModalViewProps['visible'];
   @Input() transparent?: IModalViewProps['transparent'];
@@ -824,10 +901,7 @@ export const SYMBIOTE_ELEMENTS = [
   HorizontalScrollContentElement,
   TextInputElement,
   MultilineTextInputElement,
-  ManagedTextInputElement,
-  ManagedMultilineTextInputElement,
   SwitchElement,
-  ManagedSwitchElement,
   ActivityIndicatorElement,
   ActivityIndicatorSpinnerElement,
   SafeAreaViewElement,
@@ -840,7 +914,45 @@ export const SYMBIOTE_ELEMENTS = [
   // provided, and `elements.test.ts` subtracts them from its tag-coverage check by name.
   TextInputValueAccessor,
   SwitchValueAccessor,
+  // Also not a tag: it matches on the callback ATTRIBUTES, so it lands only on the elements that
+  // bind one and carries the `ChangeDetectorRef` their wrapper needs. It rides this list for the same
+  // reason the accessors do, and `elements.test.ts` subtracts it from the tag-coverage check by name.
+  SymbioteCallbackHost,
+  // The other attribute-matched one: it claims `[style]` and `[class]` so an RN style ARRAY never
+  // reaches Angular's styling engine, which cannot represent one and throws. See `style-host.ts`.
+  SymbioteStyleHost,
 ] as const;
+
+// THE DIRECTIVES THAT GO ON MATCHING, and the list is the exceptions rather than the rule.
+//
+// A tag directive here is, with four exceptions, nothing but `@Input()` declarations over one
+// inherited `ngOnChanges` that forwards each of them to the renderer — which is the call
+// `ɵɵproperty` makes directly on an element nothing claimed. So the instance buys a compile-time
+// check at ~8.5-9.4 us of run time per element, and `./runtime-matching` keeps the check while
+// dropping the instance.
+//
+// These four cannot go, because they DO something when they are built:
+//
+//   text-input, text-input-multiline, switch   `ValueChangeElement` — listens for the engine's value
+//                                              event and registers a view flush, which is what stops
+//                                              a controlled value being undone inside one microtask
+//   refresh-control                            `ReadBackElement`, the same flush for the same reason
+//
+// The two form accessors and `SymbioteCallbackHost` are absent from both lists deliberately: they
+// match on an ATTRIBUTE rather than a tag, so they already land only where they are needed.
+withholdFromRuntimeMatching(
+  SYMBIOTE_ELEMENTS.filter(
+    directive =>
+      directive !== TextInputElement &&
+      directive !== MultilineTextInputElement &&
+      directive !== SwitchElement &&
+      directive !== RefreshControlElement &&
+      directive !== TextInputValueAccessor &&
+      directive !== SwitchValueAccessor &&
+      directive !== SymbioteCallbackHost &&
+      directive !== SymbioteStyleHost,
+  ),
+);
 
 // A prop this file forgets is not a silent gap — it is `Can't bind to 'x'` in the app that tries
 // it, which is the failure mode a hand-written list produces here. So the lists are checked

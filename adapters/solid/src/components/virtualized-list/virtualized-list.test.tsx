@@ -14,7 +14,11 @@ import { createSignal } from 'solid-js';
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { STICKY_HEADER_Z_INDEX } from '@symbiote-native/components';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 import { mount, unmount } from '../../render';
 import '../../register';
 import { VirtualizedList } from './index';
@@ -32,7 +36,8 @@ interface IRow {
   label: string;
 }
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -81,56 +86,48 @@ const getItemLayout = (
 });
 const keyExtractor = (item: IRow): string => `k-${item.id}`;
 
-function flatCommitted(): IFakeNode[] {
-  const flat: IFakeNode[] = [];
-  const walk = (nodes: IFakeNode[]): void => {
-    for (const node of nodes) {
-      flat.push(node);
-      walk(node.children);
-    }
-  };
-  walk(fabric.committed);
-  return flat;
-}
-
-function committed(viewName: string): IFakeNode {
-  const found = flatCommitted().find(node => node.viewName === viewName);
+function committed(viewName: string): ILiveNode {
+  const found = live.findLive(
+    live.appRoot(),
+    node => node.viewName === viewName,
+  );
   if (found === undefined) throw new Error(`no ${viewName} was committed`);
   return found;
 }
 
-// Every committed raw-text payload — the row labels plus whatever the header/footer/empty slots
-// render. Read off the COMMITTED tree, never `fabric.created`: a created node's props are frozen at
-// its first createNode, so asserting there would make every update test pass forever.
+// The total creation-log size — every node the engine has ever authored, whatever became of it
+// since. The direct replacement for the old mirror's `counts.createNode`: a claim that "nothing was
+// rebuilt" is a claim that this number held still across the update.
+function totalCreated(): number {
+  return fabric.findAll(() => true).length;
+}
+
+// Every committed raw-text payload, read off the LIVE tree in tree order.
 function committedLabels(): Set<string> {
-  const labels = new Set<string>();
-  for (const node of flatCommitted()) {
-    const text: unknown = node.props.text;
-    if (typeof text === 'string') labels.add(text);
-  }
-  return labels;
+  return new Set(live.texts(live.appRoot()));
 }
 
 // How many TIMES a node carrying this text was created. 1 means the row survived whatever happened in
-// between; >1 means it was destroyed and rebuilt.
+// between; >1 means it was destroyed and rebuilt. `findAll` searches the creation log — the AUTHORED
+// bag, which is what `text` on a raw-text node always is.
 function createdCountForText(text: string): number {
-  return fabric.created.filter(node => node.props.text === text).length;
+  return fabric.findAll(node => node.props.text === text).length;
 }
 
 // Does this committed subtree carry a raw-text payload anywhere inside it? Used to ask WHERE a node
 // sits rather than merely whether it exists — placement is geometry for a separator.
-function carriesText(node: IFakeNode, text: string): boolean {
+function carriesText(node: ILiveNode, text: string): boolean {
   return (
-    node.props.text === text ||
+    node.payload.text === text ||
     node.children.some(child => carriesText(child, text))
   );
 }
 
-function contentChildren(): IFakeNode[] {
+function contentChildren(): ILiveNode[] {
   return committed(CONTENT_VIEW).children;
 }
 
-function fireLayout(node: IFakeNode, height: number): void {
+function fireLayout(node: ILiveNode, height: number): void {
   fabric.fireEvent(node.instanceHandle, 'topLayout', {
     layout: { x: 0, y: 0, width: 320, height },
   });
@@ -159,7 +156,12 @@ describe('Solid VirtualizedList on the engine', () => {
     // simply does not scroll on a device; on Android a second direct child of the scroll view is an
     // outright addViewAt crash, which is why RN also pins the content view un-flattened
     // (ScrollView.js preserveChildren / collapsable=false).
-    it('commits a nested scroll host with an un-flattened content container', async () => {
+    //
+    // THE UN-FLATTENING ITSELF is `foldScrollContentProps` in the engine since 2026-09-18 and is
+    // pinned in `core/engine/cpp/tests/js/scroll-content-payload.itest.ts`; this host carries no
+    // copy of the tag rules. What Solid owns is the NESTING, which is the half a flat tree gets
+    // wrong.
+    it('commits a nested scroll host holding a single content container', async () => {
       mount(ROOT_TAG, () => (
         <VirtualizedList<IRow>
           data={[]}
@@ -172,7 +174,9 @@ describe('Solid VirtualizedList on the engine', () => {
 
       const scroll = committed(SCROLL_VIEW);
       expect(scroll.children[0]?.viewName).toBe(CONTENT_VIEW);
-      expect(committed(CONTENT_VIEW).props.collapsable).toBe(false);
+      // ONE content child, which is the Android crash this case is named for: a second direct child
+      // of the scroll view is an addViewAt failure. The count is the claim, not the node's name.
+      expect(scroll.children).toHaveLength(1);
     });
 
     // why: virtualization IS the component. RN mounts only `initialNumToRender` cells in the first
@@ -218,7 +222,7 @@ describe('Solid VirtualizedList on the engine', () => {
       expect(children[0]?.children.length, 'the first child is a cell').toBe(1);
       const trailing = children[children.length - 1];
       expect(trailing?.children.length, 'the last child is a spacer').toBe(0);
-      expect(trailing?.props.height).toBe(900);
+      expect(trailing?.payload.height).toBe(900);
     });
 
     // why: the resident window is a function of the MEASURED viewport and the live scroll offset —
@@ -251,11 +255,11 @@ describe('Solid VirtualizedList on the engine', () => {
       );
 
       const children = contentChildren();
-      expect(children[0]?.props.height, 'leading spacer covers 10 rows').toBe(
+      expect(children[0]?.payload.height, 'leading spacer covers 10 rows').toBe(
         500,
       );
       expect(
-        children[children.length - 1]?.props.height,
+        children[children.length - 1]?.payload.height,
         'trailing spacer covers the remaining 8',
       ).toBe(400);
     });
@@ -533,7 +537,7 @@ describe('Solid VirtualizedList on the engine', () => {
       ]);
       expect(fabric.commands[0]?.args).toEqual([0, 200, true]);
       expect(fabric.commands[1]?.args).toEqual([0, 0, false]);
-      expect(fabric.commands[0]?.node.viewName).toBe(SCROLL_VIEW);
+      expect(fabric.commands[0]?.viewName).toBe(SCROLL_VIEW);
     });
 
     // why: RN's scrollToIndex places item `index` in the viewport, and the placement is tunable:
@@ -677,7 +681,7 @@ describe('Solid VirtualizedList on the engine', () => {
       expect(fabric.commands.map(command => command.commandName)).toEqual([
         'flashScrollIndicators',
       ]);
-      expect(fabric.commands[0]?.node.viewName).toBe(SCROLL_VIEW);
+      expect(fabric.commands[0]?.viewName).toBe(SCROLL_VIEW);
       expect(list?.getScrollNode()).not.toBeNull();
       expect(list?.getNativeScrollRef()).not.toBeNull();
       expect(list?.getScrollableNode()).not.toBeNull();
@@ -759,7 +763,7 @@ describe('Solid VirtualizedList on the engine', () => {
       const trailing = contentChildren()[contentChildren().length - 1];
       expect(trailing?.children.length, 'a trailing spacer appeared').toBe(0);
       // 20 rows at the measured 50pt average, minus the 100pt the two rendered cells occupy.
-      expect(trailing?.props.height).toBe(900);
+      expect(trailing?.payload.height).toBe(900);
     });
 
     // why: onEndReached is what drives every infinite list. RN fires it when the scroll position is
@@ -1067,7 +1071,7 @@ describe('Solid VirtualizedList on the engine', () => {
       ));
       await settleViewport();
 
-      const props = committed(SCROLL_VIEW).props;
+      const props = committed(SCROLL_VIEW).payload;
       expect(props.keyboardDismissMode).toBe('on-drag');
       expect(props.keyboardShouldPersistTaps).toBe('handled');
       expect(props.scrollEventThrottle).toBe(16);
@@ -1092,9 +1096,13 @@ describe('Solid VirtualizedList on the engine', () => {
       ));
       await tick();
       const scroll = committed(SCROLL_VIEW);
-      expect(scroll.props.horizontal).toBe(true);
-      expect(committed(CONTENT_VIEW).props.flexDirection).toBe('row');
-      expect(committed(CONTENT_VIEW).props.width).toBe(ITEM_HEIGHT * ROW_COUNT);
+      // The axis flag and the content node's row style are BOTH engine rules now
+      // (`scroll-view-payload.itest.ts`, `scroll-content-payload.itest.ts`). The WIDTH below is this
+      // list's own arithmetic — it pins the content to the row total, not the frame — and is what
+      // fails if the list stops treating itself as horizontal.
+      expect(committed(CONTENT_VIEW).payload.width).toBe(
+        ITEM_HEIGHT * ROW_COUNT,
+      );
 
       // The viewport is measured along the scroll axis too: width, not height.
       fabric.fireEvent(scroll.instanceHandle, 'topLayout', {
@@ -1109,7 +1117,7 @@ describe('Solid VirtualizedList on the engine', () => {
       expect(committedLabels().has('row-10')).toBe(true);
       expect(committedLabels().has('row-0')).toBe(false);
       expect(
-        contentChildren()[0]?.props.width,
+        contentChildren()[0]?.payload.width,
         'the spacer sizes by width',
       ).toBe(500);
     });
@@ -1133,9 +1141,11 @@ describe('Solid VirtualizedList on the engine', () => {
       ));
       await settleViewport();
 
-      expect(committed(SCROLL_VIEW).props.transform).toEqual([{ scaleY: -1 }]);
+      expect(committed(SCROLL_VIEW).payload.transform).toEqual([
+        { scaleY: -1 },
+      ]);
       expect(
-        committed(CONTENT_VIEW).props.transform,
+        committed(CONTENT_VIEW).payload.transform,
         'the content container must NOT be flipped as well',
       ).toBeUndefined();
 
@@ -1144,7 +1154,7 @@ describe('Solid VirtualizedList on the engine', () => {
       );
       expect(cells.length).toBeGreaterThan(0);
       for (const cell of cells) {
-        expect(cell.props.transform).toEqual([{ scaleY: -1 }]);
+        expect(cell.payload.transform).toEqual([{ scaleY: -1 }]);
       }
     });
 
@@ -1184,14 +1194,14 @@ describe('Solid VirtualizedList on the engine', () => {
       ));
       await settleViewport();
 
-      const scroll = committed(SCROLL_VIEW).props;
+      const scroll = committed(SCROLL_VIEW).payload;
       expect(scroll.flex, 'the class resolved onto the scroll view').toBe(1);
       expect(scroll.backgroundColor).toBe('red');
       expect(
         scroll.padding,
         'the content style stays off the scroll view',
       ).toBe(undefined);
-      expect(committed(CONTENT_VIEW).props.padding).toBe(20);
+      expect(committed(CONTENT_VIEW).payload.padding).toBe(20);
     });
 
     // why: the React adapter spreads the list's whole accessibility surface onto the underlying
@@ -1214,7 +1224,7 @@ describe('Solid VirtualizedList on the engine', () => {
       ));
       await settleViewport();
 
-      const props = committed(SCROLL_VIEW).props;
+      const props = committed(SCROLL_VIEW).payload;
       expect(props.testID).toBe('the-list');
       expect(
         props.accessibilityLabel,
@@ -1241,7 +1251,7 @@ describe('Solid VirtualizedList on the engine', () => {
       ));
       await settleViewport();
 
-      const props = committed(SCROLL_VIEW).props;
+      const props = committed(SCROLL_VIEW).payload;
       for (const leaked of [
         'renderItem',
         'getItem',
@@ -1286,15 +1296,15 @@ describe('Solid VirtualizedList on the engine', () => {
         REFRESH_CONTROL,
         CONTENT_VIEW,
       ]);
-      expect(scroll.children[0]?.props.refreshing).toBe(false);
-      expect(scroll.children[0]?.props.progressViewOffset).toBe(12);
+      expect(scroll.children[0]?.payload.refreshing).toBe(false);
+      expect(scroll.children[0]?.payload.progressViewOffset).toBe(12);
 
       setRefreshing(true);
       await tick();
 
-      expect(committed(REFRESH_CONTROL).props.refreshing).toBe(true);
+      expect(committed(REFRESH_CONTROL).payload.refreshing).toBe(true);
       expect(
-        fabric.created.filter(node => node.viewName === REFRESH_CONTROL),
+        fabric.findAll(node => node.viewName === REFRESH_CONTROL),
         'the update re-props the SAME control, it does not build a second one',
       ).toHaveLength(1);
     });
@@ -1329,14 +1339,15 @@ describe('Solid VirtualizedList on the engine', () => {
       ));
       await settleViewport();
 
-      const wrappers = flatCommitted().filter(
-        node => node.props.zIndex === STICKY_HEADER_Z_INDEX,
+      const wrappers = live.findAllLive(
+        live.appRoot(),
+        node => node.payload.zIndex === STICKY_HEADER_Z_INDEX,
       );
       expect(wrappers, 'exactly the one flagged cell is wrapped').toHaveLength(
         1,
       );
       expect(
-        'stickyHeaderIndices' in committed(SCROLL_VIEW).props,
+        'stickyHeaderIndices' in committed(SCROLL_VIEW).payload,
         'native ignores the array; forwarding it would be a silent no-op',
       ).toBe(false);
     });
@@ -1431,7 +1442,11 @@ describe('Solid VirtualizedList on the engine', () => {
       ));
       await settleViewport();
 
-      expect(committed(SCROLL_VIEW).props.nestedScrollEnabled).toBe(true);
+      // `nestedScrollEnabled` is `foldScrollViewProps` in the engine now
+      // (`core/engine/cpp/tests/js/scroll-view-payload.itest.ts`), and this host carries no copy of
+      // the tag rules. What a VirtualizedList still owes here is that it reaches a committed scroll
+      // view at all — the default has nothing to land on otherwise.
+      expect(committed(SCROLL_VIEW)).toBeDefined();
     });
 
     // why: RN both FORWARDS maintainVisibleContentPosition to native (so the scroll view anchors the
@@ -1456,9 +1471,11 @@ describe('Solid VirtualizedList on the engine', () => {
       await settleViewport();
 
       expect(
-        committed(SCROLL_VIEW).props.maintainVisibleContentPosition,
+        committed(SCROLL_VIEW).payload.maintainVisibleContentPosition,
       ).toEqual({ minIndexForVisible: 1 });
-      expect(committed(CONTENT_VIEW).props.collapsableChildren).toBe(false);
+      // `collapsableChildren` is derived from the prop above by the ENGINE now, which reads it off
+      // the owner through `ownerProps` (`core/engine/cpp/tests/js/scroll-content-payload.itest.ts`).
+      // What this list owes is the FORWARDING asserted above it.
     });
 
     // why: native maintainVisibleContentPosition can only anchor cells it has MOUNTED. Items
@@ -1563,7 +1580,7 @@ describe('Solid VirtualizedList on the engine', () => {
       await tick();
 
       expect(fabric.commands, 'nothing could be commanded yet').toHaveLength(0);
-      expect(committed(SCROLL_VIEW).props.contentOffset).toEqual({
+      expect(committed(SCROLL_VIEW).payload.contentOffset).toEqual({
         x: 0,
         y: 200,
       });
@@ -1571,11 +1588,17 @@ describe('Solid VirtualizedList on the engine', () => {
       fireScroll(120);
       await tick();
 
-      // A cleared prop reaches Fabric as literal null — that IS the delete (symbiote-engine-core §8).
+      // ABSENT, not null: the literal null was the CLONE PROTOCOL's spelling of "reset to the
+      // default", held only inside the diff the stand-in merged. The engine's op stream says the
+      // same thing with `NO_VALUE`, and a host replaying that op deletes the key.
       expect(
-        committed(SCROLL_VIEW).props.contentOffset,
+        Object.hasOwn(committed(SCROLL_VIEW).payload, 'contentOffset'),
         'a real scroll supersedes the commanded offset',
-      ).toBeNull();
+      ).toBe(false);
+      // …and the half that proves the engine ACTED: the record carried the offset after the commanded
+      // write above, so its being gone from the record means a clearing op was sent for it.
+      const recorded = fabric.find(node => node.viewName === SCROLL_VIEW);
+      expect(Object.hasOwn(recorded?.props ?? {}, 'contentOffset')).toBe(false);
     });
 
     // why: RN fills a widened window INCREMENTALLY — at most maxToRenderPerBatch new cells per batch,
@@ -1639,7 +1662,7 @@ describe('Solid VirtualizedList on the engine', () => {
       ));
       await settleViewport();
 
-      expect(committed(SCROLL_VIEW).props.scrollEventThrottle).toBe(16);
+      expect(committed(SCROLL_VIEW).payload.scrollEventThrottle).toBe(16);
 
       fireScroll(500);
       await tick();
@@ -1722,7 +1745,7 @@ describe('Solid VirtualizedList on the engine', () => {
       ));
       await settleViewport();
       expect(committedLabels().has('row-0')).toBe(true);
-      const createdAtMount = fabric.counts.createNode;
+      const createdAtMount = totalCreated();
 
       // Same keys, new labels: nothing structural changed, only the text each row reads.
       setRows(makeRows(ROW_COUNT, '-v2'));
@@ -1733,7 +1756,7 @@ describe('Solid VirtualizedList on the engine', () => {
         'the accessor carried the new item down to the leaf',
       ).toBe(true);
       expect(
-        fabric.counts.createNode,
+        totalCreated(),
         'and it did so without rebuilding the cell subtree',
       ).toBe(createdAtMount);
     });
@@ -1762,13 +1785,13 @@ describe('Solid VirtualizedList on the engine', () => {
         />
       ));
       await settleViewport();
-      const createdAtMount = fabric.counts.createNode;
+      const createdAtMount = totalCreated();
 
       setRows(makeRows(ROW_COUNT, '-v2'));
       await tick();
 
       expect(
-        fabric.counts.createNode,
+        totalCreated(),
         'a data change must not tear the cell subtree down and rebuild it',
       ).toBe(createdAtMount);
       expect(committedLabels().has('row-0')).toBe(true);
@@ -1825,17 +1848,19 @@ describe('Solid VirtualizedList on the engine', () => {
         />
       ));
       await settleViewport();
-      const createdAtMount = fabric.counts.createNode;
-      expect(committed(SCROLL_VIEW).props.keyboardDismissMode).toBe('none');
+      const nodeAtMount = committed(SCROLL_VIEW).handle;
+      expect(committed(SCROLL_VIEW).payload.keyboardDismissMode).toBe('none');
 
       setDismiss('on-drag');
       await tick();
 
-      expect(committed(SCROLL_VIEW).props.keyboardDismissMode).toBe('on-drag');
+      expect(committed(SCROLL_VIEW).payload.keyboardDismissMode).toBe(
+        'on-drag',
+      );
       expect(
-        fabric.counts.createNode,
+        committed(SCROLL_VIEW).handle,
         'the scroll host kept its identity',
-      ).toBe(createdAtMount);
+      ).toBe(nodeAtMount);
     });
 
     // why: the scroll AXIS resolves a different host TAG (on Android horizontal scrolling is its own
@@ -1858,16 +1883,17 @@ describe('Solid VirtualizedList on the engine', () => {
         />
       ));
       await settleViewport();
-      const createdAtMount = fabric.counts.createNode;
+      const createdAtMount = totalCreated();
 
       setHorizontal(true);
       await tick();
 
       expect(
-        fabric.counts.createNode,
+        totalCreated(),
         'the axis flip must rebuild the host tags',
       ).toBeGreaterThan(createdAtMount);
-      expect(committed(CONTENT_VIEW).props.flexDirection).toBe('row');
+      // The row style is the engine's rule (`scroll-content-payload.itest.ts`); what this case is
+      // about is that the flip REBUILT the host tags (above) without losing the cells (below).
       expect(committedLabels().has('row-0'), 'the cells survived').toBe(true);
     });
   });
@@ -1949,17 +1975,17 @@ describe('Solid VirtualizedList on the engine', () => {
         />
       ));
       await settleViewport();
-      const createdAtMount = fabric.counts.createNode;
+      const createdAtMount = totalCreated();
 
       setExtra(2);
       await tick();
 
       expect(
-        fabric.counts.createNode,
+        totalCreated(),
         'nothing is re-rendered on an extraData change',
       ).toBe(createdAtMount);
       expect(
-        'extraData' in committed(SCROLL_VIEW).props,
+        'extraData' in committed(SCROLL_VIEW).payload,
         'and it never reaches native',
       ).toBe(false);
     });

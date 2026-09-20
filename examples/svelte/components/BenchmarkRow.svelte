@@ -16,9 +16,8 @@
   // identically (`svelte-adapter-dom-shim` §32). This component carries no conditional at all.
   //
   // The input is also as bare as it can be: `class` and a controlled `value`, nothing else.
-  // `multiline` would select the other intrinsic, and `onChangeText` or `bind:this` would each
-  // refuse the lowering outright (a ref arrives as a BindDirective and this transform refuses the
-  // whole element on any directive) — lowering is what this row is measured for.
+  // `multiline` would select the other intrinsic, and `onChangeText` or `bind:this` would each add
+  // work this row is not measuring.
   export type IBenchmarkRow = {
     id: number;
     label: string;

@@ -115,9 +115,15 @@ describe('Angular source imports under Vitest', () => {
     // anchorHostStyle back into the resolved Image props (see create-animated-component.ts) so
     // a `class="..."` on `<AnimatedImage>` actually reaches the real inner primitive instead of
     // silently staying unstyled/unsized, the exact device-confirmed bug §21 documents. This
-    // exercises that merge end to end: width/height become a dimension-style entry, the
-    // animatedProps.style entry stays a SEPARATE array slot (not flattened together), and
-    // accessible/accessibilityLabel derive from `alt`, mirroring resolveImageProps' contract.
+    // exercises that merge end to end: the anchor style is a SEPARATE array slot from
+    // `animatedProps.style` (not flattened together), and the aliases reach the tag as the app
+    // wrote them.
+    //
+    // It used to assert `accessible`/`accessibilityLabel` derived from `alt`, and a folded `source`
+    // array. `resolveImageProps` is a GATHER now, not a fold — the rule is the engine's
+    // (`foldImageProps`, contract in `core/engine/cpp/tests/js/image-payload.itest.ts`) — so what
+    // this path owes is that every alias ARRIVES, which is what it is checked for here. The `style`
+    // slot no longer carries the width/height entry for the same reason.
     it('resolves AnimatedImage props through the composed Image path', () => {
       // AnimatedImage is an ANCHOR_HOST_COMPONENT: its field initializer injects its own
       // ElementRef (anchorHostStyle merge, see create-animated-component.ts), so constructing it
@@ -137,10 +143,11 @@ describe('Angular source imports under Vitest', () => {
 
       expect(image.animatedImageProps).toMatchObject({
         testID: 'animated-image',
-        accessible: true,
-        accessibilityLabel: 'Preview',
-        source: [{ uri: 'https://example.invalid/image.png' }],
-        style: [undefined, [{ width: 32, height: 24 }, { opacity: 0.5 }]],
+        src: 'https://example.invalid/image.png',
+        width: 32,
+        height: 24,
+        alt: 'Preview',
+        style: [undefined, { opacity: 0.5 }],
       });
     });
   });

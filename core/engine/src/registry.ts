@@ -20,6 +20,9 @@
 // when we add a core primitive of our own.
 
 import { isRecord } from './type-guards';
+// Type-only, so this does not close an import cycle at runtime: `host-behavior` owns the fold
+// contract and reaches this module for nothing.
+import type { IPayloadFold } from './host-behavior';
 
 export type IPropProcessor = (value: unknown) => unknown;
 
@@ -99,6 +102,11 @@ const BUILTIN_COMPONENTS = new Set([
 // Manual overrides per component (usually none): the escape hatch.
 const overrides = new Map<string, IComponentRegistration[]>();
 const resolvedCache = new Map<string, IResolved>();
+// `configPayloadFold`'s answer, boxed so a component with no processors caches its `undefined`
+// instead of re-resolving on every `createElement`.
+const foldCache = new Map<string, { fold: IPayloadFold | undefined }>();
+// Same boxing, for the key set `configProcessedKeys` answers.
+const keysCache = new Map<string, { keys: ReadonlySet<string> | undefined }>();
 
 let viewConfigSource: INativeViewConfigSource | undefined;
 
@@ -108,6 +116,7 @@ export function setNativeViewConfigSource(
 ): void {
   viewConfigSource = source;
   resolvedCache.clear();
+  foldCache.clear();
 }
 
 // Escape hatch: override a derived config, or supply one for a view with no codegen
@@ -120,6 +129,7 @@ export function registerComponent(
   if (list === undefined) overrides.set(name, [registration]);
   else list.push(registration);
   resolvedCache.delete(name);
+  foldCache.delete(name);
 }
 
 // onChange -> change (mirrors node.ts listenerName; the split of the handler prop).
@@ -221,4 +231,72 @@ export function registeredProcessor(
   key: string,
 ): IPropProcessor | undefined {
   return resolve(component).processors.get(key);
+}
+
+/**
+ * A component's ViewConfig processors, as a payload fold — or undefined when it has none.
+ *
+ * WHY A FOLD AND NOT A LOOKUP AT PAYLOAD-BUILD TIME. The payload is built in C++ on a device
+ * (`core/engine/cpp/SymbioteFabricProps.cpp`) and only in JS headless, and this registry cannot
+ * cross that boundary: it is populated lazily from an INJECTED `ReactNativeViewConfigRegistry`
+ * lookup, holding JS closures. `payloadFold` is the one seam that already runs in JS on both paths
+ * — the C++ probes it once per node and calls back — so putting the processors there is what makes
+ * a third-party view behave the same on a device as it does in a test.
+ *
+ * The alternative was a list of prop NAMES in C++, and that is what this replaces. It cost a day:
+ * `@symbiote-native/slider` declares `minimumTrackTintColor` / `maximumTrackTintColor` in its own
+ * ViewConfig, neither name was in the C++ list, both reached Fabric as CSS strings, and iOS answers
+ * a string colour with `clearColor()`. The slider dragged and reported values correctly with no
+ * track drawn at all. Any list of names is a list somebody has to extend for a component we have
+ * never seen — which would have meant editing C++ to add a native view, and that is exactly the
+ * coupling `<native_core_is_untouched>` exists to prevent.
+ *
+ * Resolved ONCE per component and cached, because `createElement` asks per node. A built-in
+ * short-circuits inside `resolve` before any of this.
+ */
+/**
+ * The prop names a component's OWN ViewConfig claims a processor for — i.e. exactly the keys
+ * `configPayloadFold` has already converted by the time the payload builder's own passes run.
+ *
+ * It exists so "a colour is converted exactly once" can be a stated rule rather than a lucky one.
+ * The overlap is real: `thumbTintColor` is claimed by @symbiote-native/slider's config AND by the
+ * engine's built-in COLOR_PROPS, and for a while nothing broke only because a processed colour came
+ * back as a NUMBER and the engine skipped numbers. That guard died when a numeric colour became
+ * processable in its own right — an author writing `color: 0xff0000ff` means rrggbbaa and owes the
+ * same rotation a string owes — and the second conversion then turned an already-correct int into
+ * a different colour.
+ */
+export function configProcessedKeys(
+  component: string,
+): ReadonlySet<string> | undefined {
+  const cached = keysCache.get(component);
+  if (cached !== undefined) return cached.keys;
+  const { processors } = resolve(component);
+  const keys = processors.size === 0 ? undefined : new Set(processors.keys());
+  keysCache.set(component, { keys });
+  return keys;
+}
+
+export function configPayloadFold(component: string): IPayloadFold | undefined {
+  const cached = foldCache.get(component);
+  if (cached !== undefined) return cached.fold;
+  const { processors } = resolve(component);
+  const fold: IPayloadFold | undefined =
+    processors.size === 0
+      ? undefined
+      : props => {
+          // Copied only when a processor actually claims a key present in the bag: the fold
+          // contract forbids mutating `node.props`, and a component whose config declares
+          // processors for props this node never sets must still hand its input back by identity.
+          let out: Record<string, unknown> | undefined;
+          for (const [key, process] of processors) {
+            if (!(key in props)) continue;
+            const claimed = out ?? { ...props };
+            claimed[key] = process(props[key]);
+            out = claimed;
+          }
+          return out ?? props;
+        };
+  foldCache.set(component, { fold });
+  return fold;
 }

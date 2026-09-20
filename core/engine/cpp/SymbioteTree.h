@@ -1,0 +1,257 @@
+#pragma once
+
+#include <jsi/jsi.h>
+
+namespace symbiote {
+
+/**
+ * The shadow tree, owned by NATIVE. JS emits nothing but a command buffer.
+ *
+ * The spec is `core/engine/src/mutation-buffer.ts` and this file must agree with it — the opcode
+ * numbers are the contract, and renumbering on one side commits a different tree in silence.
+ *
+ * ── WHAT THIS REPLACES, AND WHY IT IS SMALLER THAN WHAT IT REPLACES ──────────────────────────────
+ *
+ * `SymbioteApplier` sat beside this file until 2026-09-08 and is deleted. It replayed FABRIC
+ * operations that a 2 041-line JS walk worked out — and that walk existed to re-derive a diff the
+ * framework had already computed and thrown away: a reconciler's whole job is knowing what changed,
+ * and every adapter tells us call by call.
+ *
+ * So this takes the ADAPTER's alphabet instead, and the derivation does not move here — it stops
+ * existing. What was 2 041 lines of JS diffing is, on this side, a child vector and a dirty flag.
+ * Three rules survive the collapse, and all three are two lines each rather than a walk:
+ *
+ *   a text element inside a text element commits as `RCTVirtualText`. Decided when a node acquires
+ *   a PARENT, because that is when the answer first exists, and re-decided on a reparent.
+ *
+ *   an anchor and an empty raw-text node are skipped from their parent's child set — an anchor
+ *   hoisting its own children up in its place. Decided when the set is built.
+ *
+ *   `cloneNodeWithNewProps` MERGES rather than replaces, so a clone's payload must be a minimal
+ *   diff with vanished keys sent as `null`. Cheaper here than in JS: we already know which keys an
+ *   op touched, so nothing has to be compared.
+ *
+ * ── LIFETIME: THIS CLASS HOLDS NOTHING ───────────────────────────────────────────────────────────
+ *
+ * A node's owner is the JS handle. `applyOps` attaches each created node to the placeholder object
+ * the adapter is already holding, as JSI `NativeState`, so the node lives exactly as long as that
+ * object and Hermes' collector is what frees it. A node also stays alive while a PARENT holds it,
+ * which is the browser's rule exactly: alive while in the tree or referenced from script.
+ *
+ * That is not a preference. The previous applier kept an `unordered_map<int32_t, shared_ptr>` and
+ * addressed nodes by a monotonic id — correct, and a second owner with nothing to tell it when the
+ * first one let go. One benchmark suite took it from 792 MB to 1492 MB. A `weak_ptr` table was
+ * tried and died on device on the first commit (`node 1 is gone`): Fabric's state reconciliation
+ * clones a stateful node AND THE PATH TO THE ROOT, so any `ScrollView` re-creates the root every
+ * commit while the JS side legitimately still names it. The repair is not a better table. It is
+ * having one owner.
+ *
+ * Hence: no members. `Tree` exists to give the host functions a `this`, and a per-call instance
+ * would behave identically.
+ */
+class Tree {
+ public:
+  /**
+   * `applyOps(ops, strings, values, instanceHandles, handles)`.
+   *
+   * `ops` is an `Int32Array` read as MEMORY — the commands never become JS values. The side tables
+   * carry what JSI has to marshal either way, and `handles` travels OUT: it holds the placeholder
+   * object for every slot the ops address, and a created node is attached to the object at its own
+   * slot. A slot is an index into THIS batch and is meaningless outside it, deliberately — an id
+   * that outlives a batch is what forces a table on this side.
+   *
+   * Prop values are converted to `folly::dynamic` ONCE, here, and never marshalled again. That is
+   * strictly cheaper than what ships today: `ConcreteComponentDescriptor::cloneProps` calls
+   * `RawProps::parse` unconditionally, and in `Mode::JSI` the preparse walks every key of every
+   * node with a `std::string` allocation per key — ~44 001 of each on a 1 000-row create, inside
+   * `createNode`. `Mode::Dynamic` does the identical work with no JSI at all.
+   */
+  facebook::jsi::Value applyOps(
+      facebook::jsi::Runtime &runtime,
+      const facebook::jsi::Value *arguments,
+      size_t count);
+
+  /**
+   * The five READS JS makes, and their oracle is `core/test-utils/src/tree-applier.ts` — the
+   * TypeScript half of this file, which ~5 500 tests drive. Each one below mirrors an export there.
+   *
+   * Two are VALUE reads. The host behaviors (the press, text-input and switch machines) run in JS
+   * and must see the props they react to; `getViewName` exists on top of that because it may answer
+   * something the adapter did not choose — see the virtual-text rule above.
+   *
+   * Three are STRUCTURAL, and they are their seams' contract rather than our choice: Solid's nodeOps
+   * declare getParentNode / getFirstChild / getNextSibling, Vue's RendererOptions and Angular's
+   * Renderer2 declare a parent/sibling pair, and Svelte's compiled output reaches `firstChild` as a
+   * real prototype getter. Fabric answers none of them — `nativeFabricUIManager` exposes no
+   * structural read, and `NativeDOM` answers against the CURRENT REVISION, which is never the tree a
+   * reconciler is mid-way through building.
+   *
+   * All five run at GESTURE or lifecycle rate rather than commit rate, which is what makes the
+   * crossing irrelevant: ~10 reads per touch against the 19 009 per commit this design exists to
+   * remove.
+   *
+   * `census` is deliberately NOT here. It has one JS caller, it is diagnostics, and answering it
+   * would cost a full native walk of the very tree this design exists to stop walking.
+   */
+  facebook::jsi::Value getProp(
+      facebook::jsi::Runtime &runtime,
+      const facebook::jsi::Value *arguments,
+      size_t count);
+  /** `getProps(handle)` — every prop standing on the node, in one crossing. */
+  facebook::jsi::Value getProps(
+      facebook::jsi::Runtime &runtime,
+      const facebook::jsi::Value *arguments,
+      size_t count);
+  /** `markPropsDirty(handle)` — the dirtying route a DERIVED payload has, since it writes no prop. */
+  facebook::jsi::Value markPropsDirty(
+      facebook::jsi::Runtime &runtime,
+      const facebook::jsi::Value *arguments,
+      size_t count);
+  facebook::jsi::Value getViewName(
+      facebook::jsi::Runtime &runtime,
+      const facebook::jsi::Value *arguments,
+      size_t count);
+  /** `parentOf(handle)` — the node's OWN parent, a surface included. */
+  facebook::jsi::Value parentOf(
+      facebook::jsi::Runtime &runtime,
+      const facebook::jsi::Value *arguments,
+      size_t count);
+  /**
+   * `nextSiblingOf(handle)` — the next entry in the parent's child list, anchors included.
+   *
+   * Its own call because the JS spelling was `parentOf` plus a whole `childrenOf`, which a keyed
+   * patch makes quadratic: 1 002 001 handles crossed on a 1 000-row Vue append.
+   */
+  facebook::jsi::Value nextSiblingOf(
+      facebook::jsi::Runtime &runtime,
+      const facebook::jsi::Value *arguments,
+      size_t count);
+  /** `childrenOf(handle)` — in order, ANCHORS INCLUDED. */
+  facebook::jsi::Value childrenOf(
+      facebook::jsi::Runtime &runtime,
+      const facebook::jsi::Value *arguments,
+      size_t count);
+  /**
+   * `parentsOf(handles)` / `subtreesOf(roots)` — the batched twins of the two reads above, each
+   * answering for a whole list in ONE crossing.
+   *
+   * They are members rather than a JS loop because the teardown sweep is the one structural read
+   * whose size is the TREE's rather than one node's: it asks for every removed node's parent and
+   * then walks everything the removal took with it, which at a thousand rows was eleven thousand
+   * crossings inside the timed step.
+   *
+   * `subtreesOf` answers PRE-ORDER, each root followed by its descendants, concatenated in root
+   * order. Anchors included, exactly as `childrenOf` includes them.
+   */
+  facebook::jsi::Value parentsOf(
+      facebook::jsi::Runtime &runtime,
+      const facebook::jsi::Value *arguments,
+      size_t count);
+  facebook::jsi::Value subtreesOf(
+      facebook::jsi::Runtime &runtime,
+      const facebook::jsi::Value *arguments,
+      size_t count);
+  /**
+   * `ancestorsOf(handle)` — the node and every ancestor above it, DEEPEST FIRST, in one crossing.
+   *
+   * The upward twin of `subtreesOf`, and it exists for the same reason the batched pair above does:
+   * a walk that asks per LEVEL pays a crossing per level. Event dispatch needs this chain for every
+   * event (capture reads it reversed, bubble forward) and the responder negotiation needs it again
+   * on every frame of every drag — measured at 18 crossings per event on a depth-8 chain before the
+   * two phases shared a walk, and 9 after.
+   *
+   * A SURFACE is included, exactly as `parentOf`'s answer includes one: stopping at a surface is
+   * `host-access.ts`'s job, and it reads the answer's `component` to do it.
+   */
+  facebook::jsi::Value ancestorsOf(
+      facebook::jsi::Runtime &runtime,
+      const facebook::jsi::Value *arguments,
+      size_t count);
+  /** `committedRecordOf(handle)` — `{handle, tag, rootTag}`, or undefined before a first commit. */
+  facebook::jsi::Value committedRecordOf(
+      facebook::jsi::Runtime &runtime,
+      const facebook::jsi::Value *arguments,
+      size_t count);
+
+  /**
+   * The imperative six, taking the same placeholder object `applyOps` attached the node to.
+   *
+   * Each is the matching branch of `UIManagerBinding::get` with one substitution: where the binding
+   * unwraps a handle IT minted, these unwrap ours and then take the `ShadowNode` the last commit
+   * left on the node. They live HERE rather than beside `Applier` because a handle carries exactly
+   * one `NativeState` — under this tree that state is a `Node`, which nothing in `Applier` can read.
+   *
+   * A node with no committed `ShadowNode` gets the SAME answer as a surface with no revision: six
+   * zeroes, four zeroes, `onFail`, and a no-op for the two that go straight to `UIManager`. It is
+   * the ordinary state under an async-batched commit, and an app that only asked where something is
+   * must not be thrown into.
+   *
+   *   dispatchCommand(handle, name, args)   sendAccessibilityEvent(handle, eventType)
+   *   measure(handle, cb)                   measureInWindow(handle, cb)
+   *   measureLayout(handle, relativeTo, onFail, onSuccess)
+   *   setIsJSResponder(handle, isResponder, blockNativeResponder)
+   */
+  facebook::jsi::Value dispatchCommand(
+      facebook::jsi::Runtime &runtime,
+      const facebook::jsi::Value *arguments,
+      size_t count);
+  facebook::jsi::Value sendAccessibilityEvent(
+      facebook::jsi::Runtime &runtime,
+      const facebook::jsi::Value *arguments,
+      size_t count);
+  facebook::jsi::Value measure(
+      facebook::jsi::Runtime &runtime,
+      const facebook::jsi::Value *arguments,
+      size_t count);
+  facebook::jsi::Value measureInWindow(
+      facebook::jsi::Runtime &runtime,
+      const facebook::jsi::Value *arguments,
+      size_t count);
+  facebook::jsi::Value measureLayout(
+      facebook::jsi::Runtime &runtime,
+      const facebook::jsi::Value *arguments,
+      size_t count);
+  facebook::jsi::Value setIsJSResponder(
+      facebook::jsi::Runtime &runtime,
+      const facebook::jsi::Value *arguments,
+      size_t count);
+
+  /**
+   * RN's own commit telemetry for ANY surface, read on demand — `{ layoutMs, textMs, commitMs,
+   * layoutNodes, textMeasures }` for whichever commit produced that surface's current revision.
+   *
+   * It takes a surface id, so it can be pointed at a surface REACT drove — the only way to answer
+   * whether a tree-wide text re-measure is ours or something a Fabric commit costs.
+   */
+  facebook::jsi::Value readSurfaceTelemetry(
+      facebook::jsi::Runtime &runtime,
+      const facebook::jsi::Value *arguments,
+      size_t count);
+
+  /**
+   * The PAYLOAD the last commit handed Fabric for this node, or `undefined` before its first.
+   *
+   * A TEST READ, and the only complete one there is. What a committed node can otherwise report is
+   * `Props::getDebugProps()`, a hand-written SELECTION per component — `RCTView` answers seven keys
+   * and `RCTSinglelineTextInputView` answers `testID` and nothing else, because RN implements none
+   * for `TextInputProps`. So a test asking "did the payload builder resolve `inputMode` into
+   * `keyboardType`" had no way to look, and every rule in `SymbioteFabricProps.cpp` was verifiable
+   * only through its TypeScript twin.
+   *
+   * RN's own complete read is `Props::rawProps`, behind `RN_SERIALIZABLE_STATE` — which drags
+   * `fbjni/fbjni.h` into `State`'s virtual interface and cannot compile on a host build (tried
+   * 2026-09-15, recorded in `core/engine/cpp/tests/CMakeLists.txt`). This needs no flag: the bag is
+   * already retained per node as the next commit's diff baseline, so the read costs a conversion and
+   * nothing else, and no commit path changes at all.
+   *
+   * WHAT IT IS NOT: proof that Fabric PARSED any of it. A key no ViewConfig declares sits in here
+   * exactly as it was sent — `processor-refusal.itest.ts` is the test for that question, and
+   * `getDebugProps` stays the read that proves the round trip. This answers what we SENT.
+   */
+  facebook::jsi::Value committedPayloadOf(
+      facebook::jsi::Runtime &runtime,
+      const facebook::jsi::Value *arguments,
+      size_t count);
+};
+
+} // namespace symbiote

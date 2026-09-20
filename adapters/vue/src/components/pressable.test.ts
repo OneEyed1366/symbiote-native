@@ -10,14 +10,16 @@
 import { defineComponent, h } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '@symbiote-native/vue';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+// A RECORDING host: the node is found over the AUTHORED nodes and the touch is aimed at the
+// `instanceHandle` the ops named — no commit rule decides either.
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 518;
 const PRESS_DELAY_MS = 30;
 const TOUCH_START = 'topTouchStart';
 const TOUCH_END = 'topTouchEnd';
 const TERMINATION_REQUEST = 'responderTerminationRequest';
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -44,24 +46,6 @@ function responderHandle(): unknown {
   if (node === undefined)
     throw new Error('no Vue Pressable responder was created');
   return node.instanceHandle;
-}
-
-// The live committed tree, never `fabric.find` (which reads the pre-clone `created` set and can
-// read a clone-on-write update back as its own pre-update self).
-function committedProps(
-  predicate: (node: IFakeNode) => boolean,
-): Record<string, unknown> | undefined {
-  const walk = (
-    nodes: readonly IFakeNode[],
-  ): Record<string, unknown> | undefined => {
-    for (const node of nodes) {
-      if (predicate(node)) return node.props;
-      const hit = walk(node.children);
-      if (hit !== undefined) return hit;
-    }
-    return undefined;
-  };
-  return walk(fabric.appRoot().children);
 }
 
 function terminationGate(
@@ -98,10 +82,12 @@ describe('Vue Pressable on the engine', () => {
     expect(presses).toBe(1);
   });
 
-  // why: RN's Pressable never fires ANY press callback while disabled, and folds `disabled` into
-  // accessibilityState so assistive tech is told regardless of what the caller passed — ported
-  // from RN's Pressable-test.js snapshot scenarios.
-  it('suppresses onPress and folds accessibilityState.disabled when disabled', async () => {
+  // why: RN's Pressable never fires ANY press callback while disabled — ported from RN's
+  // Pressable-test.js snapshot scenarios. The accessibilityState fold (`disabled` -> assistive
+  // tech) is `foldPressableProps` in `SymbioteFabricProps.cpp` now; this harness builds its
+  // payload through the TypeScript `fabricProps`, which carries no copy of it — asserted against
+  // the committed payload in `core/engine/cpp/tests/js/touchable-focusable-payload.itest.ts`.
+  it('suppresses onPress when disabled', async () => {
     let presses = 0;
     mount(
       ROOT_TAG,
@@ -117,9 +103,6 @@ describe('Vue Pressable on the engine', () => {
       }),
     );
     await tick();
-
-    const props = committedProps(node => node.props.testID === 'subject');
-    expect(props?.accessibilityState).toMatchObject({ disabled: true });
 
     const node = fabric.find(candidate => candidate.props.testID === 'subject');
     fabric.fireEvent(node?.instanceHandle, TOUCH_START);

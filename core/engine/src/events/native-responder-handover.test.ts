@@ -14,7 +14,7 @@
 // `injectGlobalResponderHandler` (ReactFabric-dev.js:18862); everything below the call is stock
 // C++ (UIManagerBinding.cpp:255).
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import {
   appendChild,
   createElement,
@@ -23,7 +23,7 @@ import {
   type ISymbioteNode,
 } from '../index';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 let nextRootTag = 9900;
 
 interface ITree {
@@ -73,7 +73,7 @@ describe('a granted responder is handed over to native', () => {
 
     expect(fabric.responderHandovers).toEqual([
       {
-        node: expect.anything(),
+        handle: expect.anything(),
         isResponder: true,
         blockNativeResponder: true,
       },

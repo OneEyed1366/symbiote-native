@@ -284,6 +284,7 @@ There's no per-instance service to `inject()` in the Angular case — every cons
 plain export off the core package, read straight in the constructor or class-field initializer.
 These snippets mirror the real canary demo screens — `examples/expo-react/screens/DeviceScreen.tsx`,
 `examples/expo-vue-sfc/screens/DeviceScreen.vue`, `examples/expo-vue-tsx/screens/DeviceScreen.tsx`,
+`examples/expo-svelte/screens/DeviceScreen.svelte`, `examples/expo-solid/screens/DeviceScreen.tsx`,
 `examples/expo-angular/src/screens/DeviceScreen.ts`.
 
 ## API

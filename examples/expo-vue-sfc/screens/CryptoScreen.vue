@@ -55,71 +55,43 @@ function handleGetRandomBytes(): void {
     >
       <view :class="`line-tag line-tag-${lineInfo.line}`">
         <text class="line-tag-text">
-          {{
-            `${lineInfo.code} · ${lineInfo.label}`
-          }}
+          {{ `${lineInfo.code} · ${lineInfo.label}` }}
         </text>
       </view>
       <view class="hero-card">
-        <view
-          class="hero-badge"
-          :style="{ backgroundColor: lineColor }"
-        >
+        <view class="hero-badge" :style="{ backgroundColor: lineColor }">
           <text class="hero-badge-text">
             {{ lineInfo.code }}
           </text>
         </view>
         <view class="hero-copy">
-          <text class="hero-title">
-            Crypto
-          </text>
+          <text class="hero-title"> Crypto </text>
           <text class="hero-body">
             @symbiote-native/crypto — cryptographically secure random bytes,
-            randomUUID, and string digest hashing (SHA-1/256/384/512,
-            MD2/4/5).
+            randomUUID, and string digest hashing (SHA-1/256/384/512, MD2/4/5).
           </text>
         </view>
       </view>
 
-      <view
-        testID="crypto-uuid-card"
-        class="crypto-card"
-      >
-        <text class="crypto-card-title">
-          Random UUID
-        </text>
+      <view testID="crypto-uuid-card" class="crypto-card">
+        <text class="crypto-card-title"> Random UUID </text>
         <ActionButton
           testID="crypto-generate-uuid-button"
           title="Generate UUID"
           :onPress="handleGenerateUuid"
           :color="lineColor"
         />
-        <view
-          v-if="uuidResult !== null"
-          class="crypto-result-box"
-        >
-          <text
-            testID="crypto-uuid-result-value"
-            class="crypto-result-text"
-          >
-            {{
-              uuidResult
-            }}
+        <view v-if="uuidResult !== null" class="crypto-result-box">
+          <text testID="crypto-uuid-result-value" class="crypto-result-text">
+            {{ uuidResult }}
           </text>
         </view>
       </view>
 
-      <view
-        testID="crypto-digest-card"
-        class="crypto-card"
-      >
-        <text class="crypto-card-title">
-          Digest
-        </text>
+      <view testID="crypto-digest-card" class="crypto-card">
+        <text class="crypto-card-title"> Digest </text>
         <text class="info-text">
-          {{
-            `SHA-256 of "${DIGEST_SAMPLE_TEXT}"`
-          }}
+          {{ `SHA-256 of "${DIGEST_SAMPLE_TEXT}"` }}
         </text>
         <ActionButton
           testID="crypto-digest-sha256-button"
@@ -127,36 +99,22 @@ function handleGetRandomBytes(): void {
           :onPress="handleDigestSha256"
           :color="lineColor"
         />
-        <view
-          v-if="digestResult !== null"
-          class="crypto-result-box"
-        >
-          <text
-            testID="crypto-digest-result-value"
-            class="crypto-result-text"
-          >
+        <view v-if="digestResult !== null" class="crypto-result-box">
+          <text testID="crypto-digest-result-value" class="crypto-result-text">
             {{ digestResult }}
           </text>
         </view>
       </view>
 
-      <view
-        testID="crypto-random-bytes-card"
-        class="crypto-card"
-      >
-        <text class="crypto-card-title">
-          Random bytes
-        </text>
+      <view testID="crypto-random-bytes-card" class="crypto-card">
+        <text class="crypto-card-title"> Random bytes </text>
         <ActionButton
           testID="crypto-get-random-bytes-button"
           title="Get 16 random bytes"
           :onPress="handleGetRandomBytes"
           :color="lineColor"
         />
-        <view
-          v-if="randomBytesResult !== null"
-          class="crypto-result-box"
-        >
+        <view v-if="randomBytesResult !== null" class="crypto-result-box">
           <text
             testID="crypto-random-bytes-result-value"
             class="crypto-result-text"

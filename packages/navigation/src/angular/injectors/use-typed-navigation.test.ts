@@ -21,7 +21,7 @@ import {
   Dimensions,
 } from '@symbiote-native/angular';
 import type { INativeViewConfig } from '@symbiote-native/engine';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import { Stack } from '../stack';
 import { ScreenDirective } from '../screen.directive';
 import { Tab } from '../tabs';
@@ -53,7 +53,7 @@ const VIEW_CONFIGS: Record<string, INativeViewConfig> = {
 // module, so seed a concrete width once - same fixture as drawer.test.ts.
 Dimensions.set({ window: { width: 375, height: 812, scale: 1, fontScale: 1 } });
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 setNativeViewConfigSource(name => VIEW_CONFIGS[name]);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));

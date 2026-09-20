@@ -61,24 +61,17 @@ function handleSend(): void {
     >
       <view :class="`line-tag line-tag-${lineInfo.line}`">
         <text class="line-tag-text">
-          {{
-            `${lineInfo.code} · ${lineInfo.label}`
-          }}
+          {{ `${lineInfo.code} · ${lineInfo.label}` }}
         </text>
       </view>
       <view class="hero-card">
-        <view
-          class="hero-badge"
-          :style="{ backgroundColor: lineColor }"
-        >
+        <view class="hero-badge" :style="{ backgroundColor: lineColor }">
           <text class="hero-badge-text">
             {{ lineInfo.code }}
           </text>
         </view>
         <view class="hero-copy">
-          <text class="hero-title">
-            SMS
-          </text>
+          <text class="hero-title"> SMS </text>
           <text class="hero-body">
             @symbiote-native/sms — opens the system SMS composer prefilled with
             recipients and a message. The user still has to press send
@@ -87,20 +80,10 @@ function handleSend(): void {
         </view>
       </view>
 
-      <view
-        testID="sms-capability-card"
-        class="sms-card"
-      >
-        <text class="sms-card-title">
-          Capabilities
-        </text>
-        <view
-          testID="sms-available"
-          class="sms-row"
-        >
-          <text class="sms-row-label">
-            Available
-          </text>
+      <view testID="sms-capability-card" class="sms-card">
+        <text class="sms-card-title"> Capabilities </text>
+        <view testID="sms-available" class="sms-row">
+          <text class="sms-row-label"> Available </text>
           <view :class="`sms-status-badge sms-status-badge-${isAvailable}`">
             <text class="sms-status-text">
               {{ toBadgeText(isAvailable) }}
@@ -114,13 +97,8 @@ function handleSend(): void {
         </text>
       </view>
 
-      <view
-        testID="sms-compose-card"
-        class="sms-card"
-      >
-        <text class="sms-card-title">
-          Compose
-        </text>
+      <view testID="sms-compose-card" class="sms-card">
+        <text class="sms-card-title"> Compose </text>
         <text-input
           v-model="recipients"
           testID="sms-recipients-input"
@@ -144,21 +122,14 @@ function handleSend(): void {
           :color="lineColor"
         />
         <view class="sms-row">
-          <text class="sms-row-label">
-            Last result
-          </text>
-          <text
-            testID="sms-result"
-            class="sms-value-text"
-          >
-            {{
-              lastResult
-            }}
+          <text class="sms-row-label"> Last result </text>
+          <text testID="sms-result" class="sms-value-text">
+            {{ lastResult }}
           </text>
         </view>
         <text class="sms-note">
-          iOS reports sent or cancelled; Android always reports unknown,
-          because reading the real outcome needs the READ_SMS permission Google
+          iOS reports sent or cancelled; Android always reports unknown, because
+          reading the real outcome needs the READ_SMS permission Google
           restricts to default-SMS-app publishers. Treat unknown as "the
           composer closed".
         </text>

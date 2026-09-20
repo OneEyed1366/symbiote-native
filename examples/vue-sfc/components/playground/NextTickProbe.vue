@@ -41,9 +41,5 @@ onMounted(() => {
 </script>
 
 <template>
-  <view
-    ref="probe"
-    class="chip"
-    testID="nexttick-probe-node"
-  />
+  <view ref="probe" class="chip" testID="nexttick-probe-node" />
 </template>

@@ -9,9 +9,18 @@ This is the **SFC** authoring of the Vue slice (`.vue` single-file components). 
 authored in **Vue JSX/TSX** lives next door in [`examples/vue-tsx`](../vue-tsx) — same engine,
 same components, only the template-vs-JSX authoring differs.
 
+The app boots into the `@symbiote-native/navigation` demo suite: `Menu` is the initial route, and
+its first row pushes into `Canary`, the "every `@symbiote-native/vue` primitive" screen this
+example started life as (its own former root content, unchanged, just relocated).
+
 ```
 index.js                  registers a RUNNABLE with RN's AppRegistry → mounts the Vue app via @symbiote-native/vue
-App.vue                    a Vue counter, authored as a real SFC (<template> + <script setup lang="ts">)
+App.vue                    the native stack navigator (Stack + Screen markers) + the global stylesheet import
+routes.ts                 route-name constants, shared by every registration and every push()
+navigation-lines.ts       the wayfinding palette (LINE_COLOR / ROUTE_LINE_INFO)
+navigation-linking.ts     the deep-link config, shared by the root wiring and the DeepLinking demo
+screens/                  29 screens — CanaryScreen plus the tour stops and their nested children
+components/               the canary's own demo components (Animated, NativeModules, Responder, …)
 metro-vue-transformer.js   compiles .vue on the way into the bundle (parse → compileScript → 'vue'→runtime-core)
 metro.config.js            sourceExts += 'vue', babelTransformerPath → the SFC transformer; pins one react + one runtime-core
 ```
@@ -23,11 +32,7 @@ single-pass compile itself with `@vue/compiler-sfc` — `parse` → `compileScri
 custom, non-DOM renderer needs the compiler helpers from `@vue/runtime-core`, not
 `vue/runtime-dom`; the shim also supplies `vShow`, since `v-show`
 compiles to an import runtime-core alone doesn't export). The compiled module is handed to `@react-native/babel-preset` as `.tsx`
-so it strips the `lang="ts"` types. The tap is the raw responder protocol
-(`@start-should-set-responder` + `@responder-release`), not `Pressable` — the press-retention
-controller lands with `@symbiote-native/components`. `ActivityIndicator` is the first
-`@symbiote-native/components` component: render fn shared verbatim with React, Vue supplies only the
-`descriptorToVue` bridge.
+so it strips the `lang="ts"` types.
 
 Editing the transformer or `metro.config.js` needs a Metro cache reset
 (`npm start -- --reset-cache`); editing `App.vue` does not.
@@ -48,8 +53,10 @@ npm run android
 # diagnostic logs:  DEBUG=1 npm start -- --reset-cache   (then run ios/android)
 ```
 
-Tap the box → the counter increments. That tap re-enters Vue's reactivity, which recommits
-through `@symbiote-native/engine` into Fabric — RN's renderer never involved.
+From the `Menu` screen, push into `Canary` and tap the counter card — that tap re-enters Vue's
+reactivity, which recommits through `@symbiote-native/engine` into Fabric, RN's renderer never
+involved. The other menu rows reach the navigator demos, the benchmark screen, and the style
+showcase.
 
 ## Note — shares the canary's native shell
 

@@ -1,13 +1,15 @@
 // A BARE tag must commit what the `p={{…}}` bag commits.
 //
 // Until 2026-09-07 it committed NOTHING: `setAttribute` wrote an inert Map and no key ever reached
-// `routeProp`, so `<view testID="x">` mounted an empty node with nothing red. That is the single
-// reason Svelte's lowering transform was load-bearing for CORRECTNESS while it is an optimisation
-// on every other adapter — the transform builds the bag, and only the bag was routed.
+// `routeProp`, so `<view testID="x">` mounted an empty node with nothing red — only the bag was
+// routed.
 //
 // The parity row is the point of the file; the rest exist so a failure says WHICH half broke.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 import {
   createSurface,
   disposeRoot,
@@ -25,7 +27,8 @@ if (globalThis.navigator === undefined)
 
 const ROOT_TAG = 91_407;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -48,30 +51,15 @@ function liveRoot(): ShimElement {
   return createRootShimElement(surface);
 }
 
-// The LIVE committed tree, never `fabric.find()` — a search hit is the pre-clone node and would
-// report the original bag forever.
+// The LIVE tree, never the recording's own `find()` — a hit there is the node as it was CREATED
+// and would report the original bag forever.
 function committedPropsOf(testID: string): Record<string, unknown> {
-  const walk = (
-    nodes: ReadonlyArray<{
-      props: Record<string, unknown>;
-      children: ReadonlyArray<unknown>;
-    }>,
-  ): Record<string, unknown> | undefined => {
-    for (const node of nodes) {
-      if (node.props.testID === testID) return node.props;
-      const hit = walk(
-        node.children.filter(
-          (child): child is { props: Record<string, unknown>; children: [] } =>
-            typeof child === 'object' && child !== null,
-        ),
-      );
-      if (hit !== undefined) return hit;
-    }
-    return undefined;
-  };
-  const hit = walk(fabric.appRoot().children);
+  const hit = live.findLive(
+    live.appRoot(),
+    node => node.payload.testID === testID,
+  );
   if (hit === undefined) throw new Error(`no committed node testID=${testID}`);
-  return hit;
+  return hit.payload;
 }
 
 async function mount(element: ShimElement): Promise<void> {
@@ -143,7 +131,7 @@ describe('a bare intrinsic tag', () => {
 
 describe('a bare tag and the prop bag', () => {
   // THE row. Everything above narrows a failure; this one states the contract, and it is what makes
-  // the lowering transform an optimisation on this adapter rather than a correctness dependency.
+  // the bag spelling an optimisation rather than the only way to reach the engine.
   it('commit the same payload for the same props', async () => {
     const props: Record<string, unknown> = {
       accessibilityLabel: 'hello',

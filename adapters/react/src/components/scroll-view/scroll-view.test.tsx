@@ -16,14 +16,19 @@
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '@symbiote-native/react';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 51;
 
 // onScroll payload recorder. Reset per test after fabric.reset().
 let scrolled: Record<string, unknown> | undefined;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 beforeEach(() => {
   fabric.reset();
   scrolled = undefined;
@@ -43,8 +48,16 @@ function horizontalApp(): React.ReactElement {
   );
 }
 
-function byName(name: string): IFakeNode | undefined {
-  return fabric.find(node => node.viewName === name);
+function byName(name: string): ILiveNode | undefined {
+  return live.findLive(live.appRoot(), node => node.viewName === name);
+}
+
+// The app's own top-level node, serialized — the counterpart of the old `fabric.serialize`.
+function appShape(): string {
+  const [child] = live.nodeOf(live.appRoot()).children;
+  if (child === undefined)
+    throw new Error('the app rendered no top-level node');
+  return live.serialize(child.handle);
 }
 
 describe('React <scroll-view> on the engine', () => {
@@ -54,84 +67,48 @@ describe('React <scroll-view> on the engine', () => {
   // `buildStructure` is what builds the second one; nothing in this adapter does.
   it('commits the nested scroll view shape under a box-none AppContainer', () => {
     mount(ROOT_TAG, horizontalApp());
-    expect(fabric.serialize(fabric.appRoot().children)).toBe(
-      'RCTScrollView(RCTScrollContentView(RCTView))',
-    );
+    expect(appShape()).toBe('RCTScrollView(RCTScrollContentView(RCTView))');
   });
 
   // why: contentContainerStyle styles the SCROLLABLE content, not the clipping frame — it must
   // land on RCTScrollContentView, and the horizontal TAG must flip the content's growth axis
   // (flexDirection: row) so children lay out side-by-side instead of stacking.
-  it('maps contentContainerStyle + the horizontal tag onto the content node', () => {
+  it('maps contentContainerStyle onto the content node', () => {
     mount(ROOT_TAG, horizontalApp());
 
     const content = byName('RCTScrollContentView');
     expect(content, 'RCTScrollContentView was created').toBeDefined();
-    expect(content!.props.padding).toBe(8);
-    expect(content!.props.flexDirection).toBe('row');
+    // The REDIRECT is the adapter's half and stays: an app writes this on the scroll view and it has
+    // to land here. The row direction that used to be asserted beside it is the engine's rule
+    // (`core/engine/cpp/tests/js/scroll-content-payload.itest.ts`).
+    expect(content!.payload.padding).toBe(8);
   });
 
   // why: the outer/inner style split must stay strict in both directions — a content-container
   // prop leaking onto the outer node would double-apply padding (Yoga would size the frame by it
   // too), and the outer node's own base clip/axis styles must still be present since native reads
   // them to know how to clip and scroll.
-  it('keeps content padding off the outer node and gives it the horizontal base style', () => {
+  it('keeps content padding off the outer node', () => {
     mount(ROOT_TAG, horizontalApp());
 
     const outer = byName('RCTScrollView');
     expect(outer, 'RCTScrollView was created').toBeDefined();
-    // `padding` is a content-container style and must NOT leak onto the scroll view node.
-    expect('padding' in outer!.props).toBe(false);
-    // flexDirection:'row' on the scroll view NODE is RN's styles.baseHorizontal: Yoga sizes the
-    // content child along the scroll axis so the row overflows and scrolls.
-    expect(outer!.props.flexDirection).toBe('row');
-    // overflow:'scroll' clips content to the frame, RN's base style on both axes.
-    expect(outer!.props.overflow).toBe('scroll');
+    // `padding` is a content-container style and must NOT leak onto the scroll view node. That is
+    // the SLOT ROUTING, which is this adapter's half and still JS.
+    expect(Object.hasOwn(outer!.payload, 'padding')).toBe(false);
+    // The base style (`flexDirection`, `overflow`) used to be asserted here too and is the engine's
+    // rule now — `foldScrollViewProps`, contract in
+    // `core/engine/cpp/tests/js/scroll-view-payload.itest.ts`. This host builds its payload through
+    // the TypeScript `fabricProps`, which carries no copy of the tag rules.
   });
 
-  // why: this was reported as a missing core fold and it is IMPLEMENTED — `ownerFold`
-  // (behaviors/scroll-view/shared.ts) deletes whatever `horizontal` the app wrote and rewrites it
-  // from the TAG. On iOS both tags resolve to RCTScrollView, so the boolean is the only thing that
-  // tells the native view which axis it scrolls; on Android the tag picks a different ViewManager.
-  // The row is here so the next reader checks the behavior rather than a wrapper's comment.
-  it('writes `horizontal` from the tag, on both axes', () => {
-    mount(ROOT_TAG, horizontalApp());
-    expect(byName('RCTScrollView')!.props.horizontal).toBe(true);
-
-    unmount(ROOT_TAG);
-    fabric.reset();
-    mount(
-      ROOT_TAG,
-      <scroll-view>
-        <view />
-      </scroll-view>,
-    );
-    // Absent, not `false`: RN's own ScrollView omits the prop on the vertical axis.
-    expect(byName('RCTScrollView')!.props.horizontal).toBeUndefined();
-  });
-
-  // why: the second half of the same correction. `nestedScrollEnabled ?? true` was reported as
-  // owed by core and is likewise implemented — the behavior defaults it, which is what every
-  // wrapper used to write by hand, so a bare tag does NOT lose the default.
-  it('defaults nestedScrollEnabled to true and honours an explicit false', () => {
-    mount(
-      ROOT_TAG,
-      <scroll-view>
-        <view />
-      </scroll-view>,
-    );
-    expect(byName('RCTScrollView')!.props.nestedScrollEnabled).toBe(true);
-
-    unmount(ROOT_TAG);
-    fabric.reset();
-    mount(
-      ROOT_TAG,
-      <scroll-view nestedScrollEnabled={false}>
-        <view />
-      </scroll-view>,
-    );
-    expect(byName('RCTScrollView')!.props.nestedScrollEnabled).toBe(false);
-  });
+  // The axis flag and `nestedScrollEnabled` LEFT THIS FILE on 2026-09-18 — both are
+  // `foldScrollViewProps` in the engine, asserted on the committed payload in
+  // `core/engine/cpp/tests/js/scroll-view-payload.itest.ts`. They were a pair here for a reason
+  // worth carrying over rather than losing: each case held its own negative control (absent on the
+  // vertical tag; an explicit `false` honoured), and after the port BOTH controls went on passing,
+  // because an absent key and an untouched passthrough are what a harness with no rule produces.
+  // A control only controls beside the thing it controls, so the pairs moved whole.
 
   // why: onScroll must reach the caller unmodified — RN's ScrollView does no JS-side
   // transformation of the native scroll payload, so re-wrapping or partially copying it here
@@ -152,9 +129,11 @@ describe('React <scroll-view> on the engine', () => {
     expect(scrolled).toBe(payload);
   });
 
-  it('carries the vertical base clip and lets a user style win over it', () => {
-    // Regression guard for the iOS bleed: a vertical scroll view used to get NO base style, so
-    // overflow was never set and iOS didn't clip. It must match RN's baseVertical.
+  // The vertical base clip — the regression guard for an iOS bleed where a vertical scroll view got
+  // NO base style and never clipped — is the engine's rule now, with its "a user style still wins"
+  // half beside it: `core/engine/cpp/tests/js/scroll-view-payload.itest.ts`. Nothing about it was
+  // ever this adapter's, which is why it moved rather than shrinking to the half that still passes.
+  it('reaches a committed RCTScrollView from the bare tag', () => {
     mount(
       ROOT_TAG,
       <scroll-view style={{ height: 120 }}>
@@ -164,10 +143,7 @@ describe('React <scroll-view> on the engine', () => {
 
     const vertical = byName('RCTScrollView');
     expect(vertical, 'vertical RCTScrollView was created').toBeDefined();
-    expect(vertical!.props.overflow).toBe('scroll');
-    expect(vertical!.props.flexDirection).toBe('column');
-    // A user style still wins over the base: the explicit height must survive the merge.
-    expect(vertical!.props.height).toBe(120);
+    expect(vertical!.payload.height).toBe(120);
   });
 });
 
@@ -217,7 +193,7 @@ describe('React <scroll-view> imperative handle', () => {
     expect(fabric.commands).toHaveLength(1);
     expect(fabric.commands[0]?.commandName).toBe('scrollTo');
     expect(fabric.commands[0]?.args).toEqual([0, 42, false]);
-    expect(fabric.commands[0]?.node.viewName).toBe('RCTScrollView');
+    expect(fabric.commands[0]?.viewName).toBe('RCTScrollView');
   });
 
   it('dispatches flashScrollIndicators through the same handle', () => {

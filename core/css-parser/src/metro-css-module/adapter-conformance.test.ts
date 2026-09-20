@@ -22,6 +22,7 @@ import {
 import {
   createElement,
   getExplicitStyle,
+  getPublishedStyle,
   routeProp,
   type ISymbioteNode,
 } from '../../../engine/src/node.ts';
@@ -210,8 +211,12 @@ function styledNode(
   return node;
 }
 
+// The node's own class+style pair rather than a committed payload: the engine holds no props any
+// more, so `style` lives in the HOST, and this file installs none — it drives `routeProp` directly
+// and never mounts. `getPublishedStyle` returns exactly what the node would publish, in the order
+// `flattenStyle` collapses.
 function resolvedStyle(node: ISymbioteNode): Record<string, unknown> {
-  return flattenStyle(node.props.style);
+  return flattenStyle(getPublishedStyle(node));
 }
 
 // ---------------------------------------------------------------------------

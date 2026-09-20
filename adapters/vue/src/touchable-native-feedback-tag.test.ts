@@ -17,7 +17,11 @@
 // answer from the same spec entry this tag now has).
 import { defineComponent, h, type VNode } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 
 // SIDE-EFFECT IMPORT: the behavior is what clones the owner's props onto the child. An app reaches
 // it through the package barrel; a test importing the renderer directly does not.
@@ -25,22 +29,26 @@ import './register';
 import { mount, unmount } from './render';
 
 const ROOT_TAG = 9_931;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+// The tag commits NO view of its own, so its anchor flattens here exactly as the commit walk
+// flattens it — which is the claim this file makes.
+const live = createLiveTree(fabric);
 
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
-function flatten(nodes: readonly IFakeNode[]): IFakeNode[] {
-  return nodes.flatMap(node => [node, ...flatten(node.children)]);
+function flatten(root: ILiveNode): ILiveNode[] {
+  return root.children.flatMap(node => [node, ...flatten(node)]);
 }
 
 /** Everything committed under the labelled root, the root itself excluded. */
-function subtreeOf(label: string): IFakeNode[] {
-  const root = flatten(fabric.appRoot().children).find(
-    node => node.props.nativeID === label,
+function subtreeOf(label: string): ILiveNode[] {
+  const root = live.findLive(
+    live.appRoot(),
+    node => node.payload.nativeID === label,
   );
   if (root === undefined) throw new Error(`no committed root ${label}`);
-  return flatten(root.children);
+  return flatten(root);
 }
 
 async function mountTree(render: () => VNode): Promise<void> {
@@ -68,25 +76,24 @@ describe('touchable-native-feedback as a tag', () => {
 
   // why: the count above is satisfied by an unregistered tag too — an anchor commits nothing on its
   // own. This is the arm that fails when the registration is missing.
-  it('clones the owner’s props onto that one child', async () => {
+  // THE WITNESS CHANGED ON 2026-09-18 and the case did not. It used to be the CLONE, which moved to
+  // `foldCloneOntoChild` in C++ and which this host cannot run — it builds its payloads through the
+  // TypeScript `fabricProps`, carrying no copy of the tag rules. `onLayout` is the same KIND of
+  // claim and is still JS: RN clones it as a LISTENER (`:386`), the behavior's `FORWARDED_LISTENERS`
+  // carries it, and being a Fabric BOOLEAN-GATED event it shows up in the payload as `true`.
+  it('forwards the owner’s listener onto that one child', async () => {
     await mountTree(() =>
       h('view', { nativeID: 'root' }, [
         h(
           'touchable-native-feedback',
-          { accessibilityLabel: 'Save', nativeID: 'tnf', testID: 'probe' },
-          [h('view', { testID: 'ignored' })],
+          { accessibilityLabel: 'Save', nativeID: 'tnf', onLayout: () => {} },
+          [h('view', {})],
         ),
       ]),
     );
 
     const [child] = subtreeOf('root');
-    expect(child.props).toMatchObject({
-      accessibilityLabel: 'Save',
-      // :373 — the owner's `id`/`nativeID`, not the child's.
-      nativeID: 'tnf',
-      // :389 — `testID` is cloned, so the OWNER's wins over whatever the child declared.
-      testID: 'probe',
-    });
+    expect(child.payload.onLayout).toBe(true);
   });
 
   // why: the clone case above proves the PROPS bridge; it does not prove a real touch on the child

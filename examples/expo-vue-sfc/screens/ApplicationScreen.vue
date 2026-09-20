@@ -88,24 +88,17 @@ function handleGetIosReleaseType(): void {
     >
       <view :class="`line-tag line-tag-${lineInfo.line}`">
         <text class="line-tag-text">
-          {{
-            `${lineInfo.code} · ${lineInfo.label}`
-          }}
+          {{ `${lineInfo.code} · ${lineInfo.label}` }}
         </text>
       </view>
       <view class="hero-card">
-        <view
-          class="hero-badge"
-          :style="{ backgroundColor: lineColor }"
-        >
+        <view class="hero-badge" :style="{ backgroundColor: lineColor }">
           <text class="hero-badge-text">
             {{ lineInfo.code }}
           </text>
         </view>
         <view class="hero-copy">
-          <text class="hero-title">
-            Application
-          </text>
+          <text class="hero-title"> Application </text>
           <text class="hero-body">
             @symbiote-native/application — app version/build/name/ID, install
             time, the Android ID and install referrer on Android, the vendor ID
@@ -114,62 +107,36 @@ function handleGetIosReleaseType(): void {
         </view>
       </view>
 
-      <view
-        testID="application-info-card"
-        class="application-card"
-      >
-        <text class="application-card-title">
-          Info
-        </text>
+      <view testID="application-info-card" class="application-card">
+        <text class="application-card-title"> Info </text>
         <view class="application-row">
-          <text class="application-row-label">
-            Name
-          </text>
+          <text class="application-row-label"> Name </text>
           <text class="application-value-text">
-            {{
-              applicationName ?? 'unknown'
-            }}
+            {{ applicationName ?? 'unknown' }}
           </text>
         </view>
         <view class="application-row">
-          <text class="application-row-label">
-            ID
-          </text>
+          <text class="application-row-label"> ID </text>
           <text class="application-value-text">
-            {{
-              applicationId ?? 'unknown'
-            }}
+            {{ applicationId ?? 'unknown' }}
           </text>
         </view>
         <view class="application-row">
-          <text class="application-row-label">
-            Version
-          </text>
+          <text class="application-row-label"> Version </text>
           <text class="application-value-text">
-            {{
-              nativeApplicationVersion ?? 'unknown'
-            }}
+            {{ nativeApplicationVersion ?? 'unknown' }}
           </text>
         </view>
         <view class="application-row">
-          <text class="application-row-label">
-            Build
-          </text>
+          <text class="application-row-label"> Build </text>
           <text class="application-value-text">
-            {{
-              nativeBuildVersion ?? 'unknown'
-            }}
+            {{ nativeBuildVersion ?? 'unknown' }}
           </text>
         </view>
       </view>
 
-      <view
-        testID="application-actions-card"
-        class="application-card"
-      >
-        <text class="application-card-title">
-          Actions
-        </text>
+      <view testID="application-actions-card" class="application-card">
+        <text class="application-card-title"> Actions </text>
         <view class="button-row">
           <ActionButton
             testID="application-installation-time-button"
@@ -178,13 +145,8 @@ function handleGetIosReleaseType(): void {
             :color="lineColor"
           />
         </view>
-        <view
-          v-if="installationTimeResult !== null"
-          class="application-row"
-        >
-          <text class="application-row-label">
-            Installed
-          </text>
+        <view v-if="installationTimeResult !== null" class="application-row">
+          <text class="application-row-label"> Installed </text>
           <text
             testID="application-installation-time-value"
             class="application-value-text"
@@ -193,10 +155,7 @@ function handleGetIosReleaseType(): void {
           </text>
         </view>
 
-        <view
-          v-if="Platform.OS === 'android'"
-          class="button-row"
-        >
+        <view v-if="Platform.OS === 'android'" class="button-row">
           <ActionButton
             testID="application-android-id-button"
             title="Get Android ID"
@@ -210,13 +169,8 @@ function handleGetIosReleaseType(): void {
             :color="lineColor"
           />
         </view>
-        <view
-          v-if="androidIdResult !== null"
-          class="application-row"
-        >
-          <text class="application-row-label">
-            Android ID
-          </text>
+        <view v-if="androidIdResult !== null" class="application-row">
+          <text class="application-row-label"> Android ID </text>
           <text
             testID="application-android-id-value"
             class="application-value-text"
@@ -224,13 +178,8 @@ function handleGetIosReleaseType(): void {
             {{ androidIdResult }}
           </text>
         </view>
-        <view
-          v-if="installReferrerResult !== null"
-          class="application-row"
-        >
-          <text class="application-row-label">
-            Install referrer
-          </text>
+        <view v-if="installReferrerResult !== null" class="application-row">
+          <text class="application-row-label"> Install referrer </text>
           <text
             testID="application-install-referrer-value"
             class="application-value-text"
@@ -239,10 +188,7 @@ function handleGetIosReleaseType(): void {
           </text>
         </view>
 
-        <view
-          v-if="Platform.OS === 'ios'"
-          class="button-row"
-        >
+        <view v-if="Platform.OS === 'ios'" class="button-row">
           <ActionButton
             testID="application-ios-vendor-id-button"
             title="Get iOS ID For Vendor"
@@ -256,13 +202,8 @@ function handleGetIosReleaseType(): void {
             :color="lineColor"
           />
         </view>
-        <view
-          v-if="iosVendorIdResult !== null"
-          class="application-row"
-        >
-          <text class="application-row-label">
-            iOS vendor ID
-          </text>
+        <view v-if="iosVendorIdResult !== null" class="application-row">
+          <text class="application-row-label"> iOS vendor ID </text>
           <text
             testID="application-ios-vendor-id-value"
             class="application-value-text"
@@ -270,13 +211,8 @@ function handleGetIosReleaseType(): void {
             {{ iosVendorIdResult }}
           </text>
         </view>
-        <view
-          v-if="iosReleaseTypeResult !== null"
-          class="application-row"
-        >
-          <text class="application-row-label">
-            iOS release type
-          </text>
+        <view v-if="iosReleaseTypeResult !== null" class="application-row">
+          <text class="application-row-label"> iOS release type </text>
           <text
             testID="application-ios-release-type-value"
             class="application-value-text"

@@ -1,3 +1,5 @@
+import babel from '@babel/core';
+import { createRequire } from 'node:module';
 import { defineConfig } from 'vitest/config';
 import solidPlugin from 'vite-plugin-solid';
 
@@ -79,11 +81,153 @@ const SOLID_TRANSFORM = solidPlugin({
 // Vitest imports Angular adapter source directly. The production AOT path is still ngc partial
 // compilation, but source tests need Vite/Oxc to lower Angular's legacy TS decorators before
 // Node evaluates @Component/@Directive files.
+// react-native's own source is Flow, which Rolldown cannot parse - importing any of it from a
+// module a test reaches kills the run with `Parse failure: Flow is not supported`. That is the
+// single reason this repo hand-ported 36 RN modules (symbiote-rn-port-elimination); stripping the
+// types here is what lets a port be deleted in favour of the upstream implementation.
+//
+// The parser swap is load-bearing. @babel/preset-flow, the obvious choice, is BEHIND Flow's
+// syntax and dies on the conditional type at flattenStyle.js:19 with a bare `Missing semicolon`.
+// react-native compiles itself with Hermes' parser for exactly that reason.
+const require_ = createRequire(import.meta.url);
+const HERMES_SYNTAX = require_.resolve('babel-plugin-syntax-hermes-parser');
+const FLOW_STRIP = require_.resolve('@babel/plugin-transform-flow-strip-types');
+
+// RN mixes ESM `import` with top-level `require('./X')` in ONE file (PanResponder.js:15). Vite
+// rewrites the imports and leaves the require, so Node loads the next hop RAW - as Flow - and the
+// failure reads as a syntax error in a file this transform was never asked about. Hoisting those
+// requires into real imports keeps every hop inside the transform.
+const requireToImport = ({ types: t }: { types: typeof babel.types }) => ({
+  visitor: {
+    CallExpression(path: babel.NodePath<babel.types.CallExpression>, state) {
+      if (!t.isIdentifier(path.node.callee, { name: 'require' })) return;
+      const [arg] = path.node.arguments;
+      if (!t.isStringLiteral(arg)) return;
+      if (path.scope.getBinding('require')) return;
+      const ns = path.scope.generateUidIdentifier('req');
+      // A namespace object is not callable, so a CJS target (`invariant`) is read through
+      // `.default`. But RN writes `require('./X').default` against its own ESM files, where that
+      // unwrap is already the caller's - doing it twice yields undefined.
+      const callerUnwraps =
+        path.parentPath.isMemberExpression({ computed: false }) &&
+        t.isIdentifier(path.parentPath.node.property, { name: 'default' });
+      state.file.path.unshiftContainer(
+        'body',
+        t.importDeclaration(
+          [t.importNamespaceSpecifier(ns)],
+          t.stringLiteral(arg.value),
+        ),
+      );
+      path.replaceWith(
+        callerUnwraps
+          ? ns
+          : t.logicalExpression(
+              '??',
+              t.memberExpression(ns, t.identifier('default')),
+              ns,
+            ),
+      );
+    },
+  },
+});
+
+// NOT just `react-native/`: its Flow reaches into sibling @react-native/* packages.
+const RN_SOURCE =
+  /\/node_modules\/(react-native|@react-native\/[^/]+)\/.*\.jsx?$/;
+
+const REACT_NATIVE_FLOW = {
+  name: 'strip-flow-from-react-native',
+  enforce: 'pre' as const,
+  async transform(code: string, id: string) {
+    if (!RN_SOURCE.test(id.split('?')[0])) return null;
+    const out = await babel.transformAsync(code, {
+      filename: id,
+      babelrc: false,
+      configFile: false,
+      sourceMaps: true,
+      plugins: [
+        [HERMES_SYNTAX, { parseLangTypes: 'flow' }],
+        FLOW_STRIP,
+        requireToImport,
+      ],
+    });
+    return out?.code == null ? null : { code: out.code, map: out.map };
+  },
+};
+
+// `Libraries/Utilities/Platform.js` is a back-compat shim whose entire body is
+// `import Platform from './Platform'`. Metro resolves that by platform extension to
+// `Platform.ios.js` / `Platform.android.js`; Vite has no such step, so `./Platform` resolves back
+// to the shim ITSELF. The default export is then undefined, and the first `Platform.OS` read
+// throws - inside our own catch, so it surfaces as an empty result rather than a stack. That one
+// self-import is what blocked importing processColor, and with it every colour-touching upstream
+// processor.
+//
+// Pinned to `.ios.js` because that is already this repo's headless answer: core/engine/src/
+// platform/index.ts re-exports the iOS implementation for the same reason - headless has no
+// platform, so the filename is the selector.
+//
+// A resolver rather than `resolve.extensions`: putting `.ios.js` ahead of `.js` repo-wide would
+// silently change which platform variant EVERY react-native-* package resolves to under test, a
+// far larger blast radius than the one file that needs it. Scoped to an importer inside RN's own
+// source so our code, which never imports RN's Platform, cannot be caught by it.
+const RN_PLATFORM_IOS = require_.resolve(
+  'react-native/Libraries/Utilities/Platform.ios.js',
+);
+
+// Platform.ios then reaches `TurboModuleRegistry.getEnforcing('PlatformConstants')` at MODULE
+// scope, so the import throws without a native host - and satisfying that through
+// `global.__turboModuleProxy` is the wrong lever, because that global is itself the SUBJECT of
+// several tests: platform.test.ts sets it to undefined to prove Platform degrades gracefully, and
+// a dozen others install a single-module proxy of their own. A host fake living there either
+// breaks those tests or gets broken by them, depending on load order.
+//
+// Resolving the spec module instead keeps the two apart entirely: RN's chain is satisfied at the
+// import boundary, and `__turboModuleProxy` keeps meaning exactly what every existing test already
+// assumes. The values are an iOS simulator's.
+//
+// `isTesting: false` is the one that is not cosmetic. It stands in for a DEVICE, not for a test
+// runner, and core/engine/src/platform/index.ios.ts:92 derives `isDisableAnimations` from it - set
+// it true and animations switch off engine-wide, which took the native Animated driver down with
+// it in ten tests across three adapters, none of them near this file.
+const RN_PLATFORM_CONSTANTS = '\0symbiote:rn-platform-constants';
+const PLATFORM_CONSTANTS = {
+  forceTouchAvailable: false,
+  interfaceIdiom: 'phone',
+  isTesting: false,
+  osVersion: '26.5',
+  reactNativeVersion: { major: 0, minor: 86, patch: 0, prerelease: null },
+  systemName: 'iOS',
+};
+
+const REACT_NATIVE_PLATFORM = {
+  name: 'react-native-platform-ios',
+  enforce: 'pre' as const,
+  resolveId(source: string, importer: string | undefined) {
+    if (source === RN_PLATFORM_CONSTANTS) return source;
+    if (importer == null) return null;
+    if (!RN_SOURCE.test(importer.split('?')[0])) return null;
+    if (/NativePlatformConstants(IOS|Android)$/.test(source)) {
+      return RN_PLATFORM_CONSTANTS;
+    }
+    return /(^|\/)Platform(\.js)?$/.test(source) ? RN_PLATFORM_IOS : null;
+  },
+  load(id: string) {
+    if (id !== RN_PLATFORM_CONSTANTS) return null;
+    return `export default { getConstants: () => (${JSON.stringify(
+      PLATFORM_CONSTANTS,
+    )}) };`;
+  },
+};
+
 const SHARED = {
   oxc: { decorator: { legacy: true } },
+  plugins: [REACT_NATIVE_FLOW, REACT_NATIVE_PLATFORM],
   test: {
     environment: 'node' as const,
-    server: { deps: { inline: [/@symbiote-native\//] } },
+    // ./vitest.setup.ts defines __DEV__, which react-native's own source reads bare.
+    setupFiles: ['./vitest.setup.ts'],
+    server: { deps: { inline: [/@symbiote-native\//, /react-native/] } },
   },
 };
 
@@ -124,7 +268,10 @@ export default defineConfig({
       {
         ...SHARED,
         ...BROWSER_CONDITIONS,
-        plugins: [SOLID_TRANSFORM],
+        // SHARED.plugins is REPLACED, not merged, so the Flow transform has to be restated.
+        // SHARED.plugins is REPLACED, not merged, by a project that declares its own - so every
+        // react-native plugin has to be restated here or solid's tests lose them silently.
+        plugins: [REACT_NATIVE_FLOW, REACT_NATIVE_PLATFORM, SOLID_TRANSFORM],
         test: {
           ...SHARED.test,
           name: 'solid',

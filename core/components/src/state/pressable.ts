@@ -10,7 +10,7 @@
 // node plus its measure call). The rest (the timers, the geometry, the suppression flags,
 // the decision of when each callback fires) is here, shared by every adapter.
 
-import { dlog, Platform, type ISymbioteEvent } from '@symbiote-native/engine';
+import { dlog, type ISymbioteEvent } from '@symbiote-native/engine';
 
 export const DEFAULT_DELAY_LONG_PRESS_MS = 500;
 // Pressability's default active-visual floor for a plain Pressable. Touchable* overrides this to 0.
@@ -141,23 +141,13 @@ export function computeRegion(
   };
 }
 
-// Build the Android native-feedback prop the inner View carries from the ripple config. RN runs
-// the color through processColor → a native int; we have no native bridge in JS, so we keep the
-// string and let Android resolve it (a null color is the documented "no tint"). Inert on iOS.
-export function rippleProps(
-  config: IPressableAndroidRippleConfig,
-): Record<string, IRippleBackground> | undefined {
-  if (Platform.OS !== 'android') return undefined;
-  const background: IRippleBackground = {
-    type: 'RippleAndroid',
-    color: config.color ?? null,
-    borderless: config.borderless === true,
-    rippleRadius: config.radius,
-  };
-  return config.foreground === true
-    ? { nativeForegroundAndroid: background }
-    : { nativeBackgroundAndroid: background };
-}
+// `rippleProps` STOOD HERE and is now the engine's — `applyAndroidRipple` in
+// `SymbioteFabricProps.cpp`, under the same `#ifdef ANDROID` its `Platform.OS` check was. Deleted
+// rather than kept exported: nothing called it any more, and an uncalled twin of a rule that lives
+// somewhere else is a copy kept alive by its own test.
+//
+// `IRippleBackground` above stays — it describes the shape the engine emits, which every adapter
+// still re-exports as a public type.
 
 // ---- the press state machine ------------------------------------------------------------------
 

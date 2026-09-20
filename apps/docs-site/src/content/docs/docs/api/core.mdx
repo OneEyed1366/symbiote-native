@@ -27,8 +27,12 @@ dependency and stays your app's own top-level dependency either way.
 The engine owns the native route:
 
 ```txt
-adapter mutation → retained tree → Fabric clone-on-write commit → native views
+adapter mutation → JS command buffer → SymbioteTree (C++) → Fabric clone-on-write commit → native views
 ```
+
+The retained tree used to live in the JS package itself; it now lives in C++
+(`core/engine/cpp`), and the JS side's job is building the buffer and crossing into it once per
+commit instead of once per mutation. The public API below is unchanged either way.
 
 Its public surface includes:
 

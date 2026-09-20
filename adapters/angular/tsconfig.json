@@ -3,6 +3,15 @@
   "compilerOptions": {
     "rootDir": "src",
     "outDir": "build",
+    // ANGULAR'S OWN SETTING, and it defaults the other way at this repo's ES2022 target. Every
+    // `@Input()` is a bare field DECLARATION, and ngc's output keeps every one of them — so under
+    // ES2022 class-field semantics each is a real `[[Define]]` on every instance. `SymbioteElement`
+    // declares 279, and a screen written against `SYMBIOTE_ELEMENTS` instantiates a directive per
+    // TAG. Angular's own integration configs carry this line beside the same target
+    // (`.vendors/angular/integration/*/tsconfig.json`). The twin for CONSUMERS is in
+    // `tsconfig.angular.base.json`, which is a different chain — this one is what `ngc -p
+    // tsconfig.angular.json` and `tsc --build` actually read.
+    "useDefineForClassFields": false,
     "lib": ["ES2022", "DOM"],
     "types": ["node"]
   },

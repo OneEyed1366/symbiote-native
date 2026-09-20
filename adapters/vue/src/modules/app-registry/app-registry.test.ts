@@ -13,6 +13,10 @@
 // `getRunnable`/`getSections`/`getRegistry` are one-line Map/Set reads with no branch of their
 // own — N/A, trivial pass-through. Headless-task host forwarding and pre-bootstrap replay are
 // framework-agnostic and covered by core/engine/src/app-registry/app-registry.test.ts.
+//
+// A RECORDING host. Every read here is either "was a node with this name created at all" or "what
+// text reached the raw-text nodes" — both answerable off the CREATION log, residency-agnostic and
+// matching what the old mirror's `.find`/`.created` gave.
 
 import { defineComponent, h, type SetupContext } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -23,7 +27,7 @@ import {
   type IAppParameters,
   type IRunnable,
 } from '../..';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 
 const APP_KEY = 'canary';
 const ROOT_TAG = 211;
@@ -31,7 +35,7 @@ const ROOT_TAG = 211;
 // The TAGS. Children go to an element as an ARRAY, never a slot function.
 const App = () => h('view', { style: { flex: 1 } }, [h('text', null, 'hi')]);
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 // Vue's mount() requestCommit()s on a microtask (vue-adapter-reactivity Gotcha 2), unlike
 // React's synchronous commit, so assertions on the committed tree need one tick.
 const tick = (): Promise<void> =>
@@ -128,7 +132,7 @@ describe('AppRegistry', () => {
       AppRegistry.runApplication('does-not-exist', { rootTag: ROOT_TAG });
       await tick();
 
-      expect(fabric.created).toHaveLength(0);
+      expect(fabric.findAll(() => true)).toHaveLength(0);
     });
   });
 
@@ -170,8 +174,8 @@ describe('AppRegistry', () => {
       await tick();
 
       expect(receivedParams).toEqual({ rootTag: ROOT_TAG });
-      const texts = fabric.created
-        .filter(n => n.viewName === 'RCTRawText')
+      const texts = fabric
+        .findAll(n => n.viewName === 'RCTRawText')
         .map(n => n.props.text);
       expect(texts).toEqual(expect.arrayContaining(['wrapped', 'hi']));
     });

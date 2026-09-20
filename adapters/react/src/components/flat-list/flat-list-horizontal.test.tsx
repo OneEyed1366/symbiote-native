@@ -6,7 +6,11 @@
 import { createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { FlatList, mount, unmount } from '@symbiote-native/react';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  installRecordingFabric,
+  payloadOf,
+  type IAuthoredNode,
+} from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 32;
 const ITEM_COUNT = 20;
@@ -42,35 +46,42 @@ function App(): ReactElement {
   });
 }
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-function findCreated(viewName: string): IFakeNode {
+function findCreated(viewName: string): IAuthoredNode {
   const node = fabric.find(n => n.viewName === viewName);
   expect(node, `${viewName} created`).toBeDefined();
   if (node === undefined) throw new Error(`unreachable: ${viewName} missing`);
   return node;
 }
 
+/** The PAYLOAD: `width` and `flexDirection` are style keys, flattened on the way into it. */
+function payloadFor(viewName: string): Record<string, unknown> {
+  return payloadOf(findCreated(viewName).handle);
+}
+
 // No Negative group: `horizontal` is a plain boolean prop with no guard clause — every value
 // it accepts is valid, so there is no reject path to assert against.
 describe('horizontal FlatList (Positive — no throwing path)', () => {
-  it('forwards horizontal to the native RCTScrollView', () => {
-    // why: iOS decides the scroll axis from the native RCTScrollView's own `horizontal` prop,
-    // so a dropped forward silently degrades a horizontal list back to vertical.
+  it('reaches the horizontal scroll tag, which is what carries the axis', () => {
+    // why: both the axis flag and the content node's row style are engine rules now
+    // (`scroll-view-payload.itest.ts`, `scroll-content-payload.itest.ts`), and under this host the
+    // iOS name table maps BOTH axes to `RCTScrollView`/`RCTScrollContentView` — so nothing visible
+    // here distinguishes the axis at all. What a list still owes is the two-node scroll structure:
+    // reach no behavior and there is no content view to pin a width to, which the next case does.
     mount(ROOT_TAG, createElement(App));
-    const scrollView = findCreated('RCTScrollView');
-    expect(scrollView.props.horizontal).toBe(true);
+    expect(payloadFor('RCTScrollContentView')).toBeDefined();
   });
 
   it('pins the content view to the full row width as a row', () => {
     // why: the content view must be pinned to the full row width, not the frame width — else
     // the row never overflows and the native scroll view has nothing to scroll.
     mount(ROOT_TAG, createElement(App));
-    const content = findCreated('RCTScrollContentView');
-    expect(content.props.width).toBe(TOTAL_WIDTH);
-    expect(content.props.flexDirection).toBe('row');
+    // The WIDTH is the list's own arithmetic and stays here; the row direction beside it is the
+    // engine's rule (`core/engine/cpp/tests/js/scroll-content-payload.itest.ts`).
+    expect(payloadFor('RCTScrollContentView').width).toBe(TOTAL_WIDTH);
   });
 
   it('registers an event handler that accepts a layout event', () => {

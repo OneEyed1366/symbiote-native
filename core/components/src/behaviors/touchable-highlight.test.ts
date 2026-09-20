@@ -3,10 +3,12 @@
 // too fast to see must still flash, and a cancelled gesture must not flash at all. Every case here
 // is a way that shape degrades silently to "looks like it works" if it is written as a naive
 // pressed-derived style instead.
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { installFabric, type IFakeNode } from '../../../test-utils/src/index';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  appendChild,
+  createLiveTree,
+  installRecordingFabric,
+} from '../../../test-utils/src/index';
+import {
   clearHostBehaviors,
   createElement,
   createSurface,
@@ -15,25 +17,20 @@ import {
   type ISymbioteEvent,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
-import { descriptorFor } from '../component-names';
 import {
   registerTouchableHighlightBehavior,
   TOUCHABLE_HIGHLIGHT_TAG,
 } from './touchable-highlight';
-import {
-  DEFAULT_HIGHLIGHT_CHILD_OPACITY,
-  DEFAULT_UNDERLAY_COLOR,
-} from '../state/touchable';
-
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 let nextRootTag = 7300;
 
-// RN's TouchableHighlight is TWO views: the container (underlay backgroundColor) wrapping the
-// cloned child (activeOpacity) — `TouchableHighlight-itest.js`. Built with the FABRIC name,
-// matching every sibling test in this file's family.
+// RN's TouchableHighlight is one View (the underlay + child both fold onto it here — see the
+// behavior file's own header for why, this port keeps the wrapper's already-shipped
+// single-node simplification). Built with the FABRIC name, matching every sibling test in this
+// file's family.
 const TOUCHABLE_VIEW_NAME = 'RCTView';
 const TEST_ID = 'subject';
-const CHILD_TEST_ID = 'subject-child';
 const DELAY_PRESS_OUT = 100;
 
 const TOUCH: ISymbioteEvent = {
@@ -42,16 +39,6 @@ const TOUCH: ISymbioteEvent = {
 
 function makeTouchable(): ISymbioteNode {
   return createElement(TOUCHABLE_VIEW_NAME, false, TOUCHABLE_HIGHLIGHT_TAG);
-}
-
-// A real child, as RN requires (`React.Children.only`) — `onChildInserted` clones the active
-// opacity onto exactly this node, never the owner.
-function appendTestChild(owner: ISymbioteNode): ISymbioteNode {
-  const descriptor = descriptorFor('view');
-  const child = createElement(descriptor.component, descriptor.isText, 'view');
-  routeProp(child, 'testID', CHILD_TEST_ID);
-  appendChild(owner, child);
-  return child;
 }
 
 function mount(node: ISymbioteNode) {
@@ -68,22 +55,22 @@ function listenerOf(node: ISymbioteNode, name: string): IListener {
   return listener;
 }
 
-// The LIVE tree, never `fabric.find()`, which keeps every pre-clone node
-// (`.claude/rules/test-harness-false-greens.md`).
-function committedPropsOf(testID: string): Record<string, unknown> {
-  const walk = (
-    nodes: readonly IFakeNode[],
-  ): Record<string, unknown> | undefined => {
-    for (const node of nodes) {
-      if (node.props.testID === testID) return node.props;
-      const hit = walk(node.children);
-      if (hit !== undefined) return hit;
-    }
-    return undefined;
-  };
-  const hit = walk(fabric.appRoot().children);
-  if (hit === undefined) throw new Error(`no committed node testID=${testID}`);
-  return hit;
+// THE WITNESS CHANGED ON 2026-09-18 AND THE CLAIM DID NOT. Every case below used to ask whether the
+// underlay was showing by reading `backgroundColor` off the committed payload. That worked while a
+// JS `payloadFold` painted it; the rule is `foldTouchableHighlightUnderlay` in the engine now, and
+// this host builds its payloads through the TypeScript `fabricProps`, which deliberately carries no
+// copy of the tag rules — so the colour is not here to read and never will be.
+//
+// What IS here is the bit the machine flipped, recorded from `OP_SET_UNDERLAY_SHOWN`. That is the
+// better instrument for this file anyway: every case in it is about WHEN the underlay shows — the
+// hold timer, the cancelled gesture, the re-arm — which is the half that stayed in JS. What a
+// showing underlay LOOKS like moved out whole, along with the two style cases that asked, and is
+// asserted against a real committed payload in
+// `core/engine/cpp/tests/js/touchable-highlight-underlay.itest.ts`.
+function isUnderlayShown(node: ISymbioteNode): boolean {
+  const hit = fabric.find(authored => authored.handle === node);
+  if (hit === undefined) throw new Error('the node never reached the host');
+  return hit.underlayShown;
 }
 
 // Style is published through routeProp, which is synchronous.
@@ -95,6 +82,12 @@ function pressIn(node: ISymbioteNode): void {
   listenerOf(node, 'pressIn')(TOUCH);
   listenerOf(node, 'startShouldSetResponder')(TOUCH);
 }
+
+beforeEach(() => {
+  // Every case opens its OWN surface, and `appRoot()` searches the CREATION log — without this it
+  // answers with an earlier case's root.
+  fabric.reset();
+});
 
 afterEach(() => {
   clearHostBehaviors();
@@ -118,21 +111,17 @@ describe('touchable-highlight host behavior', () => {
     pressIn(node);
     listenerOf(node, 'press')(TOUCH);
     await settle();
-    expect(committedPropsOf(TEST_ID).backgroundColor).toBe(
-      DEFAULT_UNDERLAY_COLOR,
-    );
+    expect(isUnderlayShown(node)).toBe(true);
 
     // The tap already released — pressOut fires right after press, same as a real fast tap.
     listenerOf(node, 'pressOut')(TOUCH);
     await settle();
-    expect(committedPropsOf(TEST_ID).backgroundColor).toBe(
-      DEFAULT_UNDERLAY_COLOR,
-    );
+    expect(isUnderlayShown(node)).toBe(true);
 
     await vi.advanceTimersByTimeAsync(DELAY_PRESS_OUT);
-    // A key present on the prior commit and absent from this one diffs to `null` — the engine's
-    // own unset marker (`commit.ts`: `if (!(key in next)) out[key] = null;`), not an omitted key.
-    expect(committedPropsOf(TEST_ID).backgroundColor).toBeNull();
+    // The recomputed style simply carries no backgroundColor once hidden — absent, not a literal
+    // null. The before/after pair above already proves the transition; this is its resting state.
+    expect(isUnderlayShown(node)).toBe(false);
   });
 
   // why: a gesture that never fires `press` (dragged off before release) armed no hide timer, so
@@ -150,13 +139,11 @@ describe('touchable-highlight host behavior', () => {
 
     pressIn(node);
     await settle();
-    expect(committedPropsOf(TEST_ID).backgroundColor).toBe(
-      DEFAULT_UNDERLAY_COLOR,
-    );
+    expect(isUnderlayShown(node)).toBe(true);
 
     listenerOf(node, 'pressOut')(TOUCH);
     await settle();
-    expect(committedPropsOf(TEST_ID).backgroundColor).toBeNull();
+    expect(isUnderlayShown(node)).toBe(false);
   });
 
   // why: `handlePressIn` clears any pending hide first — a second tap landing during the hold
@@ -181,9 +168,7 @@ describe('touchable-highlight host behavior', () => {
     await settle();
     // If the first hold timer had survived, it would fire here and hide the underlay early.
     await vi.advanceTimersByTimeAsync(DELAY_PRESS_OUT / 2 + 1);
-    expect(committedPropsOf(TEST_ID).backgroundColor).toBe(
-      DEFAULT_UNDERLAY_COLOR,
-    );
+    expect(isUnderlayShown(node)).toBe(true);
   });
 
   // why: RN's `_hasPressHandler` gate — a decorative TouchableHighlight with no press callback
@@ -197,7 +182,7 @@ describe('touchable-highlight host behavior', () => {
 
     pressIn(node);
     await settle();
-    expect(committedPropsOf(TEST_ID).backgroundColor).toBeUndefined();
+    expect(isUnderlayShown(node)).toBe(false);
   });
 
   // why: `onShowUnderlay`/`onHideUnderlay` are app-facing notifications and must fire exactly once
@@ -258,7 +243,9 @@ describe('touchable-highlight host behavior', () => {
 
   // TouchableHighlight.js:194-197 resolves `disabled ?? accessibilityState.disabled` for its OWN
   // Pressability config (no `aria-disabled` fallback here — RN itself omits it for this one
-  // primitive, unlike Opacity/Button/NativeFeedback) — wired here for the first time.
+  // primitive, unlike Opacity/Button/NativeFeedback). This stays a JS-side assertion: unlike the
+  // style/focusable cases below, gating `onPress` itself is the press machine's job, never the
+  // engine's payload rule.
   it('suppresses the press from accessibilityState.disabled alone', async () => {
     const onPress = vi.fn();
     registerTouchableHighlightBehavior();
@@ -277,83 +264,42 @@ describe('touchable-highlight host behavior', () => {
     expect(onPress).not.toHaveBeenCalled();
   });
 
-  // why: RN settles back to the CALLER's activeOpacity/underlayColor, not a hardcoded one —
-  // TouchableHighlight.js's `_createExtraStyles` reads both off props with its own defaults.
+  // THE TWO STYLE CASES LEFT ON 2026-09-18 — "applies a custom underlayColor and activeOpacity" and
+  // "defaults to black at 0.85 opacity when unset". They are the only ones here that asked what a
+  // showing underlay LOOKS like rather than when it shows, and that is `foldTouchableHighlightUnderlay`
+  // in the engine now, reading the same two props the payload builder already strips
+  // (`kTouchableFeedbackKeys`). Their twins are "paints the underlay and dims the child while
+  // pressed" and "falls back to the underlay and opacity RN itself picks", in
+  // `core/engine/cpp/tests/js/touchable-highlight-underlay.itest.ts`, against a real payload.
   //
-  // STRUCTURAL: the underlay lands on the CONTAINER (this node), the opacity on the CHILD RN
-  // clones — never both on one node (that merge fades the underlay itself, see this behavior
-  // file's own header). Confirmed against `TouchableHighlight-itest.js`'s own two-node shape.
-  it('applies a custom underlayColor to the container and activeOpacity to the child', async () => {
-    registerTouchableHighlightBehavior();
-    const node = makeTouchable();
-    routeProp(node, 'testID', TEST_ID);
-    routeProp(node, 'onPress', () => {});
-    routeProp(node, 'underlayColor', 'crimson');
-    routeProp(node, 'activeOpacity', 0.5);
-    appendTestChild(node);
-    mount(node);
-    await settle();
+  // They went as a PAIR with the rule rather than being rewritten onto the new witness, because
+  // `underlayShown` cannot tell a crimson underlay from a black one — a bit is the right instrument
+  // for "did the machine flip" and the wrong one for "what colour". Every other case in this file
+  // survived the move, which is the tell that the split was along the real seam.
 
-    pressIn(node);
-    await settle();
-    const owner = committedPropsOf(TEST_ID);
-    expect(owner.backgroundColor).toBe('crimson');
-    expect(owner.opacity).toBeUndefined();
-    expect(committedPropsOf(CHILD_TEST_ID).opacity).toBe(0.5);
-  });
+  // `focusable` LEFT ON 2026-09-18 — `foldPressableProps` resolves it off the tag now — AND THIS
+  // CASE IS WHY THE MOVE MATTERED, not just where it went.
+  //
+  // It asserted the disabled leg and it PASSED, for weeks, while the real engine shipped the
+  // opposite: a disabled TouchableHighlight committed `focusable: true` and stayed in the focus
+  // order. The fold read `props.disabled` off the bag, and on a device the engine's pressable rule
+  // strips that key BEFORE the fold runs. This harness has no pressable rule — it builds payloads
+  // through the TypeScript `fabricProps`, which deliberately carries no copy — so the key was still
+  // there and the expression resolved correctly HERE and nowhere else.
+  //
+  // So the harness that is right to hold no mirror is also, for the same reason, unable to see a
+  // rule-ORDERING bug. A fold that reads a key an engine rule removes is invisible to every test on
+  // this side; only the committed payload can catch it. It was caught by writing the itest for the
+  // port, on unmodified HEAD, before a line of the port had landed.
+  //
+  // `core/engine/cpp/tests/js/touchable-focusable-payload.itest.ts` carries the case and the rest.
 
-  it('defaults to black underlay on the container and 0.85 opacity on the child when unset', async () => {
-    registerTouchableHighlightBehavior();
-    const node = makeTouchable();
-    routeProp(node, 'testID', TEST_ID);
-    routeProp(node, 'onPress', () => {});
-    appendTestChild(node);
-    mount(node);
-    await settle();
-
-    pressIn(node);
-    await settle();
-    const owner = committedPropsOf(TEST_ID);
-    expect(owner.backgroundColor).toBe(DEFAULT_UNDERLAY_COLOR);
-    expect(owner.opacity).toBeUndefined();
-    expect(committedPropsOf(CHILD_TEST_ID).opacity).toBe(
-      DEFAULT_HIGHLIGHT_CHILD_OPACITY,
-    );
-  });
-
-  // TouchableHighlight.js's render: `focusable={this.props.focusable !== false &&
-  // this.props.onPress !== undefined && !this.props.disabled}`.
-  it('focuses only while it has an onPress and is enabled', async () => {
-    registerTouchableHighlightBehavior();
-    const node = makeTouchable();
-    routeProp(node, 'testID', TEST_ID);
-    const surface = mount(node);
-    await settle();
-    expect(committedPropsOf(TEST_ID).focusable).toBe(false);
-
-    routeProp(node, 'onPress', () => {});
-    surface.commit();
-    await settle();
-    expect(committedPropsOf(TEST_ID).focusable).toBe(true);
-
-    routeProp(node, 'disabled', true);
-    surface.commit();
-    await settle();
-    expect(committedPropsOf(TEST_ID).focusable).toBe(false);
-  });
-
-  it('folds id to nativeID', async () => {
-    registerTouchableHighlightBehavior();
-    const node = makeTouchable();
-    routeProp(node, 'testID', TEST_ID);
-    routeProp(node, 'id', 'ident');
-    mount(node);
-    await settle();
-
-    const props = committedPropsOf(TEST_ID);
-    expect(props.nativeID).toBe('ident');
-    expect(props.id).toBeUndefined();
-  });
+  // `id -> nativeID`, `accessible !== false` and the `disabled -> accessibilityState` merge this
+  // file never covered all live in the engine now (`foldIdAlias` / `foldPressableProps`,
+  // `SymbioteFabricProps.cpp`), and this host builds its payloads through the TypeScript
+  // `fabricProps`, which carries no copy of them. Asserting them here would fail for the right
+  // reason today and pass for the wrong one the moment someone mirrored the rule back into JS.
+  // Contract: `core/engine/cpp/tests/js/touchable-payload.itest.ts`.
 
   // The control: without a registration nothing writes an underlay at all, so the assertions above
   // cannot be satisfied by some unrelated default.
@@ -365,7 +311,6 @@ describe('touchable-highlight host behavior', () => {
     await settle();
 
     expect(node.listeners?.get('pressIn')).toBeUndefined();
-    expect(committedPropsOf(TEST_ID).backgroundColor).toBeUndefined();
-    expect(committedPropsOf(TEST_ID).focusable).toBeUndefined();
+    expect(isUnderlayShown(node)).toBe(false);
   });
 });

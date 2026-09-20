@@ -5,7 +5,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 // Relative rather than by package name: `core/components` does not declare test-utils, matching
 // the sibling pressable suite.
-import { installFabric, type IFakeNode } from '../../../test-utils/src/index';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '../../../test-utils/src/index';
 import {
   appendChild,
   clearHostBehaviors,
@@ -25,7 +28,8 @@ import {
 } from './text-input';
 import { INITIAL_EVENT_COUNT } from '../state/text-input';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 let nextRootTag = 7000;
 
 // PRODUCTION SHAPE. An adapter resolves the intrinsic tag through `descriptorFor` and calls
@@ -81,20 +85,12 @@ function changeEvent(text: string, eventCount: number): ISymbioteEvent {
 
 const EMPTY_EVENT: ISymbioteEvent = { nativeEvent: {} };
 
-// The LIVE tree, by testID — never `fabric.find()`, which searches `created` and hands back the
-// pre-clone node with its mount-time props.
+// The LIVE tree, by testID — never `fabric.find()`, which searches the creation log and hands back
+// the AUTHORED bag, not the committed payload. Reads `.payload` (`fabricProps`'s output):
+// `mostRecentEventCount` is a fold, never a prop the app wrote.
 function committedPropsOf(testID: string): Record<string, unknown> | undefined {
-  const walk = (
-    nodes: readonly IFakeNode[],
-  ): Record<string, unknown> | undefined => {
-    for (const node of nodes) {
-      if (node.props.testID === testID) return node.props;
-      const hit = walk(node.children);
-      if (hit !== undefined) return hit;
-    }
-    return undefined;
-  };
-  return walk(fabric.appRoot().children);
+  return live.findLive(live.appRoot(), node => node.payload.testID === testID)
+    ?.payload;
 }
 
 function commandsNamed(
@@ -116,10 +112,9 @@ afterEach(() => {
 
 describe('text input host behavior', () => {
   // THE CREATE PAYLOAD, and the only assertion in this file that reads the tree before an event.
-  // Every wrapper hands the count to `renderTextInput` on every render, so a COMPONENT-path input
-  // commits `mostRecentEventCount: 0` at create; the behavior used to write the key only inside the
-  // change handshake, so a LOWERED input committed without it until the user typed. Two spellings of
-  // one primitive disagreeing on the create payload — found by three adapters' equivalence arms
+  // The wrappers handed the count over on every render, so an input committed
+  // `mostRecentEventCount: 0` at create; the behavior used to write the key only inside the change
+  // handshake, so the tag committed without it until the user typed. Found by three adapters
   // independently, 2026-09-01.
   //
   // Asserted on the committed payload rather than on `node.props`: a mirror the behavior keeps for
@@ -159,7 +154,7 @@ describe('text input host behavior', () => {
 
   // THE WRAPPER-DERIVED CALLBACK, and the reason it is asserted here rather than in an adapter.
   // `onValueChange(event)` is not a Fabric event — it is a fold the component wrapper did over
-  // the raw `change` payload. A LOWERED element has no wrapper, so before this the app's callback
+  // the raw `change` payload. A tag has no wrapper, so before this the app's callback
   // reached `node.props` as a function key, `fabricProps` dropped it, and nothing ever called it:
   // the field echoed keystrokes natively while every derived value in the app stayed frozen. Found
   // on device 2026-08-31 in examples/solid's canary ("Hello, stranger" never updated).

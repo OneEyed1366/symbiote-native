@@ -6,14 +6,18 @@ import '@angular/compiler';
 import { Component } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  installRecordingFabric,
+  payloadOf,
+  type IAuthoredNode,
+} from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../../render';
 import { FlatList } from './index';
 import { VListItemDirective } from '../virtualized-list/directives';
 
 const ROOT_TAG = 953;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -27,20 +31,14 @@ const rows: IRow[] = Array.from({ length: 4 }, (_unused, index) => ({
   label: `row-${index}`,
 }));
 
-function walk(nodes: IFakeNode[], visit: (node: IFakeNode) => void): void {
-  for (const node of nodes) {
-    visit(node);
-    walk(node.children, visit);
-  }
-}
-
-function rowsWithFlexDirection(): IFakeNode[] {
-  const found: IFakeNode[] = [];
-  walk(fabric.committed, node => {
-    if (node.viewName === 'RCTView' && node.props.flexDirection === 'row')
-      found.push(node);
-  });
-  return found;
+// `flexDirection` and `gap` are STYLE keys, so they live in the payload the engine builds, not in
+// the author's prop bag.
+function rowsWithFlexDirection(): IAuthoredNode[] {
+  return fabric.findAll(
+    node =>
+      node.viewName === 'RCTView' &&
+      payloadOf(node.handle).flexDirection === 'row',
+  );
 }
 
 @Component({
@@ -106,7 +104,7 @@ describe('FlatList columnWrapperStyle class-name support', () => {
 
     const found = rowsWithFlexDirection();
     expect(found.length, 'two flex-row rows for 4 items in 2 columns').toBe(2);
-    expect(found[0].props.gap).toBe(8);
+    expect(payloadOf(found[0].handle).gap).toBe(8);
   });
 
   it('still accepts an ordinary style object unchanged', async () => {
@@ -115,6 +113,6 @@ describe('FlatList columnWrapperStyle class-name support', () => {
     await tick();
 
     const found = rowsWithFlexDirection();
-    expect(found[0].props.gap).toBe(4);
+    expect(payloadOf(found[0].handle).gap).toBe(4);
   });
 });

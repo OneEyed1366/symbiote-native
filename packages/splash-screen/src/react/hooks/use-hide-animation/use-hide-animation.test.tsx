@@ -18,7 +18,7 @@ import {
 } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount } from '@symbiote-native/react';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import { useHideAnimation } from './index';
 import type {
   IHideAnimationConfig,
@@ -88,7 +88,7 @@ class CaptureBoundary extends Component<IBoundaryProps, IBoundaryState> {
   }
 }
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 
 beforeEach(() => {
   fabric.reset();

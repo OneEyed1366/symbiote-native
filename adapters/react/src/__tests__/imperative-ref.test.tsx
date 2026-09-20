@@ -1,86 +1,40 @@
 // Proves the imperative host-component ref API libraries like
 // reanimated / gesture-handler reach through: ref.current.measure / measureInWindow /
 // measureLayout / setNativeProps, plus findNodeHandle(ref). A host ref hands back the
-// public instance; its methods route to the slot's measure family (keyed by the node's
-// CURRENT Fabric handle) and to the engine's scoped setNativeProps.
+// public instance (the engine node itself, `toPublicInstance` is the identity — see
+// `core/engine/src/host-instance`); its methods route through `treeHost().measure` /
+// `.measureInWindow` / `.measureLayout`, so canned geometry grafts onto the RECORDING HOST's own
+// fields rather than the global Fabric slot, which those calls never reach.
 //
-// The slot's measure family and the merge-on-clone semantics aren't part of the shared
-// recorder, so we graft canned geometry onto the live slot and make the clone MERGE the
-// diff onto existing props (real Fabric's C++ behavior) before any mount, so the
-// setNativeProps partial-style merge is observable. The engine destructures these off the
-// global on its first commit, so they must be installed before mount.
+// `setNativeProps` no longer bypasses to a raw clone call (`core/engine/src/imperative.ts`'s
+// header records the correction): it writes ordinary ops through the normal commit path, so the
+// recording host's incremental `OP_SET_PROP` handling already merges a partial style onto the
+// node's standing props — nothing to model here.
 
 import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount, findNodeHandle } from '@symbiote-native/react';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
+import { isSymbioteNode } from '@symbiote-native/engine';
 
 const ROOT_TAG = 180;
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-function nodeTag(node: unknown): number {
-  if (isRecord(node) && typeof node.tag === 'number') return node.tag;
-  throw new Error('measured node has no numeric tag');
-}
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 
-// Fabric's clone*WithNewProps MERGES the diff onto the node's existing props (a key sent
-// as null resets to default: how the engine signals a removed prop). The shared recorder
-// REPLACES, which would drop unchanged base props; model the real merge so the partial
-// setNativeProps style override is observable as a merge, not a replace.
-function mergeProps(
-  previous: Record<string, unknown>,
-  patch: Record<string, unknown>,
-): Record<string, unknown> {
-  const merged = { ...previous, ...patch };
-  for (const key of Object.keys(patch)) {
-    if (patch[key] === null) delete merged[key];
-  }
-  return merged;
-}
-
-const fabric = installFabric();
-const installed: unknown = globalThis.nativeFabricUIManager;
-if (!isRecord(installed)) throw new Error('fabric slot was not installed');
-
-installed.cloneNodeWithNewProps = (
-  node: IFakeNode,
-  patch: Record<string, unknown>,
-): IFakeNode => ({
-  ...node,
-  props: mergeProps(node.props, patch),
-});
-installed.cloneNodeWithNewChildrenAndProps = (
-  node: IFakeNode,
-  patch: Record<string, unknown>,
-): IFakeNode => ({
-  ...node,
-  props: mergeProps(node.props, patch),
-  children: [],
-});
-// Canned geometry, keyed off the node's tag so we can prove the RIGHT node was measured.
-installed.measure = (
-  _node: IFakeNode,
-  cb: (
-    x: number,
-    y: number,
-    w: number,
-    h: number,
-    px: number,
-    py: number,
-  ) => void,
-): void => cb(1, 2, 100, 50, 11, 22);
-installed.measureInWindow = (
-  _node: IFakeNode,
-  cb: (x: number, y: number, w: number, h: number) => void,
-): void => cb(11, 22, 100, 50);
-installed.measureLayout = (
-  _node: IFakeNode,
-  relativeTo: IFakeNode,
-  _onFail: () => void,
-  onSuccess: (left: number, top: number, w: number, h: number) => void,
-): void => onSuccess(relativeTo.tag, 6, 100, 50);
+// Canned geometry. `measureLayout` records the `relativeTo` handle it was called WITH so a test
+// can prove the RIGHT node was forwarded — `relativeTo` is the anchor's own host instance (the
+// engine node itself), so identity compares directly rather than through a committed tag.
+let lastMeasureLayoutRelativeTo: unknown;
+fabric.measure = (_handle, callback) => callback(1, 2, 100, 50, 11, 22);
+fabric.measureInWindow = (_handle, callback) => callback(11, 22, 100, 50);
+fabric.measureLayout = (_handle, relativeTo, _onFail, onSuccess) => {
+  lastMeasureLayoutRelativeTo = relativeTo;
+  onSuccess(9, 6, 100, 50);
+};
 
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
@@ -120,24 +74,6 @@ function method(
   if (typeof candidate !== 'function')
     throw new Error(`ref instance has no ${name}() method`);
   return (...args: unknown[]) => Reflect.apply(candidate, instance, args);
-}
-
-function findCommitted(
-  predicate: (node: IFakeNode) => boolean,
-): IFakeNode | undefined {
-  function walk(node: IFakeNode): IFakeNode | undefined {
-    if (predicate(node)) return node;
-    for (const child of node.children) {
-      const hit = walk(child);
-      if (hit) return hit;
-    }
-    return undefined;
-  }
-  for (const root of fabric.committed) {
-    const hit = walk(root);
-    if (hit) return hit;
-  }
-  return undefined;
 }
 
 describe('React imperative host-component ref API', () => {
@@ -184,10 +120,9 @@ describe('React imperative host-component ref API', () => {
     });
 
     // why: measureLayout measures relative to a DIFFERENT node's handle (the anchor), not the
-    // box's own — this is the one call that must forward a second ref through to the slot.
+    // box's own — this is the one call that must forward a second ref through to the host.
     it('delivers measureLayout(relative, onSuccess) measured against the anchor', () => {
       const { box, anchor } = mountApp();
-      const anchorTag = findNodeHandle(anchor);
       let seen = '';
       method(box, 'measureLayout')(
         anchor,
@@ -195,7 +130,10 @@ describe('React imperative host-component ref API', () => {
           seen = `${left},${top},${w},${h}`;
         },
       );
-      expect(seen).toBe(`${anchorTag},6,100,50`);
+      expect(lastMeasureLayoutRelativeTo, 'forwarded the anchor itself').toBe(
+        anchor,
+      );
+      expect(seen).toBe('9,6,100,50');
     });
 
     // why: findNodeHandle is the seam third-party libraries use to convert a ref to a plain
@@ -215,19 +153,15 @@ describe('React imperative host-component ref API', () => {
     // not named in the patch would vanish on the next native-driven frame.
     it('merges a partial setNativeProps style onto the box instead of replacing it', async () => {
       const { box } = mountApp();
+      if (!isSymbioteNode(box)) throw new Error('box ref is not a host node');
       method(box, 'setNativeProps')({ style: { opacity: 0.25 } });
       // The write is coalesced to the microtask boundary (core/engine/src/commit.ts).
       await Promise.resolve();
-      const updated = findCommitted(
-        n => n.viewName === 'RCTView' && n.props.opacity === 0.25,
-      );
-      expect(
-        updated,
-        'setNativeProps re-committed the box with opacity 0.25',
-      ).toBeDefined();
+      const payload = live.nodeOf(box).payload;
+      expect(payload.opacity, 'setNativeProps re-committed the box').toBe(0.25);
       // opacity is added while the declarative width/height survive the merge.
-      expect(updated!.props.width).toBe(50);
-      expect(updated!.props.height).toBe(50);
+      expect(payload.width).toBe(50);
+      expect(payload.height).toBe(50);
     });
   });
 });

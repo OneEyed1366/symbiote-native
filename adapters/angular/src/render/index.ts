@@ -22,6 +22,7 @@ import {
   createComponent,
   createEnvironmentInjector,
   DOCUMENT,
+  enableProdMode,
   ErrorHandler,
   RendererFactory2,
   ɵINJECTOR_SCOPE as INJECTOR_SCOPE,
@@ -137,11 +138,54 @@ function teardown(rootTag: IRootTag): void {
   disposeRoot(rootTag);
 }
 
+// Metro's build switch, and esbuild's in this repo's headless runner. Declared HERE rather than in
+// an ambient `globals.d.ts`, because the AOT tests (`elements.test.ts`, `style-input-aot.test.ts`)
+// build their own ngtsc programs from an explicit file list that an ambient declaration never
+// reaches — seven of them went red with `Cannot find name '__DEV__'`, reported as an empty
+// diagnostic set, which reads as "the template checker found nothing" and is not that.
+//
+// `declare const` emits no JavaScript, so it shadows nothing at runtime and both bundlers still
+// substitute the identifier.
+declare const __DEV__: boolean;
+
+/**
+ * Turn Angular's assertions off when — and only when — the bundler has said this is a release.
+ *
+ * `ngDevMode` is a THIRD dev switch, and neither of the two this project already handles reaches
+ * it: `initNgDevMode()` turns itself ON whenever the global is undefined (`ng_dev_mode.ts:85`), and
+ * `@react-native/babel-preset` inlines `__DEV__` while knowing nothing about Angular. So every
+ * release build made with this adapter shipped dev-mode Angular — `inject()` of a special token
+ * builds a `new NodeInjector` and emits two profiler events PER ELEMENT
+ * (`di.ts:525`, `runInInjectorProfilerContext`). Measured on `angular-elements-suite.itest.ts`,
+ * `build-release`, with the census byte-identical on both sides: a 1 000-row create went from
+ * ~300 ms to ~223 ms, all of it in pass 1.
+ *
+ * AN EXPLICIT `false` IS THE ONLY RELEASE SIGNAL. A host that never defines `__DEV__` reads
+ * `undefined`, and a `!__DEV__` test would silence every NG-code diagnostic there in exchange for a
+ * speed-up nobody asked for. Metro writes a literal `true` or `false`, so the signal exists exactly
+ * where it can be trusted.
+ *
+ * Per mount rather than once per process: `enableProdMode()` only ever writes `false`, so repeating
+ * it costs a property write and a guard that has already been taken on every surface but the first.
+ *
+ * READ AS AN IDENTIFIER, NEVER AS `globalThis.__DEV__`, and that distinction is the whole
+ * mechanism. Both Metro and esbuild deliver `__DEV__` by SUBSTITUTING the identifier for a literal,
+ * so a property lookup finds nothing whatever the build says. The first spelling of this function
+ * used `Reflect.get(globalThis, '__DEV__')`, never fired once in the bench bundle, and measured a
+ * clean zero — which reads exactly like "this optimization does not work" and is not that. The
+ * `typeof` guard is what makes the bare identifier safe where nothing declares it at all.
+ */
+function settleAngularDevMode(): void {
+  if (typeof __DEV__ === 'undefined' || __DEV__ !== false) return;
+  enableProdMode();
+}
+
 export function mount(
   rootTag: IRootTag,
   rootComponent: Type<unknown>,
   options?: IMountOptions,
 ): SymbioteSurface {
+  settleAngularDevMode();
   // A re-mount on a live rootTag starts clean; otherwise the stale app double-drives the surface.
   teardown(rootTag);
 

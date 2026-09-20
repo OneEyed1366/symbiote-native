@@ -14,7 +14,12 @@ import {
   unmount,
   type IViewableItemsChangedInfo,
 } from '@symbiote-native/react';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type IAuthoredNode,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 22;
 
@@ -72,33 +77,23 @@ function GatedApp(): ReactElement {
   });
 }
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 beforeEach(() => {
   fabric.reset();
   viewableReports.length = 0;
 });
 afterEach(() => unmount(ROOT_TAG));
 
-// ---- helpers (repointed at the shared recorder) -------------------------
+// ---- helpers (repointed at the live tree) --------------------------------
 
-function walk(nodes: IFakeNode[], visit: (node: IFakeNode) => void): void {
-  for (const node of nodes) {
-    visit(node);
-    walk(node.children, visit);
-  }
+function findCommitted(viewName: string): ILiveNode | undefined {
+  return live.findLive(live.appRoot(), node => node.viewName === viewName);
 }
 
-function findCommitted(viewName: string): IFakeNode | undefined {
-  let found: IFakeNode | undefined;
-  walk(fabric.committed, node => {
-    if (found === undefined && node.viewName === viewName) found = node;
-  });
-  return found;
-}
-
-// True when a scale(-1) flip (the inversion transform) appears anywhere in a node's props,
-// robust to whether style lands as `props.style.transform` or a hoisted `props.transform`.
-function hasInversionTransform(props: Record<string, unknown>): boolean {
+// True when a scale(-1) flip (the inversion transform) appears anywhere in a node's payload,
+// robust to whether style lands as `payload.style.transform` or a hoisted `payload.transform`.
+function hasInversionTransform(payload: Record<string, unknown>): boolean {
   let found = false;
   const seen = new Set<unknown>();
   const visit = (value: unknown): void => {
@@ -118,30 +113,28 @@ function hasInversionTransform(props: Record<string, unknown>): boolean {
     }
     for (const key of Object.keys(record)) visit(record[key]);
   };
-  visit(props);
+  visit(payload);
   return found;
 }
 
 // The cell wrapper is the measuring RCTView whose direct child is the RCTText for a single
 // "row-N". Matching on a direct RCTText child skips the outer root/scroll/content RCTViews.
-function findCellWithRowText(): IFakeNode | undefined {
-  let found: IFakeNode | undefined;
-  walk(fabric.committed, node => {
-    if (found !== undefined || node.viewName !== 'RCTView') return;
+function findCellWithRowText(): ILiveNode | undefined {
+  return live.findLive(live.appRoot(), node => {
+    if (node.viewName !== 'RCTView') return false;
     const textChild = node.children.find(child => child.viewName === 'RCTText');
-    if (textChild === undefined) return;
+    if (textChild === undefined) return false;
     let carriesRow = false;
-    walk([textChild], descendant => {
-      const text = descendant.props.text;
+    live.walkLive(textChild.handle, descendant => {
+      const text = descendant.payload.text;
       if (typeof text === 'string' && text.startsWith('row-'))
         carriesRow = true;
     });
-    if (carriesRow) found = node;
+    return carriesRow;
   });
-  return found;
 }
 
-function findScrollView(): IFakeNode {
+function findScrollView(): IAuthoredNode {
   const node = fabric.find(n => n.viewName === 'RCTScrollView');
   expect(node, 'an RCTScrollView was created').toBeDefined();
   return node!;
@@ -172,17 +165,17 @@ describe('React FlatList inverted + waitForInteraction on the engine (Positive)'
 
     // The outer scroll node IS flipped.
     expect(
-      hasInversionTransform(scrollNode!.props),
+      hasInversionTransform(scrollNode!.payload),
       'scroll node flipped',
     ).toBe(true);
     // Each cell IS flipped (counter-flip so its content reads upright).
     expect(
-      hasInversionTransform(cellNode!.props),
+      hasInversionTransform(cellNode!.payload),
       'cell wrapper counter-flipped',
     ).toBe(true);
     // The content container is NOT flipped: the bug was a third, cancelling flip here.
     expect(
-      hasInversionTransform(contentNode!.props),
+      hasInversionTransform(contentNode!.payload),
       'content container NOT flipped',
     ).toBe(false);
   });

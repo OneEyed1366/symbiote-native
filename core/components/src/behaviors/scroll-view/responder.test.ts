@@ -2,7 +2,7 @@
 // `ScrollView.js:1263-1546`. Exercises the dispatched listener the same way `pressable.test.ts`'s
 // `listenerOf` does: through `setBehaviorListener`'s real slot, not a bypassed pure-function call.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { installFabric } from '../../../../test-utils/src/index';
+import { installRecordingFabric } from '../../../../test-utils/src/index';
 import {
   appListenerFor,
   clearHostBehaviors,
@@ -22,7 +22,7 @@ import { descriptorFor } from '../../component-names';
 import { TEXT_INPUT_TAG } from '../text-input';
 import { registerScrollViewBehavior, SCROLL_VIEW_TAG } from './index';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 let nextRootTag = 9800;
 
 function listenerOf(node: ISymbioteNode, name: string): IListener {

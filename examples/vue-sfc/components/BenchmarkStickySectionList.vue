@@ -107,20 +107,12 @@ const sectionRowStyle = { height: SECTION_LIST_ROW_HEIGHT };
     :get-item-layout="sectionListItemLayout"
   >
     <template #sectionHeader="{ section }">
-      <text
-        class="section-header"
-        :style="sectionHeaderStyle"
-      >
-        {{
-          section.title
-        }}
+      <text class="section-header" :style="sectionHeaderStyle">
+        {{ section.title }}
       </text>
     </template>
     <template #item="{ item }">
-      <view
-        class="parity-row"
-        :style="sectionRowStyle"
-      >
+      <view class="parity-row" :style="sectionRowStyle">
         <text class="list-row-text">
           {{ item.label }}
         </text>

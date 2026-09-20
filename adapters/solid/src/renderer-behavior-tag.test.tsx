@@ -11,7 +11,7 @@
 // It uses `view` for the same reason the real case works — the tag and the resolved
 // component genuinely differ — so it keeps testing the right thing after Pressable lands.
 import { afterEach, describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import {
   clearHostBehaviors,
   registerHostBehavior,
@@ -19,7 +19,7 @@ import {
 } from '@symbiote-native/engine';
 import { mount, unmount } from './render';
 
-installFabric();
+installRecordingFabric();
 const ROOT_TAG = 733;
 
 afterEach(() => {

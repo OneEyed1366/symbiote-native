@@ -14,13 +14,15 @@ import '@angular/compiler';
 import { Component, Input, signal } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
-  censusRetainedTree,
   dlog,
-  isSymbioteNode,
+  parentOf,
   readCommitProfile,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
-import { installFabric } from '@symbiote-native/test-utils';
+import {
+  censusLive,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 
 import { mount, unmount } from './render';
 import { Text, View } from './components';
@@ -41,7 +43,7 @@ const UPDATE_STRIDE = 10;
 // The row component itself, and nothing else — its two `<pressable>`s are tags now.
 const COMPOSED_COMPONENTS_PER_ROW = 1;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 
 const flush = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
@@ -118,13 +120,14 @@ function drive(): List {
 }
 
 function retainedRoot(): ISymbioteNode {
-  const seed = fabric.created.find(node => node.props.testID === 'list');
+  const seed = fabric.find(node => node.props.testID === 'list');
   if (seed === undefined) throw new Error('the list node was never created');
-  const handle: unknown = seed.instanceHandle;
-  if (!isSymbioteNode(handle))
-    throw new Error('the list node carries no retained handle');
-  let current: ISymbioteNode = handle;
-  while (current.parent !== undefined) current = current.parent;
+  let current: ISymbioteNode = seed.handle;
+  let above = parentOf(current);
+  while (above !== undefined) {
+    current = above;
+    above = parentOf(current);
+  }
   return current;
 }
 
@@ -147,16 +150,13 @@ describe('angular anchor flattening cost', () => {
     await flush();
     report('create');
 
-    const census = censusRetainedTree([retainedRoot()]);
+    const census = censusLive(retainedRoot());
     dlog(
       `ANCHOR-CENSUS ${JSON.stringify({
         adapter: 'angular',
         nodes: census.nodes,
         anchors: census.anchors,
-        emptyRawTexts: census.emptyRawTexts,
-        renderable: census.renderable,
-        flattenSites: census.flattenWidths.length,
-        widest: census.flattenWidths.slice(0, 5),
+        nonAnchors: census.nonAnchors,
       })}`,
     );
 
@@ -182,7 +182,7 @@ describe('angular anchor flattening cost', () => {
 
     // why: the row shape has to be the canary's, or every column is measuring a different list.
     expect(
-      census.renderable,
+      census.nonAnchors,
       'the benchmark row must expand to nine native views',
     ).toBe(ROWS * NATIVE_VIEWS_PER_ROW + 1);
     // why: THE structural claim, and the one this whole file exists to make a runtime number.

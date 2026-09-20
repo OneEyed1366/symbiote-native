@@ -202,37 +202,25 @@ const directProvideValue = inject(DIRECT_PROVIDE_KEY, 'not provided');
     >
       <view :class="`line-tag line-tag-${lineInfo.line}`">
         <text class="line-tag-text">
-          {{
-            `${lineInfo.code} · ${lineInfo.label}`
-          }}
+          {{ `${lineInfo.code} · ${lineInfo.label}` }}
         </text>
       </view>
       <view class="hero-card">
-        <view
-          class="hero-badge"
-          :style="{ backgroundColor: ACCENT }"
-        >
-          <text class="hero-badge-text">
-            AP
-          </text>
+        <view class="hero-badge" :style="{ backgroundColor: ACCENT }">
+          <text class="hero-badge-text"> AP </text>
         </view>
         <view class="hero-copy">
-          <text class="hero-title">
-            API Playground
-          </text>
+          <text class="hero-title"> API Playground </text>
           <text class="hero-body">
             Vue's own template/Composition API surface, running live under
-            Symbiote's renderer — not @symbiote-native/navigation this
-            time.
+            Symbiote's renderer — not @symbiote-native/navigation this time.
           </text>
         </view>
       </view>
 
       <!-- ══════════════════════ Template Directives ══════════════════════ -->
       <view class="section-nested">
-        <text class="section-header">
-          Template Directives
-        </text>
+        <text class="section-header"> Template Directives </text>
 
         <text class="section-label">
           v-if / v-else-if / v-else + &lt;template v-if&gt;
@@ -247,11 +235,7 @@ const directProvideValue = inject(DIRECT_PROVIDE_KEY, 'not provided');
             :color="ACCENT"
           />
         </view>
-        <text
-          v-if="mode === 'a'"
-          class="list-row-text"
-          testID="mode-branch"
-        >
+        <text v-if="mode === 'a'" class="list-row-text" testID="mode-branch">
           Branch A
         </text>
         <text
@@ -261,11 +245,7 @@ const directProvideValue = inject(DIRECT_PROVIDE_KEY, 'not provided');
         >
           Branch B
         </text>
-        <text
-          v-else
-          class="list-row-text"
-          testID="mode-branch"
-        >
+        <text v-else class="list-row-text" testID="mode-branch">
           Branch C (v-else fallback)
         </text>
         <ActionButton
@@ -278,31 +258,22 @@ const directProvideValue = inject(DIRECT_PROVIDE_KEY, 'not provided');
         />
         <template v-if="expanded">
           <text class="note-text">
-            Grouped sibling 1 — no wrapper element, via &lt;template
-            v-if&gt;
+            Grouped sibling 1 — no wrapper element, via &lt;template v-if&gt;
           </text>
           <text class="note-text">
             Grouped sibling 2 — same &lt;template&gt; block
           </text>
         </template>
 
-        <text class="section-label">
-          v-show
-        </text>
+        <text class="section-label"> v-show </text>
         <ActionButton
           :testID="'v-show-toggle'"
           :title="showPulse ? 'Hide (v-show)' : 'Show (v-show)'"
           :onPress="() => (showPulse = !showPulse)"
           :color="ACCENT"
         />
-        <view
-          v-show="showPulse"
-          testID="v-show-target"
-          class="chip"
-        >
-          <text class="chip-text">
-            👁
-          </text>
+        <view v-show="showPulse" testID="v-show-target" class="chip">
+          <text class="chip-text"> 👁 </text>
         </view>
         <text class="note-text">
           v-show sets style.display via setNativeProps (whenCommitted-guarded),
@@ -320,15 +291,13 @@ const directProvideValue = inject(DIRECT_PROVIDE_KEY, 'not provided');
           testID="v-model-input"
         />
         <text class="note-text">
-          `text-input` is an intrinsic TAG, so the compiler expands v-model to
-          a runtime directive rather than a modelValue prop pair. The adapter
+          `text-input` is an intrinsic TAG, so the compiler expands v-model to a
+          runtime directive rather than a modelValue prop pair. The adapter
           ships that directive (runtime-helpers/vModelText) — Vue's own lives in
           @vue/runtime-dom, which never enters this bundle.
         </text>
 
-        <text class="section-label">
-          v-bind (:prop) + v-bind.camel
-        </text>
+        <text class="section-label"> v-bind (:prop) + v-bind.camel </text>
         <text class="note-text">
           Every dynamic prop on this screen already goes through v-bind's `:`
           shorthand → routeProp → the engine. `.camel` folds a kebab-case
@@ -336,9 +305,7 @@ const directProvideValue = inject(DIRECT_PROVIDE_KEY, 'not provided');
           normalizeVueAttrs already folds kebab-case generally.
         </text>
 
-        <text class="section-label">
-          v-on (@press) + .self + .stop
-        </text>
+        <text class="section-label"> v-on (@press) + .self + .stop </text>
         <pressable
           testID="press-outer-self"
           class="pressable-card"
@@ -350,9 +317,7 @@ const directProvideValue = inject(DIRECT_PROVIDE_KEY, 'not provided');
               )
           "
         >
-          <text class="note-text">
-            tap this border vs the button below
-          </text>
+          <text class="note-text"> tap this border vs the button below </text>
           <pressable
             testID="press-inner-plain"
             class="pressable-card"
@@ -362,9 +327,7 @@ const directProvideValue = inject(DIRECT_PROVIDE_KEY, 'not provided');
                 logSelfPress('inner fired (its own listener — always fires)')
             "
           >
-            <text class="pressable-label">
-              inner (@press, no modifier)
-            </text>
+            <text class="pressable-label"> inner (@press, no modifier) </text>
           </pressable>
         </pressable>
         <text
@@ -388,9 +351,7 @@ const directProvideValue = inject(DIRECT_PROVIDE_KEY, 'not provided');
               () => logStopPress('inner-stop fired (.stop — never bubbles)')
             "
           >
-            <text class="pressable-label">
-              inner (@press.stop)
-            </text>
+            <text class="pressable-label"> inner (@press.stop) </text>
           </pressable>
           <pressable
             testID="press-inner-plain2"
@@ -398,9 +359,7 @@ const directProvideValue = inject(DIRECT_PROVIDE_KEY, 'not provided');
             :style="{ borderColor: NESTED_TARGET_BORDER }"
             @press="() => logStopPress('inner-plain2 fired')"
           >
-            <text class="pressable-label">
-              inner (@press, no modifier)
-            </text>
+            <text class="pressable-label"> inner (@press, no modifier) </text>
           </pressable>
         </pressable>
         <text
@@ -414,11 +373,7 @@ const directProvideValue = inject(DIRECT_PROVIDE_KEY, 'not provided');
         <text class="section-label">
           v-text (Partial) + v-pre (not supported)
         </text>
-        <text
-          class="note-text"
-          testID="v-text-demo"
-          v-text="vTextValue"
-        />
+        <text class="note-text" testID="v-text-demo" v-text="vTextValue" />
         <text class="note-text">
           v-pre is NOT demoed live: it makes the compiler skip codegen for its
           subtree and emit a DOM-oriented static-content node
@@ -430,31 +385,18 @@ const directProvideValue = inject(DIRECT_PROVIDE_KEY, 'not provided');
           Not a partial gap like v-text — genuinely unsupported.
         </text>
 
-        <text class="section-label">
-          v-once vs v-memo
-        </text>
+        <text class="section-label"> v-once vs v-memo </text>
         <ActionButton
           testID="vonce-bump"
           title="bump counter"
           :onPress="() => (vOnceCounter += 1)"
           :color="ACCENT"
         />
-        <text
-          v-once
-          class="list-row-text"
-          testID="vonce-frozen"
-        >
-          {{
-            `v-once (frozen at first render): ${vOnceCounter}`
-          }}
+        <text v-once class="list-row-text" testID="vonce-frozen">
+          {{ `v-once (frozen at first render): ${vOnceCounter}` }}
         </text>
-        <text
-          class="list-row-text"
-          testID="vonce-live"
-        >
-          {{
-            `live (no v-once): ${vOnceCounter}`
-          }}
+        <text class="list-row-text" testID="vonce-live">
+          {{ `live (no v-once): ${vOnceCounter}` }}
         </text>
         <ActionButton
           testID="vmemo-bump"
@@ -467,17 +409,10 @@ const directProvideValue = inject(DIRECT_PROVIDE_KEY, 'not provided');
           class="list-row-text"
           testID="vmemo-timestamp"
         >
-          {{
-            `v-memo'd (deps: [vMemoTrigger]) timestamp: ${Date.now()}`
-          }}
+          {{ `v-memo'd (deps: [vMemoTrigger]) timestamp: ${Date.now()}` }}
         </text>
-        <text
-          class="list-row-text"
-          testID="live-timestamp"
-        >
-          {{
-            `not memoized, timestamp: ${Date.now()}`
-          }}
+        <text class="list-row-text" testID="live-timestamp">
+          {{ `not memoized, timestamp: ${Date.now()}` }}
         </text>
         <text class="note-text">
           Trigger ANY other button above and re-check: the non-memoized
@@ -485,9 +420,7 @@ const directProvideValue = inject(DIRECT_PROVIDE_KEY, 'not provided');
           v-memo dep" button was pressed.
         </text>
 
-        <text class="section-label">
-          Custom directive (v-highlight)
-        </text>
+        <text class="section-label"> Custom directive (v-highlight) </text>
         <ActionButton
           testID="directive-toggle"
           :title="highlightOn ? 'highlight: on' : 'highlight: off'"
@@ -500,22 +433,20 @@ const directProvideValue = inject(DIRECT_PROVIDE_KEY, 'not provided');
           class="chip"
         />
         <text class="note-text">
-          Local `vHighlight` object directive (mounted/updated/unmounted
-          hooks), reused programmatically via withDirectives() in the Other
-          section below.
+          Local `vHighlight` object directive (mounted/updated/unmounted hooks),
+          reused programmatically via withDirectives() in the Other section
+          below.
         </text>
 
         <text class="note-text">
-          v-slot (#name) — the full slot demo lives in Slots &amp; Template
-          Refs below, not duplicated here.
+          v-slot (#name) — the full slot demo lives in Slots &amp; Template Refs
+          below, not duplicated here.
         </text>
       </view>
 
       <!-- ══════════════════════ Built-in Components ══════════════════════ -->
       <view class="section-nested">
-        <text class="section-header">
-          Built-in Components
-        </text>
+        <text class="section-header"> Built-in Components </text>
         <KeepAliveDemo />
         <SuspenseDemo />
         <text class="note-text">
@@ -529,9 +460,7 @@ const directProvideValue = inject(DIRECT_PROVIDE_KEY, 'not provided');
 
       <!-- ══════════════════════ Reactivity API ══════════════════════ -->
       <view class="section-nested">
-        <text class="section-header">
-          Reactivity API
-        </text>
+        <text class="section-header"> Reactivity API </text>
         <CounterWatchDemo />
         <ShallowRefDemo />
         <CustomRefDebounceDemo />
@@ -542,9 +471,7 @@ const directProvideValue = inject(DIRECT_PROVIDE_KEY, 'not provided');
 
       <!-- ══════════════════════ Lifecycle Hooks ══════════════════════ -->
       <view class="section-nested">
-        <text class="section-header">
-          Lifecycle Hooks
-        </text>
+        <text class="section-header"> Lifecycle Hooks </text>
         <view class="row-tight">
           <ActionButton
             testID="lifecycle-mount-toggle"
@@ -564,9 +491,7 @@ const directProvideValue = inject(DIRECT_PROVIDE_KEY, 'not provided');
           :seed="lifecycleSeed"
           @log="pushLifecycleLog"
         />
-        <text class="section-label">
-          hook log
-        </text>
+        <text class="section-label"> hook log </text>
         <text
           v-for="(entry, index) in lifecycleLog"
           :key="index"
@@ -575,8 +500,7 @@ const directProvideValue = inject(DIRECT_PROVIDE_KEY, 'not provided');
           {{ entry }}
         </text>
         <text class="section-label">
-          onErrorCaptured (this screen's own hook, does not stop
-          propagation)
+          onErrorCaptured (this screen's own hook, does not stop propagation)
         </text>
         <text
           v-for="(entry, index) in capturedErrors"
@@ -633,22 +557,16 @@ const directProvideValue = inject(DIRECT_PROVIDE_KEY, 'not provided');
 
       <!-- ══════════════════════ Slots & Template Refs ══════════════════════ -->
       <view class="section-nested">
-        <text class="section-header">
-          Slots &amp; Template Refs
-        </text>
+        <text class="section-header"> Slots &amp; Template Refs </text>
         <SlotsDemoCard>
-          <text class="note-text">
-            default slot content
-          </text>
+          <text class="note-text"> default slot content </text>
           <template #body="{ tone }">
             <text class="note-text">
               {{ `scoped slot: tone="${tone}"` }}
             </text>
           </template>
           <template #footer>
-            <text class="note-text">
-              named #footer slot content
-            </text>
+            <text class="note-text"> named #footer slot content </text>
           </template>
         </SlotsDemoCard>
 
@@ -656,11 +574,7 @@ const directProvideValue = inject(DIRECT_PROVIDE_KEY, 'not provided');
           Template ref (Partial — deep ref()) vs useTemplateRef() (3.5+)
         </text>
         <view :style="{ flexDirection: 'row', gap: 12 }">
-          <view
-            ref="deepRefTarget"
-            testID="deep-ref-target"
-            class="chip"
-          />
+          <view ref="deepRefTarget" testID="deep-ref-target" class="chip" />
           <view
             ref="correctRefTarget"
             testID="correct-ref-target"
@@ -716,9 +630,7 @@ const directProvideValue = inject(DIRECT_PROVIDE_KEY, 'not provided');
 
       <!-- ══════════════════════ Component Communication ══════════════════════ -->
       <view class="section-nested">
-        <text class="section-header">
-          Component Communication
-        </text>
+        <text class="section-header"> Component Communication </text>
         <CounterCapsule
           ref="capsuleRef"
           v-model:count="capsuleCount"
@@ -746,9 +658,7 @@ const directProvideValue = inject(DIRECT_PROVIDE_KEY, 'not provided');
           data-note="options-fallthrough"
           @ping="onPing"
         >
-          <text class="note-text">
-            passed via default slot
-          </text>
+          <text class="note-text"> passed via default slot </text>
         </OptionsApiChild>
         <text
           v-for="(entry, index) in pingLog"
@@ -761,9 +671,7 @@ const directProvideValue = inject(DIRECT_PROVIDE_KEY, 'not provided');
 
       <GlobalApiDemo />
       <view class="section-tight">
-        <text class="section-label">
-          app.mixin() mount log
-        </text>
+        <text class="section-label"> app.mixin() mount log </text>
         <text
           v-for="(entry, index) in mixinMountLog"
           :key="index"

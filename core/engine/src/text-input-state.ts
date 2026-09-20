@@ -3,7 +3,7 @@
 // Keyboard.dismiss can blur whatever holds focus without a ref, exactly how RN's
 // dismissKeyboard() works (blurTextInput(currentlyFocusedInput())).
 
-import { dispatchViewCommand } from './commit';
+import { dispatchViewCommand, propOf } from './imperative';
 import { dlog } from './debug';
 import type { ISymbioteNode } from './node';
 
@@ -40,7 +40,7 @@ export function blurTextInput(node: ISymbioteNode | null): void {
 // this side of the pair also carries: already-focused or `editable: false` is a no-op.
 export function focusTextInput(node: ISymbioteNode | null): void {
   if (node === null) return;
-  if (currentlyFocused === node || node.props.editable === false) return;
+  if (currentlyFocused === node || propOf(node, 'editable') === false) return;
   dlog('TextInputState.focusTextInput -> focus command');
   setInputFocused(node);
   dispatchViewCommand(node, 'focus', []);

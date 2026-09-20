@@ -12,6 +12,7 @@ import {
   isRecord,
   isSymbioteNode,
   Keyboard,
+  propOf,
   setBehaviorListener,
   type ISymbioteEvent,
   type ISymbioteNode,
@@ -125,10 +126,10 @@ function startShouldSetResponderCapture(
 ): boolean {
   const state = stateFor(owner);
   if (isAnimating(state)) return true;
-  if (owner.props.disableScrollViewPanResponder === true) return false;
+  if (propOf(owner, 'disableScrollViewPanResponder') === true) return false;
   if (softKeyboardIsDetached()) return false;
   if (
-    keyboardNeverPersistsTaps(owner.props.keyboardShouldPersistTaps) &&
+    keyboardNeverPersistsTaps(propOf(owner, 'keyboardShouldPersistTaps')) &&
     keyboardIsDismissible()
   ) {
     const target = touchTargetOf(event.nativeEvent);
@@ -144,9 +145,9 @@ function startShouldSetResponder(
   owner: ISymbioteNode,
   event: ISymbioteEvent,
 ): boolean {
-  if (owner.props.disableScrollViewPanResponder === true) return false;
+  if (propOf(owner, 'disableScrollViewPanResponder') === true) return false;
   if (
-    owner.props.keyboardShouldPersistTaps === 'handled' &&
+    propOf(owner, 'keyboardShouldPersistTaps') === 'handled' &&
     keyboardIsDismissible()
   ) {
     const target = touchTargetOf(event.nativeEvent);
@@ -187,7 +188,7 @@ function handleResponderRelease(
   const app = appListenerFor(owner, 'responderRelease');
   if (typeof app === 'function') app(event);
   const focused = currentlyFocusedInput();
-  const persist = owner.props.keyboardShouldPersistTaps;
+  const persist = propOf(owner, 'keyboardShouldPersistTaps');
   if (
     focused === null ||
     persist === true ||

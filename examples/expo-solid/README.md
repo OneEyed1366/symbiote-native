@@ -1,4 +1,4 @@
-# Expo-native-modules canary (`@symbiote-native/sensors` + 20 more Expo-SDK ports on device)
+# Expo-native-modules canary (`@symbiote-native/sensors` + 21 more Expo-SDK ports on device)
 
 The **Expo native-modules demo canary**, sibling of [`solid`](../solid), same
 `@symbiote-native/solid` renderer and `@symbiote-native/engine` core, but this app owns the

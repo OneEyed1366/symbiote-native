@@ -4,7 +4,10 @@
 // have (a snap-back that never fires, a fold that leaves an authored alias in the payload) is
 // invisible on `node.props`.
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { installFabric, type IFakeNode } from '../../../test-utils/src/index';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '../../../test-utils/src/index';
 import {
   clearHostBehaviors,
   createElement,
@@ -17,7 +20,8 @@ import {
 import { registerSwitchBehavior, SWITCH_TAG } from './switch';
 import { descriptorFor } from '../component-names/index.ios';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 let nextRootTag = 8000;
 
 // PRODUCTION SHAPE. An adapter resolves the intrinsic tag through `descriptorFor` and calls
@@ -61,20 +65,13 @@ function changeEvent(node: ISymbioteNode, value: boolean): ISymbioteEvent {
   };
 }
 
-// The LIVE tree, by testID — never `fabric.find()`, which searches `created` and hands back the
-// pre-clone node with its mount-time props (`test-harness-false-greens.md`).
+// The LIVE tree, by testID — never `fabric.find()`, which searches the creation log and hands back
+// the AUTHORED bag, not the committed payload (`test-harness-false-greens.md`). Reads `.payload`
+// (`fabricProps`'s output): `onTintColor`/`tintColor`/`thumbTintColor` are folds, never props the
+// app wrote.
 function committedPropsOf(testID: string): Record<string, unknown> | undefined {
-  const walk = (
-    nodes: readonly IFakeNode[],
-  ): Record<string, unknown> | undefined => {
-    for (const node of nodes) {
-      if (node.props.testID === testID) return node.props;
-      const hit = walk(node.children);
-      if (hit !== undefined) return hit;
-    }
-    return undefined;
-  };
-  return walk(fabric.appRoot().children);
+  return live.findLive(live.appRoot(), node => node.payload.testID === testID)
+    ?.payload;
 }
 
 function commandsNamed(
@@ -190,50 +187,20 @@ describe('switch host behavior', () => {
     expect(committedPropsOf(TEST_ID)).toMatchObject({ value: true });
   });
 
-  it('folds trackColor/thumbColor/ios_backgroundColor to the iOS native prop names and drops the authored keys', () => {
-    registerSwitchBehavior();
-    const node = makeSwitch();
-    routeProp(node, 'testID', TEST_ID);
-    routeProp(node, 'value', true);
-    routeProp(node, 'trackColor', { false: '#111', true: '#222' });
-    routeProp(node, 'thumbColor', '#333');
-    routeProp(node, 'ios_backgroundColor', '#444');
-    mount(node);
+  // THE TWO FOLD CASES MOVED: `core/engine/cpp/tests/js/switch-payload.itest.ts`. The authored-name
+  // resolution — `trackColor`/`thumbColor`/`ios_backgroundColor` onto the per-platform native names,
+  // and `value === true` — is `foldSwitchProps` in `SymbioteFabricProps.cpp` now, so this harness's
+  // payload (built by the TypeScript `fabricProps`) cannot see it and never will.
+  //
+  // They gained two assertions on the way that this file could not make: `foldsFound === 0`, which
+  // is the reason the rule moved at all, and a behaviorless control proving the renames are the
+  // rule rather than something the engine does for every node.
+  //
+  // Everything below stays, and it is the half that never moved: the snap-back handshake, which
+  // reads app state a microtask after native reports a toggle.
 
-    const props = committedPropsOf(TEST_ID);
-    expect(props).toMatchObject({
-      value: true,
-      onTintColor: '#222',
-      tintColor: '#111',
-      thumbTintColor: '#333',
-    });
-    expect(props).not.toHaveProperty('trackColor');
-    expect(props).not.toHaveProperty('thumbColor');
-    expect(props).not.toHaveProperty('ios_backgroundColor');
-    expect(props).not.toHaveProperty('style');
-    // `fabricProps` hoists a style slot's keys onto the payload rather than keeping a nested
-    // `style` object (`core/engine/src/fabric-props.ts`'s `addStyle`), so the ios_backgroundColor
-    // fold's own keys land flat, same as every other adapter's committed payload.
-    expect(props).toMatchObject({ backgroundColor: '#444', borderRadius: 16 });
-  });
-
-  it('folds an authored non-boolean value to a strict false', () => {
-    registerSwitchBehavior();
-    const node = makeSwitch();
-    routeProp(node, 'testID', TEST_ID);
-    mount(node);
-
-    expect(committedPropsOf(TEST_ID)).toMatchObject({ value: false });
-  });
-
-  // The `switch-managed` tag resolves to the SAME native views as `switch` — the
-  // wrapper's spelling must not silently orphan itself from either platform table.
-  it('resolves switch-managed to the same Fabric view as switch, on iOS', () => {
+  it('resolves switch to the native Switch view, on iOS', () => {
     expect(descriptorFor('switch')).toEqual({
-      component: 'Switch',
-      isText: false,
-    });
-    expect(descriptorFor('switch-managed')).toEqual({
       component: 'Switch',
       isText: false,
     });

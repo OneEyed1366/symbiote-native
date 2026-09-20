@@ -15,7 +15,11 @@
 
 import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 // SIDE-EFFECT IMPORT: the nativeID/backgroundColor/style mapping lives in the tag's behavior, and
 // only this module installs it. An app reaches it through the package barrel; a test does not.
 import '../register';
@@ -28,27 +32,21 @@ const ACCESSORY_VIEW = 'RCTInputAccessoryView';
 const NATIVE_ID = 'accessory-1';
 const BACKGROUND_COLOR = '#eeeeee';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-function committed(predicate: (node: IFakeNode) => boolean): IFakeNode {
-  let found: IFakeNode | undefined;
-  const walk = (nodes: IFakeNode[]): void => {
-    for (const node of nodes) {
-      if (found === undefined && predicate(node)) found = node;
-      walk(node.children);
-    }
-  };
-  walk(fabric.committed);
+function committed(predicate: (node: ILiveNode) => boolean): ILiveNode {
+  const found = live.findLive(live.appRoot(), predicate);
   if (found === undefined) throw new Error('no committed node matched');
   return found;
 }
 
-function accessory(): IFakeNode {
+function accessory(): ILiveNode {
   return committed(node => node.viewName === ACCESSORY_VIEW);
 }
 
@@ -68,7 +66,7 @@ describe('Solid InputAccessoryView on the engine', () => {
       ));
       await tick();
 
-      const props = accessory().props;
+      const props = accessory().payload;
       expect(props.nativeID).toBe(NATIVE_ID);
       expect(props.backgroundColor).toBe(BACKGROUND_COLOR);
       expect(props.flex).toBe(1);
@@ -105,22 +103,25 @@ describe('Solid InputAccessoryView on the engine', () => {
       const input = committed(
         node => node.viewName === 'RCTSinglelineTextInputView',
       );
-      expect(input.props.inputAccessoryViewID).toBe(accessory().props.nativeID);
+      expect(input.payload.inputAccessoryViewID).toBe(
+        accessory().payload.nativeID,
+      );
     });
 
-    // why: native reads only `accessibility*`. This component owns its host element rather than
-    // rendering through a View, so nothing else in the path folds the web aliases — dropping the
-    // fold would send `aria-label` to Fabric as a meaningless prop and leave the toolbar
-    // unlabelled for a screen reader.
-    it('folds aria aliases into the canonical accessibility props', async () => {
+    // why: native reads only `accessibility*`, and the engine folds the web aliases into them off
+    // the authored, HYPHENATED names. This component owns its host element rather than rendering
+    // through a View, so nothing else in the path carries the aliases down for it — losing one
+    // leaves the toolbar unlabelled for a screen reader.
+    // The fold's own cases: `core/engine/cpp/tests/js/aria-payload.itest.ts`.
+    it('forwards the aria aliases under their authored names', async () => {
       mount(ROOT_TAG, () => (
         <input-accessory-view aria-label="toolbar" aria-busy={true} />
       ));
       await tick();
 
-      const props = accessory().props;
-      expect(props.accessibilityLabel).toBe('toolbar');
-      expect(props.accessibilityState).toEqual({ busy: true });
+      const props = accessory().payload;
+      expect(props['aria-label']).toBe('toolbar');
+      expect(props['aria-busy']).toBe(true);
     });
 
     // why: Solid runs a component body ONCE. Every prop read sits inside the bag accessor
@@ -134,15 +135,17 @@ describe('Solid InputAccessoryView on the engine', () => {
         <input-accessory-view nativeID={NATIVE_ID} backgroundColor={color()} />
       ));
       await tick();
-      const createdAtMount = fabric.counts.createNode;
-      expect(accessory().props.backgroundColor).toBe(BACKGROUND_COLOR);
+      // Node IDENTITY rather than a creation count: a rebuild that netted out even would satisfy
+      // a count, and the identity moving is what the case is about.
+      const hostAtMount = accessory().handle;
+      expect(accessory().payload.backgroundColor).toBe(BACKGROUND_COLOR);
 
       setColor('#ff0000');
       await tick();
 
-      expect(accessory().props.backgroundColor).toBe('#ff0000');
-      expect(fabric.counts.createNode, 'the host node kept its identity').toBe(
-        createdAtMount,
+      expect(accessory().payload.backgroundColor).toBe('#ff0000');
+      expect(accessory().handle, 'the host node kept its identity').toBe(
+        hostAtMount,
       );
     });
 
@@ -159,14 +162,23 @@ describe('Solid InputAccessoryView on the engine', () => {
         <input-accessory-view nativeID={NATIVE_ID} backgroundColor={color()} />
       ));
       await tick();
-      expect(accessory().props.backgroundColor).toBe(BACKGROUND_COLOR);
+      expect(accessory().payload.backgroundColor).toBe(BACKGROUND_COLOR);
 
       setColor(undefined);
       await tick();
 
       // The engine's diffProps sends a removed key down as literal null, not absence
       // (symbiote-engine-core §8) — so `null` here IS the cleared state Fabric acts on.
-      expect(accessory().props.backgroundColor).toBeNull();
+      // ABSENT, not null: the literal null was the CLONE PROTOCOL's spelling of "reset to the
+      // default", held only inside the diff the stand-in merged. The engine's op stream says the
+      // same thing with `NO_VALUE`, and a host replaying that op deletes the key.
+      expect(Object.hasOwn(accessory().payload, 'backgroundColor')).toBe(false);
+      // …and the half that proves the engine ACTED: the record carried the colour after the mount
+      // above, so its being gone from the record means a clearing op was sent for it.
+      const recorded = fabric.find(node => node.viewName === ACCESSORY_VIEW);
+      expect(Object.hasOwn(recorded?.props ?? {}, 'backgroundColor')).toBe(
+        false,
+      );
     });
   });
 });

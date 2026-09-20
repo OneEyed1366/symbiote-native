@@ -1,17 +1,15 @@
-import { Component, ViewChild } from '@angular/core';
+import { Component, ElementRef, ViewChild } from '@angular/core';
 import {
   AccessibilityInfo,
-  ButtonElement,
   FlatList,
   Keyboard,
+  SYMBIOTE_ELEMENTS,
   SectionList,
   SymbioteHostPropsDirective,
-  Text,
-  TextInputElement,
-  View,
   VListItemDirective,
   VSectionHeaderDirective,
   VSectionItemDirective,
+  type IHostInstance,
   type ISection,
 } from '@symbiote-native/angular';
 // static look compiled at build time by @symbiote-native/css-parser
@@ -66,10 +64,7 @@ const paritySections: ISection<ISectionEntry>[] = [
   selector: 'ParityDemo',
   standalone: true,
   imports: [
-    View,
-    Text,
-    ButtonElement,
-    TextInputElement,
+    SYMBIOTE_ELEMENTS,
     FlatList,
     SectionList,
     VListItemDirective,
@@ -175,7 +170,10 @@ const paritySections: ISection<ISectionEntry>[] = [
   `,
 })
 export class ParityDemo {
-  @ViewChild('titleRef') private titleRef?: Text;
+  // An `ElementRef` off the template reference, not a `Text` COMPONENT: `<text>` is a tag that
+  // `SYMBIOTE_ELEMENTS` covers, and `nativeElement` is the same engine node either way — typed as
+  // `IHostInstance`, which is what the imperative calls below are declared against.
+  @ViewChild('titleRef') private titleRef?: ElementRef<IHostInstance>;
   @ViewChild(FlatList) private listRef?: FlatList<IParityRow>;
 
   readonly parityRows = parityRows;
