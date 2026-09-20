@@ -12,7 +12,12 @@
 import { createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { VirtualizedList, mount, unmount } from '@symbiote-native/react';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import { childrenOf, type ISymbioteNode } from '@symbiote-native/engine';
+import {
+  installRecordingFabric,
+  payloadOf,
+  type IAuthoredNode,
+} from '@symbiote-native/test-utils';
 
 interface IRow {
   id: number;
@@ -25,41 +30,41 @@ const DATA: IRow[] = Array.from({ length: 20 }, (_unused, index) => ({
   id: index,
 }));
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
+// RESIDENCY is the whole subject, so every walk here descends the LIVE child links from the scroll
+// view down. A recording keeps every node it ever saw created, so a windowed-out cell is still in
+// the record — searching the record instead would report index 1 as resident forever.
+function descendantsOf(handle: ISymbioteNode): ISymbioteNode[] {
+  return childrenOf(handle).flatMap(child => [child, ...descendantsOf(child)]);
+}
+
 // Collect the text content of every rendered row so we can tell which cells are resident.
-function renderedRows(nodes: IFakeNode[]): string[] {
+function renderedRows(handle: ISymbioteNode): string[] {
   const rows: string[] = [];
-  for (const node of nodes) {
-    if (
-      typeof node.props.text === 'string' &&
-      node.props.text.startsWith('row-')
-    ) {
-      rows.push(node.props.text);
-    }
-    rows.push(...renderedRows(node.children));
+  for (const node of descendantsOf(handle)) {
+    const text = fabric.find(one => one.handle === node)?.props.text;
+    if (typeof text === 'string' && text.startsWith('row-')) rows.push(text);
   }
   return rows;
 }
 
-function findScrollView(): IFakeNode {
+function findScrollView(): IAuthoredNode {
   const node = fabric.find(n => n.viewName === 'RCTScrollView');
-  expect(node, 'scroll view node found in committed tree').toBeDefined();
+  expect(node, 'the scroll view was created').toBeDefined();
   if (node === undefined) throw new Error('unreachable: scroll view missing');
   return node;
 }
 
 // A sticky-header wrapper is the only node carrying a `transform` (its translateY); regular
-// cells and the content container don't (same tell sticky-section-headers.test.tsx uses).
-function collectStickyWrappers(nodes: IFakeNode[]): IFakeNode[] {
-  const wrappers: IFakeNode[] = [];
-  for (const node of nodes) {
-    if (Array.isArray(node.props.transform)) wrappers.push(node);
-    wrappers.push(...collectStickyWrappers(node.children));
-  }
-  return wrappers;
+// cells and the content container don't (same tell sticky-section-headers.test.tsx uses). It is a
+// style key, so it lives in the payload rather than the author's bag.
+function collectStickyWrappers(handle: ISymbioteNode): ISymbioteNode[] {
+  return descendantsOf(handle).filter(node =>
+    Array.isArray(payloadOf(node).transform),
+  );
 }
 
 function App(): ReactElement {
@@ -84,12 +89,7 @@ function App(): ReactElement {
 describe('VirtualizedList force-mounts the sticky header below the window', () => {
   it('keeps the sticky index-0 cell mounted after scrolling its origin position off-window', () => {
     mount(ROOT_TAG, <App />);
-    expect(
-      fabric.committed.length,
-      'VirtualizedList committed',
-    ).toBeGreaterThan(0);
-
-    findScrollView(); // sanity: the inner ScrollView committed.
+    findScrollView(); // sanity: the inner ScrollView was created.
     fabric.fireEvent(findScrollView().instanceHandle, 'topLayout', {
       layout: { x: 0, y: 0, width: 320, height: VIEWPORT },
     });
@@ -103,7 +103,7 @@ describe('VirtualizedList force-mounts the sticky header below the window', () =
       layoutMeasurement: { width: 320, height: VIEWPORT },
     });
 
-    const rows = renderedRows(fabric.committed);
+    const rows = renderedRows(findScrollView().handle);
     // The forced sticky cell: index 0 stays mounted even though it is far outside the
     // in-window range.
     expect(
@@ -136,13 +136,13 @@ describe('VirtualizedList force-mounts the sticky header below the window', () =
       layoutMeasurement: { width: 320, height: VIEWPORT },
     });
 
-    const stickyWrappers = collectStickyWrappers(fabric.committed);
+    const stickyWrappers = collectStickyWrappers(findScrollView().handle);
     expect(
       stickyWrappers.length,
       'the forced sticky cell got wrapped',
     ).toBeGreaterThan(0);
     expect(
-      stickyWrappers.some(wrapper => renderedRows([wrapper]).includes('row-0')),
+      stickyWrappers.some(wrapper => renderedRows(wrapper).includes('row-0')),
       'row-0 (the forced cell) is inside a sticky wrapper',
     ).toBe(true);
   });

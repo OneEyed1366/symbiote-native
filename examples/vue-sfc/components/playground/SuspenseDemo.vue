@@ -34,10 +34,7 @@ const loadKey = ref(0);
       </template>
       <template #fallback>
         <view class="a11y-card">
-          <text
-            class="note-text"
-            testID="suspense-fallback"
-          >
+          <text class="note-text" testID="suspense-fallback">
             loading async payload…
           </text>
         </view>

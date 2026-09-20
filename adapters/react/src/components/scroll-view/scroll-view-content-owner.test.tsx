@@ -13,57 +13,55 @@
 // nothing. Every case therefore also asserts the app's own child is a DESCENDANT of the one
 // content node — a capability an app depends on, rather than a shape
 // (`.claude/rules/adapter-parity-audit.md`, "Phrase a parity oracle as a CAPABILITY").
+
+// A RECORDING host, and the tree walked here is the AUTHORED one. The question is WHO EMITTED the
+// content node; `RCTScrollContentView` is a name the engine sends, and React Native's own
+// `componentNameByReactViewName` maps `ScrollContentView` to plain `View`, so the committed tree
+// cannot tell a content node from any other view by name at all.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { VirtualizedList, mount, unmount } from '@symbiote-native/react';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import { childrenOf } from '@symbiote-native/engine';
+import {
+  installRecordingFabric,
+  payloadOf,
+  type IAuthoredNode,
+} from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 6102;
 const SCROLL_VIEW = 'RCTScrollView';
 const SCROLL_CONTENT = 'RCTScrollContentView';
 const CHILD_ID = 'owner-child';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-function walk(
-  nodes: readonly IFakeNode[],
-  visit: (n: IFakeNode) => void,
-): void {
-  for (const node of nodes) {
-    visit(node);
-    walk(node.children, visit);
-  }
-}
-
 function countByName(name: string): number {
-  let found = 0;
-  walk(fabric.committed, node => {
-    if (node.viewName === name) found += 1;
-  });
-  return found;
+  return fabric.findAll(node => node.viewName === name).length;
 }
 
-function findByTestId(id: string): IFakeNode | undefined {
-  let found: IFakeNode | undefined;
-  walk(fabric.committed, node => {
-    if (node.props.testID === id) found = node;
-  });
-  return found;
+function findByTestId(id: string): IAuthoredNode | undefined {
+  return fabric.find(node => node.props.testID === id);
 }
 
 // Is the app's own child underneath the ONE content node, rather than a sibling of it? That is the
 // observable an app depends on; "the content node exists" is not.
+//
+// Descends from the content node rather than from a root, which is the same claim stated forwards:
+// the engine's structure builder put the app's children INSIDE what it created.
 function childIsUnderContent(): boolean {
-  let under = false;
-  const descend = (node: IFakeNode, insideContent: boolean): void => {
-    const nowInside = insideContent || node.viewName === SCROLL_CONTENT;
-    if (nowInside && node.props.testID === CHILD_ID) under = true;
-    for (const child of node.children) descend(child, nowInside);
+  const content = fabric.find(node => node.viewName === SCROLL_CONTENT);
+  if (content === undefined) return false;
+  const descend = (handle: object): boolean => {
+    for (const child of childrenOf(handle)) {
+      const recorded = fabric.find(node => node.handle === child);
+      if (recorded?.props.testID === CHILD_ID) return true;
+      if (descend(child)) return true;
+    }
+    return false;
   };
-  for (const root of fabric.committed) descend(root, false);
-  return under;
+  return descend(content.handle);
 }
 
 describe('exactly one owner builds the scroll content node', () => {
@@ -102,13 +100,13 @@ describe('exactly one owner builds the scroll content node', () => {
         <view testID={CHILD_ID} />
       </scroll-view>,
     );
-    let content: IFakeNode | undefined;
-    walk(fabric.committed, node => {
-      if (node.viewName === SCROLL_CONTENT) content = node;
-    });
-    expect(content, 'a content node was committed').toBeDefined();
-    expect(content!.props.padding).toBe(7);
-    expect(findByTestId('sv')?.props.padding).toBeUndefined();
+    const content = fabric.find(node => node.viewName === SCROLL_CONTENT);
+    expect(content, 'a content node was created').toBeDefined();
+    // The PAYLOAD: `padding` is a style key, flattened on the way into it.
+    expect(payloadOf(content!.handle).padding).toBe(7);
+    const owner = findByTestId('sv');
+    expect(owner, 'the scroll view itself was created').toBeDefined();
+    expect(payloadOf(owner!.handle).padding).toBeUndefined();
   });
 
   // why: the list family is the OTHER path to a scroll node, and it stays a component. It must

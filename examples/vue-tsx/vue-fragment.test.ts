@@ -10,7 +10,7 @@
 import { defineComponent, Fragment, h, ref } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '@symbiote-native/vue';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 
 interface IRow {
   id: number;
@@ -58,17 +58,23 @@ async function mountApp(): Promise<void> {
 }
 
 // Slot is a process singleton (installed once); per-test isolation is the surface.
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
+
+// An anchor is created on the wire too (`OP_CREATE_ANCHOR`, for the commit walk to flatten away),
+// carrying no view name — so a real Fabric create is one whose authored node has a name.
+function realNodeCount(): number {
+  return fabric.findAll(node => node.viewName !== '').length;
+}
 
 describe('Vue Fragment list on the engine', () => {
   it('mounts a 2-row fragment without throwing, creating only real nodes (6)', async () => {
     await mountApp();
     // flex root + View + 2x(Text + raw-text) = 6. The two empty-text fragment anchors create
     // ZERO native nodes. That is the fix.
-    expect(fabric.counts.createNode, 'mount creates only real nodes').toBe(6);
-    expect(fabric.counts.completeRoot, 'mount commits once').toBe(1);
+    expect(realNodeCount(), 'mount creates only real nodes').toBe(6);
+    expect(fabric.commits, 'mount commits once').toBe(1);
   });
 
   it('appending a keyed row creates exactly the new Text + raw-text (2)', async () => {
@@ -76,11 +82,8 @@ describe('Vue Fragment list on the engine', () => {
     fabric.reset();
     addRow();
     await tick();
-    expect(
-      fabric.counts.createNode,
-      'append creates the new Text + raw-text',
-    ).toBe(2);
-    expect(fabric.counts.completeRoot, 'append commits once').toBe(1);
+    expect(realNodeCount(), 'append creates the new Text + raw-text').toBe(2);
+    expect(fabric.commits, 'append commits once').toBe(1);
   });
 
   it('removing a keyed row creates no native node', async () => {
@@ -88,7 +91,7 @@ describe('Vue Fragment list on the engine', () => {
     fabric.reset();
     dropRow();
     await tick();
-    expect(fabric.counts.createNode, 'remove creates no native node').toBe(0);
-    expect(fabric.counts.completeRoot, 'remove commits once').toBe(1);
+    expect(realNodeCount(), 'remove creates no native node').toBe(0);
+    expect(fabric.commits, 'remove commits once').toBe(1);
   });
 });

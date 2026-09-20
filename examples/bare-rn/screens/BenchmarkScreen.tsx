@@ -1066,6 +1066,47 @@ export function BenchmarkScreen() {
           frame.
         </Text>
 
+        {/* These sat BELOW the rows until 2026-09-07, deliberately, so nobody would report
+          numbers from them: their Remove and Append act on whatever happened to be on screen,
+          which is the whole reason the suite above exists. That is still true and the note under
+          them still says so — what changed is that "below the fold" became UNREACHABLE once the
+          list holds a thousand rows, which is exactly the state you are in when you want to poke
+          at one commit shape. A caveat keeps working from the top of the screen; a scroll
+          position does not.
+
+          Moved here in the same pass as the five adapter canaries. This screen is the stock
+          baseline, so the bar for touching it is "changes no measurement" — a control's position
+          in a ScrollView changes none, and keeping the two screens navigable the same way is what
+          makes them comparable to drive. */}
+        <Text style={styles.sectionLabel}>OPERATIONS · LAST RUN</Text>
+        {operations.map(operation => (
+          <View key={operation.id} style={styles.benchOpRow}>
+            <View style={styles.flex1}>
+              <ActionButton
+                testID={`bench-op-${operation.id}`}
+                title={operation.label}
+                onPress={operation.onPress}
+                color={ACCENT_COLOR}
+              />
+            </View>
+            <Text
+              testID={`bench-result-${operation.id}`}
+              style={styles.benchOpResult}
+            >
+              {formatDuration(lastDurations.get(operation.id))}
+            </Text>
+          </View>
+        ))}
+        <Text style={styles.noteText}>
+          Single operations, for poking at one commit shape while debugging. Do
+          NOT report from them — Remove and Append act on whatever row count is
+          on screen, which is what the suite above removes.
+        </Text>
+
+        <Text testID="bench-row-count" style={styles.infoText}>
+          {`rows: ${rows.length} · ${mountedViews} native views mounted · selected: ${selectedId ?? 'none'}`}
+        </Text>
+
         <Text style={styles.sectionLabel}>
           {isAllMounted ? 'ROWS · ALL MOUNTED' : 'ROWS · VIRTUALIZED'}
         </Text>
@@ -1101,32 +1142,6 @@ export function BenchmarkScreen() {
           />
         )}
 
-        {/* Below the fold on purpose: the single operations are for poking at one commit shape
-          while debugging, not for reporting. Their Remove and Append numbers depend on press
-          order, which is exactly what the suite above exists to remove. */}
-        <Text style={styles.sectionLabel}>OPERATIONS · LAST RUN</Text>
-        {operations.map(operation => (
-          <View key={operation.id} style={styles.benchOpRow}>
-            <View style={styles.flex1}>
-              <ActionButton
-                testID={`bench-op-${operation.id}`}
-                title={operation.label}
-                onPress={operation.onPress}
-                color={ACCENT_COLOR}
-              />
-            </View>
-            <Text
-              testID={`bench-result-${operation.id}`}
-              style={styles.benchOpResult}
-            >
-              {formatDuration(lastDurations.get(operation.id))}
-            </Text>
-          </View>
-        ))}
-
-        <Text testID="bench-row-count" style={styles.infoText}>
-          {`rows: ${rows.length} · ${mountedViews} native views mounted · selected: ${selectedId ?? 'none'}`}
-        </Text>
 
         <Text
           style={styles.sectionLabel}

@@ -31,19 +31,14 @@ const debounced = useDebouncedRef('', DEBOUNCE_MS);
 
 <template>
   <view class="a11y-card">
-    <text class="switch-label">
-      customRef() — debounced v-model
-    </text>
+    <text class="switch-label"> customRef() — debounced v-model </text>
     <text-input
       v-model="debounced"
       testID="customref-input"
       class="focus-input"
       placeholder="type here…"
     />
-    <text
-      class="note-text"
-      testID="customref-committed"
-    >
+    <text class="note-text" testID="customref-committed">
       {{
         `debounced (committed ${DEBOUNCE_MS}ms after typing stops) = "${debounced}"`
       }}

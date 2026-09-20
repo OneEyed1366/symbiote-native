@@ -1,10 +1,8 @@
 // The runtime half of `intrinsicWhen`: which native view a primitive commits, decided from the
 // props it is created with rather than from source text.
 //
-// Until this existed only the lowering transforms read the field, so the choice was a COMPILE-time
-// one and `dynamicIntrinsicChoice` had to be a refusal category — a transform seeing
-// `multiline={isLong}` cannot know the value. A public primitive tag has no transform in front of
-// it on three adapters, so the choice moves here, where the value is known.
+// The deciding prop can be a RUNTIME value — `multiline={isLong}` is knowable only once the element
+// is created — so the choice is made here, where the value is.
 import { describe, expect, it } from 'vitest';
 import { HOST_PRIMITIVES } from '../host-primitives.cjs';
 import { resolveIntrinsicTag } from './resolve-intrinsic';

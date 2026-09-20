@@ -4,6 +4,21 @@
 //
 // SEAM SCAFFOLD: mount/unmount + the renderer seam + host intrinsic selectors. Full RN-like
 // composed components still flow through the shared @symbiote-native/components bridge.
+//
+// `View` AND `Text` ARE NO LONGER WORTH IMPORTING, and on 2026-09-18 the examples stopped. They are
+// `@Component`s on the `view` and `text` SELECTORS — a second mechanism on the same tags
+// `SYMBIOTE_ELEMENTS` covers, kept for one stated reason their own header gives: "Declaring `style`
+// as a real Angular input prevents Angular's CSS style engine from decomposing RN `StyleProp`
+// arrays". `SymbioteStyleHost` does exactly that now, for every tag, at a directive's cost rather
+// than a component's.
+//
+// An app loses nothing it cannot spell better: `@ViewChild('ref')` on a template reference returns
+// Angular's own `ElementRef<IHostInstance>`, whose `nativeElement` IS the engine host node — the same
+// property the component exposed, reached without a component instance per element.
+//
+// They stay EXPORTED because the composed components render them and ngtsc resolves a component's
+// template dependencies to importable names (NG3004, the same rule that put the element directives
+// back below). Retiring them means retiring them from those nine components first.
 
 import './register';
 
@@ -123,10 +138,28 @@ export type {
 } from './components';
 export { setImageSourceResolver } from './components';
 // The element directives that make a HAND-WRITTEN intrinsic tag (`<view>`, `<text-input>`, ...)
-// compile under ngtsc with no schema, and with a real type on every declared prop. `imports:
-// [SYMBIOTE_ELEMENTS]` is the whole app-facing surface; the individual classes are exported for an
-// app that wants a narrower import. See `elements.ts`'s header for why a directive rather than
-// `CUSTOM_ELEMENTS_SCHEMA`/`NO_ERRORS_SCHEMA`.
+// compile under ngtsc with no schema, and with a real type on every declared prop. See `elements.ts`
+// for why a directive rather than `CUSTOM_ELEMENTS_SCHEMA`/`NO_ERRORS_SCHEMA`.
+//
+// `imports: [SYMBIOTE_ELEMENTS]` IS THE ONLY SUPPORTED SPELLING — and the individual classes are
+// exported anyway, because ngtsc requires it and a build proves it.
+//
+// They were removed on 2026-09-18 and put back the same hour. The reason to remove them is real: a
+// withheld tag directive (`./runtime-matching`) is a compile-time declaration and nothing else, so
+// what makes `<view [style]="[a, b]">` work at RUN time is `SymbioteStyleHost`, and what makes
+// `<view [onPress]="fn">` work at all is `SymbioteCallbackHost` claiming the name before
+// `setDomProperty` throws NG0306. Both ride this array. A narrow `imports: [ViewElement]` type-checks
+// and then fails on a device the first time the app writes an array style.
+//
+// WHAT PUTS THEM BACK is NG3004: `Unable to import directive ViewElement — the symbol is not
+// exported from index.d.ts`. ngtsc resolves every directive reachable through an imported array to an
+// IMPORTABLE NAME in the package's public types, so a class inside `SYMBIOTE_ELEMENTS` that the
+// barrel does not name breaks AOT for every screen that uses the array. The removal passed its own
+// vitest guard and every headless suite, and failed on the first real `ngc` run — the same
+// wrong-harness green this repo keeps finding.
+//
+// So the narrow spelling is DISCOURAGED and not prevented, and `elements-are-exported-for-aot.test.ts`
+// now asserts the opposite invariant: every member of the array is named here.
 export {
   SYMBIOTE_ELEMENTS,
   SymbioteElement,
@@ -138,9 +171,6 @@ export {
   ImageBackgroundElement,
   ImageElement,
   InputAccessoryViewElement,
-  ManagedMultilineTextInputElement,
-  ManagedSwitchElement,
-  ManagedTextInputElement,
   ModalElement,
   MultilineTextInputElement,
   PressableElement,
@@ -150,22 +180,25 @@ export {
   ScrollViewElement,
   StickyHeaderElement,
   SwitchElement,
+  SwitchValueAccessor,
   TextElement,
   TextInputElement,
-  // The `[(ngModel)]` / `formControl*` accessors for the two controlled tags — where the deleted
-  // wrappers' `NG_VALUE_ACCESSOR` went. Both ride `SYMBIOTE_ELEMENTS`; named separately for an app
-  // that imports narrowly.
-  SwitchValueAccessor,
   TextInputValueAccessor,
-  // The three the list omitted while their components still existed. These are now the ONLY
-  // replacements for their deleted components in an app's `imports`, so a narrower import has to be
-  // able to name them.
   TouchableHighlightElement,
   TouchableNativeFeedbackElement,
   TouchableOpacityElement,
   TouchableWithoutFeedbackElement,
   ViewElement,
 } from './elements';
+// `CALLBACK_ATTRIBUTE_SELECTOR` is exported so a MEASUREMENT can carry the real string rather than a
+// copy of it — the ladder in `core/engine/cpp/tests/js/angular-directive-cost.itest.ts` prices what
+// this selector costs to match, and a second copy there would price a different one the day either
+// drifts. The two host classes are exported for the same reason the array is: they are part of it.
+export {
+  CALLBACK_ATTRIBUTE_SELECTOR,
+  SymbioteCallbackHost,
+} from './callback-host';
+export { STYLE_HOST_SELECTOR, SymbioteStyleHost } from './style-host';
 export type {
   IElementProps,
   IStickyHeaderElementProps,

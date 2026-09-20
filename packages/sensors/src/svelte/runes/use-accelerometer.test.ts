@@ -14,7 +14,7 @@ import type { Component } from 'svelte';
 // The .svelte-free subpath — the main barrel re-exports real .svelte component sources, which
 // vitest's plain (svelte-plugin-free) test transform cannot parse.
 import { mount, unmount } from '@symbiote-native/svelte/native-view-bridge';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import type { IAccelerometerMeasurement } from '../../core';
 // The real Metro pipeline's own .svelte.ts compile step (TS-strip + compileModule), reused here so
 // this test exercises the actual shipped compile path.
@@ -60,7 +60,7 @@ vi.mock('../../core', () => ({
   },
 }));
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 

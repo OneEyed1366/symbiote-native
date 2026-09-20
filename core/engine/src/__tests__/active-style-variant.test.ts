@@ -7,18 +7,24 @@
 // It replaces slot 1 (the EXPLICIT style), not slot 0: an authored `style` is what it stands in
 // for, so it must beat the class cascade exactly the way the authored style does.
 import { afterEach, describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 import {
   clearGlobalStyles,
   createElement,
   createSurface,
+  propOf,
   registerRules,
   routeProp,
   setNodePressed,
   type ISymbioteNode,
 } from '../index';
 
-installFabric();
+const fabric = installRecordingFabric();
+// The payload is what ships; the author's bag is not. Every read below is `.payload`.
+const live = createLiveTree(fabric);
 let nextRootTag = 7500;
 
 function mount(node: ISymbioteNode) {
@@ -28,8 +34,10 @@ function mount(node: ISymbioteNode) {
   return surface;
 }
 
+// The published `[classStyle, explicitStyle]` pair, read back out of the tree HOST — the engine
+// holds no props, and slot identity is what the no-variant case asserts on.
 function slots(node: ISymbioteNode): unknown[] {
-  const style = node.props.style;
+  const style = propOf(node, 'style');
   return Array.isArray(style) ? style : [];
 }
 
@@ -103,6 +111,6 @@ describe('compiler-supplied pressed style variant', () => {
     routeProp(node, 'activeStyle', { opacity: 0.6 });
     mount(node);
 
-    expect('activeStyle' in node.props).toBe(false);
+    expect('activeStyle' in live.nodeOf(node).payload).toBe(false);
   });
 });

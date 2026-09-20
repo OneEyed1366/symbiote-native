@@ -23,7 +23,11 @@ import {
   setNativeViewConfigSource,
 } from '@symbiote-native/solid';
 import type { INativeViewConfig } from '@symbiote-native/engine';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import { childrenOf, type ISymbioteNode } from '@symbiote-native/engine';
+import {
+  installRecordingFabric,
+  type IAuthoredNode,
+} from '@symbiote-native/test-utils';
 import { Stack } from './index';
 import type { INavigatorHandle } from './index';
 import { useRoute } from '../primitives';
@@ -89,7 +93,7 @@ const VIEW_CONFIGS: Record<string, INativeViewConfig> = {
   },
 };
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 setNativeViewConfigSource(name => VIEW_CONFIGS[name]);
 
 // The engine commits on a microtask and the navigators defer their focus/state emits by another
@@ -100,25 +104,35 @@ const flush = (): Promise<void> =>
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
+// A POP is the subject of half this file, so every walk below descends the LIVE child links from
+// the stack container down. A recording keeps every node it ever saw created, so a popped screen
+// is still in the record and only the tree says it is gone.
+function stackRoot(): ISymbioteNode {
+  const stack = fabric.find(node => node.viewName === STACK_VIEW);
+  if (stack === undefined) throw new Error('no screen stack created');
+  return stack.handle;
+}
+
 function findAll(
-  predicate: (node: IFakeNode) => boolean,
-  nodes: readonly IFakeNode[] = fabric.committed,
-): IFakeNode[] {
-  const found: IFakeNode[] = [];
-  for (const node of nodes) {
-    if (predicate(node)) found.push(node);
-    found.push(...findAll(predicate, node.children));
+  predicate: (node: IAuthoredNode) => boolean,
+  handle: ISymbioteNode = stackRoot(),
+): IAuthoredNode[] {
+  const found: IAuthoredNode[] = [];
+  for (const child of childrenOf(handle)) {
+    const recorded = fabric.find(one => one.handle === child);
+    if (recorded !== undefined && predicate(recorded)) found.push(recorded);
+    found.push(...findAll(predicate, child));
   }
   return found;
 }
 
-const screenNodes = (): IFakeNode[] =>
+const screenNodes = (): IAuthoredNode[] =>
   findAll(node => node.viewName === SCREEN_VIEW);
 
-function headerConfigOf(screen: IFakeNode): IFakeNode {
+function headerConfigOf(screen: IAuthoredNode): IAuthoredNode {
   const header = findAll(
     node => node.viewName === HEADER_CONFIG_VIEW,
-    screen.children,
+    screen.handle,
   )[0];
   if (header === undefined) throw new Error('no header config under screen');
   return header;
@@ -149,7 +163,9 @@ describe('Solid Stack navigator', () => {
       const screens = screenNodes();
       expect(screens).toHaveLength(1);
       expect(screens[0].props.activityState).toBe(2);
-      expect(findAll(node => node.viewName === STACK_VIEW)).not.toHaveLength(0);
+      // `stackRoot()` is where every walk above starts, so it throwing is the assertion — named
+      // here so the case still says out loud that a stack view was committed.
+      expect(fabric.find(node => node.viewName === STACK_VIEW)).toBeDefined();
       expect(headerConfigOf(screens[0]).props.title).toBe('Home');
     });
 
@@ -336,7 +352,10 @@ describe('Solid Stack navigator', () => {
     // why: the flip side of the same hazard, and the one a passing "params reach the screen" test
     // hides. Keying <For> on the ROUTE OBJECT also makes params reach the screen - by rebuilding the
     // whole subtree, which destroys node identity (every ref, every native-owned state). The only
-    // headless-observable trace is node churn, exactly as the render-prop trap documents.
+    // headless-observable trace is node churn — asserted here as NODE IDENTITY, which is what
+    // "rebuilt" literally means and is strictly stronger than the create count this read before:
+    // a count holds steady only while nothing is created, identity also catches a node replaced by
+    // an equal-looking one.
     it('setParams does not rebuild the screen subtree', async () => {
       let handle: INavigatorHandle | null = null;
       const ParamScreen = () => {
@@ -349,12 +368,14 @@ describe('Solid Stack navigator', () => {
         </Stack>
       ));
       await flush();
-      const before = fabric.counts.createNode;
+      const before = findAll(() => true).map(node => node.handle);
 
       handle?.setParams('after');
       await flush();
 
-      expect(fabric.counts.createNode).toBe(before);
+      const after = findAll(() => true).map(node => node.handle);
+      expect(after).toHaveLength(before.length);
+      expect(after.every((node, index) => node === before[index])).toBe(true);
     });
 
     // why: an options RESOLVER reads live app state. Resolving options once at build time would

@@ -7,7 +7,11 @@ import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount, Animated } from '@symbiote-native/react';
 import { event, AnimatedEvent } from '@symbiote-native/engine';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 
 // ---- fake NativeAnimatedTurboModule (records calls) ----------------------
 
@@ -49,11 +53,13 @@ Object.assign(globalThis, {
   nativeModuleProxy: { NativeAnimatedTurboModule: fakeNativeAnimated },
 });
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+// Animated writes through the engine's own prop path, so what an app can observe is the PAYLOAD.
+const live = createLiveTree(fabric);
 const ROOT_TAG = 41;
 
-function appView(): IFakeNode {
-  return fabric.appRoot().children[0];
+function appView(): ILiveNode {
+  return live.nodeOf(live.appRoot()).children[0];
 }
 
 function callsOf(method: string): INativeCall[] {
@@ -62,11 +68,11 @@ function callsOf(method: string): INativeCall[] {
 
 // translateY read off the committed view's flattened transform. The scoped setNativeProps commit
 // hoists `style` onto the view, so transform lands on props.
-function committedTranslateY(view: IFakeNode): number {
-  const transform = Reflect.get(view.props, 'transform');
+function committedTranslateY(view: ILiveNode): number {
+  const transform = Reflect.get(view.payload, 'transform');
   if (!Array.isArray(transform)) {
     throw new Error(
-      `expected a transform array on the view, got ${JSON.stringify(view.props)}`,
+      `expected a transform array on the view, got ${JSON.stringify(view.payload)}`,
     );
   }
   for (const entry of transform) {
@@ -87,7 +93,7 @@ beforeEach(() => {
 afterEach(() => unmount(ROOT_TAG));
 
 describe('Animated.event', () => {
-  it('drives a bound translateY from a real scroll event and forwards the raw arg', () => {
+  it('drives a bound translateY from a real scroll event and forwards the raw arg', async () => {
     const scrollY = new Animated.Value(0);
 
     function App(): ReactElement {
@@ -111,6 +117,9 @@ describe('Animated.event', () => {
 
     const scrollEvent = { nativeEvent: { contentOffset: { y: 42 } } };
     handler(scrollEvent);
+    // setNativeProps queues; the frame reaches Fabric at the microtask boundary
+    // (core/engine/src/imperative.ts), same as the setValue path in animated-component.test.tsx.
+    await Promise.resolve();
 
     expect(committedTranslateY(appView())).toBe(42);
     expect(listenerArg).toBe(scrollEvent);

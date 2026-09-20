@@ -18,15 +18,28 @@
 //
 // No Negative group: a namespace member and its wrapper have no rejecting input; a malformed
 // `data` degrades to an empty list at the FlatList layer, which is that file's concern.
+//
+// A RECORDING host. The second case used to compare `getNativeTag(...)` against `scrollView().tag`
+// — under this host every node's tag reads the same `NO_TAG` sentinel, which would make that
+// comparison a tautology (mirror-elimination.md, "A tag is not a node"). The claim it is actually
+// making is node IDENTITY — did the wrapper's leaf bind to the SAME engine node the committed
+// scroll view is — so it now compares the resolved host node directly against that node's handle.
+// The recording host never clones (it mutates the same node object in place), so a handle read
+// once stays valid to compare against for the rest of the case.
 
 import '../../components/flat-list';
 import { defineComponent, h, ref } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount, Animated } from '@symbiote-native/vue';
-import { getNativeTag } from '@symbiote-native/engine';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import { isSymbioteNode, type ISymbioteNode } from '@symbiote-native/engine';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const ROOT_TAG = 351;
 
 const tick = (): Promise<void> =>
@@ -42,41 +55,36 @@ const ROWS: IRow[] = [
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-function walk(nodes: IFakeNode[], visit: (node: IFakeNode) => void): void {
-  for (const node of nodes) {
-    visit(node);
-    walk(node.children, visit);
-  }
-}
-
 function committedTexts(): string[] {
   const texts: string[] = [];
-  walk(fabric.committed, node => {
-    if (typeof node.props.text === 'string') texts.push(node.props.text);
+  live.walkLive(live.appRoot(), node => {
+    if (typeof node.payload.text === 'string') texts.push(node.payload.text);
   });
   return texts;
 }
 
-// Walks the COMMITTED tree, not `fabric.find` (which scans every node ever created): a per-frame
-// setNativeProps commits a CLONE, so the first-created node keeps its original props forever.
-function scrollView(): IFakeNode {
-  let found: IFakeNode | undefined;
-  walk(fabric.committed, node => {
-    if (node.viewName === 'RCTScrollView') found ??= node;
-  });
-  if (found === undefined) throw new Error('no RCTScrollView was committed');
-  return found;
+function scrollView(): ILiveNode {
+  const node = live.findLive(
+    live.appRoot(),
+    n => n.viewName === 'RCTScrollView',
+  );
+  if (node === undefined) throw new Error('no RCTScrollView was committed');
+  return node;
 }
 
 // The wrapper exposes a delegating proxy over FlatList's own handle, so the test reads the host
-// node back through a guard rather than a cast.
-function scrollNodeOf(instance: unknown): unknown {
+// node back through a guard rather than a cast. The result is the engine node itself (the same
+// type `getNativeTag` takes), which is what makes a direct handle comparison meaningful below.
+function scrollNodeOf(instance: unknown): ISymbioteNode {
   if (instance === null || typeof instance !== 'object')
     throw new Error('ref captured no instance');
   const getScrollNode = Reflect.get(instance, 'getScrollNode');
   if (typeof getScrollNode !== 'function')
     throw new Error('exposed instance is not a list handle');
-  return getScrollNode.call(instance);
+  const node: unknown = getScrollNode.call(instance);
+  if (!isSymbioteNode(node))
+    throw new Error('getScrollNode did not resolve to an engine node');
+  return node;
 }
 
 function mountList(extra: Record<string, unknown>): Promise<void> {
@@ -114,7 +122,7 @@ describe('Vue Animated.FlatList', () => {
       expect(committedTexts()).toEqual(
         expect.arrayContaining(['row-0', 'row-1']),
       );
-      expect(scrollView().props.opacity).toBe(0.25);
+      expect(scrollView().payload.opacity).toBe(0.25);
     });
 
     it('binds the leaf to the host scroll node while exposing the list handle', async () => {
@@ -127,15 +135,16 @@ describe('Vue Animated.FlatList', () => {
       const listRef = ref<unknown>(null);
       await mountList({ ref: listRef, style: { opacity } });
 
-      // The exposed ref is the list handle; only the test unwraps it to the host node.
-      expect(getNativeTag(scrollNodeOf(listRef.value))).toBe(scrollView().tag);
+      // The exposed ref is the list handle; only the test unwraps it to the host node. Identity,
+      // not a tag, is the claim: the leaf must have bound to this SAME engine node.
+      expect(scrollNodeOf(listRef.value)).toBe(scrollView().handle);
 
       // The per-frame path (setValue -> flushValue -> AnimatedProps.update -> setNativeProps) only
       // reaches Fabric if the leaf was bound to that same host node.
       opacity.setValue(0.4);
       // The engine coalesces setNativeProps writes to the microtask boundary.
       await Promise.resolve();
-      expect(scrollView().props.opacity).toBe(0.4);
+      expect(scrollView().payload.opacity).toBe(0.4);
     });
 
     it('memoizes the wrapper and leaves the drivers half intact', () => {

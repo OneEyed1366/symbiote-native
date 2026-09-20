@@ -76,8 +76,8 @@ const FAKE_CUSTOM_ELEMENT_REGISTRY = {
 // rather than by reading. Svelte's `event()` (dom/elements/events.js) ends its teardown check with
 // a BARE `dom instanceof HTMLMediaElement`, no `typeof` guard, so an undeclared global throws
 // ReferenceError instead of yielding `undefined`. It is reached by every `on<Name>={fn}` an app
-// writes on a bare tag, which is why nothing hit it while the lowering transform funnelled every
-// handler through the `p` bag. Nothing of ours ever derives from it, so an empty class is enough:
+// writes on a bare tag, which is why nothing hit it while every handler went through the `p` bag.
+// Nothing of ours ever derives from it, so an empty class is enough:
 // `instanceof` only has to answer false.
 class FakeHTMLMediaElement {}
 

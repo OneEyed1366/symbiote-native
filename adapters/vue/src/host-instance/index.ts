@@ -11,7 +11,12 @@
 // onto it. An uncommitted or unknown input has no tag yet and surfaces as null.
 
 import { isRef, toRaw } from '@vue/runtime-core';
-import { getNativeTag, isSymbioteNode, dlog } from '@symbiote-native/engine';
+import {
+  componentOf,
+  getNativeTag,
+  isSymbioteNode,
+  dlog,
+} from '@symbiote-native/engine';
 
 // The public instance a Vue host ref hands back: the engine node itself. Re-exported from the
 // engine so a call site reads in parity with the React adapter's IHostInstance.
@@ -28,7 +33,7 @@ export function findNodeHandle(componentOrHandle: unknown): number | null {
   const node = toRaw(candidate);
   if (isSymbioteNode(node)) {
     const tag = getNativeTag(node) ?? null;
-    dlog(`findNodeHandle: component=${node.component} tag=${tag}`);
+    dlog(`findNodeHandle: component=${componentOf(node)} tag=${tag}`);
     return tag;
   }
   dlog('findNodeHandle: input did not resolve to a symbiote host node');

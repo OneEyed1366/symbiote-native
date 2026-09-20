@@ -13,11 +13,14 @@ import { defineComponent, h } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '@symbiote-native/vue';
 import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
-import { installFabric } from '@symbiote-native/test-utils';
+// A RECORDING host. The search is by the view name the OPS carry, and the assertion is on the
+// PAYLOAD — `padding` only exists once the style slot is flattened on the way into it, so the
+// node's own prop bag is the wrong bag to ask.
+import { installRecordingFabric, payloadOf } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 513;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -52,17 +55,17 @@ describe('Vue <scroll-view> contentContainerStyle class-name resolution', () => 
 
     const content = fabric.find(n => n.viewName === 'RCTScrollContentView');
     expect(content, 'RCTScrollContentView was created').toBeDefined();
-    expect(content!.props.padding).toBe(20);
+    expect(payloadOf(content!.handle).padding).toBe(20);
 
     const outer = fabric.find(n => n.viewName === 'RCTScrollView');
     expect(outer, 'RCTScrollView was created').toBeDefined();
-    expect('padding' in outer!.props).toBe(false);
+    expect('padding' in payloadOf(outer!.handle)).toBe(false);
   });
 
   it('still accepts a plain style object unchanged', async () => {
     await mountScrollView({ padding: 12 });
 
     const content = fabric.find(n => n.viewName === 'RCTScrollContentView');
-    expect(content!.props.padding).toBe(12);
+    expect(payloadOf(content!.handle).padding).toBe(12);
   });
 });

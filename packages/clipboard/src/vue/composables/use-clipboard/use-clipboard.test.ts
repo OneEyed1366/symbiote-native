@@ -5,7 +5,7 @@
 import { defineComponent, h, type Ref } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount } from '@symbiote-native/vue';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import type { IClipboardEvent } from '../../../core';
 // Imported from the types module directly (not the mocked `../../../core` barrel below) — a
 // pure enum declaration with no expo-modules-core native resolution, so it's safe to import
@@ -29,7 +29,7 @@ vi.mock('../../../core', () => ({
     addClipboardListenerMock(listener),
 }));
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 
 beforeEach(() => {
   fabric.reset();

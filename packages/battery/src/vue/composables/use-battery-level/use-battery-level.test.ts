@@ -8,7 +8,7 @@
 import { defineComponent, h, type Ref } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount } from '@symbiote-native/vue';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import { useBatteryLevel } from './index';
 
 const ROOT_TAG = 9951;
@@ -28,7 +28,7 @@ vi.mock('../../../core', () => ({
   getBatteryLevelAsync: () => getBatteryLevelAsyncMock(),
 }));
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 
 beforeEach(() => {
   fabric.reset();

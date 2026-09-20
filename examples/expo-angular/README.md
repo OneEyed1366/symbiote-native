@@ -4,8 +4,8 @@ The Expo-native-modules demo home for the Angular adapter — sibling of
 [`examples/angular`](../angular), which stays a "pure" SymbioteNative canary with zero
 expo-modules-core dependency. This app owns the expo-modules-core native bootstrap (Podfile
 autolinking, Gradle wiring, the `SymbioteExpoModulesFactory` iOS bring-up) and demos every
-Expo-SDK-ported package as it lands: `@symbiote-native/sensors` today, `@symbiote-native/local-auth`
-and others to follow. Otherwise it drives the same framework-agnostic
+`expo-modules-core`-based wrapper package this repo ships — all 22, one screen per package,
+reached from a `Menu` screen. Otherwise it drives the same framework-agnostic
 `@symbiote-native/engine` core through `@symbiote-native/angular`'s `Renderer2`/`RendererFactory2`,
 with React Native's own renderer never in the path. See the
 [Angular adapter README](../../adapters/angular) for the full surface and the AOT pipeline this
@@ -45,7 +45,7 @@ pnpm e2e:test:ios              # run the canary journeys on the iOS simulator
 
 ## Note — its own native shell
 
-Unlike the Vue examples (which copy `examples/react`'s native projects verbatim),
-`examples/expo-angular` has its **own** separate `ios`/`android` native project (app identity
+Unlike the other framework examples (Vue, Svelte, and Solid all copy `examples/react`'s native
+projects verbatim), `examples/expo-angular` has its **own** separate `ios`/`android` native project (app identity
 `CanaryExpo` / `com.canaryexpo`, distinct from `examples/angular`'s `Canary` / `com.canary`), so
 it can run side-by-side with the other canaries on the same simulator without conflicting.

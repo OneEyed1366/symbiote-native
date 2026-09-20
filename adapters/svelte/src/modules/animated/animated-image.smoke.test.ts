@@ -18,7 +18,11 @@ import { rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
 import { AnimatedValue } from '@symbiote-native/engine';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 // The fold is a host BEHAVIOR now, so it exists only once this side-effect module has run.
 import '../../register';
 import { mount, unmount } from '../../render';
@@ -30,29 +34,17 @@ if (globalThis.navigator === undefined) {
 }
 globalThis.nativeModuleProxy = undefined;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const ROOT_TAG = 91_104;
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
-// fabric.find() walks the CREATION log, which never reflects a later clone's props
-// (svelte-adapter-dom-shim skill §15's documented gotcha) — a live-value assertion must
-// instead walk the currently COMMITTED tree, same as activity-indicator.smoke.test.ts's
-// findLive.
-function findLive(
-  node: IFakeNode,
-  predicate: (n: IFakeNode) => boolean,
-): IFakeNode | undefined {
-  if (predicate(node)) return node;
-  for (const child of node.children) {
-    const found = findLive(child, predicate);
-    if (found !== undefined) return found;
-  }
-  return undefined;
-}
-
-function appView(): IFakeNode {
-  const node = findLive(fabric.appRoot(), n => n.viewName === 'RCTImageView');
+function appView(): ILiveNode {
+  const node = live.findLive(
+    live.appRoot(),
+    n => n.viewName === 'RCTImageView',
+  );
   if (node === undefined) throw new Error('no RCTImageView committed');
   return node;
 }
@@ -107,8 +99,9 @@ describe('Animated.Image (real compiled source) (Positive)', () => {
 
     const node = appView();
     expect(node.viewName).toBe('RCTImageView');
-    expect(node.props.source).toEqual([{ uri: 'https://example.com/a.png' }]);
-    expect(node.props.resizeMode).toBe('cover');
+    // source/resizeMode are buildImageBag's (foldImagePayload's) output, not authored props.
+    expect(node.payload.source).toEqual([{ uri: 'https://example.com/a.png' }]);
+    expect(node.payload.resizeMode).toBe('cover');
   });
 
   // why: `style` must survive buildImageBag's own field-splitting and stay reactive — an
@@ -126,11 +119,11 @@ describe('Animated.Image (real compiled source) (Positive)', () => {
     await tick();
     await tick();
 
-    expect(appView().props.opacity).toBe(0.5);
+    expect(appView().payload.opacity).toBe(0.5);
 
     opacity.setValue(1);
     await tick();
 
-    expect(appView().props.opacity).toBe(1);
+    expect(appView().payload.opacity).toBe(1);
   });
 });

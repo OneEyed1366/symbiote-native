@@ -30,7 +30,11 @@ import {
 import { dirname, join } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import type { Type } from '@angular/core';
-import { installFabric } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 
 import './register';
 import { mount, unmount } from './render';
@@ -54,7 +58,8 @@ const babel: {
 const linker: unknown = require_('../babel-linker.cjs');
 
 const ROOT_TAG = 9483;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -134,25 +139,14 @@ function emittedPathFor(name: string): string {
   return found;
 }
 
-interface ICommitted {
-  props: Record<string, unknown>;
-  children: ICommitted[];
-}
-
-function committed(testID: string): ICommitted {
-  const visit = (node: ICommitted): ICommitted | undefined => {
-    if (node.props.testID === testID) return node;
-    for (const child of node.children) {
-      const hit = visit(child);
-      if (hit !== undefined) return hit;
-    }
-    return undefined;
-  };
-  for (const root of fabric.committed) {
-    const hit = visit(root as unknown as ICommitted);
-    if (hit !== undefined) return hit;
-  }
-  throw new Error(`no committed node carrying testID="${testID}"`);
+function committed(testID: string): ILiveNode {
+  const hit = live.findLive(
+    live.appRoot(),
+    node => node.payload.testID === testID,
+  );
+  if (hit === undefined)
+    throw new Error(`no committed node carrying testID="${testID}"`);
+  return hit;
 }
 
 /** The linked module's single exported class — `mount` takes it as the root component. */
@@ -243,6 +237,6 @@ describe('a declared style input claims [style] in a linked AOT artifact', () =>
     mount(ROOT_TAG, Matched);
     await tick();
 
-    expect(committed('probe').props.opacity).toBe(1);
+    expect(committed('probe').payload.opacity).toBe(1);
   });
 });

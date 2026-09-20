@@ -11,13 +11,18 @@
 
 import { createEffect, createSignal, ErrorBoundary } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 import { mount, unmount } from './render';
 
 const ROOT_TAG = 823;
 const BOOM = 'render exploded';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 let consoleError: ReturnType<typeof vi.spyOn>;
 
 // The surface commits on a microtask (requestCommit), so anything reading the committed tree waits
@@ -48,21 +53,10 @@ function installHostReporter(): ReturnType<typeof vi.fn> {
   return reportError;
 }
 
-function walk(nodes: IFakeNode[], visit: (node: IFakeNode) => void): void {
-  for (const node of nodes) {
-    visit(node);
-    walk(node.children, visit);
-  }
-}
-
 function findCommitted(
-  predicate: (node: IFakeNode) => boolean,
-): IFakeNode | undefined {
-  let found: IFakeNode | undefined;
-  walk(fabric.committed, node => {
-    if (found === undefined && predicate(node)) found = node;
-  });
-  return found;
+  predicate: (node: ILiveNode) => boolean,
+): ILiveNode | undefined {
+  return live.findLive(live.appRoot(), predicate);
 }
 
 function Exploding() {
@@ -246,7 +240,7 @@ describe('An ErrorBoundary claimed the error', () => {
     expect(
       findCommitted(
         node =>
-          node.viewName === 'RCTRawText' && node.props.text === 'recovered',
+          node.viewName === 'RCTRawText' && node.payload.text === 'recovered',
       ),
       'the fallback committed',
     ).toBeDefined();

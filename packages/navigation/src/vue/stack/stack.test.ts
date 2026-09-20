@@ -22,7 +22,15 @@ import {
   setNativeViewConfigSource,
 } from '@symbiote-native/vue';
 import type { INativeViewConfig } from '@symbiote-native/engine';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  childrenOf,
+  isAnchor,
+  type ISymbioteNode,
+} from '@symbiote-native/engine';
+import {
+  installRecordingFabric,
+  type IAuthoredNode,
+} from '@symbiote-native/test-utils';
 import { Stack } from './index';
 import type { INavigatorHandle } from './index';
 import { useRoute } from '../composables';
@@ -97,7 +105,7 @@ const VIEW_CONFIGS: Record<string, INativeViewConfig> = {
   [SEARCH_BAR_VIEW]: RNS_SEARCH_BAR_VIEW_CONFIG,
 };
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 setNativeViewConfigSource(name => VIEW_CONFIGS[name]);
 
 const tick = (): Promise<void> =>
@@ -106,36 +114,65 @@ const tick = (): Promise<void> =>
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-function findInTree(
-  predicate: (node: IFakeNode) => boolean,
-  nodes = fabric.committed,
-): IFakeNode | undefined {
-  for (const node of nodes) {
-    if (predicate(node)) return node;
-    const child = findInTree(predicate, node.children);
-    if (child) return child;
-  }
-  return undefined;
+// A POP is the subject of half this file, so every walk below descends the LIVE child links from
+// the stack container down. A recording keeps every node it ever saw created, so a popped screen
+// is still in the record and only the tree says it is gone.
+function stackRoot(): ISymbioteNode {
+  const stack = fabric.find(node => node.viewName === STACK_VIEW);
+  if (stack === undefined) throw new Error('no screen stack created');
+  return stack.handle;
 }
 
-function screenNodes(): IFakeNode[] {
-  const found: IFakeNode[] = [];
-  const collect = (nodes: readonly IFakeNode[]): void => {
-    for (const node of nodes) {
-      if (node.viewName === SCREEN_VIEW) found.push(node);
-      collect(node.children);
+// Anchors are FLATTENED, the commit walk's own rule (`renderableChildren`): an anchor is
+// structural bookkeeping nothing native ever sees, so its children stand in its place. The counts
+// below therefore mean NATIVE children.
+function kidsOf(node: IAuthoredNode): IAuthoredNode[] {
+  const walk = (handle: ISymbioteNode): IAuthoredNode[] => {
+    const kids: IAuthoredNode[] = [];
+    for (const child of childrenOf(handle)) {
+      if (isAnchor(child)) {
+        kids.push(...walk(child));
+        continue;
+      }
+      const recorded = fabric.find(one => one.handle === child);
+      if (recorded !== undefined) kids.push(recorded);
     }
+    return kids;
   };
-  collect(fabric.committed);
+  return walk(node.handle);
+}
+
+function liveNodes(handle: ISymbioteNode = stackRoot()): IAuthoredNode[] {
+  const found: IAuthoredNode[] = [];
+  for (const child of childrenOf(handle)) {
+    const recorded = fabric.find(one => one.handle === child);
+    if (recorded !== undefined) found.push(recorded);
+    found.push(...liveNodes(child));
+  }
   return found;
 }
 
-function headerConfigOf(screen: IFakeNode): IFakeNode {
-  const header = screen.children.find(
+function findInTree(
+  predicate: (node: IAuthoredNode) => boolean,
+): IAuthoredNode | undefined {
+  return liveNodes().find(predicate);
+}
+
+function screenNodes(): IAuthoredNode[] {
+  return liveNodes().filter(node => node.viewName === SCREEN_VIEW);
+}
+
+function headerConfigOf(screen: IAuthoredNode): IAuthoredNode {
+  const header = kidsOf(screen).find(
     child => child.viewName === HEADER_CONFIG_VIEW,
   );
   if (!header) throw new Error('no header config child on screen');
   return header;
+}
+
+// header config -> the one subview -> the search bar itself.
+function searchBarNode(): IAuthoredNode {
+  return kidsOf(kidsOf(headerConfigOf(screenNodes()[0]))[0])[0];
 }
 
 function HomeScreen() {
@@ -451,13 +488,13 @@ describe('Vue Stack navigator', () => {
       );
       await tick();
       const header = headerConfigOf(screenNodes()[0]);
-      expect(header.children).toHaveLength(1);
-      const subview = header.children[0];
+      expect(kidsOf(header)).toHaveLength(1);
+      const subview = kidsOf(header)[0];
       expect(subview.viewName).toBe(HEADER_SUBVIEW_VIEW);
       expect(subview.props.type).toBe('searchBar');
-      expect(subview.children).toHaveLength(1);
-      expect(subview.children[0].viewName).toBe(SEARCH_BAR_VIEW);
-      expect(subview.children[0].props.placeholder).toBe('Search');
+      expect(kidsOf(subview)).toHaveLength(1);
+      expect(kidsOf(subview)[0].viewName).toBe(SEARCH_BAR_VIEW);
+      expect(kidsOf(subview)[0].props.placeholder).toBe('Search');
     });
 
     // why: a text change typed into the native search bar must reach the app's own onChangeText
@@ -485,8 +522,7 @@ describe('Vue Stack navigator', () => {
         }),
       );
       await tick();
-      const searchBar = headerConfigOf(screenNodes()[0]).children[0]
-        .children[0];
+      const searchBar = searchBarNode();
       fabric.fireEvent(searchBar.instanceHandle, 'topChangeText', {
         text: 'asdf',
       });
@@ -532,8 +568,7 @@ describe('Vue Stack navigator', () => {
         }),
       );
       await tick();
-      const searchBar = headerConfigOf(screenNodes()[0]).children[0]
-        .children[0];
+      const searchBar = searchBarNode();
       fabric.fireEvent(searchBar.instanceHandle, 'topSearchFocus', {});
       fabric.fireEvent(searchBar.instanceHandle, 'topSearchBlur', {});
       fabric.fireEvent(searchBar.instanceHandle, 'topCancelButtonPress', {});
@@ -578,15 +613,16 @@ describe('Vue Stack navigator', () => {
         }),
       );
       await tick();
-      const searchBar = headerConfigOf(screenNodes()[0]).children[0]
-        .children[0];
+      const searchBar = searchBarNode();
 
       searchBarRef.value?.focus();
       expect(fabric.commands.at(-1)).toMatchObject({
         commandName: 'focus',
         args: [],
       });
-      expect(fabric.commands.at(-1)?.node.tag).toBe(searchBar.tag);
+      // The node identity itself rather than a tag standing in for it — the command has to reach
+      // THIS search bar, and the handle is what the engine actually named.
+      expect(fabric.commands.at(-1)?.handle).toBe(searchBar.handle);
 
       searchBarRef.value?.setText('preset');
       expect(fabric.commands.at(-1)).toMatchObject({
@@ -634,7 +670,7 @@ describe('Vue Stack navigator', () => {
       );
       await tick();
       const header = headerConfigOf(screenNodes()[0]);
-      expect(header.children).toHaveLength(0);
+      expect(kidsOf(header)).toHaveLength(0);
     });
 
     // why: the route list is navigation HISTORY, not a projection of the slot's markers, so a

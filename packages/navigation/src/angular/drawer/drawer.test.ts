@@ -20,7 +20,15 @@ import {
   Dimensions,
   registerComposedComponent,
 } from '@symbiote-native/angular';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  childrenOf,
+  isAnchor,
+  type ISymbioteNode,
+} from '@symbiote-native/engine';
+import {
+  installRecordingFabric,
+  type IAuthoredNode,
+} from '@symbiote-native/test-utils';
 import { Drawer } from './index';
 import type { IDrawerNavigatorHandle } from './index';
 import { DrawerScreenDirective } from '../drawer-screen.directive';
@@ -72,7 +80,7 @@ function installRequestAnimationFrame(): void {
   });
 }
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 
 beforeEach(() => {
   fabric.reset();
@@ -89,16 +97,64 @@ afterEach(() => {
   Reflect.deleteProperty(globalThis, 'cancelAnimationFrame');
 });
 
+// OPENING AND CLOSING is the subject, so every walk below descends the LIVE child links from the
+// app root down. A recording keeps every node it ever saw created, so an overlay the drawer
+// unmounted would still answer here.
+//
+// Anchors are FLATTENED, not dropped — the commit walk's own rule (`renderableChildren`), and on
+// this adapter it is the difference between finding the drawer and not. `registerComposedComponent`
+// makes `<Drawer>` a non-painting anchor, so the AppContainer's only authored child is that anchor
+// and the drawer's own root view hangs beneath it. A committed tree has already flattened it away;
+// an authored one has not, so the positional read below has to do the same flattening.
+function kidsOf(handle: ISymbioteNode): IAuthoredNode[] {
+  const kids: IAuthoredNode[] = [];
+  for (const child of childrenOf(handle)) {
+    if (isAnchor(child)) {
+      kids.push(...kidsOf(child));
+      continue;
+    }
+    const recorded = fabric.find(one => one.handle === child);
+    if (recorded !== undefined) kids.push(recorded);
+  }
+  return kids;
+}
+
+// The AppContainer root, the same node `installFabric`'s `appRoot()` named: the engine creates it
+// with `pointerEvents: 'box-none'`, and that is an authored prop rather than anything derived.
+function appRoot(): ISymbioteNode {
+  const root = fabric.find(node => node.props.pointerEvents === 'box-none');
+  if (root === undefined) throw new Error('no AppContainer root was created');
+  return root.handle;
+}
+
 function findInTree(
-  predicate: (node: IFakeNode) => boolean,
-  nodes = fabric.committed,
-): IFakeNode | undefined {
-  for (const node of nodes) {
-    if (predicate(node)) return node;
-    const found = findInTree(predicate, node.children);
+  predicate: (node: IAuthoredNode) => boolean,
+  handle: ISymbioteNode = appRoot(),
+): IAuthoredNode | undefined {
+  for (const child of childrenOf(handle)) {
+    const recorded = fabric.find(one => one.handle === child);
+    if (recorded !== undefined && predicate(recorded)) return recorded;
+    const found = findInTree(predicate, child);
     if (found) return found;
   }
   return undefined;
+}
+
+// Every raw text under the app root, in TREE order — sibling order is the whole claim the
+// paint-order case makes, and the ops state it directly.
+function textsInOrder(handle: ISymbioteNode = appRoot()): string[] {
+  const found: string[] = [];
+  for (const child of childrenOf(handle)) {
+    const recorded = fabric.find(one => one.handle === child);
+    if (
+      recorded?.viewName === 'RCTRawText' &&
+      typeof recorded.props.text === 'string'
+    ) {
+      found.push(recorded.props.text);
+    }
+    found.push(...textsInOrder(child));
+  }
+  return found;
 }
 
 // The drawer's own root View, carrying panResponder.panHandlers via
@@ -108,15 +164,15 @@ function findInTree(
 // AppContainer root (fabric.appRoot()'s own contract), so the Drawer's own root view - the first
 // and only thing this test host renders - is that root's first child, mirroring
 // react/drawer.test.tsx's identical `drawerRoot()`.
-function drawerRootNode(): IFakeNode {
-  return fabric.appRoot().children[0];
+function drawerRootNode(): IAuthoredNode {
+  return kidsOf(appRoot())[0];
 }
 
 // The overlay is the one slot carrying `pointerEvents` ('auto' while open, 'none' while closed -
 // overlayResponderPassthrough in index.ts) - the one stable, non-animated signal of state.isOpen
 // this file reads, since the slide/opacity transforms themselves are driven by a real (unawaited)
 // Animated.timing. Mirrors react/drawer.test.tsx's identical helper.
-function overlayNode(): IFakeNode | undefined {
+function overlayNode(): IAuthoredNode | undefined {
   return findInTree(
     node_ =>
       node_.props.pointerEvents === 'auto' ||
@@ -142,7 +198,6 @@ type ITouchFrame = { x: number; y: number; t: number };
 function swipe(path: readonly ITouchFrame[]): void {
   const node = drawerRootNode();
   const handle = node.instanceHandle;
-  const tag = node.tag;
   const point = (frame: ITouchFrame): Record<string, unknown> => ({
     identifier: TOUCH_ID,
     pageX: frame.x,
@@ -152,10 +207,11 @@ function swipe(path: readonly ITouchFrame[]): void {
   });
   const fire = (type: string, frame: ITouchFrame, isEnd: boolean): void => {
     const touch = point(frame);
+    // No top-level `target`: nothing in the engine's touch path reads one (it resolves ancestry
+    // from `touches[].target`), and a tag was only ever the fake tree's stand-in for a node.
     fabric.fireEvent(handle, type, {
       touches: isEnd ? [] : [touch],
       changedTouches: [touch],
-      target: tag,
       timestamp: frame.t,
     });
   };
@@ -380,9 +436,9 @@ describe('Angular Drawer navigator', () => {
     it('reuses core geometry: content/overlay/panel slots paint in front-type order (content, overlay, panel)', async () => {
       await mountDrawer();
       expect(overlayNode()).toBeDefined();
-      const serialized = fabric.serialize(fabric.committed);
-      const contentIndex = serialized.indexOf('home');
-      const panelIndex = serialized.indexOf('2 routes, focused index 0');
+      const texts = textsInOrder();
+      const contentIndex = texts.indexOf('home');
+      const panelIndex = texts.indexOf('2 routes, focused index 0');
       expect(contentIndex).toBeGreaterThanOrEqual(0);
       expect(panelIndex).toBeGreaterThan(contentIndex);
     });

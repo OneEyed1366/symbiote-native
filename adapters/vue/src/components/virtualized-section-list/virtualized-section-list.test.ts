@@ -15,6 +15,9 @@
 // order, the right scrollTo args), not re-derived independently.
 //
 // No Negative group: the public props have no throwing path.
+//
+// A RECORDING host, read through the LIVE tree for the committed text stream — the claim is about
+// the CURRENT committed order.
 
 import {
   defineComponent,
@@ -29,7 +32,11 @@ import {
   unmount,
   type IVirtualizedSectionListHandle,
 } from '@symbiote-native/vue';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 
 // VirtualizedSectionList is a generic component (generic construct signature), which h()'s overloads
 // can't resolve. Drive it through a loose functional-component handle (generic-component h() limit).
@@ -37,11 +44,6 @@ const VirtualizedSectionListHost =
   VirtualizedSectionList as unknown as FunctionalComponent<
     Record<string, unknown>
   >;
-
-type ICommandCall = {
-  name: string;
-  args: readonly unknown[];
-};
 
 type IRow = { id: number; label: string };
 type ISectionShape = { title: string; data: readonly IRow[] };
@@ -78,43 +80,30 @@ const EXPECTED = [
   'footer:Section B',
 ];
 
-const commands: ICommandCall[] = [];
-
-const fabric = installFabric();
-const slot = globalThis.nativeFabricUIManager;
-if (slot === undefined) throw new Error('fabric slot was not installed');
-slot.dispatchCommand = (_node, name, args) => {
-  commands.push({ name, args });
-};
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
-beforeEach(() => {
-  fabric.reset();
-  commands.length = 0;
-});
+beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
-
-function walk(nodes: IFakeNode[], visit: (node: IFakeNode) => void): void {
-  for (const node of nodes) {
-    visit(node);
-    walk(node.children, visit);
-  }
-}
 
 function collectTexts(): string[] {
   const texts: string[] = [];
-  walk(fabric.committed, node => {
-    const text = node.props.text;
+  live.walkLive(live.appRoot(), node => {
+    const text = node.payload.text;
     if (typeof text === 'string') texts.push(text);
   });
   return texts;
 }
 
-function findScrollView(): IFakeNode {
-  const node = fabric.find(n => n.viewName === 'RCTScrollView');
-  expect(node, 'RCTScrollView was created').toBeDefined();
+function findScrollView(): ILiveNode {
+  const node = live.findLive(
+    live.appRoot(),
+    n => n.viewName === 'RCTScrollView',
+  );
+  expect(node, 'RCTScrollView was committed').toBeDefined();
   if (node === undefined) throw new Error('unreachable: RCTScrollView missing');
   return node;
 }
@@ -205,7 +194,7 @@ describe('Vue VirtualizedSectionList flattens sections into one windowed stream'
         itemIndex: 1,
         animated: false,
       });
-      const scrolls = commands.filter(c => c.name === 'scrollTo');
+      const scrolls = fabric.commands.filter(c => c.commandName === 'scrollTo');
       expect(scrolls.length, 'one scrollTo from scrollToLocation').toBe(1);
       expect(scrolls[0].args[1]).toBe(5 * ITEM_HEIGHT);
       expect(scrolls[0].args[2]).toBe(false);

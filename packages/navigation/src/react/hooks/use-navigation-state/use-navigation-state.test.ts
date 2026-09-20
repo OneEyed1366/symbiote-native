@@ -13,7 +13,7 @@
 import { act, createElement, useReducer } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '@symbiote-native/react';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import type {
   INavigationEmitter,
   INavigationEventListener,
@@ -25,7 +25,7 @@ import { useNavigationState } from './index';
 
 const ROOT_TAG = 833;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));

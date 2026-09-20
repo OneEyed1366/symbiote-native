@@ -10,6 +10,7 @@ import {
   readCommitProfile,
   registerPostCommit,
   unregisterPostCommit,
+  type ICommitProfile,
 } from '@symbiote-native/engine';
 import {
   readFabricCallProfile,
@@ -240,26 +241,14 @@ type IBenchResult = {
 // What the ENGINE did inside one timed step, captured from readCommitProfile() around the step
 // rather than sampled on a timer. This is the number that separates "our commit is expensive" from
 // "the framework above it is expensive": every adapter builds the same 9 001-node tree for
-// Create 1 000, so a nodesVisited or propWrites that differs between adapters on the SAME step is
-// work the screen is generating, not a cost of the platform.
+// Create 1 000, so a propWrites that differs between adapters on the SAME step is work the screen
+// is generating, not a cost of the platform.
 //
-// `walkMs` is NOT the engine's JS cost — the window around reconcile() contains the createNode and
-// appendChild JSI crossings it makes. Read it only as a DELTA between adapters, where the native
-// part is a shared constant (measured: identical Fabric call counts across react/vue/solid/svelte).
-type IStepProfile = {
-  nodesVisited: number;
-  propWrites: number;
-  propNoops: number;
-  commits: number;
-  walkMs: number;
-};
-
-const EMPTY_STEP_PROFILE: IStepProfile = {
-  nodesVisited: 0,
-  propWrites: 0,
-  propNoops: 0,
+// Two counts and no milliseconds. The walk numbers went with the walk — the tree lives in C++ and
+// JS holds only a command buffer, so what applying it costs is not readable from here.
+const EMPTY_STEP_PROFILE: ICommitProfile = {
   commits: 0,
-  walkMs: 0,
+  propWrites: 0,
 };
 
 const EMPTY_FABRIC_PROFILE: IFabricCallProfile = {
@@ -270,8 +259,8 @@ const EMPTY_FABRIC_PROFILE: IFabricCallProfile = {
 };
 
 // The one quantity this canary and `examples/bare-rn` (stock React Native on React's own Fabric
-// renderer) can both report. IStepProfile above counts the ENGINE's reconcile walk, which stock
-// has no equivalent of; `global.nativeFabricUIManager` is what both stacks actually drive, so
+// renderer) can both report. The ENGINE table above counts what this adapter pushed at OUR engine,
+// which stock has no counterpart for; `global.nativeFabricUIManager` is what both stacks drive, so
 // counting calls there is the only like-for-like number between them.
 function formatFabric(profile: IFabricCallProfile | undefined): string {
   if (profile === undefined) return '—';
@@ -292,7 +281,7 @@ type ISuiteEntry = {
   label: string;
   durationMs: number;
   startRows: number;
-  profile: IStepProfile;
+  profile: ICommitProfile;
   fabric: IFabricCallProfile;
 };
 
@@ -429,9 +418,9 @@ const BenchmarkRow = defineComponent<IBenchmarkRowProps>(
         </pressable>
         {/* UNCONDITIONAL, and it used to sit behind a row-shape toggle so one TextInput could be
           priced as a delta. That number has been taken; a second arm only splits every later
-          measurement in two. No multiline / onChangeText / ref: each makes the lowering transform
-          refuse, and the lowered element is what is being measured. `value`, not `defaultValue`:
-          a CONTROLLED input runs the behavior's afterCommit handshake on every commit. */}
+          measurement in two. No multiline / onChangeText / ref: each adds work this row is not
+          measuring. `value`, not `defaultValue`: a CONTROLLED input runs the behavior's afterCommit
+          handshake on every commit. */}
         <text-input class="bench-row-input" value={props.row.label} />
       </view>
     );
@@ -594,7 +583,7 @@ export const BenchmarkScreen = defineComponent(
     // Locals rather than refs for the same reason as the two above, and because a reactive write
     // here would commit the screen inside the window the profile describes. Steps are serialized,
     // so the value standing here when it is read is always the measured step's.
-    let lastStepProfile: IStepProfile = EMPTY_STEP_PROFILE;
+    let lastStepProfile: ICommitProfile = EMPTY_STEP_PROFILE;
     let lastFabricProfile: IFabricCallProfile = EMPTY_FABRIC_PROFILE;
     // Drives the progress block AND gates every operation button: a press that landed mid-suite
     // would install its own pending record over the suite's, and the next commit would stop the
@@ -677,16 +666,9 @@ export const BenchmarkScreen = defineComponent(
       if (finished === null) return;
       pending = null;
       const durationMs = performance.now() - finished.startedAt;
-      // Safe to read here: commitContainer increments walkMs and commits BEFORE completeRoot, and
-      // runPostCommitHooks() fires after it, so the profile for this commit is already complete.
-      const profile = readCommitProfile();
-      lastStepProfile = {
-        nodesVisited: profile.nodesVisited,
-        propWrites: profile.propWrites,
-        propNoops: profile.propNoops,
-        commits: profile.commits,
-        walkMs: profile.walkMs,
-      };
+      // Safe to read here: the commit is recorded BEFORE completeRoot and runPostCommitHooks()
+      // fires after it, so this step's numbers are already in the profile.
+      lastStepProfile = readCommitProfile();
       lastFabricProfile = readFabricCallProfile();
       finished.settle(durationMs);
     };
@@ -1037,15 +1019,8 @@ export const BenchmarkScreen = defineComponent(
         return {
           op: step.op,
           label: step.label,
-          visited: profile === undefined ? '—' : String(profile.nodesVisited),
-          writes:
-            profile === undefined
-              ? '—'
-              : `${profile.propWrites}/${profile.propNoops}`,
-          commits:
-            profile === undefined
-              ? '—'
-              : `${profile.commits} · ${profile.walkMs.toFixed(1)}ms`,
+          writes: profile === undefined ? '—' : String(profile.propWrites),
+          commits: profile === undefined ? '—' : String(profile.commits),
         };
       });
       const fabricRows = SUITE_STEPS.map(step => {
@@ -1161,8 +1136,7 @@ export const BenchmarkScreen = defineComponent(
                 <text class="section-label">ENGINE PER STEP · ALL MOUNTED</text>
                 <view class="bench-compare-row">
                   <text class="bench-compare-label" />
-                  <text class="bench-compare-head-cell">VISITED</text>
-                  <text class="bench-compare-head-cell">WRITES/NOOP</text>
+                  <text class="bench-compare-head-cell">WRITES</text>
                   <text class="bench-compare-head-cell">COMMITS</text>
                 </view>
                 {engineRows.map(row => (
@@ -1172,13 +1146,12 @@ export const BenchmarkScreen = defineComponent(
                     class="bench-compare-row"
                   >
                     <text class="bench-compare-label">{row.label}</text>
-                    <text class="bench-compare-cell">{row.visited}</text>
                     <text class="bench-compare-cell">{row.writes}</text>
                     <text class="bench-compare-cell">{row.commits}</text>
                   </view>
                 ))}
                 <text class="note-text">
-                  {`Captured around each timed step, with the frame meter held so its own read-and-reset cannot eat them. Every adapter builds the same ${SUITE_ROWS * NATIVE_VIEWS_PER_ROW + 1}-node tree for Create, so a VISITED or WRITES that differs between adapters is work this screen is generating — not a cost of the platform. COMMITS must read 1; anything higher means a foreign commit landed inside the window. The ms is the reconcile window and it CONTAINS the createNode/appendChild JSI calls, so compare it across adapters, never read it as engine JS.`}
+                  {`Captured around each timed step, with the frame meter held so its own read-and-reset cannot eat them. Every adapter builds the same ${SUITE_ROWS * NATIVE_VIEWS_PER_ROW + 1}-node tree for Create, so a WRITES that differs between adapters is work this screen is generating — not a cost of the platform. COMMITS must read 1; anything higher means a foreign commit landed inside the window. There is no ms here and no node count: the tree lives in C++ and JS only fills a command buffer, so what the host spends applying it is invisible from JS.`}
                 </text>
               </view>
             ) : null}
@@ -1205,7 +1178,7 @@ export const BenchmarkScreen = defineComponent(
                   </view>
                 ))}
                 <text class="note-text">
-                  {`Counted by wrapping global.nativeFabricUIManager before the engine binds it — the one surface this canary and the stock-React-Native baseline (examples/bare-rn) genuinely share, and therefore the only like-for-like number between them. The ENGINE table above has no counterpart over there: stock has no reconcile walk to count. Read as two questions. CREATE/APPEND/CLONE answers "does one stack ask Fabric to do MORE"; PROP KEYS answers the other half, "or the same number of times with fatter payloads". The wrapper costs one JS call per crossing and is therefore in every timing on this screen — the comparison holds only because the other side carries the identical wrapper.`}
+                  {`Counted by wrapping global.nativeFabricUIManager before the engine binds it — the one surface this canary and the stock-React-Native baseline (examples/bare-rn) genuinely share, and therefore the only like-for-like number between them. The ENGINE table above has no counterpart over there: stock has no command buffer to count. Read as two questions. CREATE/APPEND/CLONE answers "does one stack ask Fabric to do MORE"; PROP KEYS answers the other half, "or the same number of times with fatter payloads". The wrapper costs one JS call per crossing and is therefore in every timing on this screen — the comparison holds only because the other side carries the identical wrapper.`}
                 </text>
               </view>
             ) : null}
@@ -1223,6 +1196,42 @@ export const BenchmarkScreen = defineComponent(
               Drag inside a box (not the page) and watch the counters above —
               the two boxes differ only in which sticky implementation carries
               the frame.
+            </text>
+
+            {/* These sat BELOW the rows until 2026-09-07, deliberately, so nobody would report
+              numbers from them: their Remove and Append act on whatever happened to be on screen,
+              which is the whole reason the suite above exists. That is still true and the note
+              under them still says so — what changed is that "below the fold" became UNREACHABLE
+              once the list holds a thousand rows, which is exactly the state you are in when you
+              want to poke at one commit shape. A caveat keeps working from the top of the screen;
+              a scroll position does not. */}
+            <text class="section-label">OPERATIONS · LAST RUN</text>
+            {operations.map(operation => (
+              <view key={operation.id} class="bench-op-row">
+                <view class="flex1">
+                  <ActionButton
+                    testID={`bench-op-${operation.id}`}
+                    title={operation.label}
+                    onPress={operation.onPress}
+                    color={accent}
+                  />
+                </view>
+                <text
+                  testID={`bench-result-${operation.id}`}
+                  class="bench-op-result"
+                >
+                  {formatDuration(lastDurations.get(operation.id))}
+                </text>
+              </view>
+            ))}
+            <text class="note-text">
+              Single operations, for poking at one commit shape while debugging.
+              Do NOT report from them — Remove and Append act on whatever row
+              count is on screen, which is what the suite above removes.
+            </text>
+
+            <text testID="bench-row-count" class="info-text">
+              {`rows: ${rows.length} · ${mountedViews} native views mounted · selected: ${selectedId ?? 'none'}`}
             </text>
 
             <text class="section-label">
@@ -1265,33 +1274,6 @@ export const BenchmarkScreen = defineComponent(
                 }
               </FlatList>
             )}
-
-            {/* Below the fold on purpose: the single operations are for poking at one commit shape
-              while debugging, not for reporting. Their Remove and Append numbers depend on press
-              order, which is exactly what the suite above exists to remove. */}
-            <text class="section-label">OPERATIONS · LAST RUN</text>
-            {operations.map(operation => (
-              <view key={operation.id} class="bench-op-row">
-                <view class="flex1">
-                  <ActionButton
-                    testID={`bench-op-${operation.id}`}
-                    title={operation.label}
-                    onPress={operation.onPress}
-                    color={accent}
-                  />
-                </view>
-                <text
-                  testID={`bench-result-${operation.id}`}
-                  class="bench-op-result"
-                >
-                  {formatDuration(lastDurations.get(operation.id))}
-                </text>
-              </view>
-            ))}
-
-            <text testID="bench-row-count" class="info-text">
-              {`rows: ${rows.length} · ${mountedViews} native views mounted · selected: ${selectedId ?? 'none'}`}
-            </text>
 
             <text class="section-label">{`HISTORY · LAST ${HISTORY_LIMIT} MEASUREMENTS`}</text>
             {history.value.length === 0 ? (

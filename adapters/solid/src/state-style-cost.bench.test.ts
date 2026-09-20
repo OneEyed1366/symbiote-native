@@ -22,12 +22,13 @@ import { describe, expect, it } from 'vitest';
 import {
   createElement,
   createSurface,
+  disposeRoot,
   routeProp,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric, payloadOf } from '@symbiote-native/test-utils';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 const N = 10_000;
 const REPS = 7;
 
@@ -57,6 +58,11 @@ function build(arm: 'split' | 'split-hoisted' | 'callback', tag: number): void {
     surface.appendChild(node);
   }
   surface.commit();
+  // Disposed, or every earlier arm's surface stays LIVE and the counters stop being about the arm:
+  // a commit names every live root, so `completeRoot` would count surfaces this function has leaked
+  // rather than work this arm did. The two arms run at different points in the file, so the leak is
+  // not even symmetric.
+  disposeRoot(tag);
 }
 
 function timeArm(
@@ -73,8 +79,13 @@ function timeArm(
   return samples.sort((a, b) => a - b);
 }
 
+// `creates`/`commits` rather than a native op-level count (`installFabric`'s `counts.createNode`/
+// `appendChild`/`completeRoot`): both arms build the SAME flat N-node shape, so a divergence in how
+// many nodes got created or how many commits landed is exactly the structural signal this identity
+// check exists to catch, and `findAll`/`commits` read it straight off the real op stream without
+// deriving anything the mirror's own walk would have to invent.
 function counters(): string {
-  return `createNode=${fabric.counts.createNode} appendChild=${fabric.counts.appendChild} completeRoot=${fabric.counts.completeRoot}`;
+  return `creates=${fabric.findAll(() => true).length} commits=${fabric.commits}`;
 }
 
 describe('state-style: build-time split vs runtime callback', () => {
@@ -104,7 +115,7 @@ describe('state-style: build-time split vs runtime callback', () => {
     routeProp(a, 'activeStyle', { ...ACTIVE });
     sA.appendChild(a);
     sA.commit();
-    const payloadA = { ...fabric.appRoot().children[0].props };
+    const payloadA = payloadOf(a);
 
     fabric.reset();
     const sB = createSurface(7002);
@@ -113,7 +124,7 @@ describe('state-style: build-time split vs runtime callback', () => {
     routeProp(b, 'style', CALLBACK);
     sB.appendChild(b);
     sB.commit();
-    const payloadB = { ...fabric.appRoot().children[0].props };
+    const payloadB = payloadOf(b);
 
     console.log('PAYLOAD split   :', JSON.stringify(payloadA));
 

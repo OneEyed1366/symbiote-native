@@ -2,27 +2,30 @@ import {
   AfterViewInit,
   ChangeDetectorRef,
   Component,
+  ElementRef,
   ViewChild,
   inject,
 } from '@angular/core';
 import {
-  ButtonElement,
-  Text,
-  View,
+  SYMBIOTE_ELEMENTS,
   findNodeHandle,
+  type IHostInstance,
 } from '@symbiote-native/angular';
 
 // Static look lives in RefApiDemo.css, compiled at build time by @symbiote-native/css-parser.
 import './RefApiDemo.css';
 
-// @ViewChild gives back the real ViewHost component instance directly (no reactive-proxy
-// wrapping to worry about, unlike Vue's shallowRef requirement) — its `nativeElement`
-// getter (SymbiotePrimitiveHost) is the engine host node measure/setNativeProps run on.
+// @ViewChild on a template reference gives back Angular's own ElementRef, whose `nativeElement` IS
+// the engine host node — the same node measure / setNativeProps / findNodeHandle run on, and no
+// reactive-proxy wrapping to worry about the way Vue's shallowRef requirement forces.
+//
+// It used to name a `View` COMPONENT here. `<view>` is a tag covered by `SYMBIOTE_ELEMENTS` and
+// nothing else is needed for it — the host components were a second mechanism on the same selector.
 
 @Component({
   selector: 'RefApiDemo',
   standalone: true,
-  imports: [View, Text, ButtonElement],
+  imports: [SYMBIOTE_ELEMENTS],
   template: `
     <view class="section-nested">
       <text class="section-label"
@@ -34,7 +37,7 @@ import './RefApiDemo.css';
         }}</text>
       </view>
       <text testID="measure-frame" class="info-text">{{
-        'frame: ' + frame
+        'measure · ' + frame
       }}</text>
       <view class="row">
         <view class="flex-1">
@@ -58,7 +61,9 @@ import './RefApiDemo.css';
   `,
 })
 export class RefApiDemo implements AfterViewInit {
-  @ViewChild('boxRef') private boxRef?: View;
+  // `ElementRef<IHostInstance>`, not `ElementRef<unknown>`: the imperative surface lives on the
+  // engine's public instance, and an unknown `nativeElement` type-checks here and fails at every use.
+  @ViewChild('boxRef') private boxRef?: ElementRef<IHostInstance>;
 
   private readonly changeDetector = inject(ChangeDetectorRef);
 
@@ -78,10 +83,14 @@ export class RefApiDemo implements AfterViewInit {
   readonly onMeasure = (): void => {
     const box = this.boxRef?.nativeElement;
     if (box === undefined) return;
+    // The two halves answer different questions and only one of them moves when you scroll, which
+    // reads as a bug until the labels say so. `measure`'s x/y are the node's offset inside its
+    // PARENT (`DOM.cpp`'s `originRelativeToParent`) — scrolling does not change that — while
+    // pageX/pageY are measured from the root and do.
     box.measure((x, y, width, height, pageX, pageY) => {
       this.frame =
-        `x${Math.round(x)} y${Math.round(y)} · ${Math.round(width)}×${Math.round(height)}` +
-        ` · page ${Math.round(pageX)},${Math.round(pageY)}`;
+        `in parent x${Math.round(x)} y${Math.round(y)} · ${Math.round(width)}×${Math.round(height)}` +
+        ` · from root ${Math.round(pageX)},${Math.round(pageY)}`;
     });
   };
 

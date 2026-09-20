@@ -149,9 +149,7 @@ function lineInfoFor(route: ITourRouteName) {
       content-container-style="scroll-content"
     >
       <view class="menu-hero">
-        <text class="menu-eyebrow">
-          EXPO MODULES DEMOS
-        </text>
+        <text class="menu-eyebrow"> EXPO MODULES DEMOS </text>
         <text class="menu-hero-title">
           Expo-SDK ports on a real native stack
         </text>
@@ -169,9 +167,7 @@ function lineInfoFor(route: ITourRouteName) {
       >
         <view :class="`menu-badge menu-badge-${lineInfoFor(item.route).line}`">
           <text class="menu-badge-text">
-            {{
-              lineInfoFor(item.route).code
-            }}
+            {{ lineInfoFor(item.route).code }}
           </text>
         </view>
         <view class="menu-row-copy">

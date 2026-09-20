@@ -13,7 +13,7 @@ import {
   setEventDispatcher,
   type IRootTag,
 } from '@symbiote-native/engine';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import reconciler, { withDiscretePriority } from '../../host-config';
 import { LegacyRoot } from '../../reconciler-constants';
 import { Animated } from './index';
@@ -34,7 +34,7 @@ function callsOf(method: string): INativeCall[] {
   return nativeCalls.filter(call => call.method === method);
 }
 
-installFabric();
+installRecordingFabric();
 
 const ROOT_TAG: IRootTag = 73;
 const noop = (): void => {};

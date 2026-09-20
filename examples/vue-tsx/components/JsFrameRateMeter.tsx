@@ -1,5 +1,8 @@
 import { defineComponent, onMounted, onUnmounted, ref, shallowRef } from 'vue';
-import { readCommitProfile } from '@symbiote-native/engine';
+import {
+  readCommitProfile,
+  type ICommitProfile,
+} from '@symbiote-native/engine';
 import { ActionButton } from './ActionButton';
 
 // The benchmark holds this while a timed step is in flight. Without it the meter's own sampling
@@ -36,26 +39,15 @@ type IJsFrameRateMeterProps = {
   accent: string;
 };
 
-// What the engine's reconcile walk cost inside the last window, next to the frame numbers so the
-// two can be read against each other: the walk is a term in every adapter's frame budget.
+// What the engine was ASKED for inside the last window, beside the frame numbers so the two can be
+// read against each other: a stall with no commits under it is not the commit path's.
 //
-// Reported as two halves, never as `walkMs / nodesVisited`. Dirty-marking means the denominator
-// counts only the nodes reconcile did NOT skip, while the numerator still covers everything it does
-// (the JSI createNode/appendChild calls included), so that ratio inflates by the skip factor: 13.4
-// us/node without dirty-marking, 438 us/node with it, on a device that had got ~2x faster. So
-// `nodesPerCommit` is the skip itself (read against the screen's node count) and `msPerCommit` is
-// what a commit costs. A true per-node figure needs a full walk - a cold mount, where nothing is
-// skippable.
-type IWalkSample = {
-  sharePercent: number;
-  nodesPerCommit: number;
-  msPerCommit: number;
-};
-
-const EMPTY_WALK_SAMPLE: IWalkSample = {
-  sharePercent: 0,
-  nodesPerCommit: 0,
-  msPerCommit: 0,
+// Counts, never a share of the window. What the engine SPENDS is no longer readable from JS - the
+// tree lives in C++ and this side only fills a command buffer, so timing it means instrumenting the
+// host, not this meter.
+const EMPTY_COMMIT_PROFILE: ICommitProfile = {
+  commits: 0,
+  propWrites: 0,
 };
 
 /**
@@ -69,8 +61,8 @@ export const JsFrameRateMeter = defineComponent<IJsFrameRateMeterProps>(
     const droppedFrames = ref(0);
     const worstFrameMs = ref(0);
     // shallowRef, not ref: the sample is replaced wholesale each window, so a deep proxy would
-    // only add per-field tracking - and would wrap the shared EMPTY_WALK_SAMPLE constant.
-    const walk = shallowRef<IWalkSample>(EMPTY_WALK_SAMPLE);
+    // only add per-field tracking - and would wrap the shared EMPTY_COMMIT_PROFILE constant.
+    const engine = shallowRef<ICommitProfile>(EMPTY_COMMIT_PROFILE);
     // Plain locals, not refs: setup runs once, so these survive re-renders on their own. React
     // needs useRef here only because its component body re-runs.
     let droppedCount = 0;
@@ -112,18 +104,7 @@ export const JsFrameRateMeter = defineComponent<IJsFrameRateMeterProps>(
           worstFrameMs.value = worstMs;
           // Read-and-reset, once per window, so each sample covers exactly the window just closed
           // rather than an ever-growing total.
-          const commitProfile = readCommitProfile();
-          walk.value = {
-            sharePercent: (commitProfile.walkMs / windowMs) * 100,
-            nodesPerCommit:
-              commitProfile.commits === 0
-                ? 0
-                : commitProfile.nodesVisited / commitProfile.commits,
-            msPerCommit:
-              commitProfile.commits === 0
-                ? 0
-                : commitProfile.walkMs / commitProfile.commits,
-          };
+          engine.value = readCommitProfile();
           framesInWindow = 0;
           windowStartedAt = now;
         }
@@ -144,7 +125,7 @@ export const JsFrameRateMeter = defineComponent<IJsFrameRateMeterProps>(
       worstMs = 0;
       droppedFrames.value = 0;
       worstFrameMs.value = 0;
-      walk.value = EMPTY_WALK_SAMPLE;
+      engine.value = EMPTY_COMMIT_PROFILE;
     };
 
     return () => (
@@ -178,37 +159,27 @@ export const JsFrameRateMeter = defineComponent<IJsFrameRateMeterProps>(
             <text class="bench-metric-label">worst ms</text>
           </view>
         </view>
-        <text class="section-label">ENGINE RECONCILE WALK</text>
+        <text class="section-label">ENGINE PER WINDOW</text>
         <view class="bench-meter-row">
           <view class="bench-metric">
             <text
-              testID="bench-walk-share"
+              testID="bench-commits"
               class="bench-metric-value"
               style={{ color: props.accent }}
             >
-              {walk.value.sharePercent.toFixed(1)}
+              {String(engine.value.commits)}
             </text>
-            <text class="bench-metric-label">% of window</text>
+            <text class="bench-metric-label">commits</text>
           </view>
           <view class="bench-metric">
             <text
-              testID="bench-walk-nodes-per-commit"
+              testID="bench-commit-writes"
               class="bench-metric-value"
               style={{ color: props.accent }}
             >
-              {walk.value.nodesPerCommit.toFixed(0)}
+              {String(engine.value.propWrites)}
             </text>
-            <text class="bench-metric-label">nodes / commit</text>
-          </view>
-          <view class="bench-metric">
-            <text
-              testID="bench-walk-ms-per-commit"
-              class="bench-metric-value"
-              style={{ color: props.accent }}
-            >
-              {walk.value.msPerCommit.toFixed(1)}
-            </text>
-            <text class="bench-metric-label">ms / commit</text>
+            <text class="bench-metric-label">prop writes</text>
           </view>
         </view>
         <ActionButton

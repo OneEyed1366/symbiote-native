@@ -101,7 +101,8 @@
       <text-input
         testID="sms-recipients-input"
         value={recipients}
-        onValueChange={(event: ITextInputChangeEvent) => (recipients = event.text)}
+        onValueChange={(event: ITextInputChangeEvent) =>
+          (recipients = event.text)}
         placeholder="Recipients, comma-separated"
         placeholderTextColor={PLACEHOLDER_COLOR}
         class="text-input"

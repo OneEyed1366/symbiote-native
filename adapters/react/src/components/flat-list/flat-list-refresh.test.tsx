@@ -6,7 +6,12 @@
 import { createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { FlatList, mount, unmount } from '@symbiote-native/react';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type IAuthoredNode,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 23;
 
@@ -60,43 +65,32 @@ function PlainApp(): ReactElement {
   });
 }
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 beforeEach(() => {
   fabric.reset();
   refreshCalls = 0;
 });
 afterEach(() => unmount(ROOT_TAG));
 
-// ---- helpers (repointed at the shared recorder) -------------------------
+// ---- helpers (repointed at the live tree) --------------------------------
 
-function walk(nodes: IFakeNode[], visit: (node: IFakeNode) => void): void {
-  for (const node of nodes) {
-    visit(node);
-    walk(node.children, visit);
-  }
-}
-
-function findCommitted(viewName: string): IFakeNode | undefined {
-  let found: IFakeNode | undefined;
-  walk(fabric.committed, node => {
-    if (found === undefined && node.viewName === viewName) found = node;
-  });
-  return found;
+function findCommitted(viewName: string): ILiveNode | undefined {
+  return live.findLive(live.appRoot(), node => node.viewName === viewName);
 }
 
 // The scroll node whose own children contain a PullToRefreshView, proves the refresh
 // control is a child of the scroll view, not stranded elsewhere.
-function findScrollWithRefreshChild(): IFakeNode | undefined {
-  let found: IFakeNode | undefined;
-  walk(fabric.committed, node => {
-    if (found !== undefined || node.viewName !== 'RCTScrollView') return;
-    if (node.children.some(child => child.viewName === REFRESH_VIEW_NAME))
-      found = node;
-  });
-  return found;
+function findScrollWithRefreshChild(): ILiveNode | undefined {
+  return live.findLive(
+    live.appRoot(),
+    node =>
+      node.viewName === 'RCTScrollView' &&
+      node.children.some(child => child.viewName === REFRESH_VIEW_NAME),
+  );
 }
 
-function findScrollView(): IFakeNode {
+function findScrollView(): IAuthoredNode {
   const node = fabric.find(n => n.viewName === 'RCTScrollView');
   expect(node, 'an RCTScrollView was created').toBeDefined();
   return node!;
@@ -127,8 +121,8 @@ describe('React FlatList pull-to-refresh on the engine (Positive)', () => {
       `${REFRESH_VIEW_NAME} is a child of the RCTScrollView`,
     ).toBeDefined();
 
-    expect(refreshNode!.props.refreshing).toBe(true);
-    expect(refreshNode!.props.progressViewOffset).toBe(12);
+    expect(refreshNode!.payload.refreshing).toBe(true);
+    expect(refreshNode!.payload.progressViewOffset).toBe(12);
   });
 
   it('commits no PullToRefreshView when onRefresh is absent', () => {

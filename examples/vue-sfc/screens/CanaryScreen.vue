@@ -350,9 +350,7 @@ const rotationStyle = {
       />
       <view :class="`line-tag line-tag-${lineInfo.line}`">
         <text class="line-tag-text">
-          {{
-            `${lineInfo.code} · ${lineInfo.label}`
-          }}
+          {{ `${lineInfo.code} · ${lineInfo.label}` }}
         </text>
       </view>
       <view class="hero-card">
@@ -360,14 +358,10 @@ const rotationStyle = {
           class="hero-badge"
           :style="{ backgroundColor: LINE_COLOR.primitives }"
         >
-          <text class="hero-badge-text">
-            CN
-          </text>
+          <text class="hero-badge-text"> CN </text>
         </view>
         <view class="hero-copy">
-          <text class="hero-title">
-            All primitives
-          </text>
+          <text class="hero-title"> All primitives </text>
           <text class="hero-body">
             Every @symbiote-native/vue primitive, driven straight onto Fabric —
             no react-native renderer in the path.
@@ -413,10 +407,7 @@ const rotationStyle = {
       </view>
       <!-- #6 Android-only window flags: the blank-risk pair. PASS: the top strip turns
            red / goes translucent and the app STAYS rendered. -->
-      <view
-        v-if="Platform.OS === 'android'"
-        class="row"
-      >
+      <view v-if="Platform.OS === 'android'" class="row">
         <view class="flex1">
           <ActionButton
             :title="statusBarRed ? 'BG default' : 'BG red'"
@@ -442,10 +433,7 @@ const rotationStyle = {
           />
         </view>
         <!-- ActionSheetIOS is iOS-only by design (no Android native module exists). -->
-        <view
-          v-if="Platform.OS !== 'android'"
-          class="flex1"
-        >
+        <view v-if="Platform.OS !== 'android'" class="flex1">
           <ActionButton
             title="Action sheet"
             :onPress="onActionSheet"
@@ -477,37 +465,18 @@ const rotationStyle = {
 
       <!-- The native UIRefreshControl spinner only shows while iOS holds the pull-down; our full
            re-commit snaps the offset back, so we drive our OWN indicator from `refreshing`. -->
-      <view
-        v-if="refreshing"
-        class="refresh-row"
-      >
+      <view v-if="refreshing" class="refresh-row">
         <activity-indicator :color="LINE_COLOR.primitives" />
-        <text class="accent-note">
-          Refreshing…
-        </text>
+        <text class="accent-note"> Refreshing… </text>
       </view>
-      <text
-        v-else
-        class="muted-center"
-      >
-        {{
-          `pull to refresh · refreshed ${refreshes}×`
-        }}
+      <text v-else class="muted-center">
+        {{ `pull to refresh · refreshed ${refreshes}×` }}
       </text>
 
       <!-- View + press-to-increment -->
-      <view
-        testID="counter-card"
-        class="counter-card"
-        @press="count += 1"
-      >
-        <text
-          testID="counter-value"
-          class="counter-text"
-        >
-          {{
-            `tapped ${count}×`
-          }}
+      <view testID="counter-card" class="counter-card" @press="count += 1">
+        <text testID="counter-value" class="counter-text">
+          {{ `tapped ${count}×` }}
         </text>
       </view>
 
@@ -520,20 +489,13 @@ const rotationStyle = {
         placeholder-text-color="#41506a"
         class="text-input"
       />
-      <text
-        testID="greeting-output"
-        class="greeting"
-      >
-        {{
-          name ? `Hello, ${name}` : 'Hello, stranger'
-        }}
+      <text testID="greeting-output" class="greeting">
+        {{ name ? `Hello, ${name}` : 'Hello, stranger' }}
       </text>
 
       <!-- Switch drives the ActivityIndicator, via v-model -->
       <view class="switch-row">
-        <text class="switch-label">
-          spinner
-        </text>
+        <text class="switch-label"> spinner </text>
         <switch
           v-model="spinning"
           testID="spinner-switch"
@@ -552,9 +514,7 @@ const rotationStyle = {
            backs the React canary. -->
       <view class="section-tight">
         <text class="switch-label">
-          {{
-            `volume · ${Math.round(volume * 100)}%`
-          }}
+          {{ `volume · ${Math.round(volume * 100)}%` }}
         </text>
         <Slider
           v-model="volume"
@@ -622,9 +582,7 @@ const rotationStyle = {
       </pressable>
 
       <!-- Horizontal FlatList: real windowing. -->
-      <text class="section-label">
-        FlatList · 24 chips, windowed
-      </text>
+      <text class="section-label"> FlatList · 24 chips, windowed </text>
       <FlatList
         testID="chips-list"
         :data="chips"
@@ -668,9 +626,7 @@ const rotationStyle = {
         @press-move="onRetentionMove"
       >
         <text class="info-text">
-          {{
-            `drag me · dx ${retentionMove.dx} · dy ${retentionMove.dy}`
-          }}
+          {{ `drag me · dx ${retentionMove.dx} · dy ${retentionMove.dy}` }}
         </text>
       </pressable>
 
@@ -678,9 +634,7 @@ const rotationStyle = {
            you are looking at DO NOT jump; new items appear above without shifting the
            viewport. FAIL: the list jumps to the top. box-list160 is shared with the
            Animated.ScrollView below. -->
-      <text class="section-label">
-        MVCP · prepend without jump
-      </text>
+      <text class="section-label"> MVCP · prepend without jump </text>
       <FlatList
         :data="mvcpItems"
         :key-extractor="mvcpKeyExtractor"
@@ -722,9 +676,7 @@ const rotationStyle = {
           transform: [{ translateY: parityHeaderTranslateY }],
         }"
       >
-        <text class="parity-header-text">
-          HEADER — fades as you scroll ↓
-        </text>
+        <text class="parity-header-text"> HEADER — fades as you scroll ↓ </text>
       </Animated.View>
       <!-- box-list160 is shared with the MVCP FlatList above. -->
       <Animated.ScrollView
@@ -732,11 +684,7 @@ const rotationStyle = {
         :scroll-event-throttle="16"
         @scroll="onParityScroll"
       >
-        <view
-          v-for="i in scrollRows"
-          :key="i"
-          class="scroll-demo-row"
-        >
+        <view v-for="i in scrollRows" :key="i" class="scroll-demo-row">
           <text class="list-row-text">
             {{ `scroll me · row ${i}` }}
           </text>
@@ -762,40 +710,23 @@ const rotationStyle = {
            is unmistakable on the dark theme. -->
       <!-- boxShadow: a BLUE glow (a black shadow is invisible on the near-black bg).
            PASS: a soft blue halo bleeds out around the panel. -->
-      <view
-        class="shadow-card"
-        :style="shadowCardExtra"
-      >
-        <text class="note-text">
-          boxShadow · glow
-        </text>
+      <view class="shadow-card" :style="shadowCardExtra">
+        <text class="note-text"> boxShadow · glow </text>
       </view>
       <!-- filter: same base colour both sides; the right one is darkened by
            brightness(0.5). PASS: the right panel is clearly darker than the left. -->
       <view class="row">
         <view class="filter-tile">
-          <text class="tile-text">
-            no filter
-          </text>
+          <text class="tile-text"> no filter </text>
         </view>
-        <view
-          class="filter-tile"
-          :style="dimStyle"
-        >
-          <text class="tile-text">
-            brightness 0.5
-          </text>
+        <view class="filter-tile" :style="dimStyle">
+          <text class="tile-text"> brightness 0.5 </text>
         </view>
       </view>
       <!-- transformOrigin: the panel rotates around its TOP-LEFT corner, not its centre.
            PASS: the left edge stays put while the bottom-right swings down. -->
-      <view
-        class="rotated-card"
-        :style="rotationStyle"
-      >
-        <text class="tile-text">
-          transformOrigin · top-left
-        </text>
+      <view class="rotated-card" :style="rotationStyle">
+        <text class="tile-text"> transformOrigin · top-left </text>
       </view>
 
       <!-- background-image: a CSS `linear-gradient(...)` authored entirely in App.css
@@ -803,9 +734,7 @@ const rotationStyle = {
            `experimental_backgroundImage` raw passthrough works end to end. PASS: the panel
            shows a blue-to-orange gradient sweeping left to right. -->
       <view class="gradient-card">
-        <text class="tile-text">
-          background-image · linear-gradient
-        </text>
+        <text class="tile-text"> background-image · linear-gradient </text>
       </view>
 
       <!-- Image web aliases. PASS: the logo loads via the web-alias fold (src→source uri,
@@ -822,9 +751,7 @@ const rotationStyle = {
            lifts it above the keyboard AND the keyboard is the email layout (proves
            autoComplete/inputMode fold); with enabled OFF the keyboard covers the field. -->
       <view class="switch-row">
-        <text class="switch-label">
-          avoid keyboard
-        </text>
+        <text class="switch-label"> avoid keyboard </text>
         <switch
           v-model="kavEnabled"
           :track-color="{ false: '#334155', true: '#42b883' }"
@@ -850,9 +777,7 @@ const rotationStyle = {
       />
 
       <view class="bottom-card">
-        <text class="bottom-text">
-          ↑ you scrolled to the bottom
-        </text>
+        <text class="bottom-text"> ↑ you scrolled to the bottom </text>
       </view>
 
       <!-- Modal overlays its own window -->
@@ -864,13 +789,8 @@ const rotationStyle = {
       >
         <!-- transparent modal => paint our own dim layer (the RN pattern) -->
         <view class="modal-overlay">
-          <view
-            testID="modal-card"
-            class="modal-card"
-          >
-            <text class="modal-title">
-              It's a Modal
-            </text>
+          <view testID="modal-card" class="modal-card">
+            <text class="modal-title"> It's a Modal </text>
             <text class="modal-body">
               Rendered through ModalHostView — its own native window, same
               Fabric tree.
@@ -895,18 +815,9 @@ const rotationStyle = {
         :onPress="() => (toastVisible = true)"
         :color="LINE_COLOR.primitives"
       />
-      <Teleport
-        v-if="overlayHost"
-        :to="overlayHost"
-      >
-        <view
-          v-if="toastVisible"
-          testID="toast-card"
-          class="modal-card"
-        >
-          <text class="modal-body">
-            Ported via Teleport ✦
-          </text>
+      <Teleport v-if="overlayHost" :to="overlayHost">
+        <view v-if="toastVisible" testID="toast-card" class="modal-card">
+          <text class="modal-body"> Ported via Teleport ✦ </text>
           <ActionButton
             testID="toast-dismiss"
             title="Dismiss"
@@ -927,13 +838,8 @@ const rotationStyle = {
         :color="LINE_COLOR.primitives"
       />
       <TunnelIn v-if="tunnelToastVisible">
-        <view
-          testID="tunnel-toast-card"
-          class="modal-card"
-        >
-          <text class="modal-body">
-            Ported via createTunnel ✦
-          </text>
+        <view testID="tunnel-toast-card" class="modal-card">
+          <text class="modal-body"> Ported via createTunnel ✦ </text>
           <ActionButton
             testID="tunnel-toast-dismiss"
             title="Dismiss"

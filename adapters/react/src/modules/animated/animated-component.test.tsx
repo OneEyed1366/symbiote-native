@@ -6,14 +6,20 @@
 import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount, Animated } from '@symbiote-native/react';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+// Animated writes through the engine's own prop path, so what an app can observe is the PAYLOAD.
+const live = createLiveTree(fabric);
 const ROOT_TAG = 41;
 
 // The app view sits under the synthetic box-none AppContainer root.
-function appView(): IFakeNode {
-  return fabric.appRoot().children[0];
+function appView(): ILiveNode {
+  return live.nodeOf(live.appRoot()).children[0];
 }
 
 beforeEach(() => fabric.reset());
@@ -31,13 +37,13 @@ describe('Animated component bridge', () => {
 
     expect(appView().viewName).toBe('RCTView');
     // Initial render reduces the animated value to its current (1).
-    expect(appView().props.opacity).toBe(1);
+    expect(appView().payload.opacity).toBe(1);
 
     opacity.setValue(0.3);
     // The engine coalesces setNativeProps writes to the microtask boundary, so an animated value
     // reaches Fabric one tick after the drive (core/engine/src/commit.ts).
     await Promise.resolve();
-    expect(appView().props.opacity).toBe(0.3);
+    expect(appView().payload.opacity).toBe(0.3);
   });
 
   it('setValue on an interpolated value maps through the leaf', async () => {
@@ -53,10 +59,10 @@ describe('Animated component bridge', () => {
 
     mount(ROOT_TAG, <FadeApp />);
 
-    expect(appView().props.opacity).toBe(0);
+    expect(appView().payload.opacity).toBe(0);
 
     progress.setValue(0.5);
     await Promise.resolve();
-    expect(appView().props.opacity).toBe(0.5);
+    expect(appView().payload.opacity).toBe(0.5);
   });
 });

@@ -34,13 +34,8 @@ defineExpose({ reset });
     <text class="switch-label">
       CounterCapsule — defineModel + defineEmits + defineExpose
     </text>
-    <text
-      class="list-row-text"
-      testID="capsule-count"
-    >
-      {{
-        `count=${count}`
-      }}
+    <text class="list-row-text" testID="capsule-count">
+      {{ `count=${count}` }}
     </text>
     <text class="note-text">
       {{

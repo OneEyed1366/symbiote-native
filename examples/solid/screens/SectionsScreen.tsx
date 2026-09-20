@@ -11,10 +11,7 @@
 
 import { createSignal } from 'solid-js';
 import { ListDiagnostics } from './ListDiagnostics';
-import {
-  SectionList,
-  type ISectionListHandle,
-} from '@symbiote-native/solid';
+import { SectionList, type ISectionListHandle } from '@symbiote-native/solid';
 
 interface IContact {
   key: string;

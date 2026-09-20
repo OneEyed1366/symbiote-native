@@ -290,6 +290,7 @@ export const CANONICAL_PROP_NAMES: readonly string[] = [
   'submitBehavior',
   'supportedOrientations',
   'testID',
+  'testOnly_pressed',
   'textAlign',
   'textContentType',
   'thumbColor',

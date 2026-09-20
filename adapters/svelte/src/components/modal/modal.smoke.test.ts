@@ -60,7 +60,11 @@ import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
 import type { ISymbioteEvent } from '@symbiote-native/engine';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 import { mount, unmount } from '../../render';
 
 if (globalThis.window === undefined)
@@ -80,7 +84,8 @@ const DISMISSIBLE_PARENT_OUT = join(
 );
 const HIDDEN_PARENT_OUT = join(__dirname, '.smoke-compiled-parent-hidden.mjs');
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 const settle = async (rounds = 4): Promise<void> => {
@@ -124,23 +129,15 @@ async function importDefault(
   return mod.default as Component;
 }
 
-// Walks the CURRENTLY COMMITTED tree (unlike `fabric.find`, which walks the creation log and
-// stays "defined" even after a node is later removed from the committed childSet).
+// Walks the tree as it stands NOW (unlike `fabric.find`, which walks the creation log and stays
+// "defined" even after a node is later removed from the committed childSet).
 function findInCommittedTree(
-  predicate: (node: IFakeNode) => boolean,
-): IFakeNode | undefined {
-  function walk(nodes: IFakeNode[]): IFakeNode | undefined {
-    for (const node of nodes) {
-      if (predicate(node)) return node;
-      const found = walk(node.children);
-      if (found !== undefined) return found;
-    }
-    return undefined;
-  }
-  return walk(fabric.appRoot().children);
+  predicate: (node: ILiveNode) => boolean,
+): ILiveNode | undefined {
+  return live.findLive(live.appRoot(), predicate);
 }
 
-function committedModalNode(): IFakeNode {
+function committedModalNode(): ILiveNode {
   const node = findInCommittedTree(n => n.viewName === 'ModalHostView');
   if (!node) throw new Error('no ModalHostView is currently committed');
   return node;
@@ -204,19 +201,20 @@ describe('Modal (real compiled index.svelte)', () => {
       // (not exact equality), matching mount-pipeline.smoke.test.ts's own precedent: mount()'s
       // component boundary contributes a couple of empty RCTRawText siblings alongside the real
       // content that aren't this test's concern.
-      expect(fabric.serialize(fabric.appRoot().children)).toContain(
+      expect(live.serialize(live.appRoot())).toContain(
         'ModalHostView(RCTView(RCTView))',
       );
 
       const host = committedModalNode();
       expect(host.props.visible).toBe(true);
       expect(host.props.animationType).toBe('none');
-      // RN sets styles.modal (position:'absolute') on RCTModalHostView itself.
-      expect(host.props.position).toBe('absolute');
+      // RN sets styles.modal (position:'absolute') on RCTModalHostView itself — style travels
+      // through the style slot, so it only shows up in the flattened payload.
+      expect(host.payload.position).toBe('absolute');
       // Default (opaque, non-transparent) presentationStyle is 'fullScreen'.
       expect(host.props.presentationStyle).toBe('fullScreen');
       // The opaque modal's container backdrop stays the default white.
-      expect(host.children[0]?.props.backgroundColor).toBe('white');
+      expect(host.children[0]?.payload.backgroundColor).toBe('white');
     });
 
     // why: proves the keep-alive reducer (modalReducer/shouldRenderModal) is actually wired

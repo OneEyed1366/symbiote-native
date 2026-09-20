@@ -1,7 +1,7 @@
 // What a PUBLIC bare tag would mean on this adapter, measured 2026-09-01 for the primitives-as-tags
 // work. The question was "does a bare tag commit a payload identical to the wrapper's". Here it
-// does not, and the reason is the funnel: our props do not reach the engine as props. Every lowered
-// element takes ONE `p={{…}}` object and the shim's `p` setter fans it out through `routeProp`; an
+// does not, and the reason is the funnel: our props do not reach the engine as props. A
+// bag-carrying element takes ONE `p={{…}}` object and the shim's `p` setter fans it out; an
 // app-authored `<view class="x" id="y">` has no bag, and Svelte's own codegen sends its
 // attributes three different ways, none of which the shim implements.
 //
@@ -29,7 +29,10 @@ import { compile } from 'svelte/compiler';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
-import { installFabric } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 import './register';
 import { mount, unmount } from './render';
 
@@ -38,7 +41,8 @@ if (globalThis.window === undefined)
 if (globalThis.navigator === undefined)
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 // Named for this suite alone: two suites sharing a compiled artifact race
 // (`.claude/rules/smoke-compiled-artifact-collisions.md`).
 const PROBE_OUT = join(__dirname, '.smoke-compiled-bare-tag-probe.mjs');
@@ -57,34 +61,21 @@ const settle = async (): Promise<void> => {
   await tick();
 };
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
-
-function committedProps(testID: string): Record<string, unknown> | undefined {
-  const walk = (
-    nodes: readonly unknown[],
-  ): Record<string, unknown> | undefined => {
-    for (const node of nodes) {
-      if (!isRecord(node)) continue;
-      const props = node.props;
-      if (isRecord(props) && props.testID === testID) return props;
-      const children = node.children;
-      if (Array.isArray(children)) {
-        const hit = walk(children);
-        if (hit !== undefined) return hit;
-      }
-    }
-    return undefined;
-  };
-  return walk(fabric.appRoot().children);
+function committedPayload(testID: string): Record<string, unknown> | undefined {
+  return live.findLive(live.appRoot(), node => node.payload.testID === testID)
+    ?.payload;
 }
 
-/** Mount, read, unmount — reading once several arms are live finds the wrong root. */
+/**
+ * Mount, read, unmount. The recording is cleared per arm because `appRoot()` searches the CREATION
+ * log — an earlier arm's surface is still in it, and would be found first.
+ */
 async function arm(
   source: string,
   rootTag: number,
   testID: string,
 ): Promise<Record<string, unknown> | undefined> {
+  fabric.reset();
   writeFileSync(
     PROBE_OUT,
     compile(source, { ...COMPILE_OPTIONS, filename: 'BareTag.svelte' }).js.code,
@@ -95,7 +86,7 @@ async function arm(
   )) as { default: Component };
   mount(rootTag, Probe, {});
   await settle();
-  const props = committedProps(testID);
+  const props = committedPayload(testID);
   unmount(rootTag);
   await settle();
   return props;
@@ -105,10 +96,11 @@ afterAll(() => {
   rmSync(PROBE_OUT, { force: true });
 });
 
-// The wrapper-vs-bag comparison this file opened with is GONE with the wrappers. What replaced it
-// is not a smaller version of it: `tag-fold-coverage.test.ts` asserts every primitive's fold
-// ABSOLUTELY, against the spec, which is the half a cross-arm comparison was structurally blind to
-// anyway (`test-harness-false-greens.md` §16).
+// The wrapper-vs-bag comparison this file opened with is GONE with the wrappers, and so is
+// `tag-fold-coverage.test.ts`, which replaced it: the spec-driven `defaults` it asserted against
+// were deleted on 2026-09-18 along with `foldHostBag`, because the engine's own component-keyed
+// rules had made every one of them redundant. There is no per-primitive fold left in this adapter to
+// assert absolutely, which is the end state and not a gap.
 
 describe('children under a tag', () => {
   it('mount as markup, which a `children` key in the bag never does', async () => {
@@ -126,6 +118,10 @@ describe('children under a tag', () => {
     // something a transform emitted: the same child handed over as a bag KEY never mounts, because
     // `routeProp` treats `children` as an ordinary prop and a Snippet is not markup there.
     expect(kid, 'a child written as markup commits').toBeDefined();
-    expect(kid?.ellipsizeMode, 'and its Text defaults are folded').toBe('tail');
+    // The witness used to be `ellipsizeMode: 'tail'`, one of RN's Text defaults, which this adapter
+    // no longer supplies — the rule is the engine's, keyed on the component. `testID` is the better
+    // witness anyway: it proves the child's own BAG arrived, which is the thing a markup child and a
+    // `children` key actually differ about.
+    expect(kid?.testID, 'and its own bag arrived with it').toBe('kid');
   });
 });

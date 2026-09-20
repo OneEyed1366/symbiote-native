@@ -16,7 +16,7 @@ import '@angular/compiler';
 import { Component, inject } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount } from '@symbiote-native/angular';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import { KeepAwakeService } from './index';
 
 const activateKeepAwakeAsyncMock = vi.fn(async (_tag: string) => undefined);
@@ -39,7 +39,7 @@ vi.mock('../../../core/keep-awake', () => ({
 }));
 
 const ROOT_TAG = 974;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 

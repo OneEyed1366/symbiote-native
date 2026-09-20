@@ -27,4 +27,8 @@ export type IAngularTouchableOpacityProps = IAngularTouchableBaseProps & {
 export type IAngularTouchableHighlightProps = IAngularTouchableBaseProps & {
   activeOpacity?: number;
   underlayColor?: string;
+  // RN's snapshot affordance (`Pressable.js:151`, `TouchableHighlight.js:61`): render the control in
+  // its pressed state with no gesture, so a test can capture it. Consumed by the engine and stripped
+  // before the payload — no ViewConfig declares it.
+  testOnly_pressed?: boolean;
 };

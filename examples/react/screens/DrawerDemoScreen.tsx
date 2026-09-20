@@ -88,7 +88,10 @@ function renderDrawerContent({
   navigation,
 }: IDrawerContentProps) {
   return (
-    <safe-area-view testID="drawer-panel" className="section-tight drawer-panel">
+    <safe-area-view
+      testID="drawer-panel"
+      className="section-tight drawer-panel"
+    >
       <text className="section-label">Menu</text>
       {state.routes.map(route => (
         <pressable

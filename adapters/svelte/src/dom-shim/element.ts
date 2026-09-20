@@ -36,7 +36,6 @@ import {
   CANONICAL_BY_LOWER,
   CANONICAL_PROP_NAMES,
 } from './canonical-prop-names';
-import { foldHostBag } from './fold-host-bag';
 import { ShimNode } from './shim-node';
 import { discoverStyleCacheKey } from './style-cache';
 
@@ -76,11 +75,19 @@ export class ShimElement extends ShimElementBase {
   // The four attribute doors write `doorBag`, `set p` writes `pBag`, `lastBag` is the folded merge.
   // Held in ONE object, `set p` deleted the `class` `from_tree` had written at clone time, so
   // `<view p={handlers} class="x">` committed with no style at all and nothing was red. Unreachable
-  // while an element used one door, which every lowered tag and adapter component does.
+  // while an element used one door, which nearly every element does.
   // Both LAZY: an element touching one door still allocates one object.
   private doorBag: IShimPropBag | undefined = undefined;
   private pBag: IShimPropBag | undefined = undefined;
   private lastBag: IShimPropBag = EMPTY_BAG;
+  // COPY-ON-WRITE ownership of `doorBag`. `true` only while THIS element is the sole holder of the
+  // object `doorBag` points at, which lets `writeBagKey` mutate it in place instead of re-copying it
+  // on every one of an element's own sequential door writes. `cloneNode` hands the SAME object to a
+  // second element (§ below) and must clear this on both sides the moment it does, or a write on
+  // one clone would mutate the bag a sibling clone still reads — see
+  // `prop-bag-diff.test.ts`'s "a write to one clone does not leak into a sibling clone" for the
+  // isolation this exists to preserve.
+  private ownsDoorBag = false;
 
   constructor(tagName: string, namespaceURI?: string) {
     super();
@@ -96,7 +103,7 @@ export class ShimElement extends ShimElementBase {
   // no-opping — a `style` attribute on a bare tag crashed the mount. LAZY, for the reason
   // `.claude/rules/svelte-shim-is-the-per-node-create-path.md` records about the two Maps below it:
   // an eager field is one object per element, ~9 000 per create, in the window where GC is the
-  // largest bucket. Only `set_style` touches this, and no lowered element takes that path.
+  // largest bucket. Only `set_style` touches this, and a bag-carrying element never takes it.
   private styleSlot: { cssText: string } | undefined = undefined;
 
   get style(): { cssText: string } {
@@ -147,12 +154,10 @@ export class ShimElement extends ShimElementBase {
     this.surface?.requestCommit();
   }
 
-  // A BARE tag's props arrive here, one key at a time, and they used to stop here: an inert Map,
-  // nothing routed, nothing committed, nothing red. That was survivable only while every host
-  // element in an app was produced by the lowering transform, which builds the `p` bag above —
-  // and it is exactly what made that transform load-bearing for CORRECTNESS on this adapter
-  // alone. Routing the key makes `<view testID="x">` and `<view p={{ testID: 'x' }}>` the same
-  // commit, so the transform goes back to being the optimisation it is everywhere else.
+  // A tag's props arrive here one key at a time, and they used to stop here: an inert Map, nothing
+  // routed, nothing committed, nothing red. Routing the key is what makes `<view testID="x">` and
+  // `<view p={{ testID: 'x' }}>` the same commit — the bag spelling is an optimisation, not the
+  // only way to reach the engine.
   //
   // `value` is `unknown`, not `string`: Svelte's `set_attribute` hands the raw value straight
   // through for a name with no prototype setter, so an object `style` or a number arrives
@@ -186,7 +191,18 @@ export class ShimElement extends ShimElementBase {
   // Not `private`: the prototype accessors installed at the bottom of this file are the third
   // writer, and they are defined from module scope because there are ~290 of them.
   writeBagKey(name: string, value: unknown): void {
-    const door: IShimPropBag = { ...this.doorBag };
+    // COW: reuse `doorBag` in place only while this element is its SOLE owner (never cloned since
+    // its last write) — `cloneNode` clears the flag on both sides the instant a bag becomes shared
+    // (§ above). A fresh `{}` is `own`ed immediately: nothing else can reach it yet.
+    // Narrowed through a LOCAL, not through `owned`: TypeScript discards an aliased condition
+    // whose operands include a mutable property (`this.ownsDoorBag`), so the `!== undefined` leg
+    // never reached `this.doorBag` at the use site and this line did not compile.
+    const reusable =
+      this.doorBag !== undefined && this.ownsDoorBag ? this.doorBag : undefined;
+    const owned = reusable !== undefined;
+    const door: IShimPropBag = reusable ?? { ...this.doorBag };
+    this.ownsDoorBag = true;
+    const prevValue = door[name];
     if (value === undefined) delete door[name];
     else door[name] = value;
     this.doorBag = door;
@@ -195,6 +211,22 @@ export class ShimElement extends ShimElementBase {
     const next = this.foldedBag();
     this.lastBag = next;
     if (this.engineNode === undefined) return; // not live yet — onMadeLive() replays in full
+
+    // `foldedBag()` hands `door` straight back, BY REFERENCE, whenever there is no `p` bag to merge
+    // it with (its own "no `pBag`" branch) — so when `door` was mutated IN PLACE above (`owned`),
+    // `next` and `door` are the same object post-mutation, and a full `prev`-vs-`next` diff would
+    // be comparing that object against itself and finding nothing changed. The one key just written
+    // is the whole diff in that shape, by construction, so route it directly and skip the diff loop
+    // — this is what makes the COW above safe rather than merely silent (see
+    // `prop-bag-diff.test.ts`'s "commits an attribute written after it is live" style cases, which
+    // caught the alternative — a no-op write — the first time this was tried without this branch).
+    if (owned && this.pBag === undefined) {
+      const nextValue = next[name];
+      if (prevValue !== nextValue) routeProp(this.engineNode, name, nextValue);
+      this.surface?.requestCommit();
+      return;
+    }
+
     applyBagDiff(this.engineNode, prev, next);
     this.surface?.requestCommit();
   }
@@ -204,11 +236,9 @@ export class ShimElement extends ShimElementBase {
   private foldedBag(): IShimPropBag {
     const door = this.doorBag;
     const bag = this.pBag;
-    if (door === undefined)
-      return foldHostBag(this.tagName, normalizeBagClasses(bag ?? {}));
-    if (bag === undefined)
-      return foldHostBag(this.tagName, normalizeBagClasses(door));
-    return foldHostBag(this.tagName, normalizeBagClasses({ ...bag, ...door }));
+    if (door === undefined) return normalizeBagClasses(bag ?? {});
+    if (bag === undefined) return normalizeBagClasses(door);
+    return normalizeBagClasses({ ...bag, ...door });
   }
 
   // THE FIFTH DOOR, and it converges on the same bag as the other four. Svelte turns EVERY
@@ -239,6 +269,12 @@ export class ShimElement extends ShimElementBase {
     clone.doorBag = this.doorBag;
     clone.pBag = this.pBag;
     clone.lastBag = this.lastBag;
+    // `doorBag` (if any) now has TWO owners. Neither may mutate it in place from here — the next
+    // write on either side must copy first and only then reclaims exclusive ownership of ITS OWN
+    // copy. Without this a clone's first `setAttribute` would mutate the master's (and every other
+    // sibling clone's) committed props in place.
+    this.ownsDoorBag = false;
+    clone.ownsDoorBag = false;
     if (deep === true) {
       for (const child of this.children)
         clone.appendChild(child.cloneNode(true));

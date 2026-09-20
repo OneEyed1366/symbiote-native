@@ -72,24 +72,17 @@ function handleUnlock(): void {
     >
       <view :class="`line-tag line-tag-${lineInfo.line}`">
         <text class="line-tag-text">
-          {{
-            `${lineInfo.code} · ${lineInfo.label}`
-          }}
+          {{ `${lineInfo.code} · ${lineInfo.label}` }}
         </text>
       </view>
       <view class="hero-card">
-        <view
-          class="hero-badge"
-          :style="{ backgroundColor: lineColor }"
-        >
+        <view class="hero-badge" :style="{ backgroundColor: lineColor }">
           <text class="hero-badge-text">
             {{ lineInfo.code }}
           </text>
         </view>
         <view class="hero-copy">
-          <text class="hero-title">
-            Screen Orientation
-          </text>
+          <text class="hero-title"> Screen Orientation </text>
           <text class="hero-body">
             @symbiote-native/screen-orientation — live orientation state plus
             lock/unlock controls.
@@ -101,13 +94,9 @@ function handleUnlock(): void {
         testID="screen-orientation-state-card"
         class="screen-orientation-card"
       >
-        <text class="screen-orientation-card-title">
-          Current state
-        </text>
+        <text class="screen-orientation-card-title"> Current state </text>
         <view class="screen-orientation-row">
-          <text class="screen-orientation-row-label">
-            Orientation
-          </text>
+          <text class="screen-orientation-row-label"> Orientation </text>
           <text
             testID="screen-orientation-value"
             class="screen-orientation-value-text"
@@ -116,9 +105,7 @@ function handleUnlock(): void {
           </text>
         </view>
         <view class="screen-orientation-row">
-          <text class="screen-orientation-row-label">
-            Orientation lock
-          </text>
+          <text class="screen-orientation-row-label"> Orientation lock </text>
           <text
             testID="screen-orientation-lock-value"
             class="screen-orientation-value-text"
@@ -132,9 +119,7 @@ function handleUnlock(): void {
         testID="screen-orientation-actions-card"
         class="screen-orientation-card"
       >
-        <text class="screen-orientation-card-title">
-          Lock controls
-        </text>
+        <text class="screen-orientation-card-title"> Lock controls </text>
         <view class="button-row">
           <ActionButton
             testID="screen-orientation-lock-portrait-button"

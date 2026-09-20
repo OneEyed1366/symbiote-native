@@ -17,7 +17,11 @@ import {
   setNativeViewConfigSource,
 } from '@symbiote-native/solid';
 import type { INativeViewConfig } from '@symbiote-native/engine';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import { childrenOf, type ISymbioteNode } from '@symbiote-native/engine';
+import {
+  installRecordingFabric,
+  type IAuthoredNode,
+} from '@symbiote-native/test-utils';
 import { Stack } from '../stack';
 import type { INavigatorHandle } from '../stack';
 import { Tab } from '../tabs';
@@ -33,6 +37,7 @@ import {
 
 const ROOT_TAG = 7704;
 const SCREEN_VIEW = 'RNSScreen';
+const STACK_VIEW = 'RNSScreenStack';
 
 const VIEW_CONFIGS: Record<string, INativeViewConfig> = {
   [SCREEN_VIEW]: {
@@ -60,7 +65,7 @@ const VIEW_CONFIGS: Record<string, INativeViewConfig> = {
   },
 };
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 setNativeViewConfigSource(name => VIEW_CONFIGS[name]);
 
 const flush = (): Promise<void> =>
@@ -69,19 +74,28 @@ const flush = (): Promise<void> =>
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
+// Descends the LIVE child links from the stack container down: a recording keeps every node it
+// ever saw created, so a popped screen would still be counted if this searched the record.
+function stackRoot(): ISymbioteNode {
+  const stack = fabric.find(node => node.viewName === STACK_VIEW);
+  if (stack === undefined) throw new Error('no screen stack created');
+  return stack.handle;
+}
+
 function findAll(
-  predicate: (node: IFakeNode) => boolean,
-  nodes: readonly IFakeNode[] = fabric.committed,
-): IFakeNode[] {
-  const found: IFakeNode[] = [];
-  for (const node of nodes) {
-    if (predicate(node)) found.push(node);
-    found.push(...findAll(predicate, node.children));
+  predicate: (node: IAuthoredNode) => boolean,
+  handle: ISymbioteNode = stackRoot(),
+): IAuthoredNode[] {
+  const found: IAuthoredNode[] = [];
+  for (const child of childrenOf(handle)) {
+    const recorded = fabric.find(one => one.handle === child);
+    if (recorded !== undefined && predicate(recorded)) found.push(recorded);
+    found.push(...findAll(predicate, child));
   }
   return found;
 }
 
-const screenNodes = (): IFakeNode[] =>
+const screenNodes = (): IAuthoredNode[] =>
   findAll(node => node.viewName === SCREEN_VIEW);
 
 const texts = (): string[] =>

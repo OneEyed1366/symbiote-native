@@ -97,10 +97,7 @@ onMounted(() => hide());
 </script>
 
 <template>
-  <Stack
-    ref="stackHandle"
-    :initial-route-name="ROUTE_NAME.Menu"
-  >
+  <Stack ref="stackHandle" :initial-route-name="ROUTE_NAME.Menu">
     <Screen
       :name="ROUTE_NAME.Menu"
       :component="MenuScreen"

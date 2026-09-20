@@ -37,6 +37,7 @@
 
 import { createMemo, createRenderEffect, onCleanup } from 'solid-js';
 import {
+  componentOf,
   createAnchor,
   dlog,
   isSymbioteNode,
@@ -93,7 +94,7 @@ export function Portal(props: IPortalProps): JSX.Element {
   createRenderEffect(() => {
     const to = target();
     dlog(
-      `solid portal -> ${to instanceof SymbioteSurface ? 'surface' : to.component}`,
+      `solid portal -> ${to instanceof SymbioteSurface ? 'surface' : componentOf(to)}`,
     );
     insertNode(to, host);
     // Runs both on a `mount` change (before the effect re-attaches elsewhere) and on the Portal's

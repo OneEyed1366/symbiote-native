@@ -22,7 +22,11 @@ import { compile } from 'svelte/compiler';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 import { mount, unmount } from './render';
 
 if (globalThis.window === undefined)
@@ -35,7 +39,8 @@ const ROOT_TAG = 91_303;
 const TMP_DIR = join(__dirname, '../build/__async_smoke__');
 const AWAITING_CHILD_MODULE = 'awaiting-child.mjs';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -90,14 +95,18 @@ async function compileComponent(
   return component;
 }
 
-function appChildren(): IFakeNode[] {
-  const wrapper = fabric.appRoot().children[0];
+function appChildren(): ILiveNode[] {
+  const wrapper = live.nodeOf(live.appRoot()).children[0];
   expect(wrapper, 'the root wrapper view committed').toBeDefined();
   return wrapper?.children ?? [];
 }
 
 function testIds(): Array<unknown> {
   return appChildren().map(child => child.props.testID);
+}
+
+function serialize(nodes: readonly ILiveNode[]): string {
+  return nodes.map(node => live.serialize(node.handle)).join('');
 }
 
 type IDeferred = {
@@ -149,9 +158,7 @@ describe('deferred {#await} / <svelte:boundary pending> (svelte async mode)', ()
     await tick();
     await tick();
     expect(testIds()).toEqual(['then']);
-    expect(fabric.serialize(appChildren())).toBe(
-      'RCTView(RCTText(RCTRawText "one"))',
-    );
+    expect(serialize(appChildren())).toBe('RCTView(RCTText(RCTRawText "one"))');
 
     // Back to pending, then forward again — each transition now runs inside an effect that has
     // already fired once, which is exactly the `REACTION_RAN` condition should_defer_append()
@@ -165,9 +172,7 @@ describe('deferred {#await} / <svelte:boundary pending> (svelte async mode)', ()
     await tick();
     await tick();
     expect(testIds()).toEqual(['then']);
-    expect(fabric.serialize(appChildren())).toBe(
-      'RCTView(RCTText(RCTRawText "two"))',
-    );
+    expect(serialize(appChildren())).toBe('RCTView(RCTText(RCTRawText "two"))');
   });
 
   // why: a top-level `await` inside a boundary must render into the live anchor, get moved
@@ -210,7 +215,7 @@ describe('deferred {#await} / <svelte:boundary pending> (svelte async mode)', ()
     // Only the pending snippet may be committed: the child's own nodes were built, then moved
     // offscreen, and must not still be in the native tree.
     expect(testIds()).toEqual(['pending']);
-    expect(fabric.serialize(appChildren())).toBe(
+    expect(serialize(appChildren())).toBe(
       'RCTView(RCTText(RCTRawText "loading"))',
     );
 
@@ -221,7 +226,7 @@ describe('deferred {#await} / <svelte:boundary pending> (svelte async mode)', ()
 
     // Exactly one child, once — not the child twice, and not pending plus child.
     expect(testIds()).toEqual(['child']);
-    expect(fabric.serialize(appChildren())).toBe(
+    expect(serialize(appChildren())).toBe(
       'RCTView(RCTText(RCTRawText "resolved"))',
     );
   });
@@ -272,7 +277,7 @@ describe('deferred {#await} / <svelte:boundary pending> (svelte async mode)', ()
     await tick();
 
     expect(testIds()).toEqual(['sibling', 'child']);
-    expect(fabric.serialize(appChildren())).toBe(
+    expect(serialize(appChildren())).toBe(
       'RCTView(RCTText(RCTRawText "sync"))RCTView(RCTText(RCTRawText "resolved"))',
     );
   });

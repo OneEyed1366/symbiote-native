@@ -33,10 +33,9 @@ import { descriptorFor } from '@symbiote-native/components';
 // A bare intrinsic tag has no wrapper to apply RN's per-primitive prop folds (id -> nativeID,
 // Text's ellipsizeMode / allowFontScaling defaults), so the renderer is the layer that must.
 // Shared with every other adapter, driven by the same HOST_PRIMITIVES spec.
-import { foldHostBag } from '@symbiote-native/components/fold-host-bag';
-// WHICH native view a primitive commits can depend on a prop (TextInput's `multiline`). A lowering
-// transform decides that from source text; a bare tag has no transform, so the choice is made here,
-// where the runtime value is known. Identity for every primitive that declares no alternative.
+// WHICH native view a primitive commits can depend on a prop (TextInput's `multiline`), and that
+// prop can be a runtime value — so the choice is made here, where it is known. Identity for every
+// primitive that declares no alternative.
 import { resolveIntrinsicTag } from '@symbiote-native/components/resolve-intrinsic';
 
 type IProps = Record<string, unknown>;
@@ -169,12 +168,8 @@ const reconciler = createReconciler<
     // other four adapters all pass it (vue `renderer/index.ts`, svelte `dom-shim/element.ts`,
     // solid `renderer.ts`, angular `renderer/index.ts`), and React is the one that did not.
     //
-    // Inert on landing and deliberately so — nothing registers a behavior under a tag React emits.
-    // The `-managed` split is what keeps it inert once something does: React's TextInput and
-    // Switch wrappers emit `text-input-managed` / `switch-managed`, so a machine
-    // registered on the lowered tag cannot also attach to a wrapper-built node and run twice.
     const node = createElement(descriptor.component, descriptor.isText, tag);
-    applyProps(node, foldHostBag(type, props));
+    applyProps(node, props);
     return node;
   },
   createTextInstance(text, _container, hostContext) {
@@ -210,9 +205,7 @@ const reconciler = createReconciler<
       node,
       descriptorFor(resolveIntrinsicTag(type, newProps)).component,
     );
-    // BOTH sides folded, or the diff compares a raw `id` against a folded `nativeID` and writes
-    // the alias twice while never clearing the raw key.
-    applyUpdate(node, foldHostBag(type, oldProps), foldHostBag(type, newProps));
+    applyUpdate(node, oldProps, newProps);
   },
   commitTextUpdate(node, _oldText, newText) {
     setText(node, newText);

@@ -13,7 +13,11 @@ import { compile } from 'svelte/compiler';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 import { mount, unmount } from './render';
 
 // RN sets both before any app code runs; a bare vitest sandbox has neither, and svelte's
@@ -28,7 +32,8 @@ const ROOT_TAG = 91_411;
 const TMP_DIR = join(__dirname, '../build/__render_error_smoke__');
 const BOOM = 'render exploded';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -80,8 +85,13 @@ async function compileComponent(
 
 // root-element.ts inserts an unlabeled `view` between the box-none AppContainer and the
 // mounted component, so the app's own nodes are one level down.
-function appChildren(): IFakeNode[] {
-  return fabric.appRoot().children[0]?.children ?? [];
+function appChildren(): ILiveNode[] {
+  return live.nodeOf(live.appRoot()).children[0]?.children ?? [];
+}
+
+// The whole fallback subtree on one line, not just its root.
+function serialize(nodes: readonly ILiveNode[]): string {
+  return nodes.map(node => live.serialize(node.handle)).join('');
 }
 
 function joinCalls(spy: ReturnType<typeof vi.spyOn>): string[] {
@@ -187,7 +197,9 @@ describe('Recovers — a <svelte:boundary> claims the error', () => {
   it('lets the boundary paint its fallback all the same', async () => {
     await mountGuarded();
 
-    expect(appChildren().map(child => child.props.testID)).toEqual(['failed']);
+    expect(appChildren().map(child => child.payload.testID)).toEqual([
+      'failed',
+    ]);
   });
 
   it('still says so on the diagnostic channel, which is where a claimed error belongs', async () => {
@@ -212,7 +224,7 @@ describe('Recovers — a <svelte:boundary> claims the error', () => {
     // to keep rendering the real message.
     await mountGuarded();
 
-    expect(fabric.serialize(appChildren())).toBe(
+    expect(serialize(appChildren())).toBe(
       `RCTView(RCTText(RCTRawText "${BOOM}"))`,
     );
   });

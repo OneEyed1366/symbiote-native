@@ -24,12 +24,12 @@
 //   unmount would grow this harness well beyond a smoke test's scope.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import { mount, unmount } from '@symbiote-native/svelte/native-view-bridge';
 import { setNativeViewConfigSource } from '@symbiote-native/engine';
 import type { INativeViewConfig } from '@symbiote-native/engine';
 import type { INavigatorHandle } from '../../core';
-import { findLive, findLiveByTestId } from '../fabric-tree.test-helper';
+import { createNavigationLiveTree } from '../fabric-tree.test-helper';
 import {
   createSvelteHarness,
   loadComponent,
@@ -67,7 +67,9 @@ const VIEW_CONFIGS: Record<string, INativeViewConfig> = {
   },
 };
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const { appRoot, findLive, findLiveByTestId } =
+  createNavigationLiveTree(fabric);
 setNativeViewConfigSource(name => VIEW_CONFIGS[name]);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
@@ -174,8 +176,7 @@ function isStackHandle(value: unknown): value is INavigatorHandle {
 }
 
 function probeLabel(testID: string): string {
-  const label = findLiveByTestId(fabric.appRoot(), testID)?.props
-    ?.accessibilityLabel;
+  const label = findLiveByTestId(appRoot(), testID)?.props?.accessibilityLabel;
   return typeof label === 'string' ? label : '';
 }
 
@@ -204,7 +205,7 @@ describe('navigation runes (real compiled components)', () => {
       // together on blur (effect's cleanup runs, isFocused flips back to false), or a consumer
       // relying on one and not the other would desync.
       await mountWithScreen('focus', PROBE_SOURCE);
-      const screen = findLive(fabric.appRoot(), 'RNSScreen');
+      const screen = findLive(appRoot(), 'RNSScreen');
       expect(screen).toBeDefined();
       if (screen === undefined) return;
 

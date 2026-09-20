@@ -17,7 +17,7 @@
 //
 // The three orphans this first caught also show the quiet half: `state-style` and React's `jsx`,
 // both deleted the same day, were still being published as importable modules.
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { adapterNames } from '../scripts/lib/adapter-names.mjs';
@@ -35,10 +35,15 @@ function packageRoots(): readonly string[] {
   );
 }
 
+// `withFileTypes`, which is a race fix and not a tidy-up — the type comes from the SAME syscall that
+// listed the entry, so a file that vanishes between the listing and the question cannot throw ENOENT
+// here. The window is real in a full parallel run: the Svelte suites write a `.smoke-compiled-*.mjs`
+// beside their own source and `rmSync` it in an `afterAll`, dozens of them by design. Presents as a
+// guard that passes alone and fails in a full run, with no assertion in the message.
 function walk(dir: string, found: string[] = []): string[] {
-  for (const name of readdirSync(dir)) {
-    const full = join(dir, name);
-    if (statSync(full).isDirectory()) walk(full, found);
+  for (const dirent of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, dirent.name);
+    if (dirent.isDirectory()) walk(full, found);
     else found.push(full);
   }
   return found;

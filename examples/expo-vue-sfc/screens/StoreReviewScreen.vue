@@ -62,42 +62,28 @@ function handleRequestReview(): void {
     >
       <view :class="`line-tag line-tag-${lineInfo.line}`">
         <text class="line-tag-text">
-          {{
-            `${lineInfo.code} · ${lineInfo.label}`
-          }}
+          {{ `${lineInfo.code} · ${lineInfo.label}` }}
         </text>
       </view>
       <view class="hero-card">
-        <view
-          class="hero-badge"
-          :style="{ backgroundColor: lineColor }"
-        >
+        <view class="hero-badge" :style="{ backgroundColor: lineColor }">
           <text class="hero-badge-text">
             {{ lineInfo.code }}
           </text>
         </view>
         <view class="hero-copy">
-          <text class="hero-title">
-            Store Review
-          </text>
+          <text class="hero-title"> Store Review </text>
           <text class="hero-body">
-            @symbiote-native/store-review — prompts the platform's native
-            in-app review flow.
+            @symbiote-native/store-review — prompts the platform's native in-app
+            review flow.
           </text>
         </view>
       </view>
 
-      <view
-        testID="store-review-capabilities-card"
-        class="store-review-card"
-      >
-        <text class="store-review-card-title">
-          Capabilities
-        </text>
+      <view testID="store-review-capabilities-card" class="store-review-card">
+        <text class="store-review-card-title"> Capabilities </text>
         <view class="store-review-row">
-          <text class="store-review-row-label">
-            Available
-          </text>
+          <text class="store-review-row-label"> Available </text>
           <view
             :class="`store-review-status-badge store-review-status-badge-${isAvailable}`"
           >
@@ -113,9 +99,7 @@ function handleRequestReview(): void {
           </view>
         </view>
         <view class="store-review-row">
-          <text class="store-review-row-label">
-            Has action
-          </text>
+          <text class="store-review-row-label"> Has action </text>
           <view
             :class="`store-review-status-badge store-review-status-badge-${hasReviewAction}`"
           >
@@ -132,13 +116,8 @@ function handleRequestReview(): void {
         </view>
       </view>
 
-      <view
-        testID="store-review-actions-card"
-        class="store-review-card"
-      >
-        <text class="store-review-card-title">
-          Actions
-        </text>
+      <view testID="store-review-actions-card" class="store-review-card">
+        <text class="store-review-card-title"> Actions </text>
         <ActionButton
           testID="store-review-request-button"
           title="Request Review"
@@ -146,16 +125,9 @@ function handleRequestReview(): void {
           :color="lineColor"
         />
         <view class="store-review-row">
-          <text class="store-review-row-label">
-            Last result
-          </text>
-          <text
-            testID="store-review-result"
-            class="store-review-value-text"
-          >
-            {{
-              lastResult
-            }}
+          <text class="store-review-row-label"> Last result </text>
+          <text testID="store-review-result" class="store-review-value-text">
+            {{ lastResult }}
           </text>
         </view>
         <text class="info-text">

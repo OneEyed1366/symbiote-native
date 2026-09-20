@@ -18,10 +18,13 @@ Framework adapter
 Mutation API
   insert · remove · setProp · commit
         ↓
-@symbiote-native/engine
-  retained tree · clone-on-write · event normalization
+@symbiote-native/engine (JavaScript)
+  builds a command buffer — no retained tree on this side
+        ↓  one JSI crossing per commit
+SymbioteTree (C++)
+  retained tree · clone-on-write · tag-keyed platform rules · event normalization
         ↓
-nativeFabricUIManager
+Fabric's UIManager
   createNode · cloneNodeWithNewProps · appendChildToSet · completeRoot
         ↓
 stock React Native
@@ -34,11 +37,19 @@ Most UI frameworks express host updates as mutations: set a prop, insert a
 child, remove a child. Fabric is persistent: you do not mutate an existing node;
 you clone nodes with new props or children and atomically commit a new child set.
 
-The engine is the translation layer between those worlds. It owns the retained
-shadow tree and turns adapter mutations into Fabric child set commits.
+The engine is the translation layer between those worlds. Its JavaScript half
+turns adapter mutations into a buffer of ops; its C++ half — `SymbioteTree` — owns
+the retained tree, applies that buffer, and turns it into Fabric child set commits,
+one JSI crossing per commit instead of one per mutation.
+
+Platform behavior that React Native's own components carry in JavaScript —
+a `Pressable`'s `disabled` folding into its accessibility state, a `Switch`'s
+different prop names per platform, a `Text`'s default `ellipsizeMode` — is folded
+into the same C++ layer, keyed off the Fabric tag a node was created with. Every
+adapter gets it once, instead of porting it per framework.
 
 That means each framework adapter stays thin. A persistence bug is fixed once in
-`@symbiote-native/engine`, not once per framework.
+the engine, not once per framework.
 
 ## What stays stock
 

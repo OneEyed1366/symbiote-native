@@ -12,17 +12,23 @@
 // Android Button's own `<View style={buttonStyles}>` IS the responder:
 //
 //   iOS      button   RCTView      TouchableOpacity's Animated.View — the responder + the fade
-//            └ view   RCTView      resolveButtonViewStyle(color, disabled) — `{}` here
-//              └ text RCTText      resolveButtonTextStyle(color, disabled) + RN's Text defaults
-//                └ raw RCTRawText  resolveButtonTitle(title)                       FOUR nodes
+//            └ view   RCTView      no style at all, and no fold
+//              └ text RCTText      `button-label-text` — foldButtonLabelStyle + RN's Text defaults
+//                └ raw RCTRawText  `button-label`    — foldButtonLabel            FOUR nodes
 //
 //   Android  button   RCTView      the styled button view, CLONED onto: the responder, the ripple
 //            │                     background, the whole a11y fold. No fade, no wrapper.
 //            └ text   RCTText
 //              └ raw  RCTRawText   UPPERCASED (Button.js:352-353)                 THREE nodes
 //
-// EVERY FOLD IS ALREADY WRITTEN AND TESTED in `../view/render-button`; nothing here re-derives one.
-// What is new is only WHERE they run: on engine nodes, instead of in a component body.
+// EVERY RULE IS IN THE ENGINE AS OF 2026-09-18, and off Android this primitive binds no
+// `payloadFold` on any of its four nodes — it costs ZERO trips into JS, down from five. The one that
+// survives is the OWNER's on Android, for the view style and the ripple background.
+//
+// The last to move was the label text's, and it needed a seam none of the others did: its style is a
+// function of the BUTTON's `color` and `disabled`, and the button is its GRANDPARENT here and its
+// parent on Android. `IAncestorLookup` asks for the nearest ancestor carrying a tag — a CSS ancestor
+// selector — so one rule is correct on both trees.
 //
 // ---------------------------------------------------------------------------------------------
 // HOW THE PROJECTION REACHES ITS NODES, given that each `payloadFold` MUST be pure:
@@ -109,7 +115,6 @@
 import {
   addDerivedNode,
   appendChild,
-  appListenerFor,
   createElement,
   createRawText,
   markPropsDirty,
@@ -117,25 +122,12 @@ import {
   registerHostBehavior,
   requestCommitFor,
   type IHostBehavior,
-  type IPayloadFold,
   type ISymbioteNode,
+  setProp,
 } from '@symbiote-native/engine';
 
 import { descriptorFor } from '../component-names';
-import { resolveTextProps } from '../text-props';
-import {
-  BUTTON_ACCESSIBILITY_ROLE,
-  resolveButtonDisabled,
-  resolveButtonImportantForAccessibility,
-  resolveButtonTextStyle,
-  resolveButtonTitle,
-  resolveButtonViewStyle,
-} from '../view/render-button';
-import {
-  backgroundProps,
-  selectableBackground,
-} from '../view/render-touchable-native-feedback';
-import { resolveTouchableFocusable } from '../view/render-pressable';
+import { resolveButtonDisabled } from '../view/render-button';
 import {
   booleanOr,
   createPressBehavior,
@@ -213,31 +205,41 @@ const buttonDisabled: IDisabledResolver = props => projectionOf(props).disabled;
  * (commit.ts) and reuses the committed handle when nothing moved. An equal-but-fresh style is
  * therefore not a change, and there is nothing to feed back.
  */
-function viewFold(owner: ISymbioteNode): IPayloadFold {
-  return props => {
-    const { color, disabled } = projectionOf(owner.props);
-    return { ...props, style: resolveButtonViewStyle(color, disabled) };
-  };
-}
+// THE VIEW'S FOLD IS GONE AND WAS NOT PORTED — it was doing nothing, on the only platform where it
+// ran. It wrote `style: resolveButtonViewStyle(color, disabled)`, and that function returns the
+// constant `buttonViewStyle` on every platform but Android while the view node is built ONLY in the
+// non-Android branch of `buildStructure`. `buttonViewStyle` off Android is `{}`. So it read two
+// props off its owner, discarded both, and spent a JSI round trip per button per commit to write an
+// empty style.
+//
+// This is the `input-accessory-view` shape again, and the second time this migration has found one:
+// a fold's price is the TRIP, not the body, so a fold that does nothing is the worst value in the
+// file and deleting it is worth as much as porting one that does a lot.
+//
+// Proven not to move the payload rather than argued: `button-derived-payload.itest.ts` pins the
+// view's committed keys, including with an app-set `color` — which lands on the LABEL here and must
+// not reach this node.
 
-function textFold(owner: ISymbioteNode): IPayloadFold {
-  return props => {
-    const { color, disabled } = projectionOf(owner.props);
-    return {
-      ...props,
-      style: resolveButtonTextStyle(color, disabled),
-      // RN puts `disabled` on the Text as well (Button.js:386) — a real RCTText prop read by
-      // Android's accessibility layer, and not the same thing as the greyed colour above.
-      disabled,
-    };
-  };
-}
+// THE LABEL TEXT'S TAG. Its style is a function of the BUTTON's `color` and `disabled`, and the
+// button is this node's grandparent on iOS (`button -> view -> text`) and its parent on Android —
+// so the rule asks for the NEAREST BUTTON ancestor rather than for a fixed number of hops, which is
+// the same question a CSS ancestor selector asks and is true on both trees.
+//
+// `foldButtonLabelStyle` in `SymbioteFabricProps.cpp`, reached through `IAncestorLookup`. That seam
+// was the thing this fold was waiting for: `ownerProps` answers "my parent" and this node's parent
+// is the wrapping view, which knows none of it.
+export const BUTTON_LABEL_TEXT_TAG = 'button-label-text';
 
-// Reads its OWN `text`, which `SLOT_PROPS` redirected the app's `title` into — no owner closure, so
-// the fold is shared by every button. `fabricProps` reads only `.text` off a raw-text fold.
-const labelFold: IPayloadFold = props => ({
-  text: resolveButtonTitle(stringOr(props.text) ?? ''),
-});
+// The label's own tag. A raw text carrying one looks odd and is not: it has no props an app can
+// write, but its CONTENT is the platform's decision here — RN renders a button's title uppercased on
+// Android and verbatim elsewhere (`Button.js:352-353`), which is a user-agent choice about a control
+// rather than anything the app asked for.
+//
+// That is what the fold here used to do, and it is `foldButtonLabel` in `SymbioteFabricProps.cpp`
+// now, reached off this tag. `button-payload.itest.ts` recorded "a raw text carries no tag at all,
+// so there is nothing for a tag-keyed rule to key on" — true of `createRawText`'s old signature, not
+// of raw texts, and it takes a tag now for exactly this.
+export const BUTTON_LABEL_TAG = 'button-label';
 
 // ---- the Android touchable -------------------------------------------------------------------
 
@@ -251,7 +253,7 @@ const labelFold: IPayloadFold = props => ({
 // one caller became two.
 const touchable: Pick<
   IHostBehavior,
-  'attach' | 'detach' | 'foldPayload' | 'ownedListeners' | 'afterCommit'
+  'attach' | 'detach' | 'ownedListeners' | 'afterCommit'
 > = IS_ANDROID
   ? createPressBehavior(nativeFeedbackRefinement, buttonDisabled)
   : createTouchableOpacityBehavior(buttonDisabled);
@@ -268,52 +270,37 @@ const touchable: Pick<
  *                       fold then merges `props.disabled` over it, which composes to RN's
  *                       `props.disabled ?? aria ?? state.disabled` — the same value, with
  *                       busy/checked/expanded/selected preserved, without a Button-specific fold.
+ *
+ * THE TOUCHABLE'S HALF IS NO LONGER A FUNCTION ON EITHER PLATFORM, and the absence is the design
+ * rather than a gap: neither `createPressBehavior` nor `createTouchableOpacityBehavior` has a
+ * `foldPayload` any more, because both rules moved into the engine (`foldPressableProps` and
+ * `foldIdAlias`, `SymbioteFabricProps.cpp`), which names `button` among the tags it serves. So the
+ * same work happens, one layer down and before this fold runs — the order is unchanged, the trip
+ * into JS is gone.
+ *
+ * The composition used to be spelled `touchable.foldPayload === undefined ? props : ...`, and that
+ * shape is deleted rather than left standing at its `undefined` branch: a conditional call through
+ * a field nothing assigns any more is a whole rule that vanishes silently the day the field is
+ * removed, which is exactly how it would have gone unnoticed here.
  */
-function ownerFold(node: ISymbioteNode): IPayloadFold {
-  return props => {
-    const next: Record<string, unknown> = {
-      ...(touchable.foldPayload === undefined
-        ? props
-        : touchable.foldPayload(props)),
-    };
-    next.accessibilityRole = BUTTON_ACCESSIBILITY_ROLE;
-    // 'no' is the only value the resolver moves (Button.js:356), so checking for it IS the
-    // narrowing this bag needs — the shared resolver still owns what 'no' becomes.
-    if (next.importantForAccessibility === 'no')
-      next.importantForAccessibility =
-        resolveButtonImportantForAccessibility('no');
-    // Re-mapped, so the raw name must not also reach Fabric. Where the wrappers put it too — the
-    // pressable owns sound suppression (Button.js:377 hands `touchSoundDisabled` to the touchable).
-    if (Object.hasOwn(next, 'touchSoundDisabled')) {
-      next.android_disableSound = next.touchSoundDisabled;
-      delete next.touchSoundDisabled;
-    }
-    const { color, disabled } = projectionOf(props);
-    // TouchableOpacity.js:336 and TouchableNativeFeedback.js:369 — the SAME expression, so the tag
-    // owes it on both platforms. `onPress` is an owned name, so it is in the stash and never in
-    // `props`; a flip of it dirties nothing by itself, which `onOwnedListenerChange` answers.
-    next.focusable = resolveTouchableFocusable(
-      booleanOr(props.focusable),
-      appListenerFor(node, 'press') !== undefined,
-      disabled,
-    );
-    if (IS_ANDROID) {
-      // TNF renders no view, it CLONES onto Button's `<View style={buttonStyles}>`
-      // (TouchableNativeFeedback.js:339), so this host IS that view. Overwritten rather than merged
-      // because RN's Button declares no `style` prop at all — there is nothing to compose with.
-      next.style = resolveButtonViewStyle(color, disabled);
-      // Button passes no `background` and no `useForeground`, so TNF resolves the theme's
-      // selectable background onto the background slot (TouchableNativeFeedback.js:343-348,
-      // :402). The dicts are the shared factories', never restated here.
-      Object.assign(next, backgroundProps(selectableBackground(), false));
-    }
-    // Read by the folds above and declared by no ViewConfig. A key Fabric does not know throws
-    // nothing, logs nothing and paints nothing, so the strip has to be here or it is never noticed.
-    // `title` needs none — `SLOT_PROPS` redirects it before it can land on this node.
-    delete next.color;
-    return next;
-  };
-}
+// `focusable` LEFT THIS FOLD ON 2026-09-18, and with it the whole fold off Android.
+//
+// It was the last thing here that ran on both platforms, and it stayed because its middle leg is
+// `onPress !== undefined` — an owned listener, stashed in JS. That bit crosses now
+// (`OP_SET_OWNED_LISTENER`), and Button's three-way `disabled` was only ever three PROPS, so
+// `foldButtonProps` resolves the expression itself. It reads the AUTHORED bag rather than the folded
+// one, which is the same Trap A correction this fold carried as `projectionOf(propsOf(node))`.
+//
+// The ANDROID half went the same day, once the test host grew an arm that compiles `#ifdef ANDROID`
+// (`tests/CMakeLists.txt`, `SYMBIOTE_PLATFORM_ANDROID`). It is inside `foldButtonProps` now: the
+// Material view style and the theme's selectable background, which TNF clones onto this very node
+// (`TouchableNativeFeedback.js:339`) because it renders no view of its own.
+//
+// SO BUTTON BINDS NO FOLD ON EITHER PLATFORM, and it is the first primitive to reach that with a
+// subtree — four nodes, four crossings per commit when this migration started.
+//
+// Contract: `core/engine/cpp/tests/js/button-payload.itest.ts` for the platform-invariant half and
+// `android-rules.itest.ts` for the style, the colour override and the disabled greying.
 
 /**
  * Builds the whole subtree, once, at `attachHostBehavior`.
@@ -329,19 +316,19 @@ function buildStructure(node: ISymbioteNode): ISymbioteNode {
   const text = createElement(
     textDescriptor.component,
     textDescriptor.isText,
-    'text',
+    BUTTON_LABEL_TEXT_TAG,
   );
-  // RN's Text.js applies these to every non-virtual Text on its way to native, and a hand-written
-  // host tag inherits nothing a `<Text>` component did — Svelte's Button clipped long labels
-  // mid-word for exactly this reason (`.claude/rules/host-primitive-tier.md`, "The THIRD path").
-  // Constants, because the app cannot reach this node to override them.
-  text.props = resolveTextProps({});
+  // RN's two Text defaults are NOT written here, and that is deliberate as of 2026-09-18: they are
+  // the platform's, applied by the payload builder to every `RCTText` (`foldTextDefaults`), so this
+  // node inherits them for being a text rather than for being handed them. Seeding them was two
+  // writes per button per commit producing the payload the builder already produces — the shape
+  // `seedTextDefaults` had in three adapters. `button-derived-payload.itest.ts` reads them off the
+  // committed payload and is what proves the node still gets them.
+  //
   // Empty until the redirected `title` arrives. The commit walk drops an empty raw text
   // (`isEmptyRawText`, node.ts), so no Fabric node exists for it until it has a label — and that
   // check reads `props.text`, which the redirect writes, not the fold's uppercased output.
-  const label = createRawText('');
-  text.payloadFold = textFold(node);
-  label.payloadFold = labelFold;
+  const label = createRawText('', BUTTON_LABEL_TAG);
   // The hop `slotDerived` alone does not make: it marks the slot (the label), and this is past it.
   addDerivedNode(node, text);
   appendChild(text, label);
@@ -356,7 +343,8 @@ function buildStructure(node: ISymbioteNode): ISymbioteNode {
       viewDescriptor.isText,
       'view',
     );
-    view.payloadFold = viewFold(node);
+    // No fold: see the note where `viewFold` was. Off Android this node's style was `{}` and this
+    // branch is the only one that builds it, so the fold was a crossing bought for an empty object.
     addDerivedNode(node, view);
     appendChild(view, text);
     // Lands on the owner, because `node.childHost` is still undefined here — the engine assigns it
@@ -364,9 +352,10 @@ function buildStructure(node: ISymbioteNode): ISymbioteNode {
     // setting the field itself.
     appendChild(node, view);
   }
-  // See the header: the owner's fold needs its own node, and this runs after
-  // `attachHostBehavior` has already written `behavior.foldPayload` into the field.
-  node.payloadFold = ownerFold(node);
+  // ANDROID ONLY since 2026-09-18. See the header: the owner's fold needs its own node, and this
+  // NOTHING IS BOUND HERE ON EITHER PLATFORM as of 2026-09-18, which is the point — a fold with an
+  // empty body still costs a full JSI round trip per commit, so leaving one that returns its input
+  // is the worst value available (`input-accessory-view`, and Button's own `viewFold`).
   return label;
 }
 
@@ -384,14 +373,22 @@ export function registerButtonBehavior(): void {
   // that leave with the sweep, and each carries only a pure fold, so this behavior owns no per-node
   // runtime of its own to release.
   //
-  // No `foldPayload` here on purpose — `buildStructure` binds the owner's fold to its node.
   const behavior: IHostBehavior = {
     ...touchable,
-    foldPayload: undefined,
     buildStructure,
     onOwnedListenerChange,
     slotProps: SLOT_PROPS,
     slotDerived: SLOT_DERIVED,
   };
+  // The two DERIVED nodes' tags, registered with no runtime at all. A tag reaches C++ only through
+  // `recordSetTag`, which `attachHostBehavior` emits, so a tag nobody registered carries an empty
+  // `tagName` in the host and no rule fires for it — however the rule is written. Same shape as the
+  // ActivityIndicator spinner's and ImageBackground's inner image.
+  //
+  // A registration is how this codebase declares a tag HAS platform semantics, which is exactly the
+  // claim: the label's style is RN's, not the app's.
+  const derived: IHostBehavior = { attach() {}, detach() {} };
+  registerHostBehavior(BUTTON_LABEL_TEXT_TAG, derived);
+  registerHostBehavior(BUTTON_LABEL_TAG, derived);
   registerHostBehavior(BUTTON_TAG, behavior);
 }

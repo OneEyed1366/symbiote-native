@@ -9,30 +9,33 @@
 // array either way. A branch calling the slot ourselves was written, break-tested, found to move
 // nothing, and removed. The child here is a lone VNode precisely because that is the spelling the
 // suspected hazard needed.
+//
+// A RECORDING host, read through the LIVE tree — the claim is about the CURRENT committed shape
+// (which views exist, and the folded payload of one of them), not about mechanism.
 
 import { describe, expect, it } from 'vitest';
 import { defineComponent, h } from '@vue/runtime-core';
 import { mount, unmount } from '@symbiote-native/vue';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 import { createAnimatedComponent } from './create-animated-component';
 
 const ROOT_TAG = 7411;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
-function census(): { views: string[]; props: Record<string, unknown> } {
+function census(): { views: string[]; payload: Record<string, unknown> } {
   const views: string[] = [];
   let first: Record<string, unknown> = {};
-  const walk = (nodes: readonly IFakeNode[]): void => {
-    for (const node of nodes) {
-      views.push(node.viewName);
-      if (views.length === 2) first = { ...node.props };
-      walk(node.children);
-    }
-  };
-  walk(fabric.committed);
-  return { views, props: first };
+  live.walkLive(live.appRoot(), node => {
+    views.push(node.viewName);
+    if (views.length === 2) first = { ...node.payload };
+  });
+  return { views, payload: first };
 }
 
 describe('createAnimatedComponent over a tag', () => {
@@ -49,7 +52,7 @@ describe('createAnimatedComponent over a tag', () => {
       }),
     );
     await tick();
-    const { views, props } = census();
+    const { views, payload } = census();
     unmount(ROOT_TAG);
 
     // The child is the point: forwarding the slots object instead of calling it commits only the
@@ -57,7 +60,7 @@ describe('createAnimatedComponent over a tag', () => {
     expect(views).toContain('RCTText');
     expect(views).toContain('RCTRawText');
     // And the renderer's kebab fold still applies through the wrapper.
-    expect(props.accessibilityLabel).toBe('bar');
+    expect(payload.accessibilityLabel).toBe('bar');
   });
 
   it('names itself after the tag, since a tag has no displayName', () => {

@@ -29,19 +29,16 @@
 // a bare `import './register';` that the barrel does not re-export.
 
 import {
-  appListenerFor,
   markPropsDirty,
   registerHostBehavior,
   requestCommitFor,
+  setNodeUnderlayShown,
   type IHostBehavior,
-  type IPayloadFold,
   type ISymbioteEvent,
   type ISymbioteNode,
+  propOf,
 } from '@symbiote-native/engine';
-import { resolveTouchableFocusable } from '../view/render-pressable';
 import {
-  accessibleUnlessOptedOut,
-  booleanOr,
   createPressBehavior,
   type IDisabledResolver,
   type IPressConfigRefinement,
@@ -52,8 +49,6 @@ import {
   hasTouchablePressHandler,
   type IHighlightUnderlayRuntime,
 } from '../state/touchable';
-import { resolveHighlightExtraStyles } from '../view/render-touchable-highlight';
-
 export const TOUCHABLE_HIGHLIGHT_TAG = 'touchable-highlight';
 
 interface IHighlightState {
@@ -68,10 +63,6 @@ const states = new WeakMap<ISymbioteNode, IHighlightState>();
 
 function numberOr(value: unknown, fallback: number): number {
   return typeof value === 'number' ? value : fallback;
-}
-
-function stringOr(value: unknown, fallback: string | undefined): unknown {
-  return typeof value === 'string' ? value : fallback;
 }
 
 // Runs once per GESTURE, matching `./touchable-opacity`'s `refine` — the config it reads is
@@ -90,7 +81,7 @@ const refine: IPressConfigRefinement = (node, config) => {
 
   const underlay = createHighlightUnderlayHandlers(
     {
-      delayPressOut: numberOr(node.props.delayPressOut, 0),
+      delayPressOut: numberOr(propOf(node, 'delayPressOut'), 0),
       hasPressHandler,
       schedule: (callback, ms) => {
         const id = setTimeout(() => {
@@ -109,15 +100,20 @@ const refine: IPressConfigRefinement = (node, config) => {
       setShown: (shown: boolean): void => {
         if (state.shown === shown) return;
         state.shown = shown;
+        // THE BIT, and nothing else. No style is resolved here: what a showing underlay looks like
+        // is `foldTouchableHighlightUnderlay` in the engine, which reads the same two props it
+        // already strips from the payload. `markPropsDirty` is still owed — the op marks the host's
+        // node, and this marks the JS side's so the commit walk visits it.
+        setNodeUnderlayShown(node, shown);
         markPropsDirty(node);
         requestCommitFor(node);
       },
       onShowUnderlay: () => {
-        const onShowUnderlay = node.props.onShowUnderlay;
+        const onShowUnderlay = propOf(node, 'onShowUnderlay');
         if (typeof onShowUnderlay === 'function') onShowUnderlay();
       },
       onHideUnderlay: () => {
-        const onHideUnderlay = node.props.onHideUnderlay;
+        const onHideUnderlay = propOf(node, 'onHideUnderlay');
         if (typeof onHideUnderlay === 'function') onHideUnderlay();
       },
     },
@@ -143,49 +139,30 @@ const refine: IPressConfigRefinement = (node, config) => {
   };
 };
 
-// `id -> nativeID`, the fold every un-lowered wrapper's `foldHostBag` already applies. Not read off
-// `HOST_PRIMITIVES`, matching `./touchable-opacity`'s own inline check — that spec entry is
-// deliberately withheld until this primitive's wrapper collapses to one node everywhere.
-const foldPayload: IPayloadFold = props => {
-  const next: Record<string, unknown> = { ...props };
-  if (Object.hasOwn(next, 'id')) {
-    next.nativeID = next.id;
-    delete next.id;
-  }
-  next.accessible = accessibleUnlessOptedOut(props);
-  return next;
-};
-
-function tagFold(node: ISymbioteNode): IPayloadFold {
-  return props => {
-    const next = foldPayload(props);
-    const state = states.get(node);
-    const hasPressHandler =
-      appListenerFor(node, 'press') !== undefined ||
-      appListenerFor(node, 'pressIn') !== undefined ||
-      appListenerFor(node, 'pressOut') !== undefined ||
-      appListenerFor(node, 'longPress') !== undefined;
-    const extra =
-      state === undefined
-        ? undefined
-        : resolveHighlightExtraStyles({
-            shown: state.shown,
-            hasPressHandler,
-            underlayColor: stringOr(props.underlayColor, undefined) as
-              string | undefined,
-            activeOpacity: numberOr(props.activeOpacity, NaN) || undefined,
-          });
-    if (extra !== undefined) {
-      next.style = [props.style, extra.underlay, extra.child];
-    }
-    next.focusable = resolveTouchableFocusable(
-      booleanOr(props.focusable),
-      appListenerFor(node, 'press') !== undefined,
-      booleanOr(props.disabled),
-    );
-    return next;
-  };
-}
+// THE UNDERLAY FOLD LEFT THIS FILE ON 2026-09-18, and with it the last `payloadFold` on this tag —
+// this behavior now costs ZERO trips into JS per commit, down from one on every commit it was dirty
+// in (which for a touchable is FIVE at mount alone, because the opacity settle re-commits it).
+//
+// THE NOTE IT REPLACES SAID THE UNDERLAY WAS "the genuine unportable article" BECAUSE IT IS BUILT
+// FROM LIVE PRESS STATE. Half right, and the half it got wrong is the reusable part: `shown` really
+// does flip mid-gesture and really is JS's, but the RULE was never made of it. Of four inputs, three
+// were already portable — `underlayColor` and `activeOpacity` are ordinary props (ones the engine
+// ALREADY strips), and `_hasPressHandler` is listener EXISTENCE, which has crossed since
+// `OP_SET_OWNED_LISTENER`. The fourth is one bit. "JS holds it" was never the same claim as "only JS
+// can compute it", and this is the third time that distinction has moved a rule.
+//
+// WHAT CROSSES AND WHAT DOES NOT. `setNodeUnderlayShown` sends the bit on a flip — twice a tap. The
+// hold timer, the `press`-then-`pressOut` ordering, the re-arm on a second tap and the
+// `onShowUnderlay` / `onHideUnderlay` callbacks all stay here, where Pressability is, because they
+// run at gesture rate and call into app code. That is the browser's line too: a UA paints `:active`,
+// the page decides what a click means.
+//
+// `focusable` left earlier the same day and carried a bug out with it — it read `props.disabled` off
+// the BAG, which the engine's pressable rule strips, so every DISABLED highlight stayed in the focus
+// order. One rule serves both touchable tags now (`foldPressableProps`), so there is no second copy
+// to drift; pinned in `core/engine/cpp/tests/js/touchable-focusable-payload.itest.ts`.
+//
+// The underlay's own contract: `core/engine/cpp/tests/js/touchable-highlight-underlay.itest.ts`.
 
 // A listener flip changes no payload by itself, so the commit after it is a no-op and no fold
 // re-runs (`IHostBehavior.onOwnedListenerChange`) — same reason `./touchable-opacity` carries this.
@@ -205,7 +182,6 @@ export function createTouchableHighlightBehavior(
   const machine = createPressBehavior(refine, disabledOf);
   return {
     ...machine,
-    foldPayload,
     attach(node: ISymbioteNode): void {
       states.set(node, {
         shown: false,
@@ -228,13 +204,10 @@ export function createTouchableHighlightBehavior(
 // Idempotent: an adapter entry may be imported more than once in a bundle.
 export function registerTouchableHighlightBehavior(): void {
   const touchable = createTouchableHighlightBehavior();
+  // Spread whole: the tag used to override `attach` purely to bind a per-node `payloadFold`, and
+  // with the underlay rule in the engine there is nothing left to add.
   registerHostBehavior(TOUCHABLE_HIGHLIGHT_TAG, {
     ...touchable,
-    // Only the TAG binds a per-node fold — see `./touchable-opacity`'s identical comment.
-    attach(node: ISymbioteNode): void {
-      touchable.attach(node);
-      node.payloadFold = tagFold(node);
-    },
     onOwnedListenerChange,
   });
 }

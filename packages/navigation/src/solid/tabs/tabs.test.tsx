@@ -13,7 +13,12 @@
 
 import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import { childrenOf, type ISymbioteNode } from '@symbiote-native/engine';
+import {
+  installRecordingFabric,
+  payloadOf,
+  type IAuthoredNode,
+} from '@symbiote-native/test-utils';
 import { mount, unmount } from '@symbiote-native/solid';
 import { Tab } from './index';
 import type { ITabNavigatorHandle } from './index';
@@ -21,21 +26,34 @@ import { useRoute, createIsFocused } from '../primitives';
 
 const ROOT_TAG = 7702;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 const flush = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
+// SWITCHING TABS is the subject, so every walk below descends the LIVE child links from the app
+// root down. A recording keeps every node it ever saw created, so the screen a switch unmounted
+// would still answer here.
+//
+// The AppContainer root is the same node `installFabric`'s `appRoot()` named: the engine creates it
+// with `pointerEvents: 'box-none'`, and that is an authored prop rather than anything derived.
+function appRoot(): ISymbioteNode {
+  const root = fabric.find(node => node.props.pointerEvents === 'box-none');
+  if (root === undefined) throw new Error('no AppContainer root was created');
+  return root.handle;
+}
+
 function findAll(
-  predicate: (node: IFakeNode) => boolean,
-  nodes: readonly IFakeNode[] = fabric.committed,
-): IFakeNode[] {
-  const found: IFakeNode[] = [];
-  for (const node of nodes) {
-    if (predicate(node)) found.push(node);
-    found.push(...findAll(predicate, node.children));
+  predicate: (node: IAuthoredNode) => boolean,
+  handle: ISymbioteNode = appRoot(),
+): IAuthoredNode[] {
+  const found: IAuthoredNode[] = [];
+  for (const child of childrenOf(handle)) {
+    const recorded = fabric.find(one => one.handle === child);
+    if (recorded !== undefined && predicate(recorded)) found.push(recorded);
+    found.push(...findAll(predicate, child));
   }
   return found;
 }
@@ -45,8 +63,22 @@ const texts = (): string[] =>
     String(node.props.text),
   );
 
-const tabItems = (): IFakeNode[] =>
-  findAll(node => node.props.accessibilityRole === 'tab');
+// `accessibilityRole` reaches the renderer through the payload, not the author's bag.
+const tabItems = (): IAuthoredNode[] =>
+  findAll(node => payloadOf(node.handle).accessibilityRole === 'tab');
+
+// Every live node's handle, in tree order — the trace a rebuild leaves. Identity is what "rebuilt"
+// literally means, and it is strictly stronger than the create count these cases read before: a
+// count holds steady only while nothing is created, identity also catches a node replaced by an
+// equal-looking one.
+const liveHandles = (): ISymbioteNode[] =>
+  findAll(() => true).map(node => node.handle);
+
+function expectUnchanged(before: readonly ISymbioteNode[]): void {
+  const after = liveHandles();
+  expect(after).toHaveLength(before.length);
+  expect(after.every((node, index) => node === before[index])).toBe(true);
+}
 
 const FeedScreen = () => <text>feed-content</text>;
 const InboxScreen = () => <text>inbox-content</text>;
@@ -163,13 +195,13 @@ describe('Solid Tab navigator', () => {
       ));
       await flush();
       expect(texts()).toContain('1');
-      const before = fabric.counts.createNode;
+      const before = liveHandles();
 
       setBadge(2);
       await flush();
 
       expect(texts()).toContain('2');
-      expect(fabric.counts.createNode).toBe(before);
+      expectUnchanged(before);
     });
 
     // why: the flip side. A badge APPEARING adds an icon-wrapper child to the item's Descriptor, so
@@ -250,14 +282,14 @@ describe('Solid Tab navigator', () => {
       ));
       await flush();
       expect(texts()).toContain('p:none');
-      const before = fabric.counts.createNode;
+      const before = liveHandles();
 
       handle?.setParams('after', routeKey);
       await flush();
 
       expect(texts()).toContain('p:after');
       // And without rebuilding the screen: a focus-keyed content memo must not react to params.
-      expect(fabric.counts.createNode).toBe(before);
+      expectUnchanged(before);
     });
 
     // why: focus is SYNTHESIZED here (no native onAppear to hook), and the emit has to land after

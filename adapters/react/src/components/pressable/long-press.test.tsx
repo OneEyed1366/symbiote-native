@@ -15,7 +15,9 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount } from '@symbiote-native/react';
-import { installFabric } from '@symbiote-native/test-utils';
+// A RECORDING host: the node is found by its authored `testID` and the touch is aimed at the
+// `instanceHandle` the ops named. The press machine runs in JS; no commit rule is in this path.
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 140;
 const TOUCH_START = 'topTouchStart';
@@ -23,7 +25,7 @@ const TOUCH_END = 'topTouchEnd';
 // Longer than the 500ms synthesis delay so the hold timer has surely fired.
 const HOLD_ADVANCE_MS = 600;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 beforeEach(() => {
   vi.useFakeTimers();
   fabric.reset();

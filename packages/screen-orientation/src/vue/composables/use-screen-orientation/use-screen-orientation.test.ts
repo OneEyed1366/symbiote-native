@@ -4,7 +4,7 @@
 import { defineComponent, h, type Ref } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount } from '@symbiote-native/vue';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import { useScreenOrientation } from './index';
 
 const ROOT_TAG = 9954;
@@ -34,7 +34,7 @@ vi.mock('../../../core', () => ({
   OrientationLock: { UNKNOWN: 9, DEFAULT: 0 },
 }));
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 
 beforeEach(() => {
   fabric.reset();

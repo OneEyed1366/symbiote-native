@@ -10,7 +10,10 @@
 import '@angular/compiler';
 import { Component, Input, type Type } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 import {
   AppRegistry,
   setHostRegistrar,
@@ -54,7 +57,8 @@ Component({
   template: '<text>{{ label }}</text><ng-content></ng-content>',
 })(WrapperComponent);
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 
 // The host registrar the native side drives (RN's AppRegistry stand-in).
 const hostRunnables = new Map<string, IRunnable>();
@@ -122,7 +126,6 @@ describe('AppRegistry', () => {
     AppRegistry.runApplication(WRAPPED_APP_KEY, { rootTag: WRAPPED_ROOT_TAG });
     await tick();
 
-    const texts = fabric.appRoot().children.flatMap(n => fabric.serialize([n]));
-    expect(texts.join('')).toContain('hi');
+    expect(live.texts(live.appRoot()).join('')).toContain('hi');
   });
 });

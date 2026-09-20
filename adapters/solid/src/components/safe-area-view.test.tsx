@@ -16,7 +16,11 @@
 
 import { createSignal, Show } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 // SIDE-EFFECT IMPORT: the tag's fold lives in its behavior, and only this module installs it. An
 // app reaches it through the package barrel; a test importing the renderer directly does not.
 import '../register';
@@ -27,34 +31,24 @@ const SAFE_AREA = 'SafeAreaView';
 const TEST_ID = 'safe-area';
 const ACCESSIBILITY_LABEL = 'screen';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-function walk(nodes: IFakeNode[], visit: (node: IFakeNode) => void): void {
-  for (const node of nodes) {
-    visit(node);
-    walk(node.children, visit);
-  }
-}
-
-// Reads the LIVE committed tree, never `fabric.created` — a created node's props are frozen at
-// first commit, so anything asserted after an update has to come off the committed child set
-// (symbiote-engine-core §8).
+// Reads the LIVE tree, never the recording — the record holds a node as it was CREATED, with its
+// props frozen at that moment, so anything asserted after an update has to come off the live child
+// links (symbiote-engine-core §8).
 function committed(
-  predicate: (node: IFakeNode) => boolean,
-): IFakeNode | undefined {
-  let found: IFakeNode | undefined;
-  walk(fabric.committed, node => {
-    if (found === undefined && predicate(node)) found = node;
-  });
-  return found;
+  predicate: (node: ILiveNode) => boolean,
+): ILiveNode | undefined {
+  return live.findLive(live.appRoot(), predicate);
 }
 
-function safeArea(): IFakeNode {
+function safeArea(): ILiveNode {
   const node = committed(n => n.viewName === SAFE_AREA);
   if (node === undefined) throw new Error('no SafeAreaView was committed');
   return node;
@@ -72,9 +66,12 @@ describe('Solid SafeAreaView on the engine', () => {
     ));
     await tick();
 
-    expect(fabric.serialize(fabric.appRoot().children)).toBe(
-      'SafeAreaView(RCTView)',
-    );
+    expect(
+      live
+        .nodeOf(live.appRoot())
+        .children.map(child => live.serialize(child.handle))
+        .join(''),
+    ).toBe('SafeAreaView(RCTView)');
   });
 
   // why: SafeAreaView has no JS-side layout math of its own, so a caller's style must reach the
@@ -88,8 +85,8 @@ describe('Solid SafeAreaView on the engine', () => {
     ));
     await tick();
 
-    expect(safeArea().props.flex).toBe(1);
-    expect(safeArea().props.backgroundColor).toBe('#fff');
+    expect(safeArea().payload.flex).toBe(1);
+    expect(safeArea().payload.backgroundColor).toBe('#fff');
     expect(safeArea().children).toHaveLength(1);
     expect(safeArea().children[0].viewName).toBe('RCTView');
   });
@@ -107,9 +104,9 @@ describe('Solid SafeAreaView on the engine', () => {
     ));
     await tick();
 
-    expect(safeArea().props.testID).toBe(TEST_ID);
-    expect(safeArea().props.accessibilityLabel).toBe(ACCESSIBILITY_LABEL);
-    expect(safeArea().props.accessible).toBe(true);
+    expect(safeArea().payload.testID).toBe(TEST_ID);
+    expect(safeArea().payload.accessibilityLabel).toBe(ACCESSIBILITY_LABEL);
+    expect(safeArea().payload.accessible).toBe(true);
   });
 
   // why: Fabric only measures and fires layout for a node explicitly flagged onLayout:true, and
@@ -126,7 +123,7 @@ describe('Solid SafeAreaView on the engine', () => {
     ));
     await tick();
 
-    expect(safeArea().props.onLayout).toBe(true);
+    expect(safeArea().payload.onLayout).toBe(true);
     fabric.fireEvent(safeArea().instanceHandle, 'topLayout', {});
     expect(layoutFired).toBe(true);
   });
@@ -137,7 +134,7 @@ describe('Solid SafeAreaView on the engine', () => {
     mount(ROOT_TAG, () => <safe-area-view testID={TEST_ID} />);
     await tick();
 
-    expect('onLayout' in safeArea().props).toBe(false);
+    expect('onLayout' in safeArea().payload).toBe(false);
   });
 
   // why: Solid runs a component body ONCE. Every prop read sits inside the bag accessor precisely
@@ -147,15 +144,17 @@ describe('Solid SafeAreaView on the engine', () => {
     const [label, setLabel] = createSignal('before');
     mount(ROOT_TAG, () => <safe-area-view accessibilityLabel={label()} />);
     await tick();
-    const createdAtMount = fabric.counts.createNode;
-    expect(safeArea().props.accessibilityLabel).toBe('before');
+    // Node IDENTITY rather than a creation count: a rebuild that netted out even would satisfy a
+    // count, and the identity moving is what the case is about.
+    const hostAtMount = safeArea().handle;
+    expect(safeArea().payload.accessibilityLabel).toBe('before');
 
     setLabel('after');
     await tick();
 
-    expect(safeArea().props.accessibilityLabel).toBe('after');
-    expect(fabric.counts.createNode, 'the host node kept its identity').toBe(
-      createdAtMount,
+    expect(safeArea().payload.accessibilityLabel).toBe('after');
+    expect(safeArea().handle, 'the host node kept its identity').toBe(
+      hostAtMount,
     );
   });
 
@@ -172,30 +171,39 @@ describe('Solid SafeAreaView on the engine', () => {
       </safe-area-view>
     ));
     await tick();
-    expect(committed(n => n.props.testID === 'late')).toBeUndefined();
+    expect(committed(n => n.payload.testID === 'late')).toBeUndefined();
 
     setShown(true);
     await tick();
 
-    expect(committed(n => n.props.testID === 'late')).toBeDefined();
+    expect(committed(n => n.payload.testID === 'late')).toBeDefined();
   });
 
-  // why: Solid's spread walks only the CURRENT key set and has no removal pass, and
-  // resolveAccessibilityProps emits `accessibilityLabel` only while an aria alias holds a VALUE.
-  // Without the withStableKeys widening the folded key simply vanishes from the bag and a screen
-  // reader keeps announcing a label the app already removed — green in every other test here.
-  it('clears a folded accessibility prop when its aria alias goes undefined', async () => {
+  // why: Solid's spread walks only the CURRENT key set and has no removal pass, so without the
+  // withStableKeys widening a prop that goes undefined simply vanishes from the bag instead of being
+  // cleared — and a screen reader keeps announcing a label the app already removed, green in every
+  // other test here.
+  //
+  // Read on the AUTHORED key: the fold into `accessibilityLabel` is the engine's rule
+  // (`aria-payload.itest.ts`) and this harness holds no copy of it. `aria-label` is the key the
+  // spread actually holds, so the widening is watched where it operates.
+  it('clears an aria alias that goes undefined', async () => {
     const [label, setLabel] = createSignal<string | undefined>('screen');
     mount(ROOT_TAG, () => <safe-area-view aria-label={label()} />);
     await tick();
-    expect(safeArea().props.accessibilityLabel).toBe('screen');
+    expect(safeArea().payload['aria-label']).toBe('screen');
 
     setLabel(undefined);
     await tick();
 
-    // `null`, not absent: a key the node held last commit and no longer has goes to Fabric as
-    // literal null so the native setter resets to its default (diffProps, symbiote-engine-core
-    // §8). Without the widening this reads back the stale 'screen'.
-    expect(safeArea().props.accessibilityLabel).toBeNull();
+    // ABSENT, not null: the literal null was the CLONE PROTOCOL's spelling of "reset to the
+    // default", held only inside the diff the stand-in merged. The engine's op stream says the
+    // same thing with `NO_VALUE`, and a host replaying that op deletes the key. Without the
+    // widening this reads back the stale 'screen'.
+    expect(Object.hasOwn(safeArea().payload, 'aria-label')).toBe(false);
+    // …and the half that proves the engine ACTED: the record carried the label after the mount
+    // above, so its being gone from the record means a clearing op was sent for it.
+    const recorded = fabric.find(node => node.viewName === SAFE_AREA);
+    expect(Object.hasOwn(recorded?.props ?? {}, 'aria-label')).toBe(false);
   });
 });

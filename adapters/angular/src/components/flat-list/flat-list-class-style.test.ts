@@ -7,14 +7,17 @@ import '@angular/compiler';
 import { Component } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
-import { installFabric } from '@symbiote-native/test-utils';
+// A RECORDING host, and the predicate runs over the PAYLOAD: `backgroundColor` is a class-derived
+// style, so it exists only after the style slot is flattened on the way into the payload — the
+// node's own prop bag still holds the unresolved slot.
+import { installRecordingFabric, payloadOf } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../../render';
 import { FlatList } from './index';
 import { VListItemDirective } from '../virtualized-list/directives';
 
 const ROOT_TAG = 951;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -76,7 +79,9 @@ describe('FlatList anchor class= resolution', () => {
     await tick();
     await tick();
 
-    const node = fabric.find(n => n.props.backgroundColor === 'red');
+    const node = fabric.find(
+      n => payloadOf(n.handle).backgroundColor === 'red',
+    );
     expect(
       node,
       'a real Fabric node carries the class-derived style',

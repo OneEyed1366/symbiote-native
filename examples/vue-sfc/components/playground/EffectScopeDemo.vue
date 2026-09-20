@@ -61,13 +61,8 @@ function bumpTicks(): void {
     <text class="switch-label">
       effectScope + getCurrentScope + onScopeDispose
     </text>
-    <text
-      class="note-text"
-      testID="effectscope-had-scope"
-    >
-      {{
-        `getCurrentScope() at setup() !== undefined: ${hadScopeAtSetup}`
-      }}
+    <text class="note-text" testID="effectscope-had-scope">
+      {{ `getCurrentScope() at setup() !== undefined: ${hadScopeAtSetup}` }}
     </text>
     <view class="row-tight">
       <ActionButton
@@ -89,14 +84,8 @@ function bumpTicks(): void {
         color="#f5a623"
       />
     </view>
-    <text
-      v-for="(entry, index) in log"
-      :key="index"
-      class="list-row-text"
-    >
-      {{
-        entry
-      }}
+    <text v-for="(entry, index) in log" :key="index" class="list-row-text">
+      {{ entry }}
     </text>
   </view>
 </template>

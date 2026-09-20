@@ -13,36 +13,40 @@ import {
   isSymbioteNode,
   registerRules,
 } from '@symbiote-native/engine';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 import { SymbioteRenderer, SymbioteRendererFactory } from './index';
 import { registerComposedComponent } from '../anchor-host-registry';
 
 const ROOT_TAG = 707;
 const PROBE_ID = 'probe';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 
 // A macrotask boundary drains the engine's coalesced (requestCommit) commit before asserting.
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
-// Fabric is clone-on-write ONLY once a node has been committed at least once — a mutation
-// before the FIRST commit still lands on the same object `fabric.find` (which searches
-// `created`, the pre-clone originals) sees. A SECOND mutation after that first commit produces
-// a NEW cloned object `fabric.find` never observes, so any assertion on a value that changed
-// across two commits must walk the live COMMITTED tree instead (mirrors the __tests__/responder-*
-// files' own `findCommitted` helper).
+// The LIVE tree, not the record's `find` — `find` searches the CREATION log, which never
+// forgets a node once it exists, so a residency question ("is it still there") phrased against
+// it would pass forever whatever removeChild actually did. Every test in this file calls
+// `setup()` exactly once and `fabric.reset()` runs in `beforeEach`, so `live.appRoot()` is safe
+// (`.docs/mirror-elimination.md`, "`appRoot()` is only safe in a file that mounts once per case
+// AND resets the recording between cases").
 function findCommitted(
-  predicate: (node: IFakeNode) => boolean,
-): IFakeNode | undefined {
-  const stack = [...fabric.committed];
-  while (stack.length > 0) {
-    const node = stack.pop();
-    if (node === undefined) continue;
-    if (predicate(node)) return node;
-    stack.push(...node.children);
-  }
-  return undefined;
+  predicate: (node: ReturnType<typeof live.nodeOf>) => boolean,
+) {
+  return live.findLive(live.appRoot(), predicate);
+}
+
+function serializedApp(): string {
+  return live
+    .nodeOf(live.appRoot())
+    .children.map(child => live.serialize(child.handle))
+    .join('');
 }
 
 function setup(): {
@@ -97,10 +101,7 @@ describe('Angular SymbioteRenderer drives the engine', () => {
     await tick();
 
     // The engine wraps surface.children in the synthetic box-none AppContainer root.
-    const root = fabric.appRoot();
-    expect(fabric.serialize(root.children)).toBe(
-      'RCTView(RCTText(RCTRawText "Hello"))',
-    );
+    expect(serializedApp()).toBe('RCTView(RCTText(RCTRawText "Hello"))');
   });
 
   // why: descriptorFor's table is shared across every adapter — a symbiote intrinsic beyond
@@ -120,12 +121,12 @@ describe('Angular SymbioteRenderer drives the engine', () => {
     renderer.appendChild(surface, image);
     await tick();
 
-    const committed = fabric.find(node => node.props.testID === 'spinner');
+    const committed = findCommitted(n => n.payload.testID === 'spinner');
     expect(committed?.viewName).toBe('ActivityIndicatorView');
-    expect(committed?.props.animating).toBe(true);
-    const committedImage = fabric.find(node => node.props.testID === 'image');
+    expect(committed?.payload.animating).toBe(true);
+    const committedImage = findCommitted(n => n.payload.testID === 'image');
     expect(committedImage?.viewName).toBe('RCTImageView');
-    expect(committedImage?.props.source).toEqual({
+    expect(committedImage?.payload.source).toEqual({
       uri: 'https://example.invalid/image.png',
     });
   });
@@ -142,12 +143,12 @@ describe('Angular SymbioteRenderer drives the engine', () => {
     renderer.appendChild(surface, view);
     await tick();
 
-    const committed = fabric.find(node => node.props.nativeID === PROBE_ID);
+    const committed = findCommitted(n => n.payload.nativeID === PROBE_ID);
     expect(committed, 'the probed RCTView committed').toBeDefined();
     // Angular emits a [style] binding as per-key setStyle; the seam folds them into one style
     // object, then the engine HOISTS style keys to top-level Fabric props (RN's flat C++ props
     // contract — style is never a nested key on a committed node).
-    expect(committed?.props).toMatchObject({
+    expect(committed?.payload).toMatchObject({
       nativeID: PROBE_ID,
       padding: 24,
       opacity: 0.5,
@@ -178,13 +179,67 @@ describe('Angular SymbioteRenderer drives the engine', () => {
     renderer.appendChild(surface, view);
     await tick();
 
-    const committed = fabric.find(node => node.props.nativeID === PROBE_ID);
+    const committed = findCommitted(n => n.payload.nativeID === PROBE_ID);
     // padding comes from the class; backgroundColor is explicit style, so it wins over the
     // class-derived red — same precedence Vue's class="..."/:style="..." merge guarantees.
-    expect(committed?.props).toMatchObject({
+    expect(committed?.payload).toMatchObject({
       padding: 10,
       backgroundColor: 'blue',
     });
+  });
+
+  // why: TWO SOURCES OF CLASSES ON ONE NODE MUST UNION, and this guard exists because the adapter
+  // is about to gain a second one. Angular shadows a `[class]` MAP into a directive input when the
+  // directive declares `class` (`setShadowStylingInputFlags`, `view/directives.ts`), while
+  // `[class.foo]` stays an `ɵɵclassProp` and keeps arriving as `addClass`. So a node can be told its
+  // classes as a whole STRING and one TOKEN at a time in the same pass, and whichever writes last
+  // must not erase the other — which a naive `routeProp(el, 'class', theString)` would do.
+  //
+  // Written against the renderer's two entry points directly, because that is what the two Ivy
+  // instructions call and the union has to hold whatever order they come in.
+  it('unions a whole class string with per-token classes, in either order', async () => {
+    registerRules([
+      {
+        tokens: ['card'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { padding: 10 },
+      },
+      {
+        tokens: ['wide'],
+        specificity: [0, 1, 0],
+        order: 1,
+        style: { flexGrow: 1 },
+      },
+      {
+        tokens: ['lit'],
+        specificity: [0, 1, 0],
+        order: 2,
+        style: { opacity: 1 },
+      },
+    ]);
+    const { surface, renderer } = setup();
+
+    const mapFirst = renderer.createElement('view');
+    renderer.setProperty(mapFirst, 'nativeID', 'map-first');
+    renderer.setProperty(mapFirst, 'class', 'card wide');
+    renderer.addClass(mapFirst, 'lit');
+    renderer.appendChild(surface, mapFirst);
+
+    const tokenFirst = renderer.createElement('view');
+    renderer.setProperty(tokenFirst, 'nativeID', 'token-first');
+    renderer.addClass(tokenFirst, 'lit');
+    renderer.setProperty(tokenFirst, 'class', 'card wide');
+    renderer.appendChild(surface, tokenFirst);
+    await tick();
+
+    // All three rules, from both channels, on both nodes.
+    expect(
+      findCommitted(n => n.payload.nativeID === 'map-first')?.payload,
+    ).toMatchObject({ padding: 10, flexGrow: 1, opacity: 1 });
+    expect(
+      findCommitted(n => n.payload.nativeID === 'token-first')?.payload,
+    ).toMatchObject({ padding: 10, flexGrow: 1, opacity: 1 });
   });
 
   // why: `[ngClass]`/`[class.foo]="false"` compiles to a removeClass call — the resolved style
@@ -215,9 +270,9 @@ describe('Angular SymbioteRenderer drives the engine', () => {
     renderer.appendChild(surface, view);
     await tick();
 
-    const committed = fabric.find(node => node.props.nativeID === PROBE_ID);
-    expect(committed?.props.padding).toBe(10);
-    expect(committed?.props.opacity).toBeUndefined();
+    const committed = findCommitted(n => n.payload.nativeID === PROBE_ID);
+    expect(committed?.payload.padding).toBe(10);
+    expect(committed?.payload.opacity).toBeUndefined();
   });
 
   // why: this exercises removeChild's TOP-LEVEL case only (`drop` is a direct surface child,
@@ -232,15 +287,14 @@ describe('Angular SymbioteRenderer drives the engine', () => {
     renderer.appendChild(surface, drop);
     await tick();
     expect(
-      fabric.find(node => node.props.nativeID === PROBE_ID),
+      findCommitted(n => n.payload.nativeID === PROBE_ID),
       'present before remove',
     ).toBeDefined();
 
-    fabric.reset();
     renderer.removeChild(surface, drop);
     await tick();
     expect(
-      fabric.find(node => node.props.nativeID === PROBE_ID),
+      findCommitted(n => n.payload.nativeID === PROBE_ID),
       'gone after remove',
     ).toBeUndefined();
   });
@@ -259,15 +313,14 @@ describe('Angular SymbioteRenderer drives the engine', () => {
     renderer.appendChild(surface, container);
     await tick();
     expect(
-      fabric.find(node => node.props.nativeID === PROBE_ID),
+      findCommitted(n => n.payload.nativeID === PROBE_ID),
       'present before remove',
     ).toBeDefined();
 
-    fabric.reset();
     renderer.removeChild(container, nested);
     await tick();
     expect(
-      fabric.find(node => node.props.nativeID === PROBE_ID),
+      findCommitted(n => n.payload.nativeID === PROBE_ID),
       'gone after remove',
     ).toBeUndefined();
   });
@@ -286,7 +339,7 @@ describe('Angular SymbioteRenderer drives the engine', () => {
     renderer.appendChild(surface, first);
     renderer.appendChild(surface, last);
     await tick();
-    expect(fabric.serialize(fabric.appRoot().children)).toBe(
+    expect(serializedApp()).toBe(
       'RCTText(RCTRawText "first")RCTText(RCTRawText "last")',
     );
 
@@ -295,7 +348,7 @@ describe('Angular SymbioteRenderer drives the engine', () => {
     renderer.insertBefore(surface, middle, last);
     await tick();
 
-    expect(fabric.serialize(fabric.appRoot().children)).toBe(
+    expect(serializedApp()).toBe(
       'RCTText(RCTRawText "first")RCTText(RCTRawText "middle")RCTText(RCTRawText "last")',
     );
   });
@@ -311,7 +364,10 @@ describe('Angular SymbioteRenderer drives the engine', () => {
     expect(() => renderer.appendChild(null, orphan)).not.toThrow();
     await tick();
 
-    expect(fabric.committed).toEqual([]);
+    // Nothing reached a surface, so no commit was ever requested — the recording host's own
+    // commit counter, not `fabric.committed` (a mirror-only field): a create with no attach
+    // still shows up in the CREATION log, which is not the claim under test.
+    expect(fabric.commits).toBe(0);
   });
 
   // why: setAttribute/removeAttribute are the STATIC-attribute half of Renderer2 (an unbound
@@ -326,17 +382,21 @@ describe('Angular SymbioteRenderer drives the engine', () => {
     renderer.appendChild(surface, view);
     await tick();
     expect(
-      findCommitted(n => n.props.nativeID === PROBE_ID)?.props.testID,
+      findCommitted(n => n.payload.nativeID === PROBE_ID)?.payload.testID,
     ).toBe('static-attr');
 
     renderer.removeAttribute(view, 'testID');
     await tick();
-    // The fake Fabric's clone-on-write merge keeps a removed key as an explicit `null`, not a
-    // deleted one (fake-fabric.ts's own header comment) — this is the real committed contract,
-    // not a test-harness quirk: RN's own diff sends an explicit prop-removal, never a delete.
+    // The op stream spells a removed key with `NO_VALUE`, which the recording obeys by deleting
+    // it — the key's ABSENCE is proof a clearing op was sent, not a `null` the mirror's
+    // clone-on-write merge produced (`.docs/mirror-elimination.md`, "RESOLVED: the
+    // `onLayout === null` decision").
     expect(
-      findCommitted(n => n.props.nativeID === PROBE_ID)?.props.testID,
-    ).toBeNull();
+      Object.hasOwn(
+        findCommitted(n => n.payload.nativeID === PROBE_ID)?.payload ?? {},
+        'testID',
+      ),
+    ).toBe(false);
   });
 
   // why: removeStyle is setStyle's inverse (an `[ngStyle]` binding removing one key) — it must
@@ -352,9 +412,9 @@ describe('Angular SymbioteRenderer drives the engine', () => {
     renderer.appendChild(surface, view);
     await tick();
 
-    const committed = fabric.find(node => node.props.nativeID === PROBE_ID);
-    expect(committed?.props.padding).toBe(24);
-    expect(committed?.props.opacity).toBeUndefined();
+    const committed = findCommitted(n => n.payload.nativeID === PROBE_ID);
+    expect(committed?.payload.padding).toBe(24);
+    expect(committed?.payload.opacity).toBeUndefined();
   });
 
   // why: setValue is Angular's `ɵɵtextInterpolate`/`{{binding}}` update path (renderer.ts's own
@@ -370,14 +430,14 @@ describe('Angular SymbioteRenderer drives the engine', () => {
     renderer.appendChild(surface, text);
     await tick();
     expect(
-      findCommitted(n => n.props.nativeID === PROBE_ID)?.children[0]?.props
+      findCommitted(n => n.payload.nativeID === PROBE_ID)?.children[0]?.payload
         .text,
     ).toBe('first');
 
     renderer.setValue(raw, 'second');
     await tick();
     expect(
-      findCommitted(n => n.props.nativeID === PROBE_ID)?.children[0]?.props
+      findCommitted(n => n.payload.nativeID === PROBE_ID)?.children[0]?.payload
         .text,
     ).toBe('second');
   });
@@ -429,8 +489,7 @@ describe('Angular SymbioteRenderer drives the engine', () => {
 
     // The anchor never reaches Fabric; its child keeps the same sibling position. Angular
     // composed components use this to make their framework host element disappear.
-    const root = fabric.appRoot();
-    expect(fabric.serialize(root.children)).toBe('RCTViewRCTText');
+    expect(serializedApp()).toBe('RCTViewRCTText');
   });
 
   // why: Angular hands (press)="x" the event name EXPLICITLY at compile time (no onX->x

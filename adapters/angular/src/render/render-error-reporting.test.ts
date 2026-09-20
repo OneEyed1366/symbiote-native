@@ -18,14 +18,18 @@
 import '@angular/compiler';
 import { Component, signal } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 import { mount, unmount } from './index';
 
 const ROOT_TAG = 733;
 const TICK_BOOM = 'template exploded';
 const LISTENER_BOOM = 'listener exploded';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
@@ -206,8 +210,10 @@ describe('Negative — an Angular app throws', () => {
     caption.set('recovered');
     await drainAngularAndCommit();
 
-    expect(fabric.serialize(fabric.appRoot().children)).toContain(
-      'RCTRawText "recovered"',
-    );
+    const serialized = live
+      .nodeOf(live.appRoot())
+      .children.map(child => live.serialize(child.handle))
+      .join('');
+    expect(serialized).toContain('RCTRawText "recovered"');
   });
 });

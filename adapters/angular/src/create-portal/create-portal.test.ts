@@ -18,7 +18,11 @@
 import '@angular/compiler';
 import { Component, signal } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import { childrenOf, parentOf } from '@symbiote-native/engine';
+import {
+  installRecordingFabric,
+  type IAuthoredNode,
+} from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../render';
 import { ViewHost, TextHost } from '../primitives';
@@ -26,7 +30,7 @@ import { PortalDirective, PortalOutletDirective } from './index';
 
 const ROOT_TAG = 930;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 const settle = async (): Promise<void> => {
@@ -80,45 +84,47 @@ afterEach(() => unmount(ROOT_TAG));
 // This file asserted the SIBLING placement until 2026-09-02, i.e. it pinned the divergence instead
 // of catching it.
 
-function containsText(node: IFakeNode, text: string): boolean {
-  if (node.viewName === 'RCTRawText' && node.props.text === text) return true;
-  return node.children.some(child => containsText(child, text));
+function containsText(handle: object, text: string): boolean {
+  return childrenOf(handle).some(child => {
+    const recorded = fabric.find(node => node.handle === child);
+    if (recorded?.viewName === 'RCTRawText' && recorded.props.text === text)
+      return true;
+    return containsText(child, text);
+  });
 }
 
-function findNode(
-  predicate: (node: IFakeNode) => boolean,
-): IFakeNode | undefined {
-  let result: IFakeNode | undefined;
-  const walk = (nodes: IFakeNode[]): void => {
-    for (const node of nodes) {
-      if (predicate(node)) result = node;
-      walk(node.children);
-    }
-  };
-  walk(fabric.committed);
-  return result;
-}
-
-function outlet(testId: string): IFakeNode | undefined {
-  return findNode(node => node.props.testID === testId);
+function outlet(testId: string): IAuthoredNode | undefined {
+  return fabric.find(node => node.props.testID === testId);
 }
 
 // Strict: a node is not its own descendant, so an assertion cannot pass by finding the host.
-function isDescendantOf(root: IFakeNode, target: IFakeNode): boolean {
-  return root.children.some(
+function isDescendantOf(root: object, target: object): boolean {
+  return childrenOf(root).some(
     child => child === target || isDescendantOf(child, target),
   );
 }
 
-// Matches the plain wrapper View authored by `<view *portal="…">` — deepest RCTView containing
-// the text and carrying none of the outlet testIDs, so ancestor Views along the way don't
-// shadow it (DFS visits the deepest match last and it wins).
-function portaledContent(): IFakeNode | undefined {
-  return findNode(
+// Matches the plain wrapper View authored by `<view *portal="…">`: the DEEPEST RCTView that
+// contains the text and carries none of the outlet testIDs. Its ancestors match the same
+// predicate, so the one with no other candidate beneath it is the wrapper itself.
+//
+// `parentOf` is the part the recording host needs and the fake tree got for free. A recording
+// keeps every node it ever saw created, so a destroyed view is still IN the record — what says it
+// is gone is that the ops detached it, and that is what an absent parent means. (Nothing asked
+// about here is a surface root, which reports the same absent parent for a different reason.)
+function portaledContent(): IAuthoredNode | undefined {
+  const candidates = fabric.findAll(
     node =>
       node.viewName === 'RCTView' &&
       !node.props.testID &&
-      containsText(node, 'portaled content'),
+      parentOf(node.handle) !== undefined &&
+      containsText(node.handle, 'portaled content'),
+  );
+  return candidates.find(
+    one =>
+      !candidates.some(
+        other => other !== one && isDescendantOf(one.handle, other.handle),
+      ),
   );
 }
 
@@ -164,10 +170,16 @@ describe('createPortal (Angular) — same-surface delivery', () => {
       if (hostA === undefined || hostB === undefined || ported === undefined) {
         throw new Error('outlets and portaled content must all be committed');
       }
-      expect(isDescendantOf(hostA, ported), 'landed under outlet A').toBe(true);
+      expect(
+        isDescendantOf(hostA.handle, ported.handle),
+        'landed under outlet A',
+      ).toBe(true);
       // The other outlet pins that "under A" is a real placement rather than "somewhere in the
       // tree" — both hosts are siblings, so a portal that never moved would fail this half.
-      expect(isDescendantOf(hostB, ported), 'not under outlet B').toBe(false);
+      expect(
+        isDescendantOf(hostB.handle, ported.handle),
+        'not under outlet B',
+      ).toBe(false);
     });
 
     it('removes the portaled content once toggled off', async () => {
@@ -207,10 +219,14 @@ describe('createPortal (Angular) — same-surface delivery', () => {
       if (hostA === undefined || hostB === undefined || ported === undefined) {
         throw new Error('outlets and portaled content must all be committed');
       }
-      expect(isDescendantOf(hostB, ported), 'moved under outlet B').toBe(true);
-      expect(isDescendantOf(hostA, ported), 'no stale copy under A').toBe(
-        false,
-      );
+      expect(
+        isDescendantOf(hostB.handle, ported.handle),
+        'moved under outlet B',
+      ).toBe(true);
+      expect(
+        isDescendantOf(hostA.handle, ported.handle),
+        'no stale copy under A',
+      ).toBe(false);
     });
   });
 

@@ -1,4 +1,3 @@
-
 type IActionButtonProps = {
   title: string;
   onPress: () => void;

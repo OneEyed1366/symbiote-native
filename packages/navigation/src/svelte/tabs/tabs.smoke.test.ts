@@ -13,16 +13,12 @@
 //    every one of its branches - a gap worth a core-level render-tabs test, not this file's job.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import { mount, unmount } from '@symbiote-native/svelte/native-view-bridge';
 import type { ITabNavigatorHandle } from '../../core';
 import {
-  countLive,
-  findAllLive,
-  findLiveByTestId,
-  outline,
-  rawTextsOutsideTextContainer,
-  walkLive,
+  createNavigationLiveTree,
+  type IFabricNode,
 } from '../fabric-tree.test-helper';
 import {
   createSvelteHarness,
@@ -36,7 +32,16 @@ if (globalThis.navigator === undefined) {
 }
 
 const ROOT_TAG = 91_702;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const {
+  appRoot,
+  countLive,
+  findAllLive,
+  findLiveByTestId,
+  outline,
+  rawTextsOutsideTextContainer,
+  walkLive,
+} = createNavigationLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -198,44 +203,30 @@ async function mountToggleTab(): Promise<{
   return { navigator: handle.navigator, hideProfile: handle.hideProfile };
 }
 
-// Tab's OWN root (not fabric.appRoot(), which is the outer mount wrapper a few levels up) is the
+// Tab's OWN root (not appRoot(), which is the outer mount wrapper a few levels up) is the
 // node with exactly 3 children shaped [registry host (RCTText), content, bar] - the same shape
 // the "paints the shared tab bar" outline test below asserts explicitly. Locating it structurally
-// (rather than assuming a fixed depth under fabric.appRoot()) keeps these helpers from picking up
+// (rather than assuming a fixed depth under appRoot()) keeps these helpers from picking up
 // the registry-host's own incidental whitespace text, which is not a tab-bar label at all.
-type INode = {
-  viewName?: string;
-  props?: Record<string, unknown>;
-  children?: INode[];
-};
-function isNode(value: unknown): value is INode {
-  return typeof value === 'object' && value !== null;
-}
-function tabRootNode(): INode | undefined {
-  let found: INode | undefined;
-  const search = (node: unknown): void => {
-    if (found !== undefined || !isNode(node)) return;
-    const children = node.children ?? [];
-    if (children.length === 3 && children[0]?.viewName === 'RCTText') {
-      found = node;
-      return;
-    }
-    for (const child of children) search(child);
-  };
-  search(fabric.appRoot());
+function tabRootNode(): IFabricNode | undefined {
+  let found: IFabricNode | undefined;
+  walkLive(appRoot(), node => {
+    if (found !== undefined) return;
+    const kids = node.children;
+    if (kids.length === 3 && kids[0]?.viewName === 'RCTText') found = node;
+  });
   return found;
 }
-function tabBarNode(): INode | undefined {
-  return tabRootNode()?.children?.[2];
+function tabBarNode(): IFabricNode | undefined {
+  return tabRootNode()?.children[2];
 }
 
 function tabBarLabels(): string[] {
+  const bar = tabBarNode();
+  if (bar === undefined) return [];
   const labels: string[] = [];
-  walkLive(tabBarNode(), node => {
-    if (
-      node.viewName === 'RCTRawText' &&
-      typeof node.props?.text === 'string'
-    ) {
+  walkLive(bar.handle, node => {
+    if (node.viewName === 'RCTRawText' && typeof node.props.text === 'string') {
       labels.push(node.props.text);
     }
   });
@@ -250,10 +241,12 @@ function isSelectionState(value: unknown): value is { selected?: boolean } {
 // registration order - the one prop that survives onto the live tree and lets a black-box test
 // tell which item is "selected" without depending on paint position.
 function tabBarItemSelection(): boolean[] {
-  return findAllLive(tabBarNode(), 'RCTView')
-    .filter(node => node.props?.accessibilityState !== undefined)
+  const bar = tabBarNode();
+  if (bar === undefined) return [];
+  return findAllLive(bar.handle, 'RCTView')
+    .filter(node => node.props.accessibilityState !== undefined)
     .map(node => {
-      const state = node.props?.accessibilityState;
+      const state = node.props.accessibilityState;
       return isSelectionState(state) ? Boolean(state.selected) : false;
     });
 }
@@ -262,8 +255,7 @@ function readScreenLabel(
   testID: string,
 ):
   { name: string; focused: boolean; params: unknown; key: string } | undefined {
-  const label = findLiveByTestId(fabric.appRoot(), testID)?.props
-    ?.accessibilityLabel;
+  const label = findLiveByTestId(appRoot(), testID)?.props?.accessibilityLabel;
   if (typeof label !== 'string') return undefined;
   const [name, focused, paramsJson, key] = label.split('|');
   if (
@@ -292,8 +284,14 @@ describe('Tab (real compiled index.svelte)', () => {
 
       // Root > [registry host, content, bar]; the bar's own subtree comes from the shared
       // renderTabBar Descriptor, mounted through the bridge rather than hand-authored markup.
-      expect(outline(fabric.appRoot()).slice(0, 6)).toEqual([
-        'RCTView',
+      //
+      // The root line reads `#surface` rather than `RCTView`, and the change is a CORRECTION.
+      // The app root is the surface node; it is created as an `RCTView` and then set to the
+      // surface component, so `componentOf` says `#surface` and Fabric commits it as `RootView`.
+      // The stand-in tree kept the creation name — a third answer, and the only one nothing
+      // downstream agrees with. Everything below the root is unchanged.
+      expect(outline(appRoot()).slice(0, 6)).toEqual([
+        '#surface',
         '  RCTView',
         '    RCTView',
         '      RCTText',
@@ -324,22 +322,22 @@ describe('Tab (real compiled index.svelte)', () => {
     // subtree (and any state it holds) must not exist in the tree until it becomes focused.
     it('mounts only the focused route and swaps it on jumpTo', async () => {
       const handle = await mountTab();
-      expect(findLiveByTestId(fabric.appRoot(), 'feed')).toBeDefined();
-      expect(findLiveByTestId(fabric.appRoot(), 'profile')).toBeUndefined();
+      expect(findLiveByTestId(appRoot(), 'feed')).toBeDefined();
+      expect(findLiveByTestId(appRoot(), 'profile')).toBeUndefined();
 
       handle.jumpTo('profile');
       await tick();
       await tick();
-      expect(findLiveByTestId(fabric.appRoot(), 'feed')).toBeUndefined();
-      expect(findLiveByTestId(fabric.appRoot(), 'profile')).toBeDefined();
+      expect(findLiveByTestId(appRoot(), 'feed')).toBeUndefined();
+      expect(findLiveByTestId(appRoot(), 'profile')).toBeDefined();
     });
 
     // why: `initialRouteName` lets a consumer land on a tab other than the first registered
     // one - the common "deep link into the second tab" case.
     it('honours initialRouteName', async () => {
       await mountTab('initial-route', 'initialRouteName="profile"');
-      expect(findLiveByTestId(fabric.appRoot(), 'profile')).toBeDefined();
-      expect(findLiveByTestId(fabric.appRoot(), 'feed')).toBeUndefined();
+      expect(findLiveByTestId(appRoot(), 'profile')).toBeDefined();
+      expect(findLiveByTestId(appRoot(), 'feed')).toBeUndefined();
     });
 
     // why: there is no native appear/disappear event for a pure-JS tab bar, so focus/blur must
@@ -384,16 +382,14 @@ describe('Tab (real compiled index.svelte)', () => {
         focused: true,
         params: { sort: 'trending' },
       });
-      expect(findLiveByTestId(fabric.appRoot(), 'profile')).toBeUndefined();
+      expect(findLiveByTestId(appRoot(), 'profile')).toBeUndefined();
     });
 
     // why: an app can render <Tab> before any <Tab.Screen> marker resolves (e.g. behind a
     // data-driven {#each}) - this must degrade to an empty bar and no content, never throw.
     it('renders an empty bar and no focused screen when no screens are registered', async () => {
       await mountEmptyTab();
-      expect(findAllLive(fabric.appRoot(), 'RCTView').length).toBeGreaterThan(
-        0,
-      );
+      expect(findAllLive(appRoot(), 'RCTView').length).toBeGreaterThan(0);
       expect(tabBarLabels()).toEqual([]);
     });
 
@@ -401,11 +397,11 @@ describe('Tab (real compiled index.svelte)', () => {
     // content host and the bar are the three fixed slots every navigation must preserve.
     it('keeps exactly one root, one content host and one bar after a jump', async () => {
       const handle = await mountTab();
-      const before = countLive(fabric.appRoot(), 'RCTView');
+      const before = countLive(appRoot(), 'RCTView');
       handle.jumpTo('profile');
       await tick();
       await tick();
-      expect(countLive(fabric.appRoot(), 'RCTView')).toBe(before);
+      expect(countLive(appRoot(), 'RCTView')).toBe(before);
     });
 
     // why: the navigator templates are formatted normally, so Svelte emits a ' ' text node
@@ -415,12 +411,12 @@ describe('Tab (real compiled index.svelte)', () => {
     // the focused screen's subtree is rebuilt on each focus change.
     it('commits no raw text outside a text container', async () => {
       const handle = await mountTab('hygiene');
-      expect(rawTextsOutsideTextContainer(fabric.appRoot())).toEqual([]);
+      expect(rawTextsOutsideTextContainer(appRoot())).toEqual([]);
 
       handle.jumpTo('profile');
       await tick();
       await tick();
-      expect(rawTextsOutsideTextContainer(fabric.appRoot())).toEqual([]);
+      expect(rawTextsOutsideTextContainer(appRoot())).toEqual([]);
     });
   });
 
@@ -478,14 +474,14 @@ describe('Tab (real compiled index.svelte)', () => {
       navigator.jumpTo('profile');
       await tick();
       await tick();
-      expect(findLiveByTestId(fabric.appRoot(), 'profile')).toBeDefined();
+      expect(findLiveByTestId(appRoot(), 'profile')).toBeDefined();
 
       hideProfile();
       await tick();
       await tick();
 
       expect(tabBarLabels()).toEqual(['Feed']);
-      expect(findLiveByTestId(fabric.appRoot(), 'profile')).toBeUndefined();
+      expect(findLiveByTestId(appRoot(), 'profile')).toBeUndefined();
       expect(readScreenLabel('feed')).toMatchObject({
         name: 'feed',
         focused: true,

@@ -1,4 +1,4 @@
-// An AnimatedNode written straight into a prop of a BARE TAG — no `Animated.View`, no wrapper, no
+// An AnimatedValue written straight into a prop of a BARE TAG — no `Animated.View`, no wrapper, no
 // component anywhere. This is the proof that `createAnimatedComponent` has no job left: the engine
 // publishes the current value, subscribes, writes each frame through its own targeted commit, and
 // releases the subscription when the node leaves the tree.
@@ -6,9 +6,18 @@
 // Every "nothing happened" assertion here is paired with a positive control on the SAME path — an
 // animation that stops writing and an animation that never started produce the identical
 // observation, and only the control tells them apart.
+//
+// SPLIT: this file kept the JS-DRIVEN describe plus the one native-event case that never compares
+// a real tag either, both on `installRecordingFabric()`. The tag-dependent native-driver/-event
+// cases (comparing `connect?.args[1] === viewTag` etc.) genuinely need REAL Fabric tags — under the
+// recording host every committed node reads the same `NO_TAG` sentinel, so a tag comparison there
+// would pass as a tautology regardless of which view actually got bound — and moved to
+// `core/engine/cpp/tests/js/engine-animated-native-driver.itest.ts` (Round 13), the engine-level
+// (bare-tag) twin of the adapter-level animated-native-driver/-event itests Rounds 5-6 already
+// built.
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import { afterEach, describe, expect, it } from 'vitest';
+import { installRecordingFabric, payloadOf } from '@symbiote-native/test-utils';
 import {
   AnimatedValue,
   AnimatedValueXY,
@@ -16,59 +25,12 @@ import {
   createElement,
   createSurface,
   event,
-  getNativeTag,
   removeChild,
   routeProp,
-  type ISymbioteNode,
 } from '../index';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 let nextRootTag = 9700;
-
-interface INativeCall {
-  method: string;
-  args: readonly unknown[];
-}
-
-let nativeCalls: INativeCall[];
-
-function record(method: string): (...args: unknown[]) => void {
-  return (...args: unknown[]) => {
-    nativeCalls.push({ method, args });
-  };
-}
-
-// The whole TurboModule surface, recorded. Installed for every test — the JS-driven cases never
-// reach it, which is what makes "zero native calls" a meaningful assertion there.
-beforeEach(() => {
-  nativeCalls = [];
-  Object.assign(globalThis, {
-    nativeModuleProxy: {
-      NativeAnimatedTurboModule: {
-        createAnimatedNode: record('createAnimatedNode'),
-        connectAnimatedNodes: record('connectAnimatedNodes'),
-        disconnectAnimatedNodes: record('disconnectAnimatedNodes'),
-        connectAnimatedNodeToView: record('connectAnimatedNodeToView'),
-        disconnectAnimatedNodeFromView: record(
-          'disconnectAnimatedNodeFromView',
-        ),
-        restoreDefaultValues: record('restoreDefaultValues'),
-        dropAnimatedNode: record('dropAnimatedNode'),
-        startAnimatingNode: record('startAnimatingNode'),
-        stopAnimation: record('stopAnimation'),
-        setAnimatedNodeValue: record('setAnimatedNodeValue'),
-        setAnimatedNodeOffset: record('setAnimatedNodeOffset'),
-        flattenAnimatedNodeOffset: record('flattenAnimatedNodeOffset'),
-        extractAnimatedNodeOffset: record('extractAnimatedNodeOffset'),
-        startListeningToAnimatedNodeValue: record('startListening'),
-        stopListeningToAnimatedNodeValue: record('stopListening'),
-        getValue: record('getValue'),
-        addAnimatedEventToView: record('addAnimatedEventToView'),
-        removeAnimatedEventFromView: record('removeAnimatedEventFromView'),
-      },
-    },
-  });
-});
 
 afterEach(() => {
   fabric.reset();
@@ -82,22 +44,6 @@ const tick = (): Promise<void> =>
 function mount(): { surface: ReturnType<typeof createSurface> } {
   const surface = createSurface((nextRootTag += 1));
   return { surface };
-}
-
-// The COMMITTED payload of a node, found by its Fabric tag rather than by position — a clone keeps
-// the tag and replaces the object, so holding a reference would read a stale copy.
-function payloadOf(node: ISymbioteNode): Record<string, unknown> {
-  const tag = getNativeTag(node);
-  let found: Record<string, unknown> | undefined;
-  const walk = (nodes: readonly IFakeNode[]): void => {
-    for (const candidate of nodes) {
-      if (candidate.tag === tag) found = candidate.props;
-      walk(candidate.children);
-    }
-  };
-  walk(fabric.committed);
-  if (found === undefined) throw new Error('node is not in the committed tree');
-  return found;
 }
 
 describe('an animated value in a prop of a bare tag', () => {
@@ -119,8 +65,6 @@ describe('an animated value in a prop of a bare tag', () => {
     expect(payloadOf(view).opacity).toBe(0.75);
     // The static half of the same style survives the frame write — a merge, not a replace.
     expect(payloadOf(view).width).toBe(40);
-    // JS-driven throughout: nothing was asked of the native module.
-    expect(nativeCalls).toHaveLength(0);
   });
 
   it('reads an animated entry out of a style ARRAY', async () => {
@@ -226,16 +170,17 @@ describe('an animated value in a prop of a bare tag', () => {
     opacity.setValue(0.5);
     await tick();
     expect(payloadOf(view).opacity).toBe(0.5);
-    const lastPayload = payloadOf(view);
 
     removeChild(root, view);
     surface.commit();
 
     expect(opacity.__getChildren()).toHaveLength(0);
-    // And the frame that would have been written now writes nothing.
+    // And the frame that would have been written now writes nothing — read the AUTHORED prop
+    // directly rather than a stale committed snapshot, since the node no longer has a parent to
+    // walk from through the recording host's own tree accessors.
     opacity.setValue(0.9);
     await tick();
-    expect(lastPayload.opacity).toBe(0.5);
+    expect(payloadOf(view).opacity).toBe(0.5);
   });
 
   it('re-arms a subtree the sweep tore down and the framework put back', async () => {
@@ -287,228 +232,26 @@ describe('an animated value in a prop of a bare tag', () => {
   });
 });
 
-describe('the native driver on a bare tag', () => {
-  it('connects the props node to the view tag when the value goes native, and disconnects on removal', () => {
-    const opacity = new AnimatedValue(0);
-    const { surface } = mount();
-    const root = createElement('RCTView');
-    const view = createElement('RCTView');
-    appendChild(root, view);
-    routeProp(view, 'style', { opacity });
-    surface.appendChild(root);
-    surface.commit();
-
-    const viewTag = getNativeTag(view);
-    expect(viewTag).toBeDefined();
-    // Control: nothing is native until an animation asks for it.
-    expect(
-      nativeCalls.filter(call => call.method === 'connectAnimatedNodeToView'),
-    ).toHaveLength(0);
-
-    // `useNativeDriver: true` reaches the value as this handshake; the leaf goes native by CASCADE
-    // from the value it is a child of, which is the whole reason nothing here forces it.
-    opacity.__startNativeAnimation(
-      { type: 'frames', frames: [0, 1] },
-      1,
-      () => {},
-    );
-
-    const connect = nativeCalls.find(
-      call => call.method === 'connectAnimatedNodeToView',
-    );
-    expect(connect).toBeDefined();
-    // The right view: the props node bound to THIS node's committed Fabric tag.
-    expect(connect?.args[1]).toBe(viewTag);
-    const propsTag = connect?.args[0];
-
-    removeChild(root, view);
-    surface.commit();
-
-    // Torn down against exactly what it connected — a disconnect on the wrong tag leaves native
-    // driving a view nobody owns.
-    expect(nativeCalls).toContainEqual({
-      method: 'disconnectAnimatedNodeFromView',
-      args: [propsTag, viewTag],
-    });
-    expect(nativeCalls).toContainEqual({
-      method: 'restoreDefaultValues',
-      args: [propsTag],
-    });
-  });
-});
-
-describe('a native-driven Animated.event on a bare tag', () => {
-  const scrollMapping = (
-    scrollY: AnimatedValue,
-  ): ReadonlyArray<{
-    nativeEvent: { contentOffset: { y: AnimatedValue } };
-  }> => [{ nativeEvent: { contentOffset: { y: scrollY } } }];
-
-  const callsTo = (method: string): INativeCall[] =>
-    nativeCalls.filter(call => call.method === method);
-
-  it('registers the mapping against the committed view tag, under the PROP name', () => {
-    const scrollY = new AnimatedValue(0);
-    const { surface } = mount();
-    const scroller = createElement('RCTScrollView');
-    routeProp(
-      scroller,
-      'onScroll',
-      event(scrollMapping(scrollY), { useNativeDriver: true }),
-    );
-    // The prop is written before the node is committed, so there is no Fabric tag to bind to yet.
-    // This is the control for the assertion below: it proves the attach came from the commit and
-    // not from the prop write.
-    expect(callsTo('addAnimatedEventToView')).toHaveLength(0);
-
-    surface.appendChild(scroller);
-    surface.commit();
-
-    const viewTag = getNativeTag(scroller);
-    expect(viewTag).toBeDefined();
-    expect(callsTo('addAnimatedEventToView')).toEqual([
-      {
-        method: 'addAnimatedEventToView',
-        args: [
-          viewTag,
-          // `onScroll`, not `scroll`: native strips the `on` prefix and keys its drivers on what
-          // is left, so the listener-name spelling would register under a key no event matches.
-          'onScroll',
-          {
-            nativeEventPath: ['contentOffset', 'y'],
-            animatedValueTag: scrollY.__getNativeTag(),
-          },
-        ],
-      },
-    ]);
-  });
-
-  it('detaches against the SAME view tag when the node leaves the tree', () => {
-    const scrollY = new AnimatedValue(0);
-    const { surface } = mount();
-    const root = createElement('RCTView');
-    const scroller = createElement('RCTScrollView');
-    appendChild(root, scroller);
-    routeProp(
-      scroller,
-      'onScroll',
-      event(scrollMapping(scrollY), { useNativeDriver: true }),
-    );
-    surface.appendChild(root);
-    surface.commit();
-
-    const viewTag = getNativeTag(scroller);
-    // Control: it was attached at all, and to this tag.
-    expect(callsTo('addAnimatedEventToView')[0]?.args[0]).toBe(viewTag);
-    expect(callsTo('removeAnimatedEventFromView')).toHaveLength(0);
-
-    removeChild(root, scroller);
-    surface.commit();
-
-    // A detach on any other tag leaves native driving a view nobody owns.
-    expect(callsTo('removeAnimatedEventFromView')).toEqual([
-      {
-        method: 'removeAnimatedEventFromView',
-        args: [viewTag, 'onScroll', scrollY.__getNativeTag()],
-      },
-    ]);
-  });
-
-  it('re-arms a subtree the sweep tore down and the framework put back', () => {
-    const scrollY = new AnimatedValue(0);
-    const { surface } = mount();
-    const root = createElement('RCTView');
-    const parkable = createElement('RCTView');
-    const scroller = createElement('RCTScrollView');
-    appendChild(parkable, scroller);
-    routeProp(
-      scroller,
-      'onScroll',
-      event(scrollMapping(scrollY), { useNativeDriver: true }),
-    );
-    appendChild(root, parkable);
-    surface.appendChild(root);
-    surface.commit();
-    expect(callsTo('addAnimatedEventToView')).toHaveLength(1);
-
-    // Parked and returned with no prop write of its own — Svelte's `{#if}`.
-    removeChild(root, parkable);
-    surface.commit();
-    expect(callsTo('removeAnimatedEventFromView')).toHaveLength(1);
-
-    appendChild(root, parkable);
-    surface.commit();
-    expect(callsTo('addAnimatedEventToView')).toHaveLength(2);
-    expect(callsTo('addAnimatedEventToView')[1]?.args[0]).toBe(
-      getNativeTag(scroller),
-    );
-  });
-
-  it('does not churn the native module when the same handler is written again', () => {
-    const scrollY = new AnimatedValue(0);
-    const { surface } = mount();
-    const scroller = createElement('RCTScrollView');
-    const handler = event(scrollMapping(scrollY), { useNativeDriver: true });
-    routeProp(scroller, 'onScroll', handler);
-    surface.appendChild(scroller);
-    surface.commit();
-    expect(callsTo('addAnimatedEventToView')).toHaveLength(1);
-
-    routeProp(scroller, 'onScroll', handler);
-    surface.commit();
-
-    expect(callsTo('addAnimatedEventToView')).toHaveLength(1);
-    expect(callsTo('removeAnimatedEventFromView')).toHaveLength(0);
-
-    // The control: a DIFFERENT handler does go round trip, so the guard above is identity and not
-    // a write that never reaches the module.
-    routeProp(
-      scroller,
-      'onScroll',
-      event(scrollMapping(scrollY), { useNativeDriver: true }),
-    );
-    surface.commit();
-    expect(callsTo('addAnimatedEventToView')).toHaveLength(2);
-    expect(callsTo('removeAnimatedEventFromView')).toHaveLength(1);
-  });
-
-  it('detaches when the app clears the handler, without removing the node', () => {
-    const scrollY = new AnimatedValue(0);
-    const { surface } = mount();
-    const scroller = createElement('RCTScrollView');
-    routeProp(
-      scroller,
-      'onScroll',
-      event(scrollMapping(scrollY), { useNativeDriver: true }),
-    );
-    surface.appendChild(scroller);
-    surface.commit();
-    const viewTag = getNativeTag(scroller);
-    expect(callsTo('addAnimatedEventToView')).toHaveLength(1);
-
-    routeProp(scroller, 'onScroll', undefined);
-    surface.commit();
-
-    expect(callsTo('removeAnimatedEventFromView')).toEqual([
-      {
-        method: 'removeAnimatedEventFromView',
-        args: [viewTag, 'onScroll', scrollY.__getNativeTag()],
-      },
-    ]);
-  });
-
+describe('a native-driven Animated.event on a bare tag — the JS-driven control', () => {
+  // why: not tag-dependent — no `useNativeDriver`, so the value is driven per event on the JS
+  // thread and the native module is never asked for anything. Kept beside the JS-driven describe
+  // above rather than the itest twin: this is the negative control for THAT file's positive cases,
+  // and it needs no real Fabric tag to be one.
   it('leaves a JS-driven Animated.event alone', async () => {
     const scrollY = new AnimatedValue(0);
     const { surface } = mount();
     const scroller = createElement('RCTScrollView');
     routeProp(scroller, 'style', { top: scrollY });
     // No `useNativeDriver`, so the values are driven per event on the JS thread.
-    routeProp(scroller, 'onScroll', event(scrollMapping(scrollY)));
+    routeProp(
+      scroller,
+      'onScroll',
+      event([{ nativeEvent: { contentOffset: { y: scrollY } } }]),
+    );
     surface.appendChild(scroller);
     surface.commit();
 
-    expect(callsTo('addAnimatedEventToView')).toHaveLength(0);
-    // The control that makes the line above mean something: the handler is wired and it drives.
+    // The control that makes the claim mean something: the handler is wired and it drives.
     scroller.listeners?.get('scroll')?.({
       type: 'scroll',
       target: scroller,

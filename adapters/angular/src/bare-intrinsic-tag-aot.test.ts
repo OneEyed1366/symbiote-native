@@ -3,9 +3,8 @@
 //
 // Every Angular test here mounts through JIT, and JIT does not enforce `schemas` at all: a bare
 // `<view>` with no schema mounts clean, commits the right node, and logs nothing. ngtsc rejects
-// that same template outright. So a suite that only mounts is green for templates no app can
-// build, which is how a lowering transform could be deleted on the strength of a passing
-// `lowering-equivalence.test.ts` and leave every hand-written tag uncompilable.
+// that same template outright. So a suite that only mounts is green for templates no app can build
+// — every tag here could be uncompilable with the whole JIT suite passing.
 //
 // THE FINDING THIS PINS: `CUSTOM_ELEMENTS_SCHEMA` admits an unknown element only when the name is
 // a valid CUSTOM ELEMENT name, and the HTML spec requires a hyphen. Our tags lost their

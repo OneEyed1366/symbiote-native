@@ -31,7 +31,6 @@
     ".": "./src/index.ts",
     "./bootstrap": "./src/bootstrap/index.ts",
     "./host-primitives": "./host-primitives.cjs",
-    "./fold-host-bag": "./src/fold-host-bag.ts",
     "./resolve-intrinsic": "./src/resolve-intrinsic.ts",
     "./register": "./src/register.ts"
   },
@@ -57,10 +56,6 @@
       "./host-primitives": {
         "types": "./host-primitives.d.cts",
         "default": "./host-primitives.cjs"
-      },
-      "./fold-host-bag": {
-        "types": "./build/fold-host-bag.d.ts",
-        "default": "./build/fold-host-bag.js"
       },
       "./resolve-intrinsic": {
         "types": "./build/resolve-intrinsic.d.ts",

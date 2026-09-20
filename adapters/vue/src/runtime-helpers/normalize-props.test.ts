@@ -12,7 +12,10 @@ import { defineComponent, h, type Component } from '@vue/runtime-core';
 import * as engine from '@symbiote-native/engine';
 import * as vueAdapter from '@symbiote-native/vue';
 import { mount, unmount } from '@symbiote-native/vue';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 import * as runtimeHelpers from './index';
 import metroVueTransformer from '../../metro-vue-transformer.cjs';
 
@@ -21,7 +24,8 @@ const {
   compileSfc,
 }: { compileSfc: (s: string, f: string) => Promise<string> } =
   metroVueTransformer;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -85,32 +89,28 @@ async function commit(
   fabric.reset();
   mount(ROOT_TAG, defineComponent({ setup: () => () => h(evaluate(code)) }));
   await tick();
-  const flat: IFakeNode[] = [];
-  const walk = (nodes: readonly IFakeNode[]): void => {
-    for (const node of nodes) {
-      flat.push(node);
-      walk(node.children);
-    }
-  };
-  walk(fabric.committed);
-  const subject = flat[1];
+  const subject = live.nodeOf(live.appRoot()).children[0];
   if (subject === undefined)
     throw new Error('nothing committed under the container');
-  const props = { ...subject.props };
+  const props = { ...subject.payload };
   unmount(ROOT_TAG);
   return props;
 }
 
-// The press behavior writes RN's `accessible` (Pressable.js:252) and `focusable`
-// (Pressable.js:258) defaults, and `view` has neither, so the payload differs by primitive.
+// THE PAYLOAD NO LONGER DIFFERS BY PRIMITIVE HERE, and the two keys that used to make it differ
+// are not gone — they moved. RN's `accessible` (Pressable.js:252) and `focusable` (:258) defaults
+// are resolved by the engine now (`foldPressableProps`, `SymbioteFabricProps.cpp`), and this
+// harness builds its payload through the TypeScript `fabricProps`, which carries no copy of that
+// rule. They are asserted where they are actually produced:
+// `core/engine/cpp/tests/js/pressable-payload.itest.ts`.
+//
+// Which is fine for what this file asks, and worth saying so the parameter does not look vestigial:
+// the subject is STYLE surviving three Vue compiler doors, and the press defaults were only ever
+// noise this assertion had to account for.
 function expectedProps(
-  primitive: string,
   style: Record<string, unknown>,
 ): Record<string, unknown> {
-  const base = { testID: 'p', ...style };
-  return primitive === 'pressable'
-    ? { ...base, accessible: true, focusable: true }
-    : base;
+  return { testID: 'p', ...style };
 }
 
 describe('a functional style survives v-bind', () => {
@@ -123,7 +123,7 @@ describe('a functional style survives v-bind', () => {
 
       // `opacity: 1` is the callback resolved at `pressed: false` by routeProp. Before the
       // normalizeProps override this key was absent entirely — not wrong, missing.
-      expect(props).toEqual(expectedProps(primitive, { opacity: 1 }));
+      expect(props).toEqual(expectedProps({ opacity: 1 }));
     },
   );
 
@@ -134,16 +134,14 @@ describe('a functional style survives v-bind', () => {
     async primitive => {
       const props = await commit(primitive, FUNCTION_STYLE, sfcMerged);
 
-      expect(props).toEqual(expectedProps(primitive, { opacity: 1 }));
+      expect(props).toEqual(expectedProps({ opacity: 1 }));
     },
   );
 
   // The THIRD door, and the one that unblocked removing the state-style split from both Vue
   // transforms. A `:style` binding compiles to `_normalizeStyle(expr)` whenever the compiler cannot
-  // keep it on the cheap patch-flag path — an inline arrow does, a bare identifier does not. While
-  // the transforms rewrote that attribute into a resting/active pair the helper never saw a
-  // callback, so this was unreachable; with the split gone it is the only thing standing between a
-  // lowered `<Pressable :style="({pressed}) => …" />` and no style at all.
+  // keep it on the cheap patch-flag path — an inline arrow does, a bare identifier does not. It is
+  // the only thing standing between `<pressable :style="({pressed}) => …">` and no style at all.
   it('an inline callback survives the :style path', async () => {
     const props = await commit(
       'pressable',
@@ -155,7 +153,7 @@ const __tagArm = true;
 <template><${primitive} testID="p" :style="${expr}" /></template>`,
     );
 
-    expect(props).toEqual(expectedProps('pressable', { opacity: 1 }));
+    expect(props).toEqual(expectedProps({ opacity: 1 }));
   });
 
   // The control. Without it, "the style is present" cannot distinguish a working override from a
@@ -166,7 +164,7 @@ const __tagArm = true;
     async primitive => {
       const props = await commit(primitive, '{ opacity: 0.3 }');
 
-      expect(props).toEqual(expectedProps(primitive, { opacity: 0.3 }));
+      expect(props).toEqual(expectedProps({ opacity: 0.3 }));
     },
   );
 });

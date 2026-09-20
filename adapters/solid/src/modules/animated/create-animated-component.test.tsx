@@ -8,14 +8,19 @@
 import { createSignal } from 'solid-js';
 import type { JSX } from '../../jsx-runtime';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
-import { getNativeTag, isSymbioteNode } from '@symbiote-native/engine';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
+import { isSymbioteNode } from '@symbiote-native/engine';
 import { mount, unmount } from '../../render';
 import { Animated } from './index';
 import { createAnimatedComponent } from './create-animated-component';
 
 const ROOT_TAG = 613;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 
 // The surface commits on a microtask (requestCommit), so every assertion waits one macrotask.
 const tick = (): Promise<void> =>
@@ -25,8 +30,8 @@ beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
 // The app's own view sits under the synthetic box-none AppContainer root.
-function appView(): IFakeNode {
-  return fabric.appRoot().children[0];
+function appView(): ILiveNode {
+  return live.nodeOf(live.appRoot()).children[0];
 }
 
 describe('Solid createAnimatedComponent', () => {
@@ -36,7 +41,7 @@ describe('Solid createAnimatedComponent', () => {
     await tick();
 
     // A live AnimatedValue reaching Fabric would serialize as an object and paint nothing.
-    expect(appView().props.opacity).toBe(0.25);
+    expect(appView().payload.opacity).toBe(0.25);
   });
 
   it('drives a frame through the leaf without rebuilding the subtree', async () => {
@@ -51,12 +56,12 @@ describe('Solid createAnimatedComponent', () => {
     // The one headless-observable difference between "updates a leaf" and "replaces the subtree".
     // Solid's `insert` REPLACES, so a wrap that let the animated value into the reactive graph
     // would recreate the child on every frame — invisible to any assertion about the value itself.
-    const created = fabric.counts.createNode;
+    const handleAtMount = appView().handle;
     opacity.setValue(1);
     await tick();
 
-    expect(fabric.counts.createNode).toBe(created);
-    expect(appView().props.opacity).toBe(1);
+    expect(appView().handle).toBe(handleAtMount);
+    expect(appView().payload.opacity).toBe(1);
   });
 
   it('clears a prop that VANISHES from a spread bag', async () => {
@@ -65,7 +70,7 @@ describe('Solid createAnimatedComponent', () => {
     // version passed with the wrap's widening removed. A dynamic spread is the real shape, and the
     // base here deliberately does not widen its own bag, so this pins the WRAP.
     const Bare = (props: Record<string, unknown>): JSX.Element => (
-      <symbiote-view {...props} />
+      <view {...props} />
     );
     const AnimatedBare = createAnimatedComponent(Bare);
 
@@ -74,14 +79,13 @@ describe('Solid createAnimatedComponent', () => {
       carry() ? { testID: 'before' } : {};
     mount(ROOT_TAG, () => <AnimatedBare {...spreadBag()} />);
     await tick();
-    expect(appView().props.testID).toBe('before');
+    expect(appView().payload.testID).toBe('before');
 
     setCarry(false);
     await tick();
-    // Literal null, not absence: that is how the engine spells 'reset to default' to Fabric
-    // (symbiote-engine-core §8). Without the wrap's widening the key never reaches diffProps and
+    // Absent, not merely falsy: without the wrap's widening the key never reaches diffProps and
     // the node keeps 'before' forever — Solid's `spread` has no removal pass.
-    expect(appView().props.testID).toBeNull();
+    expect(Object.hasOwn(appView().payload, 'testID')).toBe(false);
   });
 
   it('gives the caller the base instance and the leaf the resolved host node', async () => {
@@ -99,10 +103,12 @@ describe('Solid createAnimatedComponent', () => {
     // here. There is no `Animated.ScrollView` any more (`modules/animated/index.ts`'s own header) —
     // a native-driven scroll listener is `<scroll-view onScroll={Animated.event(...)}>` like any
     // other host node's `on*` prop, resolved by `bindAnimatedEvent` with no wrap of this kind at all.
+    //
+    // Node IDENTITY, not a Fabric tag: a recording host never speaks to Fabric, so a tag comparison
+    // would compare two `NO_TAG` sentinels and prove nothing. The engine node itself is the real
+    // claim — the ref and the committed leaf are the SAME object.
     expect(isSymbioteNode(received)).toBe(true);
-    expect(isSymbioteNode(received) ? getNativeTag(received) : undefined).toBe(
-      appView().tag,
-    );
+    expect(received).toBe(appView().handle);
   });
 
   // A TAG base, which is what every primitive becomes under `.claude/skills/symbiote-primitive-tags`.
@@ -125,18 +131,16 @@ describe('Solid createAnimatedComponent', () => {
           received = instance;
         }}
       >
-        <symbiote-view testID="tag-child" />
+        <view testID="tag-child" />
       </AnimatedTag>
     ));
     await tick();
 
     // The animated node was reduced to a number, so the wrap's own bag ran on the tag path.
-    expect(appView().props.opacity).toBe(0.4);
-    expect(appView().props.testID).toBe('tag-base');
-    expect(appView().children[0].props.testID).toBe('tag-child');
+    expect(appView().payload.opacity).toBe(0.4);
+    expect(appView().payload.testID).toBe('tag-base');
+    expect(appView().children[0].payload.testID).toBe('tag-child');
     expect(isSymbioteNode(received)).toBe(true);
-    expect(isSymbioteNode(received) ? getNativeTag(received) : undefined).toBe(
-      appView().tag,
-    );
+    expect(received).toBe(appView().handle);
   });
 });

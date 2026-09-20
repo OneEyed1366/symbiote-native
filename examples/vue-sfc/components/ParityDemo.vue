@@ -79,10 +79,7 @@ const parityRowHeightStyle = { height: PARITY_ROW_H };
 
 <template>
   <view class="section-nested">
-    <text
-      ref="titleRef"
-      class="section-label"
-    >
+    <text ref="titleRef" class="section-label">
       Parity checks · longPress · dismiss · animated scroll · sticky · a11y
       focus
     </text>
@@ -132,9 +129,7 @@ const parityRowHeightStyle = { height: PARITY_ROW_H };
     <!-- #12 animated VirtualizedList scroll: smooth (native command) vs instant.
          A fixed height with no wrapper: the vertical ScrollView clips to its own
          frame (overflow:'scroll' base, like RN), so rows stay inside the box on iOS too. -->
-    <text class="section-label">
-      FlatList · animated scrollToOffset
-    </text>
+    <text class="section-label"> FlatList · animated scrollToOffset </text>
     <FlatList
       ref="listRef"
       :data="parityRows"
@@ -143,13 +138,8 @@ const parityRowHeightStyle = { height: PARITY_ROW_H };
       class="parity-list"
     >
       <template #item="{ item }">
-        <view
-          class="parity-row"
-          :style="parityRowHeightStyle"
-        >
-          <text class="info-text">
-            row {{ item.n }}
-          </text>
+        <view class="parity-row" :style="parityRowHeightStyle">
+          <text class="info-text"> row {{ item.n }} </text>
         </view>
       </template>
     </FlatList>
@@ -189,10 +179,7 @@ const parityRowHeightStyle = { height: PARITY_ROW_H };
         </text>
       </template>
       <template #item="{ item }">
-        <view
-          class="parity-row"
-          :style="parityRowHeightStyle"
-        >
+        <view class="parity-row" :style="parityRowHeightStyle">
           <text class="info-text">
             {{ item.label }}
           </text>

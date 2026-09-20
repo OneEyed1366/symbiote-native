@@ -31,7 +31,12 @@ import { compile } from 'svelte/compiler';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type IAuthoredNode,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 import { STICKY_HEADER_Z_INDEX } from '@symbiote-native/components';
 // Svelte's headers ARE the engine's sticky behavior now, so the registration is what this file
 // measures — without it the tag commits inert and the Svelte arm traces nothing at all. The
@@ -120,7 +125,8 @@ const DATA = Array.from({ length: ITEM_COUNT }, (_unused, index) => ({
   id: index,
 }));
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -180,7 +186,7 @@ async function loadSvelteRoot(): Promise<Component> {
 
 // --- Shared scenario --------------------------------------------------------------------------
 
-function findScrollView(): IFakeNode {
+function findScrollView(): IAuthoredNode {
   const node = fabric.find(n => n.viewName === 'RCTScrollView');
   if (node === undefined)
     throw new Error('scroll view missing from committed tree');
@@ -198,10 +204,11 @@ function findScrollView(): IFakeNode {
 // difference that is really the probe's (`.claude/rules/adapter-parity-audit.md`, "Phrase a parity
 // oracle as a CAPABILITY"). On a device every mounted view gets an onLayout whether or not it has
 // been pinned yet, which is what the zIndex tell reproduces.
-function collectStickyWrappers(nodes: IFakeNode[]): IFakeNode[] {
-  const wrappers: IFakeNode[] = [];
+// zIndex travels through the style slot, so it only shows up in the flattened payload.
+function collectStickyWrappers(nodes: ILiveNode[]): ILiveNode[] {
+  const wrappers: ILiveNode[] = [];
   for (const node of nodes) {
-    if (node.props.zIndex === STICKY_HEADER_Z_INDEX) wrappers.push(node);
+    if (node.payload.zIndex === STICKY_HEADER_Z_INDEX) wrappers.push(node);
     wrappers.push(...collectStickyWrappers(node.children));
   }
   return wrappers;
@@ -210,7 +217,7 @@ function collectStickyWrappers(nodes: IFakeNode[]): IFakeNode[] {
 // Which list index does this wrapper hold? Read it off the row text the cell renders, rather than
 // from tree position — position shifts as spacers and the forced sticky cell come and go, and a
 // wrong index would silently feed a wrong y into the collision map.
-function stickyIndexOf(wrapper: IFakeNode): number | undefined {
+function stickyIndexOf(wrapper: ILiveNode): number | undefined {
   const stack = [wrapper];
   while (stack.length > 0) {
     const node = stack.pop();
@@ -226,7 +233,7 @@ function stickyIndexOf(wrapper: IFakeNode): number | undefined {
 // Every mounted sticky header reports its true content y, exactly as a real onLayout does on mount
 // and after each relayout. This is the ONLY way `nextHeaderLayoutY` ever becomes defined.
 async function measureStickyHeaders(): Promise<void> {
-  for (const wrapper of collectStickyWrappers(fabric.committed)) {
+  for (const wrapper of collectStickyWrappers([live.nodeOf(live.appRoot())])) {
     const index = stickyIndexOf(wrapper);
     if (index === undefined) continue;
     fabric.fireEvent(wrapper.instanceHandle, 'topLayout', {

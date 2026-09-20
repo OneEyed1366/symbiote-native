@@ -17,7 +17,11 @@
 import '@angular/compiler';
 import { Component } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import { childrenOf, type ISymbioteNode } from '@symbiote-native/engine';
+import {
+  installRecordingFabric,
+  type IAuthoredNode,
+} from '@symbiote-native/test-utils';
 
 // registerScrollViewBehavior() is what builds the content container the assertions below read —
 // the tag has no content node of its own without it.
@@ -37,7 +41,7 @@ interface IRow {
   id: number;
 }
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -92,31 +96,25 @@ class SeparatorHost {
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-function findScrollView(): IFakeNode {
+function findScrollView(): IAuthoredNode {
   const node = fabric.find(n => n.viewName === 'RCTScrollView');
-  if (node === undefined) throw new Error('no scroll view committed');
+  if (node === undefined) throw new Error('no scroll view created');
   return node;
 }
 
-function flatten(nodes: readonly IFakeNode[]): IFakeNode[] {
-  return nodes.flatMap(node => [node, ...flatten(node.children)]);
-}
-
 // The content container's DIRECT children — the level a spacer collapses, and the only level at
-// which "inside the cell" and "beside the cell" look different.
-function contentChildren(): IFakeNode[] {
-  const content = flatten(fabric.committed).find(
-    node => node.viewName === CONTENT_VIEW,
-  );
-  if (content === undefined) throw new Error('no content container committed');
-  return content.children;
+// which "inside the cell" and "beside the cell" look different. Read off the engine's own child
+// links, which is where "who was put inside whom" is stated.
+function contentChildren(): readonly ISymbioteNode[] {
+  const content = fabric.find(node => node.viewName === CONTENT_VIEW);
+  if (content === undefined) throw new Error('no content container created');
+  return childrenOf(content.handle);
 }
 
-function carriesTestID(node: IFakeNode, testID: string): boolean {
-  return (
-    node.props.testID === testID ||
-    node.children.some(child => carriesTestID(child, testID))
-  );
+function carriesTestID(handle: ISymbioteNode, testID: string): boolean {
+  const recorded = fabric.find(node => node.handle === handle);
+  if (recorded?.props.testID === testID) return true;
+  return childrenOf(handle).some(child => carriesTestID(child, testID));
 }
 
 async function mountWithViewport(

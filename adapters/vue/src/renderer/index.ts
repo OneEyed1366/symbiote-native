@@ -16,14 +16,19 @@ import {
   createAnchor,
   createElement,
   createRawText,
+  childrenOf,
   dlog,
   insertBefore,
+  isRawTextNode,
+  isTextContainer,
+  nextSiblingOf,
+  parentOf,
   removeChild,
   routeProp,
   setProp,
   setText,
+  textOf,
   toPublicInstance,
-  RAW_TEXT_COMPONENT,
   SymbioteSurface,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
@@ -40,36 +45,24 @@ function isSurface(parent: IHostElement): parent is SymbioteSurface {
 }
 
 function isRawText(node: ISymbioteNode): boolean {
-  return node.component === RAW_TEXT_COMPONENT;
+  return isRawTextNode(node);
 }
 
-// RN's Text.js applies two defaults on the way to native (core/components/src/text-props.ts:
-// ellipsizeMode 'tail', allowFontScaling true unless literally false). The Vue <Text> wrapper
-// folded them with resolveTextProps; a template that the SFC transformer lowered to the
-// intrinsic `text` has no wrapper, so the renderer seeds them instead. Without this a
-// numberOfLines={1} line clips mid-word with no ellipsis — device-observed, and silent.
-const TEXT_DEFAULTS: ReadonlyMap<string, unknown> = new Map<string, unknown>([
-  ['ellipsizeMode', 'tail'],
-  ['allowFontScaling', true],
-]);
-
-function seedTextDefaults(node: ISymbioteNode): void {
-  for (const [key, value] of TEXT_DEFAULTS) setProp(node, key, value);
-}
-
-// RN's `id` is the modern W3C-named alias for `nativeID` — View.js copies it over
-// (`processedProps.nativeID = id`), so the two name ONE native prop. React folds it in its
-// component wrapper and Svelte and Solid in their transforms; Vue had it nowhere, so `<View
-// id="x">` reached Fabric with an unknown `id` and no `nativeID`, silently and on device only.
-// It lives in the renderer rather than in a transform because that covers all four Vue paths at
-// once — lowered SFC, lowered TSX, the component wrapper, and a hand-written
-// `h('view', { id })` no compiler ever sees.
+// RN's two Text defaults left this renderer entirely on 2026-09-18, in two steps a month apart. The
+// CREATE seed went first, because writing them as props cost a crossing every time the app authored
+// the same value — 6 000 per 1 000-row create, measured with `writesOfUnchanged`. What stayed was a
+// clear-back: an explicit `undefined` at patch time was substituted for the default, since RN treats
+// a missing prop and an explicit `undefined` alike.
 //
-// Caveat, and it matches what Solid's compile-time rename already does: with BOTH `id` and
-// `nativeID` on one element the last patchProp wins, where upstream gives `id` priority
-// unconditionally. Honouring that needs per-node state to remember an `id` arrived; no example or
-// test sets both, so the state is not worth carrying.
-const PROP_ALIASES: ReadonlyMap<string, string> = new Map([['id', 'nativeID']]);
+// That substitution is gone too, and it was redundant rather than wrong. The rule reads the AUTHORED
+// bag at payload time (`foldTextDefaults`, `SymbioteFabricProps.cpp`), so it cannot tell a cleared
+// prop from one never written — both are absent by the time it looks, and both get the default. The
+// adapter was re-supplying an answer the layer below already had.
+
+// `PROP_ALIASES` (`id` -> `nativeID`) left this renderer on 2026-09-18 — `routeProp` resolves it
+// for every adapter now, and carries the per-node state the caveat here said was not worth it: with
+// both names on one element upstream gives `id` unconditional priority, where a per-key rename
+// resolved it by write order.
 
 // RN-style event prop naming ('onPress', 'onValueChange', ...), the same convention JSX itself
 // uses to separate an event from a plain value prop — good enough to decide whether to wrap,
@@ -120,13 +113,6 @@ function wrapListenerForErrorHandling(
   return Object.assign(wrapper, listener);
 }
 
-// An explicit `undefined` must NOT clear one of those defaults: RN treats a missing prop and an
-// explicit undefined alike, and only a literal `false` opts out of allowFontScaling. Reached
-// only when a value is already undefined, so it costs nothing on the hot path.
-function textDefaultFor(node: ISymbioteNode, key: string): unknown {
-  return node.isText ? TEXT_DEFAULTS.get(key) : undefined;
-}
-
 // One renderer per mounted surface: the options close over the surface so every mutation
 // can ask it to (microtask-coalesced) recommit. Vue has no resetAfterCommit; instead
 // requestCommit() collapses a burst of insert/patchProp within one tick into a single
@@ -137,10 +123,9 @@ export function createSymbioteRenderer(surface: SymbioteSurface) {
       const descriptor = descriptorFor(type);
       // `type` as the third argument, not just `descriptor.component`: the behavior registry is
       // keyed by the INTRINSIC TAG (`pressable`), while a node only ever carries the
-      // resolved Fabric name (`RCTView`). This is the one place that still holds both, so a
-      // lowered primitive whose machine lives on the engine node can be matched at all.
+      // resolved Fabric name (`RCTView`). This is the one place that holds both, so a primitive
+      // whose machine lives on the engine node can be matched at all.
       const node = createElement(descriptor.component, descriptor.isText, type);
-      if (descriptor.isText) seedTextDefaults(node);
       // The imperative public-instance API (measure / setNativeProps / focus / …) is already on
       // the node's prototype, so a template/function ref to a host element exposes it exactly
       // like React's getPublicInstance and toPublicInstance is the identity. The ref must keep
@@ -194,27 +179,28 @@ export function createSymbioteRenderer(surface: SymbioteSurface) {
       // this instead of insert() when an element's children collapse to a single string, so
       // without the check a raw text lands under a non-Text parent - an invalid Fabric tree
       // built silently, which is worse than the throw insert() would have given.
-      if (!el.isText) {
+      if (!isTextContainer(el)) {
         throw new Error(
           `Text string "${text}" must be rendered inside a <Text>`,
         );
       }
       // An RCTText carries its string as a single raw-text child. Reuse a lone existing
       // one to avoid churn; otherwise replace all children with a fresh raw-text node.
-      const [first] = el.children;
-      if (el.children.length === 1 && first !== undefined && isRawText(first)) {
+      const existing = childrenOf(el);
+      const [first] = existing;
+      if (existing.length === 1 && first !== undefined && isRawText(first)) {
         setText(first, text);
       } else {
-        for (const child of el.children.slice()) removeChild(el, child);
+        for (const child of existing.slice()) removeChild(el, child);
         appendChild(el, createRawText(text));
       }
       surface.requestCommit();
     },
 
     insert(child, parent, anchor) {
-      if (isRawText(child) && (isSurface(parent) || !parent.isText)) {
+      if (isRawText(child) && (isSurface(parent) || !isTextContainer(parent))) {
         throw new Error(
-          `Text string "${String(child.props.text)}" must be rendered inside a <Text>`,
+          `Text string "${textOf(child) ?? ''}" must be rendered inside a <Text>`,
         );
       }
       if (isSurface(parent)) {
@@ -231,32 +217,30 @@ export function createSymbioteRenderer(surface: SymbioteSurface) {
     remove(child) {
       // A top-level node has no parent (it lives in surface.children); everything else
       // detaches from its retained parent.
-      const parent = child.parent;
+      const parent = parentOf(child);
       if (parent !== undefined) removeChild(parent, child);
       else surface.removeChild(child);
       surface.requestCommit();
     },
 
     parentNode(node) {
-      return node.parent ?? surface;
+      return parentOf(node) ?? surface;
     },
 
     nextSibling(node) {
-      const siblings =
-        node.parent !== undefined ? node.parent.children : surface.children;
-      const index = siblings.indexOf(node);
-      return index >= 0 ? (siblings[index + 1] ?? null) : null;
+      // `?? null` because Vue's RendererOptions types the miss as null, not undefined; the
+      // engine answers undefined uniformly and the surface fallback lives there now.
+      return nextSiblingOf(node, surface) ?? null;
     },
 
-    patchProp(el, key, _prev, next, _namespace, parentComponent) {
+    patchProp(el, key, prev, next, _namespace, parentComponent) {
       if (isSurface(el)) return;
       // Kebab -> camel happens HERE, not only inside a component wrapper: the SFC transformer
       // lowers View/Text to their intrinsic tags (metro-vue-transformer.cjs), so those props
       // arrive one key at a time with no component to fold the bag. Idempotent for the wrapped
       // path, which already normalized.
-      const normalized = normalizeVueAttrKey(key);
-      const name = PROP_ALIASES.get(normalized) ?? normalized;
-      const value = next === undefined ? textDefaultFor(el, name) : next;
+      const name = normalizeVueAttrKey(key);
+      const value = next;
       const routed =
         EVENT_PROP_NAME.test(name) && typeof value === 'function'
           ? wrapListenerForErrorHandling(value, parentComponent ?? null)
@@ -265,7 +249,30 @@ export function createSymbioteRenderer(surface: SymbioteSurface) {
       // View becomes a listener; onTintColor on a Switch stays a prop), shared with React. The
       // class/style merge (explicit :style always winning, regardless of which of Vue's two
       // independent patchProp calls lands last) is centralized there too (core/engine/src/node.ts).
-      routeProp(el, name, routed);
+      //
+      // `value` REACHES HERE UNCHANGED, on every re-render, and that is upstream by design:
+      // `patchProps` excludes it from its own diff and then patches it on its own line
+      // (@vue/runtime-core 3.5.39 — `if (next !== prev && key !== "value")`, then
+      // `if ("value" in newProps)`). The reason is a DOM one: typing mutates `el.value` directly,
+      // so what Vue last SET is not what the element now HOLDS, and only the element can say.
+      // Upstream pairs it with a guard in the patcher, and that half we did not have — `patchDOMProp`
+      // writes only on a difference against the element's live value (@vue/runtime-dom,
+      // `if (oldValue !== newValue || !("_value" in el))`). So every `<text-input>` re-routed its
+      // value on every re-render of its parent: 1 000 writes and ~6 000 wire slots per relabel of
+      // the benchmark list, against solid's 0 for the identical tree.
+      //
+      // On `prev` rather than on the node's own prop: the divergence upstream protects against is
+      // not visible from here — native text lives on the far side and TextInput's behavior owns the
+      // mirror — and asking the host would cost a crossing per input per render to be told the
+      // declarative value, which is what `prev` already is.
+      //
+      // The COMMIT REQUEST still goes out, which is why this skips the route and does not return.
+      // The controlled handshake hangs off the commit beat, not off the write: `afterCommit` reads
+      // the node's own `value` against its native mirror. An idle commit is O(1) (F-12) and its
+      // post-commit hooks run whether or not the commit reached the host (F-7).
+      if (key !== 'value' || prev !== next) {
+        routeProp(el, name, routed);
+      }
       surface.requestCommit();
     },
 

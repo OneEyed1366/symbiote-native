@@ -5,7 +5,11 @@
 import { useState, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '@symbiote-native/react';
-import { installFabric } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type IAuthoredNode,
+} from '@symbiote-native/test-utils';
 
 function Counter(): ReactElement {
   const [count, setCount] = useState(0);
@@ -23,19 +27,30 @@ const ROOT_TAG = 11;
 // first mount via a module-level one-shot. So the slot is installed ONCE; the per-test unit
 // is the mounted surface: `beforeEach(reset)` clears recordings, `afterEach(unmount)` tears
 // the surface down so every `it` mounts from scratch.
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
+
+// The app's own View — the non-box-none RCTView (the box-none one is the AppContainer/surface).
+function appView(): IAuthoredNode {
+  const view = fabric.find(
+    n => n.viewName === 'RCTView' && n.props.pointerEvents !== 'box-none',
+  );
+  if (view === undefined) throw new Error('app View was never created');
+  return view;
+}
 
 describe('React Counter on the engine', () => {
   // Positive only: mount/commit/recommit have no throwing contract on valid React trees —
   // there is nothing here for a Negative group to assert against.
   describe('Positive', () => {
     // why: proves the FIRST commit already produces the real Fabric shape (View->Text->RawText)
-    // wrapped by the synthetic AppContainer, not just "something got created".
+    // wrapped by the synthetic AppContainer, not just "something got created". Serialized from the
+    // app's own View rather than the surface root, since the surface commits AS a root child.
     it('mounts View > Text > RawText under a box-none AppContainer', () => {
       mount(ROOT_TAG, <Counter />);
-      expect(fabric.serialize(fabric.appRoot().children)).toBe(
+      expect(live.serialize(appView().handle)).toBe(
         'RCTView(RCTText(RCTRawText "count: 0"))',
       );
     });
@@ -46,18 +61,13 @@ describe('React Counter on the engine', () => {
     it('a tap increments the counter and recommits', () => {
       mount(ROOT_TAG, <Counter />);
 
-      // The app's own View is the non-box-none RCTView (the box-none one is the AppContainer).
-      const view = fabric.find(
-        n => n.viewName === 'RCTView' && n.props.pointerEvents !== 'box-none',
-      );
-      expect(view, 'app View was created').toBeDefined();
-
+      const view = appView();
       // A press is an honest gesture: a touch that starts and ends on the same node. Fabric
       // hands the View's instanceHandle straight back.
-      fabric.fireEvent(view!.instanceHandle, 'topTouchStart');
-      fabric.fireEvent(view!.instanceHandle, 'topTouchEnd');
+      fabric.fireEvent(view.instanceHandle, 'topTouchStart');
+      fabric.fireEvent(view.instanceHandle, 'topTouchEnd');
 
-      expect(fabric.serialize(fabric.appRoot().children)).toBe(
+      expect(live.serialize(appView().handle)).toBe(
         'RCTView(RCTText(RCTRawText "count: 1"))',
       );
     });

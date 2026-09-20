@@ -36,14 +36,7 @@ const ANDROID_NAMES: Readonly<Record<ISymbioteIntrinsic, string>> = {
   // Android has one text-input ViewManager for both single- and multiline.
   'text-input': 'AndroidTextInput',
   'text-input-multiline': 'AndroidTextInput',
-  // The component path's pair — same native views, a tag the behavior registry does not
-  // carry. See `shared.ts` for why the wrapper may not share the lowered tag.
-  'text-input-managed': 'AndroidTextInput',
-  'text-input-multiline-managed': 'AndroidTextInput',
   switch: 'AndroidSwitch',
-  // The wrapper's tag — same native view, a tag the behavior registry does not carry. See
-  // `shared.ts` for why the wrapper may not share the lowered tag.
-  'switch-managed': 'AndroidSwitch',
   'activity-indicator': 'RCTView',
   'activity-indicator-spinner': 'AndroidProgressBar',
   // KNOWN DIVERGENCE FROM REACT NATIVE, and it is in our favour — recorded 2026-09-01 because it

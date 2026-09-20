@@ -92,24 +92,17 @@ function handleSetUrl(): void {
     >
       <view :class="`line-tag line-tag-${lineInfo.line}`">
         <text class="line-tag-text">
-          {{
-            `${lineInfo.code} · ${lineInfo.label}`
-          }}
+          {{ `${lineInfo.code} · ${lineInfo.label}` }}
         </text>
       </view>
       <view class="hero-card">
-        <view
-          class="hero-badge"
-          :style="{ backgroundColor: lineColor }"
-        >
+        <view class="hero-badge" :style="{ backgroundColor: lineColor }">
           <text class="hero-badge-text">
             {{ lineInfo.code }}
           </text>
         </view>
         <view class="hero-copy">
-          <text class="hero-title">
-            Clipboard
-          </text>
+          <text class="hero-title"> Clipboard </text>
           <text class="hero-body">
             @symbiote-native/clipboard — read and write the system clipboard's
             text and URL content, plus a live change-listener composable.
@@ -117,27 +110,15 @@ function handleSetUrl(): void {
         </view>
       </view>
 
-      <view
-        testID="clipboard-value-card"
-        class="clipboard-card"
-      >
-        <text class="clipboard-card-title">
-          Current value
-        </text>
+      <view testID="clipboard-value-card" class="clipboard-card">
+        <text class="clipboard-card-title"> Current value </text>
         <view class="clipboard-value-box">
-          <text
-            testID="clipboard-current-text"
-            class="clipboard-value-text"
-          >
-            {{
-              clipboardText || '(empty)'
-            }}
+          <text testID="clipboard-current-text" class="clipboard-value-text">
+            {{ clipboardText || '(empty)' }}
           </text>
         </view>
         <view class="clipboard-capability-row">
-          <text class="clipboard-capability-label">
-            Has text
-          </text>
+          <text class="clipboard-capability-label"> Has text </text>
           <view
             :class="`clipboard-status-badge clipboard-status-badge-${hasString}`"
           >
@@ -154,13 +135,8 @@ function handleSetUrl(): void {
         </view>
       </view>
 
-      <view
-        testID="clipboard-copy-card"
-        class="clipboard-card"
-      >
-        <text class="clipboard-card-title">
-          Copy text
-        </text>
+      <view testID="clipboard-copy-card" class="clipboard-card">
+        <text class="clipboard-card-title"> Copy text </text>
         <text-input
           v-model="inputText"
           testID="clipboard-input"
@@ -181,9 +157,7 @@ function handleSetUrl(): void {
         testID="clipboard-url-card"
         class="clipboard-card"
       >
-        <text class="clipboard-card-title">
-          URL (iOS only)
-        </text>
+        <text class="clipboard-card-title"> URL (iOS only) </text>
         <text-input
           v-model="urlInput"
           testID="clipboard-url-input"
@@ -206,9 +180,7 @@ function handleSetUrl(): void {
           />
         </view>
         <view class="clipboard-capability-row">
-          <text class="clipboard-capability-label">
-            Has URL
-          </text>
+          <text class="clipboard-capability-label"> Has URL </text>
           <view
             :class="`clipboard-status-badge clipboard-status-badge-${hasUrl}`"
           >
@@ -223,13 +195,8 @@ function handleSetUrl(): void {
             </text>
           </view>
         </view>
-        <text
-          testID="clipboard-url-value"
-          class="clipboard-value-text"
-        >
-          {{
-            clipboardUrl ?? 'tap Get URL to read the clipboard'
-          }}
+        <text testID="clipboard-url-value" class="clipboard-value-text">
+          {{ clipboardUrl ?? 'tap Get URL to read the clipboard' }}
         </text>
       </view>
     </scroll-view>

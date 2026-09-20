@@ -13,7 +13,13 @@ import {
   setNativeViewConfigSource,
 } from '@symbiote-native/react';
 import { type ISymbioteEvent } from '@symbiote-native/engine';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+// A RECORDING host, as in the packages/slider twins: the leaf is found by the view name the OPS
+// carry, and its props are read as the PAYLOAD the wrapper's fold produces.
+import {
+  installRecordingFabric,
+  payloadOf,
+  type IAuthoredNode,
+} from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 200;
 const SLIDER_VIEW = 'RNCSlider';
@@ -54,7 +60,7 @@ const RNC_SLIDER_VIEW_CONFIG = {
   },
 };
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 setNativeViewConfigSource(name =>
   name === SLIDER_VIEW ? RNC_SLIDER_VIEW_CONFIG : undefined,
 );
@@ -62,10 +68,14 @@ setNativeViewConfigSource(name =>
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-function sliderNode(): IFakeNode {
+function sliderNode(): IAuthoredNode {
   const node = fabric.find(n => n.viewName === SLIDER_VIEW);
   if (!node) throw new Error(`no ${SLIDER_VIEW} was created`);
   return node;
+}
+
+function sliderProps(): Record<string, unknown> {
+  return payloadOf(sliderNode().handle);
 }
 
 function numberFromEvent(event: ISymbioteEvent): number | undefined {
@@ -91,7 +101,7 @@ describe('React-driven derived RNCSlider', () => {
           step: 0.1,
         }),
       );
-      const props = sliderNode().props;
+      const props = sliderProps();
       expect(props.value).toBe(0.5);
       expect(props.minimumValue).toBe(0);
       expect(props.maximumValue).toBe(1);
@@ -111,7 +121,7 @@ describe('React-driven derived RNCSlider', () => {
           thumbTintColor: '#0000ff',
         }),
       );
-      const props = sliderNode().props;
+      const props = sliderProps();
       expect(props.minimumTrackTintColor).toBe('processed(#ff0000)');
       expect(props.maximumTrackTintColor).toBe('processed(#00ff00)');
       expect(props.thumbTintColor).toBe('processed(#0000ff)');
