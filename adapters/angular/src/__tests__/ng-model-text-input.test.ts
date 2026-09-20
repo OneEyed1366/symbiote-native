@@ -47,7 +47,12 @@ import {
 // in for them.
 import { FormsModule } from '@angular/forms';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { childrenOf, propsOf } from '@symbiote-native/engine';
+import {
+  childrenOf,
+  isSymbioteNode,
+  propsOf,
+  type ISymbioteNode,
+} from '@symbiote-native/engine';
 import { installRecordingFabric } from '@symbiote-native/test-utils';
 
 import '../register';
@@ -324,6 +329,27 @@ function readout(): string | undefined {
   return typeof text === 'string' ? text : undefined;
 }
 
+@Component({
+  selector: 'switch-ng-model-host',
+  standalone: true,
+  imports: [SYMBIOTE_ELEMENTS, FormsModule],
+  template: `
+    <switch testID="probe" [(ngModel)]="on"></switch>
+    <text testID="readout">{{ on }}</text>
+  `,
+})
+class SwitchNgModelHost {
+  on = false;
+}
+
+function nodeFor(testID: string): ISymbioteNode {
+  const node = fabric.find(n => n.props.testID === testID);
+  if (!node) throw new Error(`no node created with testID=${testID}`);
+  if (!isSymbioteNode(node.instanceHandle))
+    throw new Error(`testID=${testID} is not a symbiote node`);
+  return node.instanceHandle;
+}
+
 function handle(testID: string): unknown {
   const node = fabric.find(n => n.props.testID === testID);
   if (!node) throw new Error(`no node created with testID=${testID}`);
@@ -334,6 +360,49 @@ beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
 describe('[(ngModel)] on a text-input tag', () => {
+  // THE CONTROLLED HANDSHAKE, and `[(ngModel)]` is the one binding that can lose it. The behaviour's
+  // `afterCommit` re-commands the native text whenever `props.value` and what native last reported
+  // disagree — which is what makes a controlled input controlled. The synchronous flush exists so
+  // the app's new value is ON THE NODE by then; @angular/forms writes its half through
+  // `resolvedPromise.then` instead, so it lands a microtask LATER than the flush and the commit
+  // reads the value from before the keystroke.
+  //
+  // Device-reported 2026-09-20: the field snapped back to `edit me` after every character.
+  it('does not command the pre-keystroke text back', async () => {
+    mount(ROOT_TAG, NgModelHost);
+    await tick();
+
+    const before = fabric.commands.length;
+    fabric.fireEvent(handle('probe'), 'topChange', {
+      text: 'edit mex',
+      eventCount: 1,
+    });
+    await tick();
+    await tick();
+
+    const commanded = fabric.commands
+      .slice(before)
+      .filter(entry => entry.commandName === 'setTextAndSelection')
+      .map(entry => entry.args[1]);
+    expect(commanded).not.toContain('edit me');
+    expect(readout()).toBe('edit mex');
+  });
+
+  // The SWITCH twin, because the accessor is one base class and `<switch>` has the same shape of
+  // read-back: `behaviors/switch.ts` snaps back on a `queueMicrotask` that reads `props.value`.
+  it('does not snap a switch back after a toggle', async () => {
+    mount(ROOT_TAG, SwitchNgModelHost);
+    await tick();
+    expect(readout()).toBe('false');
+
+    fabric.fireEvent(handle('probe'), 'topChange', { value: true });
+    await tick();
+    await tick();
+
+    expect(readout()).toBe('true');
+    expect(propsOf(nodeFor('probe')).value).toBe(true);
+  });
+
   it('carries a keystroke into the model and back onto the screen', async () => {
     mount(ROOT_TAG, NgModelHost);
     await tick();

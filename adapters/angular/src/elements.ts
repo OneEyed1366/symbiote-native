@@ -740,6 +740,21 @@ abstract class SymbioteValueAccessor
       this.host.nativeElement,
       VALUE_CHANGE_EVENT,
       (value: unknown) => {
+        // THE HALF THE DOM DOES FOR FREE, and without it a controlled input undoes every
+        // keystroke. `<text-input>`'s behavior re-commands the native text whenever `props.value`
+        // disagrees with what native last reported — that is what makes it controlled — and the
+        // read-back flush exists so the app's new value is on the node by the time the commit runs.
+        // @angular/forms does not reach the node in that window: `NgModel.ngOnChanges` defers
+        // `_updateValue` through `resolvedPromise.then`, so `writeValue` lands a MICROTASK after
+        // the flush, and the commit in between still reads the value from before the keystroke.
+        //
+        // In a browser there is nothing to do here: `input.value` already holds what the user
+        // typed. `node.props.value` is the same slot, and nothing else writes it — so the accessor
+        // mirrors it, which is the shape rather than a workaround. A later `writeValue` still wins,
+        // so an app that transforms or refuses the value keeps doing so, one microtask on.
+        //
+        // Device-reported 2026-09-20: every character snapped the field back to its mounted text.
+        this.setProp('value', value);
         fn(value);
       },
     );
