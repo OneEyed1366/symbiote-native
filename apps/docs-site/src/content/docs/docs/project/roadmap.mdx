@@ -20,6 +20,7 @@ parity through shared layers.
 | Components         | In progress          | Shared state/view layers so adapters inherit parity.                                        |
 | Android host shim  | Active               | Keeps Android at canary parity with iOS.                                                    |
 | Navigation package | Shipped              | Native stack/tab/drawer navigator over `react-native-screens`, shared by every adapter.     |
+| `@symbiote-native/cli` scaffolder | Beta | `new` scaffolds a full app; `add` extends an existing SymbioteNative app with optional layers — wiring symbiote into a plain RN app isn't automated yet. |
 
 ## Next adapter work
 
@@ -71,7 +72,9 @@ it — Clipboard, Haptics, Sensors, Battery, Device and a dozen more, each wrapp
 `expo-modules-core` module. Those don't use the autolinking-proxy recipe `@symbiote-native/slider`
 and `@symbiote-native/splash-screen` do: they ship a passive manifest, and a single app-level
 `@symbiote-native/expo-modules-link` postinstall registers whichever ones are installed (see [How
-to: wire up an Expo native module](/docs/howtos/expo-native-module-setup/)). Reanimated, a full worklet-driven animation layer, is the largest remaining piece and is
+to: wire up an Expo native module](/docs/howtos/expo-native-module-setup/)). `npx @symbiote-native/cli new`/`add`
+picks up each one as its own flag (`--battery`, `--sensors`, ...) and wires the autolinking for
+you. Reanimated, a full worklet-driven animation layer, is the largest remaining piece and is
 saved for last. The end goal is package-surface parity with Expo's SDK: whatever a real app can
 reach for in Expo, a SymbioteNative app can reach for too, off the same untouched native core.
 
