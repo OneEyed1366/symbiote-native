@@ -4,7 +4,7 @@
 
 # SymbioteNative
 
-### Want to ship a real native iOS/Android app, but you don't write React? Today you can't.
+### Want React Native's stack, but you don't write React? Today you can't.
 
 **Stable** | iOS + Android | React, Vue 3, Angular, Svelte, Solid
 
@@ -17,10 +17,14 @@
 ## The Problem
 
 React Native gives you a genuinely good native stack: Fabric's C++ shadow tree, Yoga layout, JSI,
-the iOS/Android host, Hermes. But that stack only takes orders from **React**. Write your UI in
-Vue, Svelte, Solid, or Angular and your options collapse to a WebView or a rewrite.
+the iOS/Android host, Hermes, and thousands of npm packages that assume all of it. But that stack
+only takes orders from **React**.
 
-It doesn't have to. React is **not** privileged inside React Native's renderer. Fabric exposes a
+You can of course ship a native app in Vue or Svelte today, through NativeScript, Hippy or Lynx.
+What you cannot do is ship it on _this_ stack. Each of those runs its own native layer, so
+choosing one means leaving React Native's ecosystem behind and picking up a smaller one.
+
+That lock is not a property of the stack, though. React is **not** privileged inside React Native's renderer. Fabric exposes a
 framework-agnostic, JSI-bound mutation API, `global.nativeFabricUIManager`, and React's renderer is
 just one client of it. All of React's glue lives in a single file, `ReactFiberConfigFabric.js`.
 "Removing React" means: stop calling that file, call the slot from your own renderer instead.
@@ -118,21 +122,26 @@ canary and how to run it live in each adapter's README:
 
 ## Why Not NativeScript, Hippy, or Lynx?
 
-The demand is real: Tencent's Hippy and ByteDance's Lynx both ship multi-framework native UI at
-production scale. Each answer gives up something structural.
+**Framework count is not the differentiator.** NativeScript has supported this many flavors for
+years, and Lynx is adding them fast. If all you want is Vue on a phone, those work, and they are
+older than we are.
 
-|                    | Whose native layer                   | Frameworks shipping today            | What it costs you                                                      |
-| ------------------ | ------------------------------------ | ------------------------------------ | ---------------------------------------------------------------------- |
-| **React Native**   | Meta's Fabric / Yoga / Hermes        | React only                           | React lock-in                                                          |
-| **NativeScript**   | its own runtime and bindings         | Angular and Vue; Svelte is stale     | leaving RN's ecosystem, and uneven framework support                   |
-| **Hippy**          | its own C++ DOM and layout engine    | React; its Vue packages are stale    | leaving RN's ecosystem for Tencent's                                   |
-| **Lynx**           | its own engine (PrimJS, dual-thread) | ReactLynx only                       | an 18-month-old ecosystem, mostly hand-written bridging                |
-| **SymbioteNative** | **stock, unforked React Native**     | React, Vue 3, Angular, Svelte, Solid | Angular is our slowest adapter; ecosystem packages are wrapped by hand |
+|                    | Whose native layer                   | Frameworks                                | What it costs you                                                      |
+| ------------------ | ------------------------------------ | ----------------------------------------- | ---------------------------------------------------------------------- |
+| **React Native**   | Meta's Fabric / Yoga / Hermes        | React only                                | React lock-in                                                          |
+| **NativeScript**   | its own runtime and bindings         | JS/TS, Angular, Vue, Solid, Svelte, React | leaving RN's ecosystem for its own                                     |
+| **Hippy**          | its own C++ DOM and layout engine    | React, Vue                                | leaving RN's ecosystem for Tencent's                                   |
+| **Lynx**           | its own engine (PrimJS, dual-thread) | React, Vue                                | an 18-month-old ecosystem, mostly hand-written bridging                |
+| **SymbioteNative** | **stock, unforked React Native**     | React, Vue 3, Angular, Svelte, Solid      | Angular is our slowest adapter; ecosystem packages are wrapped by hand |
 
-As far as we have verified, SymbioteNative is the only one reusing React Native's own unforked
-Fabric/JSI/Yoga pipeline as the shared native backend. Everyone else wrote a native layer from
-scratch. It buys Meta's maintenance and the existing RN ecosystem, at the price of staying inside
-what Fabric can already do.
+The difference is the row you read first. All three alternatives wrote their own native layer, so
+picking one means adopting its ecosystem too. As far as we have verified, SymbioteNative is the only
+one reusing React Native's own unforked Fabric/JSI/Yoga pipeline as the shared native backend: Meta
+keeps maintaining the native half, upstream releases keep arriving, and Detox, the debugger and
+native modules work because underneath it really is an RN app.
+
+The price of that bet is the other direction. We stay inside what Fabric can already do, where a
+project owning its runtime can change it.
 
 Three costs:
 
@@ -151,17 +160,29 @@ Three costs:
 <details>
 <summary>Evidence behind that table, with dates</summary>
 
-Latest npm releases, read from the registry on 2026-09-20:
+Latest npm releases, read from the registry on 2026-09-20.
 
-- **NativeScript** is healthy on two of three. `@nativescript/core` 9.1.2 (Sep 16 2026),
-  `@nativescript/angular` 22.0.1 (Aug 24 2026), and `nativescript-vue` 3.1.2 (Sep 15 2026) after
-  four releases in the preceding month. Only Svelte is stale: `svelte-native` 1.0.29 has not
-  shipped since Nov 7 2024.
-- **Hippy** ships React actively, `@hippy/react` 3.3.5 (Aug 4 2026), in QQ, QQ Music and Tencent
-  News. Its Vue packages are the stale half: `@hippy/vue` and `@hippy/vue-next` both sit at 3.3.2
-  from Feb 17 2025.
-- **Lynx** launched Mar 2025 and moves fast, `@lynx-js/react` 0.126.1 (Sep 11 2026). There is no
-  Vue package under the scope; Vue support is an unfinished community prototype.
+**NativeScript** lists six flavors in its own docs, and five of the six are current:
+
+| Flavor  | Package                                 | Latest              |
+| ------- | --------------------------------------- | ------------------- |
+| JS / TS | `@nativescript/core`                    | 9.1.2, Sep 16 2026  |
+| Angular | `@nativescript/angular`                 | 22.0.1, Aug 24 2026 |
+| Vue     | `nativescript-vue`                      | 3.1.2, Sep 15 2026  |
+| Solid   | `@nativescript-community/solid-js`      | 0.1.2, Aug 15 2026  |
+| Svelte  | `@nativescript-community/svelte-native` | 1.0.32, Apr 9 2026  |
+| React   | `react-nativescript`                    | 5.0.0, Aug 2023     |
+
+The original `svelte-native` (1.0.29, Nov 2024) is the abandoned one; the maintained fork is the
+`@nativescript-community` package above. React is their stale flavor, not Svelte.
+
+**Hippy** ships React actively, `@hippy/react` 3.3.5 (Aug 4 2026), in QQ, QQ Music and Tencent News.
+Its Vue packages lag: `@hippy/vue` and `@hippy/vue-next` both sit at 3.3.2 from Feb 17 2025.
+
+**Lynx** launched Mar 2025 and moves fast, `@lynx-js/react` 0.126.1 (Sep 11 2026). Vue Lynx is real
+rather than a prototype: `vue-lynx` 0.5.1 (Jul 2026), its own docs site, `npm create vue-lynx`, and
+Composition API, SFCs, Vue Router and Pinia. Pre-1.0, and Lynx says non-React flavors are already
+about half its usage.
 
 The wrapping cost has one mechanism behind it: a library's JS component calls React hooks in its own
 body, so under a non-React adapter the dispatcher is null and it throws. The _native view_ is
