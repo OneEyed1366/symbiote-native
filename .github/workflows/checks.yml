@@ -108,7 +108,30 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
+      # `--ignore-scripts` IS THE SECOND HALF OF "BUILD ONCE", AND IT WAS THE BIGGER ONE. Twenty-six
+      # workspace packages carry `prepare: ng:build` (`adapters/angular` plus the 25 Expo wrappers),
+      # and pnpm runs a WORKSPACE package's `prepare` on every `pnpm install` — so a plain install
+      # here is not an install, it is 26 Angular AOT compiles. Split from the itest job's own log:
+      # resolve+link took 21 s and the `prepare` phase took 58 s, in every one of the ten jobs this
+      # file runs. That is where the build was really happening "тучу раз".
+      #
+      # NOTHING IN THIS FILE NEEDS IT, and that is measured rather than reasoned:
+      #   - every workspace package's DEV entry point is `src/` (35 of 35; the `build*` targets live
+      #     under `publishConfig`, which only a pack sees),
+      #   - `tsc --build`, `eslint` and the whole vitest + node suite were each run against a tree
+      #     with ZERO build directories and passed,
+      #   - `scripts/run-itests.mjs` bundles with `conditions: ['browser', 'import', 'default']`, so
+      #     `@symbiote-native/angular` resolves through `default` to `./src/index.ts` — its `types`
+      #     and `react-native` conditions, the two that point into `build/angular`, never match.
+      # The Typecheck job builds everything itself through `prepublish-build`; the bundle matrix gets
+      # it as an artifact, including the 25 `build-ngc` trees a `pnpm pack` needs (pack does NOT run
+      # `prepare` — verified against a full local arm, zero `ng:build` lines).
+      #
+      # THE ONE FUTURE FOOTGUN, said out loud because it is silent: this also suppresses DEPENDENCY
+      # install scripts. Today that costs nothing — pnpm 11 blocks those by default and this repo
+      # allowlists none (no `onlyBuiltDependencies`, and no "Ignored build scripts" notice in any CI
+      # log). The day somebody allowlists one, it stops running here and nothing says so.
+      - run: pnpm install --frozen-lockfile --ignore-scripts
 
       - run: pnpm run lint
 
@@ -144,7 +167,9 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
+      # `--ignore-scripts`: see the Lint job. `prepublish-build` runs `ng:build` across the workspace
+      # itself, so the 58 s of install-time AOT this skips is work this very step is about to redo.
+      - run: pnpm install --frozen-lockfile --ignore-scripts
 
       - run: pnpm run prepublish-build
 
@@ -188,7 +213,9 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
+      # `--ignore-scripts`: see the Lint job. The whole suite was run against a tree with no build
+      # output at all and passed.
+      - run: pnpm install --frozen-lockfile --ignore-scripts
 
       - run: pnpm run test
 
@@ -252,7 +279,10 @@ jobs:
 
       # Not for the JS half alone: the CMakeLists resolves `react-native/package.json` to find the
       # ReactCommon it must compile, and fails its configure step without an install.
-      - run: pnpm install --frozen-lockfile
+      #
+      # `--ignore-scripts`: see the Lint job. This is the job it pays off in most — it is the longest
+      # one here, and 58 s of Angular AOT was the second-largest slice of it after the fixtures.
+      - run: pnpm install --frozen-lockfile --ignore-scripts
 
       - run: brew install --quiet ccache folly glog fmt double-conversion gflags boost googletest
 
@@ -312,7 +342,10 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
+      # `--ignore-scripts`: see the Lint job. Safe HERE specifically because the artifact below
+      # carries the 25 `build-ngc` trees that install-time `prepare` used to produce and `pnpm pack`
+      # does not — drop the artifact and this flag together, or the tarballs ship empty.
+      - run: pnpm install --frozen-lockfile --ignore-scripts
 
       # The build arrives instead of being repeated. Every tarball's publishConfig points at build/
       # (and build-ngc/ for Angular), so it has to be on disk before anything packs — it just does
