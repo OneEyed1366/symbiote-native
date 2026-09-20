@@ -51,15 +51,40 @@ CLI facts (verified from `packages/cli/README.md` + `packages/cli/src/expo-packa
       `npx @symbiote-native/cli new --framework <fw> [--<package>]`. `bare-rn` deliberately skipped
       (zero symbiote deps by design, see root CLAUDE.md `<examples_vs_dot_examples>`).
 
-## Not yet done — pick up here, in priority order
+## Done, continued
+- [x] `core/{engine,components,css-parser,test-utils}/README.md` — checked all four.
+      `core/css-parser/README.md`: added one clause (already installed automatically via adapters,
+      now says the CLI wires it too). `core/engine`, `core/components`: no `## Install` section at
+      all (deep internals, consumed only indirectly through adapters) — skipped, forcing it would
+      be noise. `core/test-utils`: skipped — no CLI flag exists (it's a devDependency test harness,
+      unrelated to any `add`/`new` layer; don't confuse with the unrelated `--testing` Detox flag).
+- [x] `README.md` — fixed a real staleness bug: the milestones table's `DX | @symbiote-native/cli
+      scaffolder` row still said `⏳ planned`; now `🔶 beta` (matches the "beta" wording already
+      used in this file's own prose).
+- [x] `apps/docs-site/src/content/docs/docs/project/roadmap.mdx` — added a milestones-table row for
+      the CLI scaffolder + a one-line mention in "Package parity with Expo" (`add --<package>`).
+- [x] `apps/docs-site/src/content/docs/docs/howtos/{splash-screen,expo-native-module-setup}.mdx` —
+      both document a manual native-wiring dance the CLI's `--splash-screen`/`--<package>` flags
+      now automate; added a short note up top saying so before the manual steps. High-value: these
+      are exactly the two howtos where the CLI change makes the rest of the page optional.
+- [x] Reviewed the rest of `apps/docs-site/src/content/docs/docs/{howtos,learn,navigation,api,
+      examples,project}/*.mdx` (~30 remaining files: styling/animations/events/two-way-binding/
+      platform-code/third-party-views/debugging/svelte-refs/error-boundaries/solid-reactivity
+      howtos; all of `learn/*`, `navigation/*`, `api/*`; `examples/*.mdx`; `project/{status,faq}.mdx`;
+      `how-it-works.mdx`, `testing.mdx`, `quick-start.mdx` already done, `index.mdx` already links
+      to quick-start). None of these has a natural "getting started" moment — they're deep-dive
+      recipes/reference for code already inside an app. Forcing a CLI mention into e.g. the
+      Animated-value howto would be noise. Deliberately left alone.
+- [x] `benchmarks/component-overhead/README.md`, `scripts/verdaccio/README.md` — checked both:
+      internal tooling docs (perf harness usage, local registry setup), no "start a new app" moment.
+      Deliberately left alone.
 
-1. **`core/{engine,components,css-parser,test-utils}/README.md`** (4) — lower priority, internal
-   packages; only add a mention if there's a natural "getting started" section, don't force it.
-5. **`apps/docs-site/src/content/docs/docs/{howtos,learn,navigation,api,examples,project}/*.mdx`**
-   (~35 files) + `how-it-works.mdx`, `testing.mdx` — lowest priority, mostly deep-dive/reference
-   content where a CLI mention may not fit naturally. Skim each; skip if forcing it would be noise.
-6. `benchmarks/component-overhead/README.md`, `scripts/verdaccio/README.md` — internal tooling docs,
-   likely skip (not user-facing "getting started" content) unless they document project setup steps.
+## Remaining
+None identified. Every md/mdx file with a genuine CLI-scaffolder tie-in has been updated (see
+`git log --oneline` on this branch for the commit-by-commit breakdown). If a NEW file is added
+later, or the CLI gains a capability that makes one of the "deliberately left alone" pages above
+newly relevant (e.g. Reanimated ships and gets its own howto), extend this list — don't restart
+the sweep from scratch.
 
 ## Method
 Read the file, look for an install/getting-started code block, insert ONE line

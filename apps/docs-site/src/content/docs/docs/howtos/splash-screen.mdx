@@ -9,6 +9,9 @@ You want a native launch screen shown _before_ JS ever runs, hidden once your ap
 is [`@symbiote-native/splash-screen`](/docs/packages/splash-screen/) — a wrapper
 over `react-native-bootsplash` reachable from React, Vue, Angular, Svelte, and Solid alike.
 
+`npx @symbiote-native/cli new --splash-screen` (or `add --splash-screen` in an existing app) does
+both setups below for you. Read on if you're wiring it by hand or want to know what the flag does.
+
 <Aside type="danger" title="This is two setups, not one">
   Installing the JS package only gets you `hide()`/`useHideAnimation`. The
   launch screen itself — the native drawable/storyboard shown at boot — has to
