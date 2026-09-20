@@ -32,45 +32,35 @@ renderer. **The native core is never forked.**
 
 ## Install
 
-### A new app
-
 ```bash
 npx @symbiote-native/cli new my-app
 ```
 
-Picks the framework, wires Metro and the entry seam, optionally sets up Expo-module autolinking.
-**The CLI is brand new.** If it gets in your way, the manual path below is what it automates.
+Pick a framework and you get a working app: Metro configured, the entry seam wired, Expo-module
+autolinking if you want it. **The CLI is brand new**, so it has far less mileage than the rest of
+this README.
 
-### An existing React Native app
-
-Every adapter is [on npm](https://www.npmjs.com/org/symbiote-native) at `2.0.x`:
-
-```bash
-npm install @symbiote-native/react    react-native react
-npm install @symbiote-native/vue      react-native vue
-npm install @symbiote-native/angular  react-native @angular/core   # >=20, zoneless
-npm install @symbiote-native/svelte   react-native svelte
-npm install @symbiote-native/solid    react-native solid-js
-```
+**Start a new app rather than converting one you already have.** The renderer, the Metro config and
+the entry point all differ from a stock RN app, so bolting SymbioteNative onto an existing one is
+more work than moving your screens into a fresh project, and it is not a path we support.
 
 `react-native` stays **your app's own top-level dependency**. SymbioteNative never hides it, it only
 replaces the JS renderer driving it.
 
-Then the Metro config and the `index.js` entry seam (`registerRunnable`, not `registerComponent`).
-`@symbiote-native/cli` wires both into a bare RN app, or copy them from the matching example. Each
-adapter's README has the recipe, and they differ in exactly one line:
+One line in the build differs per framework, and the CLI writes it for you:
 
-| Adapter                       | Extra build step                                                         |
-| ----------------------------- | ------------------------------------------------------------------------ |
-| [react](./adapters/react)     | none, plain Metro                                                        |
-| [vue](./adapters/vue)         | none for TSX; a Metro transformer for `.vue` SFCs                        |
-| [angular](./adapters/angular) | `ngc --watch` beside Metro, since AOT compiles separately                |
-| [svelte](./adapters/svelte)   | a Metro transformer for `.svelte`, same recipe as Vue SFC                |
-| [solid](./adapters/solid)     | `@symbiote-native/solid/babel-preset` listed **last** in Metro's presets |
+| Framework                     | Package                    | What it adds to the build                                                                        |
+| ----------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------ |
+| [React](./adapters/react)     | `@symbiote-native/react`   | nothing, plain Metro                                                                             |
+| [Vue 3](./adapters/vue)       | `@symbiote-native/vue`     | a Metro transformer for `.vue` SFCs; TSX needs none                                              |
+| [Angular](./adapters/angular) | `@symbiote-native/angular` | `ngc --watch` beside Metro, since AOT compiles separately. Needs `@angular/core` >= 20, zoneless |
+| [Svelte](./adapters/svelte)   | `@symbiote-native/svelte`  | a Metro transformer for `.svelte`                                                                |
+| [Solid](./adapters/solid)     | `@symbiote-native/solid`   | its `babel-preset` listed **last** in Metro's presets                                            |
 
-The scope publishes **37 packages**. Beyond the five adapters and the shared core, 27 companion
-packages install the same way: navigation, third-party native views, and Expo-module wrappers for
-device, sensor and permission APIs. Each lives under [`packages/`](./packages) with its own README.
+Every adapter is [on npm](https://www.npmjs.com/org/symbiote-native) at `2.0.x`, and the scope
+publishes **37 packages** in all. Beyond the five adapters and the shared core, 27 companion
+packages cover navigation, third-party native views, and Expo-module wrappers for device, sensor
+and permission APIs. Each lives under [`packages/`](./packages) with its own README.
 
 ---
 
@@ -154,8 +144,9 @@ Three costs:
   surface around it does not, because a library's own component body is React internally. So each
   package gets a thin agnostic wrapper written here: no native code, no forking, a few hundred
   lines. Cheap per package, but manual, so the covered surface grows one library at a time.
-- **The scaffolder is brand new.** `@symbiote-native/cli` sets a project up in one command, with far
-  less mileage than the rest of this list. The manual path it automates stays documented.
+- **The scaffolder is brand new, and it is the way in.** `@symbiote-native/cli` sets a project up in
+  one command, with far less mileage than the rest of this list, and starting a new app is the only
+  supported route. There is no migration path from an app you have already built.
 
 <details>
 <summary>Evidence behind that table, with dates</summary>
@@ -396,7 +387,7 @@ the platform axis as it lands.
 | **M6** | Svelte adapter           | a DOM shim over stock compiled Svelte output, third non-React framework, full parity                                                                                 | done    |
 | **M7** | Solid adapter            | `solid-js/universal`'s `createRenderer`, fourth non-React framework, full parity                                                                                     | done    |
 | **M8** | Web _(stretch)_          | the same trees rendered to the web as a default platform target                                                                                                      | maybe   |
-| **DX** | `@symbiote-native/cli`   | one command scaffolds an app or wires an existing bare RN one, pinning `react-native` at the app root so app code names only `@symbiote-native/*`                    | done    |
+| **DX** | `@symbiote-native/cli`   | one command scaffolds a working app, pinning `react-native` at the app root so app code names only `@symbiote-native/*`                                              | done    |
 
 </details>
 
