@@ -25,6 +25,7 @@ import { fileURLToPath } from 'node:url';
 import {
   childrenOf,
   clearGlobalStyles,
+  isAnchor,
   parentOf,
   registerRules,
   type ISymbioteNode,
@@ -46,18 +47,24 @@ import {
   VSectionHeaderDirective,
   VSectionItemDirective,
 } from '../components/virtualized-section-list';
-import {
-  ActivityIndicatorElement,
-  ButtonElement,
-  ImageBackgroundElement,
-  PressableElement,
-  ScrollViewElement,
-  TextElement,
-  TextInputElement,
-  TouchableHighlightElement,
-  TouchableOpacityElement,
-  ViewElement,
-} from '../elements';
+import { SYMBIOTE_ELEMENTS } from '../elements';
+import { registerComposedComponent } from '../anchor-host-registry';
+
+// REGISTERED, because on device they are. `babel-register-composed.cjs` reads each compiled
+// component's `selector` and injects one of these calls per bundle; vitest runs the JIT compiler
+// and no Babel pass at all, so without this every composed host below commits a REAL node instead
+// of an anchor — a different tree, and `[class]`/`[style]` reach the painting node by a different
+// route through it. That is how this file stayed green through a device checkerboard.
+for (const selector of [
+  'AnimatedView',
+  'symbiote-animated-view',
+  'FlatList',
+  'SectionList',
+  'VirtualizedList',
+  'VirtualizedSectionList',
+  'KeyboardAvoidingView',
+])
+  registerComposedComponent(selector);
 
 const ROOT_TAG = 9484;
 const fabric = installRecordingFabric();
@@ -96,21 +103,17 @@ function isRow(value: unknown): value is IRow {
 @Component({
   selector: 'rstyle-grid-host',
   standalone: true,
+  // `SYMBIOTE_ELEMENTS`, not the element directives by name — the shape every screen writes, and
+  // NOT the same runtime. The named directives are withheld from Angular's matcher
+  // (`../runtime-matching`), so importing them individually leaves every tag unclaimed and sends
+  // `[class]` / `[style]` down the styling-engine path; the array also carries `SymbioteStyleHost`,
+  // which CLAIMS both as inputs. This file asserts what the device does, so it has to be the array.
   imports: [
-    ActivityIndicatorElement,
+    SYMBIOTE_ELEMENTS,
     AnimatedView,
-    ButtonElement,
     FlatList,
-    ImageBackgroundElement,
     KeyboardAvoidingView,
-    PressableElement,
-    ScrollViewElement,
     SectionList,
-    TextElement,
-    TextInputElement,
-    TouchableHighlightElement,
-    TouchableOpacityElement,
-    ViewElement,
     VirtualizedList,
     VirtualizedSectionList,
     VListItemDirective,
@@ -379,30 +382,44 @@ function tileIdsFromScreen(): string[] {
 // `backgroundColor` is only ever a top-level key on the PAYLOAD — the class merge resolves onto
 // `props.style` as the engine's `[classStyle, explicitStyle]` pair, and only `payloadOf` (the
 // engine's own `fabricProps`) flattens that.
+//
+// AN ANCHOR DOES NOT COUNT, and leaving it in the walk is what let this file stay green through a
+// device checkerboard. `routeProp` resolves a class onto the node it was written to, and for a
+// composed component that node is its ANCHOR — which the commit walk skips, so it paints nothing
+// ever. A component frozen after mount therefore has the new colour sitting on its anchor and the
+// old one on the view the user sees, and an oracle that accepts either reports the freeze as a
+// pass. Device-diagnosed 2026-09-20: AnimatedView, FlatList and VirtualizedList stranded on theme
+// A while every assertion here was green.
+function paintedBackground(handle: ISymbioteNode): unknown {
+  if (isAnchor(handle)) return undefined;
+  const value = payloadOf(handle).backgroundColor;
+  return value === null ? undefined : value;
+}
+
 function nearestBackground(testID: string): unknown {
   const owner = fabric.find(node => node.props.testID === testID);
   if (owner === undefined)
     throw new Error(`no committed node carrying testID="${testID}"`);
 
   const inSubtree = (handle: ISymbioteNode): unknown => {
-    const own = payloadOf(handle).backgroundColor;
-    if (own !== undefined && own !== null) return own;
+    const own = paintedBackground(handle);
+    if (own !== undefined) return own;
     for (const child of childrenOf(handle)) {
       const below = inSubtree(child);
-      if (below !== undefined && below !== null) return below;
+      if (below !== undefined) return below;
     }
     return undefined;
   };
   const below = inSubtree(owner.handle);
-  if (below !== undefined && below !== null) return below;
+  if (below !== undefined) return below;
 
   for (
     let ancestor = parentOf(owner.handle);
     ancestor !== undefined;
     ancestor = parentOf(ancestor)
   ) {
-    const value = payloadOf(ancestor).backgroundColor;
-    if (value !== undefined && value !== null) return value;
+    const value = paintedBackground(ancestor);
+    if (value !== undefined) return value;
   }
   return undefined;
 }
