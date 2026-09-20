@@ -24,30 +24,34 @@ CLI facts (verified from `packages/cli/README.md` + `packages/cli/src/expo-packa
 - [x] `apps/docs-site/src/content/docs/docs/quick-start.mdx` — was actively stale (said "instead of
       starting from a published scaffolder"); added a "Scaffold a fresh app" section up top.
 - [x] `README.md`, `CLAUDE.md` — already covered pre-existing (verified, no action needed).
+- [x] `apps/docs-site/src/content/docs/docs/packages/*.mdx` (25 files: android, application, battery,
+      brightness, cellular, clipboard, crypto, device, haptics, keep-awake, local-auth, localization,
+      network, screen-orientation, secure-store, sensors, sharing, slider, sms, splash-screen,
+      standard-web-crypto, store-review, system-ui, tracking-transparency, web-browser) — same
+      one-line pattern after each `## Installation` code fence, GitHub link since docs-site has no
+      relative path to `packages/cli`. **Skipped on purpose**: `css-parser.mdx` and `test-utils.mdx`
+      — neither has a CLI flag (`--testing` is Detox E2E scaffolding, unrelated to
+      `@symbiote-native/test-utils`; verified in `packages/cli/src/add-layers.ts`, don't re-guess this).
 
 ## Not yet done — pick up here, in priority order
 
-1. **`apps/docs-site/src/content/docs/docs/packages/*.mdx`** (22 files, one per package above minus
-   android/expo-modules-link/navigation/slider/splash-screen which live under docs/navigation or
-   elsewhere — verify each). Same bulk pattern as the repo READMEs: find the `## Installation`
-   code fence, add one line after it with `npx @symbiote-native/cli new --<id>` / `add --<id>`.
-2. **`adapters/{angular,react,solid,svelte,vue}/README.md`** (5) — per-framework adapter npm package
+1. **`adapters/{angular,react,solid,svelte,vue}/README.md`** (5) — per-framework adapter npm package
    docs; add a "quick start" pointer near the top: scaffold a whole app with
    `npx @symbiote-native/cli new --framework <fw>` instead of wiring the adapter by hand.
-3. **`packages/cli/templates/**/README.md`** (8: `templates/README.md`, `templates/layers/README.md`,
+2. **`packages/cli/templates/**/README.md`** (8: `templates/README.md`, `templates/layers/README.md`,
    `templates/native/README.md`, `templates/js/{react,vue-sfc,vue-tsx,solid,svelte,angular}/README.md`)
    — these ARE the CLI's own template docs; check whether they already explain `add` for growing the
    app after scaffold — if not, add a short "add more layers" pointer.
-4. **`examples/*/README.md`** (13: angular, bare-rn(**skip** — deliberately zero symbiote deps, see
+3. **`examples/*/README.md`** (13: angular, bare-rn(**skip** — deliberately zero symbiote deps, see
    root CLAUDE.md `<examples_vs_dot_examples>`), expo-*, react, solid, svelte, vue-sfc, vue-tsx) — add
    a short note that these predate the CLI / are for in-repo development, and a real new app should
    use `npx @symbiote-native/cli new`.
-5. **`core/{engine,components,css-parser,test-utils}/README.md`** (4) — lower priority, internal
+4. **`core/{engine,components,css-parser,test-utils}/README.md`** (4) — lower priority, internal
    packages; only add a mention if there's a natural "getting started" section, don't force it.
-6. **`apps/docs-site/src/content/docs/docs/{howtos,learn,navigation,api,examples,project}/*.mdx`**
+5. **`apps/docs-site/src/content/docs/docs/{howtos,learn,navigation,api,examples,project}/*.mdx`**
    (~35 files) + `how-it-works.mdx`, `testing.mdx` — lowest priority, mostly deep-dive/reference
    content where a CLI mention may not fit naturally. Skim each; skip if forcing it would be noise.
-7. `benchmarks/component-overhead/README.md`, `scripts/verdaccio/README.md` — internal tooling docs,
+6. `benchmarks/component-overhead/README.md`, `scripts/verdaccio/README.md` — internal tooling docs,
    likely skip (not user-facing "getting started" content) unless they document project setup steps.
 
 ## Method

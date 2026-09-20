@@ -40,6 +40,9 @@ this package is what makes that name resolve on Android.
 npm install @symbiote-native/android
 ```
 
+Every app scaffolded by `npx @symbiote-native/cli new` carries this package already, no separate
+flag needed — see [`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
+
 No further native setup. The package ships a `react-native.config.js` declaring its Android
 `sourceDir` plus the `SymbioteAndroidPackage` import path and instance, so RN's Gradle
 autolinking registers both modules deterministically. There is no iOS half to link (`ios: null`
