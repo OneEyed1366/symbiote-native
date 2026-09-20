@@ -268,6 +268,17 @@ if(NOT TARGET GTest::gtest_main)
 endif()
 enable_testing()
 
+# JavaScriptCore is an Apple framework on macOS and WebKitGTK ships the same C API elsewhere, so
+# `ReactCommon/jsc/JSCRuntime.cpp` compiles against either once the include path is right.
+if(APPLE)
+  set(SYMBIOTE_JSC_LINK ${SYMBIOTE_JSC_LINK})
+else()
+  find_package(PkgConfig REQUIRED)
+  pkg_check_modules(JSCGTK REQUIRED javascriptcoregtk-4.1)
+  set(SYMBIOTE_JSC_LINK ${JSCGTK_LINK_LIBRARIES})
+  include_directories(${JSCGTK_INCLUDE_DIRS})
+endif()
+
 # A REAL JSI runtime, so `Tree::applyOps` is called the way the device calls it -- same argument
 # decoding, same `NativeState` ownership, same `Int32Array`. Hermes would need its source fetched and
 # built; JavaScriptCore ships with macOS and React Native already carries a JSI binding for it
@@ -289,7 +300,7 @@ target_link_libraries(symbiote_tree_tests PRIVATE
   GTest::gtest_main
   folly_runtime
   ${REACT_TARGETS}
-  "-framework JavaScriptCore")
+  ${SYMBIOTE_JSC_LINK})
 
 add_test(NAME symbiote_tree_tests COMMAND symbiote_tree_tests)
 
@@ -335,4 +346,4 @@ endif()
 target_link_libraries(symbiote_tester PRIVATE
   folly_runtime
   ${REACT_TARGETS}
-  "-framework JavaScriptCore")
+  ${SYMBIOTE_JSC_LINK})
