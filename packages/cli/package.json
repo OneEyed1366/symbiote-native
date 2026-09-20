@@ -1,7 +1,23 @@
 {
   "name": "@symbiote-native/cli",
   "version": "0.0.1",
-  "description": "Scaffold a new SymbioteNative app (React/Vue/Angular/Solid/Svelte, bare React Native, optional Expo-modules autolinking), or wire SymbioteNative into an existing bare RN app — the `@symbiote-native/cli new` companion to the manual steps in the root README's \"Try It In Your Own App\".",
+  "description": "Create a native iOS/Android app in Vue, Svelte, Solid, Angular or React, on React Native's own Fabric renderer. Scaffolds a new app, or wires SymbioteNative into an existing bare React Native one.",
+  "keywords": [
+    "react-native",
+    "symbiote-native",
+    "cli",
+    "scaffold",
+    "create-app",
+    "starter",
+    "vue",
+    "svelte",
+    "solid",
+    "angular",
+    "react",
+    "ios",
+    "android",
+    "cross-platform"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -31,7 +47,12 @@
     "templates"
   ],
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "main": "./bundle.js",
+    "module": "./bundle.js",
+    "exports": {
+      ".": "./bundle.js"
+    }
   },
   "scripts": {
     "typecheck": "tsc --build",
