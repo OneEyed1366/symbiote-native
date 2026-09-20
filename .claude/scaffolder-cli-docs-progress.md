@@ -33,20 +33,27 @@ CLI facts (verified from `packages/cli/README.md` + `packages/cli/src/expo-packa
       — neither has a CLI flag (`--testing` is Detox E2E scaffolding, unrelated to
       `@symbiote-native/test-utils`; verified in `packages/cli/src/add-layers.ts`, don't re-guess this).
 
+## Done, continued
+- [x] `adapters/{angular,react,solid,svelte,vue}/README.md` (5) — vue/angular/svelte already had it;
+      react was STALE ("There's no @symbiote-native/cli scaffolder yet" — fixed); solid had no
+      mention at all — added a pointer at the top of "Wiring an app".
+
+## Skipped, verified
+- `packages/cli/templates/**/README.md` (8 files) — checked all: these are maintainer/design docs
+  about the CLI's OWN implementation (per-file rationale tables, "Status: new is wired for...",
+  fragment derivations). Already extensively about the CLI; a "use the CLI" pointer here would be
+  circular noise. Confirmed none of them is copied into a generated app (explicitly excluded, see
+  `templates/js/react/README.md`'s own "What was deliberately excluded" section).
+
+## Done, continued
+- [x] `examples/*/README.md` (12: angular, react, solid, svelte, vue-sfc, vue-tsx + their expo-*
+      siblings) — added a `>` note before each `## Run` heading pointing at the equivalent
+      `npx @symbiote-native/cli new --framework <fw> [--<package>]`. `bare-rn` deliberately skipped
+      (zero symbiote deps by design, see root CLAUDE.md `<examples_vs_dot_examples>`).
+
 ## Not yet done — pick up here, in priority order
 
-1. **`adapters/{angular,react,solid,svelte,vue}/README.md`** (5) — per-framework adapter npm package
-   docs; add a "quick start" pointer near the top: scaffold a whole app with
-   `npx @symbiote-native/cli new --framework <fw>` instead of wiring the adapter by hand.
-2. **`packages/cli/templates/**/README.md`** (8: `templates/README.md`, `templates/layers/README.md`,
-   `templates/native/README.md`, `templates/js/{react,vue-sfc,vue-tsx,solid,svelte,angular}/README.md`)
-   — these ARE the CLI's own template docs; check whether they already explain `add` for growing the
-   app after scaffold — if not, add a short "add more layers" pointer.
-3. **`examples/*/README.md`** (13: angular, bare-rn(**skip** — deliberately zero symbiote deps, see
-   root CLAUDE.md `<examples_vs_dot_examples>`), expo-*, react, solid, svelte, vue-sfc, vue-tsx) — add
-   a short note that these predate the CLI / are for in-repo development, and a real new app should
-   use `npx @symbiote-native/cli new`.
-4. **`core/{engine,components,css-parser,test-utils}/README.md`** (4) — lower priority, internal
+1. **`core/{engine,components,css-parser,test-utils}/README.md`** (4) — lower priority, internal
    packages; only add a mention if there's a natural "getting started" section, don't force it.
 5. **`apps/docs-site/src/content/docs/docs/{howtos,learn,navigation,api,examples,project}/*.mdx`**
    (~35 files) + `how-it-works.mdx`, `testing.mdx` — lowest priority, mostly deep-dive/reference

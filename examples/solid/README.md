@@ -9,6 +9,9 @@ hooks, tabs, drawer, deep-linking, header-options and API-playground stops. See
 `symbiote-new-adapter` §7 for the layer order the adapter is built in, and the adapter's own README
 for current status.
 
+> This canary predates `@symbiote-native/cli` and is for in-repo development. To start a new app,
+> use `npx @symbiote-native/cli new --framework solid` instead.
+
 ## Run
 
 ```sh

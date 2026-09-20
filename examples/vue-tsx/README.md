@@ -41,6 +41,9 @@ bridge.
 Editing `babel.config.js` or `metro.config.js` needs a Metro cache reset
 (`npm start -- --reset-cache`); editing `App.tsx` does not.
 
+> This canary predates `@symbiote-native/cli` and is for in-repo development. To start a new app,
+> use `npx @symbiote-native/cli new --framework vue --vue-flavor tsx` instead.
+
 ## Run
 
 ```sh

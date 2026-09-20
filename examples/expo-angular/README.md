@@ -21,6 +21,10 @@ output. Angular uses a two-stage build pipeline:
 3. `babel.config.js` runs `@angular/compiler-cli/linker/babel` so Hermes receives
    full Ivy instructions.
 
+> This canary predates `@symbiote-native/cli` and is for in-repo development. To start a new app
+> with Expo-backed packages wired in, use
+> `npx @symbiote-native/cli new --framework angular --<package>` instead.
+
 ## Run
 
 ```bash

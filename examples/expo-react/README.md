@@ -20,6 +20,10 @@ native-host seams (colors, images, device events, third-party ViewConfigs) befor
 README](../../adapters/react) for the full surface this app exercises and what's verified on which
 platform.
 
+> This canary predates `@symbiote-native/cli` and is for in-repo development. To start a new app
+> with the same Expo packages wired in, use
+> `npx @symbiote-native/cli new --framework react --sensors --local-auth` instead.
+
 ## Run
 
 ```sh

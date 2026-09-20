@@ -30,6 +30,10 @@ Two Metro settings here are correctness, not taste (see the `svelte-adapter-dom-
 and the first `mount()` throws; and `inlineRequires: false`, without which Svelte's internal
 client runtime re-enters itself during mount and blows the JS stack.
 
+> This canary predates `@symbiote-native/cli` and is for in-repo development. To start a new app
+> with Expo-backed packages wired in, use
+> `npx @symbiote-native/cli new --framework svelte --<package>` instead.
+
 ## Run
 
 ```sh
