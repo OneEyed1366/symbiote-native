@@ -112,6 +112,23 @@ jobs:
 
       - run: pnpm run lint
 
+  # THE BUILD RUNS HERE AND NOWHERE ELSE IN THIS FILE. `prepublish-build` is a superset of
+  # `typecheck` — it starts with `clean:build && tsc --build` and then adds the three emit fixups and
+  # `ng:build` across 25 packages — so a type error still fails this job, under this name, exactly as
+  # before. Every arm of the bundle matrix used to run the whole thing itself: six identical builds
+  # per run (~60 s each), and a seventh `tsc --build` here.
+  #
+  # `name: Typecheck` IS THE CONSTRAINT, not a leftover. `Checks / Lint`, `Checks / Typecheck` and
+  # `Checks / Test` are the three required status contexts on master (verified against the branch
+  # protection API, not assumed), and that context string is built from this job's `name:`. Renaming
+  # it to `Build` stops master reporting a check it requires, and every PR then sits forever on
+  # "Expected — waiting for status". The job id is free to differ; the name is not.
+  #
+  # WHAT IT COSTS, because it is a real trade and not a free win: the matrix below now waits for this
+  # job instead of starting beside it, which adds ~90 s to the bundle path. Today that lands under
+  # the itest job's own wall clock, so the RUN does not get longer. If itest ever gets shorter than
+  # the bundle path, the next lever is sharding `check:bundle-isolation` itself — not un-sharing the
+  # build, which would put all six copies back.
   typecheck:
     name: Typecheck
     needs: gate
@@ -129,7 +146,32 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm run typecheck
+      - run: pnpm run prepublish-build
+
+      # `tsconfig.tsbuildinfo` is deliberately NOT in here. Its only consumer downstream is
+      # `adapters/svelte`'s `prepack`, which runs its own `tsc --build`; shipping a build-info file
+      # whose recorded mtimes no longer match the freshly-checked-out sources is how you get tsc to
+      # declare everything up to date and emit NOTHING into a build/ that then looks populated
+      # because the artifact filled it. `scripts/clean-build-outputs.mjs` documents that failure in
+      # its own words. Without the file that prepack simply redoes its work, which is slower and
+      # cannot be wrong.
+      #
+      # `core/*/build-ngc` matches nothing today (no core package is an Angular library) and is
+      # listed anyway — `if-no-files-found` fires only when EVERY pattern is empty, so an unmatched
+      # one costs nothing, while an omitted one silently drops the day a core package gains AOT
+      # output. Same deny-list-over-allow-list reasoning as the gate's tree hash above.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build-output
+          path: |
+            core/*/build
+            core/*/build-ngc
+            adapters/*/build
+            adapters/*/build-ngc
+            packages/*/build
+            packages/*/build-ngc
+          if-no-files-found: error
+          retention-days: 1
 
   test:
     name: Test
@@ -249,7 +291,7 @@ jobs:
   # SELECTED manifests, so each runner packs only what its own example declares.
   bundle-isolation:
     name: Packed consumer bundle matrix
-    needs: gate
+    needs: [gate, typecheck]
     if: >
       needs.gate.outputs.cache-hit != 'true' &&
       needs.gate.outputs.bundle-cache-hit != 'true'
@@ -272,12 +314,27 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # Build first because every tarball's publishConfig points at build/ (and build-ngc/ for
-      # Angular). This arm then packs the direct @symbiote-native dependencies of its own standalone
-      # canary example, installs them into a disposable npm consumer, type-checks/AOT-builds the app,
-      # and creates iOS + Android Metro production bundles. One arm per example, not per adapter —
+      # The build arrives instead of being repeated. Every tarball's publishConfig points at build/
+      # (and build-ngc/ for Angular), so it has to be on disk before anything packs — it just does
+      # not have to be MADE here, six times, from the same commit. No `path:`, so it extracts at the
+      # workspace root, which is where the upload's own paths are relative to: v4 stores entries
+      # under the least common ancestor of everything it matched, and matches land in all three of
+      # `core/`, `adapters/` and `packages/`, so that ancestor is the repo root. If output ever
+      # survived in only ONE of the three, the ancestor would shift down and every entry would
+      # arrive one level too high.
+      #
+      # Two packages rebuild themselves during `pnpm pack` regardless, through their own `prepack`:
+      # `adapters/angular` (`ng:build`, which wipes its build/ first) and `adapters/svelte`. That is
+      # their own guard and it is left alone — the artifact carries 59 output directories across 34
+      # packages, so it saves the other 32.
+      #
+      # This arm then packs the direct @symbiote-native dependencies of its own standalone canary
+      # example, installs them into a disposable npm consumer, type-checks/AOT-builds the app, and
+      # creates iOS + Android Metro production bundles. One arm per example, not per adapter —
       # vue-sfc and vue-tsx both consume @symbiote-native/vue.
-      - run: pnpm run prepublish-build
+      - uses: actions/download-artifact@v4
+        with:
+          name: build-output
 
       # Dependency cache, not build-output cache (build output is per-run by design — the whole
       # point of this matrix is a FRESH tarball install every time). Keyed per ARM now that each one
