@@ -67,14 +67,22 @@ CLI facts (verified from `packages/cli/README.md` + `packages/cli/src/expo-packa
       both document a manual native-wiring dance the CLI's `--splash-screen`/`--<package>` flags
       now automate; added a short note up top saying so before the manual steps. High-value: these
       are exactly the two howtos where the CLI change makes the rest of the page optional.
-- [x] Reviewed the rest of `apps/docs-site/src/content/docs/docs/{howtos,learn,navigation,api,
-      examples,project}/*.mdx` (~30 remaining files: styling/animations/events/two-way-binding/
-      platform-code/third-party-views/debugging/svelte-refs/error-boundaries/solid-reactivity
-      howtos; all of `learn/*`, `navigation/*`, `api/*`; `examples/*.mdx`; `project/{status,faq}.mdx`;
-      `how-it-works.mdx`, `testing.mdx`, `quick-start.mdx` already done, `index.mdx` already links
-      to quick-start). None of these has a natural "getting started" moment — they're deep-dive
-      recipes/reference for code already inside an app. Forcing a CLI mention into e.g. the
-      Animated-value howto would be noise. Deliberately left alone.
+- [x] **CORRECTION (found on a rigorous per-file re-audit, not just skimming headers):**
+      `apps/docs-site/src/content/docs/docs/navigation/index.mdx` had the exact same
+      `## Installation` code-fence pattern as the `packages/*.mdx` pages and was MISSED in that
+      earlier pass — fixed now, `--navigation` flag mention added. The other 6 navigation pages
+      (`drawer`, `faq`, `hooks`, `linking`, `stack`, `tabs`) are genuinely deep-dive feature/API
+      pages assuming navigation is already installed — individually opened and confirmed, correctly
+      skipped.
+- [x] Individually opened and confirmed correct-to-skip: all of `learn/*` (8), the remaining
+      `howtos/*` (styling/animations/events/two-way-binding/platform-code/third-party-views/
+      debugging/svelte-refs/error-boundaries/solid-reactivity/index), `api/*` (7), `examples/*.mdx`
+      (counter/pressable/text-input/index — small copyable snippet pages, not app scaffolding),
+      `project/{status,faq}.mdx` (adapter-status and navigation-FAQ content, no scaffolding tie-in),
+      `how-it-works.mdx`, `testing.mdx`. None has a natural "getting started" moment. `quick-start.mdx`
+      already done, `index.mdx` already links to quick-start.
+      **Lesson for next time**: "reviewed the rest" from a header-skim missed navigation/index.mdx's
+      Installation block — always grep for `## Install` before declaring a directory fully skipped.
 - [x] `benchmarks/component-overhead/README.md`, `scripts/verdaccio/README.md` — checked both:
       internal tooling docs (perf harness usage, local registry setup), no "start a new app" moment.
       Deliberately left alone.
