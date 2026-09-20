@@ -12,7 +12,10 @@
 import '@angular/compiler';
 import { Component, type Type } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 
 // SIDE-EFFECT IMPORT: the behavior is what runs the machine. An app reaches it through the
 // package barrel; a test importing the renderer directly does not.
@@ -23,7 +26,8 @@ import { mount, unmount } from './render';
 const ROOT_TAG = 9_985;
 const MAX_SETTLE_TICKS = 20;
 const SWITCH_VIEW = 'Switch';
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
@@ -32,14 +36,14 @@ async function flushUntilSettled(): Promise<void> {
   let previous = -1;
   for (let index = 0; index < MAX_SETTLE_TICKS; index += 1) {
     await tick();
-    const current = fabric.counts.completeRoot;
+    const current = fabric.commits;
     if (current === previous && current > 0) return;
     previous = current;
   }
   throw new Error('the tree never settled');
 }
 
-function switchNode(): IFakeNode {
+function switchNode() {
   const node = fabric.find(n => n.viewName === SWITCH_VIEW);
   if (node === undefined) throw new Error(`no ${SWITCH_VIEW} was created`);
   return node;
@@ -48,17 +52,8 @@ function switchNode(): IFakeNode {
 // The LIVE tree, by testID — never `fabric.find()`, which reads the pre-clone `created` set and
 // can hand back a node's mount-time props after a later update (`test-harness-false-greens.md`).
 function committedProps(testID: string): Record<string, unknown> | undefined {
-  const walk = (
-    nodes: readonly IFakeNode[],
-  ): Record<string, unknown> | undefined => {
-    for (const node of nodes) {
-      if (node.props.testID === testID) return node.props;
-      const hit = walk(node.children);
-      if (hit !== undefined) return hit;
-    }
-    return undefined;
-  };
-  return walk(fabric.appRoot().children);
+  return live.findLive(live.appRoot(), node => node.props.testID === testID)
+    ?.props;
 }
 
 function commandsNamed(
@@ -96,7 +91,12 @@ beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
 describe('Angular: `switch` as a tag', () => {
-  it('maps color/disabled props to the native iOS prop names', async () => {
+  // why: the trackColor/thumbColor -> onTintColor/tintColor/thumbTintColor rename is
+  // `foldSwitchProps` in `SymbioteFabricProps.cpp` now — this harness builds its payload through
+  // the TypeScript `fabricProps`, which carries no copy of the tag rules, so only the AUTHORED
+  // props (what Angular's template binding actually routed) can be asserted here. The rename
+  // itself is `core/engine/cpp/tests/js/switch-payload.itest.ts`, against a real commit.
+  it('routes color/disabled props to the tag', async () => {
     await mountTemplate(
       `<switch [value]="true" [disabled]="true" [trackColor]="trackColor" [thumbColor]="'#f5dd4b'"></switch>`,
       { trackColor: { false: '#767577', true: '#81b0ff' } },
@@ -105,9 +105,8 @@ describe('Angular: `switch` as a tag', () => {
     expect(switchNode().props).toMatchObject({
       value: true,
       disabled: true,
-      onTintColor: '#81b0ff',
-      tintColor: '#767577',
-      thumbTintColor: '#f5dd4b',
+      trackColor: { false: '#767577', true: '#81b0ff' },
+      thumbColor: '#f5dd4b',
     });
   });
 

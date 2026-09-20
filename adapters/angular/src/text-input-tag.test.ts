@@ -19,7 +19,7 @@ import {
 } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { isSymbioteNode } from '@symbiote-native/engine';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import { buildTextInputHandle } from '@symbiote-native/components';
 
 import './register';
@@ -29,11 +29,11 @@ import type { IHostInstance } from './host-instance';
 
 const ROOT_TAG = 91_050;
 const SINGLELINE_VIEW = 'RCTSinglelineTextInputView';
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
-function inputNode(): IFakeNode {
+function inputNode() {
   const node = fabric.find(n => n.viewName === SINGLELINE_VIEW);
   if (node === undefined) throw new Error(`no ${SINGLELINE_VIEW} was created`);
   return node;
@@ -85,7 +85,11 @@ describe('Angular: `text-input` as a tag', () => {
 
     mount(ROOT_TAG, ValueFixture);
     await tick();
-    expect(inputNode().props.text).toBe('hi');
+    // `value` -> `text` (the native prop) is `foldTextInputValue`'s in `SymbioteFabricProps.cpp`
+    // now — this harness builds its payload through the TypeScript `fabricProps`, which carries no
+    // copy of it. What stays this adapter's is routing the template attribute onto the tag at all,
+    // proven in `core/engine/cpp/tests/js/text-input-payload.itest.ts` against a real commit.
+    expect(inputNode().props.value).toBe('hi');
   });
 
   it('derives onValueChange from a native change', async () => {

@@ -241,9 +241,14 @@ describe('<text-input>', () => {
       expect(commands.some(c => c.commandName === 'focus')).toBe(true);
     });
 
-    it('blur() dispatches a blur command', () => {
-      mountHandle().blur();
-      expect(commands.some(c => c.name === 'blur')).toBe(true);
+    // why: `blurTextInput` only dispatches for the currently-TRACKED focused field
+    // (`TextInputState.blurTextInput` parity) — blur() must focus() first for the command to have
+    // anywhere to go.
+    it('blur() dispatches a blur command once focused', () => {
+      const handle = mountHandle();
+      handle.focus();
+      handle.blur();
+      expect(commands.some(c => c.commandName === 'blur')).toBe(true);
     });
 
     // why: clear() must reset native to an EMPTY string via the same acked-count command path
