@@ -8,6 +8,21 @@ name: Checks
 on:
   workflow_call:
 
+# THE CANCELLATION LIVES HERE, not in ci.yml: a caller's `concurrency` never reaches the jobs of a
+# workflow it calls, and ci.yml holds no job of its own — only the `uses:` that lands here. Its
+# block has therefore governed nothing since 2026-07-06, when the jobs moved into this file, and
+# every cancelled CI run up to 2026-09-20 was cancelled BY HAND.
+#
+# `cancel-in-progress` is an expression because release.yml calls this same file and queues
+# deliberately: a publish killed halfway leaves half the packages on the registry and a tag
+# matching neither half.
+#
+# `__checks` keeps this group off the CALLER's. Without it a release resolves both to
+# `Release-refs/heads/master` — the group that run already holds.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}__checks
+  cancel-in-progress: ${{ github.workflow == 'CI' }}
+
 jobs:
   # This exact tree may already have been verified — a push to master re-runs every check on a
   # merge/squash/rebase commit whose CONTENT was already checked on the PR it came from, just under

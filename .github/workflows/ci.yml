@@ -20,9 +20,12 @@ on:
   # sit forever on "Expected — waiting for status". The expensive job skips
   # itself instead, on its own content hash — see checks.yml's `gate`.
 
+# The group stays; `cancel-in-progress` does not. This workflow has no job of its own to cancel,
+# and a caller's concurrency does not govern a called workflow's jobs — so that `true` cancelled
+# nothing, while reading it as proof the repo already superseded stale runs cost three months of
+# cancelling them by hand. The one that works is in checks.yml.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
   checks:
