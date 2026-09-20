@@ -27,6 +27,15 @@ export default defineConfig(
       '**/dist/**',
       '**/build/**',
       '**/build-ngc/**',
+      // CMake's own generator output. `compiler_depend.ts` is a TIMESTAMP file — the extension
+      // means "timestamp", not TypeScript — and the parser reports 110 `Parsing error: Invalid
+      // character` on it, so anyone who has built the C++ test host cannot run lint at all.
+      // Invisible in CI, which never builds it, which is exactly why it went unnoticed.
+      // Keyed on `CMakeFiles/` rather than on the build directory: `**/build/**` above already
+      // covers `cpp/tests/build/` BY COINCIDENCE while missing `build-release/` and
+      // `build-android/`, and the real category here is generated C++ tooling state, not a
+      // TypeScript build output. The `.ts` under `cpp/tests/js/` are real sources and stay linted.
+      '**/CMakeFiles/**',
       '**/codegen-specs/**',
       '**/*.tsbuildinfo',
       'examples/**',
