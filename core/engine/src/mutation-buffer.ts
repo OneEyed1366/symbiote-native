@@ -186,6 +186,23 @@ export const KIND_ANCHOR = 2;
  * array. Native converts each to `folly::dynamic` ONCE, when the op is applied — never again per
  * commit, which is the half that ships today.
  */
+/**
+ * What the buffer needs a handle to BE.
+ *
+ * Still an identity and nothing else as far as the ops are concerned — no parent, no children, no
+ * order. The two fields are the buffer's own scratch space for `slotOf`, written by this file and
+ * read by nobody else; `ISymbioteNode` declares them from its constructor so every real handle
+ * carries the pair on one hidden class.
+ *
+ * Spelled as a requirement rather than as optional fields on purpose: a handle that cannot hold its
+ * slot would fall back to nothing, and the failure would be a silently re-pushed node rather than a
+ * type error.
+ */
+export type IMutationHandle = {
+  slot: number;
+  slotBatch: number;
+};
+
 export type IMutationBatch = {
   readonly ops: Int32Array;
   readonly strings: readonly string[];
@@ -206,9 +223,9 @@ export type IMutationBatch = {
  */
 export type INativeTree = {
   applyOps: (batch: IMutationBatch) => void;
-  getProp: (handle: object, key: string) => unknown;
+  getProp: (handle: IMutationHandle, key: string) => unknown;
   /** The resolved Fabric view name, which native may have changed at insert (see `KIND_ELEMENT`). */
-  getViewName: (handle: object) => string;
+  getViewName: (handle: IMutationHandle) => string;
 };
 
 // ── THE RECORDER ─────────────────────────────────────────────────────────────────────────────────
@@ -239,7 +256,13 @@ let handles: object[] = [];
 // Interning matters more here than it looks: a 1 000-row create emits about a dozen distinct view
 // names across 10 000 elements, and every prop KEY is drawn from a set of a few hundred.
 const stringIds = new Map<string, number>();
-const slots = new Map<object, number>();
+
+// Which batch the `slot` standing on a handle belongs to. Bumped by `takeBatch`, which is what
+// invalidates every slot at once without walking the handles that hold them.
+//
+// It starts at 1 because a fresh node's `slotBatch` is 0, so an untouched handle can never match a
+// live batch and needs no separate "is it in this batch" flag.
+let batchId = 1;
 // The same table for prop VALUES, and the reason it pays is the far side rather than this one: the
 // host turns each entry into a `folly::dynamic` when the op is applied, so a style object reused
 // across a thousand rows was a thousand conversions of one object. Measured on `build-release`,
@@ -320,8 +343,24 @@ function pushValue(value: unknown): number {
  * Assigned on first mention rather than at creation, so a batch carries exactly the nodes it names.
  * A handle created by an earlier batch arrives already owning its native node, which is what lets a
  * clone source three commits old resolve with no bookkeeping on either side.
+ *
+ * THE SLOT LIVES ON THE HANDLE, not in a `Map` keyed by it, and that is a measured decision. This
+ * function runs once per handle OPERAND — every `setProp` names its node and every append names
+ * two, so a thousand-row create mentions handles about forty thousand times — and a `Map<object,
+ * number>` charges a hash for each one, plus a second for the `set` on a miss. Two fields on a shape
+ * the node already carries turn that into a compare.
+ *
+ * Measured on `build-release` by `mutation-api-fill-cost.itest.ts`, both arms in one sitting, three
+ * runs each: `createRawText` 0.70 -> 0.51 us, `appendChild` 0.65 -> 0.58, `recordSetProp` 0.34 ->
+ * 0.30, and the whole `fill` phase of a 10 001-node create 25.0 -> 23.2 ms. `createElement` barely
+ * moved (0.72 -> 0.70), which is the control: it does enough else that one lookup is noise in it.
+ *
+ * WHY AN EPOCH RATHER THAN CLEARING: a slot is meaningless outside its batch (see `IMutationBatch`),
+ * so every slot must die when the batch drains. Walking the handles to reset them would cost exactly
+ * what the `Map.clear` cost; bumping one counter invalidates all of them at once, and a handle that
+ * is never mentioned again is never touched.
  */
-function slotOf(handle: object): number {
+function slotOf(handle: IMutationHandle): number {
   // The retained tree used to ABSORB a handle that was not a node: `children.indexOf(x)` returned
   // -1 and the mutation was a silent no-op. A buffer cannot — the op is recorded, and the failure
   // surfaces in the HOST, on a later op, in another batch, as a node whose create it appears never
@@ -340,11 +379,11 @@ function slotOf(handle: object): number {
         `calling appendChild.`,
     );
   }
-  const existing = slots.get(handle);
-  if (existing !== undefined) return existing;
+  if (handle.slotBatch === batchId) return handle.slot;
   handles.push(handle);
-  slots.set(handle, handles.length - 1);
-  return handles.length - 1;
+  handle.slot = handles.length - 1;
+  handle.slotBatch = batchId;
+  return handle.slot;
 }
 
 // Has anything changed the TREE since the last commit drained?
@@ -419,12 +458,12 @@ export function noteHostSideChange(): void {
 let placementPending = new Set<object>();
 
 /** Does the pending batch hold anything that could change what the host says this node's parent is? */
-export function hasPendingPlacement(handle: object): boolean {
+export function hasPendingPlacement(handle: IMutationHandle): boolean {
   return placementPending.has(handle);
 }
 
 export function recordCreateElement(
-  handle: object,
+  handle: IMutationHandle,
   viewName: string,
   isText: boolean,
   instanceHandle: unknown,
@@ -440,43 +479,52 @@ export function recordCreateElement(
   );
 }
 
-export function recordCreateRawText(handle: object, text: string): void {
+export function recordCreateRawText(
+  handle: IMutationHandle,
+  text: string,
+): void {
   placementPending.add(handle);
   push(OP_CREATE_RAW_TEXT, slotOf(handle), intern(text));
 }
 
-export function recordCreateAnchor(handle: object): void {
+export function recordCreateAnchor(handle: IMutationHandle): void {
   placementPending.add(handle);
   push(OP_CREATE_ANCHOR, slotOf(handle));
 }
 
-export function recordCreateVoid(handle: object): void {
+export function recordCreateVoid(handle: IMutationHandle): void {
   placementPending.add(handle);
   push(OP_CREATE_VOID, slotOf(handle));
 }
 
-export function recordAppendChild(parent: object, child: object): void {
+export function recordAppendChild(
+  parent: IMutationHandle,
+  child: IMutationHandle,
+): void {
   placementPending.add(child);
   push(OP_APPEND_CHILD, slotOf(parent), slotOf(child));
 }
 
 export function recordInsertBefore(
-  parent: object,
-  child: object,
-  before: object,
+  parent: IMutationHandle,
+  child: IMutationHandle,
+  before: IMutationHandle,
 ): void {
   placementPending.add(child);
   push(OP_INSERT_BEFORE, slotOf(parent), slotOf(child), slotOf(before));
 }
 
-export function recordRemoveChild(parent: object, child: object): void {
+export function recordRemoveChild(
+  parent: IMutationHandle,
+  child: IMutationHandle,
+): void {
   placementPending.add(child);
   push(OP_REMOVE_CHILD, slotOf(parent), slotOf(child));
 }
 
 /** `undefined` DELETES the key — the collapse `setProp` has always performed, spelled on the wire. */
 export function recordSetProp(
-  handle: object,
+  handle: IMutationHandle,
   key: string,
   value: unknown,
 ): void {
@@ -487,7 +535,7 @@ export function recordSetProp(
   push(OP_SET_PROP, slotOf(handle), intern(key), internValue(value));
 }
 
-export function recordSetText(handle: object, text: string): void {
+export function recordSetText(handle: IMutationHandle, text: string): void {
   push(OP_SET_TEXT, slotOf(handle), intern(text));
 }
 
@@ -503,11 +551,14 @@ export function recordSetText(handle: object, text: string): void {
  * A JS-only workaround was the alternative and it is the one thing this design rules out: to know
  * what to rebuild, JS would have to hold the tree.
  */
-export function recordSetComponent(handle: object, viewName: string): void {
+export function recordSetComponent(
+  handle: IMutationHandle,
+  viewName: string,
+): void {
   push(OP_SET_COMPONENT, slotOf(handle), intern(viewName));
 }
 
-export function recordSetTag(handle: object, tag: string): void {
+export function recordSetTag(handle: IMutationHandle, tag: string): void {
   push(OP_SET_TAG, slotOf(handle), intern(tag));
 }
 
@@ -530,7 +581,7 @@ export function recordSetTag(handle: object, tag: string): void {
  * op, not a per-render one — against the per-commit fold it replaces.
  */
 export function recordSetOwnedListener(
-  handle: object,
+  handle: IMutationHandle,
   name: string,
   isPresent: boolean,
 ): void {
@@ -538,11 +589,14 @@ export function recordSetOwnedListener(
 }
 
 /** See `OP_SET_UNDERLAY_SHOWN`. Emitted on a flip only, from the behavior that owns the timer. */
-export function recordSetUnderlayShown(handle: object, shown: boolean): void {
+export function recordSetUnderlayShown(
+  handle: IMutationHandle,
+  shown: boolean,
+): void {
   push(OP_SET_UNDERLAY_SHOWN, slotOf(handle), shown ? 1 : 0);
 }
 
-export function recordCommit(rootTag: number, surface: object): void {
+export function recordCommit(rootTag: number, surface: IMutationHandle): void {
   push(OP_COMMIT, rootTag, slotOf(surface));
 }
 
@@ -580,7 +634,8 @@ export function takeBatch(): IMutationBatch {
   // held ten thousand handles on a benchmark create costs more than dropping it.
   placementPending = new Set();
   stringIds.clear();
-  slots.clear();
+  // Every slot standing on a handle dies here, without touching one of them — see `slotOf`.
+  batchId += 1;
   valueIds.clear();
   trueId = NOT_INTERNED;
   falseId = NOT_INTERNED;

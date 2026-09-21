@@ -104,12 +104,23 @@ Component({
   `,
 })(BenchScreen);
 
-/** One zoneless turn: let Angular's scheduler run, then drain whatever it queued. */
-const settle = (): Promise<void> =>
-  new Promise(resolve => {
-    setTimeout(resolve, 0);
+/**
+ * Let Angular's zoneless scheduler run to quiet — ALTERNATING a microtask with a timer drain.
+ *
+ * Angular notifies on a MICROTASK and re-checks on a TIMER, so draining either alone can leave the
+ * other's queue standing. Four rounds is past what any step here needs and costs nothing once the
+ * first one has settled.
+ *
+ * IT IS NOT WHY `select` WRITES NOTHING, and that was checked before this was widened: the same
+ * scenario with SIXTEEN rounds stays dark (`angular-select-reaches-fabric.itest.ts`). The cause is a
+ * real defect in the component-input path after a keyed replace, recorded there.
+ */
+const settle = async (): Promise<void> => {
+  for (let round = 0; round < 4; round += 1) {
+    await Promise.resolve();
     flushTimers();
-  });
+  }
+};
 
 describe('the benchmark screen through the Angular adapter', () => {
   it('runs the eight device steps', async () => {
@@ -126,6 +137,13 @@ describe('the benchmark screen through the Angular adapter', () => {
       // The root, the container `createSurface` puts under it, and the screen's own wrapper. The
       // per-row component costs an anchor in the adapter's DOM shim, not a committed node.
       chrome: 3,
+      // NO EXEMPTIONS. This arm carried `unappliedSteps: ['select', 'remove']` until 2026-09-21: a
+      // keyed replace made Angular call `destroy()` on the ONE renderer the factory shares across
+      // the surface, that `destroy()` released the renderer's flush registration, and every later
+      // style run then sat in an accumulator until some other node's run closed it — which is why
+      // the selection's single write surfaced two steps later, in `remove`. Fixed by giving the
+      // registration the SURFACE's lifetime (`SymbioteRendererFactory.dispose`), and the write
+      // oracle below is what proves it: this arm now reports the same counts as every other.
       readTelemetry: () => readSurfaceTelemetry(ROOT_TAG),
       apply: async next => {
         screen.state.set(next);

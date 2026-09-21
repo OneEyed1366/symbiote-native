@@ -37,6 +37,7 @@
 
 import { flushOps, settleBeforeFlush, treeHost } from './tree-host';
 import { hasPendingPlacement } from './mutation-buffer';
+import { hasAnimatedBindings } from './animated/host-binding';
 import {
   functionPropOf,
   functionPropsOf,
@@ -130,7 +131,27 @@ export function subtreesOf(
   roots: readonly ISymbioteNode[],
 ): readonly ISymbioteNode[] {
   flushOps();
+  // The `.filter` is the type NARROWING, not a defensive check, and it costs ~0.6 ms of the 5.5 ms
+  // a thousand-row clear spends in the engine — measured on `build-release` by returning the host's
+  // array unnarrowed (`teardown-sweep-cost.itest.ts`, rest of the sweep 2.75 -> 2.16 ms). It stays,
+  // because removing it means either an `as` or declaring `ITreeHost.subtreesOf` to hand back our
+  // own type, and a pluggable host is exactly what that `object` boundary is for.
   return treeHost()?.subtreesOf(roots).filter(isSymbioteNode) ?? [];
+}
+
+/**
+ * The same walk narrowed to what a teardown must visit — see `ITreeHost.teardownSubtreesOf`.
+ *
+ * The gate is the ANIMATED one, not a behavior one: a binding is per node and carries no tag, so an
+ * app that animates needs every node back and gets the full walk. Nothing else narrows, because
+ * nothing else is charged per node of a removed subtree.
+ */
+export function teardownSubtreesOf(
+  roots: readonly ISymbioteNode[],
+): readonly ISymbioteNode[] {
+  if (hasAnimatedBindings()) return subtreesOf(roots);
+  flushOps();
+  return treeHost()?.teardownSubtreesOf(roots).filter(isSymbioteNode) ?? [];
 }
 
 /**
@@ -157,9 +178,24 @@ export function ancestorsOf(node: ISymbioteNode): readonly ISymbioteNode[] {
   return out;
 }
 
-/** The first child, anchors included, or `undefined` for a leaf. */
+/**
+ * The first child, anchors included, or `undefined` for a leaf.
+ *
+ * ONE HOST CALL, not `childrenOf(node)[0]`, and the difference is a complexity class rather than a
+ * constant. `solid-js/universal`'s `cleanChildren` empties a parent with
+ * `while (removed = getFirstChild(parent)) removeNode(parent, removed)` — so the old spelling read a
+ * list of N, then N-1, then N-2, building and discarding every handle each time. Measured on a
+ * 2 000-row Solid `Clear` (`solid-clear-scaling.itest.tsx`): **2 001 001 handles** crossed to remove
+ * two thousand children, N(N+1)/2 to the unit, against the ~2 000 the work needs.
+ *
+ * The `mayHaveChildren` fast path is kept for the same reason `childrenOf` has it: FALSE is a
+ * certainty, so a leaf answers without a drain and without a crossing.
+ */
 export function firstChildOf(node: ISymbioteNode): ISymbioteNode | undefined {
-  return childrenOf(node)[0];
+  if (!node.mayHaveChildren) return undefined;
+  flushOps();
+  const child = treeHost()?.firstChildOf(node);
+  return isSymbioteNode(child) ? child : undefined;
 }
 
 /**

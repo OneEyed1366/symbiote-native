@@ -206,9 +206,11 @@ void installBindings(jsi::Runtime &runtime) {
   install("getViewName", 1, &Tree::getViewName);
   install("parentOf", 1, &Tree::parentOf);
   install("childrenOf", 1, &Tree::childrenOf);
+  install("firstChildOf", 1, &Tree::firstChildOf);
   install("nextSiblingOf", 1, &Tree::nextSiblingOf);
   install("parentsOf", 1, &Tree::parentsOf);
   install("subtreesOf", 1, &Tree::subtreesOf);
+  install("teardownSubtreesOf", 1, &Tree::teardownSubtreesOf);
   install("ancestorsOf", 1, &Tree::ancestorsOf);
   install("committedRecordOf", 1, &Tree::committedRecordOf);
   // A TEST read, and it is on this list rather than behind a build flag because the bag it returns

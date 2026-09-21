@@ -38,7 +38,7 @@ import {
 } from './node';
 import { commitSurfaceOps, flushOps } from './tree-host';
 
-const NO_CO_COMMITTERS: readonly (readonly [IRootTag, object])[] = [];
+const NO_CO_COMMITTERS: readonly (readonly [IRootTag, ISymbioteNode])[] = [];
 
 // The predicate both behavior drains take. Passed in rather than imported by `host-behavior.ts`,
 // keeping that dependency one-directional — a cycle there is a live hazard under Metro's
@@ -70,8 +70,8 @@ export class SymbioteSurface {
    */
   private static others(
     self: SymbioteSurface,
-  ): readonly (readonly [IRootTag, object])[] {
-    let out: (readonly [IRootTag, object])[] | undefined;
+  ): readonly (readonly [IRootTag, ISymbioteNode])[] {
+    let out: (readonly [IRootTag, ISymbioteNode])[] | undefined;
     for (const other of surfaces.values()) {
       if (other === self) continue;
       out ??= [];

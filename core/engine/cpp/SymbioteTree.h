@@ -126,6 +126,18 @@ class Tree {
       facebook::jsi::Runtime &runtime,
       const facebook::jsi::Value *arguments,
       size_t count);
+  /**
+   * `firstChildOf(handle)` — the first entry of the child list, anchors included.
+   *
+   * Its own call for the same reason `nextSiblingOf` is, and it is the same bug one door along: the
+   * JS spelling was `childrenOf(node)[0]`, so emptying a list one child at a time read the whole
+   * remaining list on every step. Measured on a 2 000-row Solid `Clear`: 2 001 001 handles crossed
+   * to remove two thousand children, N(N+1)/2 exactly, against the ~2 000 the work needs.
+   */
+  facebook::jsi::Value firstChildOf(
+      facebook::jsi::Runtime &runtime,
+      const facebook::jsi::Value *arguments,
+      size_t count);
   /** `childrenOf(handle)` — in order, ANCHORS INCLUDED. */
   facebook::jsi::Value childrenOf(
       facebook::jsi::Runtime &runtime,
@@ -148,6 +160,22 @@ class Tree {
       const facebook::jsi::Value *arguments,
       size_t count);
   facebook::jsi::Value subtreesOf(
+      facebook::jsi::Runtime &runtime,
+      const facebook::jsi::Value *arguments,
+      size_t count);
+  /**
+   * `teardownSubtreesOf(roots)` — `subtreesOf` narrowed to the nodes a teardown has work for.
+   *
+   * The sweep's cost IS this walk's width: it crosses a handle per node to release the few that
+   * carry a machine, and on the benchmark row that is one node in ten. What comes back is each
+   * root, every node carrying an intrinsic TAG (which `kOpSetTag` sets from `attachHostBehavior`
+   * and nowhere else), and every node BETWEEN the two — an ancestor has to be marked or the
+   * framework bringing it back alone would never re-arm what hangs beneath it.
+   *
+   * NOT a substitute when an app animates: `detachAnimatedProps` is per node and knows nothing
+   * about tags, so `host-access.ts` asks for the full walk whenever a binding exists.
+   */
+  facebook::jsi::Value teardownSubtreesOf(
       facebook::jsi::Runtime &runtime,
       const facebook::jsi::Value *arguments,
       size_t count);
@@ -252,6 +280,15 @@ class Tree {
       facebook::jsi::Runtime &runtime,
       const facebook::jsi::Value *arguments,
       size_t count);
+
+ private:
+  /** The body `subtreesOf` and `teardownSubtreesOf` share; `narrowToTeardown` picks the walk. */
+  facebook::jsi::Value collectRoots(
+      facebook::jsi::Runtime &runtime,
+      const facebook::jsi::Value *arguments,
+      size_t count,
+      const char *what,
+      bool narrowToTeardown);
 };
 
 } // namespace symbiote
