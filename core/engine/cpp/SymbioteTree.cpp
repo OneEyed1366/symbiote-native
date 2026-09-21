@@ -396,62 +396,25 @@ void holdHandle(jsi::Runtime &runtime, Node &node) {
 }
 
 /**
- * The UIManager, resolved ONCE per runtime.
+ * The UIManager for this runtime.
  *
- * `UIManagerBinding::getBinding` reads a global off the runtime, and `applyOps` is entered once per
- * DRAIN — which a framework navigating between mutations makes once per MUTATION rather than once
- * per commit. Solid's `cleanChildren` does exactly that: 2 000 entries to clear a thousand rows.
+ * NOT cached, and the failed attempt is worth recording: keying a cache on `&runtime` treats an
+ * ADDRESS as a lifetime, and an allocator reuses addresses. `symbiote_tree_tests` builds and tears
+ * down a JSCRuntime per case, so the second one can land where the first was and inherit a dangling
+ * binding — a crash, not a wrong number. The same mistake with three interned `PropNameID`s aborted
+ * that suite outright (`~JSCRuntime`: "destroyed with a dangling API string").
  *
- * Keyed on the runtime POINTER rather than cached outright, so a second runtime (a reload) resolves
- * its own binding instead of inheriting a dangling one. Everything else in this file is already
- * single-runtime by construction — `walkCost_` below is file scope — but a stale UIManager is a
- * crash where a stale counter is a wrong number.
+ * It bought nothing anyway: both caches together moved an empty drain 4.46 -> 4.38 us, against the
+ * 4.38 -> 1.54 that dropping the checked JSI casts gave.
  */
-jsi::Runtime *uiManagerCachedFor_ = nullptr;
-react::UIManager *cachedUiManager_ = nullptr;
-
 react::UIManager &uiManagerFor(jsi::Runtime &runtime, const char *what) {
-  if (uiManagerCachedFor_ == &runtime && cachedUiManager_ != nullptr) {
-    return *cachedUiManager_;
-  }
   auto binding = react::UIManagerBinding::getBinding(runtime);
   if (binding == nullptr) {
     throw jsi::JSError(
         runtime,
         std::string(what) + ": nativeFabricUIManager is not installed on this runtime");
   }
-  cachedUiManager_ = &binding->getUIManager();
-  uiManagerCachedFor_ = &runtime;
-  return *cachedUiManager_;
-}
-
-/**
- * `buffer` / `byteOffset` / `length`, interned once per runtime.
- *
- * `Object::getProperty(runtime, const char *)` builds a `PropNameID` from UTF-8 on every call, and
- * `int32ArrayData` below makes three of them per `applyOps`. Measured on an EMPTY batch, the whole
- * prologue costs 4.4-5.1 us against a 0.13 us bare host call
- * (`small-batch-crossing-cost.itest.ts`) — a JSI property read is the dominant term in it, not the
- * call.
- */
-struct ITypedArrayNames {
-  jsi::PropNameID buffer;
-  jsi::PropNameID byteOffset;
-  jsi::PropNameID length;
-};
-
-jsi::Runtime *namesCachedFor_ = nullptr;
-std::optional<ITypedArrayNames> typedArrayNames_;
-
-const ITypedArrayNames &typedArrayNames(jsi::Runtime &runtime) {
-  if (namesCachedFor_ != &runtime || !typedArrayNames_.has_value()) {
-    typedArrayNames_.emplace(ITypedArrayNames{
-        jsi::PropNameID::forAscii(runtime, "buffer"),
-        jsi::PropNameID::forAscii(runtime, "byteOffset"),
-        jsi::PropNameID::forAscii(runtime, "length")});
-    namesCachedFor_ = &runtime;
-  }
-  return *typedArrayNames_;
+  return binding->getUIManager();
 }
 
 /**
@@ -460,13 +423,16 @@ const ITypedArrayNames &typedArrayNames(jsi::Runtime &runtime) {
  * `ArrayBuffer::data` hands back the backing store, so the commands never become JS values — which
  * is the entire reason the format is flat. `byteOffset` is read rather than assumed: a typed array
  * need not start at the head of its buffer.
+ *
+ * The three names are built from UTF-8 on every call and that stands: interning them in a
+ * file-scope cache is what aborted `symbiote_tree_tests`, because a `PropNameID` outliving its
+ * runtime is a dangling API string. See `uiManagerFor` above for the general form and the price.
  */
 const int32_t *int32ArrayData(jsi::Runtime &runtime, const jsi::Value &value, size_t &lengthOut) {
-  const auto &names = typedArrayNames(runtime);
   auto typedArray = value.asObject(runtime);
-  auto buffer = typedArray.getProperty(runtime, names.buffer).asObject(runtime).getArrayBuffer(runtime);
-  auto byteOffset = static_cast<size_t>(typedArray.getProperty(runtime, names.byteOffset).asNumber());
-  lengthOut = static_cast<size_t>(typedArray.getProperty(runtime, names.length).asNumber());
+  auto buffer = typedArray.getProperty(runtime, "buffer").asObject(runtime).getArrayBuffer(runtime);
+  auto byteOffset = static_cast<size_t>(typedArray.getProperty(runtime, "byteOffset").asNumber());
+  lengthOut = static_cast<size_t>(typedArray.getProperty(runtime, "length").asNumber());
   return reinterpret_cast<const int32_t *>(buffer.data(runtime) + byteOffset);
 }
 

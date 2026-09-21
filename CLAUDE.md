@@ -745,12 +745,28 @@ JavaScriptCore charges for crossing.
 
 **TWO GUESSES WERE WRONG BEFORE THE BISECT FOUND IT**, and both are worth not repeating. Caching
 `UIManagerBinding::getBinding` per runtime and interning the three `PropNameID`s that
-`int32ArrayData` builds from UTF-8 on every call together moved 4.46 -> 4.38 us. Both are kept —
-they are strictly less work — but neither was the cost.
+`int32ArrayData` builds from UTF-8 on every call together moved 4.46 -> 4.38 us — 1.8% of the
+prologue, against the 4.38 -> 1.54 the real cause gave.
+
+**BOTH WERE REVERTED THE SAME DAY, and the reason outranks the 0.08 us.** Each was keyed on
+`&runtime`, which treats an ADDRESS as a lifetime, and an allocator reuses addresses.
+`symbiote_tree_tests` builds and tears down a JSCRuntime per case, so the interned `PropNameID`s
+outlived the runtime that minted them and the suite aborted in `~JSCRuntime`: *"destroyed with a
+dangling API string"*. The UIManager cache had the same flaw one step quieter — a second runtime
+landing on a freed address inherits a dangling binding, which is a crash rather than a wrong number,
+and its own comment claimed the pointer key was what made it safe.
+
+**IT WENT GREEN ON `bench:itest` AND RED ON CI**, which is the part to carry forward: `test:itest`
+is `test:cpp && run-itests.mjs`, and the gtest half is the ONLY arm that constructs more than one
+runtime. Every JS fixture runs against one runtime for the life of the process, so a lifetime bug in
+the engine is invisible to all 476 of them. **Run `pnpm run test:cpp` before believing a C++ change,
+not just the itests.**
 
 The cost was `arguments[n].asObject(runtime).asArray(runtime)`, four times. The checking pair runs an
 `isObject` and an `isArray` per table, eight JSI round trips for four arguments, and dropping them to
-`getObject`/`getArray` took the prologue to 1.54 us in one edit.
+`getObject`/`getArray` took the prologue to 1.54 us in one edit. That 1.54 was read with the two
+caches still in; re-measured without them on a noisy machine the same fixture reads 2.1-3.9 us, so
+it carries NO verdict either way — the spread is twenty times what the caches were ever worth.
 
 **IT IS NOT AN UNCHECKED SHORTCUT, it is the harness's own split used for once.** `takeBatch` is the
 only producer on this wire, and `jsi::Value::getObject` / `Object::getArray` carry `assert`s that are
