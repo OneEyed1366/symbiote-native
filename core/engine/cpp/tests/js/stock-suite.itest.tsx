@@ -55,9 +55,11 @@ import { loadStockRenderer } from './stock-renderer';
 // has no matching export, and the bundle fails to build at all.
 //
 // `.default` because the module is ESM underneath and the interop hands back a namespace.
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+/* eslint-disable @typescript-eslint/no-require-imports -- prettier rewraps this across lines,
+   which drifts a disable-next-line off target; see this file's own header for why it's a require */
 const TextInput =
   require('react-native/Libraries/Components/TextInput/TextInput').default;
+/* eslint-enable @typescript-eslint/no-require-imports */
 
 const Row = memo(function RowView({
   row,

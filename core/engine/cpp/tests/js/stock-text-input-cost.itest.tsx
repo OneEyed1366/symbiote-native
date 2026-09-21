@@ -172,9 +172,11 @@ describe('what the stock arm pays for a text input', () => {
     // import has no matching export, and the bundle dies before anything runs.
     //
     // `.default` because the module is ESM underneath and the interop hands back a namespace.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    /* eslint-disable @typescript-eslint/no-require-imports -- prettier rewraps this across lines,
+       which drifts a disable-next-line off target; see the block above for why it's a require */
     const TextInput =
       require('react-native/Libraries/Components/TextInput/TextInput').default;
+    /* eslint-enable @typescript-eslint/no-require-imports */
 
     const arm = timeArm('TextInput', id =>
       h(TextInput, { style: INPUT_STYLE, value: `input ${id}` }),
