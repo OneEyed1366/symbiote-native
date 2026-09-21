@@ -13,11 +13,6 @@ export function applyBootsplashLogo(
   templatesRoot: string,
   framework: IFramework,
 ): void {
-  const overlayRoot = path.join(
-    templatesRoot,
-    'native',
-    'bootsplash-logo',
-    framework,
-  );
+  const overlayRoot = path.join(templatesRoot, 'bootsplash-logo', framework);
   if (fs.existsSync(overlayRoot)) renderTemplate(overlayRoot, root);
 }
