@@ -3,7 +3,7 @@
 // device-verify-pending: source-confirmed from RN's Android ViewManagers, proven on a
 // real host by the absence of a "Can't find ViewManager '<name>'" red box.
 
-import { ANCHOR_COMPONENT } from '@symbiote-native/engine';
+import { ANCHOR_COMPONENT, VOID_COMPONENT } from '@symbiote-native/engine';
 
 import {
   buildDescriptors,
@@ -36,14 +36,7 @@ const ANDROID_NAMES: Readonly<Record<ISymbioteIntrinsic, string>> = {
   // Android has one text-input ViewManager for both single- and multiline.
   'text-input': 'AndroidTextInput',
   'text-input-multiline': 'AndroidTextInput',
-  // The component path's pair — same native views, a tag the behavior registry does not
-  // carry. See `shared.ts` for why the wrapper may not share the lowered tag.
-  'text-input-managed': 'AndroidTextInput',
-  'text-input-multiline-managed': 'AndroidTextInput',
   switch: 'AndroidSwitch',
-  // The wrapper's tag — same native view, a tag the behavior registry does not carry. See
-  // `shared.ts` for why the wrapper may not share the lowered tag.
-  'switch-managed': 'AndroidSwitch',
   'activity-indicator': 'RCTView',
   'activity-indicator-spinner': 'AndroidProgressBar',
   // KNOWN DIVERGENCE FROM REACT NATIVE, and it is in our favour — recorded 2026-09-01 because it
@@ -64,9 +57,12 @@ const ANDROID_NAMES: Readonly<Record<ISymbioteIntrinsic, string>> = {
   modal: 'RCTModalHostView',
   'refresh-control': 'AndroidSwipeRefreshLayout',
   'sticky-header': 'RCTView',
-  // iOS-only primitive; RN ships no Android InputAccessoryView. Degrade to a plain
-  // container so an iOS-targeted usage doesn't red-box on Android.
-  'input-accessory-view': 'RCTView',
+  // `InputAccessoryView.js` on Android does `console.warn(...); return null` — the WHOLE component,
+  // children included, renders NOTHING. A plain `RCTView` container (this file's answer until
+  // 2026-09-20) committed a real, laid-out, potentially visible node plus its whole child subtree —
+  // a real divergence from vendor, not a harmless degrade. `VOID_COMPONENT` matches vendor exactly:
+  // no node, no children, on this platform only.
+  'input-accessory-view': VOID_COMPONENT,
 };
 
 export const COMPONENT_DESCRIPTORS = buildDescriptors(ANDROID_NAMES);

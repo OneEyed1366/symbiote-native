@@ -1,0 +1,22 @@
+{
+  "scripts": {
+    "android": "react-native run-android",
+    "android:release": "react-native run-android --mode Release",
+    "ios": "react-native run-ios",
+    "ios:release": "react-native run-ios --mode Release",
+    "lint": "eslint .",
+    "start": "react-native start",
+    "dev": "react-native start --reset-cache"
+  },
+  "dependencies": {
+    "@symbiote-native/android": "latest",
+    "@symbiote-native/engine": "latest",
+    "@symbiote-native/react": "latest",
+    "react": "19.2.3",
+    "react-native": "0.86.0"
+  },
+  "devDependencies": {
+    "@react-native/babel-preset": "0.86.0",
+    "@react-native/metro-config": "0.86.0"
+  }
+}

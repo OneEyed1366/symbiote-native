@@ -5,7 +5,11 @@
 // this is pure transform — every adapter (React, Vue) reuses it; the adapter supplies
 // only the element creation (createElement / h) for a row and the ref wiring.
 
-import type { IViewableItemsChangedInfo, IViewToken } from './virtualized-list';
+import {
+  defaultKeyExtractor,
+  type IViewableItemsChangedInfo,
+  type IViewToken,
+} from './virtualized-list';
 
 export const SINGLE_COLUMN = 1;
 
@@ -26,8 +30,18 @@ export function chunkIntoRows<ItemT>(
   return rows;
 }
 
-export function rowKeyExtractor<ItemT>(row: IRow<ItemT>): string {
-  return `row-${row.startIndex}`;
+// RN's own multi-column row key (`FlatList.js`'s `_keyExtractor`): each item's own key, joined
+// with `:`, never a synthetic position string — an app's `keyExtractor` (or the object's own
+// `key`/`id`) is what keeps a row's identity stable across inserts/removes, and a `row-${index}`
+// key defeats that as surely as no key at all.
+export function rowKeyExtractor<ItemT>(
+  row: IRow<ItemT>,
+  keyExtractor?: (item: ItemT, index: number) => string,
+): string {
+  const resolve = keyExtractor ?? defaultKeyExtractor;
+  return row.items
+    .map((item, column) => resolve(item, row.startIndex + column))
+    .join(':');
 }
 
 // Expand a row's viewable token to one token per item in that row, all sharing the row's

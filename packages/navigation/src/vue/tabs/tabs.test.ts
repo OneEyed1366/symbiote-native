@@ -19,7 +19,15 @@ import { defineComponent, h, ref } from '@vue/runtime-core';
 import type { Ref } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '@symbiote-native/vue';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  childrenOf,
+  isAnchor,
+  type ISymbioteNode,
+} from '@symbiote-native/engine';
+import {
+  installRecordingFabric,
+  type IAuthoredNode,
+} from '@symbiote-native/test-utils';
 import { Tab } from './index';
 import type { ITabNavigatorHandle } from './index';
 import type { IRoute } from '../../core';
@@ -34,7 +42,7 @@ const ROOT_TAG = 4640;
 const TOUCH_START = 'topTouchStart';
 const TOUCH_END = 'topTouchEnd';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -46,31 +54,64 @@ beforeEach(() => {
 });
 afterEach(() => unmount(ROOT_TAG));
 
-function findAllText(nodes: readonly IFakeNode[]): string[] {
-  const found: string[] = [];
-  const collect = (list: readonly IFakeNode[]): void => {
-    for (const node of list) {
-      if (node.viewName === 'RCTRawText' && typeof node.props.text === 'string')
-        found.push(node.props.text);
-      collect(node.children);
+// SWITCHING TABS is the subject, so every walk below descends the LIVE child links from the app
+// root down. A recording keeps every node it ever saw created, so the screen a switch unmounted
+// would still answer here — and half these cases assert a label is NOT present.
+//
+// Anchors are FLATTENED, the commit walk's own rule (`renderableChildren`): an anchor is
+// structural bookkeeping nothing native ever sees, so its children stand in its place. The
+// positional reads below therefore mean the children Tab actually rendered.
+function kidsOf(handle: ISymbioteNode): IAuthoredNode[] {
+  const kids: IAuthoredNode[] = [];
+  for (const child of childrenOf(handle)) {
+    if (isAnchor(child)) {
+      kids.push(...kidsOf(child));
+      continue;
     }
-  };
-  collect(nodes);
+    const recorded = fabric.find(one => one.handle === child);
+    if (recorded !== undefined) kids.push(recorded);
+  }
+  return kids;
+}
+
+// The AppContainer root, the same node `installFabric`'s `appRoot()` named: the engine creates it
+// with `pointerEvents: 'box-none'`, and that is an authored prop rather than anything derived.
+function appRoot(): ISymbioteNode {
+  const root = fabric.find(node => node.props.pointerEvents === 'box-none');
+  if (root === undefined) throw new Error('no AppContainer root was created');
+  return root.handle;
+}
+
+function findAllText(handle: ISymbioteNode = appRoot()): string[] {
+  const found: string[] = [];
+  for (const child of childrenOf(handle)) {
+    const recorded = fabric.find(one => one.handle === child);
+    if (
+      recorded?.viewName === 'RCTRawText' &&
+      typeof recorded.props.text === 'string'
+    ) {
+      found.push(recorded.props.text);
+    }
+    found.push(...findAllText(child));
+  }
   return found;
 }
 
 // The tab bar row: the second child of Tab's root `view` (content wrapper first, bar
 // second - see tabs.ts's final h() call).
-function tabBarRow(): IFakeNode {
-  const root = fabric.appRoot();
-  const tabRoot = root.children[0];
-  const bar = tabRoot?.children[1];
-  if (!bar) throw new Error('no tab bar row was committed');
+function tabBarRow(): IAuthoredNode {
+  const tabRoot = kidsOf(appRoot())[0];
+  const bar = tabRoot === undefined ? undefined : kidsOf(tabRoot.handle)[1];
+  if (!bar) throw new Error('no tab bar row was created');
   return bar;
 }
 
+function tabItems(): IAuthoredNode[] {
+  return kidsOf(tabBarRow().handle);
+}
+
 async function tapItem(index: number): Promise<void> {
-  const item = tabBarRow().children[index];
+  const item = tabItems()[index];
   if (!item) throw new Error(`no tab item at index ${index}`);
   fabric.fireEvent(item.instanceHandle, TOUCH_START, {
     touches: [{ identifier: 1, pageX: 0, pageY: 0 }],
@@ -165,10 +206,10 @@ describe('Vue Tab navigator', () => {
         }),
       );
       await tick();
-      expect(findAllText(fabric.committed)).toContain('home');
-      expect(findAllText(fabric.committed)).not.toContain('profile');
-      expect(tabBarRow().children).toHaveLength(2);
-      expect(findAllText(tabBarRow().children)).toEqual(['Home', 'Profile']);
+      expect(findAllText()).toContain('home');
+      expect(findAllText()).not.toContain('profile');
+      expect(tabItems()).toHaveLength(2);
+      expect(findAllText(tabBarRow().handle)).toEqual(['Home', 'Profile']);
     });
 
     // why: jumpTo() must UNMOUNT the previously-focused screen and mount the new one - not keep
@@ -188,8 +229,8 @@ describe('Vue Tab navigator', () => {
       await tick();
       handleRef.value?.jumpTo('Profile');
       await tick();
-      expect(findAllText(fabric.committed)).toContain('profile');
-      expect(findAllText(fabric.committed)).not.toContain('home');
+      expect(findAllText()).toContain('profile');
+      expect(findAllText()).not.toContain('home');
     });
 
     // why: the tab bar is a pure-JS UI, so a tap must be synthesized by the engine's own touch
@@ -208,10 +249,10 @@ describe('Vue Tab navigator', () => {
         }),
       );
       await tick();
-      expect(findAllText(fabric.committed)).toContain('home');
+      expect(findAllText()).toContain('home');
       await tapItem(1);
-      expect(findAllText(fabric.committed)).toContain('profile');
-      expect(findAllText(fabric.committed)).not.toContain('home');
+      expect(findAllText()).toContain('profile');
+      expect(findAllText()).not.toContain('home');
     });
 
     // why: jumpTo() to a name with no registered screen must be a no-op (fail closed) - matches
@@ -231,7 +272,7 @@ describe('Vue Tab navigator', () => {
       await tick();
       handleRef.value?.jumpTo('Nowhere');
       await tick();
-      expect(findAllText(fabric.committed)).toContain('home');
+      expect(findAllText()).toContain('home');
     });
 
     // why: params passed to jumpTo() must reach the newly-focused screen's own useRoute() - the
@@ -281,7 +322,7 @@ describe('Vue Tab navigator', () => {
         }),
       );
       await tick();
-      expect(findAllText(tabBarRow().children)).toContain('3');
+      expect(findAllText(tabBarRow().handle)).toContain('3');
     });
 
     // Before this fix, Tab never wrapped its focused screen in a NavigationScope at all, so every
@@ -384,12 +425,12 @@ describe('Vue Tab navigator', () => {
     it('drops the tab of a screen unregistered after mount', async () => {
       const { hideProfile } = mountToggleTab();
       await tick();
-      expect(findAllText(tabBarRow().children)).toEqual(['Home', 'Profile']);
+      expect(findAllText(tabBarRow().handle)).toEqual(['Home', 'Profile']);
 
       hideProfile();
       await tick();
 
-      expect(findAllText(tabBarRow().children)).toEqual(['Home']);
+      expect(findAllText(tabBarRow().handle)).toEqual(['Home']);
     });
 
     // why: dropping the user's current tab because a DIFFERENT screen was removed would be a
@@ -412,7 +453,7 @@ describe('Vue Tab navigator', () => {
         key: homeKey,
         params: { sort: 'trending' },
       });
-      expect(findAllText(fabric.committed)).toContain('home');
+      expect(findAllText()).toContain('home');
     });
 
     // why: when the FOCUSED screen is the one that unregisters there is no route left to stay on,
@@ -423,14 +464,14 @@ describe('Vue Tab navigator', () => {
       await tick();
       handleRef.value?.jumpTo('Profile');
       await tick();
-      expect(findAllText(fabric.committed)).toContain('profile');
+      expect(findAllText()).toContain('profile');
 
       hideProfile();
       await tick();
 
-      expect(findAllText(tabBarRow().children)).toEqual(['Home']);
-      expect(findAllText(fabric.committed)).not.toContain('profile');
-      expect(findAllText(fabric.committed)).toContain('home');
+      expect(findAllText(tabBarRow().handle)).toEqual(['Home']);
+      expect(findAllText()).not.toContain('profile');
+      expect(findAllText()).toContain('home');
     });
   });
 });

@@ -1,5 +1,145 @@
 # @symbiote-native/engine
 
+## 1.0.0
+
+### Major Changes
+
+- [`72eab44`](https://github.com/OneEyed1366/symbiote-native/commit/72eab44031a0bb30cd90ac9d0fbc55de15606e26) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - The retained tree is C++ now. JS holds no tree at all and emits a command buffer instead.
+
+  `core/engine/cpp/SymbioteTree.cpp` owns the nodes, the clone-on-write commit and the tag-keyed
+  platform rules; `mutation-buffer.ts` is the wire format, and its header is the spec both sides are
+  held to.
+
+  Three things went rather than moved. The commit walk over dirty subtrees is gone, because the
+  framework names the nodes. Desired-vs-committed diffing is gone, because the framework names the
+  operations. `IMirror` is gone - it re-implemented `ShadowNode` in JS, which already carries children
+  and props, and existed only because reading it back costs a crossing. So the buffer carries the
+  adapter's alphabet instead of Fabric's, and the derivation disappears rather than relocating.
+
+  Reading a node is a function now, not a property: `parentOf`, `childrenOf`, `firstChildOf`,
+  `nextSiblingOf`, `componentOf`, `textOf`, `propOf`, `propsOf`, `committedPayloadOf`.
+
+  `ITreeHost` with `setTreeHost` / `treeHost` is how a host gets installed, and `readSurfaceTelemetry`,
+  `takePropKeyTally` and `takeNativeDebugLog` are what a test reads back out of it.
+
+### Minor Changes
+
+- [#71](https://github.com/OneEyed1366/symbiote-native/pull/71) [`204bb30`](https://github.com/OneEyed1366/symbiote-native/commit/204bb30a61d378aea7dab9f8983e198f1e578023) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Add the structure seam a COMPOSED host primitive needs: `IHostBehavior.buildStructure` and
+  `ISymbioteNode.childHost`.
+
+  `foldPayload` gives a tag its wrapper's prop mapping. Nothing gave it the wrapper's composition, so
+  a primitive built from more than one node — ScrollView is a scroll view wrapping a content view —
+  could not become a tag at all, whatever its props did.
+
+  A behavior may now build its own internal subtree once at attach and return the node the app's
+  children belong under. `appendChild` / `insertBefore` / `removeChild` redirect there, so an adapter
+  keeps naming the owner and never learns a slot exists — the same relationship a browser's `<video>`
+  has with its UA shadow tree.
+
+  `IHostBehavior.slotProps` is the prop twin: owner prop name -> slot prop name, applied in
+  `routeProp` and gated on the same field, so an app writes `contentContainerStyle` on the ScrollView
+  and it lands as the content node's `style`. A pure rename — precedence belongs to a `payloadFold`,
+  because the two orders are opposite (the scroll node's base style goes UNDER the app's, the
+  content node's `flexDirection: 'row'` goes OVER it).
+
+  Also lands `registerScrollViewBehavior()` in `@symbiote-native/components`, the first consumer: it
+  builds the same two nodes and composes the same two style arrays every adapter's wrapper does. It
+  is exported but called by nothing — `scroll-view` is the tag the wrappers already emit and they
+  build their own content node, so a global registration would double-nest every existing ScrollView.
+  Making the engine the single owner of the content node is the next step.
+
+- [`d6fe117`](https://github.com/OneEyed1366/symbiote-native/commit/d6fe117ea712a41e6118f0cb4e84799817ee8d21) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Every item here is a place the press family answered differently from `react-native@0.86`, found by
+  reading its source.
+
+  Two controls fired backwards. `Switch` called `onValueChange` before `onChange` (`Switch.js:201-207`),
+  `TextInput` called `onChangeText` before `onChange` (`TextInput.js:504-506`). Vendor fires the event
+  handler first, so an app reading `event.nativeEvent` to accept or reject a value saw it after the
+  value had been announced. `_onSelectionChange` had the same inversion (`:522-533`).
+
+  `disabled` was only ever the raw prop. All three touchables resolve `disabled ?? aria-disabled ??
+accessibilityState.disabled` before configuring Pressability (`TouchableOpacity.js:186` and siblings;
+  Highlight has no `aria` leg, an upstream inconsistency matched rather than fixed). A control disabled
+  through `accessibilityState` alone greyed out and kept firing `onPress`.
+
+  The long-press timer is armed at `RESPONDER_GRANT`, so its threshold from touch-down is a flat 500 ms
+  instead of 500 ms after press-in settles (`Pressability.js:471-478`). Movement is gated by a separate
+  10 px jitter threshold, checked before the retention region (`:502-508`).
+
+  `blockNativeResponder` is new across the family. `onResponderGrant` returns it (`Pressability.js:479`)
+  to tell native to stand down, so a parent `ScrollView` cannot steal a claimed gesture mid-drag. We sent
+  the default and yielded.
+
+  `touchSoundDisabled` is new too, reaching Pressability as `android_disableSound`. It gates the Android
+  release-time `SoundManager.playTouchSound()` (`:749-757`), a call that did not exist here - hence the
+  new `SoundManager` engine module.
+
+  `Pressable`'s bare tag commits `collapsable: false` unconditionally (`Pressable.js:340`). `Switch`
+  claims the responder on both platforms (`:238-239,288-289`) and builds `accessibilityState` only once
+  `disabled` resolves to something (`:235-238`). Both are tag rules in `SymbioteFabricProps.cpp`; the
+  adapters gained prop declarations and nothing else.
+
+- [`d6fe117`](https://github.com/OneEyed1366/symbiote-native/commit/d6fe117ea712a41e6118f0cb4e84799817ee8d21) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - The same vendor read, applied to the view primitives.
+
+  `InputAccessoryView` renders `null` on Android. We committed a real, laid-out `RCTView` and its whole
+  subtree there. `VOID_COMPONENT` is the engine primitive for it: where `ANCHOR_COMPONENT` hoists its
+  children up in its place, a void node contributes neither itself nor them.
+
+  `Image` gets three vendor rules back. `defaultSource` resolves through `resolveAssetSource` like every
+  other source slot (`ImageViewNativeComponent.js:138`), `alt` sets `accessible` unconditionally
+  (`Image.android.js:272-273`), and the four load events stay silent on Android until
+  `shouldNotifyLoadEvents` is on - vendor raises it whenever any one of them is authored, which is what
+  `IMAGE_LOAD_EVENT_NAMES` answers.
+
+  `ImageBackground` carries `importantForAccessibility` down to both of its nodes; vendor destructures it
+  out of the spread and reapplies it explicitly (`:67,76,82`).
+
+  `Modal` pinned its container to the left edge always - vendor picks the edge off `I18nManager.isRTL`
+  (`Modal.js:372`). `ActivityIndicator` never sent Android `styleAttr` and `indeterminate` (`:100-103`),
+  so the spinner took whatever the ViewManager defaulted to. `KeyboardAvoidingView` uses vendor's own
+  duration formula, floor included (`:169-179`).
+
+  `TouchableWithoutFeedback` needs `nativeID` to beat `id`, the reverse of every other tag.
+  `IHostBehavior.nativeIdWinsOverId` says so once at `createElement` instead of each writer guessing.
+
+- [#71](https://github.com/OneEyed1366/symbiote-native/pull/71) [`204bb30`](https://github.com/OneEyed1366/symbiote-native/commit/204bb30a61d378aea7dab9f8983e198f1e578023) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - `scrollTo`, `scrollToEnd` and `flashScrollIndicators` are now methods on `ISymbioteNode`, beside
+  `focus` / `blur` / `measure`.
+
+  A `<scroll-view>` hands the app its engine node, with no wrapper to build an imperative handle
+  from — so anything the wrapper's handle offered has to be reachable from the node, or the public
+  surface silently shrinks the day the primitive stops being a component.
+
+  `buildScrollViewHandle` keeps its signature and now delegates to those methods instead of
+  dispatching its own commands. The defaults (`x`/`y` 0, `animated` true) live in one place, so a ref
+  and a tag cannot disagree about what `scrollTo()` with no argument means.
+
+- [#71](https://github.com/OneEyed1366/symbiote-native/pull/71) [`204bb30`](https://github.com/OneEyed1366/symbiote-native/commit/204bb30a61d378aea7dab9f8983e198f1e578023) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Two engine seams a composed host primitive needs, and ScrollView's prop half wired onto them.
+
+  `IHostBehavior.slotDerived` names owner props the internal slot's payload is computed from, so a
+  write to one marks the slot dirty. `markPropsDirty` bubbles up, so without it a derived slot value
+  is correct at mount and frozen forever after. Read past `setProp`'s identity guard, so a re-render
+  writing an unchanged value still costs nothing.
+
+  `IHostBehavior.onOwnedListenerChange` fires when the app wires or unwires an owned listener — never
+  on the fresh closure a framework hands over each render. `afterCommit` cannot serve this: a listener
+  change moves no Fabric prop, so the commit after it is a no-op and post-commit hooks are skipped.
+
+  A `<scroll-view>` now resolves `decelerationRate` to the platform friction constant, turns off
+  content-cell flattening for `maintainVisibleContentPosition` / `snapToAlignment`, and synthesizes
+  `onContentSizeChange` from its content view's layout — installing that gated `onLayout` only when
+  the app passed a handler, as RN and every wrapper do.
+
+- [#71](https://github.com/OneEyed1366/symbiote-native/pull/71) [`204bb30`](https://github.com/OneEyed1366/symbiote-native/commit/204bb30a61d378aea7dab9f8983e198f1e578023) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - A `<scroll-view>` can now pin a `<sticky-header>` child, the last piece a composed host primitive
+  needed before its wrapper could be deleted.
+
+  RN's sticky header is JS-built (`ScrollViewStickyHeader`), not a native concept — a plain view
+  carrying `zIndex` and an animated `translateY` computed from scroll offset against the header's own
+  measured layout. `registerScrollViewBehavior`'s owner now tracks sticky-header children through the
+  new `sticky` claim mode, and `core/components/src/behaviors/scroll-view/sticky.ts` runs the
+  offset/pin math that every wrapper used to duplicate. `<sticky-header>` and its Fabric name join the
+  platform-invariant tables in `component-names/{index.ios,index.android,shared}.ts`.
+
+  Angular's `babel-register-composed.cjs` picks up the new tag.
+
 ## 0.5.0
 
 ### Minor Changes

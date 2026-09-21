@@ -18,13 +18,19 @@
 //
 // REGISTRATION IS THE HAZARD, not the machine — see `./pressable` for why each adapter's entry
 // does a bare `import './register';` that the barrel does not re-export.
+//
+// TODO(rn-parity, low priority): `TouchableOpacity.js:197-220` gates the active/inactive opacity
+// fade on `onFocus`/`onBlur` too (TV remote focus fires the same fade `onPress` triggers). Neither
+// name is wired into the feedback machine here; they pass through as ordinary, un-intercepted
+// event props. Deliberately not implemented — dead on every device this project targets (no tvOS
+// build, no example app; iOS/Android are the only targets). Audit skill, "Found, NOT fixed: TV
+// (Platform.isTV) focus/blur feedback on TouchableOpacity/Highlight".
 
 import {
   AnimatedMock,
   AnimatedValue,
   Easing,
   Platform,
-  appListenerFor,
   dlog,
   getExplicitStyle,
   markPropsDirty,
@@ -33,13 +39,14 @@ import {
   setAnimatedBehaviorStyle,
   timing,
   type IHostBehavior,
-  type IPayloadFold,
   type ISymbioteEvent,
   type ISymbioteNode,
+  propOf,
+  propsOf,
 } from '@symbiote-native/engine';
-import { resolveTouchableFocusable } from '../view/render-pressable';
+import { resolveButtonDisabled } from '../view/render-button';
 import {
-  accessibleUnlessOptedOut,
+  asAccessibilityState,
   booleanOr,
   createPressBehavior,
   type IDisabledResolver,
@@ -49,6 +56,7 @@ import {
   createTouchableFeedbackHandlers,
   createTouchableFeedbackRuntime,
   DEFAULT_ACTIVE_OPACITY,
+  OPACITY_ACTIVE_DURATION_MS,
   OPACITY_ACTIVE_GRANT_DURATION_MS,
   OPACITY_INACTIVE_DURATION_MS,
   RESTING_OPACITY,
@@ -110,17 +118,17 @@ const refine: IPressConfigRefinement = (node, config) => {
   if (state === undefined) return config;
   const resting = restingOpacityOf(node);
   const activeOpacity = numberOr(
-    node.props.activeOpacity,
+    propOf(node, 'activeOpacity'),
     DEFAULT_ACTIVE_OPACITY,
   );
   const handlers = createTouchableFeedbackHandlers(
     {
-      delayPressIn: numberOr(node.props.delayPressIn, 0),
-      delayPressOut: numberOr(node.props.delayPressOut, 0),
+      delayPressIn: numberOr(propOf(node, 'delayPressIn'), 0),
+      delayPressOut: numberOr(propOf(node, 'delayPressOut'), 0),
       // Read raw rather than off `config`, which has already defaulted the absent case to the press
       // machine's own 130 ms — a floor RN's Touchables never see (TOUCHABLE_MIN_PRESS_DURATION_MS).
       minPressDuration: numberOr(
-        node.props.minPressDuration,
+        propOf(node, 'minPressDuration'),
         TOUCHABLE_MIN_PRESS_DURATION_MS,
       ),
       schedule: (callback, ms) => {
@@ -139,9 +147,15 @@ const refine: IPressConfigRefinement = (node, config) => {
     state.runtime,
     {
       activate(event: ISymbioteEvent): void {
-        // 0, not 150 (TouchableOpacity.js:215-220): the duration is chosen by where the press-in
-        // came from, and every pressIn our engine produces is the grant-equivalent.
-        fadeTo(state, activeOpacity, OPACITY_ACTIVE_GRANT_DURATION_MS);
+        // TouchableOpacity.js:215-220 picks the duration from WHERE the press-in came from: our
+        // engine's own 'pressIn' event (an ordinary grant, or its delayed replay) is the 0ms leg;
+        // a drift-out/drift-back-in reactivation arrives as 'responderMove'
+        // (`state/pressable.ts`'s `handleResponderMove`) and gets the 150ms ease-back-in instead.
+        const duration =
+          event.type === 'responderMove'
+            ? OPACITY_ACTIVE_DURATION_MS
+            : OPACITY_ACTIVE_GRANT_DURATION_MS;
+        fadeTo(state, activeOpacity, duration);
         config.onPressIn?.(event);
       },
       deactivate(event: ISymbioteEvent): void {
@@ -160,27 +174,16 @@ const refine: IPressConfigRefinement = (node, config) => {
   };
 };
 
-const press = createPressBehavior(refine);
-
-// The `id -> nativeID` alias every primitive's spec entry declares, applied here because
-// `HOST_PRIMITIVES` deliberately withholds this primitive's entry until the other adapters'
-// wrappers collapse to one node (the note at its Pressable neighbour says why). A raw `id` is a key
-// no ViewConfig declares, so Fabric drops it and the nativeID is lost on device with nothing red.
-//
-// Unconditional priority when both are set, matching RN (`View.js:77-79`) and `foldHostBag`.
-const foldPayload: IPayloadFold = props => {
-  const folded =
-    press.foldPayload === undefined ? props : press.foldPayload(props);
-  const next: Record<string, unknown> = { ...folded };
-  // TouchableOpacity.js:303. The tag is this primitive's only path, so unlike `pressable` there is
-  // no wrapper for it to disagree with.
-  next.accessible = accessibleUnlessOptedOut(props);
-  if (Object.hasOwn(next, 'id')) {
-    next.nativeID = next.id;
-    delete next.id;
-  }
-  return next;
-};
+// TouchableOpacity.js:186-189 — `disabled ?? aria-disabled ?? accessibilityState.disabled`, the
+// same three-way answer Button resolves, just never wired to this tag's OWN registration before.
+// Without it, a caller who sets only `accessibilityState={{disabled: true}}` (no `disabled` prop)
+// gets the greyed-out RN look but a press that still fires here — RN suppresses it.
+const touchableOpacityDisabled: IDisabledResolver = props =>
+  resolveButtonDisabled(
+    booleanOr(props.disabled),
+    booleanOr(props['aria-disabled']),
+    asAccessibilityState(props.accessibilityState),
+  );
 
 /**
  * The behavior as PARTS, so a tag that is a TouchableOpacity plus something — `button`, which RN
@@ -193,11 +196,11 @@ export function createTouchableOpacityBehavior(
   disabledOf?: IDisabledResolver,
 ): IHostBehavior {
   // Its own machine rather than the module-level `press`, so a composing tag can say what
-  // `disabled` MEANS to it. `foldPayload` below is the same function either way.
+  // `disabled` MEANS to it — the answer feeds the machine, not a payload: the props half of that
+  // question is `foldPressableProps` in `SymbioteFabricProps.cpp` and reads the authored bag.
   const machine = createPressBehavior(refine, disabledOf);
   return {
     ...machine,
-    foldPayload,
     attach(node: ISymbioteNode): void {
       const state: IFeedbackState = {
         opacity: new AnimatedValue(RESTING_OPACITY),
@@ -223,14 +226,28 @@ export function createTouchableOpacityBehavior(
       // (Button.js:331,337), so reading the prop here left an aria-only flip un-settled — the view
       // stayed at its active opacity while the press was already suppressed. RN's Button has no
       // such gap because it passes the resolved value DOWN as its touchable's prop.
-      const disabled = disabledOf?.(node.props) ?? node.props.disabled;
+      const props = propsOf(node);
+      const disabled = disabledOf?.(props) ?? props.disabled;
       const previous = state.settled;
       state.settled = { disabled, resting };
       if (previous === undefined) {
-        // RN's `Animated.View` carries `{opacity: anim}` in its style from the FIRST render, so a
-        // resting Touchable commits the key too — a tag that published nothing until the first
-        // press would differ from every wrapper on mount. Set rather than animate: this is the
-        // mount, and RN re-settles on componentDidUpdate only.
+        // NOT vendor parity, despite this comment's old claim: `TouchableOpacity-itest.js` ("does
+        // not render explicit opacity when using default") proves a resting, untouched
+        // TouchableOpacity commits no `opacity` key at all. Vendor's native-animated leaf is a
+        // separate channel from the ordinary style diff, so forcing non-flattening never implies
+        // publishing a value. Ours publishes anyway: `setAnimatedBehaviorStyle`/`bindAnimatedValue`
+        // (`host-binding.ts`) force `collapsable: false` and resolve+write the leaf's value in the
+        // SAME call. Untangling that is a change to shared animation infrastructure, not a one-line
+        // fix here — deferred, see the audit skill. Set rather than animate: this is the mount, and
+        // RN re-settles on componentDidUpdate only.
+        //
+        // TODO(rn-parity): skip this initial publish when `resting === RESTING_OPACITY` (1, Fabric's
+        // own opacity default) and no authored `style.opacity` needs another route to Fabric, so a
+        // resting default TouchableOpacity commits no `opacity` key — matching vendor. Needs
+        // `bindAnimatedValue`/`host-binding.ts` to separate "force collapsable:false" from "publish
+        // the leaf's value" (shared by every animated-behavior consumer, not just this tag), plus a
+        // new test for the untouched-default case (no existing case in touchable-opacity.test.ts
+        // covers it — every case authors an explicit style.opacity first).
         state.opacity.setValue(resting);
         return;
       }
@@ -254,26 +271,29 @@ export function createTouchableOpacityBehavior(
   };
 }
 
-// `focusable` is NOT in `foldPayload` above, because its middle leg — `onPress !== undefined`
-// (TouchableOpacity.js:338) — is an OWNED name and therefore lives in the stash, which a props-only
-// fold cannot reach. `./button` composes this behavior and resolves its own; the tag resolves it
-// here, over the node.
+// THIS TAG NOW COSTS ZERO TRIPS INTO JS (2026-09-18). `focusable` was the last thing here, and it
+// held out because its middle leg — `onPress !== undefined` (TouchableOpacity.js:338) — is an OWNED
+// name that lives in the stash and never becomes a prop, so a props-only rule could not see it.
 //
-// `props.disabled`, not `next.disabled`: the press fold strips it (MACHINE_ONLY_KEYS).
-function tagFold(node: ISymbioteNode): IPayloadFold {
-  return props => {
-    const next = foldPayload(props);
-    next.focusable = resolveTouchableFocusable(
-      booleanOr(props.focusable),
-      appListenerFor(node, 'press') !== undefined,
-      booleanOr(props.disabled),
-    );
-    return next;
-  };
-}
+// What moved was not the closure but ONE BIT. `setEventListener` already knew the flip (it computes
+// `wasWired !== isHandler` to fire `onOwnedListenerChange`); it now also records
+// `OP_SET_OWNED_LISTENER`, and `foldPressableProps` resolves the whole three-leg expression off the
+// node. The callback itself never left JS and never will — that is the split a browser draws too,
+// where the UA knows which elements carry a click handler and the handler's body stays the page's.
+//
+// So "a rule cannot read an owned listener" was two claims wearing one sentence, and only the one
+// about the FUNCTION was true. Contract:
+// `core/engine/cpp/tests/js/touchable-focusable-payload.itest.ts`.
+//
+// `./button` keeps its own fold and its own resolution, deliberately: it resolves `disabled` three
+// ways through the projection its derived children share, and it folds an Android view style and
+// ripple regardless — so moving only its `focusable` would duplicate that precedence and buy back
+// no crossing.
 
-// A listener flip changes no payload by itself, so the commit after it is a no-op and no fold
-// re-runs (`IHostBehavior.onOwnedListenerChange`). `./button` carries the twin of this.
+// STILL NEEDED, and for a reason the wire did not remove: `markDirty` on the host marks the node
+// whose payload must be rebuilt, but the COMMIT still has to be asked for. A listener flip changes
+// no prop on this side, so nothing else would schedule one and the new answer would sit in the host
+// until some unrelated write happened to dirty the node.
 function onOwnedListenerChange(node: ISymbioteNode, name: string): void {
   if (name !== 'press') return;
   markPropsDirty(node);
@@ -282,16 +302,9 @@ function onOwnedListenerChange(node: ISymbioteNode, name: string): void {
 
 // Idempotent: an adapter entry may be imported more than once in a bundle.
 export function registerTouchableOpacityBehavior(): void {
-  const touchable = createTouchableOpacityBehavior();
+  const touchable = createTouchableOpacityBehavior(touchableOpacityDisabled);
   registerHostBehavior(TOUCHABLE_OPACITY_TAG, {
     ...touchable,
-    // `attachHostBehavior` writes `behavior.foldPayload` into the field one line BEFORE it calls
-    // `attach`, so binding here is what stands. Only the TAG binds it — a composing behavior owns
-    // its own node's fold (`./button` sets one in `buildStructure`, which runs later still).
-    attach(node: ISymbioteNode): void {
-      touchable.attach(node);
-      node.payloadFold = tagFold(node);
-    },
     onOwnedListenerChange,
   });
 }

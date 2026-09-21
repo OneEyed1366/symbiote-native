@@ -116,9 +116,7 @@ const mergeReadout = computed(() => {
     >
       <view :class="`line-tag line-tag-${lineInfo.line}`">
         <text class="line-tag-text">
-          {{
-            `${lineInfo.code} · ${lineInfo.label}`
-          }}
+          {{ `${lineInfo.code} · ${lineInfo.label}` }}
         </text>
       </view>
 
@@ -127,14 +125,10 @@ const mergeReadout = computed(() => {
           class="hero-badge"
           :style="{ backgroundColor: LINE_COLOR.styling }"
         >
-          <text class="hero-badge-text">
-            ST
-          </text>
+          <text class="hero-badge-text"> ST </text>
         </view>
         <view class="hero-copy">
-          <text class="hero-title">
-            Styling showcase
-          </text>
+          <text class="hero-title"> Styling showcase </text>
           <text class="hero-body">
             Six stylesheets driving one screen — plain CSS, CSS Modules, SCSS,
             Less, Stylus, and a sheet of things the compiler refuses. Every tile
@@ -156,13 +150,8 @@ const mergeReadout = computed(() => {
           replaced.
         </text>
 
-        <text class="sc-tile-label">
-          SHORTHAND EXPANSION
-        </text>
-        <view
-          class="sc-shorthand-box"
-          testID="sc-shorthand-box"
-        >
+        <text class="sc-tile-label"> SHORTHAND EXPANSION </text>
+        <view class="sc-shorthand-box" testID="sc-shorthand-box">
           <view class="sc-shorthand-core" />
         </view>
         <text class="sc-tile-caption">
@@ -176,19 +165,13 @@ const mergeReadout = computed(() => {
             label="BORDER-RADIUS"
             caption="the shorthand — always worked"
           >
-            <view
-              class="sc-corner-shorthand"
-              testID="sc-corner-shorthand"
-            />
+            <view class="sc-corner-shorthand" testID="sc-corner-shorthand" />
           </StyleShowcaseTile>
           <StyleShowcaseTile
             label="FOUR LONGHANDS"
             caption="28 / 4 / 28 / 4 — a leaf. A square here is the bug this screen was built for."
           >
-            <view
-              class="sc-corner-longhand"
-              testID="sc-corner-longhand"
-            />
+            <view class="sc-corner-longhand" testID="sc-corner-longhand" />
           </StyleShowcaseTile>
         </view>
 
@@ -197,10 +180,7 @@ const mergeReadout = computed(() => {
             label="BACKGROUND-IMAGE"
             caption="a real native Fabric prop"
           >
-            <view
-              class="sc-gradient-tile"
-              testID="sc-gradient-tile"
-            />
+            <view class="sc-gradient-tile" testID="sc-gradient-tile" />
           </StyleShowcaseTile>
           <StyleShowcaseTile
             label="+ FILTER"
@@ -208,10 +188,7 @@ const mergeReadout = computed(() => {
               grayscale half needs RN's enableSwiftUIBasedFilters flag. Identical twins mean
               filter stopped arriving entirely."
           >
-            <view
-              class="sc-filter-tile"
-              testID="sc-filter-tile"
-            />
+            <view class="sc-filter-tile" testID="sc-filter-tile" />
           </StyleShowcaseTile>
         </view>
 
@@ -221,10 +198,7 @@ const mergeReadout = computed(() => {
             caption="pivots about centre"
           >
             <view class="sc-origin-frame">
-              <view
-                class="sc-origin-square"
-                testID="sc-origin-centre"
-              />
+              <view class="sc-origin-square" testID="sc-origin-centre" />
             </view>
           </StyleShowcaseTile>
           <StyleShowcaseTile
@@ -232,25 +206,16 @@ const mergeReadout = computed(() => {
             caption="top left — the same rotation, visibly offset"
           >
             <view class="sc-origin-frame">
-              <view
-                class="sc-origin-square-corner"
-                testID="sc-origin-corner"
-              />
+              <view class="sc-origin-square-corner" testID="sc-origin-corner" />
             </view>
           </StyleShowcaseTile>
         </view>
 
-        <text class="sc-tile-label">
-          BOX-SHADOW · TWO LAYERS
-        </text>
-        <view
-          class="sc-shadow-tile"
-          testID="sc-shadow-tile"
-        />
+        <text class="sc-tile-label"> BOX-SHADOW · TWO LAYERS </text>
+        <view class="sc-shadow-tile" testID="sc-shadow-tile" />
         <text class="sc-tile-caption">
           Handed through as raw CSS text and parsed by the engine's own
-          processBoxShadow port, so spread radius and multiple layers
-          survive.
+          processBoxShadow port, so spread radius and multiple layers survive.
         </text>
       </view>
 
@@ -267,10 +232,7 @@ const mergeReadout = computed(() => {
           `.sc-spec-late` are equally specific, so the border goes to whichever
           is later in the file.
         </text>
-        <view
-          :class="specClass"
-          testID="sc-spec-tile"
-        >
+        <view :class="specClass" testID="sc-spec-tile">
           <text class="sc-spec-text">
             {{
               isStrong
@@ -279,10 +241,7 @@ const mergeReadout = computed(() => {
             }}
           </text>
         </view>
-        <text
-          class="sc-readout"
-          testID="sc-spec-readout"
-        >
+        <text class="sc-readout" testID="sc-spec-readout">
           {{ specClass }}
         </text>
         <text class="sc-tile-caption">
@@ -319,10 +278,7 @@ const mergeReadout = computed(() => {
           matching. Each rule restates only what it changes, so the base's size
           and centring have to survive underneath all of them.
         </text>
-        <view
-          :class="triClass"
-          testID="sc-tri-tile"
-        >
+        <view :class="triClass" testID="sc-tri-tile">
           <text class="sc-tri-text">
             {{
               tokenA && tokenB && tokenC
@@ -331,10 +287,7 @@ const mergeReadout = computed(() => {
             }}
           </text>
         </view>
-        <text
-          class="sc-readout"
-          testID="sc-tri-readout"
-        >
+        <text class="sc-readout" testID="sc-tri-readout">
           {{ triClass }}
         </text>
         <StyleShowcaseToggle
@@ -380,8 +333,7 @@ const mergeReadout = computed(() => {
         </view>
         <text class="sc-tile-caption">
           The lime ring and the corners come from the class either way — the
-          inline object names only backgroundColor, so it overrides only
-          that.
+          inline object names only backgroundColor, so it overrides only that.
         </text>
         <StyleShowcaseToggle
           testID="sc-merge-class-toggle"
@@ -391,7 +343,7 @@ const mergeReadout = computed(() => {
         />
         <StyleShowcaseToggle
           testID="sc-merge-inline-toggle"
-          label=":style=&quot;{ backgroundColor }&quot;"
+          label=':style="{ backgroundColor }"'
           :active="hasMergeInline"
           :onToggle="() => (hasMergeInline = !hasMergeInline)"
         />
@@ -400,9 +352,7 @@ const mergeReadout = computed(() => {
       <!-- ---- animation over a class ----------------------------------------------------- -->
 
       <view class="sc-panel">
-        <text class="sc-panel-title">
-          5 · An animation on top of a class
-        </text>
+        <text class="sc-panel-title"> 5 · An animation on top of a class </text>
         <text class="sc-panel-note">
           The class owns the whole static look; the Animated.Value writes only
           transform and opacity. If a frame clobbered the resolved class the
@@ -418,9 +368,7 @@ const mergeReadout = computed(() => {
               transform: [{ scale: pulseScale }],
             }"
           >
-            <text class="sc-anim-text">
-              class + frame
-            </text>
+            <text class="sc-anim-text"> class + frame </text>
           </Animated.View>
         </view>
       </view>
@@ -428,9 +376,7 @@ const mergeReadout = computed(() => {
       <!-- ---- CSS Modules ---------------------------------------------------------------- -->
 
       <view class="sc-panel">
-        <text class="sc-panel-title">
-          6 · CSS Modules
-        </text>
+        <text class="sc-panel-title"> 6 · CSS Modules </text>
         <text class="sc-panel-note">
           Every class in StyleShowcase.module.css is renamed per file, so none
           of it can collide with App.css. The default export maps the AUTHORED
@@ -439,29 +385,14 @@ const mergeReadout = computed(() => {
           "undefined" reaching the class prop.
         </text>
         <view class="sc-chip-row">
-          <view
-            :class="styles['sc-chip-base']"
-            testID="sc-chip-base"
-          >
-            <text :class="styles['sc-chip-text']">
-              base
-            </text>
+          <view :class="styles['sc-chip-base']" testID="sc-chip-base">
+            <text :class="styles['sc-chip-text']"> base </text>
           </view>
-          <view
-            :class="styles['sc-chip-tinted']"
-            testID="sc-chip-tinted"
-          >
-            <text :class="styles['sc-chip-text']">
-              composes base
-            </text>
+          <view :class="styles['sc-chip-tinted']" testID="sc-chip-tinted">
+            <text :class="styles['sc-chip-text']"> composes base </text>
           </view>
-          <view
-            :class="styles['sc-chip-loud']"
-            testID="sc-chip-loud"
-          >
-            <text :class="styles['sc-chip-text']">
-              composes tinted
-            </text>
+          <view :class="styles['sc-chip-loud']" testID="sc-chip-loud">
+            <text :class="styles['sc-chip-text']"> composes tinted </text>
           </view>
         </view>
         <text class="sc-tile-caption">
@@ -475,33 +406,24 @@ const mergeReadout = computed(() => {
             :class="`${styles['sc-chip-loud']} ${styles['sc-global-mark']}`"
             testID="sc-chip-global"
           >
-            <text :class="styles['sc-chip-text']">
-              + :global mark
-            </text>
+            <text :class="styles['sc-chip-text']"> + :global mark </text>
           </view>
         </view>
         <text class="sc-tile-caption">
-          :global(.sc-global-mark) opts out of the rename, so it registers
-          under its bare name and squares off two corners of the pill. We export
-          it keyed as itself — upstream CSS Modules omits a global, which would
+          :global(.sc-global-mark) opts out of the rename, so it registers under
+          its bare name and squares off two corners of the pill. We export it
+          keyed as itself — upstream CSS Modules omits a global, which would
           force the author back to a bare string literal.
         </text>
-        <text
-          class="sc-readout"
-          testID="sc-chip-readout"
-        >
-          {{
-            styles['sc-chip-loud']
-          }}
+        <text class="sc-readout" testID="sc-chip-readout">
+          {{ styles['sc-chip-loud'] }}
         </text>
       </view>
 
       <!-- ---- preprocessors -------------------------------------------------------------- -->
 
       <view class="sc-panel">
-        <text class="sc-panel-title">
-          7 · SCSS · Less · Stylus
-        </text>
+        <text class="sc-panel-title"> 7 · SCSS · Less · Stylus </text>
         <text class="sc-panel-note">
           Each source reduces to plain CSS before the compiler sees it, so
           everything above applies identically regardless of language. Each tile
@@ -514,25 +436,19 @@ const mergeReadout = computed(() => {
             :class="`scss-tile${preprocessorsOn ? ' scss-tile-on' : ''}`"
             testID="sc-scss-tile"
           >
-            <text class="scss-tile-text">
-              SCSS
-            </text>
+            <text class="scss-tile-text"> SCSS </text>
           </view>
           <view
             :class="`less-tile${preprocessorsOn ? ' less-tile-on' : ''}`"
             testID="sc-less-tile"
           >
-            <text class="less-tile-text">
-              Less
-            </text>
+            <text class="less-tile-text"> Less </text>
           </view>
           <view
             :class="`styl-tile${preprocessorsOn ? ' styl-tile-on' : ''}`"
             testID="sc-styl-tile"
           >
-            <text class="styl-tile-text">
-              Stylus
-            </text>
+            <text class="styl-tile-text"> Stylus </text>
           </view>
         </view>
         <text class="sc-tile-caption">
@@ -553,8 +469,7 @@ const mergeReadout = computed(() => {
 
       <view class="sc-panel">
         <text class="sc-panel-title">
-          8 · Deliberately not supported — and one that is wrong, not
-          absent
+          8 · Deliberately not supported — and one that is wrong, not absent
         </text>
         <text class="sc-panel-note">
           Each of these prints a warning into the Metro output under the
@@ -563,16 +478,9 @@ const mergeReadout = computed(() => {
           where the reason is.
         </text>
 
-        <text class="sc-tile-label">
-          @MEDIA · @SUPPORTS · @CONTAINER
-        </text>
-        <view
-          class="sc-limit-cond"
-          testID="sc-limit-cond"
-        >
-          <text class="sc-combo-text">
-            must stay slate
-          </text>
+        <text class="sc-tile-label"> @MEDIA · @SUPPORTS · @CONTAINER </text>
+        <view class="sc-limit-cond" testID="sc-limit-cond">
+          <text class="sc-combo-text"> must stay slate </text>
         </view>
         <text class="sc-tile-caption">
           All three are dropped whole, rules included — React Native evaluates
@@ -580,57 +488,35 @@ const mergeReadout = computed(() => {
           Branch in JS instead: useWindowDimensions, Platform.
         </text>
 
-        <text class="sc-tile-label">
-          CALC() ACROSS UNIT FAMILIES
-        </text>
+        <text class="sc-tile-label"> CALC() ACROSS UNIT FAMILIES </text>
         <view class="sc-limit-calc-wrap">
-          <view
-            class="sc-limit-calc-ok"
-            testID="sc-limit-calc-ok"
-          >
-            <text class="sc-limit-calc-text">
-              width: 100% — fine
-            </text>
+          <view class="sc-limit-calc-ok" testID="sc-limit-calc-ok">
+            <text class="sc-limit-calc-text"> width: 100% — fine </text>
           </view>
-          <view
-            class="sc-limit-calc-bad"
-            testID="sc-limit-calc-bad"
-          >
+          <view class="sc-limit-calc-bad" testID="sc-limit-calc-bad">
             <text class="sc-limit-calc-text">
               width: calc(100% - 48px) — dropped
             </text>
           </view>
         </view>
         <text class="sc-tile-caption">
-          RN has no unit meaning "a percentage minus points", so the
-          declaration is refused rather than approximated — the red box has no
-          width at all and shrinks to its text. It used to become width: 100,
-          which RN reads as 100 POINTS. Use flex or parent padding; calc()
-          within one unit family still evaluates.
+          RN has no unit meaning "a percentage minus points", so the declaration
+          is refused rather than approximated — the red box has no width at all
+          and shrinks to its text. It used to become width: 100, which RN reads
+          as 100 POINTS. Use flex or parent padding; calc() within one unit
+          family still evaluates.
         </text>
 
-        <text class="sc-tile-label">
-          THE COMBINATOR — WRONG, NOT MISSING
-        </text>
-        <view
-          class="sc-combo-parent"
-          testID="sc-combo-parent"
-        >
-          <view
-            class="sc-combo-child"
-            testID="sc-combo-nested-child"
-          >
+        <text class="sc-tile-label"> THE COMBINATOR — WRONG, NOT MISSING </text>
+        <view class="sc-combo-parent" testID="sc-combo-parent">
+          <view class="sc-combo-child" testID="sc-combo-nested-child">
             <text class="sc-combo-text">
               nested child · the web paints this red, here it stays plain
             </text>
           </view>
-          <view
-            class="sc-combo-parent sc-combo-child"
-            testID="sc-combo-merged"
-          >
+          <view class="sc-combo-parent sc-combo-child" testID="sc-combo-merged">
             <text class="sc-combo-text">
-              both names on ONE node · the web paints nothing, here it goes
-              red
+              both names on ONE node · the web paints nothing, here it goes red
             </text>
           </view>
         </view>
@@ -641,9 +527,7 @@ const mergeReadout = computed(() => {
           its own class; never write a descendant, child, or sibling rule.
         </text>
 
-        <text class="sc-tile-label">
-          VAR() DOES NOT CROSS FILES
-        </text>
+        <text class="sc-tile-label"> VAR() DOES NOT CROSS FILES </text>
         <view class="sc-pair">
           <StyleShowcaseTile
             label="LOCAL TOKEN"
@@ -653,9 +537,7 @@ const mergeReadout = computed(() => {
               class="sc-limit-var sc-limit-var-local"
               testID="sc-limit-var-local"
             >
-              <text class="sc-combo-text">
-                resolves
-              </text>
+              <text class="sc-combo-text"> resolves </text>
             </view>
           </StyleShowcaseTile>
           <StyleShowcaseTile
@@ -666,9 +548,7 @@ const mergeReadout = computed(() => {
               class="sc-limit-var sc-limit-var-foreign"
               testID="sc-limit-var-foreign"
             >
-              <text class="sc-combo-text">
-                dropped
-              </text>
+              <text class="sc-combo-text"> dropped </text>
             </view>
           </StyleShowcaseTile>
         </view>

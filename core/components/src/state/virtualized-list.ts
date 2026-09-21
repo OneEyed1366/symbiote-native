@@ -26,18 +26,20 @@ import type { ISymbioteEvent } from '@symbiote-native/engine';
 import type { IScrollRoutingHandle } from './scroll-routing-handle';
 
 // Defaults match RN. windowSize is measured in viewport-lengths (21 => ten screens
-// of buffer on each side of the visible region). onEndReachedThreshold is a multiple
-// of the visible length (RN's onEndReachedThresholdOrDefault returns `?? 2`).
-// initialNumToRender bounds the first paint before any layout is measured.
-// maxToRenderPerBatch / batching period mirror RN's incremental fill defaults.
+// of buffer on each side of the visible region). initialNumToRender bounds the first
+// paint before any layout is measured. maxToRenderPerBatch / batching period mirror
+// RN's incremental fill defaults.
 export const DEFAULT_WINDOW_SIZE = 21;
 export const DEFAULT_INITIAL_NUM_TO_RENDER = 10;
-export const DEFAULT_END_REACHED_THRESHOLD = 2;
 export const DEFAULT_MAX_TO_RENDER_PER_BATCH = 10;
 export const DEFAULT_UPDATE_CELLS_BATCHING_PERIOD = 50;
 export const DEFAULT_VIEW_AREA_COVERAGE_PERCENT_THRESHOLD = 0;
-// onStartReachedThreshold default, mirroring RN's onStartReachedThresholdOrDefault.
-export const DEFAULT_START_REACHED_THRESHOLD = 2;
+// `_maybeCallOnEdgeReached`'s OWN fallback (`VirtualizedList.js:1567`) for whether to actually
+// FIRE onEndReached/onStartReached when the app gives no threshold — a flat 2 PIXELS. This is a
+// different RN default from `onEndReachedThresholdOrDefault`'s `?? 2`, which is a MULTIPLE of the
+// visible length used only for internal render-ahead windowing (a concern this engine does not
+// separate out); conflating the two here used to fire the callback two whole screens early.
+export const DEFAULT_EDGE_REACHED_THRESHOLD_PX = 2;
 export const FIRST_INDEX = 0;
 export const EMPTY_OFFSET = 0;
 export const NO_INDEX = -1;
@@ -95,6 +97,10 @@ export interface IViewToken<ItemT> {
 export interface IViewableItemsChangedInfo<ItemT> {
   viewableItems: IViewToken<ItemT>[];
   changed: IViewToken<ItemT>[];
+  // The config of the pair that triggered this call (`ViewabilityHelper.js`'s `_onUpdateSync`,
+  // `viewabilityConfig: this._config`) — lets one callback shared across several
+  // viewabilityConfigCallbackPairs tell which config fired.
+  viewabilityConfig?: IViewabilityConfig;
 }
 
 // Viewability tuning, mirroring RN's IViewabilityConfig. Either a coverage percentage
@@ -299,37 +305,44 @@ export function throttleWindow(
   return { first, last };
 }
 
-// Fraction (0..100) of a cell's box that lies inside the viewport.
-export function visiblePercent(
+// A cell is viewable when its visible fraction clears the configured threshold
+// (`ViewabilityHelper.js`'s `_isViewable` + `computeViewableItems`). Two percents exist and they
+// are NOT interchangeable: `viewAreaCoveragePercentThreshold` is a fraction of the VIEWPORT,
+// `itemVisiblePercentThreshold` a fraction of the CELL's own length — a short cell mostly visible
+// in a tall viewport clears the second easily while failing the first. Area wins whenever it is
+// set (vendor checks `viewAreaCoveragePercentThreshold != null` first); item only when it is not.
+export function isCellViewable(
   cellOffset: number,
   cellLength: number,
   scrollOffset: number,
   viewportLength: number,
-): number {
-  if (cellLength <= EMPTY_OFFSET) return EMPTY_OFFSET;
-  const top = Math.max(cellOffset, scrollOffset);
-  const bottom = Math.min(
-    cellOffset + cellLength,
-    scrollOffset + viewportLength,
-  );
-  const visible = Math.max(EMPTY_OFFSET, bottom - top);
-  return (visible / cellLength) * FULLY_VISIBLE_PERCENT;
-}
-
-// A cell is viewable when its visible fraction clears the configured threshold.
-// itemVisiblePercentThreshold compares against the cell's own size;
-// viewAreaCoveragePercentThreshold compares against the viewport. The former wins when
-// set, else the latter, matching RN's precedence.
-export function isCellViewable(
-  percent: number,
   config: IViewabilityConfig,
 ): boolean {
-  const itemThreshold = config.itemVisiblePercentThreshold;
-  if (itemThreshold !== undefined) return percent >= itemThreshold;
-  const areaThreshold =
-    config.viewAreaCoveragePercentThreshold ??
-    DEFAULT_VIEW_AREA_COVERAGE_PERCENT_THRESHOLD;
-  return percent > areaThreshold || percent >= FULLY_VISIBLE_PERCENT;
+  const top = cellOffset - scrollOffset;
+  const bottom = top + cellLength;
+  // No overlap at all: RN's own caller loop never reaches `_isViewable` for such a cell
+  // (`top < viewportHeight && bottom > 0` gates the whole scan), so this is exclusion by
+  // construction, not a zero percent happening to clear a zero threshold.
+  if (bottom <= EMPTY_OFFSET || top >= viewportLength) return false;
+  // RN's own `_isEntirelyVisible` shortcut: viewable in EITHER mode regardless of the cell's
+  // share of the viewport, since an area threshold sized to the viewport could otherwise reject
+  // every fully-visible cell smaller than that share. `bottom > top` excludes a zero-length cell
+  // (no measurement yet), which vendor falls through to the percent math instead.
+  if (top >= EMPTY_OFFSET && bottom <= viewportLength && bottom > top) {
+    return true;
+  }
+  const visiblePixels =
+    Math.min(bottom, viewportLength) - Math.max(top, EMPTY_OFFSET);
+  const areaThreshold = config.viewAreaCoveragePercentThreshold;
+  const areaMode = areaThreshold !== undefined;
+  const threshold = areaMode
+    ? areaThreshold
+    : (config.itemVisiblePercentThreshold ??
+      DEFAULT_VIEW_AREA_COVERAGE_PERCENT_THRESHOLD);
+  const denominator = areaMode ? viewportLength : cellLength;
+  if (denominator <= EMPTY_OFFSET) return false;
+  const percent = (visiblePixels / denominator) * FULLY_VISIBLE_PERCENT;
+  return percent >= threshold;
 }
 
 // Resolve an index to a pixel offset, optionally biasing where in the viewport the item
@@ -420,15 +433,22 @@ export function highestMeasuredIndex(measured: Map<number, number>): number {
 // onEndReached distance + threshold test (RN _maybeCallOnEdgeReached). The adapter still
 // gates on "the last cell is actually rendered" and dedups by content length via its own
 // ref; this returns only the pure geometry.
+//
+// `thresholdMultiplier` is `undefined` for "the app gave no onEndReachedThreshold" — RN's own
+// unset-case answer is a flat `DEFAULT_EDGE_REACHED_THRESHOLD_PX`, never a viewport-length
+// multiple, so `undefined` must NOT be defaulted to a multiplier at the call site.
 export function computeEndReached(
   total: number,
   scrollOffset: number,
   viewportLength: number,
-  thresholdMultiplier: number,
+  thresholdMultiplier: number | undefined,
 ): { distanceFromEnd: number; withinThreshold: boolean } {
   let distanceFromEnd = total - (scrollOffset + viewportLength);
   if (distanceFromEnd < ON_EDGE_REACHED_EPSILON) distanceFromEnd = EMPTY_OFFSET;
-  const threshold = thresholdMultiplier * viewportLength;
+  const threshold =
+    thresholdMultiplier != null
+      ? thresholdMultiplier * viewportLength
+      : DEFAULT_EDGE_REACHED_THRESHOLD_PX;
   return { distanceFromEnd, withinThreshold: distanceFromEnd <= threshold };
 }
 
@@ -436,12 +456,15 @@ export function computeEndReached(
 export function computeStartReached(
   scrollOffset: number,
   viewportLength: number,
-  thresholdMultiplier: number,
+  thresholdMultiplier: number | undefined,
 ): { distanceFromStart: number; withinThreshold: boolean } {
   let distanceFromStart = scrollOffset;
   if (distanceFromStart < ON_EDGE_REACHED_EPSILON)
     distanceFromStart = EMPTY_OFFSET;
-  const threshold = thresholdMultiplier * viewportLength;
+  const threshold =
+    thresholdMultiplier != null
+      ? thresholdMultiplier * viewportLength
+      : DEFAULT_EDGE_REACHED_THRESHOLD_PX;
   return { distanceFromStart, withinThreshold: distanceFromStart <= threshold };
 }
 
@@ -492,16 +515,8 @@ export function computeViewableSet<ItemT>(params: IViewableSetParams<ItemT>): {
     index <= params.last && index < params.count;
     index += 1
   ) {
-    const percent = visiblePercent(
-      params.offsets[index],
-      params.lengths[index],
-      params.scrollOffset,
-      params.viewportLength,
-    );
     const item = params.getItem(params.data, index);
-    const key = params.keyExtractor
-      ? params.keyExtractor(item, index)
-      : String(index);
+    const key = resolveItemKey(item, index, params.keyExtractor);
     let anyViewable = false;
     for (const pair of params.pairs) {
       if (
@@ -510,7 +525,15 @@ export function computeViewableSet<ItemT>(params: IViewableSetParams<ItemT>): {
       ) {
         continue;
       }
-      if (isCellViewable(percent, pair.viewabilityConfig)) {
+      if (
+        isCellViewable(
+          params.offsets[index],
+          params.lengths[index],
+          params.scrollOffset,
+          params.viewportLength,
+          pair.viewabilityConfig,
+        )
+      ) {
         anyViewable = true;
         break;
       }
@@ -784,14 +807,28 @@ export function computeMvcpAdjustment(
   };
 }
 
-// The default key extractor: the caller's keyExtractor when set, else the index as a string (RN's
-// default). Centralized so every adapter's keyForIndex resolves keys identically.
+// RN's real default (`VirtualizeUtils.js`'s `keyExtractor`): an object item's own `key`, else its
+// `id`, else the index. Most apps never pass `keyExtractor` at all and rely on this to keep list
+// identity stable across inserts/removes — falling straight to the index (what this used to do)
+// silently breaks that the moment two items swap position.
+export function defaultKeyExtractor<ItemT>(item: ItemT, index: number): string {
+  if (typeof item === 'object' && item !== null) {
+    const record = item as Record<string, unknown>;
+    if (record.key !== undefined && record.key !== null)
+      return String(record.key);
+    if (record.id !== undefined && record.id !== null) return String(record.id);
+  }
+  return String(index);
+}
+
+// The default key extractor: the caller's keyExtractor when set, else `defaultKeyExtractor`.
+// Centralized so every adapter's keyForIndex resolves keys identically.
 export function resolveItemKey<ItemT>(
   item: ItemT,
   index: number,
   keyExtractor: ((item: ItemT, index: number) => string) | undefined,
 ): string {
-  return keyExtractor ? keyExtractor(item, index) : String(index);
+  return (keyExtractor ?? defaultKeyExtractor)(item, index);
 }
 
 // Linear item -> index lookup for scrollToItem (RN scans by reference identity). NO_INDEX when the

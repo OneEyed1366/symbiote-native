@@ -69,10 +69,8 @@ import {
 } from 'solid-js';
 import type { JSX } from '../../jsx-runtime';
 import {
-  DEFAULT_END_REACHED_THRESHOLD,
   DEFAULT_INITIAL_NUM_TO_RENDER,
   DEFAULT_MAX_TO_RENDER_PER_BATCH,
-  DEFAULT_START_REACHED_THRESHOLD,
   DEFAULT_UPDATE_CELLS_BATCHING_PERIOD,
   DEFAULT_WINDOW_SIZE,
   EMPTY_OFFSET,
@@ -406,10 +404,8 @@ export function createVirtualizedList(): IVirtualizedListComponent {
         updateCellsBatchingPeriod:
           props.updateCellsBatchingPeriod ??
           DEFAULT_UPDATE_CELLS_BATCHING_PERIOD,
-        onEndReachedThreshold:
-          props.onEndReachedThreshold ?? DEFAULT_END_REACHED_THRESHOLD,
-        onStartReachedThreshold:
-          props.onStartReachedThreshold ?? DEFAULT_START_REACHED_THRESHOLD,
+        onEndReachedThreshold: props.onEndReachedThreshold,
+        onStartReachedThreshold: props.onStartReachedThreshold,
         maintainVisibleContentPosition: props.maintainVisibleContentPosition,
         initialScrollIndex: props.initialScrollIndex,
         onEndReachedActive: props.onEndReached !== undefined,
@@ -472,7 +468,12 @@ export function createVirtualizedList(): IVirtualizedListComponent {
             // lastViewable is folded back only when the fire actually LANDS, so a debounce superseded
             // mid-flight still diffs against the last committed set.
             const fire = (): void => {
-              for (const pair of pairs) pair.onViewableItemsChanged(info);
+              for (const pair of pairs) {
+                pair.onViewableItemsChanged({
+                  ...info,
+                  viewabilityConfig: pair.viewabilityConfig,
+                });
+              }
               dispatch({ kind: 'viewable-fired', map });
             };
             if (viewableTimer !== null) {

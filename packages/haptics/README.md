@@ -14,6 +14,10 @@ Vue, Svelte, Solid, Angular — not just React.
 npm install @symbiote-native/haptics
 ```
 
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --haptics` (or
+`add --haptics` in an existing app) installs and wires this for you — see
+[`@symbiote-native/cli`](../cli).
+
 `expo-haptics` and `expo-modules-core` come along as regular, exact-pinned dependencies — never
 install either yourself, and never add the `expo` meta-package (it bundles its own Metro/Babel
 pipeline that conflicts with this project's own).

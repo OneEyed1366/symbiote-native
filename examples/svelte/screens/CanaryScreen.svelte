@@ -759,7 +759,8 @@
       <text class="switch-label">avoid keyboard</text>
       <switch
         value={kavEnabled}
-        onValueChange={(event: ISwitchChangeEvent) => (kavEnabled = event.value)}
+        onValueChange={(event: ISwitchChangeEvent) =>
+          (kavEnabled = event.value)}
         trackColor={{ false: HAIRLINE, true: accent }}
       />
     </view>
@@ -795,8 +796,8 @@
         <view testID="modal-card" class="modal-card">
           <text class="modal-title">It's a Modal</text>
           <text class="modal-body">
-            Rendered through ModalHostView — its own native window, same
-            Fabric tree.
+            Rendered through ModalHostView — its own native window, same Fabric
+            tree.
           </text>
           <ActionButton
             testID="modal-close"

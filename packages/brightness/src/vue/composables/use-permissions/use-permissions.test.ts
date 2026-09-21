@@ -4,7 +4,7 @@
 import { defineComponent, h } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount } from '@symbiote-native/vue';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import { usePermissions } from './index';
 import { PermissionStatus, type PermissionResponse } from '../../../core';
 
@@ -42,7 +42,7 @@ const DENIED: PermissionResponse = {
 };
 
 const ROOT_TAG = 9953;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 
 beforeEach(() => {
   fabric.reset();

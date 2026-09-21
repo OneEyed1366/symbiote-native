@@ -261,7 +261,7 @@ describe('symbiote canary · user journeys', () => {
   it('imperative measure writes the on-screen frame', async () => {
     await bringIntoView('measure-btn');
     await element(by.id('measure-btn')).tap();
-    // "frame: tap …" → "frame: x123 y456 · …" once measure() resolves the live frame.
+    // The readout gains "in parent x123 y456 · …" once measure() resolves the live frame.
     await waitForText(
       'measure-frame',
       text => /x-?\d+ y-?\d+/.test(text),

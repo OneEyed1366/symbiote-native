@@ -1,11 +1,11 @@
-// Sticky headers on the lowered path. BOTH forms live here — the CHILD form (`<sticky-header>`, the
-// path our own lists use) and the INDEX form (`stickyHeaderIndices`, RN's public API) — plus the
-// owner-side half that feeds them.
+// Sticky headers. BOTH forms live here — the CHILD form (`<sticky-header>`, the path our own lists
+// use) and the INDEX form (`stickyHeaderIndices`, RN's public API) — plus the owner-side half that
+// feeds them.
 //
 // WHY A CHILD AT ALL. `stickyHeaderIndices` is an index list because JSX has no way to MARK an
-// element — RN walks its own children array and wraps the flagged ones. `<StickyHeader>` says the
-// same thing in the one place a lowered element can read without an index: the tag of a node that
-// is already in the tree.
+// element — RN walks its own children array and wraps the flagged ones. `<sticky-header>` says the
+// same thing in the one place the engine can read without an index: the tag of a node that is
+// already in the tree.
 //
 // THE INDEX FORM IS BUILT (2026-09-07), and this header said it was impossible until then. Both
 // halves of that claim were false, measured against Angular's projection controller, which already
@@ -55,7 +55,6 @@ import {
   insertBefore,
   isAnchor,
   isNativeAnimatedAvailable,
-  markPropsDirty,
   Platform,
   removeChild,
   requestCommitFor,
@@ -64,13 +63,16 @@ import {
   whenCommitted,
   type AnimatedInterpolation,
   type IHostBehavior,
-  type IPayloadFold,
   type ISymbioteEvent,
   type ISymbioteNode,
+  propOf,
+  childrenOf,
+  parentOf,
 } from '@symbiote-native/engine';
 
 import { descriptorFor } from '../../component-names';
 import { attachStickyScroll } from '../../scroll-view-commands';
+import { markScrollObserved } from './responder';
 import {
   createInitialStickyState,
   reduceSticky,
@@ -85,6 +87,12 @@ import {
 import { resolveScrollForwarding } from '../../view/render-scroll-view';
 
 export const STICKY_HEADER_TAG = 'sticky-header';
+
+// The machine's one channel to its tag rule, and the only prop it ever writes. RN's twin is
+// `passthroughAnimatedPropExplicitValues` (`ScrollViewStickyHeader.js:282-304`), a whole style
+// object; ours carries the one number that object ever holds, so it does not borrow the name.
+// `foldStickyHeaderProps` composes it into the style and strips the key — no ViewConfig declares it.
+export const STICKY_TRANSLATE_PROP = 'stickyTranslateY';
 
 // The scroll views that could own a header, so a header can find its own by walking up. The tag is
 // not on the node (`createElement` looks the behavior up and stores nothing), and the parent chain
@@ -137,7 +145,9 @@ export function hasStickyHeaders(owner: ISymbioteNode): boolean {
 // otherwise), which is exactly when RN wraps the scroll view's own onLayout — so the gate flag
 // lands on the same ScrollViews the wrapper puts it on and on no others.
 function needsViewportHeight(owner: ISymbioteNode): boolean {
-  return hasStickyHeaders(owner) && owner.props.invertStickyHeaders === true;
+  return (
+    hasStickyHeaders(owner) && propOf(owner, 'invertStickyHeaders') === true
+  );
 }
 
 function ownerSticky(owner: ISymbioteNode): IStickyOwnerState {
@@ -189,7 +199,7 @@ function collectHeaders(
   members: ReadonlySet<ISymbioteNode>,
   out: ISymbioteNode[],
 ): void {
-  for (const child of node.children) {
+  for (const child of childrenOf(node)) {
     if (members.has(child)) out.push(child);
     collectHeaders(child, members, out);
   }
@@ -217,7 +227,7 @@ function orderedHeaders(
 // The attach happens after the header has registered, which is the same ordering React's
 // `useEffect` gives it.
 function syncThrottle(owner: ISymbioteNode, sticky: IStickyOwnerState): void {
-  const current = owner.props.scrollEventThrottle;
+  const current = propOf(owner, 'scrollEventThrottle');
   // Whatever stands in the key is the APP's unless it is byte-for-byte the value written here —
   // which is what makes the take-back on the last unregister safe.
   const ours =
@@ -283,6 +293,10 @@ export function handleOwnerScroll(
   owner: ISymbioteNode,
   event: ISymbioteEvent,
 ): void {
+  // RN's `_handleScroll` (`ScrollView.js:1145-1147`) sets this unconditionally too — nothing reads
+  // it unless this node actually holds the responder, so an unconditional set on every scroll is
+  // exactly as safe here as it is there. See `./responder.ts`.
+  markScrollObserved(owner);
   const sticky = stickyOwners.get(owner);
   // Skipped while the offset rides the UI thread: the native attach already drives the value every
   // frame, so writing it again from a JS event is a redundant graph update at a WORSE rate.
@@ -316,7 +330,7 @@ export function releaseStickyOwner(owner: ISymbioteNode): void {
 
 // ---------------------------------------------------------------- the index form
 
-// `stickyHeaderIndices` on the lowered path, and it is deliberately NOT a second machine: a flagged
+// `stickyHeaderIndices`, and it is deliberately NOT a second machine: a flagged
 // child is MOVED into a synthesized `sticky-header` node, so ordering, cross-talk, the raised
 // throttle, the pin and the teardown are the child form's, unchanged. Indices decide only WHICH
 // children get one.
@@ -369,10 +383,19 @@ function wrapForIndex(slot: ISymbioteNode, child: ISymbioteNode): void {
   // so the wrapper takes the position the child vacates and nothing has to be removed.
   insertBefore(slot, wrapper, child);
   appendChild(wrapper, child);
+  // AFTER both, or the anchor above would resolve to the wrapper itself. `wrapper` is the engine's
+  // own "what stands in this node's place" indirection (`ISymbioteNode.wrapper`), and a sticky
+  // wrapper is exactly that: the framework keeps naming the ScrollView and the row, while the tree
+  // holds the wrapper in the row's place — so a later `removeChild(owner, row)` takes the wrapper
+  // out with it instead of being refused for naming a parent the row no longer has.
+  child.wrapper = wrapper;
 }
 
 function unwrapIndex(slot: ISymbioteNode, wrapper: ISymbioteNode): void {
-  const child = wrapper.children[0];
+  const child = childrenOf(wrapper)[0];
+  // Before the move, for the same reason it is set after one: `insertBefore` would otherwise put
+  // the wrapper back in the child's place.
+  if (child !== undefined) child.wrapper = undefined;
   if (child !== undefined) insertBefore(slot, child, wrapper);
   removeChild(slot, wrapper);
 }
@@ -388,7 +411,7 @@ function unwrapIndex(slot: ISymbioteNode, wrapper: ISymbioteNode): void {
 export function reconcileStickyIndices(owner: ISymbioteNode): void {
   const slot = owner.childHost;
   if (slot === undefined) return;
-  const wanted = stickyIndexSet(owner.props.stickyHeaderIndices);
+  const wanted = stickyIndexSet(propOf(owner, 'stickyHeaderIndices'));
   if (wanted === undefined && !ownersWithIndexWrappers.has(owner)) return;
 
   let paintIndex = 0;
@@ -398,13 +421,14 @@ export function reconcileStickyIndices(owner: ISymbioteNode): void {
   //
   // A claimed `<RefreshControl>` needs no filter here, unlike Angular's walk — `hostFor` keeps a
   // claimed child on the OWNER, so it never reaches the slot at all.
-  for (const child of [...slot.children]) {
+  for (const child of [...childrenOf(slot)]) {
     const wrapper = indexWrappers.has(child) ? child : undefined;
     if (wrapper !== undefined) {
       // The framework removes a child from the SLOT, because that is where it appended it — so the
       // engine's `removeChild` finds nothing to splice and only clears `child.parent`, leaving a
       // committed wrapper around a node nobody owns. This walk is the only thing that can see it.
-      if (wrapper.children[0]?.parent !== wrapper) {
+      const held = childrenOf(wrapper)[0];
+      if (held === undefined || parentOf(held) !== wrapper) {
         removeChild(slot, wrapper);
         changed = true;
         continue;
@@ -441,10 +465,10 @@ export function reconcileStickyIndices(owner: ISymbioteNode): void {
 // ---------------------------------------------------------------- the header half
 
 function findScrollOwner(node: ISymbioteNode): ISymbioteNode | undefined {
-  let current = node.parent;
+  let current = parentOf(node);
   while (current !== undefined) {
     if (scrollOwners.has(current)) return current;
-    current = current.parent;
+    current = parentOf(current);
   }
   return undefined;
 }
@@ -462,28 +486,16 @@ function nextHeaderY(
   return next === undefined ? undefined : sticky.layoutYs.get(next);
 }
 
-// The committed half of the pin: the debounced translateY RN pushes into the transform for
-// hit-testing (`passthroughAnimatedPropExplicitValues`), plus the two constants the wrapper always
-// carries. The SMOOTH half rides the AnimatedProps leaf below and never passes through here.
+// STICKY FOLD LEFT THIS FILE ON 2026-09-18, and it was the last `payloadFold` in the codebase.
 //
-// A per-node fold, assigned in `attach`, because what it reads is per-node runtime state rather
-// than a prop — the behavior-level `foldPayload` gets props and nothing else.
-function stickyFold(runtime: IStickyHeaderRuntime): IPayloadFold {
-  return props => {
-    const pin: Record<string, unknown> = { zIndex: STICKY_HEADER_Z_INDEX };
-    if (runtime.state.translateY !== null)
-      pin.transform = [{ translateY: runtime.state.translateY }];
-    return {
-      ...props,
-      // Over the app's, never under: the pin is the whole point of the element, and a header whose
-      // own style set a transform would otherwise cancel it.
-      style: [props.style, pin],
-      // Yoga may flatten a view that only groups children, and a flattened header has no transform
-      // to animate. RN's sticky wrapper sets it for the same reason.
-      collapsable: false,
-    };
-  };
-}
+// It wrote three things and they had two different origins. `zIndex: 10` and `collapsable: false`
+// are constants of the wrapper — the platform's in any app — and the debounced translate is the
+// machine's. Splitting them that way is what let the whole rule move: `foldStickyHeaderProps` in
+// `SymbioteFabricProps.cpp` owns the composition now, and the one live number crosses as an
+// ordinary prop (`STICKY_TRANSLATE_PROP`), which is how RN spells it too.
+//
+// Contract: `core/engine/cpp/tests/js/sticky-header-payload.itest.ts`. There is no JS twin — a
+// payload rule asserted against a second copy of itself is asserted against nothing.
 
 function dispatch(node: ISymbioteNode, action: IStickyAction): void {
   const runtime = headerRuntimes.get(node);
@@ -491,7 +503,7 @@ function dispatch(node: ISymbioteNode, action: IStickyAction): void {
   const sticky = stickyOwners.get(runtime.owner);
   const result = reduceSticky(runtime.state, action, {
     os: Platform.OS,
-    inverted: runtime.owner.props.invertStickyHeaders === true,
+    inverted: propOf(runtime.owner, 'invertStickyHeaders') === true,
     scrollViewHeight: sticky?.viewportHeight,
     nextHeaderLayoutY: nextHeaderY(runtime, node),
   });
@@ -522,16 +534,21 @@ function runEffects(
         }, effect.delay);
         break;
       case 'apply-passthrough':
-        // The fold reads `runtime.state`, which no prop write touched, so nothing has marked the
-        // node — and dirtying is not publishing, hence both calls.
+        // The machine's one channel to its tag rule. A prop rather than runtime state the fold
+        // reaches back for, because RN spells this the same way
+        // (`ScrollViewStickyHeader.js:302`, `passthroughAnimatedPropExplicitValues`) and because a
+        // prop write is what the rule in `SymbioteFabricProps.cpp` can read at all.
         //
-        // NOT witnessed by a headless test, and the reason is worth knowing before deleting it:
-        // while the pin is JS-driven the animated leaf's own `setNativeProps` has already written
-        // the same transform and marked the node, so removing this line reddens nothing here. It
-        // is the NATIVE-driver path this exists for — there the leaf stops writing JS-side and the
-        // committed transform is all hit-testing has, which is exactly why RN keeps
-        // `passthroughAnimatedPropExplicitValues` beside the animated one.
-        markPropsDirty(node);
+        // The write marks the node itself, so only the commit request is still owed — dirtying is
+        // not publishing.
+        //
+        // WHY A COMMIT IS REQUESTED AT ALL, and it is NOT witnessed by a headless test: while the
+        // pin is JS-driven the animated leaf's own `setNativeProps` has already written the same
+        // transform and marked the node, so removing this reddens nothing here. It is the
+        // NATIVE-driver path it exists for — there the leaf stops writing JS-side and the committed
+        // transform is all hit-testing has, which is why RN keeps that explicit value beside the
+        // animated one.
+        setProp(node, STICKY_TRANSLATE_PROP, effect.translateY);
         requestCommitFor(node);
         break;
       case 'record-header-y':
@@ -616,7 +633,6 @@ function attach(node: ISymbioteNode): void {
     cancelBind: undefined,
   };
   headerRuntimes.set(node, runtime);
-  node.payloadFold = stickyFold(runtime);
   setBehaviorListener(node, 'layout', event => handleHeaderLayout(node, event));
 }
 

@@ -15,7 +15,7 @@
 // Both arms are here on purpose: "no native call" is produced equally by a correct JS fallback and
 // by a probe that never ran, and only the positive arm on the same harness tells them apart.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric } from '../../../../test-utils/src/index';
+import { installRecordingFabric } from '../../../../test-utils/src/index';
 import {
   appendChild,
   clearHostBehaviors,
@@ -31,7 +31,9 @@ import { registerScrollViewBehavior } from './index';
 import { SCROLL_VIEW_TAG } from './shared';
 import { STICKY_HEADER_TAG } from './sticky';
 
-const fabric = installFabric();
+// A RECORDING host: nothing here reads a committed tree, so Fabric's rules have no business being
+// re-implemented in this file's path.
+const fabric = installRecordingFabric();
 let nextRootTag = 9860;
 
 interface INativeCall {

@@ -1,0 +1,325 @@
+// @symbiote-platform-extensions
+//
+// Can React's OWN Fabric renderer stand up in this harness?
+//
+// The directive on the first line asks the runner to resolve `.ios.js` before `.js` for React
+// Native's own imports, the way Metro does. It is opt-in per file and this is the only file that
+// takes it — see `reactNativePlatformExtensions` in `scripts/run-itests.mjs` for what turning it on
+// for everything cost.
+//
+// why: every comparison against stock React Native in `CLAUDE.md` is taken on a device, because
+// nothing here can run the other side. That is why `Swap` has carried "the standing React anomaly"
+// unexplained through every re-measurement: both sides run the SAME reconciler, so the 9.6-vs-35.3
+// difference has to be what React does against a MUTATION-mode host config versus its own
+// PERSISTENT-mode one — and there is no arm to subtract.
+//
+// A headless stock baseline would answer that, and every future question of its shape, without a
+// simulator. This file is the feasibility step, deliberately the smallest one: does the renderer
+// LOAD, and does it find the pieces it needs. It asserts nothing about speed.
+//
+// WHY IT LOOKS POSSIBLE. Three walls that used to stand are down:
+//   - `ReactFabric-prod.js` is a GENERATED bundle carrying `@noflow`, not Flow source.
+//   - This runner already strips Flow from all of `react-native` and `@react-native/*`
+//     (`scripts/run-itests.mjs`, `reactNativeFlow`) with Hermes' own parser — the step
+//     `CLAUDE.md`'s RN-port backlog calls "step 0 … has not been tried".
+//   - The renderer touches `ReactNativePrivateInterface` in exactly TWELVE places, so whatever does
+//     not survive the import is a small, nameable list rather than RN's whole TurboModule floor.
+//
+// WHAT A FAILURE HERE MEANS: not that the idea is dead, but that the next step is a stub for the
+// members that did not load. The point of the probe is to make that list, cheaply.
+//
+// ── IT LOADS, AND THE TWO WALLS IT HIT WERE NEITHER OF THE EXPECTED ONES ────────────────────────
+//
+// Flow was never the problem — the loader already handled it. What failed, in order:
+//
+//   1. 75x "The JSX syntax extension is not currently enabled". Stripping Flow leaves JSX ALONE, and
+//      React Native writes JSX in `.js` files, which the loader was handing esbuild as `js`. Reads
+//      like a Flow failure and is not one. Fixed by returning the `jsx` loader — strictly wider,
+//      since a `.js` file with no JSX parses identically either way.
+//   2. Unresolvable dev-only modules and `.png` imports out of LogBox. Those come from
+//      `ReactNativePrivateInitializeCore`, which `ReactFabric-prod.js` requires on line 16 for its
+//      side effects: RN's app bootstrap, dragging in LogBox, the DevTools hook and the whole
+//      component tree. Stubbed to empty in the runner — a measurement that ran an app bootstrap
+//      would be measuring the bootstrap.
+//
+// Neither was `ReactNativePrivateInterface`, which was the thing budgeted for. The renderer's twelve
+// uses of it all resolved, so no stub was needed at all.
+//
+// ── AND IT RENDERS. `RootView(View())`, committed through `nativeFabricUIManager`. ──────────────
+//
+// React's own Fabric renderer mounts a real view into this harness's surface, with RN's own view
+// config (194 `validAttributes` for `RCTView`) and RN's own `createAttributePayload` building the
+// payload. Every stock-vs-ours question in `CLAUDE.md` is now a two-arm fixture rather than a
+// simulator run — starting with `Swap` at 3.68x, where both sides run the SAME reconciler and the
+// only difference left is mutation-mode against persistent-mode.
+//
+// TWO THINGS THE CONTROL CAUGHT, and both would have shipped as findings without it:
+//
+//   - "render returned" is not "a node committed". React schedules its work, so a clean return says
+//     only that nothing threw. `flushTimers()` then `mounted()` is what settles it.
+//   - The harness has exactly ONE surface, `kSurfaceId = 1` (`symbiote-host.h`), and every reader
+//     visits that registry entry alone. Rendering into a root tag of its own — which looked like the
+//     careful thing to do, since the raw arm keeps its tags well clear of ours — committed into a
+//     surface nothing can read: `render` clean, `mounted()` back as `RootView()`, empty.
+
+import {
+  describe,
+  expect,
+  flushTimers,
+  it,
+  mounted,
+  print,
+  report,
+  shapeOf,
+} from './harness';
+
+type IProbeResult = { loaded: boolean; detail: string };
+
+/** Set by the view-config arm, so the render arm below cannot report a failure it did not cause. */
+let stockIsReachable = false;
+
+// THE HARNESS HAS EXACTLY ONE SURFACE, `kSurfaceId = 1` (`core/engine/cpp/tests/symbiote-host.h`),
+// and every reader — `mounted()`, `committedShape()`, the mounting logs — visits that registry entry
+// and no other. A stock arm rendering into a tag of its own therefore commits into a surface nothing
+// can read, which is exactly what the first attempt did: `render` returned clean and `mounted()` came
+// back `RootView()`, empty. Free to take here because this file stands up no surface of its own.
+const STOCK_ROOT_TAG = 1;
+
+/** Load the renderer, and report what happened rather than letting the whole file die on it. */
+function probeStockRenderer(): IProbeResult {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const loaded: unknown = require('react-native/Libraries/Renderer/implementations/ReactFabric-prod.js');
+    if (typeof loaded !== 'object' || loaded === null) {
+      return { loaded: false, detail: `resolved to ${typeof loaded}` };
+    }
+    return { loaded: true, detail: Object.keys(loaded).sort().join(' ') };
+  } catch (error) {
+    return {
+      loaded: false,
+      detail: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+describe('react own Fabric renderer in the headless harness', () => {
+  // why: the binding the stock renderer drives is the same one `raw-fabric-vs-engine.itest.ts`
+  // already uses, so if it were missing the probe below would fail for a reason that has nothing to
+  // do with the renderer. Checked first so the two answers cannot be confused.
+  it('has the nativeFabricUIManager the stock renderer would drive', () => {
+    const binding = (globalThis as Record<string, unknown>)
+      .nativeFabricUIManager;
+    print(`DEBUG nativeFabricUIManager: ${typeof binding}`);
+    expect(typeof binding).toBe('object');
+  });
+
+  // [characterization — this records what the harness CAN do, not what it should]
+  //
+  // why: the whole feasibility question in one assertion. A pass makes a headless stock baseline a
+  // build-out rather than a research question; a failure names the missing piece in `detail`.
+  it('loads ReactFabric-prod, or says exactly what stopped it', () => {
+    const result = probeStockRenderer();
+    print(
+      `DEBUG stock renderer loaded=${String(result.loaded)} :: ${result.detail}`,
+    );
+    expect(result.loaded).toBe(true);
+  });
+
+  // why: the renderer resolves a host element's type through `ReactNativeViewConfigRegistry.get`, so
+  // a stock arm cannot render one view until `RCTView` is registered. The config has to be RN's OWN
+  // rather than a hand-written stand-in: it carries `validAttributes`, which is what
+  // `createAttributePayload` reads to decide the payload, so an invented one would produce a
+  // different payload and the comparison would be measuring the stand-in. This repo has a standing
+  // rule about exactly that shape of error.
+  //
+  // ── THE CHAIN, AND IT IS CLOSED ────────────────────────────────────────────────────────────────
+  //
+  // Each link was found by satisfying the previous one and reading the next throw. The first four
+  // live in this test rather than the shared runner because they are facts about the stock arm; the
+  // fifth had to be the runner, because it is a resolver rule.
+  //
+  //   1. `Can't find variable: global`                     -> runner prelude, `global = globalThis`
+  //   2. `__fbBatchedBridgeConfig is not set`               -> an EMPTY bridge, so `NativeModules`
+  //                                                           can evaluate and every lookup misses
+  //   3. `getEnforcing('SourceCode') could not be found`    -> a turbomodule proxy answering to any
+  //                                                           name; chasing them one at a time does
+  //                                                           not converge
+  //   4. `Cannot destructure property 'screen'`             -> `getConstants()` returning a screen
+  //                                                           shape, since `{}` is not inert
+  //   5. `Platform_default.select is undefined`             -> Metro's platform extensions, in the
+  //                                                           runner, scoped to RN's own importers
+  //
+  // The fifth was the only one that was not a fake. `Libraries/Utilities/Platform.js` is a
+  // compatibility shim whose entire body is `import Platform from './Platform'; export default
+  // Platform;` — it relies on METRO resolving `./Platform` to `Platform.ios.js`. esbuild has no
+  // platform extensions, so it resolved the file to ITSELF, the cycle yielded `undefined`, and the
+  // throw named `BridgelessUIManager`, several modules from the cause.
+  //
+  // What was NOT in the way, having been budgeted for and then not needed: Flow (the runner already
+  // strips it), and `ReactNativePrivateInterface` (all twelve of the renderer's uses resolved).
+  it('resolves React Native own view config for RCTView', () => {
+    let detail: string;
+    let registered = false;
+    try {
+      // BRIDGELESS, and it is the correct mode rather than a way around the error. `ViewNative-
+      // Component` asks `NativeComponentRegistry.get`, whose branch is `native: !global.RN$Bridgeless`
+      // — with the bridge it calls `getNativeComponentAttributes` and dies on "__fbBatchedBridge-
+      // Config is not set"; without it, it builds the config from the STATIC one the module already
+      // carries in JS. Bridgeless is what a real RN 0.86 app runs, so the static path is also the one
+      // a device would take, which is what keeps the baseline honest.
+      //
+      // Set HERE and not in the runner prelude: it is a fact about the stock arm, and the engine's
+      // own code reads globals of this family. A harness-wide flag would change every other itest.
+      (globalThis as Record<string, unknown>).RN$Bridgeless = true;
+      // AN EMPTY BRIDGE, which is not the same as no bridge. `NativeModules.js` throws
+      // "__fbBatchedBridgeConfig is not set" from its MODULE scope, so the module cannot even
+      // evaluate — and `TurboModuleRegistry.requireModule` reaches it for every miss, including the
+      // one `NativeReactNativeFeatureFlags` takes at import time. An empty `remoteModuleConfig`
+      // lets it initialise with no modules, every lookup misses cleanly, and the feature flags fall
+      // back to their JS defaults. Set before the first require below, because both modules read
+      // these globals at module scope.
+      (globalThis as Record<string, unknown>).__fbBatchedBridgeConfig = {
+        remoteModuleConfig: [],
+      };
+      // A TURBOMODULE THAT ANSWERS TO ANY NAME. Chasing the misses one at a time does not converge:
+      // importing one component module reaches `getEnforcing('SourceCode')`, and behind it sit the
+      // rest of RN's specs, each throwing the moment the previous is satisfied.
+      //
+      // Permissive by design, and the trap that carries is already written down — a fake that
+      // resolves any name means module-NAME correctness can never be proven headlessly
+      // (`<native_module_name_is_platform_specific>`). It does not apply to what this arm is for: a
+      // payload built from a static JS view config never asks a native module anything, so nothing
+      // measured here depends on a name being right.
+      //
+      // `getConstants` is singled out because a bare `{}` is not inert: `Dimensions` destructures
+      // `screen` out of what `DeviceInfo` returns and dies on the miss. One screen shape satisfies
+      // every consumer of it, and no measurement here reads a pixel.
+      const screen = {
+        width: 390,
+        height: 844,
+        scale: 3,
+        fontScale: 1,
+      };
+      const constants = {
+        Dimensions: { window: screen, screen },
+        isIPhoneX_deprecated: false,
+      };
+      const anyTurboModule = new Proxy(
+        {},
+        {
+          get: (_target, name) =>
+            name === 'getConstants' ? () => constants : () => ({}),
+        },
+      );
+      (globalThis as Record<string, unknown>).__turboModuleProxy = () =>
+        anyTurboModule;
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const registry: unknown = require('react-native/Libraries/Renderer/shims/ReactNativeViewConfigRegistry');
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require('react-native/Libraries/Components/View/ViewNativeComponent');
+      if (typeof registry !== 'object' || registry === null) {
+        detail = `registry resolved to ${typeof registry}`;
+      } else {
+        const get: unknown = (registry as Record<string, unknown>).get;
+        if (typeof get !== 'function') {
+          detail = 'registry has no get()';
+        } else {
+          const config: unknown = get('RCTView');
+          const attributes =
+            typeof config === 'object' && config !== null
+              ? (config as Record<string, unknown>).validAttributes
+              : undefined;
+          registered = typeof attributes === 'object' && attributes !== null;
+          detail = registered
+            ? `${Object.keys(attributes as object).length} validAttributes`
+            : `config resolved to ${typeof config}`;
+        }
+      }
+    } catch (error) {
+      // The STACK, not just the message: "__fbBatchedBridgeConfig is not set" is thrown from three
+      // unrelated depths in RN and the message alone cannot say whether it came from importing the
+      // module or from asking the registry — which is the difference between a one-line flag and the
+      // whole TurboModule floor.
+      const stack = error instanceof Error ? (error.stack ?? '') : '';
+      detail = `${error instanceof Error ? error.message : String(error)} | ${stack
+        .split('\n')
+        .slice(0, 6)
+        .join(' <- ')}`;
+    }
+    print(
+      `DEBUG RCTView view config: registered=${String(registered)} :: ${detail}`,
+    );
+    stockIsReachable = registered;
+    expect(registered).toBe(true);
+    // RN's OWN config, not a stand-in, and the count is what proves it: `RCTView` carries 194
+    // `validAttributes` in 0.86. A hand-written config would pass the line above and produce a
+    // different payload out of `createAttributePayload`, which is the failure this file exists to
+    // avoid — the comparison would be measuring the stand-in. The number is a floor, not an exact
+    // match, so an upstream bump adding a prop does not read as a break.
+    expect(detail.includes('validAttributes')).toBe(true);
+    expect(Number.parseInt(detail, 10) > 150).toBe(true);
+  });
+
+  // why: the last step, and the one that turns this from a loading probe into a baseline. If
+  // `ReactFabric.render` drives `createNode` / `appendChildToSet` / `completeRoot` for a tree of
+  // plain host elements, then every stock-vs-ours question in `CLAUDE.md` — starting with `Swap` at
+  // 3.68x — becomes a two-arm fixture instead of a simulator run.
+  //
+  // Host elements are named as STRINGS (`'RCTView'`), which is what they already are inside React
+  // Native: `createReactNativeComponentClass('RCTView', …)` returns that string as the element type,
+  // and the renderer looks it up in the same registry the arm above just proved resolves.
+  //
+  // Reports rather than asserts a shape, for the same reason the arms above did: the point is to
+  // learn what the next wall is, cheaply, and a thrown error would hide it behind a stack.
+  it('renders one host element through the stock renderer, or says what stopped it', () => {
+    if (!stockIsReachable) throw new Error('the view-config arm did not run');
+
+    let detail: string;
+    let rendered = false;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const stock: unknown = require('react-native/Libraries/Renderer/implementations/ReactFabric-prod.js');
+      const render =
+        typeof stock === 'object' && stock !== null
+          ? (stock as Record<string, unknown>).render
+          : undefined;
+      if (typeof render !== 'function') {
+        detail = `render is ${typeof render}`;
+      } else {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const react: unknown = require('react');
+        const createElement = (react as Record<string, unknown>).createElement;
+        if (typeof createElement !== 'function') {
+          detail = 'react has no createElement';
+        } else {
+          render(
+            createElement('RCTView', { nativeID: 'stock-root' }),
+            STOCK_ROOT_TAG,
+          );
+          // THE CONTROL, and the reason "render returned" is not the answer: React schedules its
+          // work, so a `render` that threw nothing may simply not have run yet. What settles it is
+          // whether a node reached the platform — `mounted()` reads the tree the host actually
+          // committed, so an empty one means the call was a no-op however clean it looked.
+          flushTimers();
+          const tree = mounted();
+          rendered = tree.children.length > 0 || tree.viewName !== '';
+          detail = `committed ${shapeOf(tree)}`;
+        }
+      }
+    } catch (error) {
+      const stack = error instanceof Error ? (error.stack ?? '') : '';
+      detail = `${error instanceof Error ? error.message : String(error)} | ${stack
+        .split('\n')
+        .slice(0, 4)
+        .join(' <- ')}`;
+    }
+    print(`DEBUG stock render: rendered=${String(rendered)} :: ${detail}`);
+    expect(rendered).toBe(true);
+    // The SHAPE, not just "something committed". `RootView()` on its own is what an empty surface
+    // reads as, and it is what the first attempt produced while `render` returned perfectly clean —
+    // so the only assertion worth making names the view.
+    expect(detail.includes('View')).toBe(true);
+  });
+});
+
+report();

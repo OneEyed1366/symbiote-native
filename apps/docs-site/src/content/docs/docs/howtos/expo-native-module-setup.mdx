@@ -23,6 +23,10 @@ splash-screen) uses — it needs its own one-time native wiring per app.
   `expo-modules-autolinking` — both plain, `expo`-free dependencies.
 </Aside>
 
+`npx @symbiote-native/cli new --<package>` (or `add --<package>`, e.g. `--sensors`) does every step
+below for you, for a new or an existing SymbioteNative app. Read on if you're wiring it by hand,
+into a non-SymbioteNative app, or want to know what the flag does.
+
 ## Do this once per app, not once per package
 
 Every step below wires the app itself, not `@symbiote-native/sensors` specifically. Once done, any

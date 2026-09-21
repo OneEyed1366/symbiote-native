@@ -25,14 +25,15 @@ export const DEFAULT_ACTIVE_OPACITY = 0.2;
 // finger drifted outside and came back (RESPONDER_INACTIVE_PRESS_OUT -> RESPONDER_ACTIVE_PRESS_IN,
 // driven by onResponderMove).
 //
-// Our engine dispatches pressIn from exactly ONE place — `core/engine/src/events/index.ts:391`,
-// on topTouchStart, ahead of negotiateResponder — and has no drift-back-in re-activation at all.
-// So every pressIn we produce is the grant-equivalent, and 0 is the duration that applies. Using
-// 150 (which all five adapters did until 2026-08-19) makes every tap fade in visibly slower than
-// RN.
+// Our engine's `state/pressable.ts` DOES reproduce that reactivation — `handleResponderMove`
+// re-`activate()`s on a drift-back-in — and `touchable-opacity.ts`'s own `activate` callback picks
+// between the two constants below by checking `event.type === 'responderMove'`, our engine's own
+// dispatch-name equivalent (`core/engine/src/events/index.ts`'s `bubble`/`callOwnListener` both set
+// `type: listenerName`). A prior version of this comment claimed "no drift-back-in re-activation at
+// all" — that was true only until the drift/retention mechanism was added to `state/pressable.ts`
+// and was never re-checked against it; every reactivation was snapping to the active opacity
+// instantly instead of easing over 150ms until this was caught.
 export const OPACITY_ACTIVE_GRANT_DURATION_MS = 0;
-// The re-activation branch. Unreachable today — kept so the constant exists when the press
-// machine grows drift-back-in, and because it is the value RN uses there.
 export const OPACITY_ACTIVE_DURATION_MS = 150;
 export const OPACITY_INACTIVE_DURATION_MS = 250;
 export const RESTING_OPACITY = 1;
@@ -250,6 +251,12 @@ export interface IHighlightUnderlayConfig {
   delayPressOut: number;
   // RN's _hasPressHandler gate, resolved by the adapter over its live props.
   hasPressHandler: boolean;
+  // `_hideUnderlay` returns EARLY on this, before the press-handler check and before
+  // `onHideUnderlay` (`TouchableHighlight.js:284-286`) — a snapshot-pinned control must never
+  // un-pin or notify, however many real gestures pass through it. `_showUnderlay` has no matching
+  // guard, so a show still fires normally; the C++ payload rule paints the underlay unconditionally
+  // either way, so this only governs the JS-side state flip and the app-facing callback.
+  testOnlyPressed: boolean;
   schedule: (callback: () => void, ms: number) => () => void;
 }
 
@@ -272,7 +279,7 @@ export function createHighlightUnderlayHandlers(
   runtime: IHighlightUnderlayRuntime,
   callbacks: IHighlightUnderlayCallbacks,
 ): IHighlightUnderlayHandlers {
-  const { delayPressOut, hasPressHandler, schedule } = config;
+  const { delayPressOut, hasPressHandler, testOnlyPressed, schedule } = config;
   const { setShown, onShowUnderlay, onHideUnderlay } = callbacks;
 
   function clearHideTimer(): void {
@@ -290,6 +297,7 @@ export function createHighlightUnderlayHandlers(
 
   function hide(): void {
     clearHideTimer();
+    if (testOnlyPressed) return;
     if (!hasPressHandler) return;
     setShown(false);
     onHideUnderlay?.();

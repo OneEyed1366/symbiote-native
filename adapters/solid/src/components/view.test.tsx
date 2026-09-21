@@ -12,8 +12,11 @@
 
 import { createSignal, Show } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
-import { findNodeHandle } from '../host-instance';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 import type { IHostInstance } from '../host-instance';
 import { mount, unmount } from '../render';
 import type { IViewProps } from './view-props';
@@ -21,35 +24,25 @@ import type { IViewProps } from './view-props';
 const ROOT_TAG = 8_201;
 const VIEW = 'RCTView';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-function walk(nodes: IFakeNode[], visit: (node: IFakeNode) => void): void {
-  for (const node of nodes) {
-    visit(node);
-    walk(node.children, visit);
-  }
-}
-
-// Reads the LIVE committed tree, never `fabric.created` — a created node's props are frozen at
-// first commit, so anything asserted after an update has to come off the committed child set
-// (symbiote-engine-core §8).
+// Reads the LIVE tree, never the recording — the record holds a node as it was CREATED, with its
+// props frozen at that moment, so anything asserted after an update has to come off the live child
+// links (symbiote-engine-core §8).
 function committed(
-  predicate: (node: IFakeNode) => boolean,
-): IFakeNode | undefined {
-  let found: IFakeNode | undefined;
-  walk(fabric.committed, node => {
-    if (found === undefined && predicate(node)) found = node;
-  });
-  return found;
+  predicate: (node: ILiveNode) => boolean,
+): ILiveNode | undefined {
+  return live.findLive(live.appRoot(), predicate);
 }
 
-function probe(): IFakeNode {
-  const node = committed(n => n.props.testID === 'probe');
+function probe(): ILiveNode {
+  const node = committed(n => n.payload.testID === 'probe');
   if (node === undefined)
     throw new Error('no node with testID="probe" was committed');
   return node;
@@ -66,8 +59,8 @@ describe('Solid View on the engine', () => {
       await tick();
 
       expect(probe().viewName).toBe(VIEW);
-      expect(probe().props.pointerEvents).toBe('box-none');
-      expect(probe().props.collapsable).toBe(false);
+      expect(probe().payload.pointerEvents).toBe('box-none');
+      expect(probe().payload.collapsable).toBe(false);
       // The bag emits `nativeID` on every run so the key set stays stable (see the component's
       // fold comment); an undefined value is deleted by setProp, so nothing leaks to Fabric.
       expect('nativeID' in probe().props).toBe(false);
@@ -80,8 +73,8 @@ describe('Solid View on the engine', () => {
       mount(ROOT_TAG, () => <view testID="probe" id="foo" />);
       await tick();
 
-      expect(probe().props.nativeID).toBe('foo');
-      expect(probe().props.id).toBeUndefined();
+      expect(probe().payload.nativeID).toBe('foo');
+      expect(probe().payload.id).toBeUndefined();
     });
 
     // why: when an app supplies both the modern alias and the legacy prop, `id` must win — the
@@ -93,7 +86,7 @@ describe('Solid View on the engine', () => {
       ));
       await tick();
 
-      expect(probe().props.nativeID).toBe('from-id');
+      expect(probe().payload.nativeID).toBe('from-id');
     });
 
     // why: the fold is PER KEY here — the renderer never sees a whole bag — so without the node
@@ -105,7 +98,7 @@ describe('Solid View on the engine', () => {
       ));
       await tick();
 
-      expect(probe().props.nativeID).toBe('from-id');
+      expect(probe().payload.nativeID).toBe('from-id');
     });
 
     // why: Fabric only measures and fires layout for a node explicitly flagged onLayout:true — an
@@ -117,9 +110,9 @@ describe('Solid View on the engine', () => {
       ));
       await tick();
 
-      expect(probe().props.onLayout).toBe(true);
+      expect(probe().payload.onLayout).toBe(true);
       // A function prop reaching Fabric crashes Android's folly::dynamic serializer.
-      expect(typeof probe().props.onPress).not.toBe('function');
+      expect(typeof probe().payload.onPress).not.toBe('function');
     });
 
     // why: children are the whole reason View exists as a component rather than a prop bag. The
@@ -135,7 +128,7 @@ describe('Solid View on the engine', () => {
       ));
       await tick();
 
-      expect(fabric.serialize([probe()])).toBe(
+      expect(live.serialize(probe().handle)).toBe(
         'RCTView(RCTView(RCTText(RCTRawText "hi")))',
       );
     });
@@ -149,15 +142,17 @@ describe('Solid View on the engine', () => {
         <view testID="probe" collapsable={collapsable()} />
       ));
       await tick();
-      const createdAtMount = fabric.counts.createNode;
-      expect(probe().props.collapsable).toBe(true);
+      // Node IDENTITY rather than a creation count: a rebuild that netted out to the same number
+      // of nodes would still satisfy a count, and the identity moving is what the case is about.
+      const hostAtMount = probe().handle;
+      expect(probe().payload.collapsable).toBe(true);
 
       setCollapsable(false);
       await tick();
 
-      expect(probe().props.collapsable).toBe(false);
-      expect(fabric.counts.createNode, 'the host node kept its identity').toBe(
-        createdAtMount,
+      expect(probe().payload.collapsable).toBe(false);
+      expect(probe().handle, 'the host node kept its identity').toBe(
+        hostAtMount,
       );
     });
 
@@ -174,32 +169,44 @@ describe('Solid View on the engine', () => {
         </view>
       ));
       await tick();
-      expect(committed(n => n.props.testID === 'late')).toBeUndefined();
+      expect(committed(n => n.payload.testID === 'late')).toBeUndefined();
 
       setShown(true);
       await tick();
 
-      expect(committed(n => n.props.testID === 'late')).toBeDefined();
+      expect(committed(n => n.payload.testID === 'late')).toBeDefined();
     });
 
-    // why: Solid's spread walks only the CURRENT key set and has no removal pass, and
-    // resolveAccessibilityProps emits `accessibilityLabel` only while an aria alias holds a VALUE.
-    // Without the stable-key widening the folded key simply vanishes from the bag and a screen
-    // reader keeps announcing a label the app already removed — green in every other test here.
-    it('clears a folded accessibility prop when its aria alias goes undefined', async () => {
+    // why: Solid's spread walks only the CURRENT key set and has no removal pass, so a prop that
+    // goes undefined can leave its key STANDING at the old value — and a screen reader keeps
+    // announcing a label the app already removed, green in every other test here.
+    //
+    // Read on the AUTHORED key: the fold into `accessibilityLabel` is the engine's rule
+    // (`aria-payload.itest.ts`) and this harness holds no copy of it. The hazard is unchanged, and
+    // `aria-label` is the key Solid's spread actually holds, so this is the sharper place to watch.
+    it('clears an aria alias that goes undefined', async () => {
       const [label, setLabel] = createSignal<string | undefined>('wifi');
       mount(ROOT_TAG, () => <view testID="probe" aria-label={label()} />);
       await tick();
-      expect(probe().props.accessibilityLabel).toBe('wifi');
+      expect(probe().payload['aria-label']).toBe('wifi');
 
       setLabel(undefined);
       await tick();
 
-      // `null`, not absent: a key the node held last commit and no longer has is sent to Fabric as
-      // literal null so the native setter resets to its default (diffProps, symbiote-engine-core
-      // §8) — which is precisely the behaviour React and Vue get for free and the widening
-      // restores here. Without it the assertion reads back the stale 'wifi'.
-      expect(probe().props.accessibilityLabel).toBeNull();
+      // The claim is that the key is CLEARED, and it is read in two places because one of them
+      // alone would pass for the wrong reason.
+      //
+      // `null` is not the spelling any more, and that is a correction rather than a weakening. The
+      // literal null was the CLONE PROTOCOL's way of saying "reset this to its default" — it only
+      // ever existed in the diff the stand-in merged. The engine's op stream says the same thing
+      // with `NO_VALUE`, and the recording, replaying that op, DELETES the key. So "absent" is what
+      // the engine actually emits.
+      expect(Object.hasOwn(probe().payload, 'aria-label')).toBe(false);
+      // …and this is the half that proves the engine ACTED. Had it simply stopped setting the key,
+      // the record would still carry the value from the first commit; the key being gone from the
+      // record means a clearing op was sent for it.
+      const recorded = fabric.find(node => node.props.testID === 'probe');
+      expect(Object.hasOwn(recorded?.props ?? {}, 'aria-label')).toBe(false);
     });
 
     // why: `ref` on a COMPONENT is rewritten by Solid's compiler into a callback prop, so the
@@ -216,7 +223,11 @@ describe('Solid View on the engine', () => {
 
       expect(node()).toBeDefined();
       expect(typeof node()?.measure).toBe('function');
-      expect(findNodeHandle(node)).toBe(probe().tag);
+      // The ref hands back the very engine node the tree holds — node identity, the half of this
+      // claim readable without a renderer. That `findNodeHandle` then resolves it to the TAG Fabric
+      // committed is a number no stand-in can produce, and lives in
+      // `core/engine/cpp/tests/js/solid-adapter.itest.tsx` against the real engine.
+      expect(node()).toBe(probe().handle);
 
       // Type-level pin, no runtime claim. IViewProps['ref'] is solid-js's `Ref` UNION rather than
       // a callback because type-checking happens on what the author wrote — `ref={el}`, a plain

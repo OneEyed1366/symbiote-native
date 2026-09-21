@@ -20,7 +20,11 @@ import {
   unmount,
   setNativeViewConfigSource,
 } from '@symbiote-native/solid';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 import { Slider } from '.';
 
 const ROOT_TAG = 313;
@@ -69,7 +73,8 @@ const RNC_SLIDER_VIEW_CONFIG = {
   },
 };
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 setNativeViewConfigSource(name =>
   name === SLIDER_VIEW ? RNC_SLIDER_VIEW_CONFIG : undefined,
 );
@@ -80,34 +85,17 @@ afterEach(() => unmount(ROOT_TAG));
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
-function findInTree(
-  predicate: (node: IFakeNode) => boolean,
-  nodes = fabric.committed,
-): IFakeNode | undefined {
-  for (const node of nodes) {
-    if (predicate(node)) return node;
-    const child = findInTree(predicate, node.children);
-    if (child) return child;
-  }
-  return undefined;
-}
-
-// The created node's props are frozen at first commit (clone-on-write hands back a new object), so
-// anything asserted after an update is read off the live committed tree instead.
-function sliderNode(): IFakeNode {
-  const node = fabric.find(n => n.viewName === SLIDER_VIEW);
-  if (!node) throw new Error(`no ${SLIDER_VIEW} was created`);
+// The live tree, not the recording: a node's payload is a getter, always current, so this serves
+// both the "just mounted" and "after an update" reads — there is no frozen-at-commit half any more.
+function sliderNode(): ILiveNode {
+  const node = live.findLive(live.appRoot(), n => n.viewName === SLIDER_VIEW);
+  if (!node) throw new Error(`no ${SLIDER_VIEW} was committed`);
   return node;
 }
 
-function currentSliderNode(): IFakeNode {
-  const node = findInTree(n => n.viewName === SLIDER_VIEW);
-  if (!node) throw new Error(`no committed ${SLIDER_VIEW} exists`);
-  return node;
-}
-
-function sliderWrapperNode(): IFakeNode {
-  const node = findInTree(
+function sliderWrapperNode(): ILiveNode {
+  const node = live.findLive(
+    live.appRoot(),
     n =>
       n.viewName === 'RCTView' &&
       n.children.some(child => child.viewName === SLIDER_VIEW),
@@ -127,7 +115,7 @@ describe('Solid Slider wrapper', () => {
         <Slider value={0.5} minimumValue={0} maximumValue={1} step={0.1} />
       ));
       await tick();
-      const props = sliderNode().props;
+      const props = sliderNode().payload;
       expect(props.value).toBe(0.5);
       expect(props.minimumValue).toBe(0);
       expect(props.maximumValue).toBe(1);
@@ -140,7 +128,7 @@ describe('Solid Slider wrapper', () => {
       // limits — the library's documented default contract, ported verbatim.
       mount(ROOT_TAG, () => <Slider value={0.3} />);
       await tick();
-      const props = sliderNode().props;
+      const props = sliderNode().payload;
       expect(props.minimumValue).toBe(0);
       expect(props.maximumValue).toBe(1);
       expect(props.step).toBe(0);
@@ -156,7 +144,7 @@ describe('Solid Slider wrapper', () => {
         <Slider value={0.5} lowerLimit={0.2} upperLimit={0.8} />
       ));
       await tick();
-      const props = sliderNode().props;
+      const props = sliderNode().payload;
       expect(props.lowerLimit).toBe(0.2);
       expect(props.upperLimit).toBe(0.8);
     });
@@ -164,12 +152,12 @@ describe('Solid Slider wrapper', () => {
     it('sanitizes a falsy/NaN value to undefined (library passedValue quirk)', async () => {
       mount(ROOT_TAG, () => <Slider value={0} />);
       await tick();
-      expect(sliderNode().props.value).toBeUndefined();
+      expect(sliderNode().payload.value).toBeUndefined();
       unmount(ROOT_TAG);
       fabric.reset();
       mount(ROOT_TAG, () => <Slider value={Number.NaN} />);
       await tick();
-      expect(sliderNode().props.value).toBeUndefined();
+      expect(sliderNode().payload.value).toBeUndefined();
     });
 
     it('measures the wrapper and pins the native slider width', async () => {
@@ -181,7 +169,7 @@ describe('Solid Slider wrapper', () => {
         layout: { x: 0, y: 0, width: 240, height: 40 },
       });
       await tick();
-      expect(currentSliderNode().props.width).toBe(240);
+      expect(sliderNode().payload.width).toBe(240);
     });
 
     it('forwards tint props and runs them through the derived processor', async () => {
@@ -194,7 +182,7 @@ describe('Solid Slider wrapper', () => {
         />
       ));
       await tick();
-      const props = sliderNode().props;
+      const props = sliderNode().payload;
       expect(props.minimumTrackTintColor).toBe('processed(#ff0000)');
       expect(props.maximumTrackTintColor).toBe('processed(#00ff00)');
       expect(props.thumbTintColor).toBe('processed(#0000ff)');
@@ -261,7 +249,7 @@ describe('Solid Slider wrapper', () => {
         <Slider value={0.2} accessibilityState={{ disabled: true }} />
       ));
       await tick();
-      expect(sliderNode().props.disabled).toBe(true);
+      expect(sliderNode().payload.disabled).toBe(true);
     });
 
     it('an explicit disabled prop wins over accessibilityState.disabled', async () => {
@@ -275,8 +263,8 @@ describe('Solid Slider wrapper', () => {
         />
       ));
       await tick();
-      expect(sliderNode().props.disabled).toBe(false);
-      expect(sliderNode().props.accessibilityState).toEqual({
+      expect(sliderNode().payload.disabled).toBe(false);
+      expect(sliderNode().payload.accessibilityState).toEqual({
         disabled: false,
       });
     });
@@ -358,9 +346,11 @@ describe('Solid Slider wrapper', () => {
       await tick();
       // 'processed(...)' is the fake processor — the fold's job stops at picking 'transparent'; the
       // value still runs through the same derived processor every other tint does.
-      expect(sliderNode().props.thumbTintColor).toBe('processed(transparent)');
+      expect(sliderNode().payload.thumbTintColor).toBe(
+        'processed(transparent)',
+      );
       // The marker draws its own thumb image, so the native leaf must not ALSO receive one.
-      expect(sliderNode().props.thumbImage).toBeUndefined();
+      expect(sliderNode().payload.thumbImage).toBeUndefined();
     });
 
     it('does NOT leak the JS onValueChange callback to the native node as a prop', async () => {
@@ -368,7 +358,7 @@ describe('Solid Slider wrapper', () => {
         <Slider value={0.2} onValueChange={() => undefined} />
       ));
       await tick();
-      expect(typeof sliderNode().props.onValueChange).not.toBe('function');
+      expect(typeof sliderNode().payload.onValueChange).not.toBe('function');
     });
 
     it('pushes a later value onto the SAME native node instead of recreating it', async () => {
@@ -380,15 +370,15 @@ describe('Solid Slider wrapper', () => {
       const [value, setValue] = createSignal(0.2);
       mount(ROOT_TAG, () => <Slider value={value()} />);
       await tick();
-      const createdBefore = fabric.counts.createNode;
-      const handleBefore = sliderNode().instanceHandle;
+      const handleBefore = sliderNode().handle;
+      const instanceHandleBefore = sliderNode().instanceHandle;
 
       setValue(0.8);
       await tick();
 
-      expect(currentSliderNode().props.value).toBe(0.8);
-      expect(fabric.counts.createNode).toBe(createdBefore);
-      expect(sliderNode().instanceHandle).toBe(handleBefore);
+      expect(sliderNode().payload.value).toBe(0.8);
+      expect(sliderNode().handle).toBe(handleBefore);
+      expect(sliderNode().instanceHandle).toBe(instanceHandleBefore);
     });
 
     it('re-props the step markers through their accessor rather than re-invoking them', async () => {
@@ -420,7 +410,7 @@ describe('Solid Slider wrapper', () => {
       ));
       await tick();
       expect(invocations).toBe(3);
-      const createdBefore = fabric.counts.createNode;
+      const handleBefore = sliderNode().handle;
 
       fabric.fireEvent(sliderNode().instanceHandle, 'topRNCSliderValueChange', {
         value: 1,
@@ -428,7 +418,7 @@ describe('Solid Slider wrapper', () => {
       await tick();
 
       expect(invocations).toBe(3);
-      expect(fabric.counts.createNode).toBe(createdBefore);
+      expect(sliderNode().handle).toBe(handleBefore);
       expect(latest).toBe(true);
     });
 
@@ -441,7 +431,7 @@ describe('Solid Slider wrapper', () => {
         <Slider value={0.2} aria-disabled aria-label="volume" />
       ));
       await tick();
-      const props = sliderNode().props;
+      const props = sliderNode().payload;
       expect(props.disabled).toBe(true);
       expect(props.accessibilityState).toEqual({ disabled: true });
       expect(props.accessibilityLabel).toBe('volume');

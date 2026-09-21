@@ -22,35 +22,34 @@
 
 import { createSignal, For, Show } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 import { mount, unmount } from './render';
 
 const ROOT_TAG = 9_311;
 const RAW_TEXT = 'RCTRawText';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-// Every raw-text string in the LIVE committed tree, in order. Reads `fabric.committed` rather than
-// `fabric.created`: a created node's props are frozen at its first commit, so an update asserted
-// off it would pass forever (symbiote-engine-core §8).
+// Every raw-text STRING in the live tree, in order. Not `live.texts()`, which stringifies: the
+// filter is load-bearing here, because a non-string arriving as a raw text is a different bug and
+// `text-children.test.tsx` is where it is caught.
+//
+// The LIVE tree rather than the recording: a created node's props are frozen at its first commit,
+// so an update asserted off the record would pass forever (symbiote-engine-core §8).
 function committedText(): string[] {
-  const found: string[] = [];
-  const walk = (nodes: IFakeNode[]): void => {
-    for (const node of nodes) {
-      if (node.viewName === RAW_TEXT) {
-        const text = node.props.text;
-        if (typeof text === 'string') found.push(text);
-      }
-      walk(node.children);
-    }
-  };
-  walk(fabric.committed);
-  return found;
+  return live
+    .findAllLive(live.appRoot(), node => node.viewName === RAW_TEXT)
+    .map(node => node.payload.text)
+    .filter((text): text is string => typeof text === 'string');
 }
 
 describe("solid-js control flow through this package's renderer", () => {

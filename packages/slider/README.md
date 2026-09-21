@@ -15,6 +15,10 @@ own primitives.
 npm install @symbiote-native/slider
 ```
 
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --slider` (or
+`add --slider` in an existing app) installs and wires this for you — see
+[`@symbiote-native/cli`](../cli).
+
 Only this package — never `@react-native-community/slider` directly, see
 [Packaging](#packaging--one-dependency-not-two) below for why.
 
@@ -118,7 +122,7 @@ import { Slider } from '@symbiote-native/slider/solid';
 ```
 
 ```ts
-// Angular — examples/angular/App.ts
+// Angular — examples/angular/src/App.ts
 import { Slider } from '@symbiote-native/slider/angular';
 // ... Slider added to the component's `imports`, used the same way in its template.
 ```

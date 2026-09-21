@@ -17,13 +17,16 @@
 // Harness copied from __tests__/responder-nested-cd.test.ts: the change is driven by a real touch
 // through the fake Fabric slot, so the trigger is the device path (a flat-bag callback ->
 // SymbioteHostPropsDirective's markForCheck) rather than a hand-called detectChanges. Assertions
-// read `fabric.committed` — `fabric.find` only ever sees a node's FIRST-created props, so a prop
+// read the LIVE tree — the record's `find` only ever sees a node's FIRST-created props, so a prop
 // UPDATE is invisible there.
 
 import '@angular/compiler';
 import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 
 import { mount, unmount } from './index';
 import {
@@ -40,26 +43,16 @@ const TOUCH_END = 'topTouchEnd';
 
 registerComposedComponent('input-propagation-child');
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 
-function findCommitted(
-  predicate: (node: IFakeNode) => boolean,
-): IFakeNode | undefined {
-  const stack = [...fabric.committed];
-  while (stack.length > 0) {
-    const node = stack.pop();
-    if (node === undefined) continue;
-    if (predicate(node)) return node;
-    stack.push(...node.children);
-  }
-  return undefined;
-}
-
-// The engine flattens a resolved style onto the native node's own props bag (see render.test.ts's
-// `toMatchObject({ padding: 12 })`), so a derived style value lands as `props.margin`, never
-// `props.style.margin`.
+// The engine flattens a resolved style onto the native node's own payload bag (see render.test.ts's
+// `toMatchObject({ padding: 12 })`), so a derived style value lands as `payload.margin`, never
+// `payload.style.margin`. The LIVE tree, not the record's `find` — `find` only ever sees a node's
+// FIRST-created props, so a prop UPDATE is invisible there.
 function committedMargin(testID: string): unknown {
-  return findCommitted(n => n.props.testID === testID)?.props.margin;
+  return live.findLive(live.appRoot(), n => n.payload.testID === testID)
+    ?.payload.margin;
 }
 
 function handleFor(testID: string): unknown {

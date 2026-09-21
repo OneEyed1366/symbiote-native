@@ -14,14 +14,23 @@
 // produced nothing. Every case therefore also pins the owner count and asserts the app's own child
 // is a DESCENDANT of the one content node — a capability an app depends on, rather than a shape
 // (`.claude/rules/adapter-parity-audit.md`, "Phrase a parity oracle as a CAPABILITY").
+//
+// A RECORDING host, and the tree walked here is the AUTHORED one. The question is WHO EMITTED the
+// content node; `RCTScrollContentView` is a name the engine sends, and React Native's own
+// `componentNameByReactViewName` maps `ScrollContentView` to plain `View`, so the committed tree
+// cannot tell a content node from any other view by name at all.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
-import { STICKY_HEADER_Z_INDEX } from '@symbiote-native/components';
+import { childrenOf } from '@symbiote-native/engine';
+import {
+  installRecordingFabric,
+  type IAuthoredNode,
+} from '@symbiote-native/test-utils';
+import { STICKY_HEADER_TAG } from '@symbiote-native/components';
 // Mounting through `../../render` skips `index.ts`, so the registration has to be named here —
 // and it is the whole subject of this file.
 import '../../register';
@@ -52,7 +61,7 @@ const rootOutFor = (name: string): string =>
   join(__dirname, `.owner-compiled-root-${name}.mjs`);
 const ROOT_NAMES = ['sv-v', 'sv-h', 'sv-r', 'sv-s', 'vl-v', 'vl-h'] as const;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -122,20 +131,23 @@ async function loadRoot(name: string, body: string): Promise<Component> {
   return component;
 }
 
-function collect(
-  nodes: readonly IFakeNode[],
-  match: (node: IFakeNode) => boolean,
-): IFakeNode[] {
-  const found: IFakeNode[] = [];
-  for (const node of nodes) {
-    if (match(node)) found.push(node);
-    found.push(...collect(node.children, match));
-  }
-  return found;
+function byViewName(name: string): IAuthoredNode[] {
+  return fabric.findAll(node => node.viewName === name);
 }
 
-function byViewName(name: string): IFakeNode[] {
-  return collect(fabric.committed, node => node.viewName === name);
+// Descends FROM the content node, which is the same claim stated forwards: the engine's structure
+// builder put the app's children INSIDE what it created.
+function countUnder(
+  handle: object,
+  match: (node: IAuthoredNode) => boolean,
+): number {
+  let found = 0;
+  for (const child of childrenOf(handle)) {
+    const recorded = fabric.find(node => node.handle === child);
+    if (recorded !== undefined && match(recorded)) found += 1;
+    found += countUnder(child, match);
+  }
+  return found;
 }
 
 // iOS resolves BOTH axes to RCTScrollView / RCTScrollContentView (the horizontal split is an
@@ -150,15 +162,15 @@ function assertSingleContentNode(probeText: string): void {
   const contents = byViewName(CONTENT_VIEW);
   // The control: without this a mount that produced NOTHING would satisfy a `toBe(1)` on a count
   // taken from an empty tree only by accident, and satisfy `toBeLessThan(2)` always.
-  expect(owners.length, 'exactly one scroll view committed').toBe(1);
-  expect(contents.length, 'exactly one content view committed').toBe(1);
+  expect(owners.length, 'exactly one scroll view created').toBe(1);
+  expect(contents.length, 'exactly one content view created').toBe(1);
   // …and the second half of the control: the content node is the one the app's children reached,
   // not an empty extra box beside them.
-  const probes = collect(
-    contents[0].children,
+  const probes = countUnder(
+    contents[0].handle,
     node => node.props.text === probeText,
   );
-  expect(probes.length, `"${probeText}" sits under the content view`).toBe(1);
+  expect(probes, `"${probeText}" sits under the content view`).toBe(1);
 }
 
 async function mountRoot(name: string, body: string): Promise<void> {
@@ -216,12 +228,11 @@ describe('the engine is the only builder of a ScrollView content node', () => {
     // walking the COMMITTED children instead (`sticky-indices.test.ts`, "the COMPATIBILITY half").
     // So the wrapper had been suppressing a working engine feature, and deleting it restored RN's
     // own API on this adapter. A zero here means the index walk stopped running.
-    expect(
-      collect(
-        fabric.committed,
-        node => node.props.zIndex === STICKY_HEADER_Z_INDEX,
-      ).length,
-    ).toBe(1);
+    // By the TAG the engine was told, not by a key its tag rule writes: the pin lives in
+    // `SymbioteFabricProps.cpp` now, and this harness builds payloads through the TypeScript
+    // `fabricProps`, which carries no copy of it.
+    const pinned = fabric.findAll(node => node.tagName === STICKY_HEADER_TAG);
+    expect(pinned.length).toBe(1);
   });
 
   // The list family is the SECOND owner this guard exists for: `virtualized-list/index.svelte`
@@ -250,15 +261,20 @@ describe('the engine is the only builder of a ScrollView content node', () => {
   // tree; what would break this invariant is one of them growing a scroll tag, which is what the
   // grep in this test's sibling assertion answers.
   it('no Svelte source emits a content intrinsic any more', async () => {
-    const { readdirSync, statSync } = await import('node:fs');
+    const { readdirSync } = await import('node:fs');
     const roots = [join(__dirname, '..', '..')];
     const offenders: string[] = [];
     while (roots.length > 0) {
       const dir = roots.pop();
       if (dir === undefined) break;
-      for (const entry of readdirSync(dir)) {
+      // `withFileTypes` — the listed-then-stat race `load-time-registration.test.ts` documents.
+      // This walk reaches the very directories the Svelte suites write and delete
+      // `.smoke-compiled-*.mjs` in, so a separate `statSync` can throw ENOENT on an entry this loop
+      // was about to discard for its extension.
+      for (const dirent of readdirSync(dir, { withFileTypes: true })) {
+        const entry = dirent.name;
         const full = join(dir, entry);
-        if (statSync(full).isDirectory()) {
+        if (dirent.isDirectory()) {
           roots.push(full);
           continue;
         }

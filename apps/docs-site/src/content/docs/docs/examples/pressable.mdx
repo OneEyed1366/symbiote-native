@@ -158,8 +158,8 @@ channel, so the app mirrors `pressed` into its own local state off
 ## API takeaway
 
 React is the only adapter where `pressable` still exposes state through a
-children render function, `children: (state) => ReactNode`. A lowered
-`pressable` tag on Vue, Angular, Svelte, and Solid has no render-prop channel
+children render function, `children: (state) => ReactNode`. The `pressable`
+tag on Vue, Angular, Svelte, and Solid has no render-prop channel
 for its children, so each one instead reads `onPressIn`/`onPressOut`
 directly and mirrors `pressed` into its own local reactive state, then derives
 a class or style from that: Vue's `@press-in`/`@press-out`, Angular's

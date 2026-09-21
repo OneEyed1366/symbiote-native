@@ -2,8 +2,11 @@
 // every other test green, so each gets a case: the app's own press callbacks must survive the
 // fade being spliced in front of them, the fade must beat the AUTHOR's own `opacity` in the
 // payload, and the fade must not become the style the next resting-opacity read sees.
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { installFabric, type IFakeNode } from '../../../test-utils/src/index';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '../../../test-utils/src/index';
 import {
   clearHostBehaviors,
   createElement,
@@ -20,7 +23,8 @@ import {
 } from './touchable-opacity';
 import { DEFAULT_ACTIVE_OPACITY } from '../state/touchable';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 let nextRootTag = 7100;
 
 // The JS driver reads requestAnimationFrame off the host at call time and Node has none. A ~16ms
@@ -73,22 +77,13 @@ function listenerOf(node: ISymbioteNode, name: string): IListener {
   return listener;
 }
 
-// The LIVE tree, never `fabric.find()`, which keeps every pre-clone node and would report the
-// node's own pre-fade self (`.claude/rules/test-harness-false-greens.md`).
 function committedPropsOf(testID: string): Record<string, unknown> {
-  const walk = (
-    nodes: readonly IFakeNode[],
-  ): Record<string, unknown> | undefined => {
-    for (const node of nodes) {
-      if (node.props.testID === testID) return node.props;
-      const hit = walk(node.children);
-      if (hit !== undefined) return hit;
-    }
-    return undefined;
-  };
-  const hit = walk(fabric.appRoot().children);
+  const hit = live.findLive(
+    live.appRoot(),
+    node => node.payload.testID === testID,
+  );
   if (hit === undefined) throw new Error(`no committed node testID=${testID}`);
-  return hit;
+  return hit.payload;
 }
 
 // The ENGINE's order: `events/index.ts` bubbles PRESS_IN and only then negotiates the responder,
@@ -104,6 +99,12 @@ async function settle(): Promise<void> {
   await vi.advanceTimersByTimeAsync(400);
   await Promise.resolve();
 }
+
+beforeEach(() => {
+  // Every case opens its OWN surface, and `appRoot()` searches the CREATION log — without this it
+  // answers with an earlier case's root.
+  fabric.reset();
+});
 
 afterEach(() => {
   clearHostBehaviors();
@@ -135,6 +136,55 @@ describe('touchable-opacity host behavior', () => {
     expect(committedPropsOf(TEST_ID).opacity).toBe(0.6);
   });
 
+  // why: `TouchableOpacity.js:215-220` picks the fade duration from WHERE the press-in came from —
+  // 0ms for an ordinary grant, 150ms for a drift-out/drift-back-in reactivation
+  // (`RESPONDER_INACTIVE_PRESS_OUT -> RESPONDER_ACTIVE_PRESS_IN`, driven by `onResponderMove`). Our
+  // press machine (`state/pressable.ts`'s `handleResponderMove`) already re-`activate()`s on a
+  // drift-back-in; this pins that the reactivation still eases in over 150ms rather than snapping.
+  it('eases back in over 150ms on a drift-out/drift-back-in reactivation, not instantly', async () => {
+    vi.useFakeTimers();
+    registerTouchableOpacityBehavior();
+    const node = makeTouchable();
+    routeProp(node, 'testID', TEST_ID);
+    routeProp(node, 'style', { opacity: 0.6 });
+    mount(node);
+    await settle();
+
+    pressIn(node);
+    await settle();
+    expect(committedPropsOf(TEST_ID).opacity).toBe(DEFAULT_ACTIVE_OPACITY);
+
+    // Drift outside the retention region — deactivates, fading back to the resting opacity.
+    // `type: 'responderMove'` matches what the real engine dispatch sets
+    // (`events/index.ts`'s `bubble`/`callOwnListener`, both `type: listenerName`).
+    listenerOf(
+      node,
+      'responderMove',
+    )({
+      type: 'responderMove',
+      nativeEvent: { pageX: 100, pageY: 0 },
+    } as ISymbioteEvent);
+    await settle();
+    expect(committedPropsOf(TEST_ID).opacity).toBe(0.6);
+
+    // Drift back inside — reactivates. A 150ms ease has NOT reached the active opacity 30ms in.
+    listenerOf(
+      node,
+      'responderMove',
+    )({
+      type: 'responderMove',
+      nativeEvent: { pageX: 10, pageY: 0 },
+    } as ISymbioteEvent);
+    await vi.advanceTimersByTimeAsync(30);
+    await Promise.resolve();
+    const midway = committedPropsOf(TEST_ID).opacity;
+    expect(midway).not.toBe(DEFAULT_ACTIVE_OPACITY);
+    expect(midway).not.toBe(0.6);
+
+    await settle();
+    expect(committedPropsOf(TEST_ID).opacity).toBe(DEFAULT_ACTIVE_OPACITY);
+  });
+
   it('still calls the app callbacks the fade is spliced in front of', async () => {
     vi.useFakeTimers();
     registerTouchableOpacityBehavior();
@@ -155,6 +205,47 @@ describe('touchable-opacity host behavior', () => {
     expect(onPressOut).toHaveBeenCalledTimes(1);
   });
 
+  // TouchableOpacity.js:187-190 — `disabled ?? aria-disabled ?? accessibilityState?.disabled`. The
+  // standalone tag never passed a resolver to the press machine, so only the raw `disabled` prop
+  // gated a press: an app disabling through `accessibilityState` alone (a real a11y pattern) kept
+  // pressing. `./button` already threads the same three-way answer through its own composed
+  // touchable; this tag never wired its own copy.
+  it('suppresses press when only accessibilityState.disabled is set', async () => {
+    vi.useFakeTimers();
+    registerTouchableOpacityBehavior();
+    const onPress = vi.fn();
+    const node = makeTouchable();
+    routeProp(node, 'testID', TEST_ID);
+    routeProp(node, 'onPress', onPress);
+    routeProp(node, 'accessibilityState', { disabled: true });
+    mount(node);
+
+    pressIn(node);
+    listenerOf(node, 'press')(TOUCH);
+    listenerOf(node, 'pressOut')(TOUCH);
+    await settle();
+
+    expect(onPress).toHaveBeenCalledTimes(0);
+  });
+
+  it('suppresses press when only aria-disabled is set', async () => {
+    vi.useFakeTimers();
+    registerTouchableOpacityBehavior();
+    const onPress = vi.fn();
+    const node = makeTouchable();
+    routeProp(node, 'testID', TEST_ID);
+    routeProp(node, 'onPress', onPress);
+    routeProp(node, 'aria-disabled', true);
+    mount(node);
+
+    pressIn(node);
+    listenerOf(node, 'press')(TOUCH);
+    listenerOf(node, 'pressOut')(TOUCH);
+    await settle();
+
+    expect(onPress).toHaveBeenCalledTimes(0);
+  });
+
   // The feedback loop this design exists to avoid. A fade frame merges onto `node.props.style`, so
   // a resting-opacity read taken from there would see the fade, re-settle to it, and chase itself.
   it('leaves the declarative style untouched while the fade runs', async () => {
@@ -172,55 +263,48 @@ describe('touchable-opacity host behavior', () => {
     expect(getExplicitStyle(node)).toBe(authored);
   });
 
-  // The fold the spec would carry if this primitive had an entry there. A raw `id` is a key no
-  // ViewConfig declares — Fabric drops it, the nativeID is lost, and nothing is red.
-  it('folds id to nativeID', async () => {
+  // `id -> nativeID` and `accessible !== false` USED TO BE ASSERTED HERE and are not any more, which
+  // is a move rather than a loss: both are the engine's rules now (`foldIdAlias` /
+  // `foldPressableProps`, `SymbioteFabricProps.cpp`) and this host builds its payloads through the
+  // TypeScript `fabricProps`, which deliberately carries no copy of them. An assertion left here
+  // would fail for the right reason today and, once someone "fixed" it by mirroring the rule in JS,
+  // pass forever for the wrong one. Contract: `core/engine/cpp/tests/js/touchable-payload.itest.ts`.
+
+  // `focusable` LEFT ON 2026-09-18 and it was the LAST thing in this tag's fold, so the tag now
+  // costs zero trips into JS. Same reason as the two rules above: it is `foldPressableProps`'s, and
+  // this host carries no copy of the tag rules.
+  //
+  // It held out longer because its middle leg is `onPress !== undefined` — an OWNED name, stashed
+  // in JS and never a prop. The comment that used to sit here said a props-only fold "cannot answer
+  // this", and that was two claims in one: the callback's IDENTITY genuinely cannot cross, its
+  // EXISTENCE is one bit and now does (`OP_SET_OWNED_LISTENER`).
+  //
+  // Contract, including the late-wiring and cleared-handler cases this used to carry:
+  // `core/engine/cpp/tests/js/touchable-focusable-payload.itest.ts`.
+
+  // TouchableOpacity.js:186-189 resolves `disabled ?? aria-disabled ?? accessibilityState.disabled`
+  // for its OWN Pressability config — the same three-way answer Button resolves, wired here for the
+  // first time. `pressable.test.ts` pins the bare-Pressable asymmetry this does NOT share.
+  it.each([
+    ['aria-disabled', 'aria-disabled', true],
+    ['accessibilityState.disabled', 'accessibilityState', { disabled: true }],
+  ])('suppresses the press from %s alone', async (_name, prop, value) => {
     vi.useFakeTimers();
     registerTouchableOpacityBehavior();
+    const onPress = vi.fn();
     const node = makeTouchable();
     routeProp(node, 'testID', TEST_ID);
-    routeProp(node, 'id', 'ident');
+    routeProp(node, 'onPress', onPress);
+    routeProp(node, prop, value);
     mount(node);
     await settle();
 
-    const props = committedPropsOf(TEST_ID);
-    expect(props.nativeID).toBe('ident');
-    expect(props.id).toBeUndefined();
-  });
-
-  // TouchableOpacity.js:336-340 — three legs, and every one of them is a silent accessibility
-  // regression when it is missing: a disabled or handler-less control that stays focusable can be
-  // reached by a keyboard, a TV remote or switch control and then does nothing.
-  it('focuses only while it has an onPress and is enabled', async () => {
-    vi.useFakeTimers();
-    registerTouchableOpacityBehavior();
-    const node = makeTouchable();
-    routeProp(node, 'testID', TEST_ID);
-    const surface = mount(node);
+    pressIn(node);
+    listenerOf(node, 'press')(TOUCH);
+    listenerOf(node, 'pressOut')(TOUCH);
     await settle();
-    // Leg 2, absent. `onPress` is an OWNED name and lives in the stash, which is why a props-only
-    // fold cannot answer this and the tag binds its fold to the node.
-    expect(committedPropsOf(TEST_ID).focusable).toBe(false);
 
-    // A listener flip dirties no payload by itself, so this also pins `onOwnedListenerChange`.
-    routeProp(node, 'onPress', () => {});
-    surface.commit();
-    await settle();
-    expect(committedPropsOf(TEST_ID).focusable).toBe(true);
-
-    // Leg 3.
-    routeProp(node, 'disabled', true);
-    surface.commit();
-    await settle();
-    expect(committedPropsOf(TEST_ID).focusable).toBe(false);
-
-    // And an explicit opt-IN does not beat `disabled` — `&&`, never `??`. This is the case a
-    // naive `focusable ?? computed` implementation gets wrong, and the one that hands a screen
-    // reader a focusable dead control.
-    routeProp(node, 'focusable', true);
-    surface.commit();
-    await settle();
-    expect(committedPropsOf(TEST_ID).focusable).toBe(false);
+    expect(onPress).not.toHaveBeenCalled();
   });
 
   // NO CASE FOR LEG 1 ALONE, and that is a finding rather than a gap: `focusable` is an ordinary

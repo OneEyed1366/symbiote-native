@@ -112,6 +112,11 @@ export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
     code: 'BM',
     label: 'PERFORMANCE LINE',
   },
+  [ROUTE_NAME.JsiNavigationCost]: {
+    line: NAV_LINE.Performance,
+    code: 'JS',
+    label: 'PERFORMANCE LINE',
+  },
   [ROUTE_NAME.StyleShowcase]: {
     line: NAV_LINE.Styling,
     code: 'ST',

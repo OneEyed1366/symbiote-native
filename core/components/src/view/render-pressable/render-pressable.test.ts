@@ -87,6 +87,14 @@ describe('resolveDisabledAccessibilityState', () => {
     const state = { selected: true };
     expect(resolveDisabledAccessibilityState(state, undefined)).toBe(state);
   });
+
+  // Ported from RN's Pressable-test.js ("should overwrite accessibilityState with value of
+  // disabled prop"): a caller-supplied `accessibilityState={{disabled: false}}` must not survive
+  // an authored `disabled={true}` — the prop always wins over a stale/contradictory a11y state.
+  it('overwrites an explicit accessibilityState.disabled with the disabled prop', () => {
+    const result = resolveDisabledAccessibilityState({ disabled: false }, true);
+    expect(result).toEqual({ disabled: true });
+  });
 });
 
 function makeHandlers(calls: string[]): IPressHandlers {
@@ -150,6 +158,24 @@ describe('buildPressableListeners', () => {
     expect(typeof listeners.onResponderTerminationRequest).toBe('function');
     const fn = listeners.onResponderTerminationRequest as () => boolean;
     expect(fn()).toBe(false);
+  });
+
+  // why: `Pressability.js:479` returns `this._config.blockNativeResponder === true` from
+  // `onResponderGrant` unconditionally — a Pressable that claims the gesture tells native whether
+  // to stand down, which is what keeps a ScrollView above it from stealing the touch mid-drag.
+  // Without this, `blockNativeResponder` has no effect at all: the engine treats an absent
+  // `onResponderGrant` listener as "no block" (`events/index.ts`'s own fallback), so the prop was
+  // silently a no-op.
+  it('answers onResponderGrant from blockNativeResponder, defaulting to false', () => {
+    const calls: string[] = [];
+    const unset = buildPressableListeners(makeHandlers(calls), {});
+    expect(typeof unset.onResponderGrant).toBe('function');
+    expect((unset.onResponderGrant as () => boolean)()).toBe(false);
+
+    const blocked = buildPressableListeners(makeHandlers(calls), {
+      blockNativeResponder: true,
+    });
+    expect((blocked.onResponderGrant as () => boolean)()).toBe(true);
   });
 });
 

@@ -15,10 +15,12 @@ import {
   dlog,
   isRecord,
   KEYBOARD_EVENT,
+  LayoutAnimation,
   Platform,
 } from '@symbiote-native/engine';
 import type {
   IKeyboardEventName,
+  ILayoutAnimationConfig,
   IPlatformOSType,
   IStyleProp,
   IViewStyle,
@@ -110,6 +112,58 @@ export function readPrefersCrossFadeTransitions(
       `KeyboardAvoidingView: prefersCrossFadeTransitions read failed -> false (${String(error)})`,
     );
     return false;
+  });
+}
+
+// RCTLayoutAnimation.m's minimal accepted duration — RN's own comment at the call site
+// (`KeyboardAvoidingView.js:172-173`): "We have to pass the duration equal to minimal accepted
+// duration defined here".
+const MIN_LAYOUT_ANIMATION_DURATION = 10;
+
+export interface IKeyboardAnimationTiming {
+  duration: number;
+  easing: string;
+}
+
+// The keyboard event's own transition curve, read off the SAME raw payload `readKeyboardFrame`
+// reads `endCoordinates` from — `duration`/`easing` sit one level up, beside it.
+export function readKeyboardAnimationTiming(
+  payload: unknown,
+): IKeyboardAnimationTiming | undefined {
+  if (!isRecord(payload)) return undefined;
+  const { duration, easing } = payload;
+  if (typeof duration !== 'number' || typeof easing !== 'string')
+    return undefined;
+  return { duration, easing };
+}
+
+// RN's `_updateBottomIfNecessary` (`:169-179`): once the inset actually changes, arm the NEXT
+// commit to animate over the keyboard's own transition curve instead of snapping. Gated on
+// `enabled` and on the event carrying BOTH a duration and an easing name — Android's
+// DID_SHOW/DID_HIDE notifications carry neither, so this is correctly a no-op there, same as
+// vendor's `if (enabled && duration && easing)`.
+//
+// `configure` is injectable purely for testability, the same shape `readPrefersCrossFadeTransitions`
+// takes its `query`; callers pass nothing and get the real `LayoutAnimation.configureNext`.
+export function configureKeyboardAvoidingAnimation(
+  timing: IKeyboardAnimationTiming | undefined,
+  enabled: boolean,
+  configure: (config: ILayoutAnimationConfig) => void = config =>
+    LayoutAnimation.configureNext(config),
+): void {
+  if (!enabled || timing === undefined) return;
+  const { duration, easing } = timing;
+  if (!duration || !easing) return;
+  const flooredDuration =
+    duration > MIN_LAYOUT_ANIMATION_DURATION
+      ? duration
+      : MIN_LAYOUT_ANIMATION_DURATION;
+  configure({
+    duration: flooredDuration,
+    update: {
+      duration: flooredDuration,
+      type: LayoutAnimation.coerceType(easing),
+    },
   });
 }
 

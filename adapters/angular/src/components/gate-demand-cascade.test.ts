@@ -24,7 +24,7 @@ import '@angular/compiler';
 import { Component } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { clearGlobalStyles } from '@symbiote-native/engine';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../render';
 // Through the package's own barrel, which is the shape an app writes — and here it is load-bearing
@@ -45,7 +45,7 @@ import { registerComposedComponent } from '../anchor-host-registry';
 import { VSectionItemDirective } from './virtualized-section-list/directives';
 
 const ROOT_TAG = 979;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 
 const GATE_KEYS = [
   'onAccessibilityAction',
@@ -141,27 +141,11 @@ class SectionListSubscribedFixture {
   onTap(): void {}
 }
 
-function committedNode(testID: string): IFakeNode | undefined {
-  const visit = (node: IFakeNode): IFakeNode | undefined => {
-    if (node.props.testID === testID) return node;
-    for (const child of node.children) {
-      const found = visit(child);
-      if (found) return found;
-    }
-    return undefined;
-  };
-  for (const root of fabric.committed) {
-    const found = visit(root);
-    if (found) return found;
-  }
-  return undefined;
-}
-
-// Gate keys standing on the committed node, by name. Reads the LIVE tree rather than
-// `fabric.find()`, which searches `created` and hands back the pre-clone node
-// (`test-harness-false-greens.md`).
+// Gate keys standing on the node, by name. The recording host mutates a node's props IN PLACE, so
+// `fabric.find` reflects a gate flag set after mount just as well as one set at creation — there
+// is no separate "live clone" to walk here, unlike the old mirror.
 function litGates(testID: string): string[] {
-  const props = committedNode(testID)?.props;
+  const props = fabric.find(node => node.props.testID === testID)?.props;
   if (props === undefined) return [];
   return GATE_KEYS.filter(key => (props[key] ?? null) !== null);
 }

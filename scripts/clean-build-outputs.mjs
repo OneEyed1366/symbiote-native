@@ -23,6 +23,10 @@ const WORKSPACE_ROOTS = ['core', 'adapters', 'packages'];
 // build-ngc is Angular's AOT output with its own clean step inside each package's `ng:build`;
 // wiping it here would just make that rebuild twice.
 const OUTPUT_DIRS = ['build'];
+// Bundled single-file outputs (packages/cli's rolldown `bundle.js`). Same argument as build/:
+// gitignored, so CI always builds it fresh, but a local `pnpm pack` would happily ship whatever
+// the last successful bundle left behind — including for a source file that no longer exists.
+const OUTPUT_FILES = ['bundle.js'];
 
 function packageDirs() {
   return WORKSPACE_ROOTS.flatMap(root => {
@@ -39,6 +43,13 @@ for (const dir of packageDirs()) {
     const target = join(dir, output);
     if (existsSync(target)) {
       rmSync(target, { recursive: true, force: true });
+      removed += 1;
+    }
+  }
+  for (const output of OUTPUT_FILES) {
+    const target = join(dir, output);
+    if (existsSync(target)) {
+      rmSync(target, { force: true });
       removed += 1;
     }
   }

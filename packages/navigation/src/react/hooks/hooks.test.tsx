@@ -16,7 +16,11 @@ import {
   setNativeViewConfigSource,
 } from '@symbiote-native/react';
 import type { INativeViewConfig } from '@symbiote-native/engine';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import { childrenOf, type ISymbioteNode } from '@symbiote-native/engine';
+import {
+  installRecordingFabric,
+  type IAuthoredNode,
+} from '@symbiote-native/test-utils';
 import { Stack } from '../stack';
 import type { INavigatorHandle } from '../stack';
 import {
@@ -74,21 +78,27 @@ const VIEW_CONFIGS: Record<string, INativeViewConfig> = {
   },
 };
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 setNativeViewConfigSource(name => VIEW_CONFIGS[name]);
 
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-function screenNodes(): IFakeNode[] {
-  const found: IFakeNode[] = [];
-  const collect = (nodes: readonly IFakeNode[]): void => {
-    for (const node of nodes) {
-      if (node.viewName === SCREEN_VIEW) found.push(node);
-      collect(node.children);
-    }
-  };
-  collect(fabric.committed);
+// Descends the LIVE child links from the stack container down: a recording keeps every node it
+// ever saw created, so a popped screen would still be counted if this searched the record.
+function stackRoot(): ISymbioteNode {
+  const stack = fabric.find(node => node.viewName === STACK_VIEW);
+  if (stack === undefined) throw new Error('no screen stack created');
+  return stack.handle;
+}
+
+function screenNodes(handle: ISymbioteNode = stackRoot()): IAuthoredNode[] {
+  const found: IAuthoredNode[] = [];
+  for (const child of childrenOf(handle)) {
+    const recorded = fabric.find(one => one.handle === child);
+    if (recorded?.viewName === SCREEN_VIEW) found.push(recorded);
+    found.push(...screenNodes(child));
+  }
   return found;
 }
 

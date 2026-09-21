@@ -1,4 +1,3 @@
-
 // The component React.lazy() dynamically imports (SuspenseActivityLazyDemo.tsx) — split into
 // its own module so the import() call has a real module boundary to defer.
 export default function LazyLoadedPanel() {

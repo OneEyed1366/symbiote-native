@@ -5,10 +5,25 @@ description: Run the existing SymbioteNative examples and inspect the first nati
 
 import { Tabs, TabItem } from '@astrojs/starlight/components';
 
-:::note Run from source
-SymbioteNative is a renderer project under active development. The quickest way to try
-it today is to run one of the repository examples instead of starting from a
-published scaffolder.
+## Scaffold a fresh app
+
+The fastest way to try SymbioteNative in your own project:
+
+```sh
+npx @symbiote-native/cli new my-app --framework react
+```
+
+`--framework` is one of `react | vue | angular | solid | svelte`. This generates a full app —
+native `ios`/`android` folders plus the chosen adapter — and pins `react-native`/`react` at the
+app root for you. `@symbiote-native/cli` is beta: `new` scaffolds a complete app; `add` extends
+an *existing* SymbioteNative app with optional layers (navigation, splash screen, individual Expo
+packages, ...) but doesn't yet wire SymbioteNative into a plain, non-SymbioteNative RN project. See
+[`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli)
+for the full flag reference.
+
+:::note Prefer to read source instead?
+The rest of this page runs one of the repository's own examples instead — useful if you'd
+rather read/modify a full app in place than scaffold a new one.
 :::
 
 ## Prerequisites

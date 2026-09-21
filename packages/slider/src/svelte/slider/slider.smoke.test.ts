@@ -15,7 +15,11 @@ import { compile } from 'svelte/compiler';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 import { setNativeViewConfigSource } from '@symbiote-native/engine';
 // From the dedicated `native-view-bridge` subpath, NOT the package's main barrel: the main
 // barrel re-exports View/Text/…, real `.svelte` sources, which vitest's plain (svelte-plugin-
@@ -81,7 +85,8 @@ const RNC_SLIDER_VIEW_CONFIG = {
   },
 };
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 setNativeViewConfigSource(name =>
   name === SLIDER_VIEW ? RNC_SLIDER_VIEW_CONFIG : undefined,
 );
@@ -157,8 +162,8 @@ async function loadBindParent(): Promise<Component> {
   return importDefault(BIND_PARENT_OUT);
 }
 
-function sliderNode(): IFakeNode {
-  const node = fabric.find(n => n.viewName === SLIDER_VIEW);
+function sliderNode(): ILiveNode {
+  const node = live.findLive(live.appRoot(), n => n.viewName === SLIDER_VIEW);
   if (!node) throw new Error(`no ${SLIDER_VIEW} was created`);
   return node;
 }
@@ -194,13 +199,15 @@ describe('Slider (real compiled index.svelte)', () => {
         maximumValue: 1,
         step: 0.1,
       });
-      const props = sliderNode().props;
+      const props = sliderNode().payload;
       expect(props.value).toBe(0.5);
       expect(props.minimumValue).toBe(0);
       expect(props.maximumValue).toBe(1);
       expect(props.step).toBe(0.1);
       // The native leaf lives under a view wrapper (RCTView), not at the root.
-      expect(fabric.find(n => n.viewName === 'RCTView')).toBeDefined();
+      expect(
+        live.findLive(live.appRoot(), n => n.viewName === 'RCTView'),
+      ).toBeDefined();
     });
 
     it('defaults range + limits the way the core fold does', async () => {
@@ -208,7 +215,7 @@ describe('Slider (real compiled index.svelte)', () => {
       // defaults (constants.ts: min 0 / max 1 / step 0 / MIN_SAFE_INTEGER..MAX_SAFE_INTEGER limits),
       // not undefined props reaching the native view.
       await mountSlider({ value: 0.3 });
-      const props = sliderNode().props;
+      const props = sliderNode().payload;
       expect(props.minimumValue).toBe(0);
       expect(props.maximumValue).toBe(1);
       expect(props.step).toBe(0);
@@ -223,11 +230,11 @@ describe('Slider (real compiled index.svelte)', () => {
       // it falls back to ITS OWN default initial value, rather than the native view receiving a
       // literal 0/NaN write it would otherwise treat as a real position.
       await mountSlider({ value: 0 });
-      expect(sliderNode().props.value).toBeUndefined();
+      expect(sliderNode().payload.value).toBeUndefined();
       unmount(ROOT_TAG);
       fabric.reset();
       await mountSlider({ value: Number.NaN });
-      expect(sliderNode().props.value).toBeUndefined();
+      expect(sliderNode().payload.value).toBeUndefined();
     });
 
     it('forwards tint props and runs them through the derived processor', async () => {
@@ -241,7 +248,7 @@ describe('Slider (real compiled index.svelte)', () => {
         maximumTrackTintColor: '#00ff00',
         thumbTintColor: '#0000ff',
       });
-      const props = sliderNode().props;
+      const props = sliderNode().payload;
       expect(props.minimumTrackTintColor).toBe('processed(#ff0000)');
       expect(props.maximumTrackTintColor).toBe('processed(#00ff00)');
       expect(props.thumbTintColor).toBe('processed(#0000ff)');
@@ -292,7 +299,7 @@ describe('Slider (real compiled index.svelte)', () => {
       // accessibilityState (no separate `disabled` prop) must still reach the native view disabled,
       // matching the library wrapper's own resolution order.
       await mountSlider({ value: 0.2, accessibilityState: { disabled: true } });
-      expect(sliderNode().props.disabled).toBe(true);
+      expect(sliderNode().payload.disabled).toBe(true);
     });
 
     it('does NOT leak the JS onValueChange callback to the native node as a prop', async () => {
@@ -300,7 +307,7 @@ describe('Slider (real compiled index.svelte)', () => {
       // serialization or silently no-op — the callback belongs only in `passthrough`'s routed
       // event keys, never as a plain native attribute.
       await mountSlider({ value: 0.2, onValueChange: () => undefined });
-      expect(typeof sliderNode().props.onValueChange).not.toBe('function');
+      expect(typeof sliderNode().payload.onValueChange).not.toBe('function');
     });
 
     it('renders the default step indicator when renderStepNumber is set (2-child bridge shape)', async () => {
@@ -314,12 +321,13 @@ describe('Slider (real compiled index.svelte)', () => {
         step: 0.5,
         renderStepNumber: true,
       });
-      const container = fabric.find(
+      const container = live.findLive(
+        live.appRoot(),
         n => n.props.testID === 'StepsIndicator-Container',
       );
       expect(container, 'a StepsIndicator container is painted').toBeDefined();
       // Still exactly one native leaf underneath the same wrapper.
-      expect(sliderNode().props.value).toBe(0.5);
+      expect(sliderNode().payload.value).toBe(0.5);
     });
 
     it('tolerates the bridged child count changing between mounts (no-steps -> steps)', async () => {
@@ -333,7 +341,10 @@ describe('Slider (real compiled index.svelte)', () => {
         step: 0.5,
       });
       expect(
-        fabric.find(n => n.props.testID === 'StepsIndicator-Container'),
+        live.findLive(
+          live.appRoot(),
+          n => n.props.testID === 'StepsIndicator-Container',
+        ),
       ).toBeUndefined();
       unmount(ROOT_TAG);
       fabric.reset();
@@ -345,9 +356,12 @@ describe('Slider (real compiled index.svelte)', () => {
         renderStepNumber: true,
       });
       expect(
-        fabric.find(n => n.props.testID === 'StepsIndicator-Container'),
+        live.findLive(
+          live.appRoot(),
+          n => n.props.testID === 'StepsIndicator-Container',
+        ),
       ).toBeDefined();
-      expect(sliderNode().props.value).toBe(0.5);
+      expect(sliderNode().payload.value).toBe(0.5);
     });
 
     it('renders a custom stepMarker overlay and still bridges the native leaf', async () => {
@@ -362,7 +376,7 @@ describe('Slider (real compiled index.svelte)', () => {
 
       // computeStepOptions(0, 1, 0.25, resolution) with an explicit step yields 5 points
       // (0, 0.25, 0.5, 0.75, 1) — one marker per point.
-      const markers = fabric.created.filter(
+      const markers = fabric.findAll(
         n =>
           typeof n.props.testID === 'string' &&
           n.props.testID.startsWith('marker-'),
@@ -391,7 +405,7 @@ describe('Slider (real compiled index.svelte)', () => {
       await tick();
 
       expect(reported.at(-1)).toBe(0.2);
-      expect(sliderNode().props.value).toBe(0.2);
+      expect(sliderNode().payload.value).toBe(0.2);
 
       // Uncontrolled during the drag itself — bind:value only reflects what the native view
       // actually reports, on the SAME handleValueChange path onValueChange already fires from

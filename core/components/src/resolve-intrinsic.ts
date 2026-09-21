@@ -2,15 +2,9 @@
 // commits, from the props it was created with.
 //
 // Why this has to exist at runtime at all. `intrinsicWhen` lets one primitive map to two native
-// views (`TextInput` -> `RCTSinglelineTextInputView` / `RCTMultilineTextInputView`), and until now
-// only the lowering transforms read it — so the choice was made at COMPILE time, from the source
-// text. That is why `dynamicIntrinsicChoice` had to be a refusal category: a transform seeing
-// `multiline={isLong}` cannot know the value, so it refused to lower the element at all.
-//
-// A public primitive TAG has no transform in front of it on three of the five adapters, so the
-// choice has to be made where the value is actually known — here, at element creation. That is a
-// capability the compiler never had, and it is why the refusal category disappears WITH the
-// transform rather than migrating into it.
+// views (`TextInput` -> `RCTSinglelineTextInputView` / `RCTMultilineTextInputView`), and the
+// deciding prop can be a RUNTIME value: `multiline={isLong}` is knowable only once the element is
+// created. So the choice is made here, where the value is.
 //
 // WHAT THIS DELIBERATELY DOES NOT DO: react to the prop CHANGING later. A node's native view is
 // fixed at `createNode` and no prop write moves a node between view types, so flipping `multiline`

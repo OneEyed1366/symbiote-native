@@ -28,7 +28,8 @@
 import '@angular/compiler';
 import { Component, CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import { childrenOf } from '@symbiote-native/engine';
+import { installRecordingFabric, payloadOf } from '@symbiote-native/test-utils';
 // registerScrollViewBehavior() is what builds the content container the assertions below read.
 import '../../register';
 import { mount, unmount } from '../../render';
@@ -36,7 +37,7 @@ import { AnimatedScrollView } from './create-animated-component';
 
 const ROOT_TAG = 927;
 const OVERRIDE_ROOT_TAG = 928;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -83,16 +84,27 @@ describe('AnimatedScrollView', () => {
     await tick();
 
     const scrollView = fabric.find(node => node.viewName === 'RCTScrollView');
-    expect(scrollView?.children).toHaveLength(1);
-    expect(scrollView?.props.nestedScrollEnabled).toBe(true);
+    if (scrollView === undefined) throw new Error('no scroll view created');
+    // The AUTHORED tree, walked from the found handle via the engine's own child links — the
+    // recording host has no `.children` on a node (see its header).
+    const scrollChildren = childrenOf(scrollView.handle);
+    expect(scrollChildren).toHaveLength(1);
+    // `nestedScrollEnabled` is `foldScrollViewProps` in the engine now and this host carries no copy
+    // of the tag rules (`core/engine/cpp/tests/js/scroll-view-payload.itest.ts`). What this case is
+    // about either way is the projected-children wrap below.
 
-    const content = scrollView?.children[0];
-    expect(content?.viewName).toBe('RCTScrollContentView');
-    expect(content?.props.collapsable).toBe(false);
-    expect(content?.children.map(child => child.props.testID)).toEqual([
-      'a',
-      'b',
-    ]);
+    const contentNode = fabric.find(n => n.handle === scrollChildren[0]);
+    expect(contentNode?.viewName).toBe('RCTScrollContentView');
+    // `collapsable: false` joined `nestedScrollEnabled` in `foldScrollContentProps` on 2026-09-18 —
+    // it was a build-time `setProp` until then, so it was visible in the authored props this line
+    // read. Same note as above: what this case is about is the wrap below.
+
+    const contentChildren = contentNode ? childrenOf(contentNode.handle) : [];
+    expect(
+      contentChildren.map(
+        child => fabric.find(n => n.handle === child)?.props.testID,
+      ),
+    ).toEqual(['a', 'b']);
   });
 
   // Regression test for a THIRD bug in this same bespoke-template class, this one iOS-only (the
@@ -104,13 +116,18 @@ describe('AnimatedScrollView', () => {
   // over sibling views instead of scrolling clipped (Android's native ViewGroup clips regardless
   // of the style prop, which is why this was invisible there). See
   // core/components/src/view/render-scroll-view.ts's SCROLL_VIEW_BASE_VERTICAL comment.
-  it('applies the scroll-view base style (overflow: scroll) so content clips to the frame', async () => {
+  // The base style itself is `foldScrollViewProps` in the engine since 2026-09-18, asserted on the
+  // committed payload in `core/engine/cpp/tests/js/scroll-view-payload.itest.ts`; this host builds
+  // its payload through the TypeScript `fabricProps`, which carries no copy of the tag rules. What
+  // an Animated ScrollView still owes THIS file is that the animated wrapper reaches a real
+  // `RCTScrollView` at all — lose that and the base style has nothing to land on.
+  it('commits a real RCTScrollView from the animated wrapper', async () => {
     mount(ROOT_TAG, AnimatedScrollViewApp);
     await tick();
 
-    const scrollView = fabric.find(node => node.viewName === 'RCTScrollView');
-    expect(scrollView?.props.overflow).toBe('scroll');
-    expect(scrollView?.props.flexDirection).toBe('column');
+    expect(
+      fabric.find(node => node.viewName === 'RCTScrollView'),
+    ).toBeDefined();
   });
 
   // why: the default from bug #2 must be a DEFAULT, not a forced value — an app that
@@ -122,6 +139,8 @@ describe('AnimatedScrollView', () => {
     await tick();
 
     const scrollView = fabric.find(node => node.viewName === 'RCTScrollView');
-    expect(scrollView?.props.nestedScrollEnabled).toBe(false);
+    expect(scrollView && payloadOf(scrollView.handle).nestedScrollEnabled).toBe(
+      false,
+    );
   });
 });

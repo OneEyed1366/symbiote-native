@@ -27,7 +27,11 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
 import { h } from '@vue/runtime-core';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type IAuthoredNode,
+} from '@symbiote-native/test-utils';
 import { mount as svelteMount, unmount as svelteUnmount } from './render';
 import { mount as vueMount, unmount as vueUnmount } from '@symbiote-native/vue';
 
@@ -42,7 +46,8 @@ const VUE_ROOT = 92_002;
 const ROWS = [1, 2, 3, 4, 5];
 const TMP_DIR = join(__dirname, '../build/__parity__');
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -76,7 +81,7 @@ async function compileComponent(
   return mod.default as Component;
 }
 
-function byViewName(nodes: readonly IFakeNode[]): Record<string, number> {
+function byViewName(nodes: readonly IAuthoredNode[]): Record<string, number> {
   const tally: Record<string, number> = {};
   for (const node of nodes)
     tally[node.viewName] = (tally[node.viewName] ?? 0) + 1;
@@ -123,19 +128,26 @@ describe('native node production per adapter, same UI', () => {
       // is exactly the class of bug §16 (stray whitespace -> real RCTRawText) already caused.
       const SvelteRoot = await compileComponent(SVELTE_SOURCE, 'ParityRoot');
 
+      // An anchor (OP_CREATE_ANCHOR, empty viewName) is engine-side bookkeeping the commit walk
+      // flattens away — it never reaches nativeFabricUIManager.createNode, so it is excluded from
+      // a NATIVE node count. Svelte's each-block mints two of them for this markup; Vue's `h()`
+      // reconciler mints none, which is not a native-node difference and must not read as one.
+      const isNative = (node: { viewName: string }): boolean =>
+        node.viewName !== '';
+
       svelteMount(SVELTE_ROOT, SvelteRoot);
       await tick();
       await tick();
-      const svelteCreated = [...fabric.created];
-      const svelteTree = fabric.serialize([fabric.appRoot()]);
+      const svelteCreated = fabric.findAll(isNative);
+      const svelteTree = live.serialize(live.appRoot());
 
       fabric.reset();
 
       vueMount(VUE_ROOT, VueRoot);
       await tick();
       await tick();
-      const vueCreated = [...fabric.created];
-      const vueTree = fabric.serialize([fabric.appRoot()]);
+      const vueCreated = fabric.findAll(isNative);
+      const vueTree = live.serialize(live.appRoot());
 
       // root-element.ts puts a wrapper ShimElement between the engine's synthetic box-none
       // AppContainer and the app's own root, because Svelte's compiled output mounts through an

@@ -30,6 +30,10 @@ Two Metro settings here are correctness, not taste (see the `svelte-adapter-dom-
 and the first `mount()` throws; and `inlineRequires: false`, without which Svelte's internal
 client runtime re-enters itself during mount and blows the JS stack.
 
+> This canary predates `@symbiote-native/cli` and is for in-repo development. To start a new app
+> with Expo-backed packages wired in, use
+> `npx @symbiote-native/cli new --framework svelte --<package>` instead.
+
 ## Run
 
 ```sh
@@ -63,9 +67,10 @@ node scripts/audit-svelte-stray-whitespace.mjs examples/expo-svelte   # 0 wrappe
 
 ## Local package resolution
 
-Every `@symbiote-native/*` package this app depends on is wired as a `file:` tarball rather than an
-npm version: the `./svelte` entries are new and unpublished. Re-packing a tarball at the same
-version needs **both** `rm -rf node_modules/@symbiote-native/<pkg>` and `rm -f package-lock.json`
-before `npm install`, or npm silently serves the previously extracted copy — see the repo root's
-project instructions, `<examples_vs_dot_examples>`. Each `file:` specifier swaps back to a literal
-npm version once that package has a real release.
+Every `@symbiote-native/*` package this app depends on (`package.json` pins most at `"latest"`)
+resolves from the real npm registry — nothing here is unpublished. Iterating on a package's own
+source and wanting this app to pick up the change before a release ships uses a local Verdaccio
+registry, not a `file:` tarball — see the `symbiote-local-dev-registry` skill and the repo root's
+project instructions, `<examples_vs_dot_examples>`, for the current mechanism
+(`pnpm run registry:setup` once per machine, `pnpm run registry:sync` to publish and repoint every
+example, then `pod install` in this app's `ios/`).

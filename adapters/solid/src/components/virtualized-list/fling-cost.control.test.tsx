@@ -15,7 +15,11 @@ import {
   subscribeListDiagnostics,
   type IListDiagnosticFrame,
 } from '@symbiote-native/components';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 import { mount, unmount } from '../../render';
 import '../../register';
 import { VirtualizedList } from './index';
@@ -33,7 +37,8 @@ const FLING_FRAMES = 20;
 // Past the (21-1)/2 * 320 = 3200px overscan, so the window SLIDES instead of growing.
 const FLING_START = 6000;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const flush = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 const settle = (): Promise<void> =>
@@ -87,22 +92,8 @@ function pathBLayout(
 // costs only the rows that entered it — the whole point of the control.
 let renderItemCalls = 0;
 
-function flatCommitted(): IFakeNode[] {
-  const flat: IFakeNode[] = [];
-  const walk = (nodes: IFakeNode[]): void => {
-    for (const node of nodes) {
-      flat.push(node);
-      walk(node.children);
-    }
-  };
-  walk(fabric.committed);
-  return flat;
-}
-
-function scrollHost(): IFakeNode {
-  const node = flatCommitted().find(
-    candidate => candidate.viewName === SCROLL_VIEW,
-  );
+function scrollHost(): ILiveNode {
+  const node = live.findLive(live.appRoot(), n => n.viewName === SCROLL_VIEW);
   if (node === undefined) throw new Error('no scroll host committed');
   return node;
 }
@@ -180,9 +171,9 @@ describe('CONTROL: the cost of a FLING frame on PATH B geometry (Solid)', () => 
       [
         `SOLID (control) fling, ${FLING_FRAMES} frames of ${FLING_STEP}px over ${ENTRY_COUNT} entries`,
         `  per frame: cellBodyRuns=${per(renderItemCalls)}`,
-        `  per frame: engine commits=${per(commit.commits)} nodesVisited=${per(commit.nodesVisited)} ` +
-          `propWrites=${per(commit.propWrites)} propNoops=${per(commit.propNoops)} ` +
-          `childScans=${per(commit.childScans)} childFlattens=${per(commit.childFlattens)}`,
+        // The walk numbers (nodesVisited / childScans / childFlattens) and propNoops are gone with
+        // the JS tree — the host owns the tree now, and its cost is not observable from here.
+        `  per frame: engine commits=${per(commit.commits)} propWrites=${per(commit.propWrites)}`,
         `  per frame: deriveMetrics=${per(frames.length)} windowWidth=${meanWidth.toFixed(1)} ` +
           `cellsRebuilt=${per(frames.length * meanWidth)}`,
         '',

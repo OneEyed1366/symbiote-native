@@ -116,6 +116,24 @@ export function noteAngularWrite(propName: string): void {
   writesByProp.set(propName, (writesByProp.get(propName) ?? 0) + 1);
 }
 
+/**
+ * A style KEY write, named `style.<key>` in the readout — and the prefix is built HERE.
+ *
+ * `noteAngularWrite` gates itself, but an ARGUMENT is evaluated before the callee can refuse it, so
+ * `noteAngularWrite(`style.${key}`)` builds a string on every `setStyle` in a Release build with the
+ * detail map off. `setStyle` is Angular's only styling channel — one call per key per node — so the
+ * bench row's create allocated ~7 000 of them for nobody.
+ *
+ * It is the same trap `CLAUDE.md` records for `dlog` arguments on this very renderer, in a different
+ * function; `tests/dlog-argument-budget.test.ts` scans for the `dlog` spelling and does not see this
+ * one.
+ */
+export function noteAngularStyleWrite(key: string): void {
+  if (!isDetailEnabled) return;
+  const name = `style.${key}`;
+  writesByProp.set(name, (writesByProp.get(name) ?? 0) + 1);
+}
+
 export function noteAngularCreate(tagName: string): void {
   if (!isDetailEnabled) return;
   createsByTag.set(tagName, (createsByTag.get(tagName) ?? 0) + 1);

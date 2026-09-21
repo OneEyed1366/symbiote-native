@@ -17,7 +17,10 @@
 import '@angular/compiler';
 import { Component } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  installRecordingFabric,
+  type IAuthoredNode,
+} from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../render';
 import { SymbioteRenderer } from '../renderer';
@@ -28,7 +31,7 @@ const TOUCH_START = 'topTouchStart';
 const TOUCH_END = 'topTouchEnd';
 const PUSHES = 5;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 
 const flush = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
@@ -99,7 +102,7 @@ function host(): WrapperStabilityHost {
 }
 
 function handleFor(testID: string): unknown {
-  const node = fabric.find((n: IFakeNode) => n.props.testID === testID);
+  const node = fabric.find((n: IAuthoredNode) => n.props.testID === testID);
   if (!node) throw new Error(`no node created with testID=${testID}`);
   return node.instanceHandle;
 }

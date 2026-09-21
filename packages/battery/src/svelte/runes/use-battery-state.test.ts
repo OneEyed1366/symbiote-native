@@ -8,7 +8,7 @@ import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
 import { mount, unmount } from '@symbiote-native/svelte/native-view-bridge';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import metroSvelteTransformer from '@symbiote-native/svelte/metro-svelte-transformer';
 
 const {
@@ -54,7 +54,7 @@ vi.mock('../../core', () => ({
   },
 }));
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 

@@ -58,6 +58,9 @@ ambient `declare module '*.svelte'` fallback, so the `export function` surface i
 type. `App.svelte` therefore holds the binding as `unknown` and narrows it with a runtime guard
 before handing it to `useLinkingIntegration`.
 
+> This canary predates `@symbiote-native/cli` and is for in-repo development. To start a new app,
+> use `npx @symbiote-native/cli new --framework svelte` instead.
+
 ## Run
 
 ```sh

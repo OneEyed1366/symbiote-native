@@ -17,4 +17,7 @@ import type { IPressableProps } from './pressable-props';
 export type ITouchableNativeFeedbackProps = Omit<IPressableProps, 'style'> & {
   background?: INativeFeedbackBackground;
   useForeground?: boolean;
+  // TouchableNativeFeedback.js:228 — forwarded to Pressability as `android_disableSound`. Named
+  // differently from Pressable's own `android_disableSound`, matching vendor.
+  touchSoundDisabled?: boolean;
 };

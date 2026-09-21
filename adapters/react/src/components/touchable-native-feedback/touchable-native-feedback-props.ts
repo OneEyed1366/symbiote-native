@@ -23,4 +23,7 @@ export type ITouchableNativeFeedbackProps = Omit<
   useForeground?: boolean;
   // A single child, as RN enforces with `React.Children.only`.
   children?: ReactNode;
+  // TouchableNativeFeedback.js:228 — forwarded to Pressability as `android_disableSound`. Named
+  // differently from Pressable's own `android_disableSound`, matching vendor.
+  touchSoundDisabled?: boolean;
 };

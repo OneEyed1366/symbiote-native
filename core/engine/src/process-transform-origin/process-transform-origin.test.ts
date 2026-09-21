@@ -13,13 +13,41 @@ import { processTransformOrigin } from './index';
 import { processAspectRatio } from '../process-aspect-ratio';
 import { processFontVariant } from '../process-font-variant';
 
+// why: RN rejects each of these through invariant - and unlike processTransform's array check,
+// these invariants are NOT __DEV__-gated, so upstream refuses them in a Release build too. Our
+// port kept whatever it had parsed so far and returned a PARTIAL origin, which is not "safer":
+// a partial origin is a real, wrong origin, silently applied. An input RN refuses must write no
+// transformOrigin at all, which is what `undefined` means to the payload builder.
+describe('processTransformOrigin - an input RN refuses writes nothing', () => {
+  it.each([
+    ['a horizontal keyword in the y slot', '50% left'],
+    ['more tokens than there are axes', 'left top 5px center'],
+    ['an array of the wrong length', [10, 20]],
+  ])('drops %s', (_label, input) => {
+    expect(processTransformOrigin(input)).toBeUndefined();
+  });
+
+  // why: `undefined` reaches here because asTransformOriginInput maps any non-string, non-array
+  // value to it. The port answered with the CSS default, so `transformOrigin: null` committed a
+  // real center origin - a prop write RN never makes. Absent input means absent prop.
+  it('writes nothing for an absent value, rather than the CSS default', () => {
+    expect(processTransformOrigin(undefined)).toBeUndefined();
+  });
+
+  it('never throws, whatever it is handed', () => {
+    expect(() => processTransformOrigin('50% left')).not.toThrow();
+  });
+});
+
 describe('processTransformOrigin', () => {
   describe('defaults and passthrough', () => {
     // why: the registry only calls this processor for a present value, but the commit path
     // may still hand it undefined/null — must default to CSS's own center/center/0 default,
     // never throw.
-    it('defaults to center/center/0 for undefined', () => {
-      expect(processTransformOrigin(undefined)).toEqual(['50%', '50%', 0]);
+    // why: covered by the "writes nothing" group above. Kept as a pointer because this file
+    // asserted the opposite for months, and the CSS default is the plausible-looking answer.
+    it('writes nothing for undefined, rather than the CSS default', () => {
+      expect(processTransformOrigin(undefined)).toBeUndefined();
     });
 
     it('passes an array input through unchanged (RN re-validates arrays only in __DEV__)', () => {
@@ -64,30 +92,28 @@ describe('processTransformOrigin', () => {
       expect(processTransformOrigin('top')).toEqual(['50%', 0, 0]);
     });
 
-    it('rejects (keeps the partial array) when the lookahead token is not a horizontal keyword', () => {
-      expect(processTransformOrigin('top 10px')).toEqual(['50%', 0, 0]);
+    it('rejects when the lookahead token is not a horizontal keyword', () => {
+      expect(processTransformOrigin('top 10px')).toBeUndefined();
     });
   });
 
-  describe('malformed combinations are rejected — the partial array parsed so far is returned', () => {
+  // These three used to assert the PARTIAL array, which contradicted their own rationale: an
+  // origin that "must not silently overwrite Y" was returned anyway, half-parsed and applied.
+  describe('malformed combinations are rejected — nothing is written', () => {
     // why: 'left'/'right' are X-only; a second one after X is already resolved is invalid
     // CSS and must not silently overwrite Y.
     it('rejects a second left/right keyword once X is already resolved', () => {
-      expect(processTransformOrigin('left right')).toEqual([0, '50%', 0]);
+      expect(processTransformOrigin('left right')).toBeUndefined();
     });
 
     // why: 'top'/'bottom' can never be the Z (depth) component.
     it('rejects top/bottom used as the third (z) token', () => {
-      expect(processTransformOrigin('right bottom top')).toEqual([
-        '100%',
-        '100%',
-        0,
-      ]);
+      expect(processTransformOrigin('right bottom top')).toBeUndefined();
     });
 
     // why: 'center' can be X or Y but never Z.
     it('rejects center used as the third (z) token', () => {
-      expect(processTransformOrigin('10px 20px center')).toEqual([10, 20, 0]);
+      expect(processTransformOrigin('10px 20px center')).toBeUndefined();
     });
   });
 });

@@ -6,10 +6,20 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { mount, unmount } from '@symbiote-native/react';
-import { installFabric } from '@symbiote-native/test-utils';
+// A RECORDING host, and the assertions read the PAYLOAD rather than a committed node's props. The
+// class merge lands in the style slot and is flattened on the way into the payload, so the payload
+// is where "the class resolved" becomes visible — a stand-in tree was only somewhere that payload
+// had been written down.
+import { installRecordingFabric, payloadOf } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 909;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+
+function probePayload(): Record<string, unknown> {
+  const found = fabric.find(node => node.props.testID === 'probe');
+  if (found === undefined) throw new Error('no node carries testID "probe"');
+  return payloadOf(found.handle);
+}
 
 beforeEach(() => fabric.reset());
 afterEach(() => {
@@ -35,8 +45,7 @@ describe('React className prop', () => {
       ]);
       mount(ROOT_TAG, <view testID="probe" className="card" />);
 
-      const committed = fabric.find(node => node.props.testID === 'probe');
-      expect(committed?.props.padding).toBe(10);
+      expect(probePayload().padding).toBe(10);
     });
 
     // why: CSS cascade order (later/more-specific wins) does not apply here — an inline `style`
@@ -60,8 +69,7 @@ describe('React className prop', () => {
         />,
       );
 
-      const committed = fabric.find(node => node.props.testID === 'probe');
-      expect(committed?.props).toMatchObject({
+      expect(probePayload()).toMatchObject({
         padding: 10,
         backgroundColor: 'blue',
       });

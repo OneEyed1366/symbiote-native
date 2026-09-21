@@ -1,4 +1,4 @@
-# Expo-native-modules canary (`@symbiote-native/sensors` + 20 more Expo-SDK ports on device)
+# Expo-native-modules canary (`@symbiote-native/sensors` + 21 more Expo-SDK ports on device)
 
 The **Expo native-modules demo canary**, sibling of [`solid`](../solid), same
 `@symbiote-native/solid` renderer and `@symbiote-native/engine` core, but this app owns the
@@ -20,6 +20,10 @@ wires the native-host seams (colors, images, device events, third-party ViewConf
 mounting `App` - `nativeFabricUIManager` is driven directly, RN's own renderer never runs. See
 the [Solid adapter README](../../adapters/solid) for the full surface this app exercises and
 what's verified on which platform.
+
+> This canary predates `@symbiote-native/cli` and is for in-repo development. To start a new app
+> with Expo-backed packages wired in, use
+> `npx @symbiote-native/cli new --framework solid --<package>` instead.
 
 ## Run
 

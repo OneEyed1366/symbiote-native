@@ -15,19 +15,31 @@ import {
   type Component,
 } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import type { ISymbioteNode } from '@symbiote-native/engine';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 import { mount, unmount } from '../render';
 import type { JSX } from '../jsx-runtime';
 import { createTunnel } from './index';
 
 let nextRootTag = 9_410;
 const openRootTags: number[] = [];
+// Every rootTag `mountApp` has ever minted, in mount order — unlike `openRootTags`, never spliced
+// on `close`, since a surface's root still answers `findOn` long after its own unmount.
+const mountOrder: number[] = [];
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
-beforeEach(() => fabric.reset());
+beforeEach(() => {
+  fabric.reset();
+  mountOrder.length = 0;
+});
 afterEach(() => {
   while (openRootTags.length > 0) {
     const rootTag = openRootTags.pop();
@@ -38,6 +50,7 @@ afterEach(() => {
 function mountApp(App: Component): number {
   nextRootTag += 1;
   openRootTags.push(nextRootTag);
+  mountOrder.push(nextRootTag);
   mount(nextRootTag, App);
   return nextRootTag;
 }
@@ -48,39 +61,48 @@ function close(rootTag: number): void {
   if (index >= 0) openRootTags.splice(index, 1);
 }
 
-function walk(
-  nodes: readonly IFakeNode[],
-  visit: (node: IFakeNode) => void,
-): void {
-  for (const node of nodes) {
-    visit(node);
-    walk(node.children, visit);
-  }
+// The surface root for one rootTag, read off the creation log's `box-none` roots BY MOUNT ORDER —
+// resolved lazily (never at `mountApp` time, before the surface's own ops have flushed) and by
+// position, since `find`/`findAll` know nothing about rootTags, only creation order.
+function rootHandleFor(rootTag: number): ISymbioteNode {
+  const roots = fabric.findAll(node => node.props.pointerEvents === 'box-none');
+  const handle = roots[mountOrder.indexOf(rootTag)]?.handle;
+  if (handle === undefined) throw new Error(`no surface root for ${rootTag}`);
+  return handle;
 }
 
+// Every surface mounted this test, source and target alike — for a question that does not care
+// which surface holds the answer.
 function findCommitted(
-  predicate: (node: IFakeNode) => boolean,
-): IFakeNode | undefined {
-  let found: IFakeNode | undefined;
-  walk(fabric.committed, node => {
-    if (found === undefined && predicate(node)) found = node;
-  });
-  return found;
+  predicate: (node: ILiveNode) => boolean,
+): ILiveNode | undefined {
+  for (const rootTag of mountOrder) {
+    const found = live.findLive(rootHandleFor(rootTag), predicate);
+    if (found !== undefined) return found;
+  }
+  return undefined;
+}
+
+// One surface's own tree — the question `findCommitted` cannot answer with two surfaces mounted.
+function findOn(
+  rootTag: number,
+  predicate: (node: ILiveNode) => boolean,
+): ILiveNode | undefined {
+  return live.findLive(rootHandleFor(rootTag), predicate);
 }
 
 function committedTexts(): string[] {
   const texts: string[] = [];
-  walk(fabric.committed, node => {
-    if (node.viewName === 'RCTRawText') texts.push(String(node.props.text));
-  });
+  for (const rootTag of mountOrder)
+    texts.push(...live.texts(rootHandleFor(rootTag)));
   return texts;
 }
 
-const byText = (text: string) => (node: IFakeNode) =>
-  node.viewName === 'RCTRawText' && node.props.text === text;
+const byText = (text: string) => (node: ILiveNode) =>
+  node.viewName === 'RCTRawText' && node.payload.text === text;
 
-const byTestID = (testID: string) => (node: IFakeNode) =>
-  node.props.testID === testID;
+const byTestID = (testID: string) => (node: ILiveNode) =>
+  node.payload.testID === testID;
 
 describe('createTunnel', () => {
   // why: the whole reason this exists beside Portal. The two apps below share no node, no ref and
@@ -107,19 +129,22 @@ describe('createTunnel', () => {
       );
     }
 
-    mountApp(SourceApp);
-    mountApp(TargetApp);
+    const sourceTag = mountApp(SourceApp);
+    const targetTag = mountApp(TargetApp);
     await tick();
 
-    // fake-fabric's `committed` is last-write-wins across rootTags, and the target mounted second,
-    // so this IS the target surface's own tree.
-    const target = findCommitted(byTestID('target'));
-    const ported = findCommitted(byText('across surfaces'));
-    expect(target, 'the target surface committed').toBeDefined();
-    expect(ported, 'the tunneled text committed on it').toBeDefined();
     expect(
-      findCommitted(byTestID('source')),
-      'and the source surface is NOT what we are reading',
+      findOn(targetTag, byTestID('target')),
+      'the target surface committed',
+    ).toBeDefined();
+    expect(
+      findOn(targetTag, byText('across surfaces')),
+      'the tunneled text committed on it',
+    ).toBeDefined();
+    // The cross-surface claim itself: the text paints on B and NOT on the surface that declared it.
+    expect(
+      findOn(sourceTag, byText('across surfaces')),
+      'and it is not also painting on the source surface',
     ).toBeUndefined();
   });
 

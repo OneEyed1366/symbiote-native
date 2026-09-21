@@ -24,7 +24,13 @@ import {
   VirtualizedSectionList,
   Animated,
 } from '@symbiote-native/vue';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+// A RECORDING host, as in React's twin of this file: the op stream says outright whether some node
+// carried the id, and the authored tree is the right one to search — a `testID` is what stops a
+// bare view being flattened, so a committed-tree search would conflate "forwarded" with "survived".
+import {
+  installRecordingFabric,
+  type IAuthoredNode,
+} from '@symbiote-native/test-utils';
 
 // KeyboardAvoidingView subscribes to the native Keyboard hub in onMounted; without a device-event
 // hub that throws before the commit, so install the minimal fake hub + KeyboardObserver the
@@ -42,7 +48,7 @@ Object.assign(globalThis, {
 });
 
 const ROOT_TAG = 780;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
@@ -50,7 +56,7 @@ const tick = (): Promise<void> =>
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-function carriesTestId(id: string): IFakeNode | undefined {
+function carriesTestId(id: string): IAuthoredNode | undefined {
   return fabric.find(node => node.props.testID === id);
 }
 

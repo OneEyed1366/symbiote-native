@@ -11,7 +11,11 @@
 // did the same. The internal image has no id of its own, so it is reached through the host one hop
 // at a time with every view name asserted, the way `button.test.ts` reaches its label.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '../../../test-utils/src/index';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '../../../test-utils/src/index';
 import {
   appendChild,
   clearGlobalStyles,
@@ -27,9 +31,11 @@ import {
   registerImageBackgroundBehavior,
   IMAGE_BACKGROUND_TAG,
 } from './image-background';
-import { foldHostBag } from '../fold-host-bag';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+// `.payload` throughout, per the header: the behavior's work is a fold on the way into what Fabric
+// is handed, and the author's bag is deliberately not where it lands.
+const live = createLiveTree(fabric);
 let nextRootTag = 7700;
 
 // The Fabric name an adapter resolves `image-background` to. Built with the NAME and the TAG
@@ -71,20 +77,28 @@ function mount(node: ISymbioteNode, children: readonly ISymbioteNode[] = []) {
   const surface = createSurface((nextRootTag += 1));
   surface.appendChild(node);
   surface.commit();
+  currentHost = node;
   return surface;
 }
 
+let currentHost: ISymbioteNode | undefined;
+
 // The committed host, and the image the behavior built under it. Asserting both view names is what
 // makes this a claim about this primitive's shape rather than "the first RCTView in the tree".
-function subtree(): { host: IFakeNode; image: IFakeNode } {
-  const host = fabric.appRoot().children[0];
+//
+// Read from THIS case's own host node, never from an app-root lookup: every case opens a fresh
+// surface and the recording is never reset between them, so a root lookup would answer with the
+// FIRST case's tree for every case after it — green on case one and quietly wrong after.
+function subtree(): { host: ILiveNode; image: ILiveNode } {
+  if (currentHost === undefined) throw new Error('nothing was mounted');
+  const host = live.nodeOf(currentHost);
   expect(host.viewName).toBe(IMAGE_BACKGROUND_VIEW_NAME);
   const image = host.children[0];
   expect(image.viewName).toBe(IMAGE_VIEW_NAME);
   return { host, image };
 }
 
-function countNodes(node: IFakeNode): number {
+function countNodes(node: ILiveNode): number {
   return 1 + node.children.reduce((sum, kid) => sum + countNodes(kid), 0);
 }
 
@@ -167,79 +181,78 @@ describe('the ImageBackground behavior — where a prop lands', () => {
 
     const { host, image } = subtree();
     // RN spreads `...props` onto the Image (`ImageBackground.js:81`), so none of these belong to
-    // the box — and the shared mapping is what turns `alt` into an accessibility label.
-    expect(image.props.source).toEqual([{ uri: SOURCE.uri }]);
-    expect(image.props.resizeMode).toBe('contain');
-    expect(image.props.testID).toBe('probe');
-    expect(image.props.accessibilityLabel).toBe('A picture');
-    expect(image.props.alt).toBeUndefined();
-    expect(host.props.source).toBeUndefined();
-    expect(host.props.testID).toBeUndefined();
+    // the box. WHERE each name LANDS is this file's subject; what the image rule then makes of
+    // `alt` and `source` is `foldImageProps`'s, asserted in
+    // `core/engine/cpp/tests/js/image-payload.itest.ts` — this harness builds its payload through
+    // the TypeScript `fabricProps`, which holds no copy of it.
+    //
+    // `source` IS still the array shape here, and that is not the fold: the three source props are
+    // resolved and normalised at WRITE time (`image-source-write.ts`), which this harness does see.
+    expect(image.payload.source).toEqual([{ uri: SOURCE.uri }]);
+    expect(image.payload.resizeMode).toBe('contain');
+    expect(image.payload.testID).toBe('probe');
+    expect(image.payload.alt).toBe('A picture');
+    expect(host.payload.source).toBeUndefined();
+    expect(host.payload.testID).toBeUndefined();
     // The wrapper's own layout box, which is what the app wrote `style` for.
-    expect(host.props.width).toBe(BOX.width);
-    expect(host.props.height).toBe(BOX.height);
+    expect(host.payload.width).toBe(BOX.width);
+    expect(host.payload.height).toBe(BOX.height);
   });
 
-  it('opts the box out of colour inversion, which no wrapper ever did', () => {
-    mount(makeImageBackground({ source: SOURCE }));
-    // `ImageBackground.js:75` sets it unconditionally; a photograph inverted by Smart Invert is the
-    // case it exists for.
-    expect(subtree().host.props.accessibilityIgnoresInvertColors).toBe(true);
-  });
+  // The Smart Invert opt-out (`ImageBackground.js:75`) left this file on 2026-09-18: it is
+  // `foldImageBackgroundProps` in the engine now, and this host builds its payload through the
+  // TypeScript `fabricProps`, which carries no copy of the tag rules. Asserted against the committed
+  // payload in `core/engine/cpp/tests/js/image-background-payload.itest.ts`. What stays here is the
+  // COMPOSITION — which node each prop lands on, and the style the inner image derives from the box.
 
-  it('folds id to nativeID on the image, where the spread puts it', () => {
+  // why: WHICH NODE, which is this file's subject: RN spreads `...props` onto the Image, so the
+  // name is never the box's. The RENAME is `routeProp`'s since 2026-09-18 — one rule on the way in,
+  // over every node — so what the redirect carries down is already `nativeID` and the raw `id`
+  // never existed to route. A second case used to sit beside this one asserting the two layers
+  // composed; there is one layer now.
+  it('puts a bare id on the image, where the spread sends it', () => {
     mount(makeImageBackground({ source: SOURCE, id: 'hero' }));
 
     const { host, image } = subtree();
-    expect(image.props.nativeID).toBe('hero');
-    // A raw `id` is a key no ViewConfig declares: Fabric drops it silently, so the fold is the only
-    // thing standing between the app and a lost nativeID.
-    expect(image.props.id).toBeUndefined();
-    expect(host.props.nativeID).toBeUndefined();
+    expect(image.payload.nativeID).toBe('hero');
+    expect(image.payload.id).toBeUndefined();
+    expect(host.payload.nativeID).toBeUndefined();
   });
 
-  it('composes with the spec alias an adapter already applied, rather than double-folding', () => {
-    // `HOST_PRIMITIVES.ImageBackground` carries `ID_ALIAS`, so every adapter that runs
-    // `foldHostBag` hands the owner a bag where `id` is already `nativeID`. Measured rather than
-    // reasoned: the alias DELETES its source key, so the behavior's own fold finds nothing left and
-    // both arms commit the same payload.
-    const folded = foldHostBag(IMAGE_BACKGROUND_TAG, { id: 'hero' });
-    expect(Object.keys(folded)).toEqual(['nativeID']);
-    mount(makeImageBackground({ source: SOURCE, ...folded }));
+  // why: `ImageBackground.js:67,76` destructures `importantForAccessibility` OUT of `...props`
+  // before the spread reaches the image, and reapplies it explicitly to the WRAPPER
+  // (`importantForAccessibility={importantForAccessibility}`, :76) as well as the image (:82). So,
+  // unlike every other prop in this describe block, it belongs to the host, not to the spread — the
+  // opposite of what `IMAGE_BACKGROUND_HOST_PROPS` said before this fix (the image derives its own
+  // copy from the owner in `foldImageBackgroundImageProps`, asserted in
+  // `image-background-image-payload.itest.ts`).
+  it('keeps importantForAccessibility on the host rather than the image spread', () => {
+    mount(
+      makeImageBackground({
+        source: SOURCE,
+        importantForAccessibility: 'no-hide-descendants',
+      }),
+    );
 
-    const { image } = subtree();
-    expect(image.props.nativeID).toBe('hero');
-    expect(image.props.id).toBeUndefined();
+    const { host } = subtree();
+    expect(host.payload.importantForAccessibility).toBe('no-hide-descendants');
   });
 });
 
+// THE DERIVED STYLE ITSELF LEFT THIS FILE ON 2026-09-18 — the absolute fill, the proxied box, and
+// the late re-derive when the owner is resized are all `foldImageBackgroundImageProps` in
+// `SymbioteFabricProps.cpp`, asserted against the committed payload in
+// `core/engine/cpp/tests/js/image-background-image-payload.itest.ts`.
+//
+// Five cases went, and the two worth naming are the RE-DERIVE pair, because they are not fold
+// content: they pin that a write to the OWNER after the first commit marks the derived image dirty
+// (`slotDerived`), which is JS's and stays a real invariant. They moved rather than being deleted —
+// their subject is reachable only where the rule runs, and asserting a frozen proxy needs a harness
+// that can produce an unfrozen one.
+//
+// What stays here is the COMPOSITION this primitive owns and no rule can see: which node each prop
+// lands on, and that `imageStyle` reaches the image's own style slot.
 describe('the ImageBackground behavior — the image style it derives', () => {
-  it('fills the box absolutely and proxies the wrapper dimensions onto the image', () => {
-    mount(makeImageBackground({ source: SOURCE, style: BOX }));
-
-    const { image } = subtree();
-    expect(image.props.position).toBe('absolute');
-    expect(image.props.top).toBe(0);
-    expect(image.props.left).toBe(0);
-    expect(image.props.right).toBe(0);
-    expect(image.props.bottom).toBe(0);
-    // Without the proxy an RN Image collapses to its source's intrinsic size and fights the box —
-    // the reason RN carries the workaround at `ImageBackground.js:86-96`.
-    expect(image.props.width).toBe(BOX.width);
-    expect(image.props.height).toBe(BOX.height);
-  });
-
-  it('leaves the image dimension unset when the box never set an explicit one', () => {
-    mount(makeImageBackground({ source: SOURCE }));
-
-    const { image } = subtree();
-    // The proxy exists ONLY to counter an explicit box dimension. On an auto-sized box, forcing a
-    // numeric 0 onto the image would shrink it instead of letting it size from the source.
-    expect(image.props.position).toBe('absolute');
-    expect(image.props.width).toBeUndefined();
-    expect(image.props.height).toBeUndefined();
-  });
-
   it('merges imageStyle last, so a caller overrides the absolute fill', () => {
     mount(
       makeImageBackground({
@@ -250,10 +263,10 @@ describe('the ImageBackground behavior — the image style it derives', () => {
     );
 
     const { host, image } = subtree();
-    expect(image.props.opacity).toBe(0.25);
-    expect(image.props.top).toBe(8);
+    expect(image.payload.opacity).toBe(0.25);
+    expect(image.payload.top).toBe(8);
     // It targets the image ALONE; a caller styling the background must not repaint the box.
-    expect(host.props.opacity).toBeUndefined();
+    expect(host.payload.opacity).toBeUndefined();
   });
 
   it('resolves imageStyle given as a class name, through the shared registry', () => {
@@ -274,48 +287,7 @@ describe('the ImageBackground behavior — the image style it derives', () => {
     );
 
     const { host, image } = subtree();
-    expect(image.props.opacity).toBe(0.5);
-    expect(host.props.opacity).toBeUndefined();
-  });
-
-  it("re-derives the image when the wrapper's style changes after mount", () => {
-    const node = makeImageBackground({ source: SOURCE, style: BOX });
-    const surface = mount(node);
-    expect(subtree().image.props.width).toBe(BOX.width);
-
-    routeProp(node, 'style', { width: 200, height: 160 });
-    surface.commit();
-
-    const { host, image } = subtree();
-    expect(host.props.width).toBe(200);
-    // The freeze this primitive's `slotDerived` exists to prevent: `markPropsDirty` bubbles UP, so
-    // an owner write reaches every ancestor and never the built image, and `reconcile` hands back
-    // an untouched subtree's committed handle.
-    expect(image.props.width).toBe(200);
-    expect(image.props.height).toBe(160);
-  });
-
-  it('re-derives the image when the box is sized by a CLASS instead of a style object', () => {
-    registerRules([
-      {
-        tokens: ['box'],
-        specificity: [0, 1, 0],
-        order: 0,
-        style: { width: 300, height: 240 },
-      },
-    ]);
-    const node = makeImageBackground({ source: SOURCE });
-    const surface = mount(node);
-    expect(subtree().image.props.width).toBeUndefined();
-
-    // A class name is published INTO `node.props.style` by `pushClassStyle`, so it reaches the
-    // derived-slot mark spelled `style` — which is why `slotDerived` names only that one key.
-    routeProp(node, 'class', 'box');
-    surface.commit();
-
-    const { host, image } = subtree();
-    expect(host.props.width).toBe(300);
-    expect(image.props.width).toBe(300);
-    expect(image.props.height).toBe(240);
+    expect(image.payload.opacity).toBe(0.5);
+    expect(host.payload.opacity).toBeUndefined();
   });
 });

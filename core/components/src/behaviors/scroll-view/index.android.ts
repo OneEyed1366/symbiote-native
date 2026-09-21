@@ -6,58 +6,36 @@
 // wrapper's frame, visual on the scroller (`ScrollView.js:1856`). `nestedScrollEnabled` goes on the
 // inner view so it consumes the gesture before the refresh parent sees it.
 //
-// The two folds below are what neither node can work out alone: the wrapper is the APP's node, so
-// it carries whatever the app wrote on `<RefreshControl>` and knows nothing about the scroll view's
-// style. RN reaches the same place through `cloneElement`, which likewise OVERRIDES the refresh
-// control's own `style` — so replacing it here is parity, not a liberty.
+// THIS FILE IS A CLAIM MODE AND NOTHING ELSE NOW (2026-09-18). It carried two `payloadFold`s until
+// then — the last two folds in ScrollView and the last structural blocker in the behavior
+// migration — and both are `SymbioteFabricProps.cpp` now: `foldScrollViewProps` takes the visual
+// half when its parent is a refresh control, and `foldRefreshWrapperProps` takes the layout half of
+// the child it wraps.
+//
+// WHY THEY RESISTED THREE ITERATIONS, and what changed. Every seam the engine had read UP —
+// `ownerProps`, `IOwner.tagName`, `IAncestorLookup` — and the wrapper is the scroll view's PARENT
+// asking for the scroll view's style, the one direction none of them go. `IFirstChild` is that
+// direction, and it is the same argument `ownerProps` already made rather than a new one: the tree
+// lives in C++, so reading another node is a pointer hop, and RN itself builds this parent FROM its
+// child (`cloneElement(refreshControl, {style: outer}, scrollView)`).
+//
+// `slotDerived: ['style']` STAYS AND IS NOW LOAD-BEARING FOR THE ENGINE'S RULE. A rule re-runs when
+// ITS node is dirty; the wrapper derives from a node that is not itself, so an owner style write
+// must mark it (`routeProp`'s `node.wrapper` branch). Without this entry the wrapper freezes at its
+// mount frame while the scroller visibly restyles inside it —
+// `core/engine/cpp/tests/js/scroll-view-wrap-payload.itest.ts` is the case that says so.
+//
+// AND NOTHING HERE IS `#ifdef ANDROID` OR `Platform.OS`, on either side: the engine's rules are
+// gated on TOPOLOGY. iOS claims the refresh control BESIDE the content, so a scroll view is never
+// one's child there and neither branch can fire. That is strictly better than a compile-time split
+// for the reason `Switch`/`AndroidSwitch` already showed — and it is why the wrap's payload fixture
+// runs on the ORDINARY test host rather than needing the Android arm.
 
-import {
-  type IPayloadFold,
-  type ISymbioteNode,
-  type IViewStyle,
-} from '@symbiote-native/engine';
-
-import { splitScrollViewStyle } from '../../scroll-view-commands';
-import {
-  ownerFold,
-  registerScrollViewBehaviors,
-  type IScrollPlatform,
-} from './shared';
-
-// The owner under a wrap: the ordinary fold with the VISUAL half of its own style in place of the
-// composed one. Delegating rather than restating is what keeps `decelerationRate`, `horizontal` and
-// `nestedScrollEnabled` in ONE place — none of the three has anything to do with the wrap, and the
-// hand-written copy this replaced had already lost the first of them.
-function wrappedOwnerFold(base: IViewStyle, horizontal: boolean): IPayloadFold {
-  const plain = ownerFold(base, horizontal);
-  return props => ({
-    ...plain(props),
-    style: splitScrollViewStyle(base, props.style).inner,
-  });
-}
-
-// The wrapper: the LAYOUT half of the OWNER's style, read off the owner because that is where the
-// app wrote it. Kept in step by `slotDerived` naming `style`, which marks the wrapper dirty on an
-// owner style write.
-function wrapperFold(owner: ISymbioteNode, base: IViewStyle): IPayloadFold {
-  return props => ({
-    ...props,
-    style: splitScrollViewStyle(base, owner.props.style).outer,
-  });
-}
+import { registerScrollViewBehaviors, type IScrollPlatform } from './shared';
 
 const android: IScrollPlatform = {
   claimMode: 'wrap',
   slotDerived: ['style'],
-  onWrapChange: (base, horizontal) => (owner, wrapper) => {
-    // Back to the ordinary composition, not to `undefined` — the plain fold carries the axis and
-    // the gesture props, which have nothing to do with the wrap.
-    owner.payloadFold =
-      wrapper === undefined
-        ? ownerFold(base, horizontal)
-        : wrappedOwnerFold(base, horizontal);
-    if (wrapper !== undefined) wrapper.payloadFold = wrapperFold(owner, base);
-  },
 };
 
 export function registerScrollViewBehavior(): void {

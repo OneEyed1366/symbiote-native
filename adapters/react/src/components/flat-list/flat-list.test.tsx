@@ -14,7 +14,12 @@ import {
   type ISeparatorProps,
   type IViewableItemsChangedInfo,
 } from '@symbiote-native/react';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type IAuthoredNode,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 21;
 
@@ -77,7 +82,8 @@ function App(): ReactElement {
   });
 }
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 beforeEach(() => {
   fabric.reset();
   endReachedDistances.length = 0;
@@ -85,21 +91,14 @@ beforeEach(() => {
 });
 afterEach(() => unmount(ROOT_TAG));
 
-// ---- helpers (repointed at the shared recorder) -------------------------
+// ---- helpers (repointed at the live tree) --------------------------------
 
-function walk(nodes: IFakeNode[], visit: (node: IFakeNode) => void): void {
-  for (const node of nodes) {
-    visit(node);
-    walk(node.children, visit);
-  }
-}
-
-// The text content of a committed row cell ("row-N"). We harvest these from the committed
-// tree to know exactly which items are resident.
+// The text content of a committed row cell ("row-N"). We harvest these from the live tree to
+// know exactly which items are resident.
 function collectRowLabels(): Set<string> {
   const labels = new Set<string>();
-  walk(fabric.committed, node => {
-    const text = node.props.text;
+  live.walkLive(live.appRoot(), node => {
+    const text = node.payload.text;
     if (typeof text === 'string' && text.startsWith('row-')) labels.add(text);
   });
   return labels;
@@ -107,13 +106,13 @@ function collectRowLabels(): Set<string> {
 
 function hasText(target: string): boolean {
   let found = false;
-  walk(fabric.committed, node => {
-    if (node.props.text === target) found = true;
+  live.walkLive(live.appRoot(), node => {
+    if (node.payload.text === target) found = true;
   });
   return found;
 }
 
-function findScrollView(): IFakeNode {
+function findScrollView(): IAuthoredNode {
   const node = fabric.find(n => n.viewName === 'RCTScrollView');
   expect(node, 'an RCTScrollView was created').toBeDefined();
   return node!;
@@ -130,7 +129,7 @@ function scrollTo(handle: unknown, offsetY: number): void {
 // Establish the viewport by firing onLayout on the ScrollView. This re-renders and
 // re-commits synchronously (discrete-lane flush), narrowing the window from the initial
 // bounded prefix to the real visible region + buffer.
-function mountWithViewport(): IFakeNode {
+function mountWithViewport(): IAuthoredNode {
   mount(ROOT_TAG, <App />);
   const scrollView = findScrollView();
   fabric.fireEvent(scrollView.instanceHandle, 'topLayout', {
@@ -294,6 +293,14 @@ describe('React FlatList multi-column composition (Positive)', () => {
       numColumns: COLUMN_COUNT,
       keyExtractor: (item: IRow) => `mc-${item.id}`,
       ItemSeparatorComponent: RowSeparator,
+      // A row needs real, non-zero geometry for viewability math to have anything to measure —
+      // an unmeasured (zero-length) row is never "entirely visible" (RN's own shortcut requires
+      // bottom > top), so without this every row here reads as not viewable.
+      getItemLayout: (_data: unknown, index: number) => ({
+        length: ITEM_HEIGHT,
+        offset: ITEM_HEIGHT * index,
+        index,
+      }),
       viewabilityConfig: { itemVisiblePercentThreshold: 0 },
       onViewableItemsChanged: (info: IViewableItemsChangedInfo<IRow>) => {
         viewableReports.push(info);
@@ -309,17 +316,17 @@ describe('React FlatList multi-column composition (Positive)', () => {
   });
   afterEach(() => unmount(MULTI_COLUMN_ROOT_TAG));
 
-  function findRowWrappers(): IFakeNode[] {
-    const rows: IFakeNode[] = [];
-    walk(fabric.committed, node => {
+  function findRowWrappers(): ILiveNode[] {
+    const rows: ILiveNode[] = [];
+    live.walkLive(live.appRoot(), node => {
       if (node.viewName === 'view' || node.viewName === 'RCTView') {
-        if (node.props.flexDirection === 'row') rows.push(node);
+        if (node.payload.flexDirection === 'row') rows.push(node);
       }
     });
     return rows;
   }
 
-  function mountMultiColumnWithViewport(): IFakeNode {
+  function mountMultiColumnWithViewport(): IAuthoredNode {
     mount(MULTI_COLUMN_ROOT_TAG, <MultiColumnApp />);
     const scrollView = fabric.find(n => n.viewName === 'RCTScrollView');
     expect(scrollView, 'an RCTScrollView was created').toBeDefined();

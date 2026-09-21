@@ -16,10 +16,22 @@ parity through shared layers.
 | Angular adapter    | On the live switcher | Second non-React proof: `Renderer2` seam, DOM-less bootstrap, full component parity.        |
 | Svelte adapter     | On the live switcher | Third non-React proof: a DOM shim over stock compiled Svelte output, full component parity. |
 | Solid adapter      | On the live switcher | Fourth non-React proof: `solid-js/universal`'s `createRenderer`, full component parity.     |
-| Engine             | In progress          | Retained tree, clone-on-write commits, event normalization.                                 |
+| Engine             | Rewritten in C++, tuning ongoing | Retained tree, clone-on-write commits, tag-keyed platform rules, and event normalization now live in `core/engine/cpp`, reached from JS through one buffered crossing per commit instead of one per mutation. |
 | Components         | In progress          | Shared state/view layers so adapters inherit parity.                                        |
 | Android host shim  | Active               | Keeps Android at canary parity with iOS.                                                    |
 | Navigation package | Shipped              | Native stack/tab/drawer navigator over `react-native-screens`, shared by every adapter.     |
+| `@symbiote-native/cli` scaffolder | Beta | `new` scaffolds a full app; `add` extends an existing SymbioteNative app with optional layers — wiring symbiote into a plain RN app isn't automated yet. |
+
+## Engine rewrite
+
+The retained tree used to live in JavaScript; it now lives in C++ (`core/engine/cpp`), with the
+JS side reduced to building a command buffer and crossing into it once per commit instead of
+once per mutation. Measured headless so far, that trade isn't free in one direction: create- and
+append-shaped operations got more expensive, while operations on an already-mounted tree (swap,
+remove, select) got substantially cheaper across every non-React adapter. A fresh on-device
+benchmark run for this architecture hasn't happened yet — see the
+[README's benchmark section](https://github.com/OneEyed1366/symbiote-native#how-fast-against-stock-react-native)
+for the actual numbers and what's still missing.
 
 ## Next adapter work
 
@@ -50,8 +62,8 @@ agnostic seam for non-DOM targets. It reaches the same component parity as
 React, Vue, Angular, and Svelte, including `createPortal`, `createTunnel`,
 `Animated`, and `AppRegistry`, and every companion package now ships a
 `./solid` build too. It's also on the live switcher now, with its own demo
-clip; real-device verification is still pending, verified only in headless
-`vitest` so far.
+clip, verified on device like the other four adapters. It doesn't yet share
+the Detox `canary-journeys` e2e spec React, Vue, and Svelte carry.
 
 React, Vue, Angular, Svelte, and Solid keep expanding parity in the meantime:
 all five now have a portal primitive for same-surface content relocation
@@ -71,7 +83,9 @@ it — Clipboard, Haptics, Sensors, Battery, Device and a dozen more, each wrapp
 `expo-modules-core` module. Those don't use the autolinking-proxy recipe `@symbiote-native/slider`
 and `@symbiote-native/splash-screen` do: they ship a passive manifest, and a single app-level
 `@symbiote-native/expo-modules-link` postinstall registers whichever ones are installed (see [How
-to: wire up an Expo native module](/docs/howtos/expo-native-module-setup/)). Reanimated, a full worklet-driven animation layer, is the largest remaining piece and is
+to: wire up an Expo native module](/docs/howtos/expo-native-module-setup/)). `npx @symbiote-native/cli new`/`add`
+picks up each one as its own flag (`--battery`, `--sensors`, ...) and wires the autolinking for
+you. Reanimated, a full worklet-driven animation layer, is the largest remaining piece and is
 saved for last. The end goal is package-surface parity with Expo's SDK: whatever a real app can
 reach for in Expo, a SymbioteNative app can reach for too, off the same untouched native core.
 

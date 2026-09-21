@@ -53,13 +53,8 @@ function increment(): void {
     <text class="switch-label">
       ref + computed + watch/watchEffect/watchPostEffect/watchSyncEffect
     </text>
-    <text
-      class="list-row-text"
-      testID="reactivity-counter"
-    >
-      {{
-        `count=${count} · doubled (computed)=${doubled}`
-      }}
+    <text class="list-row-text" testID="reactivity-counter">
+      {{ `count=${count} · doubled (computed)=${doubled}` }}
     </text>
     <ActionButton
       testID="reactivity-increment"
@@ -67,17 +62,9 @@ function increment(): void {
       :onPress="increment"
       color="#f5a623"
     />
-    <text class="section-label">
-      firing order (last 8)
-    </text>
-    <text
-      v-for="(entry, index) in log"
-      :key="index"
-      class="list-row-text"
-    >
-      {{
-        entry
-      }}
+    <text class="section-label"> firing order (last 8) </text>
+    <text v-for="(entry, index) in log" :key="index" class="list-row-text">
+      {{ entry }}
     </text>
   </view>
 </template>

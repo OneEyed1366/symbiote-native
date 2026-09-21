@@ -44,10 +44,8 @@ import {
   type OnDestroy,
 } from '@angular/core';
 import {
-  DEFAULT_END_REACHED_THRESHOLD,
   DEFAULT_INITIAL_NUM_TO_RENDER,
   DEFAULT_MAX_TO_RENDER_PER_BATCH,
-  DEFAULT_START_REACHED_THRESHOLD,
   DEFAULT_UPDATE_CELLS_BATCHING_PERIOD,
   DEFAULT_WINDOW_SIZE,
   EMPTY_OFFSET,
@@ -214,6 +212,13 @@ interface IWindowCell<ItemT> {
   context: IVListItemContext<ItemT>;
   measure: (event: ISymbioteEvent) => void;
   separatorContext?: IVListSeparatorContext<ItemT>;
+  /**
+   * Picks the cell's TAG in the template — `sticky-header` pins, `view` does not.
+   *
+   * It is stable per cell key (an index is a section header or it is not), so the `@if` never
+   * swaps an element type under a live cell and nothing remounts as the window slides.
+   */
+  isSticky: boolean;
 }
 
 // The scroll body is identical on both axes; only the outer tag differs (the axis comes from the
@@ -257,7 +262,7 @@ interface IWindowCell<ItemT> {
             <view [style]="leadingSpacerStyle"></view>
           }
           @if (forcedStickyCell !== null) {
-            <view
+            <sticky-header
               (layout)="handleCellLayout(forcedStickyCell.measure, $event)"
               [style]="cellStyle"
             >
@@ -265,27 +270,45 @@ interface IWindowCell<ItemT> {
                 [vListOutlet]="itemDir?.templateRef"
                 [vListOutletContext]="forcedStickyCell.context"
               ></ng-container>
-            </view>
+            </sticky-header>
           }
           @if (gapSpacerStyle !== null) {
             <view [style]="gapSpacerStyle"></view>
           }
           @for (cell of windowCells; track cell.key) {
-            <view
-              (layout)="handleCellLayout(cell.measure, $event)"
-              [style]="cellStyle"
-            >
-              <ng-container
-                [vListOutlet]="itemDir?.templateRef"
-                [vListOutletContext]="cell.context"
-              ></ng-container>
-              @if (cell.separatorContext !== undefined) {
+            @if (cell.isSticky) {
+              <sticky-header
+                (layout)="handleCellLayout(cell.measure, $event)"
+                [style]="cellStyle"
+              >
                 <ng-container
-                  [vListOutlet]="separatorDir?.templateRef"
-                  [vListOutletContext]="cell.separatorContext"
+                  [vListOutlet]="itemDir?.templateRef"
+                  [vListOutletContext]="cell.context"
                 ></ng-container>
-              }
-            </view>
+                @if (cell.separatorContext !== undefined) {
+                  <ng-container
+                    [vListOutlet]="separatorDir?.templateRef"
+                    [vListOutletContext]="cell.separatorContext"
+                  ></ng-container>
+                }
+              </sticky-header>
+            } @else {
+              <view
+                (layout)="handleCellLayout(cell.measure, $event)"
+                [style]="cellStyle"
+              >
+                <ng-container
+                  [vListOutlet]="itemDir?.templateRef"
+                  [vListOutletContext]="cell.context"
+                ></ng-container>
+                @if (cell.separatorContext !== undefined) {
+                  <ng-container
+                    [vListOutlet]="separatorDir?.templateRef"
+                    [vListOutletContext]="cell.separatorContext"
+                  ></ng-container>
+                }
+              </view>
+            }
           }
           @if (trailingSpacerStyle !== null) {
             <view [style]="trailingSpacerStyle"></view>
@@ -323,7 +346,7 @@ interface IWindowCell<ItemT> {
             <view [style]="leadingSpacerStyle"></view>
           }
           @if (forcedStickyCell !== null) {
-            <view
+            <sticky-header
               (layout)="handleCellLayout(forcedStickyCell.measure, $event)"
               [style]="cellStyle"
             >
@@ -331,7 +354,7 @@ interface IWindowCell<ItemT> {
                 [vListOutlet]="itemDir?.templateRef"
                 [vListOutletContext]="forcedStickyCell.context"
               ></ng-container>
-            </view>
+            </sticky-header>
           }
           @if (gapSpacerStyle !== null) {
             <view [style]="gapSpacerStyle"></view>
@@ -344,21 +367,39 @@ interface IWindowCell<ItemT> {
                first index moves. Measured at exactly 17px on device 2026-08-19; see
                .claude/rules/list-geometry-feedback-loop.md. -->
           @for (cell of windowCells; track cell.key) {
-            <view
-              (layout)="handleCellLayout(cell.measure, $event)"
-              [style]="cellStyle"
-            >
-              <ng-container
-                [vListOutlet]="itemDir?.templateRef"
-                [vListOutletContext]="cell.context"
-              ></ng-container>
-              @if (cell.separatorContext !== undefined) {
+            @if (cell.isSticky) {
+              <sticky-header
+                (layout)="handleCellLayout(cell.measure, $event)"
+                [style]="cellStyle"
+              >
                 <ng-container
-                  [vListOutlet]="separatorDir?.templateRef"
-                  [vListOutletContext]="cell.separatorContext"
+                  [vListOutlet]="itemDir?.templateRef"
+                  [vListOutletContext]="cell.context"
                 ></ng-container>
-              }
-            </view>
+                @if (cell.separatorContext !== undefined) {
+                  <ng-container
+                    [vListOutlet]="separatorDir?.templateRef"
+                    [vListOutletContext]="cell.separatorContext"
+                  ></ng-container>
+                }
+              </sticky-header>
+            } @else {
+              <view
+                (layout)="handleCellLayout(cell.measure, $event)"
+                [style]="cellStyle"
+              >
+                <ng-container
+                  [vListOutlet]="itemDir?.templateRef"
+                  [vListOutletContext]="cell.context"
+                ></ng-container>
+                @if (cell.separatorContext !== undefined) {
+                  <ng-container
+                    [vListOutlet]="separatorDir?.templateRef"
+                    [vListOutletContext]="cell.separatorContext"
+                  ></ng-container>
+                }
+              </view>
+            }
           }
           @if (trailingSpacerStyle !== null) {
             <view [style]="trailingSpacerStyle"></view>
@@ -540,7 +581,6 @@ export class VirtualizedList<ItemT = unknown>
   gapSpacerStyle: IViewStyle | null = null;
   trailingSpacerStyle: IViewStyle | null = null;
   cellStyle: IViewStyle | undefined = undefined;
-  renderedStickyIndices: number[] | undefined = undefined;
   // Bound to the template's `[style]="resolvedStyle"`, which Angular compiles to the built-in
   // ɵɵstyleMap instruction — it only understands a flat object, never an array (RN's own
   // `style={[a, b]}` composition idiom crashes deep inside Angular's styling engine), so this
@@ -700,7 +740,10 @@ export class VirtualizedList<ItemT = unknown>
       keyboardShouldPersistTaps: this.keyboardShouldPersistTaps,
       keyboardDismissMode: this.keyboardDismissMode,
       contentOffset: this.commandedOffset,
-      stickyHeaderIndices: this.renderedStickyIndices,
+      // `stickyHeaderIndices` is deliberately NOT forwarded — it numbers the scroll view's PAINT
+      // children, and a windowed list paints a header, a spacer and a slice, so the positions move
+      // every time the window slides and the behavior re-wraps a different child each pass. The
+      // cells carry the `sticky-header` TAG instead, which pins by DOCUMENT order.
       maintainVisibleContentPosition:
         this.resolvedMaintainVisibleContentPosition,
       // The four boolean-gated Fabric events (`.claude/rules/fabric-boolean-event-gates.md`): the
@@ -750,11 +793,11 @@ export class VirtualizedList<ItemT = unknown>
       this.updateCellsBatchingPeriod ?? DEFAULT_UPDATE_CELLS_BATCHING_PERIOD
     );
   }
-  private get onEndReachedThresholdValue(): number {
-    return this.onEndReachedThreshold ?? DEFAULT_END_REACHED_THRESHOLD;
+  private get onEndReachedThresholdValue(): number | undefined {
+    return this.onEndReachedThreshold;
   }
-  private get onStartReachedThresholdValue(): number {
-    return this.onStartReachedThreshold ?? DEFAULT_START_REACHED_THRESHOLD;
+  private get onStartReachedThresholdValue(): number | undefined {
+    return this.onStartReachedThreshold;
   }
 
   // onScroll stays a plain callback bag key (an Animated.event(...) target must be able to flow
@@ -933,7 +976,12 @@ export class VirtualizedList<ItemT = unknown>
           const info = effect.info;
           const map = effect.map;
           const fire = (): void => {
-            for (const pair of pairs) pair.onViewableItemsChanged(info);
+            for (const pair of pairs) {
+              pair.onViewableItemsChanged({
+                ...info,
+                viewabilityConfig: pair.viewabilityConfig,
+              });
+            }
             this.dispatch({ kind: 'viewable-fired', map });
           };
           if (this.viewableTimer !== null) {
@@ -1084,7 +1132,6 @@ export class VirtualizedList<ItemT = unknown>
       this.leadingSpacerStyle = null;
       this.gapSpacerStyle = null;
       this.trailingSpacerStyle = null;
-      this.renderedStickyIndices = undefined;
       dlog(
         `Angular VirtualizedList empty (viewport=${this.listState.viewportLength})`,
       );
@@ -1112,10 +1159,7 @@ export class VirtualizedList<ItemT = unknown>
       plan.trailingExtent > EMPTY_OFFSET
         ? this.spacerStyle(plan.trailingExtent)
         : null;
-    this.renderedStickyIndices =
-      stickySet !== undefined && plan.stickyChildPositions.length > 0
-        ? plan.stickyChildPositions
-        : undefined;
+    // `plan.stickyChildPositions` is deliberately NOT read — it was the input to the index form.
     dlog(
       `STICKY[list] stickySet=${stickySet === undefined ? 'undefined' : JSON.stringify([...stickySet])} ` +
         `childPositions=${JSON.stringify(plan.stickyChildPositions)} ` +
@@ -1129,6 +1173,8 @@ export class VirtualizedList<ItemT = unknown>
             plan.forcedStickyCell.index,
             plan.forcedStickyCell.key,
             false,
+            // Sticky by construction — `forcedStickyCell` exists only for an index in `stickySet`.
+            true,
           )
         : null;
 
@@ -1141,7 +1187,12 @@ export class VirtualizedList<ItemT = unknown>
       // 2026-08-19 as a run of cells all shifting by exactly the divider's 1px.
       const includeSeparator = hasSeparators && planned.index < m.count - 1;
       cells.push(
-        this.buildWindowCell(planned.index, planned.key, includeSeparator),
+        this.buildWindowCell(
+          planned.index,
+          planned.key,
+          includeSeparator,
+          stickySet?.has(planned.index) === true,
+        ),
       );
     }
     this.windowCells = cells;
@@ -1162,6 +1213,7 @@ export class VirtualizedList<ItemT = unknown>
     index: number,
     key: string,
     includeSeparator: boolean,
+    isSticky: boolean,
   ): IWindowCell<ItemT> {
     const item = this.getItem(this.data, index);
     return {
@@ -1172,6 +1224,7 @@ export class VirtualizedList<ItemT = unknown>
       separatorContext: includeSeparator
         ? this.buildSeparatorContext(index, item)
         : undefined,
+      isSticky,
     };
   }
 

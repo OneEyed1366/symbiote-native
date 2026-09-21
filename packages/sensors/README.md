@@ -17,6 +17,10 @@ project never depends on) — every sensor's logic is hand-ported into this pack
 npm install @symbiote-native/sensors
 ```
 
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --sensors` (or
+`add --sensors` in an existing app) installs and wires this for you — see
+[`@symbiote-native/cli`](../cli).
+
 Depends on `expo-sensors` and `expo-modules-core` directly (regular dependencies, pinned to exact
 versions — never a caret range, since this package's `core/` is hand-ported against one specific
 native API shape and a newer resolve could silently drift the two apart). Never install
@@ -129,9 +133,10 @@ export class SensorsScreen {
 }
 ```
 
-The examples above mirror the real canary demo screens —
+The examples above mirror the real canary demo screens, which exist for all six Expo canaries —
 `examples/expo-react/screens/SensorsScreen.tsx`, `examples/expo-vue-sfc/screens/SensorsScreen.vue`,
-`examples/expo-vue-tsx/screens/SensorsScreen.tsx`, `examples/expo-angular/src/screens/SensorsScreen.ts`.
+`examples/expo-vue-tsx/screens/SensorsScreen.tsx`, `examples/expo-svelte/screens/SensorsScreen.svelte`,
+`examples/expo-solid/screens/SensorsScreen.tsx`, `examples/expo-angular/src/screens/SensorsScreen.ts`.
 
 Every hook/composable/rune/primitive/`connect()` takes an optional `updateIntervalMs` and returns
 `null` until the first native reading arrives — check `isAvailableAsync()` separately if you need

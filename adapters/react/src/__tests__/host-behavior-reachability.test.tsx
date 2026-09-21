@@ -11,14 +11,16 @@
 // which would work for this test's `view` and put a press machine on every View in the app.
 import { afterEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '@symbiote-native/react';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import {
   clearHostBehaviors,
   registerHostBehavior,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
 
-installFabric();
+// A RECORDING host rather than `installFabric()`: this file needs somewhere for a commit to go and
+// never reads a tree, so no second implementation of Fabric's rules belongs in its path.
+installRecordingFabric();
 let nextRootTag = 7400;
 
 function trackAttachesOn(key: string): ISymbioteNode[] {

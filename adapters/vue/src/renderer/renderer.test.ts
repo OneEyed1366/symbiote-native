@@ -24,12 +24,17 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '../render';
 // No primitive import: `view` and `text` are TAGS written directly below.
 import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 341;
 const VIEW = 'RCTView';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -39,34 +44,20 @@ beforeEach(() => {
 });
 afterEach(() => unmount(ROOT_TAG));
 
-function walk(nodes: IFakeNode[], visit: (node: IFakeNode) => void): void {
-  for (const node of nodes) {
-    visit(node);
-    walk(node.children, visit);
-  }
-}
-
-function committedView(): IFakeNode {
-  let found: IFakeNode | undefined;
-  walk(fabric.committed, node => {
-    if (node.viewName === VIEW) found = node;
-  });
+function committedView(): ILiveNode {
+  const found = live.findLive(live.appRoot(), node => node.viewName === VIEW);
   expect(found, `a ${VIEW} was committed`).toBeDefined();
   if (found === undefined) throw new Error('unreachable: View missing');
   return found;
 }
 
-// fabric.find() searches `created` — every node ever createNode'd, INCLUDING ones later removed
-// or superseded by a clone-on-write update — so it can't prove "currently in/out of the tree" or
-// "currently holds this text/prop". These tests need the LIVE committed tree instead.
+// fabric.find() searches the CREATION LOG — every node ever created, INCLUDING ones later
+// removed or superseded — so it can't prove "currently in/out of the tree" or "currently holds
+// this text/prop". These tests need the LIVE committed tree instead.
 function findCommitted(
-  predicate: (node: IFakeNode) => boolean,
-): IFakeNode | undefined {
-  let found: IFakeNode | undefined;
-  walk(fabric.committed, node => {
-    if (found === undefined && predicate(node)) found = node;
-  });
-  return found;
+  predicate: (node: ILiveNode) => boolean,
+): ILiveNode | undefined {
+  return live.findLive(live.appRoot(), predicate);
 }
 
 describe('patchProp class/style merge', () => {
@@ -86,7 +77,7 @@ describe('patchProp class/style merge', () => {
       }),
     );
     await tick();
-    expect(committedView().props.color).toBe('red');
+    expect(committedView().payload.color).toBe('red');
   });
 
   it('lets an explicit :style win over a class-derived style, regardless of declaration order', async () => {
@@ -106,7 +97,7 @@ describe('patchProp class/style merge', () => {
       }),
     );
     await tick();
-    expect(committedView().props.color).toBe('blue');
+    expect(committedView().payload.color).toBe('blue');
   });
 
   it('leaves an explicit :style unaffected when there is no class', async () => {
@@ -117,7 +108,7 @@ describe('patchProp class/style merge', () => {
       }),
     );
     await tick();
-    expect(committedView().props.color).toBe('blue');
+    expect(committedView().payload.color).toBe('blue');
   });
 
   it('re-resolves and recommits when the class changes reactively', async () => {
@@ -143,11 +134,11 @@ describe('patchProp class/style merge', () => {
       }),
     );
     await tick();
-    expect(committedView().props.color).toBe('red');
+    expect(committedView().payload.color).toBe('red');
 
     className.value = 'bar';
     await tick();
-    expect(committedView().props.color).toBe('green');
+    expect(committedView().payload.color).toBe('green');
   });
 });
 
@@ -181,15 +172,15 @@ describe("createComment / createText('') — Fragment and v-if placeholder ancho
       }),
     );
     await tick();
-    expect(findCommitted(n => n.props.nativeID === 'toggle')).toBeUndefined();
+    expect(findCommitted(n => n.payload.nativeID === 'toggle')).toBeUndefined();
 
     visible.value = true;
     await tick();
-    expect(findCommitted(n => n.props.nativeID === 'toggle')).toBeDefined();
+    expect(findCommitted(n => n.payload.nativeID === 'toggle')).toBeDefined();
 
     visible.value = false;
     await tick();
-    expect(findCommitted(n => n.props.nativeID === 'toggle')).toBeUndefined();
+    expect(findCommitted(n => n.payload.nativeID === 'toggle')).toBeUndefined();
   });
 
   it('a multi-root (Fragment) setup commits every root without the Fragment boundary painting', async () => {
@@ -203,8 +194,8 @@ describe("createComment / createText('') — Fragment and v-if placeholder ancho
       }),
     );
     await tick();
-    expect(findCommitted(n => n.props.nativeID === 'a')).toBeDefined();
-    expect(findCommitted(n => n.props.nativeID === 'b')).toBeDefined();
+    expect(findCommitted(n => n.payload.nativeID === 'a')).toBeDefined();
+    expect(findCommitted(n => n.payload.nativeID === 'b')).toBeDefined();
   });
 });
 
@@ -222,7 +213,7 @@ describe('setElementText — <Text> content updates', () => {
     await tick();
     expect(
       findCommitted(
-        n => n.viewName === 'RCTRawText' && n.props.text === 'first',
+        n => n.viewName === 'RCTRawText' && n.payload.text === 'first',
       ),
     ).toBeDefined();
 
@@ -230,16 +221,16 @@ describe('setElementText — <Text> content updates', () => {
     await tick();
     expect(
       findCommitted(
-        n => n.viewName === 'RCTRawText' && n.props.text === 'second',
+        n => n.viewName === 'RCTRawText' && n.payload.text === 'second',
       ),
     ).toBeDefined();
-    expect(findCommitted(n => n.props.text === 'first')).toBeUndefined();
+    expect(findCommitted(n => n.payload.text === 'first')).toBeUndefined();
 
     label.value = 'third';
     await tick();
     expect(
       findCommitted(
-        n => n.viewName === 'RCTRawText' && n.props.text === 'third',
+        n => n.viewName === 'RCTRawText' && n.payload.text === 'third',
       ),
     ).toBeDefined();
   });
@@ -278,12 +269,12 @@ describe('remove and reorder', () => {
       }),
     );
     await tick();
-    expect(findCommitted(n => n.props.nativeID === 'child')).toBeDefined();
+    expect(findCommitted(n => n.payload.nativeID === 'child')).toBeDefined();
 
     show.value = false;
     await tick();
-    expect(findCommitted(n => n.props.nativeID === 'child')).toBeUndefined();
-    expect(findCommitted(n => n.props.nativeID === 'parent')).toBeDefined();
+    expect(findCommitted(n => n.payload.nativeID === 'child')).toBeUndefined();
+    expect(findCommitted(n => n.payload.nativeID === 'parent')).toBeDefined();
   });
 
   // why: a keyed v-for reorder drives Vue's patch algorithm to call `insert` with an anchor and
@@ -304,10 +295,10 @@ describe('remove and reorder', () => {
       }),
     );
     await tick();
-    const list = findCommitted(n => n.props.nativeID === 'list');
+    const list = findCommitted(n => n.payload.nativeID === 'list');
     expect(list, 'list root committed').toBeDefined();
     if (list === undefined) throw new Error('unreachable: list missing');
-    expect(list.children.map(c => c.props.nativeID)).toEqual([
+    expect(list.children.map(c => c.payload.nativeID)).toEqual([
       'item-a',
       'item-b',
       'item-c',
@@ -315,10 +306,10 @@ describe('remove and reorder', () => {
 
     order.value = ['c', 'a', 'b'];
     await tick();
-    const reordered = findCommitted(n => n.props.nativeID === 'list');
+    const reordered = findCommitted(n => n.payload.nativeID === 'list');
     if (reordered === undefined)
       throw new Error('unreachable: list missing after reorder');
-    expect(reordered.children.map(c => c.props.nativeID)).toEqual([
+    expect(reordered.children.map(c => c.payload.nativeID)).toEqual([
       'item-c',
       'item-a',
       'item-b',
@@ -326,28 +317,34 @@ describe('remove and reorder', () => {
   });
 });
 
-// The lowered path: the SFC transformer rewrites <View>/<Text> to their intrinsic TAGS
-// (metro-vue-transformer.cjs), so those nodes reach the renderer with no component wrapper in
-// between. Two things the wrapper used to do must therefore happen here — RN's Text.js defaults
-// (resolveTextProps) and the kebab->camel attr fold (normalizeVueAttrs). Both failures are
-// silent: a clipped line with no ellipsis, and a prop that never reaches Fabric.
-describe('lowered host primitives (intrinsic tags)', () => {
-  const findByTestId = (id: string): IFakeNode | undefined =>
-    findCommitted(node => node.props.testID === id);
+// An intrinsic TAG reaches the renderer with no component wrapper in between, so what a wrapper used
+// to do must happen somewhere else. There were TWO such things here and there is one left: the
+// kebab->camel attr fold (`normalizeVueAttrs`), whose failure is silent — a prop that never reaches
+// Fabric under a name no ViewConfig declares.
+//
+// RN's Text.js defaults were the other, and they went one layer further down on 2026-09-18 rather
+// than staying in this renderer. `foldTextDefaults` reads the authored bag at payload time, so it
+// needs no help from any adapter, and the claims are in
+// `core/engine/cpp/tests/js/committed-payload.itest.ts`. What this renderer still owes a text tag is
+// FORWARDING, which is what the cases below assert.
+describe('host primitives as intrinsic tags', () => {
+  const findByTestId = (id: string): ILiveNode | undefined =>
+    findCommitted(node => node.payload.testID === id);
 
   const mountTemplate = async (render: () => unknown): Promise<void> => {
     mount(ROOT_TAG, defineComponent({ setup: () => render }));
     await tick();
   };
 
-  it("seeds RN's Text defaults on an intrinsic text", async () => {
+  // why: the engine's rule is keyed on the COMPONENT, so committing an intrinsic `text` as `RCTText`
+  // is the precondition for every default landing. This is what the old "seeds RN's Text defaults"
+  // case was really establishing about the renderer.
+  it('commits an intrinsic text under the component the rule is keyed on', async () => {
     await mountTemplate(() => h('text', { testID: 'plain' }, ['hello']));
-    const props = findByTestId('plain')?.props;
-    expect(props?.ellipsizeMode).toBe('tail');
-    expect(props?.allowFontScaling).toBe(true);
+    expect(findByTestId('plain')?.viewName).toBe('RCTText');
   });
 
-  it('lets an explicit value beat the seeded default', async () => {
+  it('forwards an explicit value rather than folding it', async () => {
     await mountTemplate(() =>
       h(
         'text',
@@ -359,15 +356,17 @@ describe('lowered host primitives (intrinsic tags)', () => {
         ['hello'],
       ),
     );
-    const props = findByTestId('explicit')?.props;
+    const props = findByTestId('explicit')?.payload;
     expect(props?.ellipsizeMode).toBe('middle');
     expect(props?.allowFontScaling).toBe(false);
   });
 
-  // RN treats a missing prop and an explicit `undefined` alike — only a literal `false` opts out
-  // (core/components/src/text-props.ts). Without the re-seed in patchProp the undefined would
-  // delete the default instead.
-  it('keeps the default when the prop is explicitly undefined', async () => {
+  // why: this renderer used to SUBSTITUTE the default for an explicit `undefined` in `patchProp`,
+  // on the reasoning that RN treats a missing prop and an explicit `undefined` alike. True, and the
+  // engine is where it is now acted on — which means the renderer's job is the opposite one: pass
+  // the clear through untouched and let the rule decide. A renderer that still substituted would be
+  // invisible here and would diverge from the other four.
+  it('forwards an explicit undefined rather than substituting for it', async () => {
     await mountTemplate(() =>
       h(
         'text',
@@ -379,9 +378,9 @@ describe('lowered host primitives (intrinsic tags)', () => {
         ['hello'],
       ),
     );
-    const props = findByTestId('undef')?.props;
-    expect(props?.ellipsizeMode).toBe('tail');
-    expect(props?.allowFontScaling).toBe(true);
+    const props = findByTestId('undef')?.payload;
+    expect(props?.ellipsizeMode).toBeUndefined();
+    expect(props?.allowFontScaling).toBeUndefined();
   });
 
   it('folds a kebab attr to camelCase on an intrinsic tag', async () => {
@@ -391,7 +390,7 @@ describe('lowered host primitives (intrinsic tags)', () => {
         'accessibility-label': 'close',
       }),
     );
-    const props = findByTestId('kebab')?.props;
+    const props = findByTestId('kebab')?.payload;
     expect(props?.accessibilityLabel).toBe('close');
   });
 
@@ -400,23 +399,28 @@ describe('lowered host primitives (intrinsic tags)', () => {
   // camelized `ariaLabel` is invisible to it: the fold never runs and the key reaches Fabric dead,
   // where no ViewConfig declares it.
   //
-  // The witness used to be the raw `aria-label` surviving into the payload. That stopped being
-  // observable once the fold moved into fabricProps — it now consumes the key and nulls it — and
-  // "the key is gone" is exactly what a wrongly-camelized attr would also produce. So the claim is
-  // pinned from BOTH sides instead: the fold's OUTPUT carries the aria value (only reachable if the
-  // hyphenated key arrived intact), and no camelized key is left behind.
+  // THE WITNESS HAS MOVED TWICE AND IS BACK WHERE IT STARTED, which is worth recording because the
+  // round trip explains the shape. It began as the raw `aria-label` surviving into the payload; that
+  // stopped being observable when the fold moved INTO `fabricProps`, which consumed the key, so the
+  // claim was re-pinned on the fold's OUTPUT (`accessibilityLabel`) plus the absence of a camelized
+  // key. On 2026-09-18 the fold left this builder for `SymbioteFabricProps.cpp`, so the key survives
+  // again and the original witness is the direct one once more.
+  //
+  // Both sides still, and neither is sufficient alone: the hyphenated key must be PRESENT (a
+  // camelizing pass would drop it) and the camelized spelling must be ABSENT (its presence is what
+  // such a pass produces). "The key is gone" alone would be satisfied by a renderer that dropped it.
   it('leaves the aria- family hyphenated for the engine to fold', async () => {
     await mountTemplate(() =>
       h('view', { testID: 'aria', 'aria-label': 'from-aria' }),
     );
-    const props = findByTestId('aria')?.props;
-    expect(props?.accessibilityLabel).toBe('from-aria');
+    const props = findByTestId('aria')?.payload;
+    expect(props?.['aria-label']).toBe('from-aria');
     expect(props).not.toHaveProperty('ariaLabel');
   });
 
   it('leaves a non-text node without text defaults', async () => {
     await mountTemplate(() => h('view', { testID: 'view' }));
-    const props = findByTestId('view')?.props;
+    const props = findByTestId('view')?.payload;
     expect(props?.ellipsizeMode).toBeUndefined();
     expect(props?.allowFontScaling).toBeUndefined();
   });
@@ -429,7 +433,7 @@ describe('lowered host primitives (intrinsic tags)', () => {
     await mountTemplate(() =>
       h('view', { testID: 'aliased', id: 'accessory-1' }),
     );
-    const props = findByTestId('aliased')?.props;
+    const props = findByTestId('aliased')?.payload;
     expect(props?.nativeID).toBe('accessory-1');
     expect(props?.id, 'the alias must not also reach Fabric').toBeUndefined();
   });
@@ -438,6 +442,6 @@ describe('lowered host primitives (intrinsic tags)', () => {
     await mountTemplate(() =>
       h('text', { testID: 'aliased-text', id: 'label-1' }, 'x'),
     );
-    expect(findByTestId('aliased-text')?.props.nativeID).toBe('label-1');
+    expect(findByTestId('aliased-text')?.payload.nativeID).toBe('label-1');
   });
 });

@@ -265,6 +265,26 @@ re-added to `ignore`.
 under "workspace tooling"), like every other dev tool in this repo — see
 `symbiote-dependency-catalog`.
 
+## A MINOR on a 0.x `engine` is a MAJOR for the whole repo (measured 2026-09-21)
+
+Every publishable package peers `"@symbiote-native/engine": "workspace:^"`, and `^0.5.0` does not
+cover `0.6.0` — under semver a 0.x minor is breaking. With
+`___experimentalUnsafeOptions.onlyUpdatePeerDependentsWhenOutOfRange: true`, a peer that lands out
+of range bumps its dependent to **major**. So one `engine: minor` took 31 packages to a new major,
+including 24 wrapper packages that had changed nothing.
+
+The proof is `@symbiote-native/components`: it peers only `engine` and `react-native`, its own five
+pending changesets were all `minor`, and it still resolved to `3.0.0`.
+
+**Read this before blaming a changeset for a bump.** A first reading here attributed the cascade to
+a `components: major` and was wrong; the cheap check that settles it is the counterfactual —
+`changeset status --output=X.json` with the suspect changesets moved aside, then again with them
+back, and diff the two `newVersion` maps. Attribution by eye over a 34-package release does not
+work.
+
+`engine` went to `1.0.0` the same day (the C++ tree migration was its breaking change and had never
+been recorded as one), which retires the cascade: `^1.0.0` covers `1.1.0`.
+
 ## Root scripts
 
 ```jsonc

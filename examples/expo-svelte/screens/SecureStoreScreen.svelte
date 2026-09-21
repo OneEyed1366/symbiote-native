@@ -163,7 +163,8 @@
       <text-input
         testID="secure-store-input"
         value={inputText}
-        onValueChange={(event: ITextInputChangeEvent) => (inputText = event.text)}
+        onValueChange={(event: ITextInputChangeEvent) =>
+          (inputText = event.text)}
         placeholder="Value to store"
         placeholderTextColor={PLACEHOLDER_COLOR}
         class="text-input"

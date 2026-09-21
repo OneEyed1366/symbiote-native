@@ -13,7 +13,11 @@ import {
   type Component,
 } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 import type { SymbioteSurface } from '@symbiote-native/engine';
 import { mount, unmount } from '../render';
 import type { IHostInstance } from '../host-instance';
@@ -24,7 +28,8 @@ import { Portal, type IPortalTarget } from './index';
 // one's assertion — the accumulating-state trap the same rules file warns about.
 let nextRootTag = 9_310;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 
 // Every mutation goes through renderer.ts's requestCommit, which coalesces on a microtask.
 const tick = (): Promise<void> =>
@@ -44,34 +49,23 @@ function mountApp(App: Component): SymbioteSurface {
   return mount(nextRootTag, App);
 }
 
-function walk(
-  nodes: readonly IFakeNode[],
-  visit: (node: IFakeNode) => void,
-): void {
-  for (const node of nodes) {
-    visit(node);
-    walk(node.children, visit);
-  }
-}
-
 function findCommitted(
-  predicate: (node: IFakeNode) => boolean,
-): IFakeNode | undefined {
-  let found: IFakeNode | undefined;
-  walk(fabric.committed, node => {
-    if (found === undefined && predicate(node)) found = node;
-  });
-  return found;
+  predicate: (node: ILiveNode) => boolean,
+): ILiveNode | undefined {
+  return live.findLive(live.appRoot(), predicate);
 }
 
-const byText = (text: string) => (node: IFakeNode) =>
-  node.viewName === 'RCTRawText' && node.props.text === text;
+const byText = (text: string) => (node: ILiveNode) =>
+  node.viewName === 'RCTRawText' && node.payload.text === text;
 
-const byTestID = (testID: string) => (node: IFakeNode) =>
-  node.props.testID === testID;
+const byTestID = (testID: string) => (node: ILiveNode) =>
+  node.payload.testID === testID;
 
-function contains(root: IFakeNode, target: IFakeNode): boolean {
-  if (root === target) return true;
+// Compared by HANDLE, not by object identity: `ILiveNode.children` is a getter that builds a fresh
+// object per read, so `root === target` on two reads of the same node is false. The handle is the
+// engine node itself and is stable.
+function contains(root: ILiveNode, target: ILiveNode): boolean {
+  if (root.handle === target.handle) return true;
   return root.children.some(child => contains(child, target));
 }
 
@@ -156,7 +150,7 @@ describe('Portal', () => {
     expect(overlayHost).toBeDefined();
     if (overlayHost === undefined) throw new Error('unreachable');
     expect(
-      overlayHost.children.map(child => child.props.testID),
+      overlayHost.children.map(child => child.payload.testID),
       'exactly one direct child, the portaled Text itself',
     ).toEqual(['ported']);
   });
@@ -288,7 +282,7 @@ describe('Portal', () => {
     await tick();
     expect(
       findCommitted(byTestID('host-a'))?.children.map(
-        child => child.props.testID,
+        child => child.payload.testID,
       ),
       'starts on host A',
     ).toEqual(['ported']);
@@ -298,7 +292,7 @@ describe('Portal', () => {
 
     expect(
       findCommitted(byTestID('host-b'))?.children.map(
-        child => child.props.testID,
+        child => child.payload.testID,
       ),
       'moved to host B',
     ).toEqual(['ported']);

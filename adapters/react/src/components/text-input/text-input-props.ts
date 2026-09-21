@@ -3,8 +3,7 @@
 // No component left to type — the element IS the tag, and `multiline` picks `text-input-multiline`
 // underneath. The whole lifecycle the wrapper ran — the acknowledged event count, the
 // `setTextAndSelection` controlled write, the focus/blur mirror, mount `autoFocus` — lives on the
-// engine node as `core/components/src/behaviors/text-input.ts`, wired by `../../register`. The
-// `text-input-managed` twin that kept the two machines apart is dead with the wrapper.
+// engine node as `core/components/src/behaviors/text-input.ts`, wired by `../../register`.
 //
 // The imperative API is reached the way every adapter reaches it — `buildTextInputHandle` over the
 // host instance a `ref` hands back — rather than through a `useImperativeHandle` the tag has no

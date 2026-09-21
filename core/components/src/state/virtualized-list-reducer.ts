@@ -127,8 +127,8 @@ export interface IListReducerInputs<ItemT> {
   initialNumToRender: number;
   maxToRenderPerBatch: number;
   updateCellsBatchingPeriod: number;
-  onEndReachedThreshold: number;
-  onStartReachedThreshold: number;
+  onEndReachedThreshold: number | undefined;
+  onStartReachedThreshold: number | undefined;
   onEndReachedActive: boolean;
   onStartReachedActive: boolean;
   viewabilityPairs: IViewabilityConfigCallbackPair<ItemT>[];

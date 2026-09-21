@@ -5,7 +5,11 @@
 
 import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 // SIDE-EFFECT IMPORT: the controlled-spinner handshake lives in the tag's behavior, and only this
 // module installs it. An app reaches it through the package barrel; a test importing render does not.
 import '../register';
@@ -16,29 +20,33 @@ import { mount, unmount } from '../render';
 const ROOT_TAG = 819;
 const REFRESH_CONTROL = 'PullToRefreshView';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-function committedControl(): IFakeNode {
-  let found: IFakeNode | undefined;
-  const walk = (nodes: IFakeNode[]): void => {
-    for (const node of nodes) {
-      if (found === undefined && node.viewName === REFRESH_CONTROL)
-        found = node;
-      walk(node.children);
-    }
-  };
-  walk(fabric.committed);
+function committedControl(): ILiveNode {
+  const found = live.findLive(
+    live.appRoot(),
+    node => node.viewName === REFRESH_CONTROL,
+  );
   if (found === undefined)
     throw new Error(`no ${REFRESH_CONTROL} was committed`);
   return found;
 }
 
-function createdControl(): IFakeNode {
+/**
+ * The control as the RECORDING holds it — two things only the record answers: `instanceHandle`,
+ * which an event has to be aimed at, and a key the record LOST, which is proof a clearing op was
+ * sent for it.
+ */
+function createdControl(): {
+  instanceHandle: unknown;
+  props: Readonly<Record<string, unknown>>;
+} {
   const node = fabric.find(entry => entry.viewName === REFRESH_CONTROL);
   if (node === undefined) throw new Error(`no ${REFRESH_CONTROL} was created`);
   return node;
@@ -52,7 +60,7 @@ describe('Solid RefreshControl on the engine', () => {
     it('emits the Fabric view name and forwards refreshing', async () => {
       mount(ROOT_TAG, () => <refresh-control refreshing />);
       await tick();
-      expect(committedControl().props.refreshing).toBe(true);
+      expect(committedControl().payload.refreshing).toBe(true);
     });
 
     // why: `onRefresh` is a ViewConfig EVENT, and routeProp decides that from the node's own config
@@ -71,44 +79,57 @@ describe('Solid RefreshControl on the engine', () => {
       ));
       await tick();
 
-      expect('onRefresh' in committedControl().props).toBe(false);
+      expect('onRefresh' in committedControl().payload).toBe(false);
       fabric.fireEvent(createdControl().instanceHandle, 'topRefresh');
       expect(refreshes).toBe(1);
     });
 
-    // why: native reads only `accessibility*`; the web aliases have to be folded in JS before the
-    // commit. RefreshControl owns its host element rather than rendering through a View, so the fold
-    // is its own job — skipping it leaves the control unlabelled for a screen reader.
-    it('folds aria aliases into the canonical accessibility props', async () => {
+    // why: native reads only `accessibility*`, and the engine folds the web aliases into them off
+    // the authored, HYPHENATED names. RefreshControl owns its host element rather than rendering
+    // through a View, so nothing else carries the aliases down for it.
+    // The fold's own cases: `core/engine/cpp/tests/js/aria-payload.itest.ts`.
+    it('forwards the aria aliases under their authored names', async () => {
       mount(ROOT_TAG, () => (
         <refresh-control refreshing={false} aria-label="reload" aria-busy />
       ));
       await tick();
 
-      const props = committedControl().props;
-      expect(props.accessibilityLabel).toBe('reload');
-      expect(props.accessibilityState).toEqual({ busy: true });
+      const props = committedControl().payload;
+      expect(props['aria-label']).toBe('reload');
+      expect(props['aria-busy']).toBe(true);
     });
 
-    // why: Solid-only, and silent everywhere else. `resolveAccessibilityProps` has two branches with
-    // DIFFERENT key sets, and Solid's `spread` walks only the CURRENT keys with no removal pass — so
-    // an `aria-label` that goes undefined drops the folded `accessibilityLabel` KEY and a screen
-    // reader keeps announcing a label the app already removed. React and Vue never meet this: they
-    // hand their reconciler a whole new prop object and the engine's diffProps sends the vanished
-    // key down as an explicit delete.
-    it('clears a folded accessibility prop when its aria alias goes undefined', async () => {
+    // why: Solid-only, and silent everywhere else. Solid's `spread` walks only the CURRENT keys with
+    // no removal pass, so an `aria-label` that goes undefined can leave its key STANDING at the old
+    // value — and a screen reader keeps announcing a label the app already removed. React and Vue
+    // never meet this: they hand their reconciler a whole new prop object and the engine's diffProps
+    // sends the vanished key down as an explicit delete.
+    //
+    // Read on the AUTHORED key now. The hazard is unchanged and so is the assertion's force — what
+    // moved is only which name carries it, since the fold into `accessibilityLabel` is the engine's
+    // rule and this harness has no copy of it. If anything this is the sharper place to watch,
+    // because it is the key Solid's spread actually holds.
+    it('clears an aria alias that goes undefined', async () => {
       const [label, setLabel] = createSignal<string | undefined>('reload');
       mount(ROOT_TAG, () => (
         <refresh-control refreshing={false} aria-label={label()} />
       ));
       await tick();
-      expect(committedControl().props.accessibilityLabel).toBe('reload');
+      expect(committedControl().payload['aria-label']).toBe('reload');
 
       setLabel(undefined);
       await tick();
-      // An explicit `null` is what a DELETE looks like on the wire (the engine's diffProps
-      // convention); the failure this guards is the key staying at 'reload'.
-      expect(committedControl().props.accessibilityLabel).toBeNull();
+      // The failure this guards is the key staying at 'reload'.
+      //
+      // ABSENT, not null: the literal null was the CLONE PROTOCOL's spelling of "reset to the
+      // default", held only inside the diff the stand-in merged. The engine's op stream says the
+      // same thing with `NO_VALUE`, and a host replaying that op deletes the key.
+      expect(Object.hasOwn(committedControl().payload, 'aria-label')).toBe(
+        false,
+      );
+      // …and the half that proves the engine ACTED: the record carried the label after the mount
+      // above, so its being gone from the record means a clearing op was sent for it.
+      expect(Object.hasOwn(createdControl().props, 'aria-label')).toBe(false);
     });
 
     // why: the Android spinner props have no iOS counterpart, so RN forwards them raw and lets each
@@ -127,7 +148,7 @@ describe('Solid RefreshControl on the engine', () => {
       ));
       await tick();
 
-      const props = committedControl().props;
+      const props = committedControl().payload;
       expect(props.colors).toEqual(['#ff0000']);
       expect(props.progressBackgroundColor).toBe('#ffffff');
       expect(props.size).toBe('large');
@@ -145,7 +166,7 @@ describe('Solid RefreshControl on the engine', () => {
         </refresh-control>
       ));
       await tick();
-      expect(committedControl().children[0]?.props.testID).toBe('wrapped');
+      expect(committedControl().children[0]?.payload.testID).toBe('wrapped');
     });
   });
 

@@ -16,6 +16,11 @@
 //
 // No Negative group: FlatList's public props have no throwing path — a malformed `data` (non-array)
 // degrades to an empty list, it never rejects.
+//
+// A RECORDING host, read through the LIVE tree for the structural walks (bounded window,
+// row-packing, content sizing) — the questions here are about the CURRENT committed shape, which
+// the live tree reads off the engine's own child links. `fabric.commands` carries the engine's own
+// dispatchCommand calls (the imperative scrollTo), so no local recording override is needed.
 
 import {
   defineComponent,
@@ -30,7 +35,11 @@ import {
   unmount,
   type IFlatListHandle,
 } from '@symbiote-native/vue';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 
 // FlatList is a GENERIC component (its setup is `<ItemT,>(props, ctx)`), so its value is a generic
 // construct signature. JSX infers ItemT from `data` (proven in examples/vue-tsx/App.tsx), but the
@@ -41,11 +50,6 @@ import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 const FlatListHost = FlatList as unknown as FunctionalComponent<
   Record<string, unknown>
 >;
-
-type ICommandCall = {
-  name: string;
-  args: readonly unknown[];
-};
 
 const ROOT_TAG = 330;
 const ITEM_HEIGHT = 40;
@@ -58,51 +62,35 @@ const TOTAL_WIDTH = HORIZONTAL_COUNT * ITEM_WIDTH;
 
 type IRow = { id: number; label: string };
 
-const commands: ICommandCall[] = [];
-
-const fabric = installFabric();
-const slot = globalThis.nativeFabricUIManager;
-if (slot === undefined) throw new Error('fabric slot was not installed');
-slot.dispatchCommand = (_node, name, args) => {
-  commands.push({ name, args });
-};
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
-beforeEach(() => {
-  fabric.reset();
-  commands.length = 0;
-});
+beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
-
-function walk(nodes: IFakeNode[], visit: (node: IFakeNode) => void): void {
-  for (const node of nodes) {
-    visit(node);
-    walk(node.children, visit);
-  }
-}
 
 function collectRowLabels(): Set<string> {
   const labels = new Set<string>();
-  walk(fabric.committed, node => {
-    const text = node.props.text;
+  live.walkLive(live.appRoot(), node => {
+    const text = node.payload.text;
     if (typeof text === 'string' && text.startsWith('row-')) labels.add(text);
   });
   return labels;
 }
 
-function findCreated(viewName: string): IFakeNode {
-  const node = fabric.find(n => n.viewName === viewName);
+function findCreated(viewName: string): ILiveNode {
+  const node = live.findLive(live.appRoot(), n => n.viewName === viewName);
   expect(node, `${viewName} created`).toBeDefined();
   if (node === undefined) throw new Error(`unreachable: ${viewName} missing`);
   return node;
 }
 
-function rowsWithFlexDirection(): IFakeNode[] {
-  const rows: IFakeNode[] = [];
-  walk(fabric.committed, node => {
-    if (node.viewName === 'RCTView' && node.props.flexDirection === 'row')
+function rowsWithFlexDirection(): ILiveNode[] {
+  const rows: ILiveNode[] = [];
+  live.walkLive(live.appRoot(), node => {
+    if (node.viewName === 'RCTView' && node.payload.flexDirection === 'row')
       rows.push(node);
   });
   return rows;
@@ -226,11 +214,14 @@ describe('Vue FlatList on the engine', () => {
       );
       await tick();
 
-      expect(findCreated('RCTScrollView').props.horizontal).toBe(true);
+      // The axis FLAG is `foldScrollViewProps` in the engine and unreachable from this host
+      // (`core/engine/cpp/tests/js/scroll-view-payload.itest.ts`). Which TAG the list picked is this
+      // adapter's decision and is what the row-styled content node below proves.
       const content = findCreated('RCTScrollContentView');
       // Pinned to the full row width (not the frame width) so the row overflows and scrolls.
-      expect(content.props.width).toBe(TOTAL_WIDTH);
-      expect(content.props.flexDirection).toBe('row');
+      // The width is this list's own arithmetic; the row direction beside it is the engine's rule
+      // (`core/engine/cpp/tests/js/scroll-content-payload.itest.ts`).
+      expect(content.payload.width).toBe(TOTAL_WIDTH);
     });
 
     it('gates RefreshControl on a @refresh listener (the emit bridge wires onRefresh only when listened)', async () => {
@@ -258,7 +249,10 @@ describe('Vue FlatList on the engine', () => {
       );
       await tick();
       expect(
-        fabric.find(node => node.viewName === 'PullToRefreshView'),
+        live.findLive(
+          live.appRoot(),
+          node => node.viewName === 'PullToRefreshView',
+        ),
         'RefreshControl built when @refresh is listened',
       ).toBeDefined();
 
@@ -284,7 +278,10 @@ describe('Vue FlatList on the engine', () => {
       );
       await tick();
       expect(
-        fabric.find(node => node.viewName === 'PullToRefreshView'),
+        live.findLive(
+          live.appRoot(),
+          node => node.viewName === 'PullToRefreshView',
+        ),
         'no RefreshControl without a @refresh listener',
       ).toBeUndefined();
     });
@@ -327,7 +324,7 @@ describe('Vue FlatList on the engine', () => {
 
       expect(listRef.value, 'FlatList handle attached').not.toBeNull();
       listRef.value!.scrollToOffset({ offset: 200, animated: true });
-      const scrolls = commands.filter(c => c.name === 'scrollTo');
+      const scrolls = fabric.commands.filter(c => c.commandName === 'scrollTo');
       expect(scrolls.length, 'one scrollTo from scrollToOffset').toBe(1);
       expect(scrolls[0].args[0]).toBe(0);
       expect(scrolls[0].args[1]).toBe(200);

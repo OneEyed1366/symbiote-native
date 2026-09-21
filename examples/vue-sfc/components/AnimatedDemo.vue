@@ -82,9 +82,7 @@ const freezeJs = (): void => {
 
 <template>
   <view class="section-nested">
-    <text class="section-label">
-      Animated · JS vs native driver
-    </text>
+    <text class="section-label"> Animated · JS vs native driver </text>
 
     <!-- native-driven perpetual pulse -->
     <view class="pulse-frame">
@@ -126,10 +124,6 @@ const freezeJs = (): void => {
     />
 
     <!-- Freeze the JS thread 1.5s: native (pulse + green) keep moving, JS (orange) stalls -->
-    <ActionButton
-      title="Freeze JS 1.5s"
-      :onPress="freezeJs"
-      color="#fc8181"
-    />
+    <ActionButton title="Freeze JS 1.5s" :onPress="freezeJs" color="#fc8181" />
   </view>
 </template>

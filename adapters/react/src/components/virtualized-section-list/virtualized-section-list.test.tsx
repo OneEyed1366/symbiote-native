@@ -9,7 +9,10 @@
 import { createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { VirtualizedSectionList, mount, unmount } from '@symbiote-native/react';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 33;
 const VIEWPORT_HEIGHT = 400;
@@ -54,7 +57,8 @@ function App(): ReactElement {
   });
 }
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
@@ -69,25 +73,16 @@ const EXPECTED = [
   'footer:Section B',
 ];
 
-function walk(nodes: IFakeNode[], visit: (node: IFakeNode) => void): void {
-  for (const node of nodes) {
-    visit(node);
-    walk(node.children, visit);
-  }
-}
-
 // The committed text stream, in document order: exactly the flattened entry sequence.
 function collectTexts(): string[] {
-  const texts: string[] = [];
-  walk(fabric.committed, node => {
-    const text = node.props.text;
-    if (typeof text === 'string') texts.push(text);
-  });
-  return texts;
+  return live.texts(live.appRoot());
 }
 
-function findScrollView(): IFakeNode {
-  const node = fabric.find(n => n.viewName === 'RCTScrollView');
+function findScrollView() {
+  const node = live.findLive(
+    live.appRoot(),
+    n => n.viewName === 'RCTScrollView',
+  );
   expect(node, 'RCTScrollView was created').toBeDefined();
   if (node === undefined) throw new Error('unreachable: RCTScrollView missing');
   return node;

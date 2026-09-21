@@ -10,10 +10,15 @@ import {
   type SimpleChanges,
 } from '@angular/core';
 import { countAngular } from '../diagnostics';
-import { createCallbackWrapper } from '../change-detection-flush';
+import {
+  createCallbackWrapper,
+  registerViewMarker,
+  type ICallbackWrapper,
+} from '../change-detection-flush';
 import {
   flattenStyle,
   isSymbioteNode,
+  propOf,
   type IHostInstance,
   type IStyleProp,
 } from '@symbiote-native/engine';
@@ -43,7 +48,7 @@ import {
  */
 export function anchorHostStyle(elementRef: ElementRef<unknown>): unknown {
   const node = elementRef.nativeElement;
-  return isSymbioteNode(node) ? node.props.style : undefined;
+  return isSymbioteNode(node) ? propOf(node, 'style') : undefined;
 }
 
 // anchorHostStyle returns `unknown` (it reads whatever already resolved onto the anchor node's
@@ -259,10 +264,20 @@ export class SymbioteHostPropsDirective {
   // binds its result: the "pan does nothing" bug. Shared with the TAG path's `SymbioteElement`,
   // which has the identical deficit; the mechanism, the `onScroll` exemption and why the wrapper
   // is cached per original handler live in `createCallbackWrapper`.
-  private readonly wrapCallback = createCallbackWrapper(
-    this.cdr,
-    this.elementRef.nativeElement,
-  );
+  //
+  // THE REF REACHES THE WRAPPER BY THE NODE NOW, not as an argument. `SymbioteElement` stopped
+  // injecting one per element — it was ~1-2.4 us on every tag of a screen to serve the few that carry
+  // a callback — so `createCallbackWrapper` looks its marker up in `markViewFor`. This directive
+  // keeps its own injection because it is matched by an ATTRIBUTE a composed component writes
+  // deliberately, not by every element, and registers it here for the same node the wrapper holds.
+  private readonly wrapCallback = this.registerMarkerAndWrap();
+
+  private registerMarkerAndWrap(): ICallbackWrapper {
+    const node: unknown = this.elementRef.nativeElement;
+    if (typeof node === 'object' && node !== null)
+      registerViewMarker(node, this.cdr);
+    return createCallbackWrapper(node);
+  }
 
   // Values pushed by the previous bag, so a push writes only what actually moved. Copied rather
   // than aliased: a component is free to hand back the same object with mutated fields.

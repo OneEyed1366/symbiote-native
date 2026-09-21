@@ -67,18 +67,21 @@ export function rippleBackground(
   return { type: 'RippleAndroid', color, borderless, rippleRadius };
 }
 
-// Maps the resolved background + useForeground onto the native prop Android reads. useForeground
-// only paints the foreground when the platform supports it (canUseNativeForeground); otherwise it
-// falls back to the background slot, matching RN. On iOS both props are inert.
-export function backgroundProps(
-  background: INativeFeedbackBackground,
-  useForeground: boolean,
-): Record<string, INativeFeedbackBackground> {
-  if (useForeground && canUseNativeForeground()) {
-    return { nativeForegroundAndroid: background };
-  }
-  return { nativeBackgroundAndroid: background };
-}
+// `backgroundProps` WAS HERE AND IS GONE (2026-09-18). It mapped the resolved background plus
+// `useForeground` onto the native slot Android reads, and that is the `#ifdef ANDROID` tail of
+// `foldCloneOntoChild` in `SymbioteFabricProps.cpp` — api-level gate included, since
+// `Platform.Version` on Android IS the api level and `androidApiLevel()` reads the same number.
+//
+// A JS COPY OF A RULE THAT RUNS IN C++, with no runtime caller and no test, reachable only through
+// the package barrel. Found by asking what each `Platform.OS` branch still left in
+// `core/components` is FOR. Its C++ twin is covered on both arms —
+// `android-rules.android.itest.ts` asserts the foreground slot and `clone-onto-child-payload.itest.ts`
+// asserts its absence off Android — and break-testing the gate fires exactly one of them.
+//
+// `canUseNativeForeground` below stays, and the distinction is the reusable half: it is a QUESTION
+// an app asks the platform (`TouchableNativeFeedback.canUseNativeForeground()` is RN's own public
+// static), not a rule that decides a payload. Same class as the slider reading a folded
+// `accessibilityState` — asking is not reimplementing.
 
 /**
  * RN's four statics, under RN's own spelling — `TouchableNativeFeedback.Ripple(color, borderless)`.

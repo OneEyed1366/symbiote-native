@@ -7,11 +7,11 @@
 import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount, PanResponder } from '@symbiote-native/react';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 150;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
@@ -21,7 +21,7 @@ function touch(
   pageX: number,
   pageY: number,
   timestamp: number,
-  target: number,
+  target: unknown,
 ): Record<string, unknown> {
   const point = {
     pageX,
@@ -69,15 +69,18 @@ describe('React responder system through the event layer', () => {
 
       mount(ROOT_TAG, <App />);
 
-      const viewNode = fabric.appRoot().children[0];
+      // The app's own View is the non-box-none RCTView (the box-none one is the AppContainer).
+      const viewNode = fabric.find(
+        n => n.viewName === 'RCTView' && n.props.pointerEvents !== 'box-none',
+      );
       expect(viewNode, 'PanResponder View was committed').toBeDefined();
-      const handle = viewNode.instanceHandle;
-      const tag = viewNode.tag;
+      const handle = viewNode!.instanceHandle;
 
-      // One finger: down at (10,10), drag to (40,55), lift.
-      fabric.fireEvent(handle, 'topTouchStart', touch(10, 10, 1_000, tag));
-      fabric.fireEvent(handle, 'topTouchMove', touch(40, 55, 1_016, tag));
-      fabric.fireEvent(handle, 'topTouchEnd', touch(40, 55, 1_032, tag));
+      // One finger: down at (10,10), drag to (40,55), lift. `target` is per-touch (the
+      // instanceHandle Fabric would deliver), not an outer event field nothing reads.
+      fabric.fireEvent(handle, 'topTouchStart', touch(10, 10, 1_000, handle));
+      fabric.fireEvent(handle, 'topTouchMove', touch(40, 55, 1_016, handle));
+      fabric.fireEvent(handle, 'topTouchEnd', touch(40, 55, 1_032, handle));
 
       expect(seen.join(',')).toBe('grant,move,release');
       // dx/dy are the delta from the grant point: 40-10=30, 55-10=45.

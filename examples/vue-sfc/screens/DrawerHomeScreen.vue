@@ -18,9 +18,7 @@ const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.DrawerDemo];
     <view class="section">
       <view :class="`line-tag line-tag-${lineInfo.line}`">
         <text class="line-tag-text">
-          {{
-            `${lineInfo.code} · ${lineInfo.label}`
-          }}
+          {{ `${lineInfo.code} · ${lineInfo.label}` }}
         </text>
       </view>
       <view class="hero-card">
@@ -28,14 +26,10 @@ const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.DrawerDemo];
           class="hero-badge"
           :style="{ backgroundColor: LINE_COLOR.structure }"
         >
-          <text class="hero-badge-text">
-            DR
-          </text>
+          <text class="hero-badge-text"> DR </text>
         </view>
         <view class="hero-copy">
-          <text class="hero-title">
-            Drawer
-          </text>
+          <text class="hero-title"> Drawer </text>
           <text class="hero-body">
             A swipeable drawer sliding in from the right, driven by the
             navigator's own gesture handler.

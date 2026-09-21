@@ -2,9 +2,8 @@
 // (accessibility-info/shared.ts's routeSendAccessibilityEvent), exercised through both
 // platform builds directly, no simulator needed. Proves the merge behaves identically
 // on both platforms except iOS's one 'click' no-op: createElement + createSurface commit
-// a real node so commit.ts's mirror resolves it, and the fake Fabric slot is augmented
-// with sendAccessibilityEvent (installFabric's harness models commit/clone, not the a11y
-// sink - same augmentation the React adapter's accessibility-info test already uses).
+// a real node so it resolves as committed, and the recording host's own accessibilityEvents
+// log is read directly — our own output, not a model of the renderer.
 //
 // Scope note: this file covers ONLY routeSendAccessibilityEvent (per the shared module's own
 // contract). The rest of IAccessibilityInfoStatic (isScreenReaderEnabled/addEventListener/
@@ -24,28 +23,14 @@ import {
   disposeRoot,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import { AccessibilityInfo as AccessibilityInfoIOS } from './index.ios';
 import { AccessibilityInfo as AccessibilityInfoAndroid } from './index.android';
 
-interface IAccessibilityCall {
-  node: IFakeNode;
-  eventType: string;
-}
-const a11yEvents: IAccessibilityCall[] = [];
-
-const fabric = installFabric();
-{
-  const slot: unknown = Reflect.get(globalThis, 'nativeFabricUIManager');
-  if (typeof slot !== 'object' || slot === null) {
-    throw new Error('installFabric did not install a slot');
-  }
-  Object.assign(slot, {
-    sendAccessibilityEvent(node: IFakeNode, eventType: string): void {
-      a11yEvents.push({ node, eventType });
-    },
-  });
-}
+// routeSendAccessibilityEvent dispatches through treeHost().sendAccessibilityEvent, which the
+// recording host records verbatim — our own output, not a claim about the renderer.
+const fabric = installRecordingFabric();
+const a11yEvents = fabric.accessibilityEvents;
 
 const ROOT_TAG = 91;
 
@@ -57,10 +42,7 @@ function committedNode(): ISymbioteNode {
   return node;
 }
 
-beforeEach(() => {
-  fabric.reset();
-  a11yEvents.length = 0;
-});
+beforeEach(() => fabric.reset());
 afterEach(() => disposeRoot(ROOT_TAG));
 
 describe('sendAccessibilityEvent (shared routing)', () => {

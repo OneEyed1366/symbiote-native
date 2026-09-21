@@ -33,7 +33,15 @@ export interface IAngularPressableProps
   delayLongPress?: number;
   disabled?: boolean;
   cancelable?: boolean;
+  // Tells native to stand down once this Pressable claims the gesture (RN Pressable.js:123,
+  // Pressability.js onResponderGrant), so a parent ScrollView cannot steal it mid-drag. Default
+  // false.
+  blockNativeResponder?: boolean;
   hitSlop?: IRectOffset;
+  // RN's snapshot affordance (`Pressable.js:151`, `TouchableHighlight.js:61`): render the control in
+  // its pressed state with no gesture, so a test can capture it. Consumed by the engine and stripped
+  // before the payload — no ViewConfig declares it.
+  testOnly_pressed?: boolean;
   pressRetentionOffset?: IRectOffset;
   unstable_pressDelay?: number;
   android_ripple?: IPressableAndroidRippleConfig;

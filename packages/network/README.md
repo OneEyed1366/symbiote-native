@@ -17,6 +17,10 @@ depended on directly and never the `expo` meta-package, why the upstream JS is h
 npm install @symbiote-native/network
 ```
 
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --network` (or
+`add --network` in an existing app) installs and wires this for you — see
+[`@symbiote-native/cli`](../cli).
+
 Depends on `expo-network` and `expo-modules-core` directly (regular dependencies, pinned to exact
 versions — never a caret range, since this package's `core/` is hand-ported against one specific
 native API shape and a newer resolve could silently drift the two apart). Never install

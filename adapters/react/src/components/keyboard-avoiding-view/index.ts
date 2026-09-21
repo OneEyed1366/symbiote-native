@@ -26,7 +26,9 @@ import {
 } from '@symbiote-native/engine';
 import {
   computeInset,
+  configureKeyboardAvoidingAnimation,
   keyboardAvoidingEventNamesFor,
+  readKeyboardAnimationTiming,
   readKeyboardFrame,
   readLayoutFrame,
   readPrefersCrossFadeTransitions,
@@ -117,6 +119,14 @@ export const KeyboardAvoidingView: FC<IKeyboardAvoidingViewProps> = props => {
             prefersCrossFadeTransitions: prefersCrossFadeRef.current,
           },
         );
+        // RN's `_updateBottomIfNecessary` skips the animation entirely when the inset did not
+        // change (`if (this._bottom === height) return;`) — arming a transition for a value that
+        // moves nowhere would only ever animate other props the app changed this frame.
+        if (next !== previousInset)
+          configureKeyboardAvoidingAnimation(
+            readKeyboardAnimationTiming(payload),
+            enabled,
+          );
         dlog(`KeyboardAvoidingView show -> inset ${next}`);
         return next;
       });

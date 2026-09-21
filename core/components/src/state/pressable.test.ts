@@ -134,6 +134,93 @@ describe('Pressable delayed activation and retention', () => {
   });
 });
 
+// Pressability.js:471-478 — the long-press timer is armed ONCE, at RESPONDER_GRANT, for
+// `delayLongPress + delayPressIn` (here `unstable_pressDelay`), and a drift out/back in only ever
+// CANCELS it (`_cancelLongPressDelayTimeout`), never re-arms. None of this was exercised anywhere
+// in this file before — `onLongPress` was declared in the harness default and never once asserted.
+describe('Pressable long-press timing', () => {
+  it('fires after the default 500ms from touch-down with no delay configured', () => {
+    const { clock, handlers, log } = makeHarness();
+
+    handlers.handlePressIn(eventAt(0, 0));
+    clock.advance(499);
+    expect(log).not.toContain('long');
+
+    clock.advance(1);
+    expect(log).toContain('long');
+  });
+
+  // The whole point of `configFor`'s compensation: with `unstable_pressDelay` deferring the
+  // pressed VISUAL, the long-press threshold must still land at a constant time from touch-down —
+  // never later just because the visual was deferred. Config values are passed RAW here (as
+  // `configFor` would resolve them: `delayLongPress` already has `unstable_pressDelay` baked out
+  // of its default), so this asserts the STATE MACHINE half — armed at grant, for
+  // `delayLongPress + unstable_pressDelay`.
+  it('holds the total long-press threshold constant regardless of unstable_pressDelay', () => {
+    const { clock, handlers, log } = makeHarness({
+      unstable_pressDelay: 200,
+      delayLongPress: 300, // 500 - 200, as `configFor` would resolve it
+    });
+
+    handlers.handlePressIn(eventAt(0, 0));
+    clock.advance(499); // press-in visual activated at 200, long-press not yet due
+    expect(log).not.toContain('long');
+
+    clock.advance(1); // 500ms from touch-down
+    expect(log).toContain('long');
+  });
+
+  it('never re-arms the long-press timer after a drift out and back in', () => {
+    const { clock, handlers, log } = makeHarness();
+
+    handlers.handlePressIn(eventAt(0, 0));
+    clock.advance(400);
+    handlers.handleResponderMove(eventAt(100, 0)); // drifts out — cancels the timer permanently
+    handlers.handleResponderMove(eventAt(10, 0)); // drifts back in — re-activates, must NOT re-arm
+    clock.advance(500); // 900ms from touch-down — well past the ORIGINAL 500ms threshold
+
+    expect(log).not.toContain('long');
+    expect(clock.pending()).toBe(0);
+  });
+
+  it('still cancels outright when the finger leaves and stays out', () => {
+    const { clock, handlers, log } = makeHarness();
+
+    handlers.handlePressIn(eventAt(0, 0));
+    clock.advance(400);
+    handlers.handleResponderMove(eventAt(100, 0));
+    clock.advance(200);
+
+    expect(log).not.toContain('long');
+  });
+
+  // Pressability.js:502-508 — a SEPARATE, 10px jitter threshold, independent of
+  // `pressRetentionOffset`/`hitSlop` (here 30/0, so 8px is nowhere near the retention edge). Real
+  // finger jitter during a hold must not fire a long press; a real, appreciable move must still
+  // cancel it even while the press itself stays comfortably retained.
+  it('cancels the long press on an appreciable move, even well inside the retention rect', () => {
+    const { clock, handlers, log } = makeHarness();
+
+    handlers.handlePressIn(eventAt(0, 0));
+    handlers.handleResponderMove(eventAt(8, 8)); // hypot ≈ 11.3, past the 10px jitter threshold
+    clock.advance(500);
+
+    expect(log).not.toContain('long');
+    // The press itself is unaffected — still comfortably inside pressRetentionOffset.
+    expect(log).not.toContain('pressed:false');
+  });
+
+  it('tolerates a small jitter under the 10px threshold', () => {
+    const { clock, handlers, log } = makeHarness();
+
+    handlers.handlePressIn(eventAt(0, 0));
+    handlers.handleResponderMove(eventAt(5, 5)); // hypot ≈ 7.07, under the threshold
+    clock.advance(500);
+
+    expect(log).toContain('long');
+  });
+});
+
 describe('Pressable release timing', () => {
   it('flushes an early in-bounds release, fires press, then holds pressOut for 130ms', () => {
     const { clock, handlers, log } = makeHarness({ unstable_pressDelay: 120 });

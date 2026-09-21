@@ -1,0 +1,232 @@
+#include "SymbioteEngineBindings.h"
+
+#include "SymbioteDebug.h"
+#include "SymbioteTree.h"
+
+#include <react/renderer/mounting/ShadowTreeRegistry.h>
+#include <react/renderer/uimanager/UIManager.h>
+#include <react/renderer/uimanager/UIManagerBinding.h>
+
+#include <cmath>
+#include <cstdint>
+#include <cstdlib>
+#include <memory>
+#include <string>
+#include <vector>
+
+namespace symbiote {
+
+using namespace facebook;
+
+namespace {
+
+/**
+ * A block of `int32_t` owned by native and handed to JS as the backing store of an `Int32Array`.
+ *
+ * The node table's parent edge is already a flat `Int32Array` in JS (item 8b); the endpoint is that
+ * the SAME array is memory the native applier writes. A `MutableBuffer`-backed `jsi::ArrayBuffer` is
+ * the only JSI shape that gives JS a VIEW instead of a copy — every other route costs a crossing per
+ * element, and the census that sized this design counted ~4 000 reads for a two-row swap.
+ *
+ * Note what this does and does not fork. `node-table.ts` is byte-identical whichever store it gets:
+ * one implementation, two allocators. That is why the JS store may stand indefinitely, while the JS
+ * APPLIER may not — see `native-engine.ts`'s header for the distinction, which is load-bearing.
+ *
+ * Lifetime is the ArrayBuffer's: `jsi::ArrayBuffer` retains the `shared_ptr`, so the store outlives
+ * every JS view of it and is freed with the last one. A registry of live stores would be the leak
+ * rather than the fix.
+ */
+class Int32Store : public jsi::MutableBuffer {
+ public:
+  explicit Int32Store(size_t lengthInInts) : data_(lengthInInts, 0) {}
+
+  size_t size() const override {
+    return data_.size() * sizeof(int32_t);
+  }
+
+  uint8_t *data() override {
+    return reinterpret_cast<uint8_t *>(data_.data());
+  }
+
+ private:
+  std::vector<int32_t> data_;
+};
+
+jsi::Value allocInt32Array(
+    jsi::Runtime &runtime,
+    const jsi::Value & /*thisValue*/,
+    const jsi::Value *arguments,
+    size_t count) {
+  if (count < 1 || !arguments[0].isNumber()) {
+    throw jsi::JSError(runtime, "allocInt32Array expects a length in elements");
+  }
+
+  const double requested = arguments[0].getNumber();
+  // A negative or fractional length reaches `std::vector` as a wildly wrong `size_t`. Reject it here,
+  // where there is a message, rather than at the allocation, where the failure is a bare crash.
+  if (!(requested >= 0) || requested != std::floor(requested)) {
+    throw jsi::JSError(runtime, "allocInt32Array expects a non-negative integer length");
+  }
+
+  auto store = std::make_shared<Int32Store>(static_cast<size_t>(requested));
+  auto buffer = jsi::ArrayBuffer(runtime, store);
+  auto constructor = runtime.global().getPropertyAsFunction(runtime, "Int32Array");
+  return constructor.callAsConstructor(runtime, std::move(buffer));
+}
+
+/**
+ * How many shadow trees the real `UIManager` is holding — or -1 when we could not reach one.
+ *
+ * This is item 8c-1's bring-up probe and it is deliberately NOT a commit hook. What it retires is
+ * the whole reach chain in one device run: that our pod compiles against ReactCommon's renderer
+ * headers, that it LINKS against the prebuilt `React.xcframework`, and that a plain JSI runtime
+ * handed to a third-party TurboModule can resolve the UIManager with no app-side wiring. Every one
+ * of those is a hard blocker for the native applier and none of them is visible from JS.
+ *
+ * -1 and 0 are different answers and that is the point. `getBinding` reads
+ * `global.nativeFabricUIManager` and returns null when it is absent, so -1 means the ORDERING is
+ * wrong — we were created before Fabric installed its binding. 0 means we reached a real UIManager
+ * that happens to hold no surface. A boolean would collapse the two and cost a second build.
+ *
+ * The ordering is in fact safe by construction, and this probe is what confirms it rather than
+ * assumes it: `getSlot()` (fabric.ts) reads `globalThis.nativeFabricUIManager` and throws when it is
+ * absent, and only THEN resolves our module — so by the time this file's install hook runs, the
+ * binding `getBinding` looks for is guaranteed to be there. That was luck when 8c-0 chose the seam.
+ */
+jsi::Value probeUIManager(
+    jsi::Runtime &runtime,
+    const jsi::Value & /*thisValue*/,
+    const jsi::Value * /*arguments*/,
+    size_t /*count*/) {
+  auto binding = react::UIManagerBinding::getBinding(runtime);
+  if (binding == nullptr) {
+    return jsi::Value(-1.0);
+  }
+
+  int surfaces = 0;
+  binding->getUIManager().getShadowTreeRegistry().enumerate(
+      [&surfaces](const react::ShadowTree & /*shadowTree*/, bool & /*stop*/) { surfaces += 1; });
+  return jsi::Value(static_cast<double>(surfaces));
+}
+
+} // namespace
+
+void installBindings(jsi::Runtime &runtime) {
+  auto bindings = jsi::Object(runtime);
+
+  // THE SWITCH, pushed down from the same two places `debug.ts` reads. Done at install so a host
+  // that sets `__SYMBIOTE_DEBUG__` in its bootstrap (every example's `index.js` does) gets the C++
+  // half armed without calling anything; `setDebugEnabled` below is what a LATER toggle uses, since
+  // this read happens exactly once.
+  const auto flag = runtime.global().getProperty(runtime, "__SYMBIOTE_DEBUG__");
+  const char *const env = std::getenv("DEBUG");
+  setDebugEnabled(
+      (flag.isBool() && flag.getBool()) ||
+      (env != nullptr && std::string(env) == "1"));
+
+  bindings.setProperty(
+      runtime,
+      "setDebugEnabled",
+      jsi::Function::createFromHostFunction(
+          runtime,
+          jsi::PropNameID::forAscii(runtime, "setDebugEnabled"),
+          1,
+          [](jsi::Runtime & /*rt*/, const jsi::Value & /*thisVal*/, const jsi::Value *args, size_t count)
+              -> jsi::Value {
+            if (count > 0 && args[0].isBool()) setDebugEnabled(args[0].getBool());
+            return jsi::Value::undefined();
+          }));
+
+  // Drains what the C++ side logged. The reason the lines are retained at all: a diagnostic nobody
+  // can assert on is a diagnostic that rots — this is what lets a test say "the engine warned"
+  // rather than a human noticing a line scroll past.
+  bindings.setProperty(
+      runtime,
+      "takeDebugLog",
+      jsi::Function::createFromHostFunction(
+          runtime,
+          jsi::PropNameID::forAscii(runtime, "takeDebugLog"),
+          0,
+          [](jsi::Runtime &rt, const jsi::Value & /*thisVal*/, const jsi::Value * /*args*/, size_t /*count*/)
+              -> jsi::Value {
+            const std::vector<std::string> lines = takeDebugLog();
+            auto out = jsi::Array(rt, lines.size());
+            for (size_t at = 0; at < lines.size(); at += 1)
+              out.setValueAtIndex(rt, at, jsi::String::createFromUtf8(rt, lines[at]));
+            return out;
+          }));
+
+  bindings.setProperty(runtime, "version", jsi::Value(kNativeVersion));
+  bindings.setProperty(
+      runtime,
+      "allocInt32Array",
+      jsi::Function::createFromHostFunction(
+          runtime, jsi::PropNameID::forAscii(runtime, "allocInt32Array"), 1, allocInt32Array));
+  bindings.setProperty(
+      runtime,
+      "probeUIManager",
+      jsi::Function::createFromHostFunction(
+          runtime, jsi::PropNameID::forAscii(runtime, "probeUIManager"), 0, probeUIManager));
+
+  // One tree per runtime, and it holds NOTHING — a node's owner is the JS placeholder object,
+  // through `NativeState`. So this instance exists only to give the methods a `this` to hang off,
+  // and a per-call one would work identically. It is shared because an earlier version DID hold a
+  // table, and keeping the shape makes the diff that removed it readable.
+  auto tree = std::make_shared<Tree>();
+
+  // Installed by name rather than through a switch so a JS caller's mistake is `undefined is not a
+  // function` at the call site, instead of a runtime string comparison failing somewhere inside C++.
+  // `isBindings` in `native-engine.ts` checks these names one by one for the same reason.
+  const auto install = [&](const char *name,
+                           unsigned int arity,
+                           jsi::Value (Tree::*method)(jsi::Runtime &, const jsi::Value *, size_t)) {
+    bindings.setProperty(
+        runtime,
+        name,
+        jsi::Function::createFromHostFunction(
+            runtime,
+            jsi::PropNameID::forAscii(runtime, name),
+            arity,
+            [tree, method](
+                jsi::Runtime &rt,
+                const jsi::Value & /*thisValue*/,
+                const jsi::Value *arguments,
+                size_t count) { return (tree.get()->*method)(rt, arguments, count); }));
+  };
+
+  // The one member on a commit path.
+  install("applyOps", 5, &Tree::applyOps);
+
+  // The reads — value and structural — and the imperative six. All of them take the same placeholder
+  // object `applyOps` attached the node to, and none is on a commit path: they run at gesture or
+  // lifecycle rate. `census` is deliberately absent; see `native-tree-host.ts`.
+  install("getProp", 2, &Tree::getProp);
+  install("getProps", 1, &Tree::getProps);
+  install("markPropsDirty", 1, &Tree::markPropsDirty);
+  install("getViewName", 1, &Tree::getViewName);
+  install("parentOf", 1, &Tree::parentOf);
+  install("childrenOf", 1, &Tree::childrenOf);
+  install("nextSiblingOf", 1, &Tree::nextSiblingOf);
+  install("parentsOf", 1, &Tree::parentsOf);
+  install("subtreesOf", 1, &Tree::subtreesOf);
+  install("ancestorsOf", 1, &Tree::ancestorsOf);
+  install("committedRecordOf", 1, &Tree::committedRecordOf);
+  // A TEST read, and it is on this list rather than behind a build flag because the bag it returns
+  // is already retained per node for diffing — see `Tree::committedPayloadOf` for why the complete
+  // props read-back cannot come from React Native's own `getDebugProps` or `rawProps`.
+  install("committedPayloadOf", 1, &Tree::committedPayloadOf);
+
+  install("dispatchCommand", 3, &Tree::dispatchCommand);
+  install("sendAccessibilityEvent", 2, &Tree::sendAccessibilityEvent);
+  install("measure", 2, &Tree::measure);
+  install("measureInWindow", 2, &Tree::measureInWindow);
+  install("measureLayout", 4, &Tree::measureLayout);
+  install("setIsJSResponder", 3, &Tree::setIsJSResponder);
+
+  // Diagnostic, read on demand rather than per op. See `Tree::readSurfaceTelemetry`.
+  install("readSurfaceTelemetry", 1, &Tree::readSurfaceTelemetry);
+
+  runtime.global().setProperty(runtime, "__symbioteEngineNative", std::move(bindings));
+}
+
+} // namespace symbiote

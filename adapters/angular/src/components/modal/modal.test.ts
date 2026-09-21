@@ -11,16 +11,17 @@ import { Component, signal } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   clearGlobalStyles,
+  parentOf,
   registerRules,
   type ISymbioteEvent,
 } from '@symbiote-native/engine';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric, payloadOf } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../../render';
 import { Modal } from './index';
 
 const ROOT_TAG = 912;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -106,7 +107,8 @@ describe('Modal (no throwing path — see file header)', () => {
     // forever — after the queued reducer + a CD pass run, the hidden modal must actually be gone.
     mount(ROOT_TAG, ModalHostFixture);
     await tick();
-    expect(fabric.find(n => n.props.testID === 'modal')).toBeDefined();
+    const modal = fabric.find(n => n.props.testID === 'modal');
+    expect(modal).toBeDefined();
 
     if (!capturedHost) throw new Error('host was not captured');
     capturedHost.visible.set(false);
@@ -114,11 +116,10 @@ describe('Modal (no throwing path — see file header)', () => {
     await tick();
     await tick();
 
-    const stillThere = fabric.committed.some(function walk(node): boolean {
-      if (node.props.testID === 'modal') return true;
-      return node.children.some(walk);
-    });
-    expect(stillThere).toBe(false);
+    // The recording host never forgets a node it once saw created, so residency is read off the
+    // engine's own live parent link — undefined once the node is actually detached — not off a
+    // search over the creation log, which would report this node resident forever.
+    expect(modal && parentOf(modal.handle)).toBeUndefined();
   });
 
   it('emits the raw ISymbioteEvent on orientationChange, orientation on nativeEvent', async () => {
@@ -155,6 +156,6 @@ describe('Modal (no throwing path — see file header)', () => {
     await tick();
 
     const node = fabric.find(n => n.props.testID === 'modal');
-    expect(node?.props.backgroundColor).toBe('purple');
+    expect(node && payloadOf(node.handle).backgroundColor).toBe('purple');
   });
 });

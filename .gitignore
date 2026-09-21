@@ -1,8 +1,16 @@
 node_modules/
 build/
 build-ngc/
+# the optimized twin of `core/engine/cpp/tests/build` — timings only, asserts compiled out
+build-release/
+# and the ANDROID twin — same sources, `#ifdef ANDROID` compiled in (`pnpm run test:android`)
+build-android/
 dist/
 *.tsbuildinfo
+
+# @symbiote-native/cli's own rolldown output — a single file at the package root (build.config.ts),
+# not under build/, so it needs its own line.
+packages/cli/bundle.js
 
 # local `pnpm pack`/`npm pack` output — used for local-only dev testing (installing an
 # unpublished package into a standalone examples/* app before it has a real npm release)

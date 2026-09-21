@@ -37,28 +37,20 @@
 // its own `pressable` would put two press machines on one tree.
 
 import {
-  ARIA_ALIAS_KEYS,
+  SLOT_DERIVED_ALL,
   appListenerFor,
-  foldAriaProps,
   markPropsDirty,
   registerHostBehavior,
   requestCommitFor,
   setBehaviorListener,
   type IHostBehavior,
-  type IPayloadFold,
   type ISymbioteEvent,
   type ISymbioteNode,
+  propOf,
 } from '@symbiote-native/engine';
 
 import {
-  resolveDisabledAccessibilityState,
-  resolveTouchableFocusable,
-} from '../view/render-pressable';
-import {
-  accessibleUnlessOptedOut,
-  asAccessibilityState,
   attachPressMachine,
-  booleanOr,
   detachPressMachine,
   type IPressConfigRefinement,
 } from './pressable';
@@ -71,61 +63,19 @@ import {
 
 export const TOUCHABLE_WITHOUT_FEEDBACK_TAG = 'touchable-without-feedback';
 
-// TouchableWithoutFeedback.js:130-153, RN's own order, minus two groups that are NOT props here:
-// the four `on*` names (forwarded as LISTENERS by `FORWARDED_LISTENERS`) and the five raw `aria-*`
-// entries. RN passes those raw because its TWF folds no aria itself and leaves the child View to do
-// it; we fold the owner's bag before the clone runs, so `aria-valuemax` has already become
-// `accessibilityValue` and `aria-modal` `accessibilityViewIsModal` by this point.
+// WHAT THE OWNER'S WRITES DIRTY, and it is EVERY name rather than a list of thirty.
 //
-// COPIED ONLY WHEN SET (:281), which is the split from TNF's unconditional clone.
-const CLONED_WHEN_SET: readonly string[] = [
-  'accessibilityActions',
-  'accessibilityHint',
-  'accessibilityLanguage',
-  'accessibilityIgnoresInvertColors',
-  'accessibilityLabel',
-  'accessibilityRole',
-  'accessibilityValue',
-  'accessibilityViewIsModal',
-  'hitSlop',
-  'testID',
-];
-
-// :253-276, assigned whatever their value — including `undefined`, which clears the child's, the
-// same `cloneElement` semantics TNF relies on. Three of them (`accessibilityElementsHidden`,
-// `accessibilityLiveRegion`, `importantForAccessibility`) are in RN's passthrough list TOO, and the
-// later conditional copy can only re-assign the same value the aria fold already resolved — so they
-// belong here, not above.
-const CLONED_ALWAYS: readonly string[] = [
-  'accessibilityElementsHidden',
-  'accessibilityLiveRegion',
-  'importantForAccessibility',
-];
-
-// Owner props the four COMPUTED clones read, on top of the two lists above. `focusable` also
-// derives from the `press` LISTENER, which is not a prop — see `onOwnedListenerChange`.
-const DERIVED_FROM: readonly string[] = [
-  'accessible',
-  'accessibilityState',
-  'disabled',
-  'focusable',
-  'id',
-  'nativeID',
-  // Not cloned at all: they configure the scheduler, which reads them live at gesture start. Listed
-  // so a mid-mount change still dirties the child and the next commit re-reads them.
-  'delayPressIn',
-  'delayPressOut',
-  'minPressDuration',
-];
-
-// Every owner name the child's payload reads. Without it the clone is correct at mount and frozen
-// forever after: `markPropsDirty` bubbles UP, so an owner write never reaches the child on its own.
-const SLOT_DERIVED: readonly string[] = [
-  ...CLONED_WHEN_SET,
-  ...CLONED_ALWAYS,
-  ...DERIVED_FROM,
-  ...ARIA_ALIAS_KEYS,
-];
+// RN's two clone lists (`TouchableWithoutFeedback.js:130-153` when-set, `:253-276` always) lived
+// here until 2026-09-18, feeding `slotDerived` alongside the six computed names and the three
+// scheduler ones. The clone is `foldCloneOntoChild` in `SymbioteFabricProps.cpp` now, which turned
+// the list from the RULE into a MIRROR of `kWithoutFeedbackWhenSetKeys` +
+// `kWithoutFeedbackAlwaysKeys` — two lists that must agree, failing silently when they drift.
+//
+// See `touchable-native-feedback.ts` for the same note and what the wildcard costs. The three
+// scheduler names (`delayPressIn`, `delayPressOut`, `minPressDuration`) were the one entry here that
+// was NEVER about the clone — they configure the press machine, which reads them live at gesture
+// start — and a wildcard covers them for free where a list had to remember them.
+const SLOT_DERIVED: readonly string[] = [SLOT_DERIVED_ALL];
 
 // :148-153. Owned, so the app's callback stashes on the owner and a trampoline on the child reads it
 // at dispatch time. `layout` and `accessibilityAction` are Fabric BOOLEAN-GATED events
@@ -164,57 +114,18 @@ function numberOr(value: unknown, fallback: number): number {
   return typeof value === 'number' ? value : fallback;
 }
 
-function stringOr(value: unknown): string | undefined {
-  return typeof value === 'string' ? value : undefined;
-}
-
-/**
- * `cloneElement(element, elementProps)` as a payload fold: the child's own props first, the owner's
- * two lists over them. Pure, as `IPayloadFold` requires — the owner is read, never written.
- */
-function cloneFold(owner: ISymbioteNode, inner: IPayloadFold | undefined) {
-  return (
-    props: Readonly<Record<string, unknown>>,
-  ): Record<string, unknown> => {
-    const next: Record<string, unknown> = {
-      ...(inner === undefined ? props : inner(props)),
-    };
-    // The owner's aria props are on the OWNER, so the engine's own fold at `fabricProps` — which
-    // reads the node being committed — never sees them. Run it here over the source bag; the fold
-    // returns its input by identity when there is nothing to do.
-    const source = owner.hasAriaAlias
-      ? foldAriaProps(owner.props)
-      : owner.props;
-
-    for (const key of CLONED_ALWAYS) next[key] = source[key];
-    for (const key of CLONED_WHEN_SET) {
-      if (source[key] !== undefined) next[key] = source[key];
-    }
-
-    // :255-266. `onPress` is an OWNED name, so it lives in the stash and never in `props`.
-    const disabled = booleanOr(source.disabled);
-    next.accessible = accessibleUnlessOptedOut(source);
-    next.focusable = resolveTouchableFocusable(
-      booleanOr(source.focusable),
-      appListenerFor(owner, 'press') !== undefined,
-      disabled,
-    );
-    // :275 gives `id` priority; the passthrough loop then re-assigns a set `nativeID` over it
-    // (:280-284), so upstream an explicit `nativeID` wins where TNF's `id` does. NOT reproduced,
-    // and deliberately: the spec entry declares `ID_ALIAS`, so on the three adapters that fold in
-    // the renderer `id` has already become `nativeID` before this runs and the quirk is
-    // unobservable — reproducing it would make the answer depend on WHICH adapter is driving,
-    // which is the divergence `.claude/rules/adapter-parity-audit.md` exists to prevent.
-    next.nativeID = stringOr(source.id) ?? stringOr(source.nativeID);
-    // :257-262 folded by the engine above, then :258-263: an explicit `disabled` overrides the
-    // aria/accessibilityState answer.
-    next.accessibilityState = resolveDisabledAccessibilityState(
-      asAccessibilityState(source.accessibilityState),
-      disabled,
-    );
-    return next;
-  };
-}
+// `cloneFold` LEFT THIS FILE ON 2026-09-18 — `foldCloneOntoChild` in `SymbioteFabricProps.cpp`,
+// reached through the first rule keyed on the PARENT'S tag (`IOwner`). TWF's two lists are NOT
+// TNF's: the passthrough half is copied only when SET (`:281`), and the C++ rule keeps that split
+// rather than collapsing the two into one.
+//
+// One quirk of upstream's that IS reproduced, and it is NOT free: `:280-284`'s passthrough loop
+// re-assigns a set `nativeID` over the `id` it just resolved, so an explicit `nativeID` wins here
+// where TNF's `id` does. `routeProp` settles the two names into one value before any rule runs, so
+// getting this right needed the collapse itself to know which of the two components it is running
+// for — `node.nativeIdWinsOverId`, set only by this behavior's registration, flips it.
+//
+// Contract: `core/engine/cpp/tests/js/clone-onto-child-payload.itest.ts`.
 
 /**
  * `delayPressIn` / `delayPressOut` (:186-188) plus RN's unconditional `minPressDuration: 0` (:190).
@@ -230,12 +141,12 @@ function refinementFor(
   return (_node, config) => {
     const handlers = createTouchableFeedbackHandlers(
       {
-        delayPressIn: numberOr(owner.props.delayPressIn, 0),
-        delayPressOut: numberOr(owner.props.delayPressOut, 0),
+        delayPressIn: numberOr(propOf(owner, 'delayPressIn'), 0),
+        delayPressOut: numberOr(propOf(owner, 'delayPressOut'), 0),
         // Read raw rather than off `config`, which has already defaulted the absent case to the
         // press machine's own 130 ms — a floor RN's Touchables never see.
         minPressDuration: numberOr(
-          owner.props.minPressDuration,
+          propOf(owner, 'minPressDuration'),
           TOUCHABLE_MIN_PRESS_DURATION_MS,
         ),
         schedule: (callback, ms) => {
@@ -339,10 +250,11 @@ function onChildInserted(node: ISymbioteNode, child: ISymbioteNode): void {
   // `childHost` (node.ts), so this only runs when a framework inserts without removing first.
   if (previous !== undefined) detachPressMachine(previous);
   node.childHost = child;
-  child.payloadFold = cloneFold(node, child.payloadFold);
   // The owner's props were very likely written BEFORE this child existed (React and Solid set props
-  // at createInstance), so the fold owes a run even though nothing was written since. Witnessed by
+  // at createInstance), so the CLONE owes a run even though nothing was written since. Witnessed by
   // the MOVED-child case, not by a fresh one — `appendChild` already dirties a node it created.
+  // Still owed now that the rule is in C++: it runs on the child's commit, and a child nothing
+  // dirtied has no commit.
   markPropsDirty(child);
   arm(node, child);
 }
@@ -376,6 +288,9 @@ export function registerTouchableWithoutFeedbackBehavior(): void {
     // the child (`attachPressMachine`'s `source`) and by the trampolines above.
     ownedListeners: [...PRESS_LISTENERS, ...FORWARDED_LISTENERS],
     slotDerived: SLOT_DERIVED,
+    // TouchableWithoutFeedback.js's clone overwrites `nativeID` with the raw authored value
+    // (`:279-282`), the reverse of every other component's `id ?? nativeID` — see `routeIdAlias`.
+    nativeIdWinsOverId: true,
   };
   registerHostBehavior(TOUCHABLE_WITHOUT_FEEDBACK_TAG, behavior);
 }

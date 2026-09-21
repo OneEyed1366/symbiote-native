@@ -11,7 +11,7 @@
 
 import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import type {
   IStatusBarAnimation,
   IStatusBarStyle,
@@ -66,7 +66,7 @@ Object.assign(globalThis, {
   RN$registerCallableModule: (): void => {},
 });
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 
 beforeEach(() => {
   fabric.reset();
@@ -94,7 +94,10 @@ describe('StatusBar', () => {
     expect(networkCalls).toEqual([true]);
     // StatusBar drives a native module, it does not paint: a stray host node here would land an
     // empty RCTView in the app's layout.
-    expect(fabric.counts.createNode).toBe(0);
+    // Nothing paintable was even ASKED for: the op stream carries no element and no raw text. An
+    // anchor records an empty view name, which is why the filter is on the name rather than a
+    // bare count — an anchor would be structural bookkeeping, not a stray view.
+    expect(fabric.findAll(node => node.viewName !== '')).toHaveLength(0);
   });
 
   // why: a Solid body runs once. Reading `props.hidden` outside the effect (or handing the engine

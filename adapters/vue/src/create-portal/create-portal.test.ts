@@ -30,16 +30,18 @@ import {
 } from '@symbiote-native/engine';
 import { Teleport } from './index';
 import {
-  installFabric,
+  createLiveTree,
+  installRecordingFabric,
   waitUntil,
-  type IFakeNode,
+  type ILiveNode,
 } from '@symbiote-native/test-utils';
 import * as runtimeHelpers from '../runtime-helpers';
 import metroVueTransformer from '../../metro-vue-transformer.cjs';
 
 const FIRST_ROOT_TAG = 700;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -51,36 +53,26 @@ beforeEach(() => {
 });
 afterEach(() => unmount(rootTag));
 
-function walk(nodes: IFakeNode[], visit: (node: IFakeNode) => void): void {
-  for (const node of nodes) {
-    visit(node);
-    walk(node.children, visit);
-  }
-}
-
-function findByTestId(testId: string): IFakeNode | undefined {
-  let found: IFakeNode | undefined;
-  walk(fabric.committed, node => {
-    if (node.props.testID === testId) found = node;
-  });
-  return found;
+function findByTestId(testId: string): ILiveNode | undefined {
+  return live.findLive(live.appRoot(), node => node.payload.testID === testId);
 }
 
 /** Asserting-and-narrowing lookup: a missing node is the failure, not a later `undefined` deref. */
-function committed(testId: string): IFakeNode {
+function committed(testId: string): ILiveNode {
   const node = findByTestId(testId);
   expect(node, `"${testId}" is in the committed tree`).toBeDefined();
   if (node === undefined) throw new Error('unreachable');
   return node;
 }
 
-function isDescendantOf(root: IFakeNode, target: IFakeNode): boolean {
-  if (root === target) return true;
+// Compared by `.handle`, never `===` — `ILiveNode` is a fresh object per read.
+function isDescendantOf(root: ILiveNode, target: ILiveNode): boolean {
+  if (root.handle === target.handle) return true;
   return root.children.some(child => isDescendantOf(child, target));
 }
 
-function childTestIds(node: IFakeNode): unknown[] {
-  return node.children.map(child => child.props.testID);
+function childTestIds(node: ILiveNode): unknown[] {
+  return node.children.map(child => child.payload.testID);
 }
 
 describe('Teleport — the Vue adapter portal', () => {
@@ -162,7 +154,7 @@ describe('Teleport — the Vue adapter portal', () => {
         'the content left the source subtree for the surface root',
       ).toBe(false);
       expect(
-        childTestIds(fabric.appRoot()),
+        childTestIds(live.nodeOf(live.appRoot())),
         'both the source and the portaled content are top-level siblings',
       ).toEqual(['source', 'ported']);
     });
@@ -192,13 +184,13 @@ describe('Teleport — the Vue adapter portal', () => {
         }),
       );
       await tick();
-      expect(committed('ported').props.accessibilityLabel).toBe('before');
+      expect(committed('ported').payload.accessibilityLabel).toBe('before');
 
       label.value = 'after';
       await tick();
 
       const ported = committed('ported');
-      expect(ported.props.accessibilityLabel, 'the update reached it').toBe(
+      expect(ported.payload.accessibilityLabel, 'the update reached it').toBe(
         'after',
       );
       expect(
@@ -365,7 +357,7 @@ describe('Teleport — the Vue adapter portal', () => {
 
       const ported = committed('ported');
       expect(
-        ported.props.accessibilityLabel,
+        ported.payload.accessibilityLabel,
         'inject resolved at the call site, inside the provider',
       ).toBe('call site');
       expect(
@@ -506,7 +498,7 @@ describe('Teleport — the Vue adapter portal', () => {
       `;
       const code = await compileSfc(source, 'ReproScreen.vue');
       mount(rootTag, evaluateCompiledSfc(code));
-      await waitUntil(() => fabric.counts.completeRoot > 0, 'first commit');
+      await waitUntil(() => fabric.commits > 0, 'first commit');
 
       await waitUntil(
         () => findByTestId('ported') !== undefined,

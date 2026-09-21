@@ -1,17 +1,26 @@
 {
   "extends": "@react-native/typescript-config",
   "compilerOptions": {
-    "types": [],
+    // `["node"]` and not `[]`: the benchmark screens read `performance.now()`, whose only
+    // declaration here comes from @types/node. Stripping it left 4 TS2304 in an editor that the
+    // real check never saw, because tsconfig.typecheck.json restored it. Same value svelte's and
+    // solid's app tsconfigs carry.
+    "types": ["node"],
     // Vue's JSX is compiled by @vue/babel-plugin-jsx, never by tsc — `preserve` leaves it alone and
     // `jsxImportSource` only tells tsc whose JSX namespace to type-check against. Both override
     // @react-native/typescript-config's React defaults, which would otherwise type every element
     // here as React's (see the solid example's tsconfig for the same fix). Points at OUR adapter's
     // namespace, not plain "vue" — @symbiote-native/vue/jsx-runtime.ts explains why: plain "vue"
     // types `<view>`/`<text>` as real SVG elements.
+    //
+    // These belong HERE, not only in tsconfig.typecheck.json — an editor resolves a file through
+    // the nearest tsconfig.json, so a build-only override leaves the IDE wrong.
     "jsx": "preserve",
     "jsxImportSource": "@symbiote-native/vue",
     "plugins": [{ "name": "@symbiote-native/css-parser/typescript-plugin" }]
   },
   "include": ["**/*.ts", "**/*.tsx"],
-  "exclude": ["**/node_modules", "**/Pods"]
+  // e2e/ has its own tsconfig (Detox on Jest, `types: [jest, detox, node]`); leaving it in this
+  // project too reports its jest globals as 22 undefined names.
+  "exclude": ["**/node_modules", "**/Pods", "e2e"]
 }

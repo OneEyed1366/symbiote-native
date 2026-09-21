@@ -9,8 +9,10 @@ import { compile } from 'svelte/compiler';
 import { rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
-import { installFabric } from '@symbiote-native/test-utils';
-import type { IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { normalizeSvelteClass, resolveSvelteClass } from './class-value';
 import { mount, unmount } from './render';
@@ -143,7 +145,8 @@ const COMPILE_OPTIONS = {
   css: 'external',
 } as const;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -156,18 +159,6 @@ function compileToFile(
     outPath,
     compile(source, { ...COMPILE_OPTIONS, filename }).js.code,
   );
-}
-
-function findLive(
-  node: IFakeNode,
-  predicate: (n: IFakeNode) => boolean,
-): IFakeNode | undefined {
-  if (predicate(node)) return node;
-  for (const child of node.children) {
-    const found = findLive(child, predicate);
-    if (found !== undefined) return found;
-  }
-  return undefined;
 }
 
 async function loadParent(): Promise<Component> {
@@ -227,16 +218,16 @@ describe('a clsx `class` on a real compiled View', () => {
     await tick();
     await tick();
 
-    const target = findLive(
-      fabric.appRoot(),
-      node => node.props.testID === 'clsx-target',
+    const target = live.findLive(
+      live.appRoot(),
+      node => node.payload.testID === 'clsx-target',
     );
     expect(target).toBeDefined();
     // `card` and `cardOn` are two independent single-token rules, so both land; `style` is the
-    // author's explicit half and wins the flatten (the fake Fabric spreads
-    // the flattened style onto the node's props, so the fields read off `props` directly).
-    expect(target?.props.padding).toBe(8);
-    expect(target?.props.opacity).toBe(1);
-    expect(target?.props.margin).toBe(2);
+    // author's explicit half and wins the flatten. The style slot is flattened on the way into the
+    // payload, which is why the fields read as top-level keys there rather than under `style`.
+    expect(target?.payload.padding).toBe(8);
+    expect(target?.payload.opacity).toBe(1);
+    expect(target?.payload.margin).toBe(2);
   });
 });

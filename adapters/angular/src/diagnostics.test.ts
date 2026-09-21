@@ -4,7 +4,7 @@
 import '@angular/compiler';
 import { CUSTOM_ELEMENTS_SCHEMA, Component, signal } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from './render';
 import {
@@ -14,7 +14,7 @@ import {
 } from './diagnostics';
 
 const ROOT_TAG = 9941;
-installFabric();
+installRecordingFabric();
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 

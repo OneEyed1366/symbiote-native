@@ -19,7 +19,7 @@
 // carry a behavior themselves.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import {
   clearHostBehaviors,
   createSurface,
@@ -50,7 +50,7 @@ const ROOT_TAG = 91_327;
 // against the earlier component-keyed lookup and caught the change by going red.
 const LEAF_TAG = 'image';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 

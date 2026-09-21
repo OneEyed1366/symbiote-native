@@ -16,6 +16,10 @@ composable/service to wrap — every adapter's entry point is a plain re-export 
 npm install @symbiote-native/application
 ```
 
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --application` (or
+`add --application` in an existing app) installs and wires this for you — see
+[`@symbiote-native/cli`](../cli).
+
 `expo-application` and `expo-modules-core` come along as regular dependencies, pinned to exact
 versions — never install either yourself, and never add the `expo` meta-package to your project
 (it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
@@ -227,7 +231,7 @@ function ApplicationScreen() {
 
 There's no per-instance service to `inject()` in the Angular case — every function is a plain
 free function off the core package, called straight from the constructor (or, on Solid, straight
-from the component body). All five examples mirror the real canary demo screens —
+from the component body). All six examples mirror the real canary demo screens —
 `examples/expo-react/screens/ApplicationScreen.tsx`,
 `examples/expo-vue-sfc/screens/ApplicationScreen.vue`,
 `examples/expo-vue-tsx/screens/ApplicationScreen.tsx`,

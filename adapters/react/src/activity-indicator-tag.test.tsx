@@ -9,32 +9,33 @@
 // two-consequences-of-one-cause shape (`.claude/rules/test-harness-false-greens.md` §14).
 import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 
 // SIDE-EFFECT IMPORT: the behavior is what builds the spinner. An app reaches it through the
 // package barrel; a test importing the renderer directly does not.
+import { parentOf } from '@symbiote-native/engine';
 import './register';
 import { mount, unmount } from './render';
 
 const ROOT_TAG = 9_974;
-const fabric = installFabric();
-
-// RN's iOS default (`ActivityIndicator.js:25`, GRAY) and its fixed box for the named large size.
-const IOS_DEFAULT_COLOR = '#999999';
-const SIZE_LARGE_PX = 36;
-
-function flatten(nodes: readonly IFakeNode[]): IFakeNode[] {
-  return nodes.flatMap(node => [node, ...flatten(node.children)]);
-}
+const fabric = installRecordingFabric();
+// The behavior FOLDS the label onto the spinner, so every read here is `.payload`.
+const live = createLiveTree(fabric);
 
 // The centering host, found through its CHILD. `nativeID` is one of the props RN moves onto the
 // spinner, so a label-keyed lookup lands on the spinner and the host is its parent — which is also
 // the first thing this test asserts about the split.
-function hostOf(label: string): IFakeNode {
-  const committed = flatten(fabric.appRoot().children);
-  const spinner = committed.find(node => node.props.nativeID === label);
+function hostOf(label: string): ILiveNode {
+  const spinner = live.findLive(
+    live.appRoot(),
+    node => node.payload.nativeID === label,
+  );
   if (spinner === undefined) throw new Error(`no committed spinner ${label}`);
-  const host = committed.find(node => node.children.includes(spinner));
+  const host = parentOf(spinner.handle);
   // Unregistered, the label stays on the tag's own node and there is no parent under the root to
   // find — so this is where a missing `./register` lands, and the message says so rather than
   // reading as a broken locator.
@@ -42,14 +43,14 @@ function hostOf(label: string): IFakeNode {
     throw new Error(
       `${label} committed no spinner under a host — is the behavior registered?`,
     );
-  return host;
+  return live.nodeOf(host);
 }
 
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
 describe('React: `activity-indicator` as a tag', () => {
-  it('commits RN’s two-node tree and folds the size onto the spinner', () => {
+  it('commits RN’s two-node tree from the tag alone', () => {
     mount(
       ROOT_TAG,
       createElement('activity-indicator', { nativeID: 'ind', size: 'large' }),
@@ -59,25 +60,15 @@ describe('React: `activity-indicator` as a tag', () => {
     // only because the behavior built it, so this is what fails when `./register` is dropped.
     const host = hostOf('ind');
     expect(host.viewName).toBe('RCTView');
-    expect(host.props).toMatchObject({
-      alignItems: 'center',
-      justifyContent: 'center',
-    });
+    // The centering style and the spinner's whole payload — the size translation, the two defaults,
+    // the platform colour — are the ENGINE's rules now
+    // (`core/engine/cpp/tests/js/activity-indicator-payload.itest.ts`), and this host builds its
+    // payload through the TypeScript `fabricProps`, which carries no copy of them. What is left for
+    // an adapter to prove is the half that is its own: the tag reached the behavior and the second
+    // node exists, which is exactly what fails when `./register` is dropped.
     expect(host.children.map(node => node.viewName)).toEqual([
       'ActivityIndicatorView',
     ]);
-
-    const spinner = host.children[0];
-    // RN maps a NAMED size to both the native enum and a fixed box; the defaults have no
-    // destructure to come from on a tag, so the fold is what supplies them.
-    expect(spinner.props).toMatchObject({
-      size: 'large',
-      width: SIZE_LARGE_PX,
-      height: SIZE_LARGE_PX,
-      animating: true,
-      hidesWhenStopped: true,
-      color: IOS_DEFAULT_COLOR,
-    });
   });
 
   // why: RN spreads `...restProps` onto the SPINNER and keeps only `onLayout`/`style` on the View
@@ -94,8 +85,8 @@ describe('React: `activity-indicator` as a tag', () => {
     );
 
     const host = hostOf('ind');
-    expect(host.props.margin).toBe(4);
-    expect(Object.hasOwn(host.props, 'testID')).toBe(false);
-    expect(host.children[0].props.testID).toBe('spin');
+    expect(host.payload.margin).toBe(4);
+    expect(Object.hasOwn(host.payload, 'testID')).toBe(false);
+    expect(host.children[0].payload.testID).toBe('spin');
   });
 });

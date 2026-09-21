@@ -1,16 +1,17 @@
 # Vue canary — Expo native modules (`@symbiote-native/vue` on device)
 
 Sibling of [`examples/vue-tsx`](../vue-tsx), authored the same way — **Vue JSX** instead of an
-SFC — but this one is the demo home for Expo-SDK-ported packages. It carries the
-`expo-modules-core` native bootstrap (Podfile autolinking, Gradle wiring, the
+SFC — but this one is the demo home for Expo-SDK-ported packages: all 22 `expo-modules-core`-based
+wrapper packages this repo ships, one screen per package, reached from a `Menu` screen. It carries
+the `expo-modules-core` native bootstrap (Podfile autolinking, Gradle wiring, the
 `SymbioteExpoModulesFactory` iOS factory, `MainApplication.kt`'s module-registry adapter) that
-`examples/vue-tsx` deliberately does not, so the "pure" canary stays free of it. Currently demos
-`@symbiote-native/sensors`; more Expo ports (e.g. `@symbiote-native/local-auth`) land here as they
-ship. Everything else — engine, components, navigation demos — is identical to `examples/vue-tsx`.
+`examples/vue-tsx` deliberately does not, so the "pure" canary stays free of it. Everything else —
+engine, components, navigation demos — is identical to `examples/vue-tsx`.
 
 ```
 index.js          registers a RUNNABLE with RN's AppRegistry → mounts the Vue app via @symbiote-native/vue
-App.tsx           a Vue counter, authored as a defineComponent whose setup() returns a JSX render fn
+App.tsx           the native stack navigator over the Menu + 22 wrapper-package demo screens
+screens/          MenuScreen plus one <Name>Screen.tsx per wrapper package
 babel.config.js   @vue/babel-plugin-jsx compiles the JSX → @vue/runtime-core createVNode (before RN's React-JSX transform)
 metro.config.js   aliases 'vue' → @vue/runtime-core; pins one react + one runtime-core (no custom transformer)
 ```
@@ -29,19 +30,15 @@ a babel concern:
   `'vue'`→runtime-core string rewrite), so the app and the adapter share **one** Vue runtime —
   reactivity is a singleton, two copies would silently fail to react.
 
-So `<view onResponderRelease={onTap}>` compiles to `createVNode('view', { onResponderRelease: onTap })`;
-that `onX` key lands in `patchProp` → `routeProp` exactly as the SFC's `@responder-release` did.
-
-This exercises the same structural reconciler paths as the SFC: a `? :` ternary mounts/unmounts
-the spinner (Vue comment placeholder → our anchor node), `.map()` diffs a keyed list (Vue
-Fragment → empty-text anchors + engine `insertBefore` / `removeChild`), and a `computed` derives
-reactive text. The tap is the raw responder protocol (`onStartShouldSetResponder` +
-`onResponderRelease`), not `Pressable`. `ActivityIndicator` is the first `@symbiote-native/components`
-component — its render fn is shared verbatim with React; Vue supplies only the `descriptorToVue`
-bridge.
+An `onX` prop written in JSX (`onPress={handler}`) lands in `patchProp` → `routeProp` exactly as
+the SFC's `@press` does — same runtime path, different authoring surface.
 
 Editing `babel.config.js` or `metro.config.js` needs a Metro cache reset
 (`npm start -- --reset-cache`); editing `App.tsx` does not.
+
+> This canary predates `@symbiote-native/cli` and is for in-repo development. To start a new app
+> with Expo-backed packages wired in, use
+> `npx @symbiote-native/cli new --framework vue --vue-flavor tsx --<package>` instead.
 
 ## Run
 
@@ -56,9 +53,9 @@ npm run android
 # diagnostic logs:  DEBUG=1 npm start -- --reset-cache   (then run ios/android)
 ```
 
-Tap the box → the counter increments and a keyed row is prepended; the second box toggles the
-spinner. Every tap re-enters Vue's reactivity, which recommits through `@symbiote-native/engine` into
-Fabric — RN's renderer never involved.
+From the `Menu` screen, push into any wrapper-package demo. Each screen exercises that package's
+`@symbiote-native/*/vue` entry point end to end, recommitting through `@symbiote-native/engine`
+into Fabric — RN's renderer never involved.
 
 ## Note — distinct app identity from `examples/vue-tsx`
 

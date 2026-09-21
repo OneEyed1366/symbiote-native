@@ -98,39 +98,27 @@ function handleCoolDown(): void {
     >
       <view :class="`line-tag line-tag-${lineInfo.line}`">
         <text class="line-tag-text">
-          {{
-            `${lineInfo.code} · ${lineInfo.label}`
-          }}
+          {{ `${lineInfo.code} · ${lineInfo.label}` }}
         </text>
       </view>
       <view class="hero-card">
-        <view
-          class="hero-badge"
-          :style="{ backgroundColor: lineColor }"
-        >
+        <view class="hero-badge" :style="{ backgroundColor: lineColor }">
           <text class="hero-badge-text">
             {{ lineInfo.code }}
           </text>
         </view>
         <view class="hero-copy">
-          <text class="hero-title">
-            Web Browser
-          </text>
+          <text class="hero-title"> Web Browser </text>
           <text class="hero-body">
-            @symbiote-native/web-browser — an in-app browser that keeps the
-            user inside the app, unlike Linking.openURL, plus the OAuth auth
-            session built on it.
+            @symbiote-native/web-browser — an in-app browser that keeps the user
+            inside the app, unlike Linking.openURL, plus the OAuth auth session
+            built on it.
           </text>
         </view>
       </view>
 
-      <view
-        testID="web-browser-open-card"
-        class="web-browser-card"
-      >
-        <text class="web-browser-card-title">
-          Open a page
-        </text>
+      <view testID="web-browser-open-card" class="web-browser-card">
+        <text class="web-browser-card-title"> Open a page </text>
         <text-input
           v-model="url"
           testID="web-browser-url-input"
@@ -153,16 +141,9 @@ function handleCoolDown(): void {
           :color="lineColor"
         />
         <view class="web-browser-row">
-          <text class="web-browser-row-label">
-            Last result
-          </text>
-          <text
-            testID="web-browser-result"
-            class="web-browser-value-text"
-          >
-            {{
-              lastResult
-            }}
+          <text class="web-browser-row-label"> Last result </text>
+          <text testID="web-browser-result" class="web-browser-value-text">
+            {{ lastResult }}
           </text>
         </view>
         <text class="web-browser-note">
@@ -177,9 +158,7 @@ function handleCoolDown(): void {
         testID="web-browser-custom-tabs-card"
         class="web-browser-card"
       >
-        <text class="web-browser-card-title">
-          Custom Tabs service
-        </text>
+        <text class="web-browser-card-title"> Custom Tabs service </text>
         <ActionButton
           testID="web-browser-list-browsers-button"
           title="List supporting browsers"
@@ -187,16 +166,9 @@ function handleCoolDown(): void {
           :color="lineColor"
         />
         <view class="web-browser-row">
-          <text class="web-browser-row-label">
-            Browsers
-          </text>
-          <text
-            testID="web-browser-browsers"
-            class="web-browser-value-text"
-          >
-            {{
-              supportingBrowsers ?? '(not queried)'
-            }}
+          <text class="web-browser-row-label"> Browsers </text>
+          <text testID="web-browser-browsers" class="web-browser-value-text">
+            {{ supportingBrowsers ?? '(not queried)' }}
           </text>
         </view>
         <ActionButton
@@ -212,9 +184,7 @@ function handleCoolDown(): void {
           :color="lineColor"
         />
         <view class="web-browser-row">
-          <text class="web-browser-row-label">
-            Service package
-          </text>
+          <text class="web-browser-row-label"> Service package </text>
           <text
             testID="web-browser-service-package"
             class="web-browser-value-text"

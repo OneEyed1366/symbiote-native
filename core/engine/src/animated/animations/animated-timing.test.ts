@@ -4,9 +4,9 @@
 // loops run under Node. We observe the value through addListener. The Fabric slot is only here
 // so AnimatedValue's flush path doesn't throw; no view is attached.
 //
-// No Negative group: TimingAnimation and the parallel/sequence composition functions accept
-// whatever config they're given and never validate it — there is no invalid input this unit
-// rejects.
+// No Negative group beyond `parallel`'s missing-entry case below: TimingAnimation and the
+// sequence/stagger composition functions accept whatever config they're given and never
+// validate it.
 
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
@@ -18,9 +18,9 @@ import {
   timing,
 } from '@symbiote-native/engine';
 import type { IEndResult } from '@symbiote-native/engine';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 
-installFabric();
+installRecordingFabric();
 
 // Drivers read requestAnimationFrame / cancelAnimationFrame from the host at call time; Node has
 // neither, so install a ~16ms setTimeout shim.
@@ -198,5 +198,22 @@ describe('Animated drivers over real rAF frames — Positive', () => {
     expect(result.finished).toBe(false);
     expect(a.__getValue()).toBeLessThan(1);
     expect(b.__getValue()).toBeLessThan(1);
+  });
+
+  // why: `AnimatedImplementation.js`'s `parallelImpl` treats a falsy array entry as an
+  // already-finished animation (`if (!animation) { cb({finished: true}); }`) — real app arrays
+  // built with a conditional (`cond && timing(...)`) can genuinely hold one. Ours called
+  // `.start()` unconditionally and crashed instead.
+  it('parallel treats a missing array entry as already finished instead of crashing', async () => {
+    const a = new AnimatedValue(0);
+    const result = await new Promise<IEndResult>(resolve => {
+      parallel([
+        timing(a, { toValue: 1, duration: 80, easing: Easing.linear }),
+        undefined,
+      ]).start(resolve);
+    });
+
+    expect(result.finished).toBe(true);
+    expect(a.__getValue()).toBe(1);
   });
 });

@@ -1,4 +1,4 @@
-// The Descriptor -> Solid bridge, driven through the real renderer seam into the fake Fabric slot.
+// The Descriptor -> Solid bridge, driven through the real renderer seam onto the recording host.
 // Not a pure mapping test like React's descriptor-bridge.test.ts: React's bridge returns elements
 // its own reconciler then diffs, so mapping IS the contract there. Here the bridge owns the whole
 // update path, so what has to be proven is that a reactive change reaches the props of the SAME
@@ -12,36 +12,30 @@
 import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { el, txt, type IDescriptorChild } from '@symbiote-native/components';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 import { descriptorToSolid } from './descriptor-to-solid';
 import { mount, unmount } from './render';
 
 const ROOT_TAG = 811;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-function walk(nodes: IFakeNode[], visit: (node: IFakeNode) => void): void {
-  for (const node of nodes) {
-    visit(node);
-    walk(node.children, visit);
-  }
-}
-
-// The LIVE committed tree, not `fabric.created` — a clone-on-write supersedes the created node's
-// frozen props (symbiote-engine-core §8).
+// The LIVE tree, not the recording — the record holds a node as it was CREATED, with its props
+// frozen at that moment (symbiote-engine-core §8).
 function committed(
-  predicate: (node: IFakeNode) => boolean,
-): IFakeNode | undefined {
-  let found: IFakeNode | undefined;
-  walk(fabric.committed, node => {
-    if (found === undefined && predicate(node)) found = node;
-  });
-  return found;
+  predicate: (node: ILiveNode) => boolean,
+): ILiveNode | undefined {
+  return live.findLive(live.appRoot(), predicate);
 }
 
 describe('descriptorToSolid', () => {
@@ -59,22 +53,23 @@ describe('descriptorToSolid', () => {
       );
       await tick();
 
-      const view = committed(node => node.props.testID === 'bridge');
+      const view = committed(node => node.payload.testID === 'bridge');
       expect(view?.viewName).toBe('RCTView');
-      expect(committed(node => node.props.testID === 'label')?.viewName).toBe(
+      expect(committed(node => node.payload.testID === 'label')?.viewName).toBe(
         'RCTText',
       );
       expect(
         committed(
-          node => node.viewName === 'RCTRawText' && node.props.text === 'hello',
+          node =>
+            node.viewName === 'RCTRawText' && node.payload.text === 'hello',
         ),
       ).toBeDefined();
     });
 
     // why: THE reason this bridge takes an accessor instead of a Descriptor. A Solid component body
     // runs once, so a value-taking bridge would freeze at mount; a bridge that rebuilt from a fresh
-    // Descriptor would swap the node out from under Fabric. Counting createNode is what tells those
-    // three outcomes apart — the prop moved AND no second native node appeared.
+    // Descriptor would swap the node out from under Fabric. Reading the node's IDENTITY is what
+    // tells those three outcomes apart — the prop moved AND it is the same node it moved on.
     it('re-props the SAME native node on a reactive change', async () => {
       const [opacity, setOpacity] = createSignal(0.5);
       mount(ROOT_TAG, () =>
@@ -83,21 +78,20 @@ describe('descriptorToSolid', () => {
         ),
       );
       await tick();
-      const createdAtMount = fabric.counts.createNode;
-      expect(
-        committed(node => node.props.testID === 'live')?.props.opacity,
-      ).toBe(0.5);
+      // Node IDENTITY rather than a creation count: a rebuild that netted out even would satisfy a
+      // count, and the identity moving is the thing this case forbids.
+      const liveProbe = (): ILiveNode | undefined =>
+        committed(node => node.payload.testID === 'live');
+      const hostAtMount = liveProbe()?.handle;
+      expect(liveProbe()?.payload.opacity).toBe(0.5);
 
       setOpacity(0.25);
       await tick();
 
-      expect(
-        committed(node => node.props.testID === 'live')?.props.opacity,
-      ).toBe(0.25);
-      expect(
-        fabric.counts.createNode,
-        'no second native node was created',
-      ).toBe(createdAtMount);
+      expect(liveProbe()?.payload.opacity).toBe(0.25);
+      expect(liveProbe()?.handle, 'no second native node was created').toBe(
+        hostAtMount,
+      );
     });
 
     // why: a string child takes a different update path than a prop (replaceText, not routeProp),
@@ -109,15 +103,20 @@ describe('descriptorToSolid', () => {
         descriptorToSolid(() => txt({ testID: 'text' }, [label()])),
       );
       await tick();
-      const createdAtMount = fabric.counts.createNode;
+      const rawAtMount = committed(
+        node => node.viewName === 'RCTRawText',
+      )?.handle;
 
       setLabel('second');
       await tick();
 
       expect(
-        committed(node => node.viewName === 'RCTRawText')?.props.text,
+        committed(node => node.viewName === 'RCTRawText')?.payload.text,
       ).toBe('second');
-      expect(fabric.counts.createNode).toBe(createdAtMount);
+      // Identity again: the raw text has to be RE-TEXTED, not rebuilt.
+      expect(committed(node => node.viewName === 'RCTRawText')?.handle).toBe(
+        rawAtMount,
+      );
     });
 
     // why: Solid's spread walks only the current key set and never resets one that vanished, so a
@@ -139,18 +138,25 @@ describe('descriptorToSolid', () => {
         }),
       );
       await tick();
-      expect(
-        committed(node => node.props.testID === 'aria')?.props
-          .accessibilityLabel,
-      ).toBe('Wi-Fi');
+      const aria = (): ILiveNode | undefined =>
+        committed(node => node.payload.testID === 'aria');
+      expect(aria()?.payload.accessibilityLabel).toBe('Wi-Fi');
 
       setLabel(undefined);
       await tick();
 
-      expect(
-        committed(node => node.props.testID === 'aria')?.props
-          .accessibilityLabel,
-      ).toBeNull();
+      // ABSENT, not null: the literal null was the CLONE PROTOCOL's spelling of "reset to the
+      // default", held only inside the diff the stand-in merged. The engine's op stream says the
+      // same thing with `NO_VALUE`, and a host replaying that op deletes the key.
+      expect(Object.hasOwn(aria()?.payload ?? {}, 'accessibilityLabel')).toBe(
+        false,
+      );
+      // …and the half that proves the engine ACTED: the record carried the label after the mount
+      // above, so its being gone from the record means a clearing op was sent for it.
+      const recorded = fabric.find(node => node.props.testID === 'aria');
+      expect(Object.hasOwn(recorded?.props ?? {}, 'accessibilityLabel')).toBe(
+        false,
+      );
     });
   });
 

@@ -3,14 +3,14 @@
 // VirtualizedSectionList directly and SectionList's prop-by-prop relay. Same harness shape as
 // virtualized-list.smoke.test.ts: compile the REAL .svelte sources through svelte/compiler,
 // co-locate each compiled file next to its real sibling (its own imports resolve relative to
-// where it lands), installFabric(), mount for real.
+// where it lands), installRecordingFabric(), mount for real.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 // See scroll-view.smoke.test.ts: mounting through `../../render` skips `index.ts`, so the host
 // behaviors have to be named here.
 import '../../register';
@@ -125,7 +125,7 @@ async function loadRoot(
   return mod.default as Component;
 }
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 

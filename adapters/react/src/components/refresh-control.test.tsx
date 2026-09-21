@@ -3,7 +3,7 @@
 // (PullToRefreshView is a child of RCTScrollView, a sibling BEFORE RCTScrollContentView),
 // that `refreshing` and a string prop (`title`) pass through as real Fabric props, that the
 // Android-only `enabled` prop forwards to native, and that firing topRefresh on the
-// refresh-control node calls onRefresh, all against the fake Fabric slot, no simulator.
+// refresh-control node calls onRefresh, all against the recording host, no simulator.
 // A failure here is in JS.
 //
 // There is no component any more — `<refresh-control>` is a bare tag, and nothing it accepts is
@@ -16,7 +16,11 @@
 import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '@symbiote-native/react';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 61;
 
@@ -39,12 +43,18 @@ function App(): ReactElement {
   );
 }
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 beforeEach(() => {
   fabric.reset();
   refreshed = false;
 });
 afterEach(() => unmount(ROOT_TAG));
+
+// The serializer runs siblings together, same shorthand `fabric.serialize` used to produce.
+function serialize(nodes: ILiveNode[]): string {
+  return nodes.map(node => live.serialize(node.handle)).join('');
+}
 
 describe('React <refresh-control> on the engine (Positive — completes without error)', () => {
   // why: iOS has no room in RN's Fabric ScrollView for a wrapper node, so RefreshControl
@@ -53,10 +63,8 @@ describe('React <refresh-control> on the engine (Positive — completes without 
   it('nests PullToRefreshView before the content container under the ScrollView', () => {
     mount(ROOT_TAG, <App />);
 
-    // appRoot() asserts the single box-none AppContainer root (committed.length === 1 and
-    // pointerEvents === 'box-none'), then unwraps it.
-    const appRoot = fabric.appRoot();
-    expect(fabric.serialize(appRoot.children)).toBe(
+    const appRoot = live.nodeOf(live.appRoot());
+    expect(serialize(appRoot.children)).toBe(
       'RCTScrollView(PullToRefreshViewRCTScrollContentView(RCTView))',
     );
 
@@ -64,9 +72,7 @@ describe('React <refresh-control> on the engine (Positive — completes without 
     // view directly: refresh control FIRST, content container SECOND.
     const scrollView = appRoot.children[0];
     expect(scrollView?.viewName).toBe('RCTScrollView');
-    const childNames = scrollView.children.map(
-      (node: IFakeNode) => node.viewName,
-    );
+    const childNames = scrollView.children.map(node => node.viewName);
     expect(childNames).toEqual(['PullToRefreshView', 'RCTScrollContentView']);
   });
 
@@ -81,11 +87,14 @@ describe('React <refresh-control> on the engine (Positive — completes without 
   it('forwards refreshing:false, the Android-only enabled prop, and title to native', () => {
     mount(ROOT_TAG, <App />);
 
-    const refresh = fabric.find(node => node.viewName === 'PullToRefreshView');
+    const refresh = live.findLive(
+      live.appRoot(),
+      node => node.viewName === 'PullToRefreshView',
+    );
     expect(refresh, 'a PullToRefreshView was created').toBeDefined();
-    expect(refresh!.props.refreshing).toBe(false);
-    expect(refresh!.props.enabled).toBe(true);
-    expect(refresh!.props.title).toBe('Pull to refresh');
+    expect(refresh!.payload.refreshing).toBe(false);
+    expect(refresh!.payload.enabled).toBe(true);
+    expect(refresh!.payload.title).toBe('Pull to refresh');
   });
 
   // why: native reports the pull gesture via the direct `topRefresh` event; RefreshControl's
@@ -93,7 +102,10 @@ describe('React <refresh-control> on the engine (Positive — completes without 
   it('calls onRefresh when topRefresh fires on the refresh-control node', () => {
     mount(ROOT_TAG, <App />);
 
-    const refresh = fabric.find(node => node.viewName === 'PullToRefreshView');
+    const refresh = live.findLive(
+      live.appRoot(),
+      node => node.viewName === 'PullToRefreshView',
+    );
     expect(refresh, 'a PullToRefreshView was created').toBeDefined();
 
     fabric.fireEvent(refresh!.instanceHandle, 'topRefresh', {});

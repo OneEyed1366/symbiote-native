@@ -31,11 +31,11 @@ import {
   createElement,
   registerHostBehavior,
   type IHostBehavior,
-  type IPayloadFold,
   type IStyleProp,
   type ISymbioteEvent,
   type ISymbioteNode,
   type IViewStyle,
+  setProp,
 } from '@symbiote-native/engine';
 
 import type {
@@ -75,18 +75,11 @@ export type IActivityIndicatorPlatform = {
   nativeExtras: Readonly<Record<string, unknown>>;
 };
 
-// Fixed pixel boxes RN gives the two named sizes (styles.sizeSmall/sizeLarge).
-const SIZE_SMALL_PX = 20;
-const SIZE_LARGE_PX = 36;
-
-// RN's own default when the app writes no `size` (ActivityIndicator.js:72).
-const DEFAULT_SIZE: IActivityIndicatorSize = 'small';
-
-// Centering wrapper RN puts around the spinner (styles.container).
-const CONTAINER_STYLE: IViewStyle = {
-  alignItems: 'center',
-  justifyContent: 'center',
-};
+// The two size boxes, the default size and the centering style are NOT here any more: they are
+// literals inside `foldActivityIndicatorProps` / `foldActivityIndicatorSpinnerProps`
+// (`SymbioteFabricProps.cpp`). Keeping a JS copy of a value only C++ reads is the mirror this port
+// exists to remove — it would compile, export and test cleanly while nothing on a device consulted
+// it.
 
 // The props that stay on the centering host instead of travelling to the spinner: RN's own two
 // (`ActivityIndicator.js:113`) plus the spellings the ENGINE resolves against a node's own style.
@@ -107,69 +100,17 @@ const ACTIVITY_INDICATOR_HOST_PROPS: readonly string[] = [
 // `routeProp` consumes the key on whichever node it lands on and it never reaches Fabric either
 // way. An entry no test can make fail is an entry that was never wired in.
 
-type INativeSize = {
-  sizeStyle: IViewStyle;
-  sizeProp?: 'small' | 'large';
-};
-
-function resolveSize(size: IActivityIndicatorSize): INativeSize {
-  if (size === 'small') {
-    return {
-      sizeStyle: { width: SIZE_SMALL_PX, height: SIZE_SMALL_PX },
-      sizeProp: 'small',
-    };
-  }
-  if (size === 'large') {
-    return {
-      sizeStyle: { width: SIZE_LARGE_PX, height: SIZE_LARGE_PX },
-      sizeProp: 'large',
-    };
-  }
-  return { sizeStyle: { width: size, height: size } };
-}
-
-// The HOST's fold: RN's `StyleSheet.compose(styles.container, style)` (ActivityIndicator.js:114).
-// Base first, so an app style still wins.
-const hostFold: IPayloadFold = props => ({
-  ...props,
-  style: [CONTAINER_STYLE, props.style],
-});
-
-function isActivityIndicatorSize(
-  value: unknown,
-): value is IActivityIndicatorSize {
-  return value === 'small' || value === 'large' || typeof value === 'number';
-}
-
-// The SPINNER's fold — RN's own body (`ActivityIndicator.js:99-118`) applied to the node the app
-// never names.
-function spinnerFold(platform: IActivityIndicatorPlatform): IPayloadFold {
-  return props => {
-    const size = isActivityIndicatorSize(props.size)
-      ? props.size
-      : DEFAULT_SIZE;
-    const { sizeStyle, sizeProp } = resolveSize(size);
-    const next: Record<string, unknown> = {
-      ...props,
-      // RN defaults both to true and every wrapper spelled that `!== false`. A tag has no
-      // destructuring default, so the fold is where the default has to live.
-      animating: props.animating !== false,
-      hidesWhenStopped: props.hidesWhenStopped !== false,
-      style: sizeStyle,
-    };
-    // A NUMBER never reaches native: it sizes the spinner through style alone, and the native enum
-    // takes 'small'/'large' only. So the key has to leave, not merely go unwritten.
-    if (sizeProp === undefined) delete next.size;
-    else next.size = sizeProp;
-    const color =
-      typeof props.color === 'string' ? props.color : platform.defaultColor;
-    // Omitted rather than sent as null — Android's theme default is null and Fabric's colour parser
-    // rejects one.
-    if (color === null) delete next.color;
-    else next.color = color;
-    return next;
-  };
-}
+// BOTH FOLDS LEFT THIS FILE on 2026-09-18 and neither was replaced by anything here: they are
+// `foldActivityIndicatorProps` and `foldActivityIndicatorSpinnerProps` in `SymbioteFabricProps.cpp`.
+// Every input either read was the node's own bag — no owner, no listener, no live state — which is
+// what made them tag rules rather than composition, and it is why both nodes now cost ZERO trips
+// into JS instead of one each. Contract:
+// `core/engine/cpp/tests/js/activity-indicator-payload.itest.ts`.
+//
+// The size constants, the container style and the default colour went WITH them rather than staying
+// as a second copy for the tests to assert. `platform.defaultColor` survives as the last field of
+// `IActivityIndicatorPlatform` only because the rule's Android half is chosen by COMPONENT NAME in
+// C++, so the JS value would have no reader — see the type's own note.
 
 // The composition. Returns the spinner as the slot because the prop redirect is gated on
 // `childHost` being set — the redirect is what this slot is FOR, and NOT where children go: RN's
@@ -188,8 +129,8 @@ function buildSpinner(platform: IActivityIndicatorPlatform) {
     // Constants of the platform, never a function of a prop, so they are seeded at build time the
     // way ScrollView seeds `collapsable: false` — empty on iOS, AndroidProgressBar's two
     // requirements on Android.
-    spinner.props = { ...platform.nativeExtras };
-    spinner.payloadFold = spinnerFold(platform);
+    for (const [key, value] of Object.entries(platform.nativeExtras))
+      setProp(spinner, key, value);
     appendChild(node, spinner);
     return spinner;
   };
@@ -202,7 +143,6 @@ function activityIndicatorBehavior(
     slotPropsExcept: ACTIVITY_INDICATOR_HOST_PROPS,
     slotTakesNoChildren: true,
     buildStructure: buildSpinner(platform),
-    foldPayload: hostFold,
     // Required by the interface and deliberately empty: this primitive owns no timer, no listener
     // and no native handshake. Written out rather than shared with a `noop` so the emptiness reads
     // as a decision.
@@ -219,4 +159,22 @@ export function registerActivityIndicatorBehaviors(
     ACTIVITY_INDICATOR_TAG,
     activityIndicatorBehavior(platform),
   );
+  // A REGISTRATION WITH NO RUNTIME, and it is what hands the spinner's tag to the host.
+  //
+  // A tag crosses only through `recordSetTag`, which `attachHostBehavior` emits and nothing else
+  // does — so a tag with no behavior registered carries an EMPTY `tagName` in C++ and no rule can
+  // fire for it. The spinner is built by `buildStructure` and no app ever names it, so it had a tag,
+  // had platform semantics, and the host could not see either. Its rule lives in
+  // `SymbioteFabricProps.cpp` now (the size translation, RN's two `!== false` defaults, the
+  // platform's default colour), which is why this registration has to exist even though there is no
+  // JS left to run.
+  //
+  // Not a workaround for the seam: a registration is how this codebase declares that a tag HAS
+  // platform semantics, which is exactly the claim. Emitting the tag from `createElement` for every
+  // node was the alternative and is rejected where `attachHostBehavior` explains itself — an app's
+  // own `<div>`-equivalent would pay an intern and an op to name something the host has no rule for.
+  registerHostBehavior(ACTIVITY_INDICATOR_SPINNER_TAG, {
+    attach() {},
+    detach() {},
+  });
 }

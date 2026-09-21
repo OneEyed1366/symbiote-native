@@ -12,13 +12,17 @@ import '@angular/compiler';
 import { Component, signal } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as engine from '@symbiote-native/engine';
-import { installFabric } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../../render';
 import { StatusBar } from './index';
 
 const ROOT_TAG = 901;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -67,7 +71,7 @@ describe('StatusBar', () => {
       }),
     );
 
-    const root = fabric.appRoot();
+    const root = live.nodeOf(live.appRoot());
     expect(root.children).toHaveLength(0);
   });
 

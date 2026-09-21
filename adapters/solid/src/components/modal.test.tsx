@@ -25,7 +25,11 @@ import {
   registerRules,
   type ISymbioteEvent,
 } from '@symbiote-native/engine';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 import { mount, unmount } from '../render';
 import { Modal } from './modal';
 
@@ -34,7 +38,8 @@ const MODAL_VIEW = 'ModalHostView';
 const SHEET_FLEX = 1;
 const SHEET_OPACITY = 0.25;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -56,38 +61,31 @@ afterEach(() => {
   clearGlobalStyles();
 });
 
-function walk(nodes: IFakeNode[], visit: (node: IFakeNode) => void): void {
-  for (const node of nodes) {
-    visit(node);
-    walk(node.children, visit);
-  }
+// The live tree re-derives on every read, so anything asserted after an update is safe off it.
+// Guarded on the surface root existing at all: with `visible=false` nothing ever commits, so the
+// box-none root itself was never created — `live.appRoot()` would throw where the old whole-tree
+// walk simply found nothing to iterate.
+function findCommittedModal(): ILiveNode | undefined {
+  const root = fabric.find(n => n.props.pointerEvents === 'box-none');
+  if (root === undefined) return undefined;
+  return live.findLive(live.appRoot(), n => n.viewName === MODAL_VIEW);
 }
 
-// The LIVE committed node. `fabric.created` hands back the mount-time snapshot, which clone-on-write
-// supersedes, so anything asserted after a second commit has to be read off the committed tree.
-function findCommittedModal(): IFakeNode | undefined {
-  let found: IFakeNode | undefined;
-  walk(fabric.committed, node => {
-    if (found === undefined && node.viewName === MODAL_VIEW) found = node;
-  });
-  return found;
-}
-
-function committedModal(): IFakeNode {
+function committedModal(): ILiveNode {
   const node = findCommittedModal();
   if (node === undefined) throw new Error(`no ${MODAL_VIEW} is committed`);
   return node;
 }
 
 // The container View renderModal wraps the children in: the single child of the host.
-function committedContainer(): IFakeNode {
+function committedContainer(): ILiveNode {
   const child = committedModal().children[0];
   if (child === undefined)
     throw new Error(`${MODAL_VIEW} has no container child`);
   return child;
 }
 
-// The still-live handle events are fired at. The created log is the only place instanceHandle is
+// The still-live handle events are fired at. The creation log is the only place instanceHandle is
 // exposed, and the host node keeps its identity across commits, so the first one stays valid.
 function modalHandle(): unknown {
   const node = fabric.find(n => n.viewName === MODAL_VIEW);
@@ -96,7 +94,7 @@ function modalHandle(): unknown {
 }
 
 function modalsCreated(): number {
-  return fabric.created.filter(node => node.viewName === MODAL_VIEW).length;
+  return fabric.findAll(n => n.viewName === MODAL_VIEW).length;
 }
 
 describe('Solid Modal on the engine', () => {
@@ -113,10 +111,13 @@ describe('Solid Modal on the engine', () => {
       ));
       await tick();
 
-      expect(fabric.serialize(fabric.appRoot().children)).toBe(
-        'ModalHostView(RCTView(RCTView))',
-      );
-      expect(committedModal().props.visible).toBe(true);
+      expect(
+        live
+          .nodeOf(live.appRoot())
+          .children.map(child => live.serialize(child.handle))
+          .join(''),
+      ).toBe('ModalHostView(RCTView(RCTView))');
+      expect(committedModal().payload.visible).toBe(true);
     });
 
     // why: shouldRenderModal's boolean is core-tested directly; this proves the <Show> gate actually
@@ -150,7 +151,7 @@ describe('Solid Modal on the engine', () => {
       await tick();
 
       expect(findCommittedModal()).toBeDefined();
-      expect(committedModal().props.visible).toBe(true);
+      expect(committedModal().payload.visible).toBe(true);
     });
 
     // why: the keep-alive reducer must TRANSITION, not latch. If the hide effect never ran (a
@@ -178,8 +179,8 @@ describe('Solid Modal on the engine', () => {
     // why: Solid's `insert` REPLACES a subtree instead of diffing it, so a reactive read that
     // crosses into the <Show> children getter rebuilds the whole modal on every prop change — which
     // on device destroys the native window mid-animation and drops the Fabric tag every imperative
-    // call keys on. The createNode counter is the line between a re-prop and a re-render, and it is
-    // the only headless trace of that failure.
+    // call keys on. The handle identity is the line between a re-prop and a re-render, and it is the
+    // only headless trace of that failure.
     it('creates no node when a prop changes while the modal stays visible', async () => {
       const [transparent, setTransparent] = createSignal(false);
       mount(ROOT_TAG, () => (
@@ -188,20 +189,20 @@ describe('Solid Modal on the engine', () => {
         </Modal>
       ));
       await tick();
-      const createdAtMount = fabric.counts.createNode;
-      expect(committedContainer().props.backgroundColor).toBe('white');
+      const hostAtMount = committedModal().handle;
+      expect(committedContainer().payload.backgroundColor).toBe('white');
 
       setTransparent(true);
       await tick();
 
       expect(
-        committedContainer().props.backgroundColor,
+        committedContainer().payload.backgroundColor,
         'the prop must still land',
       ).toBe('transparent');
       expect(
-        fabric.counts.createNode,
+        committedModal().handle,
         'the update rebuilt the modal subtree',
-      ).toBe(createdAtMount);
+      ).toBe(hostAtMount);
     });
 
     // why: a full hide→show cycle legitimately tears the subtree down and builds it again — ONCE.
@@ -243,18 +244,14 @@ describe('Solid Modal on the engine', () => {
         </Modal>
       ));
       await tick();
-      const createdAtMount = fabric.counts.createNode;
+      const hostAtMount = committedModal().handle;
 
       setLabel('second');
       await tick();
 
-      let text: unknown;
-      walk(fabric.committed, node => {
-        if (node.viewName === 'RCTRawText') text = node.props.text;
-      });
-      expect(text).toBe('second');
-      expect(fabric.counts.createNode, 'the child update rebuilt a node').toBe(
-        createdAtMount,
+      expect(live.texts(live.appRoot())).toContain('second');
+      expect(committedModal().handle, 'the child update rebuilt a node').toBe(
+        hostAtMount,
       );
     });
 
@@ -271,14 +268,23 @@ describe('Solid Modal on the engine', () => {
         </Modal>
       ));
       await tick();
-      expect(committedModal().props.accessibilityLabel).toBe('a dialog');
+      expect(committedModal().payload.accessibilityLabel).toBe('a dialog');
 
       setLabel(undefined);
       await tick();
 
-      // `null`, not absent: routeProp treats the widened `undefined` as a delete, and the engine's
-      // diffProps sends a removed prop down to Fabric as an explicit null (symbiote-engine-core §8).
-      expect(committedModal().props.accessibilityLabel).toBeNull();
+      // ABSENT, not null: the literal null was the CLONE PROTOCOL's spelling of "reset to the
+      // default", held only inside the diff the stand-in merged. The engine's op stream says the
+      // same thing with `NO_VALUE`, and a host replaying that op deletes the key.
+      expect(
+        Object.hasOwn(committedModal().payload, 'accessibilityLabel'),
+      ).toBe(false);
+      // …and the half that proves the engine ACTED: the record carried the label after the mount
+      // above, so its being gone from the record means a clearing op was sent for it.
+      const recorded = fabric.find(n => n.viewName === MODAL_VIEW);
+      expect(Object.hasOwn(recorded?.props ?? {}, 'accessibilityLabel')).toBe(
+        false,
+      );
     });
   });
 
@@ -388,13 +394,13 @@ describe('Solid Modal on the engine', () => {
       ));
       await tick();
 
-      const props = committedModal().props;
-      expect(props.supportedOrientations).toEqual(['portrait', 'landscape']);
-      expect(props.hardwareAccelerated).toBe(true);
-      expect(props.statusBarTranslucent).toBe(true);
-      expect(props.navigationBarTranslucent).toBe(true);
-      expect(props.allowSwipeDismissal).toBe(true);
-      expect(props.animationType).toBe('slide');
+      const payload = committedModal().payload;
+      expect(payload.supportedOrientations).toEqual(['portrait', 'landscape']);
+      expect(payload.hardwareAccelerated).toBe(true);
+      expect(payload.statusBarTranslucent).toBe(true);
+      expect(payload.navigationBarTranslucent).toBe(true);
+      expect(payload.allowSwipeDismissal).toBe(true);
+      expect(payload.animationType).toBe('slide');
     });
 
     // why: Modal owns its host element rather than rendering through a View, so folding the web
@@ -408,10 +414,10 @@ describe('Solid Modal on the engine', () => {
       ));
       await tick();
 
-      const props = committedModal().props;
-      expect(props.testID).toBe('my-modal');
-      expect(props.accessible).toBe(true);
-      expect(props.accessibilityLabel).toBe('a dialog');
+      const payload = committedModal().payload;
+      expect(payload.testID).toBe('my-modal');
+      expect(payload.accessible).toBe(true);
+      expect(payload.accessibilityLabel).toBe('a dialog');
     });
 
     // why: the transparent override is composed LAST by renderModal so it beats a user `style`; this
@@ -425,9 +431,9 @@ describe('Solid Modal on the engine', () => {
       ));
       await tick();
 
-      expect(committedContainer().props.backgroundColor).toBe('transparent');
-      expect(committedModal().props.presentationStyle).toBe('overFullScreen');
-      expect(committedModal().props.position).toBe('absolute');
+      expect(committedContainer().payload.backgroundColor).toBe('transparent');
+      expect(committedModal().payload.presentationStyle).toBe('overFullScreen');
+      expect(committedModal().payload.position).toBe('absolute');
     });
 
     // why: `class` is Solid's spelling of React's className and, like `style`, targets the CONTAINER
@@ -441,8 +447,8 @@ describe('Solid Modal on the engine', () => {
       ));
       await tick();
 
-      expect(committedContainer().props.opacity).toBe(SHEET_OPACITY);
-      expect(committedModal().props.opacity).toBeUndefined();
+      expect(committedContainer().payload.opacity).toBe(SHEET_OPACITY);
+      expect(committedModal().payload.opacity).toBeUndefined();
     });
   });
 });

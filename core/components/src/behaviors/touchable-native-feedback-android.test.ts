@@ -7,7 +7,11 @@
 // leave shared code on the iOS branch.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { installFabric, type IFakeNode } from '../../../test-utils/src/index';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '../../../test-utils/src/index';
 
 vi.mock('@symbiote-native/engine', async () => {
   const actual = await vi.importActual<
@@ -44,24 +48,17 @@ type IListener = import('@symbiote-native/engine').IListener;
 type ISymbioteEvent = import('@symbiote-native/engine').ISymbioteEvent;
 type ISymbioteNode = import('@symbiote-native/engine').ISymbioteNode;
 const { descriptorFor } = await import('../component-names');
-const {
-  registerTouchableNativeFeedbackBehavior,
-  TOUCHABLE_NATIVE_FEEDBACK_TAG,
-} = await import('./touchable-native-feedback');
+const { registerTouchableNativeFeedbackBehavior } =
+  await import('./touchable-native-feedback');
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+// Anchors flatten here exactly as the commit walk flattens them, which is the whole point on this
+// file's subject: a touchable that commits NO VIEW is born with the anchor component.
+const live = createLiveTree(fabric);
 let nextRootTag = 7700;
 
 const ROOT_TEST_ID = 'root';
 const SUBJECT_TEST_ID = 'subject';
-
-// TouchableNativeFeedback.js:343-348 — no `background` prop means TNF resolves SelectableBackground
-// onto the background slot.
-const SELECTABLE_BACKGROUND = {
-  type: 'ThemeAttrAndroid',
-  attribute: 'selectableItemBackground',
-  rippleRadius: undefined,
-};
 
 function touchAt(x: number, y: number): ISymbioteEvent {
   return { nativeEvent: { pageX: x, pageY: y, locationX: x, locationY: y } };
@@ -86,6 +83,7 @@ function mount(ownerProps: Readonly<Record<string, unknown>> = {}) {
   engineAppend(root, owner);
   engineAppend(owner, child);
   surface.commit();
+  currentRoot = root;
   return { root, owner, child, surface };
 }
 
@@ -96,18 +94,24 @@ function listenerOf(node: ISymbioteNode, name: string): IListener {
   return listener;
 }
 
-function subject(): IFakeNode {
-  const walk = (nodes: readonly IFakeNode[]): IFakeNode | undefined => {
-    for (const node of nodes) {
-      if (node.props.testID === SUBJECT_TEST_ID) return node;
-      const hit = walk(node.children);
-      if (hit !== undefined) return hit;
-    }
-    return undefined;
-  };
-  const hit = walk(fabric.appRoot().children);
-  if (hit === undefined) throw new Error('no committed subject');
-  return hit;
+// Searched from THIS case's own root, never from `appRoot()`. Every case here opens a fresh
+// surface and the recording is never reset between them, so an app-root lookup would answer with
+// the FIRST case's tree for every case after it — green on case one and quietly wrong after.
+let currentRoot: ISymbioteNode | undefined;
+
+// BY POSITION, not by the `testID` the owner clones onto the child. It was the cloned id until
+// 2026-09-18, when the clone moved to `foldCloneOntoChild` in C++ and this host — which builds its
+// payloads through the TypeScript `fabricProps`, carrying no copy of the tag rules — stopped seeing
+// it. The tag guarantees the position anyway: one child in, one node out.
+function subject(): ILiveNode {
+  if (currentRoot === undefined) throw new Error('nothing was mounted');
+  const root = live.findLive(
+    currentRoot,
+    node => node.payload.testID === ROOT_TEST_ID,
+  );
+  const child = root?.children[0];
+  if (child === undefined) throw new Error('no committed subject');
+  return child;
 }
 
 beforeEach(() => {
@@ -125,40 +129,27 @@ describe('touchable-native-feedback host behavior on Android', () => {
   // Still ONE node — the ripple is a PROP of the child, not a view of its own. Our five wrappers
   // paint it through a dedicated inner View, which is where the whole family's extra node came
   // from.
-  it('paints the selectable background on the child, adding no node', () => {
+  it('paints the background on the child, adding no node', () => {
     mount();
 
-    const committed = subject();
-    expect(committed.props.nativeBackgroundAndroid).toEqual(
-      SELECTABLE_BACKGROUND,
-    );
-    expect(Object.keys(committed.props)).not.toContain(
-      'nativeForegroundAndroid',
-    );
-    expect(committed.children).toHaveLength(0);
+    expect(subject().children).toHaveLength(0);
   });
 
-  // :343-348 + :402 — an explicit background, and `useForeground` picking the other slot.
-  it('honours background and useForeground', () => {
-    mount({
-      background: { type: 'RippleAndroid', color: '#ff0000', borderless: true },
-      useForeground: true,
-    });
-
-    const committed = subject();
-    expect(committed.props.nativeForegroundAndroid).toEqual({
-      type: 'RippleAndroid',
-      color: '#ff0000',
-      borderless: true,
-      rippleRadius: undefined,
-    });
-    expect(Object.keys(committed.props)).not.toContain(
-      'nativeBackgroundAndroid',
-    );
-    // Neither TNF prop may reach Fabric raw — no ViewConfig declares them, so a leak is silent.
-    expect(Object.keys(committed.props)).not.toContain('background');
-    expect(Object.keys(committed.props)).not.toContain('useForeground');
-  });
+  // THE TWO BACKGROUND CASES LEFT THIS FILE ON 2026-09-18 AND HAVE NO NEW HOME — a coverage LOSS,
+  // recorded rather than papered over. `foldCloneOntoChild`'s background half is `#ifdef ANDROID` in
+  // `SymbioteFabricProps.cpp`, so it is not compiled into the test host at all, and mocking
+  // `Platform.OS` no longer reaches it: what that mock steered was a JS function that no longer
+  // exists.
+  //
+  // What went: the default `selectableItemBackground` landing in `nativeBackgroundAndroid`, an
+  // explicit `background` dict being honoured, `useForeground` picking the other slot, and neither
+  // `background` nor `useForeground` reaching Fabric raw.
+  //
+  // It is the same hole `android_ripple`, `underlineColorAndroid` and `decelerationRate` already
+  // carry, and it is a PROPERTY of porting a platform-split rule: a compile-time branch is only
+  // testable in a build that compiles it. Closing it means an Android arm of the test host, not a
+  // mock. The half that IS reachable — that neither slot is written off Android — is asserted in
+  // `core/engine/cpp/tests/js/clone-onto-child-payload.itest.ts`.
 
   // :230-252. Without these the drawable is installed and never animates: the JS responder consumes
   // the touch, so Android's own pressed-state handling never fires and the child looks dead while
@@ -181,7 +172,7 @@ describe('touchable-native-feedback host behavior on Android', () => {
       'setPressed',
     ]);
     expect(fabric.commands[0].args).toEqual([12, 34]);
-    expect(fabric.commands[0].node).toBe(committed);
+    expect(fabric.commands[0].handle).toBe(committed.handle);
     expect(fabric.commands[1].args).toEqual([true]);
 
     fabric.commands.length = 0;

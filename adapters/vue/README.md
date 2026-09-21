@@ -27,8 +27,8 @@ npm install @symbiote-native/vue react-native vue
 `react-native` and `vue` stay your app's own top-level dependencies — this package only replaces
 the JS renderer that drives them. **TSX** needs nothing beyond the install above; **SFC**
 additionally needs a Metro transformer for `.vue` files (see
-[`examples/vue-sfc`](../../examples/vue-sfc)'s `metro.config.js`), since there's no
-`create-symbiote` scaffolder yet to wire it for you.
+[`examples/vue-sfc`](../../examples/vue-sfc)'s `metro.config.js`) — `npx @symbiote-native/cli new`
+wires this for a new app; an existing app still needs it copied in by hand.
 
 ---
 
@@ -102,7 +102,8 @@ the demo above is the first one running on the iOS simulator:
 ## Parity — and the one gap
 
 Both adapters reach the same primitives, runtime modules, `Animated` on both drivers, gestures,
-accessibility, and the `VirtualizedList` family. That parity is **structural, not hand-copied**: the
+accessibility, and the `VirtualizedList` family, verified on-device on iOS and Android. That
+parity is **structural, not hand-copied**: the
 component logic (state machines + render functions) is written **once** in `@symbiote-native/components`,
 and each adapter supplies only its lifecycle (Vue's `ref`/`watch` + the descriptor→`h()` bridge).
 

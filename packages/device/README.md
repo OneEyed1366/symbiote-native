@@ -17,6 +17,10 @@ are plain re-exports of the same `core`.
 npm install @symbiote-native/device
 ```
 
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --device` (or
+`add --device` in an existing app) installs and wires this for you — see
+[`@symbiote-native/cli`](../cli).
+
 `expo-device` and `expo-modules-core` come along as regular dependencies, pinned to exact
 versions — never install either yourself, and never add the `expo` meta-package to your project
 (it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
@@ -280,6 +284,7 @@ There's no per-instance service to `inject()` in the Angular case — every cons
 plain export off the core package, read straight in the constructor or class-field initializer.
 These snippets mirror the real canary demo screens — `examples/expo-react/screens/DeviceScreen.tsx`,
 `examples/expo-vue-sfc/screens/DeviceScreen.vue`, `examples/expo-vue-tsx/screens/DeviceScreen.tsx`,
+`examples/expo-svelte/screens/DeviceScreen.svelte`, `examples/expo-solid/screens/DeviceScreen.tsx`,
 `examples/expo-angular/src/screens/DeviceScreen.ts`.
 
 ## API

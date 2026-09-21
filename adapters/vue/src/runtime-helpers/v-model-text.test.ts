@@ -1,4 +1,4 @@
-// `v-model` on a LOWERED `<TextInput>`, i.e. on an element. Device-found 2026-08-31 in
+// `v-model` on a `<text-input>`, i.e. on an element. Device-found 2026-08-31 in
 // examples/vue-sfc's canary: the field echoed keystrokes and the greeting beside it never left
 // "Hello, stranger".
 //
@@ -11,7 +11,7 @@
 //   }), [[_vModelText, name.value]])
 //
 // A COMPONENT gets a different expansion (`modelValue` + `onUpdate:modelValue` as ordinary props),
-// which is why this only became reachable when TextInput started lowering.
+// which is why this only became reachable once TextInput was a tag.
 //
 // The failure it guards is silent in the worst way: `vModelText` lives in @vue/runtime-dom, so
 // before this shim existed the compiled import resolved to `undefined`, and Vue's `withDirectives`
@@ -28,15 +28,20 @@ import {
   clearHostBehaviors,
   createElement,
   isSymbioteNode,
+  propOf,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 import { vModelText } from './index';
 
 const ROOT_TAG = 341;
 const TEST_ID = 'model-subject';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 // A prop write from an event handler publishes on the microtask boundary; the render that follows
 // an app-state change is queued the same way.
 const tick = (): Promise<void> =>
@@ -51,20 +56,11 @@ afterEach(() => {
   clearHostBehaviors();
 });
 
-// The LIVE tree by testID, never `fabric.find()` — that searches `created` and hands back the
-// pre-clone node with its mount-time props, so every update assertion here would read stale.
+// The LIVE tree by testID, never `fabric.find()` — that searches the creation log and hands back
+// the pre-clone node with its mount-time props, so every update assertion here would read stale.
 function committedProps(): Record<string, unknown> | undefined {
-  const walk = (
-    nodes: readonly IFakeNode[],
-  ): Record<string, unknown> | undefined => {
-    for (const node of nodes) {
-      if (node.props.testID === TEST_ID) return node.props;
-      const hit = walk(node.children);
-      if (hit !== undefined) return hit;
-    }
-    return undefined;
-  };
-  return walk(fabric.appRoot().children);
+  return live.findLive(live.appRoot(), node => node.payload.testID === TEST_ID)
+    ?.payload;
 }
 
 interface IHarness {
@@ -133,15 +129,18 @@ function mountModel(options: {
   };
 }
 
-describe('v-model on a lowered TextInput', () => {
+describe('v-model on a text-input tag', () => {
   // The two halves of a two-way binding, asserted separately because one can work without the
   // other: the value going down is a prop write, the text coming back is the machine's fold.
-  it('sends the model value down as the committed text', async () => {
+  it('sends the model value down to the committed input', async () => {
     mountModel({ initial: 'start', withDirective: true });
     await tick();
 
-    // `value` -> `text` is the engine's own fold in fabricProps, so the payload names `text`.
-    expect(committedProps()).toMatchObject({ text: 'start' });
+    // `value`, not `text`. The `value -> text` fold moved to `SymbioteFabricProps.cpp` on
+    // 2026-09-18 and this harness's payload comes from the TypeScript builder, which holds no copy
+    // of it — `core/engine/cpp/tests/js/text-input-payload.itest.ts` asserts the fold. What the
+    // directive is responsible for is the value arriving at all, which is what this reads.
+    expect(committedProps()).toMatchObject({ value: 'start' });
   });
 
   it('assigns the typed text back into the model', async () => {
@@ -151,7 +150,7 @@ describe('v-model on a lowered TextInput', () => {
     await harness.type('typed');
 
     expect(harness.model.value).toBe('typed');
-    expect(committedProps()).toMatchObject({ text: 'typed' });
+    expect(committedProps()).toMatchObject({ value: 'typed' });
   });
 
   // THE CONTROL. Same tree, no directive — the exact shape that shipped before this shim. It must
@@ -164,7 +163,11 @@ describe('v-model on a lowered TextInput', () => {
     await harness.type('typed');
 
     expect(harness.model.value).toBe('start');
-    expect(committedProps()?.text).toBeUndefined();
+    // Moved from `text` to `value` WITH its two positives, and that grouping is the point: `text` is
+    // now absent from every payload this harness builds, so a control still reading it would pass
+    // forever and stop controlling anything. Without the directive nothing writes `value` either,
+    // so the arm still discriminates.
+    expect(committedProps()?.value).toBeUndefined();
   });
 
   // On the COMPONENT path the wrapper emits `valueChange` AND `update:modelValue`, so an app may
@@ -202,11 +205,11 @@ describe('v-model on a lowered TextInput', () => {
 });
 
 // Vue's compiler picks the v-model directive by ELEMENT, and for anything it does not recognise as
-// a DOM input it emits `vModelText` — a lowered `<switch>` included. Stringifying the
+// a DOM input it emits `vModelText` — `<switch>` included. Stringifying the
 // model there is correct upstream (a DOM input's value IS a string) and fatal here: the Switch
 // behavior reads `props.value === true`, so `String(true)` pins the control OFF and no tap moves
 // it. Device-confirmed on `examples/vue-sfc`, both switches on `CanaryScreen`, 2026-09-02.
-describe('vModelText on a lowered switch', () => {
+describe('vModelText on a switch tag', () => {
   const created = (value: unknown): ISymbioteNode => {
     const el = createElement('Switch', false, SWITCH_TAG);
     vModelText.created?.(
@@ -219,8 +222,8 @@ describe('vModelText on a lowered switch', () => {
   };
 
   it('writes the boolean the behavior actually reads', () => {
-    expect(created(true).props.value).toBe(true);
-    expect(created(false).props.value).toBe(false);
+    expect(propOf(created(true), 'value')).toBe(true);
+    expect(propOf(created(false), 'value')).toBe(false);
   });
 
   // The control that keeps the branch honest: a text input must still be stringified, which is
@@ -233,6 +236,6 @@ describe('vModelText on a lowered switch', () => {
       { props: { 'onUpdate:modelValue': () => {} } } as never,
       null as never,
     );
-    expect(el.props.value).toBe('42');
+    expect(propOf(el, 'value')).toBe('42');
   });
 });

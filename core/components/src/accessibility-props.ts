@@ -214,7 +214,7 @@ export interface IAriaProps {
 }
 
 // The gate's key list, typed against `IAriaProps` so a new alias added to that interface and
-// forgotten here is a type error. The engine carries its own untyped copy for the lowered path;
+// forgotten here is a type error. The engine carries its own untyped copy;
 // `core/engine/src/accessibility-props.ts` is the single implementation of the FOLD, this is only
 // the cheap probe that decides whether to call it.
 const ARIA_KEYS: ReadonlyArray<keyof IAriaProps> = [
@@ -249,7 +249,7 @@ function hasAnyAriaKey(props: IAriaProps): boolean {
 /**
  * The typed entry point adapters import. The FOLD itself now lives in `@symbiote-native/engine`
  * (`core/engine/src/accessibility-props.ts`) so it runs at the layer every path goes through —
- * including a LOWERED element, which has no component wrapper to run it. This function stays here
+ * including a bare tag, which has no component wrapper to run it. This function stays here
  * because the public types do, and because it keeps the typed gate: `hasAnyAriaKey` is checked
  * before anything is allocated, so the ~99% of nodes carrying no alias cost the same as before.
  *

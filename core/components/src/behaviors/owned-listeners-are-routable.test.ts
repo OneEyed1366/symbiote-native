@@ -2,14 +2,12 @@
 //
 //   ownedListeners  MINUS  (BASE_EVENTS + COMPONENT_EVENTS[component] + RESPONDER_EVENTS)
 //
-// Anything left over is DEAD on a lowered element and fine on the component path, which is why it
-// survives every other check. `routeProp` hands an `on*` prop to `setEventListener` — and so to the
-// behavior's stash — only for a registered event; a name that misses falls through to `setProp` and
-// sits in `node.props`, where a machine that reads the stash never looks. A wrapper passes the same
-// callback to the machine directly and stays correct, so the two paths disagree in silence.
+// Anything left over is DEAD, silently. `routeProp` hands an `on*` prop to `setEventListener` — and
+// so to the behavior's stash — only for a registered event; a name that misses falls through to
+// `setProp` and sits in `node.props`, where a machine that reads the stash never looks.
 //
 // Found by the gap it left: `pressMove` was the one name of the press machine's eight in neither
-// engine list, so a lowered `<Pressable @press-move>` highlighted on press (that is `activeStyle`,
+// engine list, so `<pressable @press-move>` highlighted on press (that is `activeStyle`,
 // engine-side) while its dx/dy readout never moved. Device-reported on `examples/vue-sfc`,
 // 2026-09-02.
 //
@@ -17,7 +15,7 @@
 // behavior — so a primitive or an owned name added later joins this audit by existing. A
 // hand-written list is the failure this file exists to prevent, one level up.
 import { beforeEach, describe, expect, it } from 'vitest';
-import { installFabric } from '../../../test-utils/src/index';
+import { installRecordingFabric } from '../../../test-utils/src/index';
 import {
   appListenerFor,
   clearHostBehaviors,
@@ -37,9 +35,10 @@ import { registerSwitchBehavior } from './switch';
 import { registerTextInputBehavior } from './text-input';
 import { registerTouchableNativeFeedbackBehavior } from './touchable-native-feedback';
 
-const fabric = installFabric();
+// A RECORDING host: nothing here reads a committed tree.
+const fabric = installRecordingFabric();
 
-function everyLoweredTag(): string[] {
+function everySpecTag(): string[] {
   return Object.values(HOST_PRIMITIVES).flatMap(spec =>
     spec.intrinsicWhen === undefined
       ? [spec.intrinsic]
@@ -68,7 +67,7 @@ describe('every name a behavior owns is routable to its stash', () => {
     const dead: string[] = [];
     let checked = 0;
 
-    for (const tag of everyLoweredTag()) {
+    for (const tag of everySpecTag()) {
       const owned = hostBehaviorFor(tag)?.ownedListeners ?? [];
       for (const event of owned) {
         const node = createElement(descriptorFor(tag).component, false, tag);

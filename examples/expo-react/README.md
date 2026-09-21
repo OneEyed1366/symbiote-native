@@ -1,17 +1,19 @@
-# Expo-native-modules canary (`@symbiote-native/sensors` + `@symbiote-native/local-auth` on device)
+# Expo-native-modules canary (all 22 Expo-wrapper packages, on device)
 
 The **Expo native-modules demo canary** — sibling of [`react`](../react), same
 `@symbiote-native/react` reconciler and `@symbiote-native/engine` core, but this app owns the
 `expo-modules-core` native bootstrap (Podfile autolinking, Gradle autolinking, the
 `SymbioteExpoModulesFactory` iOS factory, the hand-written Android `ExpoModulesProvider`) so the
-pure `react` canary can stay free of it. It currently demos `@symbiote-native/sensors`
-(`expo-sensors` ported onto our engine) and `@symbiote-native/local-auth` (`expo-local-authentication`
-ported onto our engine — FaceID/TouchID/fingerprint), and will grow to demo other Expo-SDK ports as
-they land.
+pure `react` canary can stay free of it. It demos every `expo-modules-core`-based wrapper package
+this repo ships — Application, Battery, Brightness, Cellular, Clipboard, Crypto, Device, Haptics,
+Keep-Awake, Local Auth, Localization, Network, Screen Orientation, Secure Store, Sensors, Sharing,
+SMS, Standard Web Crypto, Store Review, System UI, Tracking Transparency, and Web Browser — one
+screen per package, reached from a `Menu` screen.
 
 ```
 index.js    registers the app with @symbiote-native/react's bootstrap
-App.tsx     the same canary surface as examples/react, plus Sensors + Local Auth screens
+App.tsx     the native stack navigator over the Menu + 22 wrapper-package demo screens
+screens/    MenuScreen plus one <Name>Screen.tsx per wrapper package
 ```
 
 `index.js` calls `registerApp` from `@symbiote-native/react/bootstrap`, which wires the
@@ -19,6 +21,10 @@ native-host seams (colors, images, device events, third-party ViewConfigs) befor
 `nativeFabricUIManager` is driven directly, RN's own renderer never runs. See the [React adapter
 README](../../adapters/react) for the full surface this app exercises and what's verified on which
 platform.
+
+> This canary predates `@symbiote-native/cli` and is for in-repo development. To start a new app
+> with the same Expo packages wired in, use
+> `npx @symbiote-native/cli new --framework react --sensors --local-auth` instead.
 
 ## Run
 

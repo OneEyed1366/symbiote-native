@@ -12,17 +12,16 @@
 // without a render. So the logic layer is the pure folds/maps + the controlled-write predicate;
 // each adapter holds the two pieces in ITS own primitives (React useState/useRef, Vue ref/let).
 
-import { Platform } from '@symbiote-native/engine';
 import type {
   IMeasureOnSuccess,
   IMeasureInWindowOnSuccess,
   IMeasureLayoutOnSuccess,
   ISymbioteNode,
-  IPlatformOSType,
   ISymbioteEvent,
   ITextStyle,
 } from '@symbiote-native/engine';
 import type { IAccessibilityProps, IAriaProps } from '../accessibility-props';
+import type { IRectOffset } from './pressable';
 
 export type IInputMode =
   'none' | 'text' | 'decimal' | 'numeric' | 'tel' | 'search' | 'email' | 'url';
@@ -40,175 +39,20 @@ export const INITIAL_EVENT_COUNT = 0;
 // explicit selection).
 export const SELECTION_NONE = -1;
 
-// The W3C/alias → native lookup tables. Typed Record<string, string> (not Record<IInputMode,
-// string>) so the one safe-lookup helper (mapAutoComplete) serves every map without a cast;
-// the union types above still guard the app-facing prop contract.
-
-// RN's inputMode -> keyboardType map (TextInput.js:815). `search` is platform-split (iOS
-// 'web-search', else 'default'); we use the Android/default branch since the folded prop is
-// forwarded verbatim and the safe default avoids an unknown keyboardType on Android.
-const inputModeToKeyboardType: Record<string, string> = {
-  decimal: 'decimal-pad',
-  email: 'email-address',
-  none: 'default',
-  numeric: 'number-pad',
-  tel: 'phone-pad',
-  text: 'default',
-  url: 'url',
-};
-
-// `search` is the ONE inputMode token RN resolves per platform (TextInput.js:815-825):
-//   search: Platform.OS === 'ios' ? 'web-search' : 'default'
-// iOS has a dedicated search keyboard whose return key is a magnifier; every other host falls back
-// to the default one. It is deliberately absent from the map above, so there is one source for it
-// rather than a map entry and an override that can drift apart.
+// THE FOUR W3C->NATIVE LOOKUP TABLES AND THE FOLDS OVER THEM STOOD HERE, and they are the engine's
+// now: `foldTextInputAliases` in `SymbioteFabricProps.cpp`, with
+// `core/engine/cpp/tests/js/text-input-payload.itest.ts` as their contract.
 //
-// The host is an ARGUMENT rather than a `Platform.OS` read inside the body, because the headless
-// Platform module always resolves to iOS (platform/index.ts re-exports index.ios) — a direct read
-// would leave the android branch permanently unprovable. resolveTextInputProps supplies the real
-// value. This costs the callers nothing: the exported fold signature is unchanged.
-export function keyboardTypeForInputMode(
-  inputMode: string,
-  os: IPlatformOSType,
-): string | undefined {
-  if (inputMode === 'search') return os === 'ios' ? 'web-search' : 'default';
-  return mapAutoComplete(inputModeToKeyboardType, inputMode);
-}
-
-// RN's enterKeyHint -> returnKeyType map (TextInput.js:805). Note `enter` -> 'default'.
-const enterKeyHintToReturnKeyType: Record<string, string> = {
-  done: 'done',
-  enter: 'default',
-  go: 'go',
-  next: 'next',
-  previous: 'previous',
-  search: 'search',
-  send: 'send',
-};
-
-// RN's W3C autocomplete -> Android `autoComplete` map (TextInput.js:828). A token with no
-// native equivalent passes through unchanged (RN's `?? autoComplete`).
-const autoCompleteWebToAndroid: Record<string, string> = {
-  'additional-name': 'name-middle',
-  'address-line1': 'postal-address-region',
-  'address-line2': 'postal-address-locality',
-  bday: 'birthdate-full',
-  'bday-day': 'birthdate-day',
-  'bday-month': 'birthdate-month',
-  'bday-year': 'birthdate-year',
-  'cc-csc': 'cc-csc',
-  'cc-exp': 'cc-exp',
-  'cc-exp-month': 'cc-exp-month',
-  'cc-exp-year': 'cc-exp-year',
-  'cc-number': 'cc-number',
-  country: 'postal-address-country',
-  'current-password': 'password',
-  email: 'email',
-  'family-name': 'name-family',
-  'given-name': 'name-given',
-  'honorific-prefix': 'name-prefix',
-  'honorific-suffix': 'name-suffix',
-  name: 'name',
-  'new-password': 'password-new',
-  off: 'off',
-  'one-time-code': 'sms-otp',
-  'postal-code': 'postal-code',
-  sex: 'gender',
-  'street-address': 'street-address',
-  tel: 'tel',
-  'tel-country-code': 'tel-country-code',
-  'tel-national': 'tel-national',
-  username: 'username',
-};
-
-// RN's W3C autocomplete -> iOS `textContentType` map (TextInput.js:862). A token absent here
-// leaves textContentType undefined on iOS (RN's `autoComplete in map` guard).
-const autoCompleteWebToTextContentType: Record<string, string> = {
-  'additional-name': 'middleName',
-  'address-line1': 'streetAddressLine1',
-  'address-line2': 'streetAddressLine2',
-  bday: 'birthdate',
-  'bday-day': 'birthdateDay',
-  'bday-month': 'birthdateMonth',
-  'bday-year': 'birthdateYear',
-  'cc-additional-name': 'creditCardMiddleName',
-  'cc-csc': 'creditCardSecurityCode',
-  'cc-exp': 'creditCardExpiration',
-  'cc-exp-month': 'creditCardExpirationMonth',
-  'cc-exp-year': 'creditCardExpirationYear',
-  'cc-family-name': 'creditCardFamilyName',
-  'cc-given-name': 'creditCardGivenName',
-  'cc-name': 'creditCardName',
-  'cc-number': 'creditCardNumber',
-  'cc-type': 'creditCardType',
-  country: 'countryName',
-  'current-password': 'password',
-  email: 'emailAddress',
-  'family-name': 'familyName',
-  'given-name': 'givenName',
-  'honorific-prefix': 'namePrefix',
-  'honorific-suffix': 'nameSuffix',
-  name: 'name',
-  'new-password': 'newPassword',
-  nickname: 'nickname',
-  off: 'none',
-  'one-time-code': 'oneTimeCode',
-  organization: 'organizationName',
-  'organization-title': 'jobTitle',
-  'postal-code': 'postalCode',
-  'street-address': 'fullStreetAddress',
-  tel: 'telephoneNumber',
-  url: 'URL',
-  username: 'username',
-};
-
-// Safe lookup into a W3C->native / alias->native map (no `as`): own-property guard, undefined
-// if the token has no native equivalent. The caller decides the per-platform fallback. Named
-// for its first user (autoComplete), but it is the one generic safe lookup every map shares.
-export function mapAutoComplete(
-  map: Record<string, string>,
-  token: string,
-): string | undefined {
-  return Object.prototype.hasOwnProperty.call(map, token)
-    ? map[token]
-    : undefined;
-}
-
-// RN folds W3C `autoComplete` per platform (TextInput.js:938): Android takes the mapped
-// `autoComplete` token (falling back to the raw token), iOS takes the mapped `textContentType`
-// (only when the token is in the map, else leaves it untouched). Symbiote is Metro-built per
-// platform but folds platform-agnostically, resolving BOTH native props from the one token:
-// the iOS-only `textContentType` is inert on Android and the Android `autoComplete` token is
-// inert on iOS, so emitting both is safe: same shape as the dual-keyed events.
-export function foldAutoComplete(token: string | undefined): {
-  autoComplete: string | undefined;
-  textContentType: string | undefined;
-} {
-  if (token === undefined)
-    return { autoComplete: undefined, textContentType: undefined };
-  return {
-    autoComplete: mapAutoComplete(autoCompleteWebToAndroid, token) ?? token,
-    textContentType: mapAutoComplete(autoCompleteWebToTextContentType, token),
-  };
-}
-
-// RN's submitBehavior reconciliation (TextInput.js:559). Explicit submitBehavior wins (with
-// single-line 'newline' coerced to 'blurAndSubmit'); else it is derived from the legacy
-// blurOnSubmit per multiline. Input/output are plain strings: the result is forwarded to the
-// native prop verbatim, so no ISubmitBehavior union is needed at the seam.
-export function foldSubmitBehavior(
-  submitBehavior: string | undefined,
-  blurOnSubmit: boolean | undefined,
-  multiline: boolean,
-): string {
-  if (submitBehavior !== undefined) {
-    if (!multiline && submitBehavior === 'newline') return 'blurAndSubmit';
-    return submitBehavior;
-  }
-  if (multiline) return blurOnSubmit === true ? 'blurAndSubmit' : 'newline';
-  return blurOnSubmit !== false ? 'blurAndSubmit' : 'submit';
-}
-
+// Deleted in the same pass as `rippleProps` next door, for the same reason. Nothing called them
+// after the port — only this file's own tests and the barrel — and a rule that lives in two places
+// has two behaviours the day one of them is edited. An exported twin kept alive by its own test is
+// the shape the "no mirrors" rule exists to catch.
+//
+// Gone with them: `inputModeToKeyboardType`, `enterKeyHintToReturnKeyType`,
+// `autoCompleteWebToAndroid`, `autoCompleteWebToTextContentType`, `keyboardTypeForInputMode`,
+// `mapAutoComplete`, `foldAutoComplete`, `foldSubmitBehavior`, `resolveTextInputProps` and its two
+// types. What STAYS below is the machine — `foldText`, the change-event readers, and the
+// controlled-write decision — which runs at gesture rate and calls back into app code.
 // RN's fold: value wins, else defaultValue, else leave undefined (uncontrolled).
 export function foldText(
   value: string | undefined,
@@ -244,94 +88,6 @@ export function shouldCommandText(
   return typeof value === 'string' && lastNativeText !== value;
 }
 
-// The raw alias/legacy fields the per-platform fold reads. The union-typed fields accept a
-// looser `string` so an adapter that holds attrs untyped (Vue) can pass them without a guard;
-// the typed props contract (ITextInputProps) still constrains app code.
-export type ITextInputFoldInput = {
-  inputMode?: string;
-  keyboardType?: string;
-  enterKeyHint?: string;
-  returnKeyType?: string;
-  readOnly?: boolean;
-  editable?: boolean;
-  submitBehavior?: string;
-  blurOnSubmit?: boolean;
-  multiline: boolean;
-  cursorColor?: string;
-  selectionColor?: string;
-  selectionHandleColor?: string;
-  autoComplete?: string;
-  textContentType?: string;
-  showSoftInputOnFocus?: boolean;
-  underlineColorAndroid?: string;
-};
-
-// The resolved native props the render fn forwards onto the host node. Every field here is a
-// concrete native prop value (or undefined to omit); the W3C/alias indirection is gone.
-export type IFoldedTextInputProps = {
-  keyboardType: string | undefined;
-  returnKeyType: string | undefined;
-  editable: boolean | undefined;
-  submitBehavior: string;
-  selectionColor: string | undefined;
-  cursorColor: string | undefined;
-  selectionHandleColor: string | undefined;
-  underlineColorAndroid: string;
-  autoComplete: string | undefined;
-  textContentType: string | undefined;
-  showSoftInputOnFocus: boolean | undefined;
-};
-
-// The whole per-platform-agnostic prop fold in one place (TextInput.js:928-946), shared by every
-// adapter: inputMode wins over keyboardType, enterKeyHint over returnKeyType, readOnly over
-// editable (inverted), the cursor/selection-handle colors default from selectionColor, the W3C
-// autoComplete token folds to the per-platform native prop (an explicit textContentType still
-// wins), inputMode forces softInput visibility, and underlineColorAndroid defaults to
-// 'transparent' to hide the Material EditText bar.
-export function resolveTextInputProps(
-  input: ITextInputFoldInput,
-): IFoldedTextInputProps {
-  const folded = foldAutoComplete(input.autoComplete);
-  return {
-    keyboardType:
-      input.inputMode !== undefined
-        ? keyboardTypeForInputMode(input.inputMode, Platform.OS)
-        : input.keyboardType,
-    returnKeyType:
-      input.enterKeyHint !== undefined
-        ? mapAutoComplete(enterKeyHintToReturnKeyType, input.enterKeyHint)
-        : input.returnKeyType,
-    editable: input.readOnly !== undefined ? !input.readOnly : input.editable,
-    submitBehavior: foldSubmitBehavior(
-      input.submitBehavior,
-      input.blurOnSubmit,
-      input.multiline,
-    ),
-    selectionColor: input.selectionColor,
-    cursorColor:
-      input.cursorColor !== undefined
-        ? input.cursorColor
-        : input.selectionColor,
-    selectionHandleColor:
-      input.selectionHandleColor !== undefined
-        ? input.selectionHandleColor
-        : input.selectionColor,
-    underlineColorAndroid:
-      input.underlineColorAndroid !== undefined
-        ? input.underlineColorAndroid
-        : 'transparent',
-    autoComplete: folded.autoComplete,
-    textContentType:
-      input.textContentType !== undefined
-        ? input.textContentType
-        : folded.textContentType,
-    showSoftInputOnFocus:
-      input.inputMode !== undefined
-        ? input.inputMode !== 'none'
-        : input.showSoftInputOnFocus,
-  };
-}
-
 // The event `onValueChange` fires with. Svelte's compiler treats any individual `on*`-prefixed
 // attribute as a native listener attachment and always calls it with exactly one argument, a real
 // object — a two-argument `(text, event)` callback silently drops `event` there and crashes when
@@ -357,8 +113,8 @@ export type ITextInputProps = IAccessibilityProps &
     // ViewManager reads them directly); declared here so app code is type-checked.
     autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
     autoCorrect?: boolean;
-    // W3C autocomplete token. RN folds it to the Android `autoComplete` / iOS
-    // `textContentType` native prop in JS (TextInput.js:938); see foldAutoComplete.
+    // W3C autocomplete token. RN resolves it to BOTH the Android `autoComplete` and the iOS
+    // `textContentType` native prop (TextInput.js:938); the engine does it — `foldTextInputAliases`.
     autoComplete?: string;
     // iOS content-type hint. An explicit value wins over the autoComplete-derived one.
     textContentType?: string;
@@ -389,11 +145,26 @@ export type ITextInputProps = IAccessibilityProps &
     // view above the keyboard while the input is focused. Forwarded via passthrough.
     inputAccessoryViewID?: string;
     style?: ITextStyle;
+    // TextInput.js's own `usePressability` — the same Pressability class every Touchable uses,
+    // wired so a tap inside an authored `hitSlop` but outside the native view's focus zone still
+    // focuses the input. `onPress`/`onPressIn`/`onPressOut` are forwarded to the app exactly as
+    // authored; `onPress` additionally focuses the input when `editable !== false`.
+    hitSlop?: IRectOffset;
+    onPress?: ITextInputEventHandler;
+    onPressIn?: ITextInputEventHandler;
+    onPressOut?: ITextInputEventHandler;
 
     // Fires once per native change with the event, `text` carried on it (e.g. alongside
     // `nativeEvent.eventCount`/`target`) — one argument, always a real object; see
     // `ITextInputChangeEvent`.
     onValueChange?: (event: ITextInputChangeEvent) => void;
+    // TextInput.js:506 — `props.onChangeText(currentText)`, called right alongside `onChange` on
+    // the SAME native change event. RN's real signature takes the bare STRING; ours cannot — an
+    // individual `on*` attribute on a host tag compiles through Svelte's `target_handler`, which
+    // always calls with exactly one argument, a real object (`host-tag-invariants.test.ts`, and the
+    // identical reason `onValueChange` carries `text` as a FIELD rather than a second argument). So
+    // `text` rides on the event exactly like `onValueChange` does — same object, same field.
+    onChangeText?: (event: ITextInputChangeEvent) => void;
     onFocus?: ITextInputEventHandler;
     onBlur?: ITextInputEventHandler;
     onEndEditing?: ITextInputEventHandler;
@@ -404,8 +175,8 @@ export type ITextInputProps = IAccessibilityProps &
   };
 
 // The callback surface AS A VALUE, so a test can enumerate it instead of restating it. A hand-kept
-// second list is exactly the drift that let `onValueChange` go a month without reaching the app on
-// the lowered path, so this one is derived: `Record` over the keys of the prop type above makes it
+// second list is exactly the drift that let `onValueChange` go a month without reaching the app,
+// so this one is derived: `Record` over the keys of the prop type above makes it
 // exhaustive in BOTH directions — a callback declared and not listed fails to compile, and a name
 // listed and not declared fails too.
 //
@@ -424,6 +195,7 @@ type ITextInputOwnCallback = Exclude<
 
 const TEXT_INPUT_CALLBACKS: Record<ITextInputOwnCallback, true> = {
   onValueChange: true,
+  onChangeText: true,
   onFocus: true,
   onBlur: true,
   onEndEditing: true,
@@ -431,6 +203,9 @@ const TEXT_INPUT_CALLBACKS: Record<ITextInputOwnCallback, true> = {
   onKeyPress: true,
   onSelectionChange: true,
   onContentSizeChange: true,
+  onPress: true,
+  onPressIn: true,
+  onPressOut: true,
 };
 
 export const TEXT_INPUT_CALLBACK_NAMES: readonly string[] =
@@ -440,21 +215,12 @@ export const TEXT_INPUT_CALLBACK_NAMES: readonly string[] =
 // native view commands; isFocused is tracked JS-side from the focus/blur event pair (RN keeps
 // the same state in TextInputState (there is no native getter to query).
 //
-// IT IS A UNION, and that is the whole point of the type. The five TextInput methods below are
-// what the wrappers used to expose, and a wrapper that exposes ONLY those closes the node off —
-// so a component-path ref loses `measure`/`measureInWindow`/`measureLayout`/`setNativeProps`,
-// which every other primitive's ref hands over. A LOWERED element gives the bare node and loses
-// the other direction: no `clear`, `isFocused` or `setSelection`.
-//
-// So the two paths were not "lowering narrows the surface" but TWO DIFFERENT surfaces, and an app
-// crossed between them by writing `:multiline="isLong"` instead of `multiline` — a runtime
-// selector refuses lowering, a literal does not. Measured on Vue 2026-08-31, both paths, and the
-// same shape holds for every adapter: all five hand-rolled their handle and all five listed
-// exactly the same five names.
-//
-// The fix is the union rather than a refusal: refusing to lower a ref'd TextInput would only swap
-// which four methods go missing, and on `View`/`Text` — where a lowered ref is strictly BETTER,
-// handing back the node instead of a component instance — it would be a plain regression.
+// IT IS A UNION, and that is the whole point of the type. The five TextInput methods below are what
+// the wrappers used to expose, and a wrapper that exposed ONLY those closed the node off — its ref
+// lost `measure`/`measureInWindow`/`measureLayout`/`setNativeProps`, which every other primitive's
+// ref hands over. The bare node loses the other direction: no `clear`, `isFocused` or
+// `setSelection`. Measured on Vue 2026-08-31, and the same shape held for every adapter — all five
+// hand-rolled their handle and all five listed exactly the same five names.
 export type ITextInputHandle = {
   focus(): void;
   blur(): void;

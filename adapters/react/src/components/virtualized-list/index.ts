@@ -58,10 +58,8 @@ import {
   type ISymbioteNode,
 } from '@symbiote-native/engine';
 import {
-  DEFAULT_END_REACHED_THRESHOLD,
   DEFAULT_INITIAL_NUM_TO_RENDER,
   DEFAULT_MAX_TO_RENDER_PER_BATCH,
-  DEFAULT_START_REACHED_THRESHOLD,
   DEFAULT_UPDATE_CELLS_BATCHING_PERIOD,
   DEFAULT_WINDOW_SIZE,
   EMPTY_OFFSET,
@@ -250,9 +248,9 @@ export function VirtualizedList<ItemT>(
     inverted = false,
     extraData,
     onEndReached,
-    onEndReachedThreshold = DEFAULT_END_REACHED_THRESHOLD,
+    onEndReachedThreshold,
     onStartReached,
-    onStartReachedThreshold = DEFAULT_START_REACHED_THRESHOLD,
+    onStartReachedThreshold,
     onRefresh,
     refreshing,
     progressViewOffset,
@@ -433,7 +431,12 @@ export function VirtualizedList<ItemT>(
             const info = effect.info;
             const map = effect.map;
             const fire = (): void => {
-              for (const pair of pairs) pair.onViewableItemsChanged(info);
+              for (const pair of pairs) {
+                pair.onViewableItemsChanged({
+                  ...info,
+                  viewabilityConfig: pair.viewabilityConfig,
+                });
+              }
               dispatchRef.current({ kind: 'viewable-fired', map });
             };
             if (viewableTimerRef.current !== null) {

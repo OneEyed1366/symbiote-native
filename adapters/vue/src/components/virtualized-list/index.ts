@@ -41,10 +41,8 @@ import {
   type VNode,
 } from '@vue/runtime-core';
 import {
-  DEFAULT_END_REACHED_THRESHOLD,
   DEFAULT_INITIAL_NUM_TO_RENDER,
   DEFAULT_MAX_TO_RENDER_PER_BATCH,
-  DEFAULT_START_REACHED_THRESHOLD,
   DEFAULT_UPDATE_CELLS_BATCHING_PERIOD,
   DEFAULT_WINDOW_SIZE,
   EMPTY_OFFSET,
@@ -251,9 +249,9 @@ interface INarrowedProps<ItemT> {
   horizontal: boolean;
   inverted: boolean;
   onEndReached?: (info: { distanceFromEnd: number }) => void;
-  onEndReachedThreshold: number;
+  onEndReachedThreshold?: number;
   onStartReached?: (info: { distanceFromStart: number }) => void;
-  onStartReachedThreshold: number;
+  onStartReachedThreshold?: number;
   onRefresh?: () => void;
   refreshing: boolean;
   progressViewOffset?: number;
@@ -416,18 +414,18 @@ export const VirtualizedList = defineComponent(
           ? (info: { distanceFromEnd: number }): void =>
               emit('endReached', info)
           : undefined,
-        onEndReachedThreshold: asNumber(
-          props.onEndReachedThreshold,
-          DEFAULT_END_REACHED_THRESHOLD,
-        ),
+        onEndReachedThreshold:
+          typeof props.onEndReachedThreshold === 'number'
+            ? props.onEndReachedThreshold
+            : undefined,
         onStartReached: listens('onStartReached')
           ? (info: { distanceFromStart: number }): void =>
               emit('startReached', info)
           : undefined,
-        onStartReachedThreshold: asNumber(
-          props.onStartReachedThreshold,
-          DEFAULT_START_REACHED_THRESHOLD,
-        ),
+        onStartReachedThreshold:
+          typeof props.onStartReachedThreshold === 'number'
+            ? props.onStartReachedThreshold
+            : undefined,
         onRefresh: listens('onRefresh')
           ? (): void => emit('refresh')
           : undefined,
@@ -564,7 +562,12 @@ export const VirtualizedList = defineComponent(
             const info = effect.info;
             const map = effect.map;
             const fire = (): void => {
-              for (const pair of pairs) pair.onViewableItemsChanged(info);
+              for (const pair of pairs) {
+                pair.onViewableItemsChanged({
+                  ...info,
+                  viewabilityConfig: pair.viewabilityConfig,
+                });
+              }
               dispatch({ kind: 'viewable-fired', map });
             };
             if (viewableTimer !== null) {
@@ -758,8 +761,6 @@ export const VirtualizedList = defineComponent(
         children.push(h('view', { key: 'list-header' }, [header]));
       }
 
-      let renderedStickyIndices: number[] = [];
-
       if (m.count === FIRST_INDEX) {
         const empty = resolveElement(p.listEmptyComponent);
         if (empty !== undefined) {
@@ -777,7 +778,7 @@ export const VirtualizedList = defineComponent(
           stickyIndices: stickySet,
           hasHeader: header !== undefined,
         });
-        renderedStickyIndices = plan.stickyChildPositions;
+        // `plan.stickyChildPositions` is deliberately NOT read — it was the input to the index form.
 
         if (plan.leadingExtent > EMPTY_OFFSET) {
           children.push(
@@ -829,7 +830,11 @@ export const VirtualizedList = defineComponent(
               : undefined;
           children.push(
             h(
-              'view',
+              // A cell the app flagged sticky IS the `sticky-header` tag — same position, same key,
+              // same `onLayout` (the behavior forwards it rather than replacing it). The collision
+              // point then comes from the owner's DOCUMENT order, which is the one form that
+              // survives windowing; `stickyHeaderIndices` numbers paint children and does not.
+              stickySet?.has(cell.index) === true ? 'sticky-header' : 'view',
               {
                 key: `cell-${cell.key}`,
                 onLayout: makeCellMeasure(cell.index),
@@ -908,9 +913,10 @@ export const VirtualizedList = defineComponent(
       // pre-mount window before the handle attaches).
       if (commandedOffset.value !== undefined)
         scrollProps.contentOffset = commandedOffset.value;
-      // Headers in the window stick; an empty list leaves the prop off entirely.
-      if (renderedStickyIndices.length > 0)
-        scrollProps.stickyHeaderIndices = renderedStickyIndices;
+      // `stickyHeaderIndices` is deliberately NOT forwarded — see `pushCell`. It numbers the scroll
+      // view's PAINT children, and a windowed list paints a header, a spacer and a slice, so the
+      // positions move every time the window slides and the behavior re-wraps a different child
+      // each pass. The cells carry the tag instead.
       // Forward maintainVisibleContentPosition to the ScrollView so it anchors the in-window cells.
       // minIndexForVisible is bumped by 1 when a ListHeaderComponent occupies child 0.
       if (p.maintainVisibleContentPosition !== undefined) {

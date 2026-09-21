@@ -13,7 +13,7 @@
 import { defineComponent, h, type Ref } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount } from '@symbiote-native/vue';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import type { IPedometerResult } from '../../../core';
 import { usePedometer } from './index';
 
@@ -32,7 +32,7 @@ vi.mock('../../../core', () => ({
   watchStepCount: (listener: IListener) => watchStepCountMock(listener),
 }));
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 
 beforeEach(() => {
   fabric.reset();

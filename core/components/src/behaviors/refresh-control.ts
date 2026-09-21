@@ -37,6 +37,7 @@ import {
   setBehaviorListener,
   type ISymbioteEvent,
   type ISymbioteNode,
+  propOf,
 } from '@symbiote-native/engine';
 
 export const REFRESH_CONTROL_TAG = 'refresh-control';
@@ -50,12 +51,25 @@ const SET_NATIVE_REFRESHING = 'setNativeRefreshing';
 // against a value native never claimed.
 const reported = new WeakMap<ISymbioteNode, boolean>();
 
+// TODO(rn-parity, low priority, efficiency not correctness): vendor's `componentDidUpdate`
+// (`RefreshControl.js:139-158`) sends `setNativeRefreshing` only when `refreshing` did NOT change
+// between renders, trusting the ordinary prop diff to carry a real change to native. Ours has no
+// such guard — `evaluateSnapBack` fires the command on any disagreement with `reported`, even when
+// this same commit already carries the authored `refreshing` change (accept-then-finish: app agrees
+// on the gesture, then sets `refreshing: false` to end it — vendor sends zero commands, we send one
+// extra). Both settle on the same native value, so this is a harmless redundant call, not a bug —
+// and NOT a candidate for the same fix as the "repairs a snap-back the app contradicts on a later
+// commit" test below, which relies on this exact unconditional re-check for a genuine cross-
+// framework microtask race. A real fix needs tracking the last-seen authored value alongside
+// `reported`, so a same-commit authored change can be told apart from native drifting on its own —
+// not attempted here.
+//
 // Shared by both triggers — see the module header for why there are two.
 function evaluateSnapBack(node: ISymbioteNode): void {
   const lastNativeReport = reported.get(node);
   if (lastNativeReport === undefined) return; // no report yet, nothing to disagree with
 
-  const refreshing = node.props.refreshing === true;
+  const refreshing = propOf(node, 'refreshing') === true;
   if (lastNativeReport === refreshing) {
     dlog(`RefreshControl behavior snap-back no-op refreshing=${refreshing}`);
     return;

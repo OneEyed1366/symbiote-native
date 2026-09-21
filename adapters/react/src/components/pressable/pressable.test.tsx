@@ -20,7 +20,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount } from '@symbiote-native/react';
 import { DEFAULT_MIN_PRESS_DURATION_MS } from '@symbiote-native/components';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 110;
 const TOUCH_START = 'topTouchStart';
@@ -33,7 +36,8 @@ const TERMINATION_REQUEST = 'responderTerminationRequest';
 let measuredFrame:
   { width: number; height: number; pageX: number; pageY: number } | undefined;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const slot = globalThis.nativeFabricUIManager;
 if (slot === undefined) throw new Error('fabric slot was not installed');
 slot.measure = (_node, callback) => {
@@ -41,6 +45,11 @@ slot.measure = (_node, callback) => {
   if (frame === undefined) return;
   callback(0, 0, frame.width, frame.height, frame.pageX, frame.pageY);
 };
+// The recording host's own `measure` is a no-op stub (it never speaks to Fabric, so it invents
+// nothing) and would otherwise SHADOW the slot override above — the same gap that keeps
+// host-instance.test.ts on the mirror. Forward it to the slot here, exactly what the real commit
+// path does, so Pressable's responder-region measurement reaches the override.
+fabric.measure = (node, callback) => slot.measure(node, callback);
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -70,22 +79,15 @@ function responderHandle(testID?: string): unknown {
   return view.instanceHandle;
 }
 
-// The latest committed props of the responder View (re-read after each commit).
+// The latest committed props of the responder View (re-read after each commit — a live node's
+// payload is always the current one).
 function responderProps(): Record<string, unknown> {
-  function find(node: IFakeNode): IFakeNode | undefined {
-    if (node.viewName === 'RCTView' && node.props.pointerEvents !== 'box-none')
-      return node;
-    for (const child of node.children) {
-      const hit = find(child);
-      if (hit) return hit;
-    }
-    return undefined;
-  }
-  for (const root of fabric.committed) {
-    const hit = find(root);
-    if (hit) return hit.props;
-  }
-  throw new Error('no committed RCTView found');
+  const node = live.findLive(
+    live.appRoot(),
+    n => n.viewName === 'RCTView' && n.payload.pointerEvents !== 'box-none',
+  );
+  if (node === undefined) throw new Error('no committed RCTView found');
+  return node.payload;
 }
 
 function fire(handle: unknown, type: string): void {
@@ -108,11 +110,6 @@ function fireAt(handle: unknown, type: string, x: number, y: number): void {
     touches,
     changedTouches: [touch],
   });
-}
-
-function accessibilityDisabled(props: Record<string, unknown>): unknown {
-  const state = props.accessibilityState;
-  return isRecord(state) ? state.disabled : undefined;
 }
 
 function terminationGate(
@@ -337,44 +334,37 @@ describe('React Pressable on the engine', () => {
     expect(longPresses).toBe(0);
   });
 
-  // why: resolveDisabledAccessibilityState (core/components) folds `disabled` into the
-  // accessibilityState it's handed; this proves the fold actually reaches the committed native
-  // node through the View wiring, and that unrelated a11y props pass through untouched.
-  it('reports accessibilityState.disabled and passes a11y props through', () => {
+  // why: unrelated a11y props pass through untouched. The `accessibilityState.disabled` half of
+  // this case moved to `core/engine/cpp/tests/js/pressable-payload.itest.ts` — the fold is
+  // `foldPressableProps` in the engine now, and this harness builds its payload through the
+  // TypeScript `fabricProps`, which carries no copy of it. What is left is the half this harness
+  // can still answer: that React's renderer hands the authored props through to the commit.
+  it('passes a11y props through untouched', () => {
     mount(
       ROOT_TAG,
       <pressable disabled accessibilityLabel="save" testID="save-btn" />,
     );
     const props = responderProps();
-    expect(accessibilityDisabled(props)).toBe(true);
     expect(props.accessibilityLabel).toBe('save');
     expect(props.testID).toBe('save-btn');
   });
 
-  // why: `button` is a TAG whose behavior composes the press machine, so this proves the a11y fold
-  // survives React's renderer -> `./register` -> the behavior, not just Pressable's own
-  // accessibilityState fold tested above. It is also the arm that fails if the registration is
-  // dropped: an unregistered `button` commits a bare view with no role at all.
-  it('gives button role=button, accessible, and a disabled a11y state', () => {
+  // why: `button` is a TAG, so this is the arm that fails if the registration is dropped — an
+  // unregistered `button` commits a bare view and nothing forwards the label.
+  //
+  // `accessibilityRole` USED TO BE THE OBSERVABLE HERE and no longer can be: the role joined
+  // `accessible` and `accessibilityState` in the engine on 2026-09-18 (`foldButtonProps`), and this
+  // harness builds its payload through the TypeScript `fabricProps`, which holds no copy of the tag
+  // rules. `accessibilityLabel` is a plain forward and is the right observable now — it proves the
+  // registration is live without asking about a rule this host cannot see.
+  // The role itself: `core/engine/cpp/tests/js/button-payload.itest.ts`.
+  it('gives button its a11y label through the registration', () => {
     mount(
       ROOT_TAG,
       <button title="OK" disabled accessibilityLabel="confirm" />,
     );
-    const props = responderProps();
-    expect(props.accessibilityRole).toBe('button');
-    expect(props.accessible).toBe(true);
-    expect(accessibilityDisabled(props)).toBe(true);
-    expect(props.accessibilityLabel).toBe('confirm');
-  });
 
-  // why: the disabled-fold above must not leak — an enabled button must NOT report
-  // accessibilityState.disabled just because `disabled` was folded through Pressable's logic
-  // (the fold is untouched, not defaulted-to-true, when `disabled` is unset).
-  it('keeps an enabled button role=button and not disabled', () => {
-    mount(ROOT_TAG, <button title="Go" onPress={() => {}} />);
-    const props = responderProps();
-    expect(props.accessibilityRole).toBe('button');
-    expect(accessibilityDisabled(props)).not.toBe(true);
+    expect(responderProps().accessibilityLabel).toBe('confirm');
   });
 
   // why: RN's finger tracking is not pixel-perfect — a small wobble while holding a tap must
@@ -645,17 +635,9 @@ describe('React Pressable on the engine', () => {
     expect(rippleCarrier).toBeUndefined();
   });
 
-  // why: RN marks every pressable accessible unless the app opts OUT (Pressable.js:252), so a
-  // Pressable that never writes the prop must still reach a screen reader as one element rather
-  // than a plain view. Asserted on the COMMITTED payload — the gap this closes was invisible in
-  // JS and device-only. The `false` case pins `!== false` against a `?? true` regression.
-  it('marks the responder accessible when the app says nothing', () => {
-    mount(ROOT_TAG, <pressable onPress={() => {}} />);
-    expect(responderProps().accessible).toBe(true);
-  });
-
-  it('lets a literal false opt out (not `?? true`)', () => {
-    mount(ROOT_TAG, <pressable accessible={false} onPress={() => {}} />);
-    expect(responderProps().accessible).toBe(false);
-  });
+  // BOTH `accessible` CASES MOVED, as a pair:
+  // `core/engine/cpp/tests/js/pressable-payload.itest.ts`. Pressable.js:252 is the engine's rule
+  // now, and the opt-out case is the reason they had to travel together — `accessible: false` is
+  // what this harness produces whether or not any rule ran, so leaving it here would have kept a
+  // green case over a rule this file can no longer reach.
 });

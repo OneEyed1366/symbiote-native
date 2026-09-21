@@ -1,10 +1,13 @@
-// Real-execution proof (against the real dom-shim + real fake-Fabric, no Svelte compile
+// Real-execution proof (against the real dom-shim + the real engine tree, no Svelte compile
 // needed since this module never touches Svelte's own codegen) that mountDescriptorChildren
 // creates each shim node ONCE and reuses it by position on update — no removeChild+recreate,
 // no new native-view identity, matching descriptor-to-svelte.ts's whole cost model.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 import { createSurface, disposeRoot } from '@symbiote-native/engine';
 import type { IDescriptorChild } from '@symbiote-native/components';
 import { createRootShimElement } from './root-element';
@@ -17,7 +20,8 @@ const ROOT_TAG = 91_301;
 const tick = (): Promise<void> =>
   Promise.resolve().then(() => Promise.resolve());
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 
 beforeEach(() => {
   fabric.reset();
@@ -46,10 +50,9 @@ describe('mountDescriptorChildren', () => {
       mountDescriptorChildren(root, children);
       await tick();
 
-      const appRoot = fabric.appRoot();
-      const view = appRoot.children[0];
+      const view = live.nodeOf(live.appRoot()).children[0];
       expect(view?.children[0]?.viewName).toBe('ActivityIndicatorView');
-      expect(view?.children[0]?.props.animating).toBe(true);
+      expect(view?.children[0]?.payload.animating).toBe(true);
     });
 
     it('reuses the same native node identity across an update — no recreate', async () => {
@@ -67,7 +70,12 @@ describe('mountDescriptorChildren', () => {
         },
       ]);
       await tick();
-      const createdBefore = fabric.counts.createNode;
+      // Node IDENTITY, not a creation count: a recreate that happened to net out to the same
+      // number of nodes would still pass a count, and the thing that breaks a native command is
+      // the identity moving.
+      const spinnerBefore = live.nodeOf(live.appRoot()).children[0]?.children[0]
+        ?.handle;
+      expect(spinnerBefore).toBeDefined();
 
       mounted.update([
         {
@@ -78,12 +86,11 @@ describe('mountDescriptorChildren', () => {
       ]);
       await tick();
 
-      // Only the changed prop should have moved; no new createNode call, same tag.
-      expect(fabric.counts.createNode).toBe(createdBefore);
-      const appRoot = fabric.appRoot();
-      const child = appRoot.children[0]?.children[0];
-      expect(child?.props.animating).toBe(false);
-      expect(child?.props.color).toBe('red');
+      // Only the changed prop should have moved; the node itself is the one that was there.
+      const child = live.nodeOf(live.appRoot()).children[0]?.children[0];
+      expect(child?.handle).toBe(spinnerBefore);
+      expect(child?.payload.animating).toBe(false);
+      expect(child?.payload.color).toBe('red');
     });
 
     it('syncs a nested multi-level tree by position', async () => {
@@ -110,12 +117,12 @@ describe('mountDescriptorChildren', () => {
       ]);
       await tick();
 
-      const wrapper = fabric.appRoot().children[0]?.children[0];
-      expect(wrapper?.props.flex).toBe(2);
+      const wrapper = live.nodeOf(live.appRoot()).children[0]?.children[0];
+      expect(wrapper?.payload.flex).toBe(2);
       const text = wrapper?.children[0];
       expect(text?.viewName).toBe('RCTText');
       expect(text?.children[0]?.viewName).toBe('RCTRawText');
-      expect(text?.children[0]?.props.text).toBe('world');
+      expect(text?.children[0]?.payload.text).toBe('world');
     });
 
     it('mounts and updates a bare string child directly under the parent', async () => {
@@ -129,15 +136,15 @@ describe('mountDescriptorChildren', () => {
 
       const mounted = mountDescriptorChildren(root, ['hello']);
       await tick();
-      expect(fabric.appRoot().children[0]?.children[0]?.props.text).toBe(
-        'hello',
-      );
+      expect(
+        live.nodeOf(live.appRoot()).children[0]?.children[0]?.payload.text,
+      ).toBe('hello');
 
       mounted.update(['world']);
       await tick();
-      expect(fabric.appRoot().children[0]?.children[0]?.props.text).toBe(
-        'world',
-      );
+      expect(
+        live.nodeOf(live.appRoot()).children[0]?.children[0]?.payload.text,
+      ).toBe('world');
     });
   });
 
@@ -246,15 +253,17 @@ describe('createDescriptorChildrenSync', () => {
       // populates it) — must not throw and must not mount anything.
       syncChildren(null, [{ type: 'view', props: {}, children: [] }]);
       await tick();
-      expect(fabric.appRoot().children[0]?.children.length ?? 0).toBe(0);
+      expect(
+        live.nodeOf(live.appRoot()).children[0]?.children.length ?? 0,
+      ).toBe(0);
 
       syncChildren(root, [
         { type: 'view', props: { collapsable: false }, children: [] },
       ]);
       await tick();
-      const child = fabric.appRoot().children[0]?.children[0];
+      const child = live.nodeOf(live.appRoot()).children[0]?.children[0];
       expect(child?.viewName).toBe('RCTView');
-      expect(child?.props.collapsable).toBe(false);
+      expect(child?.payload.collapsable).toBe(false);
     });
 
     it("is a harmless no-op loop for an always-empty children array (Switch/TextInput's case)", async () => {
@@ -271,7 +280,9 @@ describe('createDescriptorChildrenSync', () => {
       syncChildren(root, []);
       await tick();
 
-      expect(fabric.appRoot().children[0]?.children.length ?? 0).toBe(0);
+      expect(
+        live.nodeOf(live.appRoot()).children[0]?.children.length ?? 0,
+      ).toBe(0);
     });
   });
 });

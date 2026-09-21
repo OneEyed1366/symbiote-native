@@ -8,6 +8,21 @@ name: Checks
 on:
   workflow_call:
 
+# THE CANCELLATION LIVES HERE, not in ci.yml: a caller's `concurrency` never reaches the jobs of a
+# workflow it calls, and ci.yml holds no job of its own — only the `uses:` that lands here. Its
+# block has therefore governed nothing since 2026-07-06, when the jobs moved into this file, and
+# every cancelled CI run up to 2026-09-20 was cancelled BY HAND.
+#
+# `cancel-in-progress` is an expression because release.yml calls this same file and queues
+# deliberately: a publish killed halfway leaves half the packages on the registry and a tag
+# matching neither half.
+#
+# `__checks` keeps this group off the CALLER's. Without it a release resolves both to
+# `Release-refs/heads/master` — the group that run already holds.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}__checks
+  cancel-in-progress: ${{ github.workflow == 'CI' }}
+
 jobs:
   # This exact tree may already have been verified — a push to master re-runs every check on a
   # merge/squash/rebase commit whose CONTENT was already checked on the PR it came from, just under
@@ -21,6 +36,9 @@ jobs:
     outputs:
       tree: ${{ steps.tree.outputs.hash }}
       cache-hit: ${{ steps.restore.outputs.cache-hit }}
+      bundle-tree: ${{ steps.bundle-tree.outputs.hash }}
+      bundle-cache-hit: ${{ steps.restore-bundle.outputs.cache-hit }}
+      bundle-arms: ${{ steps.arms.outputs.list }}
     steps:
       - uses: actions/checkout@v4
 
@@ -35,6 +53,45 @@ jobs:
           path: .checks-passed
           key: checks-passed-${{ steps.tree.outputs.hash }}
           lookup-only: true
+
+      # The SAME mechanism narrowed to what a packed consumer bundle can possibly depend on: a
+      # second tree hash over every path EXCEPT prose. 47 of the last 120 non-merge commits here
+      # touched nothing else, and each one paid the full 10-12 minute matrix to re-verify bytes it
+      # could not reach. A `paths-ignore:` on the workflow trigger is the obvious spelling and is
+      # WRONG — `Checks / Lint`, `/ Typecheck` and `/ Test` are required status contexts on master,
+      # and a workflow that does not run never reports them, so a docs-only PR would sit forever on
+      # "Expected — waiting for status". Gating the one expensive JOB keeps the cheap three running.
+      #
+      # It is also strictly more accurate than a diff filter: this asks whether this exact bundle-
+      # relevant CONTENT has passed before, not whether the last push happened to be prose. A docs
+      # commit on top of unverified code still misses.
+      #
+      # The exclusions are a DENY-list, like `scripts/lib/canary-examples.mjs`'s — do not invert it.
+      # A new source directory is covered the day it exists; an allow-list would silently drop it.
+      - id: bundle-tree
+        run: |
+          hash=$(git ls-tree -r HEAD \
+            | grep -Ev $'\t''(.*/)?[^/]*\.md$|'$'\t''\.(docs|claude|notes|vendors)/' \
+            | sha256sum | cut -d' ' -f1)
+          echo "hash=$hash" >> "$GITHUB_OUTPUT"
+
+      - id: restore-bundle
+        uses: actions/cache/restore@v4
+        with:
+          path: .bundle-isolation-passed
+          key: bundle-isolation-passed-${{ steps.bundle-tree.outputs.hash }}
+          lookup-only: true
+
+      # READ FROM THE SCRIPT, never written down here. `examples/vue-tsx` spent a year in no CI list
+      # at all because one was hand-maintained (`scripts/lib/canary-examples.mjs` carries the full
+      # record), and a matrix is exactly the shape that invites a second copy of the arm names.
+      # `selectedValues` validates what it is handed, so a stale name fails loudly rather than
+      # quietly shrinking coverage. No install needed: `main()` is guarded and the import chain is
+      # node builtins only.
+      - id: arms
+        run: |
+          list=$(node -e "import('./scripts/check-packed-consumer-bundles.mjs').then(m => console.log(JSON.stringify(Object.keys(m.FRAMEWORK_EXAMPLES))))")
+          echo "list=$list" >> "$GITHUB_OUTPUT"
 
   lint:
     name: Lint
@@ -51,10 +108,50 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
+      # `--ignore-scripts` IS THE SECOND HALF OF "BUILD ONCE", AND IT WAS THE BIGGER ONE. Twenty-six
+      # workspace packages carry `prepare: ng:build` (`adapters/angular` plus the 25 Expo wrappers),
+      # and pnpm runs a WORKSPACE package's `prepare` on every `pnpm install` — so a plain install
+      # here is not an install, it is 26 Angular AOT compiles. Split from the itest job's own log:
+      # resolve+link took 21 s and the `prepare` phase took 58 s, in every one of the ten jobs this
+      # file runs. That is where the build was really happening "тучу раз".
+      #
+      # NOTHING IN THIS FILE NEEDS IT, and that is measured rather than reasoned:
+      #   - every workspace package's DEV entry point is `src/` (35 of 35; the `build*` targets live
+      #     under `publishConfig`, which only a pack sees),
+      #   - `tsc --build`, `eslint` and the whole vitest + node suite were each run against a tree
+      #     with ZERO build directories and passed,
+      #   - `scripts/run-itests.mjs` bundles with `conditions: ['browser', 'import', 'default']`, so
+      #     `@symbiote-native/angular` resolves through `default` to `./src/index.ts` — its `types`
+      #     and `react-native` conditions, the two that point into `build/angular`, never match.
+      # The Typecheck job builds everything itself through `prepublish-build`; the bundle matrix gets
+      # it as an artifact, including the 25 `build-ngc` trees a `pnpm pack` needs (pack does NOT run
+      # `prepare` — verified against a full local arm, zero `ng:build` lines).
+      #
+      # THE ONE FUTURE FOOTGUN, said out loud because it is silent: this also suppresses DEPENDENCY
+      # install scripts. Today that costs nothing — pnpm 11 blocks those by default and this repo
+      # allowlists none (no `onlyBuiltDependencies`, and no "Ignored build scripts" notice in any CI
+      # log). The day somebody allowlists one, it stops running here and nothing says so.
+      - run: pnpm install --frozen-lockfile --ignore-scripts
 
       - run: pnpm run lint
 
+  # THE BUILD RUNS HERE AND NOWHERE ELSE IN THIS FILE. `prepublish-build` is a superset of
+  # `typecheck` — it starts with `clean:build && tsc --build` and then adds the three emit fixups and
+  # `ng:build` across 25 packages — so a type error still fails this job, under this name, exactly as
+  # before. Every arm of the bundle matrix used to run the whole thing itself: six identical builds
+  # per run (~60 s each), and a seventh `tsc --build` here.
+  #
+  # `name: Typecheck` IS THE CONSTRAINT, not a leftover. `Checks / Lint`, `Checks / Typecheck` and
+  # `Checks / Test` are the three required status contexts on master (verified against the branch
+  # protection API, not assumed), and that context string is built from this job's `name:`. Renaming
+  # it to `Build` stops master reporting a check it requires, and every PR then sits forever on
+  # "Expected — waiting for status". The job id is free to differ; the name is not.
+  #
+  # WHAT IT COSTS, because it is a real trade and not a free win: the matrix below now waits for this
+  # job instead of starting beside it, which adds ~90 s to the bundle path. Today that lands under
+  # the itest job's own wall clock, so the RUN does not get longer. If itest ever gets shorter than
+  # the bundle path, the next lever is sharding `check:bundle-isolation` itself — not un-sharing the
+  # build, which would put all six copies back.
   typecheck:
     name: Typecheck
     needs: gate
@@ -70,9 +167,36 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
+      # `--ignore-scripts`: see the Lint job. `prepublish-build` runs `ng:build` across the workspace
+      # itself, so the 58 s of install-time AOT this skips is work this very step is about to redo.
+      - run: pnpm install --frozen-lockfile --ignore-scripts
 
-      - run: pnpm run typecheck
+      - run: pnpm run prepublish-build
+
+      # `tsconfig.tsbuildinfo` is deliberately NOT in here. Its only consumer downstream is
+      # `adapters/svelte`'s `prepack`, which runs its own `tsc --build`; shipping a build-info file
+      # whose recorded mtimes no longer match the freshly-checked-out sources is how you get tsc to
+      # declare everything up to date and emit NOTHING into a build/ that then looks populated
+      # because the artifact filled it. `scripts/clean-build-outputs.mjs` documents that failure in
+      # its own words. Without the file that prepack simply redoes its work, which is slower and
+      # cannot be wrong.
+      #
+      # `core/*/build-ngc` matches nothing today (no core package is an Angular library) and is
+      # listed anyway — `if-no-files-found` fires only when EVERY pattern is empty, so an unmatched
+      # one costs nothing, while an omitted one silently drops the day a core package gains AOT
+      # output. Same deny-list-over-allow-list reasoning as the gate's tree hash above.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build-output
+          path: |
+            core/*/build
+            core/*/build-ngc
+            adapters/*/build
+            adapters/*/build-ngc
+            packages/*/build
+            packages/*/build-ngc
+          if-no-files-found: error
+          retention-days: 1
 
   test:
     name: Test
@@ -89,15 +213,60 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
+      # `--ignore-scripts`: see the Lint job. The whole suite was run against a tree with no build
+      # output at all and passed.
+      - run: pnpm install --frozen-lockfile --ignore-scripts
 
       - run: pnpm run test
 
-  bundle-isolation:
-    name: Packed consumer bundle matrix
+  # THE ONE JOB THAT COMMITS INTO THE ENGINE THAT SHIPS. `pnpm test` drives a fake
+  # `nativeFabricUIManager`; this one builds ReactCommon for the host and evaluates every
+  # `*.itest.ts` inside a real JSI runtime against the real `SymbioteTree`, which is the only place
+  # a payload rule, a tag-keyed fold or a `react_native_assert` can be observed at all.
+  #
+  # macOS is not a preference and `ubuntu-latest` is not a cheaper variant of this job — it is a
+  # machine where it does not build. `symbiote_tester` links `-framework JavaScriptCore` (Hermes
+  # would have to be fetched and built; JSC ships with the OS and RN already carries its JSI
+  # binding), and the CMakeLists sources folly/glog/fmt/boost from Homebrew rather than from the
+  # third-party tree gradle fetches for Android.
+  #
+  # `googletest` comes from brew so `find_package(GTest)` hits and the build skips a FetchContent
+  # clone; `fast_float` is fetched either way, pinned to RN's own tag.
+  itest:
+    name: Engine itest
     needs: gate
     if: needs.gate.outputs.cache-hit != 'true'
-    runs-on: ubuntu-latest
+    runs-on: macos-15
+    timeout-minutes: 60
+    env:
+      # The cmake invocations live in package.json, not here, so the launcher is set through the
+      # environment — CMake reads `CMAKE_<LANG>_COMPILER_LAUNCHER` as the cache variable's default.
+      # A cold build compiles some sixty ReactCommon modules; nothing else in this file is cold for
+      # minutes, which is what makes the cache worth having.
+      CMAKE_CXX_COMPILER_LAUNCHER: ccache
+      # NOT `runner.temp`, which is what `bundle-isolation` below uses — that context does not exist
+      # at JOB level (github / needs / strategy / matrix / vars / inputs only), and naming it here
+      # does not fail the job, it rejects the whole WORKFLOW FILE: run 35568194451 reported "this run
+      # likely failed because of a workflow file issue" with zero jobs and no annotation to read.
+      # `bundle-isolation` gets away with it because both of its uses are on STEPS.
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 2G
+      # WHY THE TWO ARMS DID NOT SHARE A SINGLE OBJECT ON THE FIRST RUN. This build is Debug (asserts
+      # are the point of it), so every compile carries `-g`, and ccache hashes the WORKING DIRECTORY
+      # by default because debug info embeds it. `build/` and `build-android/` are two directories,
+      # so the Android arm missed on all ~700 objects and paid a second cold compile: 193 s to run a
+      # single fixture. `hash_dir=false` is what makes them one cache; `base_dir` collapses the
+      # absolute paths that differ between the two build trees for the same reason.
+      #
+      # The debug info then names whichever directory compiled first. That is a debugger's problem
+      # and this binary is never opened in one — CI reads its stdout.
+      CCACHE_NOHASHDIR: 'true'
+      CCACHE_BASEDIR: ${{ github.workspace }}
+      # `include_file_mtime` / `include_file_ctime`: `pnpm install` rewrites the mtime of every
+      # ReactCommon header on every run, and their content is what actually decides the answer.
+      CCACHE_SLOPPINESS: include_file_mtime,include_file_ctime,time_macros
+      HOMEBREW_NO_AUTO_UPDATE: 1
+      HOMEBREW_NO_INSTALL_CLEANUP: 1
     steps:
       - uses: actions/checkout@v4
 
@@ -108,31 +277,117 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
+      # Not for the JS half alone: the CMakeLists resolves `react-native/package.json` to find the
+      # ReactCommon it must compile, and fails its configure step without an install.
+      #
+      # `--ignore-scripts`: see the Lint job. This is the job it pays off in most — it is the longest
+      # one here, and 58 s of Angular AOT was the second-largest slice of it after the fixtures.
+      - run: pnpm install --frozen-lockfile --ignore-scripts
 
-      # Build first because every tarball's publishConfig points at build/ (and build-ngc/ for
-      # Angular). The matrix then packs the exact direct @symbiote-native dependencies of all five
-      # standalone examples, installs them into disposable npm consumers, type-checks/AOT-builds
-      # each app, and creates iOS + Android Metro production bundles.
-      - run: pnpm run prepublish-build
+      - run: brew install --quiet ccache folly glog fmt double-conversion gflags boost googletest
+
+      # Keyed per run so every build saves a fresh entry and the restore-key picks up the newest
+      # one — the ordinary rolling-ccache shape. A miss costs the cold ReactCommon compile and
+      # nothing else; it can never make a result wrong, only slow.
+      - uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.ccache
+          key: itest-ccache-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            itest-ccache-${{ runner.os }}-
+
+      - run: ccache --zero-stats
+
+      - run: pnpm run test:itest
+
+      # The Android arm in the SAME job, deliberately, and the sharing is the whole argument: it
+      # recompiles exactly one translation unit (`SymbioteFabricProps.cpp`, with `-DANDROID`) and
+      # links, so every other object is the one the step above just compiled. Two runners would each
+      # pay a cold ReactCommon build; one runner pays it once. What this arm covers is reachable
+      # nowhere else headlessly: `android_ripple`, `underlineColorAndroid`, `decelerationRate`'s
+      # constants, Button's uppercase label and its Material style.
+      - run: pnpm run test:android
+
+      # A hit rate is a COUNTER, and this job's cost has already been misread once without one —
+      # 193 s of Android build looked like "the second arm is expensive" when it was ccache missing
+      # on every object. Read this before changing anything about the caching above.
+      - if: always()
+        run: ccache --show-stats --verbose
+
+  # ONE RUNNER PER ARM. The script has always run its arms concurrently, but six `npm install`s of
+  # the RN toolchain plus twelve Metro production bundles shared two vCPUs, so "concurrent" cost
+  # 10-12 minutes of wall clock. A real matrix turns that into the slowest single arm (angular, which
+  # pays `ng:build`), and per-arm packing is narrower too: `packageNames` is derived from the
+  # SELECTED manifests, so each runner packs only what its own example declares.
+  bundle-isolation:
+    name: Packed consumer bundle matrix
+    needs: [gate, typecheck]
+    if: >
+      needs.gate.outputs.cache-hit != 'true' &&
+      needs.gate.outputs.bundle-cache-hit != 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      # Every arm's verdict is wanted, not just the first failure — one framework's broken tarball
+      # says nothing about the other five, and cancelling them costs a whole second run to find out.
+      fail-fast: false
+      matrix:
+        arm: ${{ fromJSON(needs.gate.outputs.bundle-arms) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # `--ignore-scripts`: see the Lint job. Safe HERE specifically because the artifact below
+      # carries the 25 `build-ngc` trees that install-time `prepare` used to produce and `pnpm pack`
+      # does not — drop the artifact and this flag together, or the tarballs ship empty.
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+
+      # The build arrives instead of being repeated. Every tarball's publishConfig points at build/
+      # (and build-ngc/ for Angular), so it has to be on disk before anything packs — it just does
+      # not have to be MADE here, six times, from the same commit. No `path:`, so it extracts at the
+      # workspace root, which is where the upload's own paths are relative to: v4 stores entries
+      # under the least common ancestor of everything it matched, and matches land in all three of
+      # `core/`, `adapters/` and `packages/`, so that ancestor is the repo root. If output ever
+      # survived in only ONE of the three, the ancestor would shift down and every entry would
+      # arrive one level too high.
+      #
+      # Two packages rebuild themselves during `pnpm pack` regardless, through their own `prepack`:
+      # `adapters/angular` (`ng:build`, which wipes its build/ first) and `adapters/svelte`. That is
+      # their own guard and it is left alone — the artifact carries 59 output directories across 34
+      # packages, so it saves the other 32.
+      #
+      # This arm then packs the direct @symbiote-native dependencies of its own standalone canary
+      # example, installs them into a disposable npm consumer, type-checks/AOT-builds the app, and
+      # creates iOS + Android Metro production bundles. One arm per example, not per adapter —
+      # vue-sfc and vue-tsx both consume @symbiote-native/vue.
+      - uses: actions/download-artifact@v4
+        with:
+          name: build-output
 
       # Dependency cache, not build-output cache (build output is per-run by design — the whole
-      # point of this matrix is a FRESH tarball install every time). Each of the 5 frameworks gets
-      # an isolated npm cache dir under this root (check-packed-consumer-bundles.mjs's
-      # npmCacheDirFor) — sharing one dir across concurrent `npm install`s throws ENOTEMPTY on
-      # npm's cacache. Without this, every framework re-downloads the entire RN toolchain from the
-      # registry on every run; measured 2026-09-14 install dominates each framework's 300s+ wall
-      # time. Keyed on the example manifests since that's what pins the installed versions (no
-      # lockfile survives — see rewriteInternalDependencies).
+      # point of this matrix is a FRESH tarball install every time). Keyed per ARM now that each one
+      # owns its runner: a shared key would have every arm racing to save a cache holding only its
+      # own framework's downloads. `npmCacheDirFor`'s per-framework isolation under this root stays
+      # as it is — it guards the same-process case the script still supports locally. Without this,
+      # an arm re-downloads the entire RN toolchain from the registry on every run; measured
+      # 2026-09-14 install dominates each framework's 300s+ wall time. Keyed on the example
+      # manifests since that's what pins the installed versions (no lockfile survives — see
+      # rewriteInternalDependencies).
       - uses: actions/cache@v4
         with:
           path: ${{ runner.temp }}/npm-consumer-cache
-          key: npm-consumer-cache-${{ hashFiles('examples/*/package.json') }}
+          key: npm-consumer-cache-${{ matrix.arm }}-${{ hashFiles('examples/*/package.json') }}
           restore-keys: |
-            npm-consumer-cache-
+            npm-consumer-cache-${{ matrix.arm }}-
 
       - run: pnpm run check:bundle-isolation
         env:
+          SYMBIOTE_CONSUMER_FRAMEWORKS: ${{ matrix.arm }}
           SYMBIOTE_NPM_CACHE_ROOT: ${{ runner.temp }}/npm-consumer-cache
 
   # Records that this tree passed, so the NEXT push/PR carrying the identical tree (a merge/squash/
@@ -140,16 +395,23 @@ jobs:
   # runs when this job's own trigger actually did the work (cache-hit != 'true') and every check
   # succeeded — `always()` is needed because a skipped or failed dependency must still let this job
   # EVALUATE its condition rather than being skipped itself by the implicit success() default.
+  #
+  # A matrix job's `result` aggregates its legs — `success` only when every arm succeeded — so this
+  # condition did not have to change for the matrix. It DID have to admit `skipped`: the arms are
+  # now also gated on the bundle-tree cache, and a prose-only commit legitimately skips them. Naming
+  # both states is what keeps a docs commit from re-running lint/typecheck/test forever after.
   mark-passed:
     name: Mark tree as passed
-    needs: [gate, lint, typecheck, test, bundle-isolation]
+    needs: [gate, lint, typecheck, test, itest, bundle-isolation]
     if: >
       always() &&
       needs.gate.outputs.cache-hit != 'true' &&
       needs.lint.result == 'success' &&
       needs.typecheck.result == 'success' &&
       needs.test.result == 'success' &&
-      needs['bundle-isolation'].result == 'success'
+      needs.itest.result == 'success' &&
+      (needs['bundle-isolation'].result == 'success' ||
+      needs['bundle-isolation'].result == 'skipped')
     runs-on: ubuntu-latest
     steps:
       - run: mkdir -p .checks-passed && date -u > .checks-passed/verified-at
@@ -158,3 +420,23 @@ jobs:
         with:
           path: .checks-passed
           key: checks-passed-${{ needs.gate.outputs.tree }}
+
+  # The bundle matrix's own record, keyed on the narrowed hash. Deliberately NOT folded into
+  # `mark-passed`: that one says "this whole tree is verified" and must not be written when the
+  # arms were skipped, while this one says "this bundle-relevant content is verified" and is the
+  # only thing a later prose-only commit can inherit. One key per claim.
+  mark-bundle-passed:
+    name: Mark bundle tree as passed
+    needs: [gate, bundle-isolation]
+    if: >
+      always() &&
+      needs.gate.outputs.bundle-cache-hit != 'true' &&
+      needs['bundle-isolation'].result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - run: mkdir -p .bundle-isolation-passed && date -u > .bundle-isolation-passed/verified-at
+
+      - uses: actions/cache/save@v4
+        with:
+          path: .bundle-isolation-passed
+          key: bundle-isolation-passed-${{ needs.gate.outputs.bundle-tree }}

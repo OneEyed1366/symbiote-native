@@ -7,50 +7,23 @@
 // every adapter inherit it from the shared Touchable design?" - a question worth a test rather
 // than an assumption, since all four wrap the same core state machine.
 //
-// `fabric.find` only ever sees a node's FIRST-created props (createNode never re-runs on update),
-// so a style that lands after mount only shows up on the live clone in `fabric.committed`. The
-// clone here MERGES the patch, mirroring real Fabric, so a partial diff does not wipe the rest.
+// The live tree's `payload` is recomputed on every read from the node's CURRENT authored props
+// (`fabricProps(handle, propsOf(handle))`), so a style update after mount just shows up on the
+// next read — no clone-protocol mock needed, and none of the mirror's clone-on-write merge
+// semantics this file used to have to reproduce by hand.
 
 import { useState, type ReactElement } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '@symbiote-native/react';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 128;
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
-function mergeProps(
-  previous: Record<string, unknown>,
-  patch: Record<string, unknown>,
-): Record<string, unknown> {
-  const merged = { ...previous, ...patch };
-  for (const key of Object.keys(patch)) {
-    if (patch[key] === null) delete merged[key];
-  }
-  return merged;
-}
-
-const fabric = installFabric();
-const installed: unknown = globalThis.nativeFabricUIManager;
-if (!isRecord(installed)) throw new Error('fabric slot was not installed');
-installed.cloneNodeWithNewProps = (
-  node: IFakeNode,
-  patch: Record<string, unknown>,
-): IFakeNode => ({
-  ...node,
-  props: mergeProps(node.props, patch),
-});
-installed.cloneNodeWithNewChildrenAndProps = (
-  node: IFakeNode,
-  patch: Record<string, unknown>,
-): IFakeNode => ({
-  ...node,
-  props: mergeProps(node.props, patch),
-  children: [],
-});
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 
 afterEach(() => unmount(ROOT_TAG));
 
@@ -58,11 +31,11 @@ afterEach(() => unmount(ROOT_TAG));
 // on WHICH node the style lands on (Opacity folds it onto its inner Animated leaf), and the
 // question here is only whether the update arrives at all.
 function committedStyleProp(prop: string): unknown {
-  const stack = [...fabric.committed];
+  const stack = [live.nodeOf(live.appRoot())];
   while (stack.length > 0) {
     const node = stack.pop();
     if (node === undefined) continue;
-    if (node.props[prop] !== undefined) return node.props[prop];
+    if (node.payload[prop] !== undefined) return node.payload[prop];
     stack.push(...node.children);
   }
   return undefined;

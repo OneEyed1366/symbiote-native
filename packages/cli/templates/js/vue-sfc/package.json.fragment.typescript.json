@@ -1,0 +1,11 @@
+{
+  "scripts": {
+    "pretypecheck": "css-dts .",
+    "typecheck": "vue-tsc --noEmit -p tsconfig.typecheck.json"
+  },
+  "devDependencies": {
+    "vue-tsc": "^2.2.12",
+    "@react-native/typescript-config": "0.86.0",
+    "typescript": "~6.0.0"
+  }
+}

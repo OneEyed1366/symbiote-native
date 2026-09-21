@@ -1,7 +1,8 @@
-// Proves the TextInput primitive, the controlled-value / event-count handshake, over a
-// fake Fabric slot. This file keeps a PURPOSE-BUILT slot rather than the shared
-// `installFabric()` harness because TextInput drives a `dispatchCommand`
-// (setTextAndSelection / blur) view command, which the shared recorder does not capture.
+// Proves the TextInput primitive, the controlled-value / event-count handshake, over the
+// recording host — it records `dispatchCommand` calls natively, so the purpose-built slot
+// this file used to carry bought nothing and cost the TREE HOST the recording host installs
+// alongside itself (without one the engine's ops go nowhere and the mount commits no node
+// at all).
 // It checks the fold (value/defaultValue -> private `text` + mostRecentEventCount), the
 // the native change -> onValueChange derivation, the multiline intrinsic, a forced controlled write
 // that goes down as a setTextAndSelection command carrying the acknowledged event count,
@@ -26,126 +27,51 @@ import {
   type IHostInstance,
   type ITextInputHandle,
 } from '@symbiote-native/react';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 // Not from the adapter barrel: every adapter reaches the handle builder in `components` directly,
 // and `tests/adapter-barrel-parity.test.ts` compares the re-exported sets.
 import { buildTextInputHandle } from '@symbiote-native/components';
 
-interface IFakeNode {
-  tag: number;
-  viewName: string;
-  props: Record<string, unknown>;
-  children: IFakeNode[];
-  instanceHandle: unknown;
-}
-
-type IEventHandler = (
-  instanceHandle: unknown,
-  topLevelType: string,
-  nativeEvent: Record<string, unknown>,
-) => void;
-
-interface ICommandCall {
-  handle: unknown;
-  name: string;
-  args: readonly unknown[];
-}
-
-let committed: IFakeNode[] = [];
-let eventHandler: IEventHandler | undefined;
-const allCreated: IFakeNode[] = [];
-const commands: ICommandCall[] = [];
-
-const slot = {
-  createNode(
-    tag: number,
-    viewName: string,
-    _rootTag: number,
-    props: Record<string, unknown>,
-    instanceHandle: unknown,
-  ): IFakeNode {
-    const node: IFakeNode = {
-      tag,
-      viewName,
-      props,
-      children: [],
-      instanceHandle,
-    };
-    allCreated.push(node);
-    return node;
-  },
-  cloneNodeWithNewProps: (
-    node: IFakeNode,
-    newProps: Record<string, unknown>,
-  ): IFakeNode => ({
-    ...node,
-    props: newProps,
-  }),
-  cloneNodeWithNewChildren: (node: IFakeNode): IFakeNode => ({
-    ...node,
-    children: [],
-  }),
-  cloneNodeWithNewChildrenAndProps: (
-    node: IFakeNode,
-    newProps: Record<string, unknown>,
-  ): IFakeNode => ({ ...node, props: newProps, children: [] }),
-  createChildSet: (): IFakeNode[] => [],
-  appendChild(parent: IFakeNode, child: IFakeNode): IFakeNode {
-    parent.children.push(child);
-    return parent;
-  },
-  appendChildToSet(childSet: IFakeNode[], child: IFakeNode): void {
-    childSet.push(child);
-  },
-  completeRoot(_rootTag: number, childSet: IFakeNode[]): void {
-    committed = childSet;
-  },
-  registerEventHandler(handler: IEventHandler): void {
-    eventHandler = handler;
-  },
-  dispatchCommand(
-    handle: unknown,
-    name: string,
-    args: readonly unknown[],
-  ): void {
-    commands.push({ handle, name, args });
-  },
-};
-
-Object.assign(globalThis, { nativeFabricUIManager: slot });
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
+const commands = fabric.commands;
 
 const SINGLELINE = 'RCTSinglelineTextInputView';
 const MULTILINE = 'RCTMultilineTextInputView';
 const ACK_COUNT = 7;
 const ROOT_TAG = 300;
 
-function inputNode(viewName: string): IFakeNode {
-  const node = allCreated.find(n => n.viewName === viewName);
+function inputNode(viewName: string): ILiveNode {
+  const node = live.findLive(live.appRoot(), n => n.viewName === viewName);
   expect(node, `a ${viewName} was created`).toBeDefined();
   return node!;
 }
 
 function fireChange(
-  node: IFakeNode,
+  node: ILiveNode,
   nativeEvent: Record<string, unknown>,
 ): void {
-  expect(eventHandler, 'an event handler was registered').toBeDefined();
-  eventHandler!(node.instanceHandle, 'topChange', nativeEvent);
+  fabric.fireEvent(node.instanceHandle, 'topChange', nativeEvent);
 }
 
 // The event handler is registered once for the whole slot, so reset keeps it.
 // Only the per-mount node/command bookkeeping is cleared.
-beforeEach(() => {
-  committed = [];
-  allCreated.length = 0;
-  commands.length = 0;
-});
+beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
 describe('<text-input>', () => {
   // why: `value` is the controlled React prop but native reads a private `text` prop plus an
   // event-count handshake (mostRecentEventCount) — get the fold or the derived onValueChange
   // wrong and the input either doesn't render the caller's text or never reports keystrokes back.
-  it('folds the controlled value to text + mostRecentEventCount and derives onValueChange', () => {
+  // The `value -> text` fold left this case on 2026-09-18 — it is `foldTextInputValue` in
+  // `SymbioteFabricProps.cpp`, and this harness's payload comes from the TypeScript builder, which
+  // holds no copy of it (`core/engine/cpp/tests/js/text-input-payload.itest.ts` has the fold). What
+  // stays is the pair that is the MACHINE's: the counter it maintains and the change it derives.
+  it('sends the controlled value with a count and derives onValueChange', () => {
     let changedText: string | undefined;
     mount(
       ROOT_TAG,
@@ -158,8 +84,8 @@ describe('<text-input>', () => {
     );
 
     const node = inputNode(SINGLELINE);
-    expect(node.props.text).toBe('hi');
-    expect(typeof node.props.mostRecentEventCount).toBe('number');
+    expect(node.payload.value).toBe('hi');
+    expect(typeof node.payload.mostRecentEventCount).toBe('number');
 
     fireChange(node, {
       text: 'hix',
@@ -198,20 +124,19 @@ describe('<text-input>', () => {
     inputNode(MULTILINE);
   });
 
-  // why: submitBehavior is RN's replacement for the legacy blurOnSubmit boolean — an unset
-  // submitBehavior on a single-line field must still resolve to a real native value
-  // ('blurAndSubmit', RN's single-line default) rather than leaving the native prop undefined.
-  it('folds an unset submitBehavior to blurAndSubmit on a single-line field', () => {
-    mount(ROOT_TAG, <text-input value="x" />);
-    expect(inputNode(SINGLELINE).props.submitBehavior).toBe('blurAndSubmit');
-  });
-
-  // why: an explicit submitBehavior is the caller's own choice and must win outright over any
-  // derived default — proves the fold doesn't override an explicit value with the legacy path.
-  it('lets an explicit submitBehavior win over the derived default', () => {
-    mount(ROOT_TAG, <text-input value="x" submitBehavior="submit" />);
-    expect(inputNode(SINGLELINE).props.submitBehavior).toBe('submit');
-  });
+  // THE ALIAS AND submitBehavior CASES MOVED:
+  // `core/engine/cpp/tests/js/text-input-payload.itest.ts`.
+  //
+  // `text-input`'s prop resolution is the ENGINE's now (`foldTextInputAliases` in
+  // `SymbioteFabricProps.cpp`), so `createLiveTree`'s `.payload` — built by the TypeScript
+  // `fabricProps` — cannot observe it. Keeping them here would not merely fail; the
+  // `submitBehavior="submit"` case would go GREEN, because an unfolded bag passes an authored value
+  // through untouched. A false green over a rule that is not running is the worst of the three
+  // outcomes, which is why it moved with the others rather than being left as the one that
+  // still passed.
+  //
+  // What stays in this file is what is still React's: the tag choice, the controlled-write command,
+  // the event narrowing, and `Keyboard.dismiss`.
 
   it('commands setTextAndSelection with the acked count on a divergent controlled write', () => {
     // why: a plain re-push of the new `value` prop would race the user's next keystroke (native
@@ -238,7 +163,7 @@ describe('<text-input>', () => {
       selection: { start: 2, end: 2 },
     });
 
-    const setText = commands.find(c => c.name === 'setTextAndSelection');
+    const setText = commands.find(c => c.commandName === 'setTextAndSelection');
     expect(
       setText,
       'a setTextAndSelection command was dispatched',
@@ -254,90 +179,21 @@ describe('<text-input>', () => {
     mount(ROOT_TAG, <text-input value="focus me" />);
 
     const node = inputNode(SINGLELINE);
-    expect(eventHandler, 'an event handler was registered').toBeDefined();
     // Native reports focus -> TextInput records this node as the focused one.
-    eventHandler!(node.instanceHandle, 'topFocus', {});
+    fabric.fireEvent(node.instanceHandle, 'topFocus', {});
     Keyboard.dismiss();
-    expect(commands.some(c => c.name === 'blur')).toBe(true);
+    expect(commands.some(c => c.commandName === 'blur')).toBe(true);
 
     // A second dismiss has nothing focused -> must be a no-op (no new blur command).
     commands.length = 0;
     Keyboard.dismiss();
-    expect(commands.some(c => c.name === 'blur')).toBe(false);
+    expect(commands.some(c => c.commandName === 'blur')).toBe(false);
   });
 
   // why: inputMode/enterKeyHint/readOnly are the W3C-standard HTML attribute names — native
-  // Fabric only understands the legacy RN prop names (keyboardType/returnKeyType/editable), so
-  // every alias must both fold to its native equivalent AND be stripped, or an unknown prop key
-  // reaches native untranslated.
-  it('folds W3C aliases to their legacy native props and strips the raw aliases', () => {
-    mount(
-      ROOT_TAG,
-      <text-input
-        inputMode="numeric"
-        enterKeyHint="done"
-        readOnly
-        selectionColor="#ff0000"
-      />,
-    );
-
-    const node = inputNode(SINGLELINE);
-    expect(node.props.keyboardType).toBe('number-pad');
-    expect(node.props.returnKeyType).toBe('done');
-    expect(node.props.editable).toBe(false);
-    expect(node.props.cursorColor).toBe('#ff0000');
-    for (const raw of ['inputMode', 'enterKeyHint', 'readOnly']) {
-      expect(
-        raw in node.props,
-        `raw alias "${raw}" must not reach Fabric`,
-      ).toBe(false);
-    }
-  });
-
-  // why: a mapped autoComplete token (e.g. "email") must resolve to iOS's textContentType so
-  // the system keyboard/autofill can recognize the field, and a normal inputMode must default
-  // the soft keyboard to visible (the opposite case, inputMode="none", is tested separately).
-  it('folds autoComplete + derives showSoftInputOnFocus:true from inputMode', () => {
-    mount(ROOT_TAG, <text-input autoComplete="email" inputMode="text" />);
-
-    const node = inputNode(SINGLELINE);
-    expect(node.props.autoComplete).toBe('email');
-    expect(node.props.textContentType).toBe('emailAddress');
-    expect(node.props.showSoftInputOnFocus).toBe(true);
-  });
-
-  // why: inputMode="none" is the W3C signal for "I render my own custom keyboard/picker" — the
-  // system soft keyboard must NOT pop up over it, the opposite of every other inputMode value.
-  it('derives showSoftInputOnFocus:false from inputMode="none"', () => {
-    mount(ROOT_TAG, <text-input inputMode="none" />);
-    expect(inputNode(SINGLELINE).props.showSoftInputOnFocus).toBe(false);
-  });
-
-  // why: not every autoComplete token has a bespoke mapping table entry — an unrecognized-but-
-  // valid token must still pass through as the raw autoComplete value while still resolving a
-  // real iOS textContentType, rather than silently dropping to undefined for anything unmapped.
-  it('passes an unmapped autoComplete token through with its iOS textContentType', () => {
-    mount(ROOT_TAG, <text-input autoComplete="cc-name" />);
-    const node = inputNode(SINGLELINE);
-    expect(node.props.autoComplete).toBe('cc-name');
-    expect(node.props.textContentType).toBe('creditCardName');
-  });
-
-  // why: RN's Material EditText paints a visible underline by default; every host silently
-  // getting one uninvited would be a visual regression, so the default must actively suppress it.
-  it('defaults underlineColorAndroid to transparent', () => {
-    mount(ROOT_TAG, <text-input value="x" />);
-    expect(inputNode(SINGLELINE).props.underlineColorAndroid).toBe(
-      'transparent',
-    );
-  });
-
-  // why: the transparent default above must not be hardcoded past an explicit caller choice —
-  // a designer who deliberately wants the underline back must be able to set it.
-  it('lets an explicit underlineColorAndroid win', () => {
-    mount(ROOT_TAG, <text-input value="x" underlineColorAndroid="#00ff00" />);
-    expect(inputNode(SINGLELINE).props.underlineColorAndroid).toBe('#00ff00');
-  });
+  // The alias folds, `autoComplete`, `showSoftInputOnFocus` and the `underlineColorAndroid` pair
+  // all moved with the rule — `core/engine/cpp/tests/js/text-input-payload.itest.ts`. Same reason as
+  // the block above: they read a payload the TypeScript builder no longer folds.
 
   // why: RN drives autoFocus in JS with an imperative `focus` command on mount (TextInput.js),
   // not a native prop — proves the effect actually fires exactly once for a genuinely
@@ -345,12 +201,12 @@ describe('<text-input>', () => {
   // would be a real UX bug: it would pop the keyboard over a field the user never touched).
   it('commands focus once on mount when autoFocus is set, and not when unset', () => {
     mount(ROOT_TAG, <text-input value="x" autoFocus />);
-    expect(commands.filter(c => c.name === 'focus')).toHaveLength(1);
+    expect(commands.filter(c => c.commandName === 'focus')).toHaveLength(1);
 
     commands.length = 0;
     unmount(ROOT_TAG);
     mount(ROOT_TAG, <text-input value="x" />);
-    expect(commands.some(c => c.name === 'focus')).toBe(false);
+    expect(commands.some(c => c.commandName === 'focus')).toBe(false);
   });
 
   // why: RN exposes an imperative ref (focus/blur/clear/isFocused/setSelection) for the common
@@ -382,12 +238,17 @@ describe('<text-input>', () => {
 
     it('focus() dispatches a focus command', () => {
       mountHandle().focus();
-      expect(commands.some(c => c.name === 'focus')).toBe(true);
+      expect(commands.some(c => c.commandName === 'focus')).toBe(true);
     });
 
-    it('blur() dispatches a blur command', () => {
-      mountHandle().blur();
-      expect(commands.some(c => c.name === 'blur')).toBe(true);
+    // why: `blurTextInput` only dispatches for the currently-TRACKED focused field
+    // (`TextInputState.blurTextInput` parity) — blur() must focus() first for the command to have
+    // anywhere to go.
+    it('blur() dispatches a blur command once focused', () => {
+      const handle = mountHandle();
+      handle.focus();
+      handle.blur();
+      expect(commands.some(c => c.commandName === 'blur')).toBe(true);
     });
 
     // why: clear() must reset native to an EMPTY string via the same acked-count command path
@@ -395,7 +256,9 @@ describe('<text-input>', () => {
     // bookkeeping right after clear() must see the field as genuinely empty.
     it('clear() commands setTextAndSelection with an empty string', () => {
       mountHandle().clear();
-      const setText = commands.find(c => c.name === 'setTextAndSelection');
+      const setText = commands.find(
+        c => c.commandName === 'setTextAndSelection',
+      );
       expect(
         setText,
         'a setTextAndSelection command was dispatched',
@@ -410,10 +273,10 @@ describe('<text-input>', () => {
       expect(handle.isFocused()).toBe(false);
 
       const node = inputNode(SINGLELINE);
-      eventHandler!(node.instanceHandle, 'topFocus', {});
+      fabric.fireEvent(node.instanceHandle, 'topFocus', {});
       expect(handle.isFocused()).toBe(true);
 
-      eventHandler!(node.instanceHandle, 'topBlur', {});
+      fabric.fireEvent(node.instanceHandle, 'topBlur', {});
       expect(handle.isFocused()).toBe(false);
     });
 
@@ -422,7 +285,9 @@ describe('<text-input>', () => {
     // programmatically must not accidentally erase what the user typed.
     it('setSelection(start, end) commands setTextAndSelection carrying the current text', () => {
       mountHandle().setSelection(1, 3);
-      const setText = commands.find(c => c.name === 'setTextAndSelection');
+      const setText = commands.find(
+        c => c.commandName === 'setTextAndSelection',
+      );
       expect(
         setText,
         'a setTextAndSelection command was dispatched',

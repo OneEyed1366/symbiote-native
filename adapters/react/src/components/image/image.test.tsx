@@ -17,9 +17,14 @@ import {
   setImageSourceResolver,
   type ISymbioteEvent,
 } from '@symbiote-native/react';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const ROOT_TAG = 11;
 
 // A require()-style number expands to a resolved source before it reaches renderImage; this
@@ -27,8 +32,11 @@ const ROOT_TAG = 11;
 const ASSET_ID = 42;
 const RESOLVED_ASSET = { uri: 'asset://42', scale: 1, width: 10, height: 10 };
 
-function imageNode(): IFakeNode {
-  const node = fabric.find(n => n.viewName === 'RCTImageView');
+function imageNode(): ILiveNode {
+  const node = live.findLive(
+    live.appRoot(),
+    n => n.viewName === 'RCTImageView',
+  );
   if (!node) throw new Error('no RCTImageView was created');
   return node;
 }
@@ -50,9 +58,9 @@ describe('<image> (tag -> behavior -> Fabric)', () => {
       // why: an integration checkpoint, not a re-test of the fold's own branches (covered in
       // core) — it proves the tag path produces a committed Fabric node at all.
       mount(ROOT_TAG, <image source={{ uri: 'http://x/y.png' }} />);
-      expect(fabric.appRoot().children.map(n => n.viewName)).toContain(
-        'RCTImageView',
-      );
+      expect(
+        live.nodeOf(live.appRoot()).children.map(n => n.viewName),
+      ).toContain('RCTImageView');
     });
 
     it('runs the installed source resolver on a require()-style number before it reaches native', () => {
@@ -60,7 +68,7 @@ describe('<image> (tag -> behavior -> Fabric)', () => {
       // this proves an app's resolver actually reaches the render path through THIS import, not
       // just through core's own internal wiring.
       mount(ROOT_TAG, <image source={ASSET_ID} />);
-      const source = imageNode().props.source;
+      const source = imageNode().payload.source;
       expect(Array.isArray(source) ? source[0] : undefined).toEqual(
         RESOLVED_ASSET,
       );
@@ -106,7 +114,7 @@ describe('<image> (tag -> behavior -> Fabric)', () => {
         ROOT_TAG,
         <image source={{ uri: 'http://x/y.png' }} className="hero" />,
       );
-      expect(imageNode().props.opacity).toBe(0.75);
+      expect(imageNode().payload.opacity).toBe(0.75);
     });
   });
 });

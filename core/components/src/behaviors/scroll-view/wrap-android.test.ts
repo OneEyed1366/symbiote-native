@@ -13,8 +13,9 @@
 // `scroll-view-android-refresh.test.tsx` records.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
-  installFabric,
-  type IFakeNode,
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
 } from '../../../../test-utils/src/index';
 import {
   appendChild,
@@ -30,7 +31,8 @@ import { descriptorFor } from '../../component-names';
 import { registerScrollViewBehavior } from './index.android';
 import { REFRESH_CONTROL, SCROLL_VIEW_TAG } from './shared';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 let nextRootTag = 9900;
 const SCROLL = descriptorFor(SCROLL_VIEW_TAG).component;
 const CONTENT = descriptorFor('scroll-content').component;
@@ -48,7 +50,7 @@ function mount(props: Readonly<Record<string, unknown>> = {}): {
   node: ISymbioteNode;
   root: ISymbioteNode;
   refresh: ISymbioteNode;
-  commit: () => IFakeNode;
+  commit: () => ILiveNode;
 } {
   const surface = createSurface((nextRootTag += 1));
   const root = createElement('RCTView');
@@ -60,10 +62,12 @@ function mount(props: Readonly<Record<string, unknown>> = {}): {
     node,
     root,
     refresh,
-    commit: () => {
+    // `root`'s own handle, not a search — the file already holds it. Its first (only) live child is
+    // whichever node the wrap left standing there: the scroll view alone, or the refresh wrapper
+    // once a RefreshControl has been claimed.
+    commit: (): ILiveNode => {
       surface.commit();
-      const latest = fabric.committed[fabric.committed.length - 1];
-      const app = latest?.children[0]?.children[0];
+      const app = live.nodeOf(root).children[0];
       if (app === undefined)
         throw new Error('nothing committed under the root');
       return app;
@@ -80,7 +84,7 @@ describe('the RefreshControl becomes the scroll view s parent', () => {
     appendChild(node, createElement('RCTImageView'));
     appendChild(root, node);
 
-    expect(fabric.serialize([commit()])).toBe(
+    expect(live.serialize(commit().handle)).toBe(
       `${REFRESH_CONTROL}(${SCROLL}(${CONTENT}(RCTImageView)))`,
     );
   });
@@ -89,12 +93,12 @@ describe('the RefreshControl becomes the scroll view s parent', () => {
     const { node, root, refresh, commit } = mount();
     appendChild(node, createElement('RCTImageView'));
     appendChild(root, node);
-    expect(fabric.serialize([commit()])).toBe(
+    expect(live.serialize(commit().handle)).toBe(
       `${SCROLL}(${CONTENT}(RCTImageView))`,
     );
 
     appendChild(node, refresh);
-    expect(fabric.serialize([commit()])).toBe(
+    expect(live.serialize(commit().handle)).toBe(
       `${REFRESH_CONTROL}(${SCROLL}(${CONTENT}(RCTImageView)))`,
     );
   });
@@ -107,7 +111,7 @@ describe('the RefreshControl becomes the scroll view s parent', () => {
     appendChild(root, node);
     appendChild(node, createElement('RCTImageView'));
 
-    expect(fabric.serialize([commit()])).toBe(
+    expect(live.serialize(commit().handle)).toBe(
       `${REFRESH_CONTROL}(${SCROLL}(${CONTENT}(RCTImageView)))`,
     );
   });
@@ -120,90 +124,31 @@ describe('the RefreshControl becomes the scroll view s parent', () => {
     commit();
 
     removeChild(node, refresh);
-    expect(fabric.serialize([commit()])).toBe(
+    expect(live.serialize(commit().handle)).toBe(
       `${SCROLL}(${CONTENT}(RCTImageView))`,
     );
   });
 });
 
-describe('the style splits across the two boxes', () => {
-  function boxes(props: Readonly<Record<string, unknown>>): {
-    wrapper: IFakeNode;
-    scroll: IFakeNode;
-  } {
-    const { node, root, refresh, commit } = mount(props);
-    appendChild(node, refresh);
-    appendChild(node, createElement('RCTImageView'));
-    appendChild(root, node);
-    const wrapper = commit();
-    const scroll = wrapper.children[0];
-    if (scroll === undefined)
-      throw new Error('the scroll view never committed');
-    return { wrapper, scroll };
-  }
-
-  it('sends layout to the wrapper and visual to the scroller, base under both', () => {
-    const { wrapper, scroll } = boxes({
-      style: { height: 200, margin: 4, backgroundColor: '#123', padding: 8 },
-    });
-
-    expect(wrapper.props.height).toBe(200);
-    expect(wrapper.props.margin).toBe(4);
-    expect('backgroundColor' in wrapper.props).toBe(false);
-
-    expect(scroll.props.backgroundColor).toBe('#123');
-    expect(scroll.props.padding).toBe(8);
-    expect('height' in scroll.props).toBe(false);
-
-    // RN composes the axis base onto BOTH (`ScrollView.js:1856`), so the wrapper grows too.
-    expect(wrapper.props.flexGrow).toBe(1);
-    expect(scroll.props.flexGrow).toBe(1);
-    expect(scroll.props.overflow).toBe('scroll');
-  });
-
-  // The inner view has to consume the gesture before the refresh parent sees it, or a scroll
-  // becomes a pull-to-refresh.
-  it('wires nestedScrollEnabled on the inner scroll view', () => {
-    const { scroll } = boxes({});
-    expect(scroll.props.nestedScrollEnabled).toBe(true);
-  });
-
-  // The wrap swaps the owner's fold, so anything the ordinary fold does had to be restated in the
-  // wrapped copy — and `decelerationRate` was not. It reached Fabric as the string 'fast' on every
-  // Android ScrollView carrying a RefreshControl, which the native side cannot read.
-  it('still resolves decelerationRate while wrapped', () => {
-    const { scroll } = boxes({ decelerationRate: 'fast' });
-    expect(typeof scroll.props.decelerationRate).toBe('number');
-  });
-
-  // `markPropsDirty` bubbles UP, so a style written on the owner reaches every ancestor and never
-  // the wrapper. `slotDerived` naming `style` is what makes the wrapper rebuild.
-  it('re-splits when the owner style changes after the first commit', () => {
-    const { node, root, refresh, commit } = mount({ style: { height: 200 } });
-    appendChild(node, refresh);
-    appendChild(node, createElement('RCTImageView'));
-    appendChild(root, node);
-    expect(commit().props.height).toBe(200);
-
-    routeProp(node, 'style', { height: 320 });
-    expect(commit().props.height).toBe(320);
-  });
-
-  // The plain fold does more than compose the base — dropping it on unwrap would silently take
-  // `decelerationRate` resolution with it.
-  it('restores the ordinary owner fold when the wrap goes away', () => {
-    const { node, root, refresh, commit } = mount({
-      style: { height: 200 },
-      decelerationRate: 'fast',
-    });
-    appendChild(node, refresh);
-    appendChild(node, createElement('RCTImageView'));
-    appendChild(root, node);
-    commit();
-
-    removeChild(node, refresh);
-    const scroll = commit();
-    expect(scroll.props.height).toBe(200);
-    expect(typeof scroll.props.decelerationRate).toBe('number');
-  });
-});
+// THE WHOLE STYLE-SPLIT DESCRIBE LEFT THIS FILE ON 2026-09-18, three cases, as a GROUP — and the
+// group is the point rather than the count. The split is `splitScrollViewStyle` /
+// `foldRefreshWrapperProps` in `SymbioteFabricProps.cpp` now, and this host builds its payloads
+// through the TypeScript `fabricProps`, which deliberately carries no copy of the tag rules. Two of
+// the three went red on the move, which is honest. The third — "stops splitting the style when the
+// wrap goes away" — went on PASSING, and for the wrong reason: with no rule in this host there is no
+// split to stop, so an unwrapped owner carries its whole style whatever the engine does. A case whose
+// subject is a fold cannot stay behind beside the twins that failed; it would be green forever and
+// mean nothing. Same shape ActivityIndicator's "OMITS colour entirely" case had.
+//
+// Their new home is `core/engine/cpp/tests/js/scroll-view-wrap-payload.itest.ts`, against the payload
+// a commit actually sent, with a `foldsFound === 0` assertion beside them that this host could never
+// have made. `nestedScrollEnabled` and `decelerationRate` had already gone the same way, and their
+// note is worth keeping: both used to be restated in the WRAPPED copy of the owner's fold, because
+// the wrap swapped that fold out and anything the ordinary one did had to be repeated —
+// `decelerationRate` once was NOT repeated, and reached Fabric as the string 'fast' on every Android
+// ScrollView carrying a RefreshControl. A rule that runs off the TAG cannot be swapped out, so that
+// class of bug is unrepresentable now.
+//
+// What stays HERE is what this host is authoritative for and the itest is not: the TOPOLOGY. Who
+// ends up whose parent, that the owner keeps its identity across a wrap, that removing the
+// RefreshControl puts it back. That is `ISymbioteNode.wrapper`'s contract and it is JS's.

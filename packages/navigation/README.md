@@ -18,6 +18,10 @@ logic/view/lifecycle split every other SymbioteNative component follows.
 npm install @symbiote-native/navigation
 ```
 
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --navigation` (or
+`add --navigation` in an existing app) installs and wires this for you — see
+[`@symbiote-native/cli`](../cli).
+
 Only this package — never `react-native-screens` directly. `@symbiote-native/navigation` depends
 on it and ships as the sole autolinked native proxy (`react-native.config.cjs` +
 `symbiote-navigation.podspec`), the same one-dependency packaging as `@symbiote-native/slider` and

@@ -3,8 +3,9 @@
 The **reference canary**: a React app driving the
 framework-agnostic `@symbiote-native/engine` core through `@symbiote-native/react`'s
 `react-reconciler` host config, with React Native's own renderer never in the path. Every other
-example ([`vue-tsx`](../vue-tsx), [`vue-sfc`](../vue-sfc), [`angular`](../angular)) targets the same
-surface this app defines — it's the working spec, not just a demo.
+example ([`vue-tsx`](../vue-tsx), [`vue-sfc`](../vue-sfc), [`angular`](../angular),
+[`svelte`](../svelte), [`solid`](../solid)) targets the same surface this app defines — it's the
+working spec, not just a demo.
 
 ```
 index.js    registers a RUNNABLE with RN's AppRegistry → mounts App via @symbiote-native/react
@@ -17,6 +18,9 @@ the surface's `rootTag`, and `@symbiote-native/react`'s `mount` takes over from 
 `nativeFabricUIManager` is driven directly, RN's own renderer never runs. See the [React adapter
 README](../../adapters/react) for the full surface this app exercises and what's verified on which
 platform.
+
+> This canary predates `@symbiote-native/cli` and is for in-repo development. To start a new app,
+> use `npx @symbiote-native/cli new --framework react` instead.
 
 ## Run
 
@@ -46,7 +50,8 @@ npm run e2e:test:ios           # run the canary journeys on the iOS simulator
 
 ## Note — the shared native shell
 
-This app's native `ios`/`android` projects are the **origin** copy — `examples/vue-sfc` copies
-them verbatim, and `examples/vue-tsx` copies from `vue-sfc` in turn, so all three keep the same
-bundle id and app name ("Canary"). On a simulator/emulator the canaries overwrite each other — run
-**one at a time**. `examples/angular` has its own separate native project.
+This app's native `ios`/`android` projects are the **origin** copy — `examples/vue-sfc`,
+`examples/svelte`, and `examples/solid` all copy them verbatim, and `examples/vue-tsx` copies from
+`vue-sfc` in turn, so all five keep the same bundle id and app name ("Canary"). On a
+simulator/emulator the canaries overwrite each other — run **one at a time**. `examples/angular`
+has its own separate native project.

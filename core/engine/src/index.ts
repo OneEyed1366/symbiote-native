@@ -13,6 +13,12 @@ export {
   // (TouchableNativeFeedback.js:339) — rather than being converted after the fact.
   ANCHOR_COMPONENT,
   isAnchor,
+  createVoid,
+  // The component name of a node whose ENTIRE subtree the commit walk drops — unlike
+  // `ANCHOR_COMPONENT`, which hoists its children up in its place, a void node contributes neither
+  // itself nor them. For a primitive whose whole component renders nothing on this platform —
+  // `input-accessory-view` on Android, `InputAccessoryView.js`'s `return null`.
+  VOID_COMPONENT,
   appendChild,
   insertBefore,
   removeChild,
@@ -21,15 +27,42 @@ export {
   routeProp,
   censusRetainedTree,
   getExplicitStyle,
+  // Exported for the ONE adapter that has to build style objects rather than receive them: Angular's
+  // `ɵɵstyleMap` hands over keys, so its renderer allocates a fresh object per node and needs to
+  // recognise one it has already published. A second copy of this comparator in the adapter is the
+  // mirror shape this codebase deletes on sight — and its deliberate conservatism (a nested value
+  // reports "not the same") is exactly right for that use too.
+  isSameShallowStyle,
+  getPublishedStyle,
   setNodeHidden,
   setNodeComponent,
   setNodePressed,
+  setNodeUnderlayShown,
   setText,
   isSymbioteNode,
   isSymbioteEvent,
   RAW_TEXT_COMPONENT,
   debugNodeId,
+  takePropKeyTally,
 } from './node';
+// Host access — the DOM read half Fabric does not ship. Adapters route their seam's
+// parentNode/nextSibling/firstChild through these instead of reading a node's fields, which is
+// what keeps the retained tree's shape ours to change (symbiote-fabric-cxx-surface §9).
+export {
+  parentOf,
+  childrenOf,
+  firstChildOf,
+  nextSiblingOf,
+  isTextContainer,
+  isRawTextNode,
+  componentOf,
+  textOf,
+  propOf,
+  propsOf,
+  // A TEST read, exported off the package root because the itest fixtures reach it that way — the
+  // real payload builder lives in C++ and this is the only complete view of what it produced.
+  committedPayloadOf,
+} from './host-access';
 // For a HOST BEHAVIOR that owns an animated style layer on its own node — TouchableOpacity's press
 // fade, which RN drives from an `Animated.View` the tag replaces.
 export { setAnimatedBehaviorStyle } from './animated/host-binding';
@@ -72,9 +105,10 @@ export type { ISymbioteNode, ISymbioteEvent, IListener } from './node';
 
 export { SymbioteSurface, createSurface } from './surface';
 export { setEventDispatcher } from './dispatch';
+// `setColorProcessor` / `processColor` were only RE-exported by the old `commit.ts`; they point at
+// their real home now.
+export { setColorProcessor, processColor } from './platform-color';
 export {
-  setColorProcessor,
-  processColor,
   dispatchViewCommand,
   sendAccessibilityEvent,
   setNativeProps,
@@ -85,9 +119,36 @@ export {
   measureInWindow,
   measureLayout,
   disposeRoot,
+  requestCommitFor,
+} from './imperative';
+// The tree host: the seam a runtime installs to answer about the tree JS does not hold. `setTreeHost`
+// is what `installFabric()` (@symbiote-native/test-utils) calls with the TypeScript applier.
+export {
+  setTreeHost,
+  treeHost,
+  registerBeforeFlush,
   readCommitProfile,
-} from './commit';
-export type { ICommitProfile } from './commit';
+  readSurfaceTelemetry,
+  setNativeDebug,
+  takeNativeDebugLog,
+} from './tree-host';
+export type { ISurfaceTelemetry } from './tree-host';
+// The native host, exported for the same audience as `setTreeHost` — a HOST author, not an app.
+// `installNativeTreeHost` is not on any app path: `getSlot()` already calls it, and it is here so a
+// bring-up probe can install one explicitly against a hand-built set of bindings.
+export { nativeTreeHost, installNativeTreeHost } from './native-tree-host';
+export type {
+  ITreeHost,
+  ITreeCensus,
+  ICommittedRecord,
+  ICommitProfile,
+} from './tree-host';
+// The OPCODES and the recorder are deliberately NOT here. They are the wire contract between this
+// package and whatever implements the tree, so their audience is a HOST author — the C++ and the
+// TypeScript applier — not an app. They live on the `@symbiote-native/engine/mutation-buffer`
+// subpath, for the same reason `state-style` does: a name on this barrel is public API on all five
+// adapters at once, with no edit to any of them
+// (`.claude/rules/adapter-parity-audit.md`, "A build-tool-facing symbol belongs on a SUBPATH").
 // "A commit just reached completeRoot." The one seam that means the same thing under every
 // adapter: React commits synchronously inside its own commit phase, while Vue / Svelte / Angular
 // schedule completeRoot on a microtask, so each framework's own after-render hook fires at a
@@ -95,10 +156,14 @@ export type { ICommitProfile } from './commit';
 // across adapters has to hang off this, not off a per-framework lifecycle hook, or it measures a
 // different quantity in each one under the same name.
 export { registerPostCommit, unregisterPostCommit } from './post-commit';
-// The aria/role -> accessibility* fold. Lives here rather than in a component wrapper because a
-// LOWERED element has no wrapper: `fabricProps` runs it on the way to the payload, so every path
-// gets it. `core/components`' typed `resolveAccessibilityProps` delegates to this one.
+// The aria/role -> accessibility* fold. Lives here rather than in a component wrapper because a tag
+// has none: `fabricProps` runs it on the way to the payload, so every path gets it.
+// `core/components`' typed `resolveAccessibilityProps` delegates to this one.
 export { ARIA_ALIAS_KEYS, foldAriaProps } from './accessibility-props';
+// The payload builder, exported for the HOST rather than for an app: the engine holds no tree, so
+// whoever built the bag calls this on the way to `createNode`. Headlessly that is the TypeScript
+// applier; on device it will be the C++ one, which does not have it yet.
+export { fabricProps } from './fabric-props';
 // The public instance every host node already is (React's getPublicInstance, the Vue renderer's
 // createElement): the imperative measure/setNativeProps/focus API, on the shared node prototype.
 // toPublicInstance is the identity that names the seam — see ./host-instance.
@@ -255,6 +320,7 @@ export type {
   IAnimatedEventHandler,
   INativeEventAttachment,
   IValueListener,
+  IEasing,
   IEasingFunction,
   IInterpolationConfig,
   IExtrapolateType,
@@ -274,6 +340,10 @@ export type {
 } from './animated';
 
 export { getSlot } from './fabric';
+// Test seam, not app API: forget the bound slot so a
+// fixture can install a different host and be believed. Exported now that the harness lives in
+// another package (`@symbiote-native/test-utils`) and can no longer reach `./fabric` directly.
+export { resetSlot } from './fabric';
 export type {
   IFabricSlot,
   IFabricNode,
@@ -324,6 +394,7 @@ export { Linking } from './linking';
 export type { IUrlEvent } from './linking';
 export { Vibration } from './vibration';
 export { ToastAndroid } from './toast-android';
+export { SoundManager } from './sound-manager';
 export { Settings } from './settings';
 export { I18nManager } from './i18n-manager';
 export type { II18nManagerConstants } from './i18n-manager';
@@ -374,6 +445,7 @@ export {
   setInputFocused,
   setInputBlurred,
   blurTextInput,
+  focusTextInput,
 } from './text-input-state';
 export { LayoutAnimation } from './layout-animation';
 export type {
@@ -433,14 +505,15 @@ export {
   clearHostBehaviors,
   appListenerFor,
   addDerivedNode,
+  SLOT_DERIVED_ALL,
 } from './host-behavior';
 // `IPayloadFold` rides along because a behavior that BUILDS a node owns what that node carries: a
 // composed primitive assigns a fold to its own slot (`behaviors/scroll-view.ts`), and the owner's
 // `foldPayload` field cannot type that.
 export type { IClaimMode, IHostBehavior, IPayloadFold } from './host-behavior';
-export { requestCommitFor } from './commit';
 // `markPropsDirty` is a behavior's only way to say "the fold reads state I just changed". Every
 // other dirtying route goes through a prop write, and a behavior whose payload is DERIVED — the
-// sticky header's debounced translateY lives in its own runtime, not in `node.props` — has no
-// prop to write. Pair it with `requestCommitFor`: dirtying is not publishing.
+// sticky header's debounced translateY lives in its own runtime, not in the node's props — has no
+// prop to write. Pair it with `requestCommitFor` (exported off `./imperative` above): dirtying is
+// not publishing.
 export { setBehaviorListener, markPropsDirty } from './node';

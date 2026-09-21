@@ -27,7 +27,9 @@ import { createMemo, createSignal, onCleanup, splitProps } from 'solid-js';
 import type { JSX } from '../jsx-runtime';
 import {
   computeInset,
+  configureKeyboardAvoidingAnimation,
   keyboardAvoidingEventNamesFor,
+  readKeyboardAnimationTiming,
   readKeyboardFrame,
   readLayoutFrame,
   readPrefersCrossFadeTransitions,
@@ -127,6 +129,7 @@ export function KeyboardAvoidingView(
   const onShow = (payload: unknown): void => {
     const keyboard = readKeyboardFrame(payload);
     const offset = local.keyboardVerticalOffset ?? DEFAULT_VERTICAL_OFFSET;
+    const previousInset = inset();
     const next = computeInset(frame, keyboard, offset, {
       behavior: local.behavior,
       // The inset CURRENTLY applied (RN's this.state.bottom). Read from the signal at event time so
@@ -134,9 +137,15 @@ export function KeyboardAvoidingView(
       // frame shorter by exactly that much and core adds it back to cancel the shrink. Without it
       // each further keyboard event computes a smaller overlap and the view walks back down under
       // the keyboard. Core gates the correction on 'height'; the other modes ignore the value.
-      previousInset: inset(),
+      previousInset,
       prefersCrossFadeTransitions,
     });
+    // RN's `_updateBottomIfNecessary` skips the animation when the inset did not change.
+    if (next !== previousInset)
+      configureKeyboardAvoidingAnimation(
+        readKeyboardAnimationTiming(payload),
+        local.enabled !== false,
+      );
     dlog(`KeyboardAvoidingView show -> inset ${next}`);
     setInset(next);
   };
