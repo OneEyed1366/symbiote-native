@@ -146,16 +146,12 @@ project owning its runtime can change it.
 Three costs:
 
 - **Angular is the slowest of the five.** 1.62x stock on a create-shaped row where Solid is 1.04x.
-  It is down from 2.7x and is the one adapter under active optimization. The numbers and what is
-  responsible for them are [below](#how-fast-against-stock-react-native).
+  The numbers and what is responsible for them are [below](#how-fast-against-stock-react-native).
 - **Ecosystem packages are wrapped by hand, one at a time.** The _native view_ comes for free,
   through the same ViewConfig path as our own primitives, with zero SymbioteNative metadata. The JS
   surface around it does not, because a library's own component body is React internally. So each
   package gets a thin agnostic wrapper written here: no native code, no forking, a few hundred
   lines. Cheap per package, but manual, so the covered surface grows one library at a time.
-- **The scaffolder is brand new, and it is the way in.** `@symbiote-native/cli` sets a project up in
-  one command, with far less mileage than the rest of this list, and starting a new app is the only
-  supported route. There is no migration path from an app you have already built.
 
 <details>
 <summary>Evidence behind that table, with dates</summary>
