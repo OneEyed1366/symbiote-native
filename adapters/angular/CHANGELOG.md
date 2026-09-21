@@ -1,5 +1,23 @@
 # @symbiote-native/angular
 
+## 3.0.1
+
+### Patch Changes
+
+- [`fcc21bf`](https://github.com/OneEyed1366/symbiote-native/commit/fcc21bf2a3aa5f5b63c447e03586f33966d44e28) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Keep publishing styles after Angular destroys a component.
+
+  The factory hands one `Renderer2` to every component on a surface, and `Renderer2.destroy()` runs
+  per destroyed component. That call used to release the renderer's `beforeFlush` registration, which
+  is the only door an accumulated style run has, so after a keyed `@for` replace the instance went on
+  serving every surviving view while writing into an accumulator nothing would publish. A selection
+  then reached Fabric only when some other node's style run closed, two steps later.
+
+  `destroy()` now publishes what it holds and nothing more; the registration is released by
+  `SymbioteRendererFactory.dispose()`, called from `teardown` once the surface itself is going away.
+
+- Updated dependencies []:
+  - @symbiote-native/components@3.0.0
+
 ## 3.0.0
 
 ### Major Changes

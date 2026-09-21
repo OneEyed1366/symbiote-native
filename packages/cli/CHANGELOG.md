@@ -1,5 +1,27 @@
 # @symbiote-native/cli
 
+## 0.1.1
+
+### Patch Changes
+
+- [`7080650`](https://github.com/OneEyed1366/symbiote-native/commit/7080650e86d9baf157155e7fabdd6b695a49d7e6) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Every scaffold shipped a stray `bootsplash-logo/` folder at its root, holding all four other frameworks' boot-splash logo assets on top of its own.
+
+  `templates/native/bootsplash-logo/<framework>` lived inside `native/`, which `generate.ts` copies wholesale into every app before the framework-specific overlay runs. Moved to `templates/bootsplash-logo/<framework>`, alongside `native/` rather than inside it.
+
+- [`2f22bd4`](https://github.com/OneEyed1366/symbiote-native/commit/2f22bd47856f8acb40b963e261a30dffa656a44a) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - `--styling css-modules`/`stylesheet` scaffolds now render the same branded screen as the default `css` one, instead of a bare "Taps: N" stub.
+
+  The two modes had drifted onto a hand-written skeleton `App.module.css` that overwrote whatever the real per-framework template shipped.
+
+- [`c47b318`](https://github.com/OneEyed1366/symbiote-native/commit/c47b318d3c800d7a4fb7639d85b30d0f920b6b5d) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - `--navigation` scaffolds' Menu/Details screens in `css-modules`/`stylesheet` now match the branded `css` scaffold (logo, header options, details screen), instead of a bare "Welcome to SymbioteNative!" stub.
+
+  Also fixes vue-tsx's `--navigation` Menu/Details screens calling `navigation.push()`/`.pop()` on an unwrapped `ComputedRef` in those two styling modes - the same class of bug already fixed for the base App.
+
+- [`e5c9c1e`](https://github.com/OneEyed1366/symbiote-native/commit/e5c9c1eaa7b174439bb9e7d7ac76b329fa8b5b5c) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Every scaffold committed dead: `require()`'d images never resolved, and any host behavior beyond a plain press (Switch, TextInput, ScrollView, ...) silently did nothing.
+
+  `index.js` only imported each adapter's `/bootstrap` and `/jsx-runtime` subpaths. Neither reaches `import './register'`, which lives solely in the adapter's main barrel and registers the engine's host behaviors - so a fresh scaffold never ran it. Fixed by adding a bare `import '@symbiote-native/<adapter>';` to every framework's `index.js`.
+
+- [`a018a2d`](https://github.com/OneEyed1366/symbiote-native/commit/a018a2df797272848f8974058cf4da97bcce2fbd) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Every scaffold's `.brand-logo`/`.brand-logo-*` rule now sizes with an explicit pixel `width` instead of `aspect-ratio`, across every framework, every styling option (base, css-modules, stylesheet) and both the base app and navigation layers.
+
 ## 0.1.0
 
 ### Minor Changes
