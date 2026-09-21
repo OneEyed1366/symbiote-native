@@ -55,6 +55,7 @@ import {
   slotPropNameFor,
   slotTakesChildren,
   stashAppListener,
+  type IHostBehavior,
   type IPayloadFold,
 } from './host-behavior';
 import { configPayloadFold } from './registry';
@@ -195,6 +196,17 @@ export interface ISymbioteNode {
   // component name would run on every one of them. A behavior attaches per TAG, which is the
   // discriminator that already exists.
   payloadFold: IPayloadFold | undefined;
+  /**
+   * The behavior that attached to this node, or `undefined` for the vast majority that have none.
+   *
+   * A field for the same reason `payloadFold` above it is one, and set on the same line: every
+   * reader is a per-node path at list scale — the teardown sweep touches every node of a removed
+   * subtree, and `routeProp`'s slot/owned-listener questions run per prop write. A `WeakMap` probe
+   * is the dearest way to ask a question whose answer is almost always "none".
+   *
+   * Owned by `host-behavior.ts`; `attachHostBehavior` is the only writer.
+   */
+  hostBehavior: IHostBehavior | undefined;
   // The declarative halves of this node's style — see IClassStyleParts and commitClassStyle below.
   // `undefined` until the node's first class/style write, so a node nobody styles carries a slot
   // and nothing more.
@@ -259,6 +271,22 @@ export interface ISymbioteNode {
   // create: 2 000 child-list reads, every one of them returning ZERO handles, and 2 002 drains of a
   // buffer that should have crossed once.
   mayHaveChildren: boolean;
+
+  /**
+   * Whether the teardown sweep has released this node and not seen it come back.
+   *
+   * Owned by `host-behavior.ts` — see `detachOne` / `reattachHostBehaviors`. A field rather than
+   * the `WeakSet` it was, because the sweep reads and writes it for EVERY node of a removed
+   * subtree (ten thousand on a thousand-row clear) and every insert reads it to decide whether to
+   * walk at all, which is the ~9 000-call path of a create.
+   */
+  isTornDown: boolean;
+
+  // This node's index in the CURRENT batch's `handles` table, and the batch that index belongs to.
+  // Owned by `mutation-buffer.ts` and meaningless to everyone else — see `slotOf` for why the pair
+  // lives on the node instead of in a `Map`.
+  slot: number;
+  slotBatch: number;
 
   // RN's ReactFabricHostComponent surface - what a template/function ref hands back and what
   // reanimated / gesture-handler / react-navigation reach through. Each resolves the node's
@@ -327,9 +355,13 @@ class SymbioteNode implements ISymbioteNode {
   declare nativeIdWinsOverId: boolean;
   declare styleParts: IClassStyleParts | undefined;
   declare payloadFold: IPayloadFold | undefined;
+  declare hostBehavior: IHostBehavior | undefined;
   declare childHost: ISymbioteNode | undefined;
   declare wrapper: ISymbioteNode | undefined;
   declare mayHaveChildren: boolean;
+  declare isTornDown: boolean;
+  declare slot: number;
+  declare slotBatch: number;
 
   constructor(component: string, isText: boolean) {
     this[BRAND] = true;
@@ -352,6 +384,9 @@ class SymbioteNode implements ISymbioteNode {
     // Assigned here for the same hidden-class reason as `hasAriaAlias` above; `attachHostBehavior`
     // overwrites it a few lines later for the rare node that has a behavior.
     this.payloadFold = undefined;
+    // Same reason again, and the same writer: `attachHostBehavior` fills it for the rare node that
+    // gets a behavior at all.
+    this.hostBehavior = undefined;
     // Same reason again, and here it is load-bearing rather than tidy: the redirect below is read
     // on every append, so the slot must be a stable slot on one hidden class, not a property added
     // to a few nodes after the fact.
@@ -361,6 +396,16 @@ class SymbioteNode implements ISymbioteNode {
     // guards is read on every `childrenOf`, so it must be a stable slot rather than a property that
     // appears on some nodes later.
     this.mayHaveChildren = false;
+    // Same hidden-class reason again, and the same measured one: every insert reads it and the
+    // teardown sweep writes it per node.
+    this.isTornDown = false;
+    // Same hidden-class reason as every field above, and the most load-bearing of them: `slotOf`
+    // reads this pair on EVERY handle operand of every op — about two hundred thousand times on a
+    // thousand-row create — so it has to be a stable slot on one shape. `slotBatch` starts at a
+    // value no batch ever carries, which is what makes an untouched node read as "not in this
+    // batch" without a separate flag.
+    this.slot = 0;
+    this.slotBatch = 0;
   }
 
   measure(callback: IMeasureOnSuccess): void {

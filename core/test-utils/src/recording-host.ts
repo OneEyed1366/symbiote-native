@@ -477,6 +477,9 @@ export function createRecordingHost(): IRecordingHost {
     childrenOf(handle: object): readonly object[] {
       return nodeOf(handle, 'childrenOf').children.map(child => child.handle);
     },
+    firstChildOf(handle: object): object | undefined {
+      return nodeOf(handle, 'firstChildOf').children[0]?.handle;
+    },
     nextSiblingOf(handle: object): object | undefined {
       const node = nodeOf(handle, 'nextSiblingOf');
       const siblings = node.parent?.children;
@@ -493,6 +496,24 @@ export function createRecordingHost(): IRecordingHost {
         for (const child of node.children) walk(child);
       };
       for (const root of roots) walk(nodeOf(root, 'subtreesOf'));
+      return out;
+    },
+    // The twin of the engine's narrowed walk, and it MUST narrow here too: the vitest suite is where
+    // the sweep's behaviour is asserted, so a recording host that handed back everything would make
+    // every one of those cases pass whatever the engine does.
+    teardownSubtreesOf(roots: readonly object[]): readonly object[] {
+      const out: object[] = [];
+      const walk = (node: IRecorded, isRoot: boolean): boolean => {
+        const reserved = out.length;
+        out.push(node.handle);
+        let isWanted = isRoot || node.tagName !== '';
+        for (const child of node.children) {
+          if (walk(child, false)) isWanted = true;
+        }
+        if (!isWanted) out.length = reserved;
+        return isWanted;
+      };
+      for (const root of roots) walk(nodeOf(root, 'teardownSubtreesOf'), true);
       return out;
     },
     ancestorsOf(handle: object): readonly object[] {

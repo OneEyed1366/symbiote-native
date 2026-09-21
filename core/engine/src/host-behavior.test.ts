@@ -176,6 +176,37 @@ describe('teardown', () => {
     expect(log.attached.filter(node => node === parked)).toHaveLength(2);
   });
 
+  // why: the framework may bring back an INTERIOR node of a subtree it removed, not the root it
+  // named — Svelte's `{#if}` returns a branch from a fragment the engine never saw, so the node
+  // that reappears is the one it parked and not the one whose removal nominated the sweep. Whether
+  // a node re-arms therefore cannot depend on its being the root the sweep was handed.
+  //
+  // It is a GUARD on what the sweep's walk is allowed to narrow to: any node with a behavior
+  // ANYWHERE beneath it must carry the mark that makes its insert walk. The whole-subtree mark
+  // satisfies that trivially; a narrower one has to keep satisfying it.
+  it('re-arms a behavior under an interior node the framework brings back alone', () => {
+    const log = trackBehavior(PRESSABLE);
+    const { surface, root } = mount();
+    const outer = createElement('RCTView');
+    const inner = createElement('RCTView');
+    const machine = createElement(PRESSABLE);
+    appendChild(inner, machine);
+    appendChild(outer, inner);
+    appendChild(root, outer);
+    surface.commit();
+
+    // The removal names the OUTER node; the sweep never hears about `inner`.
+    removeChild(root, outer);
+    surface.commit();
+    expect(log.detached).toEqual([machine]);
+
+    // And what comes back is `inner`, on its own, somewhere else.
+    appendChild(root, inner);
+    surface.commit();
+
+    expect(log.attached.filter(node => node === machine)).toHaveLength(2);
+  });
+
   it('sweeps on a no-op commit too, so a nomination cannot outlive its tick', () => {
     const log = trackBehavior(PRESSABLE);
     const { surface, root } = mount();
