@@ -101,6 +101,12 @@ interface IMountedApp {
   cmpRef: ComponentRef<unknown>;
   rootRef: ComponentRef<unknown> | undefined;
   injector: EnvironmentInjector;
+  /**
+   * Kept so teardown can release it. Angular never will: it is provided as a `useValue`, so the
+   * injector has nothing to destroy, and the renderer it owns listens to the engine's flush door
+   * for as long as the surface lives. See `SymbioteRendererFactory.dispose`.
+   */
+  rendererFactory: SymbioteRendererFactory;
 }
 
 // AppRegistry's `wrapperComponentProvider` support: the root renders detached (Angular gives
@@ -134,6 +140,9 @@ function teardown(rootTag: IRootTag): void {
   app.rootRef?.destroy();
   app.cmpRef.destroy();
   app.injector.destroy();
+  // AFTER Angular's own teardown, so anything those destroys wrote is published rather than
+  // dropped — the renderer flushes what it holds on its way out.
+  app.rendererFactory.dispose();
   apps.delete(rootTag);
   disposeRoot(rootTag);
 }
@@ -190,11 +199,12 @@ export function mount(
   teardown(rootTag);
 
   const surface = createSurface(rootTag);
+  const rendererFactory = new SymbioteRendererFactory(surface);
   const injector = createEnvironmentInjector(
     [
       {
         provide: RendererFactory2,
-        useValue: new SymbioteRendererFactory(surface),
+        useValue: rendererFactory,
       },
       // `getElementById` is not decoration: `resource()` resolves TransferState, whose root
       // factory runs `retrieveTransferredState(doc, appId)` ->
@@ -289,7 +299,7 @@ export function mount(
   appRef.tick(); // first paint
   surface.requestCommit();
 
-  apps.set(rootTag, { cmpRef, rootRef, injector });
+  apps.set(rootTag, { cmpRef, rootRef, injector, rendererFactory });
   return surface;
 }
 

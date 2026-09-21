@@ -476,6 +476,42 @@ describe('Angular SymbioteRenderer drives the engine', () => {
     expect(second).toBe(first);
   });
 
+  // why: the factory hands ONE renderer to every component, so Angular calls `destroy()` on it
+  // whenever ANY component's views are torn down — a keyed `@for` replace destroys a thousand — and
+  // the instance then goes on serving every view that is still alive. A `destroy()` that closed the
+  // renderer's flush door left those views writing into an accumulator nothing would publish: the
+  // style only reached Fabric when some OTHER node's run happened to close it, which on the
+  // benchmark screen was two steps later.
+  //
+  // The product rule is the plain one — a style written after some component was destroyed still
+  // paints — and it is the whole of the Angular `select` defect this repo carried in
+  // `angular-select-reaches-fabric.itest.ts`.
+  it('keeps publishing styles after Angular destroys the shared renderer', async () => {
+    const { surface, renderer } = setup();
+    const node = renderer.createElement('view');
+    renderer.appendChild(surface, node);
+    renderer.setStyle(node, 'height', 44);
+    await tick();
+
+    // A component somewhere else goes away, and Angular tells the SHARED renderer about it.
+    renderer.destroy();
+
+    // A view that is still alive restyles. Nothing else writes, so nothing else can close the run
+    // on its behalf — which is exactly the shape the defect needed.
+    renderer.setStyle(node, 'borderLeftWidth', 3);
+    await tick();
+
+    // The LIVE tree, because the question is what Fabric HOLDS — a creation-log search would answer
+    // about a node that exists rather than about the style that reached it.
+    const painted = findCommitted(
+      node => node.payload.borderLeftWidth !== undefined,
+    );
+    expect(painted !== undefined).toBe(true);
+    // AND THE FIRST STYLE SURVIVED, which is the half a naive fix would lose: the run is seeded
+    // from what stands, so publishing the new key must not drop the old one.
+    expect(painted?.payload.height).toBe(44);
+  });
+
   // why: *ngIf/@if/@for need a stable position marker with no visual footprint — an anchor
   // must never paint as a real Fabric view (that would be a stray invisible-but-present node
   // in the committed tree), while its OWN children still land at the correct sibling position.

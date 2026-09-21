@@ -263,7 +263,26 @@ export class SymbioteRenderer implements Renderer2 {
     this.releaseBeforeFlush = registerBeforeFlush(() => this.flushStyling());
   }
 
+  /**
+   * Angular is done with this renderer FOR ONE COMPONENT — which is not the same as this renderer
+   * being done, and the difference was a shipped bug.
+   *
+   * The factory hands ONE instance to every component on the surface, so Angular calls this
+   * whenever ANY component's views are torn down; a keyed `@for` replace destroys a thousand. So it
+   * publishes what it is holding and nothing more. Releasing the `beforeFlush` registration here
+   * closed the only door a style run has — `flushOps` is what asks a renderer for what it holds —
+   * while every still-living view went on writing into the accumulator. The style then reached
+   * Fabric only when some OTHER node's `openStyleRun` happened to close the run, which on the
+   * benchmark screen was two steps after the selection that asked for it.
+   *
+   * The registration follows the SURFACE now, and `SymbioteRendererFactory.dispose` releases it.
+   */
   destroy(): void {
+    this.flushStyling();
+  }
+
+  /** The surface is going away — publish what is held and stop listening. See `destroy` above. */
+  dispose(): void {
     this.flushStyling();
     this.releaseBeforeFlush();
   }
@@ -800,6 +819,18 @@ export class SymbioteRendererFactory implements RendererFactory2 {
     _type: RendererType2 | null,
   ): Renderer2 {
     return (this.renderer ??= new SymbioteRenderer(this.surface));
+  }
+
+  /**
+   * The surface is being torn down, so the one renderer it shares can stop listening.
+   *
+   * IT IS THE FACTORY'S JOB and not Angular's, because the instance outlives any single component:
+   * Angular's own `Renderer2.destroy()` arrives once per destroyed component and must not close a
+   * door every surviving view still writes through. See `SymbioteRenderer.destroy`.
+   */
+  dispose(): void {
+    this.renderer?.dispose();
+    this.renderer = undefined;
   }
 
   // Not commit coalescing (requestCommit owns that) — a per-CD-pass counter only, now that the
