@@ -82,6 +82,17 @@ export type IBenchTelemetry = {
   readonly applyMs: number;
   readonly commitMs: number;
   readonly layoutMs: number;
+  /**
+   * RN's OWN commit telemetry for the step — how many Yoga nodes it re-laid out and how many text
+   * measurements it took.
+   *
+   * They answer a question no counter on this line could: `select` changes ONE row's style and
+   * spends 8-9 ms of its 12-15 in `layout`, on a tree of ten thousand nodes. Whether that is Yoga
+   * doing the least it can or us handing Fabric more than changed is the difference between a fact
+   * about the platform and a bug in the commit, and only these two numbers tell them apart.
+   */
+  readonly layoutNodes: number;
+  readonly textMeasures: number;
   readonly nodesCreated: number;
   readonly nodesCloned: number;
   readonly nodesReused: number;
@@ -101,11 +112,71 @@ export type IBenchTelemetry = {
   readonly applyCalls: number;
 };
 
+declare const __symbioteEngineNative: {
+  readSurfaceTelemetry?: (surfaceId: number) => Record<string, number>;
+};
+
+/**
+ * Fabric's OWN commit telemetry for the surface, with every engine counter zero.
+ *
+ * FOR THE STOCK ARM, and it is what makes `laidOut` comparable at all: React's own renderer drives
+ * that tree, so this says what the PLATFORM costs for the workload with our engine nowhere in the
+ * path. An adapter's `select` laying out seven thousand Yoga nodes is a fact about Fabric if stock
+ * lays out seven thousand too, and a bug in our commit if it does not — and nothing short of this
+ * column can tell the two apart.
+ *
+ * Read off the native bindings rather than through `@symbiote-native/engine`, because this module
+ * and the stock arm both refuse that import for the `Platform.ios.js` reason above.
+ */
+export function readFabricTelemetry(): IBenchTelemetry | undefined {
+  const read = __symbioteEngineNative?.readSurfaceTelemetry;
+  if (read === undefined) return undefined;
+  const raw = read(ROOT_TAG);
+  const at = (key: string): number => raw[key] ?? 0;
+  return {
+    // THE ENGINE'S HALVES ARE ZERO HERE BY CONSTRUCTION, not by omission: no op of ours reached this
+    // surface, so a non-zero in any of them would mean the arms had contaminated each other.
+    walkMs: 0,
+    applyMs: 0,
+    nodesCreated: 0,
+    nodesCloned: 0,
+    nodesReused: 0,
+    setProps: 0,
+    writesOfUnchanged: 0,
+    foldsFound: 0,
+    decodeMs: 0,
+    setPropMs: 0,
+    propConvertMs: 0,
+    stringDecodeMs: 0,
+    structureMs: 0,
+    publishMs: 0,
+    nodesDecoded: 0,
+    valueEntries: 0,
+    valueConversions: 0,
+    applyCalls: 0,
+    commitMs: at('commitMs'),
+    layoutMs: at('layoutMs'),
+    layoutNodes: at('layoutNodes'),
+    textMeasures: at('textMeasures'),
+  };
+}
+
 export type IBenchDriver = {
   /** The column name in the results table. */
   readonly name: string;
-  /** The engine's per-step counters, zeroed on read. Absent for the stock arm, which has none. */
+  /** The engine's per-step counters, zeroed on read. Absent for an arm that reads nothing. */
   readonly readTelemetry?: () => IBenchTelemetry | undefined;
+  /**
+   * False for an arm whose telemetry carries FABRIC's half and none of the engine's — the stock
+   * arm, which drives the platform itself.
+   *
+   * It has to be said rather than inferred from a zero: `setProps=0` is also what a step that
+   * silently failed to apply reports, and telling those two apart is the entire job of the write
+   * oracle below. Stock used to be exempt by passing no telemetry at all; it passes Fabric's now,
+   * because `laidOut` is the only column that can say whether an adapter's layout cost is the
+   * platform's or ours.
+   */
+  readonly drivesEngine?: boolean;
   /**
    * Committed nodes the arm holds that are not rows — its root, the container `createSurface` puts
    * under it, the screen's own wrapper, and for Svelte the DOM shim's root element. Declared rather
@@ -122,6 +193,14 @@ export type IBenchDriver = {
    * others.
    */
   apply(state: IBenchState): void | Promise<void>;
+  /**
+   * Steps this arm is KNOWN not to apply, each one a defect with a reproduction behind it.
+   *
+   * An exemption, never a convenience. It exists so the work oracle below can protect the other arms
+   * instead of being deleted, and so a column nobody may quote says so out loud in the output rather
+   * than by its absence. An entry with no named reproduction is a bug being hidden.
+   */
+  readonly unappliedSteps?: readonly IStep[];
 };
 
 let nextId = 1;
@@ -156,6 +235,31 @@ const STEP_ORDER = [
 type IStep = (typeof STEP_ORDER)[number];
 
 /**
+ * How many props each step writes — the SECOND oracle, beside the node census.
+ *
+ * WHY A CENSUS IS NOT ENOUGH, and this suite has now been caught twice by the same shape: the node
+ * count cannot see work that changes no node. A selection repaints one row and adds nothing, so a
+ * step that silently failed to apply it committed the right tree and read as the fastest column.
+ *
+ * Angular did exactly that. Its zoneless scheduler did not settle inside the arm's turn, so `select`
+ * reported `setProps=0 batches=0` while `remove` reported `setProps=1` — one write, two steps late,
+ * and three wall clocks mis-attributed. Every other adapter reports the numbers below, which is what
+ * makes them an invariant of the WORKLOAD rather than of any renderer.
+ *
+ * An arm with no engine telemetry (stock drives Fabric itself) is exempt: there is nothing to count.
+ */
+const PROPS_PER_STEP: Readonly<Record<IStep, number>> = {
+  create: ROW_BATCH * 10,
+  replace: ROW_BATCH * 10,
+  partial: ROW_BATCH / UPDATE_STRIDE,
+  select: 1,
+  swap: 0,
+  remove: 0,
+  append: ROW_BATCH * 10,
+  clear: 0,
+};
+
+/**
  * `applyOps`' own split, on the two steps that build ten thousand nodes.
  *
  * WHY IT IS HERE and not left to a one-off probe: the first full run of this suite put `apply` at
@@ -183,9 +287,9 @@ function telemetryLine(
   driver: IBenchDriver,
   step: IStep,
   wall: number,
+  telemetry: IBenchTelemetry | undefined,
 ): string {
   const arm = driver.name;
-  const telemetry = driver.readTelemetry?.();
   if (telemetry !== undefined && (step === 'create' || step === 'append')) {
     print(applySplitLine(arm, telemetry));
   }
@@ -194,9 +298,20 @@ function telemetryLine(
     `DEBUG ${arm.padEnd(7)} ${step.padEnd(7)} wall=${wall.toFixed(1).padStart(6)} ` +
     `walk=${ms(telemetry?.walkMs)} apply=${ms(telemetry?.applyMs)} ` +
     `fabric=${ms(telemetry?.commitMs)} layout=${ms(telemetry?.layoutMs)} ` +
+    // WHAT FABRIC ACTUALLY RE-MEASURED, beside how long it took. A `layout` figure with no node
+    // count behind it cannot say whether the platform is doing the least it can.
+    `laidOut=${telemetry?.layoutNodes ?? 0} texts=${telemetry?.textMeasures ?? 0} ` +
     `created=${telemetry?.nodesCreated ?? 0} cloned=${telemetry?.nodesCloned ?? 0} ` +
     `reused=${telemetry?.nodesReused ?? 0} setProps=${telemetry?.setProps ?? 0} ` +
-    `unchanged=${telemetry?.writesOfUnchanged ?? 0} folds=${telemetry?.foldsFound ?? 0}`
+    `unchanged=${telemetry?.writesOfUnchanged ?? 0} folds=${telemetry?.foldsFound ?? 0} ` +
+    // HOW MANY TIMES THE STEP CROSSED, on every row rather than only on the two create-shaped ones.
+    //
+    // A read is a batch boundary, so this counts how often the adapter asked the host a question
+    // mid-step as much as it counts commits. It is not a curiosity: an empty `applyOps` costs
+    // 4.5-4.8 us of fixed prologue (`small-batch-crossing-cost.itest.ts`), so an adapter navigating
+    // per mutation pays that per mutation. Solid's `Clear` read 1 001 here against React's and
+    // Svelte's 2 on the identical tree, and that was the whole of its `apply=13.1` against their 2.6.
+    `batches=${telemetry?.applyCalls ?? 0}`
   );
 }
 
@@ -246,14 +361,28 @@ export async function runBenchSuite(driver: IBenchDriver): Promise<void> {
     const wall = performance.now() - startedAt;
     timings.set(name, wall);
 
+    // READ ONCE: the counters zero on read, so asking twice gives the second caller zeroes.
+    const telemetry = driver.readTelemetry?.();
     const nodes = committedTags().length;
-    print(`${telemetryLine(driver, name, wall)} nodes=${nodes}`);
+    print(`${telemetryLine(driver, name, wall, telemetry)} nodes=${nodes}`);
 
     // THE ORACLE, and it is read before any millisecond is quoted: a step that built no rows commits
     // nothing and reads as instant.
     const surplus = nodes - NODES_PER_ROW * state.rows.length;
     if (surplus !== driver.chrome) print(censusLine(driver.name, name));
     expect(surplus).toBe(driver.chrome);
+
+    // THE SECOND ORACLE — what the step WROTE, which the census cannot see. See `PROPS_PER_STEP`.
+    if (telemetry === undefined || driver.drivesEngine === false) return;
+    if (driver.unappliedSteps?.includes(name) === true) {
+      print(
+        `DEBUG ${driver.name} ${name} NOT APPLIED — this arm is known not to perform this step ` +
+          `(wrote ${telemetry.setProps}, the workload is ${PROPS_PER_STEP[name]}). Its wall clock ` +
+          `is not comparable with the other columns'.`,
+      );
+      return;
+    }
+    expect(telemetry.setProps).toBe(PROPS_PER_STEP[name]);
   };
 
   await step('create', { rows: buildRows(ROW_BATCH), selectedId: undefined });
