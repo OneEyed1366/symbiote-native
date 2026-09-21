@@ -62,11 +62,11 @@
   }
 
   .brand-logo-react {
-    aspect-ratio: 1.0977;
+    width: 70px;
   }
 
   .brand-logo-svelte {
-    aspect-ratio: 0.8359;
+    width: 54px;
   }
 
   .plus-icon {

@@ -26,14 +26,12 @@
   height: 64px;
 }
 
-/* aspect-ratio matches each source PNG's real pixel proportions — a shared square box would
-   stretch them off their real shape. */
 .brand-logo-react {
-  aspect-ratio: 1.0977;
+  width: 70px;
 }
 
 .brand-logo-vue {
-  aspect-ratio: 1.1542;
+  width: 74px;
 }
 
 .plus-icon {

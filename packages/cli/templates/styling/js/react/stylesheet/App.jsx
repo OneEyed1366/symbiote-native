@@ -36,7 +36,7 @@ const styles = StyleSheet.create({
     paddingVertical: 24,
     paddingHorizontal: 32,
   },
-  brandLogo: { height: 64, aspectRatio: 1.0977 },
+  brandLogo: { width: 70, height: 64 },
   title: { color: '#ffffff', fontSize: 22, fontWeight: 'bold', textAlign: 'center' },
   subtitle: { color: '#cbd5e1', fontSize: 14, textAlign: 'center' },
   counterCard: {

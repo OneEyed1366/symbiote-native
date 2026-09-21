@@ -18,11 +18,11 @@
 }
 
 .brand-logo-react {
-  aspect-ratio: 1.0977;
+  width: 70px;
 }
 
 .brand-logo-angular {
-  aspect-ratio: 0.9463;
+  width: 61px;
 }
 
 .plus-icon {
