@@ -27,7 +27,7 @@
 // `registerHostBehavior` emits a `dlog` precisely so `DEBUG=1` answers "did my registration run at
 // all" before anyone starts debugging the behavior itself.
 
-import { parentsOf, subtreesOf } from './host-access';
+import { parentsOf, teardownSubtreesOf } from './host-access';
 import { recordSetTag } from './mutation-buffer';
 import { dlog } from './debug';
 import type { ISymbioteNode } from './node';
@@ -315,12 +315,19 @@ const behaviors = new Map<string, IHostBehavior>();
 // `sweepDetachedBehaviors` for why the answer is not known until commit.
 const detachCandidates = new Set<ISymbioteNode>();
 
-// Nodes the sweep has torn down. A torn-down node can still be re-inserted — see
-// `reattachHostBehaviors` — and this is what tells an insert whether it must walk at all, so the
+// A node the sweep has torn down carries `node.isTornDown`. It can still be re-inserted — see
+// `reattachHostBehaviors` — and the bit is what tells an insert whether it must walk at all, so the
 // common case (building a fresh tree) never walks anything.
-const tornDown = new WeakSet<ISymbioteNode>();
+//
+// A FIELD rather than the `WeakSet` it was, for the reason `slotBatch` is one: both of its readers
+// are per-node paths at list scale — the sweep touches every node of a removed subtree, and every
+// insert asks the question once.
 
-// The behavior a node actually got, remembered from its one and only registry lookup.
+// The behavior a node actually got lives on the NODE, as `node.hostBehavior`, remembered from its
+// one and only registry lookup. A field rather than the `WeakMap` it was, for the reason
+// `node.payloadFold` — written on the next line of `attachHostBehavior` — already is one: every
+// reader here is a per-node path at list scale, and a `WeakMap` probe is the dearest way to ask a
+// question whose answer is almost always "none".
 //
 // THE REGISTRY IS KEYED BY INTRINSIC TAG AND THE NODE IS NOT. `node.component` is the FABRIC view
 // name: every adapter resolves the tag through `descriptorFor` before calling `createElement`, so
@@ -333,7 +340,6 @@ const tornDown = new WeakSet<ISymbioteNode>();
 // subject with `createElement(PRESSABLE_TAG)`, which passes the tag AS the Fabric name and makes
 // the key match by accident. No adapter constructs a node that way, so the registration could
 // never have fired in an app while all six break-tests kept failing correctly on their own axes.
-const attached = new WeakMap<ISymbioteNode, IHostBehavior>();
 
 // The gate. `createElement` and `removeChild` are the two hottest paths in the engine (9 002 and
 // ~1 000 calls on one benchmark row set), so neither may pay a Set insert for a feature no app
@@ -378,9 +384,9 @@ export function hasHostBehaviors(): boolean {
  * all of it inside the commit. `Clear` is the one row where stock React Native beats every adapter.
  *
  * Nothing the sweep does can matter before the first attach, and the four collections say so:
- * `attached` is written only by `attachHostBehavior`; `awaitingCommit` and `committedEachTime` are
+ * `node.hostBehavior` is written only by `attachHostBehavior`; `awaitingCommit` and `committedEachTime` are
  * written only inside a `behavior.` branch; `parked` only by `detachAnimatedProps`, which has its
- * own gate. The one remaining effect is marking `tornDown`, which exists so a later re-insert knows
+ * own gate. The one remaining effect is marking `isTornDown`, which exists so a later re-insert knows
  * to re-arm — and there is nothing to re-arm.
  *
  * MONOTONE, deliberately: it turns on and never off, so it needs no accounting on a `WeakMap` that
@@ -399,7 +405,7 @@ export function slotPropNameFor(
   node: ISymbioteNode,
   key: string,
 ): string | undefined {
-  const behavior = attached.get(node);
+  const behavior = node.hostBehavior;
   if (behavior === undefined) return undefined;
   const named = behavior.slotProps?.[key];
   if (named !== undefined) return named;
@@ -412,7 +418,7 @@ export function slotPropNameFor(
 // `slotTakesNoChildren`. Same `node.childHost` gate as every other probe here: the two callers ask
 // only after the field said there is a slot at all.
 export function slotTakesChildren(node: ISymbioteNode): boolean {
-  return attached.get(node)?.slotTakesNoChildren !== true;
+  return node.hostBehavior?.slotTakesNoChildren !== true;
 }
 
 // Nodes a behavior built that are NOT the slot, and whose payloads derive from the owner's props.
@@ -453,7 +459,7 @@ export function notifyOwnedListenerChange(
   name: string,
   wired: boolean,
 ): void {
-  attached.get(node)?.onOwnedListenerChange?.(node, name, wired);
+  node.hostBehavior?.onOwnedListenerChange?.(node, name, wired);
 }
 
 // Called from the two inserts once the child is in place. See `onChildInserted`.
@@ -461,7 +467,7 @@ export function notifyChildInserted(
   node: ISymbioteNode,
   child: ISymbioteNode,
 ): void {
-  attached.get(node)?.onChildInserted?.(node, child);
+  node.hostBehavior?.onChildInserted?.(node, child);
 }
 
 // What this owner does with a child of that Fabric component, or undefined when it does not claim
@@ -470,7 +476,7 @@ export function claimModeFor(
   node: ISymbioteNode,
   component: string,
 ): IClaimMode | undefined {
-  return attached.get(node)?.claimedChildren?.[component];
+  return node.hostBehavior?.claimedChildren?.[component];
 }
 
 /**
@@ -485,7 +491,7 @@ export const SLOT_DERIVED_ALL = '*';
 // Does this owner key feed the slot's payload? See `slotDerived`. Same `node.childHost` gate as
 // above keeps the WeakMap probe off every node that has no slot.
 export function slotDerivesFrom(node: ISymbioteNode, key: string): boolean {
-  const names = attached.get(node)?.slotDerived;
+  const names = node.hostBehavior?.slotDerived;
   if (names === undefined) return false;
   return names.includes(SLOT_DERIVED_ALL) || names.includes(key);
 }
@@ -498,7 +504,7 @@ const stashed = new WeakMap<ISymbioteNode, Map<string, unknown>>();
 // Takes the NODE, not a component string: the caller (`setEventListener`) has only the Fabric name
 // by then, which is not the registry's alphabet. Reads the same map `attachHostBehavior` wrote.
 export function ownsListener(node: ISymbioteNode, name: string): boolean {
-  return attached.get(node)?.ownedListeners?.includes(name) === true;
+  return node.hostBehavior?.ownedListeners?.includes(name) === true;
 }
 
 export function stashAppListener(
@@ -528,7 +534,7 @@ export function appListenerFor(node: ISymbioteNode, name: string): unknown {
 export function attachHostBehavior(node: ISymbioteNode, tag: string): void {
   const behavior = behaviors.get(tag);
   if (behavior === undefined) return;
-  attached.set(node, behavior);
+  node.hostBehavior = behavior;
   hasAttached = true;
   // The tag itself, over the wire, so the host can resolve this tag's PLATFORM props without a trip
   // back into JS. Here rather than in `createElement` because here is where a tag is known to name
@@ -595,7 +601,7 @@ export function runDeferredAttaches(
     // boundary — so a node carrying both hooks paid two crossings for one fact on the commit that
     // landed it. Two per `<text-input>` on a 1 000-row create, measured at the call site.
     everCommitted.add(node);
-    attached.get(node)?.attachAfterCommit?.(node);
+    node.hostBehavior?.attachAfterCommit?.(node);
   }
 }
 
@@ -669,7 +675,7 @@ export function runCommittedHooks(
       }
       everCommitted.add(node);
     }
-    attached.get(node)?.afterCommit?.(node);
+    node.hostBehavior?.afterCommit?.(node);
   }
 }
 
@@ -760,7 +766,10 @@ export function sweepDetachedBehaviors(
   const left = candidates.filter(
     (node, at) => parents[at] === undefined && !topLevel.includes(node),
   );
-  for (const node of subtreesOf(left)) detachOne(node, onDetached);
+  // NARROWED, and it is the sweep's whole cost: what crosses is a handle per node, and on the
+  // benchmark row eight of every ten are plain views the sweep would mark and do nothing else
+  // with. See `ITreeHost.teardownSubtreesOf` for which nodes come back and why an ancestor must.
+  for (const node of teardownSubtreesOf(left)) detachOne(node, onDetached);
   detachCandidates.clear();
 }
 
@@ -777,10 +786,12 @@ export function teardownSubtree(
   node: ISymbioteNode,
   onDetached: (node: ISymbioteNode) => void,
 ): void {
-  for (const each of subtreesOf([node])) detachOne(each, onDetached);
+  // Narrowed for the same reason the sweep is, and with more to gain: this path tears down a whole
+  // SURFACE, so the subtree is the screen.
+  for (const each of teardownSubtreesOf([node])) detachOne(each, onDetached);
 }
 
-// `tornDown` guards BOTH overlaps, and it used to be helped by a per-call `seen` Set that guarded
+// `isTornDown` guards BOTH overlaps, and it used to be helped by a per-call `seen` Set that guarded
 // only the first of them:
 //
 //   within one call    a removed parent and a removed descendant are both nominated, so the
@@ -788,7 +799,7 @@ export function teardownSubtree(
 //   across calls       a node the sweep released and that `disposeRoot` then walks again, the
 //                      ordinary shape of an unmount after the framework emptied the tree
 //
-// `seen` was redundant for the first: `tornDown.add(node)` runs unconditionally two lines below the
+// `seen` was redundant for the first: the mark is raised unconditionally two lines below the
 // guard, in the same call, so a second arrival takes the same early return. The only behaviour it
 // changed was after a THROWING `onDetached`, where the node would be retried — and a sweep that
 // threw half way has already left the tree in a state no retry repairs.
@@ -801,19 +812,25 @@ export function teardownSubtree(
 // The subtree arrives FLAT, in one host read, instead of a `childrenOf` recursion. The recursion
 // stopped descending at an already-torn-down node where this skips it and carries on; the two agree
 // because both marks are whole-subtree — the sweep adds every descendant and `reattachSubtree`
-// removes every descendant — so a node in `tornDown` has its own descendants in it, and each of them
+// removes every descendant — so a marked node has its descendants marked too, and each of them
 // takes the same early return below.
 function detachOne(
   node: ISymbioteNode,
   onDetached: (node: ISymbioteNode) => void,
 ): void {
-  if (tornDown.has(node)) return;
+  if (node.isTornDown) return;
   onDetached(node);
   // Marked whether or not THIS node carries a behavior: the mark is what tells a later insert to
   // walk, and the node re-inserted is usually a plain container whose DESCENDANT holds the
   // machine. Gating the mark on `behaviors.has` made the row wrapper unmarked and the whole walk
   // skip — the first version of the parked-node test caught exactly that.
-  tornDown.add(node);
+  node.isTornDown = true;
+  // AND THE REST OF THE BODY IS THE BEHAVIOUR'S, so a node without one leaves here. Nine of every
+  // ten nodes in a removed subtree are plain views: the mark above is the whole of what they owe,
+  // and the three collection probes below were being paid for them anyway. All three are written
+  // only inside `attachHostBehavior`, so an absent behavior means an absent entry in each.
+  const behavior = node.hostBehavior;
+  if (behavior === undefined) return;
   // Drop a deferral the node never got to run. NO TEST CAN SEE THIS, and it is kept anyway —
   // stated rather than left as apparent coverage. The `isCommitted` predicate in the drain already
   // stops such a node from firing, so removing this line changes no observable behaviour; what it
@@ -825,28 +842,29 @@ function detachOne(
   // consequence if forgotten: a torn-down node would keep being asked to reconcile props against a
   // subtree that has left the tree, on every commit, forever.
   committedEachTime.delete(node);
-  // The map, not the registry: by here only the Fabric name is left on the node.
-  attached.get(node)?.detach(node);
+  behavior.detach(node);
 }
 
 // Re-arms a node the sweep tore down but that the framework put back. Called from appendChild and
 // insertBefore, and it is a WeakSet miss — no walk at all — for every node in a freshly built
 // tree, which is the path that runs ~9 000 times per benchmark create.
 export function reattachHostBehaviors(node: ISymbioteNode): void {
-  if (!tornDown.has(node)) return;
+  if (!node.isTornDown) return;
   reattachSubtree(node);
 }
 
 // Flat for the same reason the detach walk is, and with nothing to reconcile: this one always
 // descended into every child, whatever the node's own mark said.
 function reattachSubtree(root: ISymbioteNode): void {
-  for (const node of subtreesOf([root])) reattachOne(node);
+  // Narrowed like the teardown that marked them: `reattachOne` acts only on a node the sweep
+  // marked, and the sweep marked exactly what this walk returns.
+  for (const node of teardownSubtreesOf([root])) reattachOne(node);
 }
 
 function reattachOne(node: ISymbioteNode): void {
-  if (tornDown.has(node)) {
-    tornDown.delete(node);
-    const behavior = attached.get(node);
+  if (node.isTornDown) {
+    node.isTornDown = false;
+    const behavior = node.hostBehavior;
     behavior?.attach(node);
     // Re-arm the deferred half too. A parked node usually returns with its tag intact, so this
     // fires on the next drain — but re-arming is what keeps `attach` and `attachAfterCommit` a

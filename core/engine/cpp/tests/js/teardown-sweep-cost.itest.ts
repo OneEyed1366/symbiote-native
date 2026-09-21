@@ -198,16 +198,29 @@ describe('tearing down a thousand rows', () => {
     print(
       `DEBUG clear ATTACHED  fill=${measured.fill.toFixed(2)} ` +
         `apply=${measured.apply.toFixed(2)} commit=${measured.commit.toFixed(2)} ` +
-        `total=${total.toFixed(2)} ms over ${ROWS * NODES_PER_ROW} torn-down nodes`,
+        `total=${total.toFixed(2)} ms over ${ROWS * NODES_PER_ROW} removed nodes`,
     );
-    // THE SPLIT that decides what to do next: `subtreesOf` is the crossing, everything else in the
+    // THE SPLIT that decides what to do next: the host read is the crossing, everything else in the
     // commit delta is the JS loop above it.
+    //
+    // HANDLES IS NOT THE NODE COUNT and has not been since the walk was narrowed: what crosses is
+    // each root, each tagged node and each node between them — here two per row against ten removed.
+    // The per-handle figure therefore RISES when the narrowing works, because the C++ walk still
+    // visits every node and only the handle creation is saved. Read the total, not that column.
     print(
-      `DEBUG clear ATTACHED  subtreesOf=${measured.hostReadMs.toFixed(2)} ms ` +
+      `DEBUG clear ATTACHED  teardownSubtreesOf=${measured.hostReadMs.toFixed(2)} ms ` +
         `for ${measured.hostReadHandles} handles ` +
         `(${((measured.hostReadMs * 1000) / Math.max(measured.hostReadHandles, 1)).toFixed(2)} us each), ` +
         `rest of the sweep=${(measured.commit - measured.hostReadMs).toFixed(2)} ms`,
     );
+    // THE NARROWING, asserted rather than printed — it is a COUNT, so it holds on either build and
+    // it is the only thing here that can go red. Two handles per row: the row itself, because the
+    // sweep was handed it as a root, and the one node carrying a tag. The other eight are plain
+    // views with no behavior anywhere beneath them, and a teardown has nothing to say to them.
+    //
+    // A regression that widened the walk back to ten thousand would leave every correctness test
+    // green and cost ~2 ms per thousand rows, which is precisely the shape this file exists for.
+    expect(measured.hostReadHandles).toBe(ROWS * 2);
     expect(total > 0).toBe(true);
   });
 });

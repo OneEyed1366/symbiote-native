@@ -647,11 +647,546 @@ porting ANY further RN module by hand.**
 > So the buffer architecture did not pay off where it was expected to, and the gains it does show are
 > framework-level rather than architectural.
 >
-> ### The provisional replacement — THE WHOLE BENCHMARK SCREEN, headless (2026-09-17)
+> ### THE STOCK COLUMN BELOW WAS TAKEN ON A BENT RULER. Corrected 2026-09-21.
+>
+> `stock-suite.itest.tsx:52` built its text input as `h('RCTSinglelineTextInputView', …)` — a bare
+> Fabric view with nothing above it — while all five adapter arms built `h('text-input', …)`, which
+> reaches a host behavior that seeds a prop, wires four listeners and attaches a press machine. Both
+> commit ONE node named `TextInput`, so **the census oracle could not see it**, and it stood for as
+> long as the suite has existed. `examples/bare-rn:413` mounts `<TextInput>`, so the DEVICE baseline
+> never had this gap — only the headless one, and in the direction that flatters stock.
+>
+> Priced in `stock-text-input-cost.itest.tsx`, same tree, byte-identical census, three runs:
+> **RN's own `TextInput` costs 50-53 us per instance**; our `text-input` tag costs **15-17 us**
+> (`reconciler-floor.itest.tsx`). So the substitution was worth ~52 ms of a thousand-row create,
+> charged to nobody, and we are 3.4x CHEAPER than stock on the one component it hid.
 >
 > The eight device steps, in the device's order, with the device's constants, driven through all six
 > renderers. One file per arm, one process per arm, one ten-node row, the census asserted by absolute
-> count on EVERY step before any millisecond is read. `pnpm run bench:itest`, one clean sitting:
+> count on EVERY step before any millisecond is read. `pnpm run bench:itest`, one clean sitting,
+> **2026-09-21 after the teardown-sweep cuts below**, with stock's row corrected to RN's own
+> component:
+>
+> ```
+>               stock   react     vue   solid  svelte  angular      ratio = ours / stock
+> Create        153.9   127.2   155.4   106.0   115.7    162.7      0.83 1.01 0.69 0.75 1.06
+> Replace       162.6   137.8   169.5   113.3   131.1    181.0      0.85 1.04 0.70 0.81 1.11
+> Partial        35.0    10.3    13.0     6.8     9.0     10.3      0.29 0.37 0.19 0.26 0.29
+> Select         13.8    13.9    13.7    15.3    13.6     13.8      1.01 0.99 1.11 0.99 1.00
+> Swap           17.8    23.7     6.4     6.4     7.0      5.6      1.33 0.36 0.36 0.39 0.31
+> Remove         20.5     5.4     5.0     5.4     5.5      5.7      0.26 0.24 0.26 0.27 0.28
+> Append        186.0   136.3   153.1   115.3   131.3    172.7      0.73 0.82 0.62 0.71 0.93
+> Clear          14.8    16.6    20.9    28.9    16.2     22.3      1.12 1.41 1.95 1.09 1.51
+> ```
+>
+> **NO ARM CARRIES AN EXEMPTION ANY MORE.** Angular's `select` and `remove` were exempt from the
+> write oracle until 2026-09-21 and now report the same counts as every other column, which is what
+> makes all six readable together for the first time — and its `select` lands on stock's own figure
+> to the tenth. See "ANGULAR'S `select` DEFECT IS FIXED" below.
+>
+> **Every adapter is at or under stock on the three create-shaped rows, Angular's excepted, and
+> Vue's Create/Replace sitting on the line.** THE RATIOS MOVE ±0.08 BETWEEN SITTINGS and the whole
+> machine drifts with them — sittings an hour apart the same day read stock's Create at 141.1, 151.8
+> and 153.9, and React against it at 0.90, 0.86 and 0.83. Read a band, not a figure, and never
+> compare a row against one taken in another sitting. A sitting taken while the full suite was still
+> settling put Svelte's Create at 203.4 against its usual 116 — when a column moves by 75% the
+> machine moved, not the code.
+>
+> `Clear` has its own spread of ±1.5 ms; min-of-3 against a stock 13.8 reads react 15.5 · svelte
+> 15.3 · vue 19.8 · angular 21.1 · solid 25.7.
+>
+> **THE SIX ARMS ARE STRUCTURALLY IDENTICAL ON CREATE, which is what licenses reading the columns
+> against each other at all** — every adapter reports `created=10000 setProps=10000 batches=2
+> nodes=10003`, with `walk` 25.8-26.9 and `apply` 44.0-47.6. The `WRITES` gap this page once
+> recorded (Angular 17002 against Solid 15001, "the cheapest open lead on this page") is CLOSED: no
+> adapter writes a prop another does not. So Angular's 57 ms over Solid is pass 1 and nothing else,
+> and the engine is ruled out by assertion rather than by argument.
+>
+> **WHAT IS LEFT, and both are attributable rather than open.** React's `Swap` at 23.4 against 12.7
+> is the mutation-mode tax `<M1 + M2>` chose deliberately — measured at ≥15 ms with `insertBefore`
+> replaced by a no-op, so the engine cannot remove it and no other adapter pays it. Solid's `Clear`
+> is 2 000 drains from `cleanChildren` reading between every two removals, ~5 ms of its 25.7 at the
+> measured 2.6 us per drain.
+>
+> THE GENERAL FORM, and it is the third time this page has had to write one: **a census counts NODES,
+> and two trees with the same nodes can still be built by different amounts of code.** The earlier
+> two were a missing `TextInput` (read as 1.31x) and Angular's flat row (identical structural
+> counters, 19% of the prop keys absent). This one is sharper than both — the node was present, the
+> name matched, the count matched, and the component above it was missing. When an arm names a HOST
+> COMPONENT where its counterpart names a primitive, the two are not one workload however the census
+> reads.
+>
+> Solid's `Clear` at 402 ms was the largest single anomaly here and is **FIXED** — see below. The
+> table above still carries the old figure; the corrected row is 38.2 ms.
+
+### THE BOUNDARY, PRICED: a drain cost 5.5 us and 2.8 of it was four type checks
+
+A read is a batch boundary, so a framework that navigates the tree it is building enters `applyOps`
+once per MUTATION rather than once per commit. `solid-js/universal`'s `cleanChildren` does exactly
+that — 2 000 entries to clear a thousand rows — and Vue and Solid both make 101 on a `partial`. So
+what one entry costs is the price of asking the host a question at all, and nothing had measured it.
+
+`small-batch-crossing-cost.itest.ts` does, in one process: the same thousand removals once as ONE
+batch and once as a thousand, with the committed tree asserted identical first.
+
+```
+                         before    after
+ drain, all in           5.54 us   2.76 us     one extra drain, end to end
+   of which the crossing 4.88      2.05
+   of which ours         0.70      0.70        `takeBatch` — six allocations, and NOT the cost
+ prologue, empty batch   4.38      1.54        2.8x
+ bare JSI host call      0.13      0.13        the floor, and the control that made this findable
+```
+
+**THE CONTROL IS WHAT TURNED THIS FROM A SHRUG INTO A TARGET.** `performance.now()` is a host
+function taking no arguments, so it prices the CALL and nothing else: 0.13 us. Against a 4.4 us
+entry that is a factor of 34, which says the cost is work we do on the way in rather than anything
+JavaScriptCore charges for crossing.
+
+**TWO GUESSES WERE WRONG BEFORE THE BISECT FOUND IT**, and both are worth not repeating. Caching
+`UIManagerBinding::getBinding` per runtime and interning the three `PropNameID`s that
+`int32ArrayData` builds from UTF-8 on every call together moved 4.46 -> 4.38 us — 1.8% of the
+prologue, against the 4.38 -> 1.54 the real cause gave.
+
+**BOTH WERE REVERTED THE SAME DAY, and the reason outranks the 0.08 us.** Each was keyed on
+`&runtime`, which treats an ADDRESS as a lifetime, and an allocator reuses addresses.
+`symbiote_tree_tests` builds and tears down a JSCRuntime per case, so the interned `PropNameID`s
+outlived the runtime that minted them and the suite aborted in `~JSCRuntime`: *"destroyed with a
+dangling API string"*. The UIManager cache had the same flaw one step quieter — a second runtime
+landing on a freed address inherits a dangling binding, which is a crash rather than a wrong number,
+and its own comment claimed the pointer key was what made it safe.
+
+**IT WENT GREEN ON `bench:itest` AND RED ON CI**, which is the part to carry forward: `test:itest`
+is `test:cpp && run-itests.mjs`, and the gtest half is the ONLY arm that constructs more than one
+runtime. Every JS fixture runs against one runtime for the life of the process, so a lifetime bug in
+the engine is invisible to all 476 of them. **Run `pnpm run test:cpp` before believing a C++ change,
+not just the itests.**
+
+The cost was `arguments[n].asObject(runtime).asArray(runtime)`, four times. The checking pair runs an
+`isObject` and an `isArray` per table, eight JSI round trips for four arguments, and dropping them to
+`getObject`/`getArray` took the prologue to 1.54 us in one edit. That 1.54 was read with the two
+caches still in; re-measured without them on a noisy machine the same fixture reads 2.1-3.9 us, so
+it carries NO verdict either way — the spread is twenty times what the caches were ever worth.
+
+**IT IS NOT AN UNCHECKED SHORTCUT, it is the harness's own split used for once.** `takeBatch` is the
+only producer on this wire, and `jsi::Value::getObject` / `Object::getArray` carry `assert`s that are
+LIVE in `core/engine/cpp/tests/build` — Debug with `NDEBUG` off, which is the entire reason that
+build exists. A malformed batch aborts there; the build that ships pays nothing. Verified by running
+the whole suite on both builds, 91 files green on each.
+
+`parentsOf` and `subtreesOf` keep their checks deliberately: those are the BATCHED reads, entered
+once per teardown sweep rather than per mutation, so the check costs nothing measurable and is worth
+having.
+
+Solid's `Clear` fell 38.2 -> 32.9 ms on the suite, which is 2 000 drains times the 2.8 us saved and
+is what the arithmetic predicted.
+
+### A CENSUS CANNOT SEE A REPAINT — Angular's `select` measured a step that never happened
+
+> **THE DEFECT IS FIXED** (same day, `SymbioteRendererFactory.dispose`). This section stands because
+> the INSTRUMENT is the lasting part: a write counter beside every step is what found a step that
+> committed the right tree and did nothing. The cause and the fix are under "ANGULAR'S `select`
+> DEFECT IS FIXED" above.
+
+The suite's per-step counters, added 2026-09-21 and printed on every row rather than only on the two
+create-shaped ones, say it plainly: on the identical step every adapter writes `setProps=1
+batches=2` and **Angular writes `setProps=0 batches=0`**. Its `select` was then the fastest column of
+the six — 2.2 ms against 11-14 — which is what a step that does nothing looks like. The single write
+surfaced two steps later, in `remove`, where Angular alone reported `setProps=1`.
+
+**NO ORACLE IN THE SUITE COULD SEE IT.** A selection repaints one row and adds no node, so the node
+census matched throughout. Third time on this page, and the sharpest: the tree was right, the counts
+were right, and the work was absent.
+
+`PROPS_PER_STEP` in `bench-suite.ts` is the second oracle now — what each step must WRITE, which is a
+property of the workload rather than of any renderer, and all five adapters agree on it. It went red
+on Angular and nowhere else the first time it ran.
+
+Narrowed in `angular-select-reaches-fabric.itest.ts`, four cases, and the matrix is the finding:
+
+```
+ component row, no preceding replace          PAINTS
+ component row, after a keyed replace         DARK
+ component row, composed host NOT registered  DARK    <- so `registerComposedComponent` is innocent
+ row markup INLINED into the @for             PAINTS  <- so @for + the signal + our renderer are fine
+```
+
+So: **once `@for` has torn its embedded views down and rebuilt them, a component INPUT driven by a
+signal read in the parent's template stops updating; an inlined binding in the same template keeps
+updating.** Sixteen alternating microtask/timer rounds do not change it, so it is not the fixture's
+settle — that was checked before anything was concluded.
+
+WHAT IT IS NOT, each ruled out by a case rather than by argument: our composed-host registry, our
+renderer's structural path, the scheduler's patience, and the arm's single-signal state shape (the
+same shape paints before a replace).
+
+The Angular column's `select`, `swap` and `remove` are NOT comparable until this is fixed, and the
+arm says so in its own output — `unappliedSteps` on `IBenchDriver` makes the suite print `NOT
+APPLIED` for the step instead of silently passing. An exemption there without a named reproduction
+is a bug being hidden.
+
+### `firstChildOf` was `childrenOf(node)[0]` — the same quadratic `nextSiblingOf` had, one door along
+
+Solid's `Clear` read 402-435 ms against stock's 14 while the engine's own halves read `walk=0.1
+apply=13.8 fabric=2.1`. So ~410 ms was JS above the engine, and nothing said what SHAPE it had.
+
+**A FACTOR, NOT A MILLISECOND** (`solid-clear-scaling.itest.tsx`): linear work doubles when the list
+doubles, quadratic quadruples. Widths 250/500/1000/2000, three samples each, a FRESH list per sample
+because a cleared list has nothing left to remove:
+
+```
+                 before                      after
+ 250 rows          8.9 ms                      3.6 ms
+ 500 rows         28.8 ms                      7.7 ms
+1000 rows        110.6 ms                     16.3 ms      6.8x
+2000 rows        435.1 ms                     35.4 ms     12.3x
+ doubling    3.25 3.84 3.94              2.15 2.11 2.17
+childHandles     2 001 001                         1
+```
+
+**THE CALL COUNTS WERE LINEAR AND THE WORK WAS NOT, which is why a crossing counter alone would have
+missed it.** `childrenOf` was entered 2 002 times for 2 000 rows — perfectly linear — while the
+HANDLES those calls returned came to 2 001 001, N(N+1)/2 to the unit. `solid-js/universal`'s
+`cleanChildren` empties a parent with `while (removed = getFirstChild(parent)) removeNode(parent,
+removed)`, and `firstChildOf` was spelled `childrenOf(node)[0]`, so it read a list of N, then N-1,
+then N-2, building and discarding every handle each time. **Count what a read RETURNS, not how often
+it is made.**
+
+The fix is the one this repo already made for `nextSiblingOf` and did not sweep for: its own host
+member, `Tree::firstChildOf`, scanning the vector in place and crossing exactly one handle. Anchors
+included and a dead handle SKIPPED, both matching `childrenOf` element for element — `cleanChildren`
+terminates on `undefined`, so answering it early would orphan every child behind a dead one.
+
+`solid` is the only caller today (`renderer.ts:309`), so no other column moved. What stays linear is
+`applyOps`, still one drain per read because a read is a batch boundary and every removal really does
+change the answer — 2 001 batches for 2 000 rows, which is the next thing in that step.
+
+**THE GUARD IS THE HANDLE COUNT, not the clock**: the fixture asserts the widest arm crosses fewer
+than 4x the row count, so the quadratic cannot come back quietly while the milliseconds drift.
+
+### The teardown sweep crossed TEN handles to release ONE machine (2026-09-21)
+
+`clear` was the one row where all five adapters lost to stock, and the engine's own floor for it —
+a thousand rows removed one at a time, no reconciler above — was 6.58 ms, of which **5.45 was the
+sweep**. Three cuts took it to 4.32, all measured on `build-release` with
+`teardown-sweep-cost.itest.ts`:
+
+```
+                                         sweep JS   host read   engine clear floor
+ as it stood                                3.55       1.67            6.58
+ `isTornDown` a FIELD, behavior-less
+   nodes leave `detachOne` early            3.04       1.67            5.92
+ `node.hostBehavior` a FIELD too            2.75       1.67            5.55
+ the WALK narrowed                          1.72       1.41            4.32
+```
+
+**The first two are the `slotBatch` trick again**: `tornDown` was a `WeakSet` and `attached` a
+`WeakMap`, both keyed by node, both read on paths whose size is the tree's — and `node.payloadFold`,
+written on the very next line of `attachHostBehavior`, had already made the argument. Nine of every
+ten nodes in a removed subtree carry no behavior, so `detachOne` now marks them and returns before
+the two `Set.delete`s that were never going to find anything.
+
+**The third is the one worth reading.** `subtreesOf` hands back every node of a removed subtree, and
+the sweep's cost IS that width. `teardownSubtreesOf` narrows it to three kinds — each ROOT, each node
+carrying an intrinsic TAG (which `kOpSetTag` sets from `attachHostBehavior` and nowhere else, so a
+non-empty `tagName` is exactly "a behavior attached here"), and each node BETWEEN the two. On the
+benchmark row that is 2 handles of 10, asserted by absolute count in the fixture.
+
+**THE ANCESTOR LEG IS WHAT MAKES IT SOUND, and this page had recorded the narrowing as impossible for
+want of it** — "marking only the detach ROOTS would cut the sweep to a tenth, but a framework that
+removes a parent and then re-inserts one of its CHILDREN elsewhere would find that child unmarked".
+True of a ROOTS-only mark and false of this one: an ancestor of a tagged node is marked, so the
+interior node a framework brings back alone still walks. A node with no behavior anywhere beneath it
+is the only thing dropped, and there is nothing under it to re-arm. Guarded in
+`host-behavior.test.ts` ("re-arms a behavior under an interior node the framework brings back
+alone"), written and run GREEN before the narrowing landed, which is what makes it a guard rather
+than a description.
+
+**Not for an app that animates.** `detachAnimatedProps` is per node and carries no tag, so
+`host-access.ts` asks for the full walk whenever a binding exists — one boolean, the same gate
+`anyBinding` already is.
+
+On the suite, min-of-3, against a stock `clear` of 13.8:
+
+```
+             before   after    of stock
+ react        18.8     15.5      1.12      was 1.24
+ svelte       19.5     15.3      1.11      was 1.28
+ vue          25.0     19.8      1.43      was 1.64
+ angular      25.6     21.1      1.53      was 1.68
+ solid        29.6     25.7      1.86      was 1.95
+```
+
+**Solid barely moved, and its clear is now fully split — the ceiling is SOLID'S, not ours.**
+`small-batch-crossing-cost.itest.ts` runs `cleanChildren`'s own shape through our two entry points
+with no framework above them (`while (removed = firstChildOf(list)) removeChild(list, removed)`,
+`solid-js/universal/dist/universal.js:164` verbatim), with the emptied parent and the drain count
+asserted first:
+
+```
+ ours, the whole pair        5.3 us per removal      of which applyOps 2.2 · ours above it 3.1
+ solid's suite step         11.8 us per removal      `solid-clear-scaling.itest.tsx`, 2 000 rows
+ the difference              6.5 us                  solid-js disposing 2 000 row components
+```
+
+So on a 2 000-row clear the engine and our wrappers are ~10.6 ms and Solid's reactive teardown is
+~13 ms — **which is stock's entire clear on its own.** Taking our half to zero would land Solid level
+with stock and no better, so the row is not ours to win, and a drain-elimination scheme would buy
+~4 ms of 23.6 for a JS-side child cache the architecture exists to refuse.
+
+**The loop is not overridable**, checked in the vendor rather than assumed: `cleanChildren` is
+internal to `solid-js/universal`'s `createRenderer`, and what we supply is `getFirstChild` /
+`removeNode`. Both of our implementations are three lines (`adapters/solid/src/renderer.ts`), and
+`requestCommit` is guarded by `commitScheduled`, so neither is where the 6.5 us goes.
+
+**AND THE FIXTURE LIED TO ITSELF ONCE MORE ON THE WAY** — `countCrossings` installs a wrapper over
+the standing host, so the second case calling it wrapped the wrapper and every `applyOps` counted
+twice. It reported 2 000 crossings for 1 000 removals and its own oracle called that a finding.
+Same shape as the telemetry drain below: **a fixture's own setup is state the next case inherits.**
+
+### `clear`, fully attributed — the engine is 3-5 ms of it and the framework is the rest (2026-09-21)
+
+The suite's `clear` runs after `append`, so it tears down ~2 000 rows / 20 000 nodes. Read the
+`apply` column — which carries our C++ half AND the Fabric commit inside it — against the wall:
+
+```
+            wall    apply   fabric   batches      the framework's own teardown
+ stock      14.9      —        —        —          14.9, all of it
+ svelte     16.9     3.2      1.7       2          13.7
+ react      17.5     2.9      1.9       2          14.6
+ angular    22.7     2.8      1.9       2          19.9
+ vue        22.8     3.9      2.5       2          18.9
+ solid      27.9     5.3      2.0     2000         22.6
+```
+
+**React's arm is React's own unmount plus our engine, and it adds up exactly**: stock's whole step is
+14.9, our React arm's half above the engine is 14.6 — the same reconciler doing the same work — and
+our engine is the 2.9 on top. So the entire React deficit on this row is 2.9 ms, of which 1.9 is
+Fabric's own commit that stock pays too. **What is ours is about 1 ms on twenty thousand nodes.**
+
+**Svelte's framework teardown is already UNDER stock's entire step** (13.7 against 14.9), which is why
+it lands at 1.07x with our engine on top.
+
+Vue, Angular and Solid lose this row to their own frameworks: 19-23 ms disposing 2 000 component
+instances, against an engine contribution indistinguishable from React's. Angular's is the shape this
+page already priced at ~81 us per row instance; Solid's is the 6.5 us per removal split out above.
+**No engine change reaches any of it**, and the three cuts recorded here took the part that IS ours
+about as far as it goes.
+
+**One thing was measured and NOT taken**: `subtreesOf`'s `.filter(isSymbioteNode)` is 0.6 ms of the
+walk (2.75 -> 2.16 with the host's array returned unnarrowed). It is the type narrowing, not a
+defensive check, and removing it costs either an `as` or declaring `ITreeHost.subtreesOf` to hand
+back our own type — which is what that `object` boundary exists to refuse. Recorded so the next
+reader does not re-measure it.
+
+### ANGULAR'S `select` DEFECT IS FIXED — one shared renderer, and `destroy()` meant two things (2026-09-21)
+
+Two rows of the Angular column were exempt from the write oracle for a fortnight: `select` reported
+`setProps=0 batches=0` and read 2-5 ms — a step that did not happen — while `remove` reported
+`setProps=1` where every other adapter reports 0, two steps after the selection that asked for it.
+It is fixed, and both exemptions are gone.
+
+**FOUND BY ASKING EACH LAYER IN TURN**, which is the reusable half. The committed payload says only
+that the row is dark; it cannot say whose fault that is. Four questions, four instruments, and the
+answer is the FIRST one that says no:
+
+```
+ did Angular re-evaluate the binding?      an @Input() SETTER that counts        1 call, value true
+ did the child re-render?                  a GETTER the template reads           1 read, value true
+ did our Renderer2 get called?             `readAngularProfile().rendererWrites` 3 writes
+ which props?                              `readAngularProfileDetail()`          the 3 selected keys
+ did it reach the engine?                  `readSurfaceTelemetry().setProps`     0
+```
+
+Every layer but the last. So Angular was innocent — and this page had recorded the defect as living
+in "the component-input path", which the setter disproves in one line.
+
+**THE CAUSE: `SymbioteRendererFactory` hands ONE renderer to every component on the surface**
+(`this.renderer ??= new SymbioteRenderer(...)`, deliberately, so every component's mutations collapse
+into one coalesced commit). Angular calls `Renderer2.destroy()` per destroyed component, and a keyed
+`@for` replace destroys a thousand of them. That `destroy()` released the renderer's `beforeFlush`
+registration — the ONE door a style run has, since `setStyle` accumulates per node
+(`ɵɵstyleMap` decomposes `[style]` into a call per key) and `flushOps` is what asks a renderer for
+what it holds. The instance went on serving every surviving view, writing into an accumulator nothing
+would publish. It only reached Fabric when some OTHER node's `openStyleRun` closed the run — which is
+exactly why the write surfaced two steps later.
+
+**THE FIX IS A LIFETIME, not a flush.** `destroy()` publishes what it holds and nothing more;
+`SymbioteRendererFactory.dispose()` releases the registration, and `render/index.ts`'s `teardown`
+calls it after Angular's own destroys. The registration now follows the SURFACE, which is what the
+instance's scope always was.
+
+**Break-tested**: restoring the release turns the new unit test red on its own assertion
+(`adapters/angular/src/renderer/renderer.test.ts`, "keeps publishing styles after Angular destroys
+the shared renderer") and nothing else. Its first spelling failed on a typo instead — **a RED that
+throws is not a RED that fails**, and re-running it until the message was an assertion is what made
+it a guard.
+
+**Confirmed on device 2026-09-21**, which is the half a headless counter cannot give: `Create 1,000`
+-> `Replace all` -> tap a row on `examples/angular`'s `BenchmarkScreen` repaints it immediately, and
+leaving the screen and returning keeps styles publishing. Those two taps ARE the defect and the two
+halves of the fix — the keyed `@for` + `@Input()` shape at `src/screens/BenchmarkScreen.ts:850-854`,
+and `dispose()` following the surface.
+
+```
+              before        after      every other adapter
+ select        2.1-2.3      13.8       13.6-15.3    setProps 0 -> 1, laidOut 1502 -> 7000
+ remove       13.1-14.6      5.7        5.0- 5.5    setProps 1 -> 0, laidOut 6993 -> 1001
+```
+
+Angular's `select` now lands on stock's own 13.8 to the tenth, and its `remove` is 0.28x of stock
+like everyone else's. **The two figures were never Angular being fast or slow; they were the same
+write, mis-filed.**
+
+One thing this cost that is worth not re-deriving: the characterization cases pinned to the BROKEN
+answer are what made the fix recognisable — the experiment that confirmed the cause turned them red,
+which is the signal a pin exists to give. They are ordinary positive cases now, and the four-layer
+probe stays as a case of its own, because a regression can re-break any of the four and the printed
+line says which.
+
+### `laidOut` — the column that explains the whole table, and it exonerates `select` (2026-09-21)
+
+`select` changes ONE row's style and spends 7.9 ms of its 11-15 in `layout`, on a step that clones
+three nodes and writes one prop. Every engine counter says the commit did almost nothing, so the
+time had to be Fabric's — or it had to be us handing Fabric more than changed, and nothing on the
+line could tell those apart. RN's own commit telemetry already carried the answer
+(`getAffectedLayoutNodesCount`, `getNumberOfTextMeasurements`) and the suite simply never printed it.
+
+**AND THE STOCK ARM CAN BE ASKED THE SAME QUESTION**, which is what makes the column mean anything:
+`readSurfaceTelemetry` takes a SURFACE id, so it answers about a tree React's own renderer drove with
+our engine nowhere in the path. It is read off `__symbioteEngineNative` directly, because that file
+carries `@symbiote-platform-extensions` and importing `@symbiote-native/engine` there kills the
+bundle at `Platform.ios.js`.
+
+```
+ step       stock   react     vue  svelte   solid        wall: stock -> react
+ create      7001    7002    7002    7002    7002        140.2 -> 119.0
+ replace     7001    7002    7002       —    7002        151.2 -> 128.5
+ partial     1501    1502    1502       —    1502         27.3 ->   9.3
+ select      6999    7000    7000    7001    7000         12.1 ->  11.4
+ swap        6995    1002    1002    1003    1002         14.5 ->  21.8
+ remove      6988    1001    1001    1002    1001         15.5 ->   4.6
+ append     13988    8001    8001    8002    8001        169.2 -> 129.5
+ clear          1       2       2       —       2         14.2 ->  14.2
+```
+
+**`select` IS FABRIC'S, to within one node.** A layout-dirty style change on one row of a thousand
+re-lays out the whole tree, and it does so for the stock renderer exactly as for ours — 6 999 against
+7 000. The suite's selected style adds `borderLeftWidth` on purpose, because the device screen does;
+this is what that costs, and it is not ours to remove. The paint-only spelling is still 6.5x cheaper
+(`update-shapes-cost.itest.ts`), and that remains an AUTHORING choice, not an engine one.
+
+**WHERE WE WIN, THIS COLUMN IS THE REASON.** On `swap`, `remove` and `append` stock re-lays out
+~7 000 or ~14 000 Yoga nodes where we lay out ~1 000 or ~8 000 — a targeted replace against a
+persistent renderer handing Fabric a rebuilt path. `Remove` is the sharpest: 6 988 against 1 001, and
+the wall follows it 15.5 against 4.6. The thesis of this project shows up here as a node count before
+it shows up as a millisecond.
+
+**AND IT CORROBORATES THE ANGULAR DEFECT from a direction nothing else reaches.** Angular's `select`
+reads `laidOut=1502` — the PARTIAL step's number, not select's — while its `remove` reads 6 993,
+which is select's. The displaced write this page already records shows up as displaced LAYOUT, on an
+instrument that knows nothing about prop counts.
+
+One mechanical consequence: stock used to be exempt from the write oracle by passing no telemetry at
+all, and it now passes Fabric's half. The exemption is a named flag (`drivesEngine: false`) rather
+than a zero, because `setProps=0` is also exactly what a step that silently failed to apply reports —
+and telling those two apart is the entire job of that oracle.
+
+### The JS half of a create, split at last — and the engine is still 0.92x of a bare Fabric driver
+
+Every create-shaped row splits into an `apply` the C++ side accounts for line by line and a
+REMAINDER the adapter and the engine share, with nothing ever said about it. On the engine's own arm
+— no reconciler above it at all — that remainder is ~23 ms of pure JavaScript for 10 003 nodes and
+13 003 props, not a byte of which has crossed the boundary. It was the largest unattributed number
+on this page. `fill-phase-cost.itest.ts` times the three calls an adapter makes per node in three
+passes over one tree, nothing flushed until every clock has stopped:
+
+```
+ create   12.3-13.8 ms    1.19-1.38 us per node      45-48%
+ prop     10.3-10.7 ms    0.79-0.82 us per write     36-38%
+ append    4.7-4.9 ms     0.47-0.49 us per append    17-18%
+```
+
+**A creation costs more than a prop write, which inverts the intuition** — a prop write is the
+engine's hottest path BY CALL COUNT (13 per row against 10 creations) and has been optimised as such,
+while `createElement` allocates a node, records an op, asks the behavior registry and asks the
+ViewConfig registry. Per-call it is the dearest of the three.
+
+**AND THE PROP AVERAGE HIDES A 1.8x SPLIT**, so it is taken by key kind in the same pass:
+
+```
+ style    5.0 ms    1.25 us per write    4 per row + the list's
+ scalar   5.6 ms    0.70 us per write    8 per row
+```
+
+A style write costs nearly what a node creation does. It is not one lump: `stylePartsOf` allocates
+the parts record on a node's first style write, `isSameShallowStyle` compares against what stands,
+`sharedStylePair` takes a `WeakMap.get` (which is already why a hoisted `StyleSheet.create` constant
+shared by a thousand rows allocates ONE published array, not a thousand), `isAlreadyPublished` reads
+the slot back, and only then does `setProp` record. Five steps of ~0.1-0.2 us each, none dominant.
+**Not taken**: 5 ms of a 29 ms fill, of a 72 ms engine, of a 106-164 ms create — 3-4% at best, in
+the most delicate code in the engine, where the class merge, the `setNativeProps` restore path and
+the published marker all meet.
+
+**AND THE WHOLE THING IS BELOW THE FLOOR ANYWAY, re-confirmed on today's engine.**
+`raw-fabric-vs-engine.itest.ts` builds the identical tree through `createNode`/`appendChild`/
+`completeRoot` with no retained tree, no diff and no buffer:
+
+```
+ raw driver     77.9-79.2 ms      build 68.8-70.2 · completeRoot 8.7-9.1
+ the engine     71.4-72.9 ms      fill 22.5 · apply 15.3 · commit 33.5-35.1      0.92x
+```
+
+Same census both arms. So the engine — retained tree, clone-on-write, payload building and all —
+costs LESS than a driver that does nothing but call Fabric, and roughly half of what it does spend
+is Fabric's own commit. **There is no create-path win left in the engine worth the name**, and an
+adapter's deficit against stock is its own reconciler: on a 10 000-node create the engine is ~72 ms
+and the framework above it is ~35 ms (Solid), ~57 (React) or ~90 (Angular).
+
+**TWO THINGS MEASURED AND NOT TAKEN**, both recorded so they are not re-derived:
+
+- `configPayloadFold(component)` is one `Map.get` per node and **0.17 us of `createElement`'s 1.24**
+  — 13% of the creation, ~1.3% of a create. Measured by subtraction with the call stubbed out
+  (12.9 -> 11.2 ms over 10 000 nodes), then reverted.
+- **THE REGISTRY MISS COSTS NOTHING, and this is a NEGATIVE RESULT that kills a change.**
+  `createElement` asks the behavior registry about every node, and for nine in ten it is a guaranteed
+  miss: the registry is keyed by intrinsic TAG (`pressable`) while an untagged node passes its FABRIC
+  view name (`RCTView`). Timed as a real before/after — `hasHostBehaviors()` is monotone, so the cold
+  arm has to be the FIRST case in the file — the armed build comes back **faster**, run after run
+  (23.5 -> 22.4, 22.8 -> 22.1, 23.8 -> 23.4). Ten thousand failed lookups are smaller than the
+  warm-up the first build pays. So making `tag` optional so an untagged node never reaches
+  `attachHostBehavior` buys nothing, and it would break every test that registers under a Fabric name
+  and creates with `createElement(THAT_NAME)` — which is most of `host-behavior.test.ts`, by an
+  accident this page already records.
+
+One cross-check falls out and is worth keeping: the untagged build is ~22-23 ms and the tagged split
+totals ~27-28, so the thousand REAL attaches cost ~5 ms — about 5 us each, which is what
+`reconciler-floor.itest.tsx` independently prices a tagged primitive's `attach` half at (6.8-7.7 us).
+Two instruments, one number, neither built for the other.
+
+**A MONOTONE GATE MAKES ITS BEFORE-ARM UNREPEATABLE, so that pair can never carry an assertion.**
+`hasHostBehaviors()` turns on and never off, so the cold arm exists exactly once per process and
+best-of-N is not available to it — which is the sampling this page already requires of any small-ms
+comparison. A 1.5x tripwire on the ratio duly went red in the full release suite (29.2 against 49.6,
+a process per file and a sample descheduled for longer than the work) while the same pair reads
+23.5 / 22.4 run alone. The bound came out; the census and prop-count oracles on both arms stayed.
+**Any before/after separated by a one-way switch is a print, not a gate.**
+
+### A counter that ZEROES ON READ is charged to whoever reads next (2026-09-21)
+
+`reconciler-floor.itest.tsx`'s behavior arm reported `setProps` 12 006 where the tree writes 12 003,
+and the case's own oracle called the 3-prop difference a finding. It was the case ABOVE it: that one
+ends by mounting an empty list to time the teardown, reads no telemetry afterwards, and
+`readSurfaceTelemetry` resets on read — so the replacement container's two creations and three prop
+writes sat in the counters until the next arm read them.
+
+**A fixture that commits without reading hands its counters to the next one.** Drain them, or the
+oracle you wrote to catch a real drift catches the file's own housekeeping instead.
+>
+> ### SUPERSEDED — the same suite before the stock row was corrected (2026-09-17)
+>
+> Kept because the adapter columns are sound and were measured directly; only the column they are
+> read against was wrong. Every ratio in it is void.
 >
 > ```
 >               stock   react     vue   solid  svelte  angular      ratio = ours / stock
@@ -1737,6 +2272,57 @@ since this paragraph was written, not this bug. **Do not read 45-48 ms, 58%, or 
 without re-running this file fresh** — they need a full re-measurement on today's engine, not a
 patch to the old figures.
 
+### SUPERSEDED — the reconciler is ~11 ms of a React create, not 45, and it was never measured before
+
+`reconciler-floor.itest.tsx` (2026-09-21) measures the thing the paragraph above only named. It
+builds a SECOND reconciler whose every host method is empty — same flags, same container plumbing,
+same element tree — so React drives nothing and what is left is fibers, elements, the work loop and
+the commit walk. Angular has had this arm since its renderer-split (`host-does-nothing`); React
+never did, because its host config is a closed object literal with no prototype to patch.
+
+```
+ engine direct      81-90 ms
+ react/null         10.6-12.0 ms    React's OWN half, oracle-asserted at 7 001 elements + 3 000 texts
+ react real        105-117 ms
+ react over engine  25-31 ms  =  react's own 11  +  our seam 13-15
+```
+
+So **roughly a third of the "reconciler delta" is the reconciler** and the rest is our per-node JS
+being dearer under a host config than under a direct loop. The old 45-48 ms figure was the whole
+delta with nothing separated out of it.
+
+THE ORACLE HAD TO BE A CALL COUNT, because an arm that builds no tree commits nothing for a census
+to read — and an arm that quietly rendered less would read as fast rather than as broken.
+
+**AND THE TWO ARMS WERE NOT THE SAME WORKLOAD UNTIL THIS FILE MADE THEM ONE.** The engine arm named
+`RCTSinglelineTextInputView` while React named the `text-input` TAG, so only React reached the host
+behavior — 13 003 prop writes against 12 003, and a thousand more interned values. The same asymmetry
+sits in `adapter-create-cost.itest.tsx`'s `engineRow` and is carried by the 38 ms that file publishes.
+`expect(react.setProps).toBe(engine.setProps)` is the gate now.
+
+### A TAGGED PRIMITIVE COSTS 15-17 us TO MOUNT, and every adapter pays it on every one
+
+Same fixture, same tree twice, the only difference being whether one node per row is created under
+its intrinsic tag. A tag is how a node reaches its host behavior, so this prices attaching one — and
+it is not a TextInput fact: Pressable, Switch, Image, Button and ScrollView all take the same path.
+
+```
+ bare (no tag)      68-72 ms      setProps 12 003
+ tagged             83-85 ms      setProps 13 003     the behavior's own seed, part of what it costs
+ per instance       15.3 / 16.8 / 15.3 us  =  attach 8.4-9.4  +  post-commit 6.4-8.6
+```
+
+`walk` and `apply` are unchanged between the two, so none of it is the C++. The attach half is four
+closures for `setBehaviorListener`, a seeded prop and `attachPressMachine` — yes, every `<TextInput>`
+mounts a press machine (`text-input.ts:364`), which is why `behaviors/pressable.ts` shows up in a
+profile of a row that holds no Pressable. The post-commit half is `runDeferredAttaches` plus
+`runCommittedHooks`, each asking the HOST whether a node landed.
+
+**Read it against what it buys before calling it a regression: RN's own `TextInput` costs 50-53 us on
+the same tree.** We are 3.4x cheaper for the same surface. The open question is not whether 15 us is
+too much against zero, it is which of the two halves can go — and the post-commit half is two host
+crossings per instance for one fact.
+
 ### A fold is charged for EXISTING, not for what it does — the one that did nothing cost 10.7 us/node
 
 Four tag rules priced on one ruler, `build-release`, three runs, a thousand nodes per commit
@@ -1928,7 +2514,9 @@ window does not exist rather than being caught. One syscall cheaper per entry, t
 **AND IT FIRED AGAIN THE NEXT DAY, so read "fixed" as "that window is closed" rather than "the test
 is settled".** Once on 2026-09-18, in a full run, then NINE consecutive clean full runs afterwards —
 and the message was not captured, so whether it is the same cause is unproven. Chasing it further by
-guessing is the thing this section warns against.
+guessing is the thing this section warns against. **Once more on 2026-09-21**, again in a full run,
+again clean alone and clean on the three full runs that followed, and again the message escaped
+capture because it did not reproduce. Three sightings, no assertion text yet.
 
 What was done instead is narrower and is the reusable half: `parse()`'s `readFileSync` is a SECOND
 listed-then-read window, and unlike the first it cannot be collapsed into one syscall. It now
@@ -3225,6 +3813,40 @@ same workload. What IS comparable is that its fold is still on the books.
 
 And React's 90.8 is down from the ~120 this same fixture reported an hour earlier — that is the
 development-React fix above paying out, at roughly a quarter of the arm.
+
+### `Swap` re-measured on the C++ engine, and it answers the persistent-mode question (2026-09-21)
+
+Both sides run the SAME reconciler over the same thousand memoized rows; only the host config differs.
+`stock-swap-cost.itest.tsx` and `adapter-swap-cost.itest.tsx`, `build-release`, one sitting:
+
+```
+                      swap    same-order re-render    the move itself    our engine inside it
+ stock (persistent)    6.0            3.8                   2.2                 —
+ ours   (mutation)    23.4            1.9                  21.5           walk 0.8 + apply 2.5
+```
+
+**The engine is 3.3 ms of 23.4 and the other 20 is React's own mutation-mode commit** — `created=0
+cloned=2 reused=1000 targetedReplaces=1 setProps=0`, so not one prop write crosses and the C++ side
+does a targeted replace of a single slot. The earlier bisect on the JS-tree engine put React's share
+at ≥15 ms by replacing `insertBefore` with a no-op; the figure has only grown as the engine shrank
+under it.
+
+**SO THE PERSISTENT-MODE QUESTION HAS TWO ANSWERS, NOT ONE, and this page only ever wrote the first.**
+On the create-shaped rows persistent mode is the FLOOR WE ALREADY BEAT — the engine is 0.88-0.90x of
+a bare `nativeFabricUIManager` driver doing nothing else, and React at 0.86x of stock says the same
+from above. On a keyed MOVE it is the other way round entirely: a persistent renderer hands the host
+one new child set and is done, where a mutation renderer walks a thousand fibers to find the two that
+moved. That is the whole of `Swap`, and no engine change reaches it.
+
+**What it would take is a DECISION, not an optimisation.** `<M1 + M2>` chose mutation mode
+deliberately so the engine's clone-on-write path could not be skipped, and the invariant's words are
+"NOT its native persistent mode straight to the slot, which would skip R2". Driving the ENGINE in
+persistent mode is a third thing that invariant does not describe: React would hand complete child
+sets to a new engine op and the per-move fiber walk would go, but it is a rewrite of
+`adapters/react/src/host-config.ts`, it needs a set-shaped op on the wire, and it would have to be
+re-measured on the create rows where mutation mode currently wins. Raised here rather than attempted.
+**It is React-only either way** — Vue, Svelte, Solid and Angular emit their moves straight into the
+engine and all four sit at 0.37-0.43x of stock on this row.
 
 ### And the `Swap` anomaly reproduces headlessly: 2.42x, against 3.68x on device
 

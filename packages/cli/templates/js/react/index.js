@@ -7,6 +7,8 @@
  * events, third-party ViewConfigs) before registering, so this file only needs the app itself.
  */
 
+// Registers host behaviors (Image, Pressable, Switch, ...) that /bootstrap alone doesn't reach; deleting this breaks them silently.
+import '@symbiote-native/react';
 import { registerApp } from '@symbiote-native/react/bootstrap';
 import App from './App';
 import { name as appName } from './app.json';

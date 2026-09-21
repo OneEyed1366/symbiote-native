@@ -6,6 +6,8 @@
  * renderer is never in the path.
  */
 
+// Registers host behaviors (Image, Pressable, Switch, ...) that /bootstrap alone doesn't reach; deleting this breaks them silently.
+import '@symbiote-native/vue';
 import { createApp } from '@symbiote-native/vue/bootstrap';
 import App from './App';
 import { name as appName } from './app.json';

@@ -395,6 +395,18 @@ void holdHandle(jsi::Runtime &runtime, Node &node) {
   if (live.isObject()) node.attachedHandle.emplace(live.getObject(runtime));
 }
 
+/**
+ * The UIManager for this runtime.
+ *
+ * NOT cached, and the failed attempt is worth recording: keying a cache on `&runtime` treats an
+ * ADDRESS as a lifetime, and an allocator reuses addresses. `symbiote_tree_tests` builds and tears
+ * down a JSCRuntime per case, so the second one can land where the first was and inherit a dangling
+ * binding — a crash, not a wrong number. The same mistake with three interned `PropNameID`s aborted
+ * that suite outright (`~JSCRuntime`: "destroyed with a dangling API string").
+ *
+ * It bought nothing anyway: both caches together moved an empty drain 4.46 -> 4.38 us, against the
+ * 4.38 -> 1.54 that dropping the checked JSI casts gave.
+ */
 react::UIManager &uiManagerFor(jsi::Runtime &runtime, const char *what) {
   auto binding = react::UIManagerBinding::getBinding(runtime);
   if (binding == nullptr) {
@@ -411,10 +423,14 @@ react::UIManager &uiManagerFor(jsi::Runtime &runtime, const char *what) {
  * `ArrayBuffer::data` hands back the backing store, so the commands never become JS values — which
  * is the entire reason the format is flat. `byteOffset` is read rather than assumed: a typed array
  * need not start at the head of its buffer.
+ *
+ * The three names are built from UTF-8 on every call and that stands: interning them in a
+ * file-scope cache is what aborted `symbiote_tree_tests`, because a `PropNameID` outliving its
+ * runtime is a dangling API string. See `uiManagerFor` above for the general form and the price.
  */
 const int32_t *int32ArrayData(jsi::Runtime &runtime, const jsi::Value &value, size_t &lengthOut) {
   auto typedArray = value.asObject(runtime);
-  auto buffer = typedArray.getPropertyAsObject(runtime, "buffer").getArrayBuffer(runtime);
+  auto buffer = typedArray.getProperty(runtime, "buffer").asObject(runtime).getArrayBuffer(runtime);
   auto byteOffset = static_cast<size_t>(typedArray.getProperty(runtime, "byteOffset").asNumber());
   lengthOut = static_cast<size_t>(typedArray.getProperty(runtime, "length").asNumber());
   return reinterpret_cast<const int32_t *>(buffer.data(runtime) + byteOffset);
@@ -1490,10 +1506,27 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
 
   size_t opsLength = 0;
   const int32_t *ops = int32ArrayData(runtime, arguments[0], opsLength);
-  auto strings = arguments[1].asObject(runtime).asArray(runtime);
-  auto values = arguments[2].asObject(runtime).asArray(runtime);
-  auto instanceHandles = arguments[3].asObject(runtime).asArray(runtime);
-  auto handles = arguments[4].asObject(runtime).asArray(runtime);
+  // ── THE PROLOGUE WAS THE COST, AND THIS LINE WAS THE PROLOGUE ──────────────────────────────────
+  //
+  // `getObject`/`getArray` rather than `asObject`/`asArray`. The checking pair runs an `isObject`
+  // and an `isArray` per table — eight JSI round trips for four arguments — and they were 2.8 us of
+  // a 4.4 us fixed entry cost. Measured on an EMPTY batch against a 0.13 us bare host call
+  // (`small-batch-crossing-cost.itest.ts`): prologue 4.38 -> 1.54 us, and a whole small drain
+  // 5.54 -> 2.76 us.
+  //
+  // WHY IT IS SAFE TO DROP THEM, and it is the harness's own split rather than a shrug: `takeBatch`
+  // is the only producer on this wire and always hands over four arrays, and `jsi::Value::getObject`
+  // / `Object::getArray` carry `assert`s that are LIVE in the correctness build — `core/engine/cpp/
+  // tests/build` is Debug with `NDEBUG` off, which is the whole reason it exists. So a fixture that
+  // hand-builds a malformed batch aborts there and the build that ships pays nothing for the check.
+  //
+  // WHAT IT COSTS ANYONE: a framework that navigates between mutations pays this entry per
+  // mutation, not per commit. Solid's `cleanChildren` enters `applyOps` 2 000 times to clear a
+  // thousand rows.
+  auto strings = arguments[1].getObject(runtime).getArray(runtime);
+  auto values = arguments[2].getObject(runtime).getArray(runtime);
+  auto instanceHandles = arguments[3].getObject(runtime).getArray(runtime);
+  auto handles = arguments[4].getObject(runtime).getArray(runtime);
   const size_t slotCount = handles.size(runtime);
 
   // Slot -> node, resolved at most ONCE per batch and usually not at all: a slot this batch creates
@@ -2028,6 +2061,34 @@ jsi::Value Tree::nextSiblingOf(jsi::Runtime &runtime, const jsi::Value *argument
   return handleOf(runtime, **std::next(at));
 }
 
+/**
+ * The first live child, anchors included.
+ *
+ * WHY IT IS ITS OWN CALL, and it is `nextSiblingOf`'s argument one door along. The JS spelling was
+ * `childrenOf(node)[0]`, and `solid-js/universal`'s `cleanChildren` empties a parent with
+ * `while (removed = getFirstChild(parent)) removeNode(parent, removed)` — so a list of N children
+ * was read N times, each read building and discarding the whole remaining list. Measured on a
+ * 2 000-row `Clear` before this existed: **2 001 001 handles** crossed the boundary to remove two
+ * thousand children, which is N(N+1)/2 to the unit, and the step cost 435 ms against stock's 14.
+ *
+ * SKIPS A DEAD HANDLE rather than answering `undefined` on one, exactly as `childrenOf` does. The
+ * two must agree element for element or a caller that switches between them sees a different tree —
+ * and `cleanChildren`'s loop terminates on `undefined`, so answering it early would orphan every
+ * child behind the dead one.
+ */
+jsi::Value Tree::firstChildOf(jsi::Runtime &runtime, const jsi::Value *arguments, size_t count) {
+  if (count < 1) {
+    throw jsi::JSError(runtime, "symbiote engine: expected firstChildOf(handle)");
+  }
+  const auto node = nodeFrom(runtime, arguments[0].asObject(runtime), "firstChildOf");
+  compactChildren(*node);
+  for (const auto &child : node->children) {
+    auto handle = handleOf(runtime, *child);
+    if (!handle.isUndefined()) return handle;
+  }
+  return jsi::Value::undefined();
+}
+
 jsi::Value Tree::childrenOf(jsi::Runtime &runtime, const jsi::Value *arguments, size_t count) {
   if (count < 1) {
     throw jsi::JSError(runtime, "symbiote engine: expected childrenOf(handle)");
@@ -2068,6 +2129,42 @@ void collectSubtree(jsi::Runtime &runtime, const NodePtr &node, std::vector<jsi:
   into.push_back(std::move(handle));
   compactChildren(*node);
   for (const auto &child : node->children) collectSubtree(runtime, child, into);
+}
+
+// The same walk, narrowed to the nodes a TEARDOWN has anything to do with — and it is the whole of
+// what the sweep costs, because it is the walk that decides how many handles cross.
+//
+// A node earns its place three ways, and the third is the one that keeps the narrowing honest:
+//
+//   it is a ROOT           the sweep was handed it, and marking it is what makes a re-insert walk
+//   it carries a TAG       `kOpSetTag` arrives from `attachHostBehavior` and from nowhere else, so
+//                          a non-empty `tagName` is exactly "a behavior attached to this node"
+//   something under it     an ANCESTOR of a tagged node, because the framework may bring back an
+//                          interior node on its own and its insert has to walk
+//
+// What drops out is a node with no behavior and none beneath it, which on the benchmark row is
+// eight of every ten: the sweep would mark it, call `onDetached` on it, and change nothing.
+//
+// Returns whether this node earned its place, which is how its parent learns it has to keep its
+// own. Pre-order is preserved by reserving the slot BEFORE recursing and dropping it afterwards —
+// a node that turns out uninteresting resizes away, and by then every uninteresting descendant has
+// already resized itself away, so nothing interesting is ever discarded with it.
+bool collectTeardownSubtree(
+    jsi::Runtime &runtime,
+    const NodePtr &node,
+    std::vector<jsi::Value> &into,
+    bool isRoot) {
+  auto handle = handleOf(runtime, *node);
+  if (handle.isUndefined()) return false;
+  const size_t reserved = into.size();
+  into.push_back(std::move(handle));
+  bool isWanted = isRoot || !node->tagName.empty();
+  compactChildren(*node);
+  for (const auto &child : node->children) {
+    if (collectTeardownSubtree(runtime, child, into, false)) isWanted = true;
+  }
+  if (!isWanted) into.resize(reserved);
+  return isWanted;
 }
 
 jsi::Value Tree::ancestorsOf(jsi::Runtime &runtime, const jsi::Value *arguments, size_t count) {
@@ -2118,9 +2215,15 @@ jsi::Value Tree::parentsOf(jsi::Runtime &runtime, const jsi::Value *arguments, s
   return out;
 }
 
-jsi::Value Tree::subtreesOf(jsi::Runtime &runtime, const jsi::Value *arguments, size_t count) {
+// Shared by `subtreesOf` and `teardownSubtreesOf`, which differ only in which nodes the walk keeps.
+jsi::Value Tree::collectRoots(
+    jsi::Runtime &runtime,
+    const jsi::Value *arguments,
+    size_t count,
+    const char *what,
+    bool narrowToTeardown) {
   if (count < 1) {
-    throw jsi::JSError(runtime, "symbiote engine: expected subtreesOf(roots)");
+    throw jsi::JSError(runtime, std::string("symbiote engine: expected ") + what + "(roots)");
   }
   const auto readStartedAt = ISteadyClock::now();
   auto roots = arguments[0].asObject(runtime).asArray(runtime);
@@ -2134,8 +2237,9 @@ jsi::Value Tree::subtreesOf(jsi::Runtime &runtime, const jsi::Value *arguments, 
   std::vector<jsi::Value> flat;
   for (size_t at = 0; at < length; at += 1) {
     const auto root =
-        nodeFrom(runtime, roots.getValueAtIndex(runtime, at).asObject(runtime), "subtreesOf");
-    collectSubtree(runtime, root, flat);
+        nodeFrom(runtime, roots.getValueAtIndex(runtime, at).asObject(runtime), what);
+    if (narrowToTeardown) collectTeardownSubtree(runtime, root, flat, true);
+    else collectSubtree(runtime, root, flat);
   }
 
   auto out = jsi::Array(runtime, flat.size());
@@ -2145,6 +2249,17 @@ jsi::Value Tree::subtreesOf(jsi::Runtime &runtime, const jsi::Value *arguments, 
   walkCost_.hostReadNs += nanosSince(readStartedAt);
   walkCost_.hostReadHandles += flat.size();
   return out;
+}
+
+jsi::Value Tree::subtreesOf(jsi::Runtime &runtime, const jsi::Value *arguments, size_t count) {
+  return collectRoots(runtime, arguments, count, "subtreesOf", false);
+}
+
+jsi::Value Tree::teardownSubtreesOf(
+    jsi::Runtime &runtime,
+    const jsi::Value *arguments,
+    size_t count) {
+  return collectRoots(runtime, arguments, count, "teardownSubtreesOf", true);
 }
 
 jsi::Value Tree::committedRecordOf(

@@ -124,13 +124,13 @@ canary and how to run it live in each adapter's README:
 years, and Lynx is adding them fast. If all you want is Vue on a phone, those work, and they are
 older than we are.
 
-|                    | Whose native layer                   | Frameworks                                | What it costs you                                                      |
-| ------------------ | ------------------------------------ | ----------------------------------------- | ---------------------------------------------------------------------- |
-| **React Native**   | Meta's Fabric / Yoga / Hermes        | React only                                | React lock-in                                                          |
-| **NativeScript**   | its own runtime and bindings         | JS/TS, Angular, Vue, Solid, Svelte, React | leaving RN's ecosystem for its own                                     |
-| **Hippy**          | its own C++ DOM and layout engine    | React, Vue                                | leaving RN's ecosystem for Tencent's                                   |
-| **Lynx**           | its own engine (PrimJS, dual-thread) | React, Vue                                | an 18-month-old ecosystem, mostly hand-written bridging                |
-| **SymbioteNative** | **stock, unforked React Native**     | React, Vue 3, Angular, Svelte, Solid      | Angular is our slowest adapter; ecosystem packages are wrapped by hand |
+|                    | Whose native layer                   | Frameworks                                | What it costs you                                       |
+| ------------------ | ------------------------------------ | ----------------------------------------- | ------------------------------------------------------- |
+| **React Native**   | Meta's Fabric / Yoga / Hermes        | React only                                | React lock-in                                           |
+| **NativeScript**   | its own runtime and bindings         | JS/TS, Angular, Vue, Solid, Svelte, React | leaving RN's ecosystem for its own                      |
+| **Hippy**          | its own C++ DOM and layout engine    | React, Vue                                | leaving RN's ecosystem for Tencent's                    |
+| **Lynx**           | its own engine (PrimJS, dual-thread) | React, Vue                                | an 18-month-old ecosystem, mostly hand-written bridging |
+| **SymbioteNative** | **stock, unforked React Native**     | React, Vue 3, Angular, Svelte, Solid      | ecosystem packages are wrapped by hand                  |
 
 The difference is the row you read first. All three alternatives wrote their own native layer, so
 picking one means adopting its ecosystem too. As far as we have verified, SymbioteNative is the only
@@ -141,10 +141,11 @@ native modules work because underneath it really is an RN app.
 The price of that bet is the other direction. We stay inside what Fabric can already do, where a
 project owning its runtime can change it.
 
-Three costs:
+The costs:
 
-- **Angular is the slowest of the five.** 1.62x stock on a create-shaped row where Solid is 1.04x.
-  The numbers and what is responsible for them are [below](#how-fast-against-stock-react-native).
+- **Angular is the slowest of the five**, though no longer by much: 1.06x stock on a create-shaped
+  row where Solid is 0.69x. Most of what is left is Angular's own per-component machinery rather
+  than the adapter. The numbers are [below](#how-fast-against-stock-react-native).
 - **Ecosystem packages are wrapped by hand, one at a time.** The _native view_ comes for free,
   through the same ViewConfig path as our own primitives, with zero SymbioteNative metadata. The JS
   surface around it does not, because a library's own component body is React internally. So each
@@ -251,41 +252,45 @@ Headless, 1 000 rows, `bench:itest` Release build, one sitting. The stock column
 Fabric renderer running in the same harness. Ratio is ours over stock, so **below 1.00 is faster
 than stock React Native**. Bold marks a row we win.
 
-| 1 000 rows | stock RN |             React |              Vue |             Solid |            Svelte |         Angular |
-| ---------- | -------: | ----------------: | ---------------: | ----------------: | ----------------: | --------------: |
-| Create     |    109.2 |     139.5 / 1.28x |    151.9 / 1.39x |     113.9 / 1.04x |     121.1 / 1.11x |   177.2 / 1.62x |
-| Replace    |    161.2 | **150.3 / 0.93x** |    207.4 / 1.29x | **134.5 / 0.83x** |     175.4 / 1.09x |   175.2 / 1.09x |
-| Partial    |     11.7 |      12.8 / 1.09x |     13.5 / 1.15x |   **6.9 / 0.59x** |   **9.1 / 0.78x** | **7.6 / 0.65x** |
-| Select     |     14.2 |  **13.3 / 0.94x** | **13.4 / 0.94x** |      16.8 / 1.18x |      14.2 / 1.00x |         2.3 / † |
-| Swap       |     15.7 |      23.0 / 1.46x |  **5.5 / 0.35x** |   **6.8 / 0.43x** |   **6.2 / 0.39x** | **4.2 / 0.27x** |
-| Remove     |     17.9 |   **5.7 / 0.32x** |  **4.7 / 0.26x** |   **6.5 / 0.36x** |   **5.9 / 0.33x** |        14.9 / † |
-| Append     |    130.0 |     136.3 / 1.05x |    149.7 / 1.15x | **112.0 / 0.86x** | **124.8 / 0.96x** |   160.1 / 1.23x |
-| Clear      |     12.6 |      21.3 / 1.69x |     28.7 / 2.28x |     427.2 / 33.9x |      22.1 / 1.75x |    29.3 / 2.33x |
+| 1 000 rows | stock RN |             React |               Vue |             Solid |            Svelte |           Angular |
+| ---------- | -------: | ----------------: | ----------------: | ----------------: | ----------------: | ----------------: |
+| Create     |    153.9 | **127.2 / 0.83x** |     155.4 / 1.01x | **106.0 / 0.69x** | **115.7 / 0.75x** |     162.7 / 1.06x |
+| Replace    |    162.6 | **137.8 / 0.85x** |     169.5 / 1.04x | **113.3 / 0.70x** | **131.1 / 0.81x** |     181.0 / 1.11x |
+| Partial    |     35.0 |  **10.3 / 0.29x** |  **13.0 / 0.37x** |   **6.8 / 0.19x** |   **9.0 / 0.26x** |  **10.3 / 0.29x** |
+| Select     |     13.8 |      13.9 / 1.01x |      13.7 / 0.99x |      15.3 / 1.11x |      13.6 / 0.99x |      13.8 / 1.00x |
+| Swap       |     17.8 |      23.7 / 1.33x |   **6.4 / 0.36x** |   **6.4 / 0.36x** |   **7.0 / 0.39x** |   **5.6 / 0.31x** |
+| Remove     |     20.5 |   **5.4 / 0.26x** |   **5.0 / 0.24x** |   **5.4 / 0.26x** |   **5.5 / 0.27x** |   **5.7 / 0.28x** |
+| Append     |    186.0 | **136.3 / 0.73x** | **153.1 / 0.82x** | **115.3 / 0.62x** | **131.3 / 0.71x** | **172.7 / 0.93x** |
+| Clear      |     14.8 |      16.6 / 1.12x |      20.9 / 1.41x |      28.9 / 1.95x |      16.2 / 1.09x |      22.3 / 1.51x |
 
-**† Angular's `Select` and `Remove` get no ratio, by the first bullet above.** On `Select` the engine
-counters read `cloned=0 setProps=1` against every other adapter's `cloned=3 setProps=1`: the selected
-style never reached the engine, so 2.3 ms is a step that did not run. `Remove` diverges the same way.
-Both are being chased, and until they agree with the other columns they are not a measurement.
+No column carries an exemption: every arm above writes the same props and commits the same tree, and
+each row asserts that before it reads a millisecond.
 
 **Mutating a mounted tree is where this architecture pays.** Removing one row of a thousand lands
-every adapter 3x under stock, and swapping two lands the non-React ones 2.3-3.8x under. Stock pays a
-walk over a thousand fibers plus persistent-mode cloning whatever host mutations come out the other
-end. Vue, Svelte and Solid walk nothing and emit one `removeChild`.
+every adapter 3.6-4x under stock and swapping two lands the non-React ones 2.6-3.2x under. The reason
+shows up as a node count before it shows up as a millisecond: on those rows Fabric re-lays out ~7 000
+Yoga nodes for stock against ~1 000 for us, because a persistent renderer hands it a rebuilt path
+where we replace one slot.
 
-React's `Swap` is the one loss, and it is not the engine's: the engine reports `cloned=2 setProps=0`,
-so not a single prop write crosses. Both sides run the _same_ reconciler, and what differs is that we
-drive it in **mutation** mode against stock's persistent mode. That was deliberate, so the
-clone-on-write path could not be quietly skipped, and about 15 ms of the gap is React's own mutation
-commit with a host config doing nothing at all. The other four adapters emit their moves straight
-into the engine and never pay it.
+React's `Swap` is the one loss, and it is not the engine's: the engine is 3.3 ms of the 23.7 and not
+a single prop write crosses. Both sides run the _same_ reconciler, and what differs is that we drive
+it in **mutation** mode against stock's persistent mode. That was deliberate, so the clone-on-write
+path could not be quietly skipped, and about 15 ms of the gap is React's own mutation commit with a
+host config doing nothing at all. The other four adapters emit their moves straight into the engine
+and never pay it.
 
-**Create-shaped rows are where we still pay.** Solid is at parity (1.04x); React, Svelte and Vue sit
-1.1-1.4x over. Angular's 1.62x is mostly Angular's own machinery rather than the adapter: measured
-against an inlined row, a per-row component instance costs about 81 us in LViews, DI scopes and
-`EventEmitter`s. That is an app author's choice the adapter cannot remove.
+**Create-shaped rows are no longer a loss.** Solid, Svelte and React are 0.69-0.83x of
+stock on `Create`, Vue sits on the line, and Angular's 1.06x is mostly Angular's own machinery rather
+than the adapter: measured against an inlined row, a per-row component instance costs about 81 us in
+LViews, DI scopes and `EventEmitter`s. That is an app author's choice the adapter cannot remove.
 
-Solid's `Clear` at 427 ms is a known outlier, reproduced five times across two state spellings. It is
-not the engine, whose own halves account for about 3% of it.
+`Clear` is the row where every adapter still trails, and it splits cleanly. Our engine is 3-5 ms of
+it; the remaining 13-23 ms is each framework disposing 2 000 component instances, which on React's
+arm is the same 14.6 ms that makes up stock's entire step. Svelte's and React's framework halves are
+already at or under stock's whole `Clear`, so what is left there is not ours to win.
+
+`Select` is flat across all six because it is Fabric's: a layout-dirty style change on one row of a
+thousand re-lays out the whole tree, and it does so for stock's renderer exactly as for ours.
 
 The harness is JavaScriptCore rather than Hermes, a test host rather than a real Fabric pipeline, and
 the runner applies no app-level Babel lowering. Read it as a sound comparison of the six columns
@@ -309,8 +314,8 @@ recent reading from it, but the architecture underneath has been replaced. Do no
 | Select row     |      7.3 |   **5.5 / 0.75x** |      14.7 / 2.01x |       8.4 / 1.15x |       7.9 / 1.08x |     10.5 / 1.44x |
 | Clear          |     10.7 |   **9.1 / 0.85x** |      12.6 / 1.18x |      14.1 / 1.32x |   **8.7 / 0.81x** |     44.2 / 4.13x |
 
-React's `Swap` is the one row that survives the architecture change unchanged: 3.68x here, 2.42x
-headless, same cause, and the explanation above applies to both.
+React's `Swap` is the one row that survives the architecture change: 3.68x here against 1.33x on the
+table above, the same cause in both, and the explanation above applies to each.
 
 </details>
 
@@ -425,7 +430,7 @@ Detox attaches with zero SymbioteNative-specific glue, because to Detox this is 
 shared `canary-journeys` spec runs identically across the React, Vue and Svelte canaries, which is
 what proves each adapter paints and responds the same way on device.
 
-Alongside it, 87 integration fixtures drive the real C++ engine headlessly, including React's own
+Alongside it, 93 integration fixtures drive the real C++ engine headlessly, including React's own
 Fabric renderer as a baseline arm. A second host build compiles the Android branches, so a
 platform-split rule is tested in a build that actually contains it.
 

@@ -73,6 +73,10 @@ function fakeBindings(version: number): {
       calls.push(['childrenOf', handle]);
       return [child];
     },
+    firstChildOf: handle => {
+      calls.push(['firstChildOf', handle]);
+      return child;
+    },
     nextSiblingOf: handle => {
       calls.push(['nextSiblingOf', handle]);
       return undefined;
@@ -84,6 +88,10 @@ function fakeBindings(version: number): {
     subtreesOf: roots => {
       calls.push(['subtreesOf', roots]);
       return [...roots, child];
+    },
+    teardownSubtreesOf: roots => {
+      calls.push(['teardownSubtreesOf', roots]);
+      return [...roots];
     },
     ancestorsOf: handle => {
       calls.push(['ancestorsOf', handle]);

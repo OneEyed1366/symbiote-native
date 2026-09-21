@@ -137,6 +137,10 @@ export type { ISurfaceTelemetry } from './tree-host';
 // `installNativeTreeHost` is not on any app path: `getSlot()` already calls it, and it is here so a
 // bring-up probe can install one explicitly against a hand-built set of bindings.
 export { nativeTreeHost, installNativeTreeHost } from './native-tree-host';
+// `ITreeHost` is exported to be READ, not implemented outside this repo: it is the engine's own
+// seam, and the hosts that satisfy it ship here (`native-tree-host.ts`, test-utils' recording host).
+// It is versioned as internal — a new required member lands in a MINOR, so anything implementing it
+// by hand breaks on a minor bump. Implement it only if you are prepared to track that.
 export type {
   ITreeHost,
   ITreeCensus,

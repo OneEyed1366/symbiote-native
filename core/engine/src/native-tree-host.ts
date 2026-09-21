@@ -45,9 +45,11 @@ export function nativeTreeHost(bindings: INativeEngineBindings): ITreeHost {
     committedPayloadOf: bindings.committedPayloadOf,
     parentOf: bindings.parentOf,
     childrenOf: bindings.childrenOf,
+    firstChildOf: bindings.firstChildOf,
     nextSiblingOf: bindings.nextSiblingOf,
     parentsOf: bindings.parentsOf,
     subtreesOf: bindings.subtreesOf,
+    teardownSubtreesOf: bindings.teardownSubtreesOf,
     ancestorsOf: bindings.ancestorsOf,
     census: () => EMPTY_CENSUS,
     // Straight through: native already takes the placeholder, which is what `committedRecordOf`

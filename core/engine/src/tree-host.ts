@@ -27,6 +27,7 @@ import {
   recordCommit,
   takeBatch,
   type IMutationBatch,
+  type IMutationHandle,
 } from './mutation-buffer';
 import { nativeEngine } from './native-engine';
 import { takePropStats } from './node';
@@ -125,6 +126,20 @@ export type ITreeHost = {
   ) => Readonly<Record<string, unknown>> | undefined;
   parentOf: (handle: object) => object | undefined;
   childrenOf: (handle: object) => readonly object[];
+  // The FIRST entry of the child list — not `childrenOf(handle)[0]`.
+  //
+  // Its own member for the same reason `nextSiblingOf` below is, and it is the same bug one door
+  // along. `solid-js/universal`'s `cleanChildren` empties a parent with
+  // `while (removed = getFirstChild(parent)) removeNode(parent, removed)`, so reading the whole list
+  // to take its head means reading a list of N, then N-1, then N-2 — quadratic in the width, with
+  // every handle a host object built, returned, filtered and thrown away. Measured on a 2 000-row
+  // Solid `Clear`: **2 001 001 handles** crossed to remove two thousand children, N(N+1)/2 exactly,
+  // and the step cost 435 ms against stock's 14.
+  //
+  // Anchors INCLUDED and a dead handle SKIPPED, both matching `childrenOf` element for element: a
+  // caller that switches between the two must see one tree, and `cleanChildren`'s loop ends on
+  // `undefined`, so answering it early would orphan every child behind a dead one.
+  firstChildOf: (handle: object) => object | undefined;
   // The next entry in the parent's child list — NOT `parentOf` plus `childrenOf` spelled in JS.
   //
   // It is its own member because the JS spelling is quadratic on the path that uses it. Vue's
@@ -151,6 +166,20 @@ export type ITreeHost = {
   parentsOf: (handles: readonly object[]) => readonly (object | undefined)[];
   /** Each root and every descendant, PRE-ORDER, concatenated in root order. */
   subtreesOf: (roots: readonly object[]) => readonly object[];
+  /**
+   * The same walk, narrowed to the nodes a TEARDOWN has work for — each root, every node carrying
+   * an intrinsic tag, and every node between the two.
+   *
+   * It exists because the sweep's whole cost is how WIDE this walk is: a thousand-row clear crossed
+   * ten thousand handles to release a thousand machines, and eight in ten of those nodes were plain
+   * views the sweep marked and did nothing else with. An ancestor of a tagged node has to come back
+   * too, or a framework that returns an interior node on its own would never re-arm what hangs
+   * beneath it (`host-behavior.test.ts` guards exactly that shape).
+   *
+   * Not a replacement for `subtreesOf`: an animated binding is per node and carries no tag, so
+   * `host-access.ts` asks for the full walk whenever one exists.
+   */
+  teardownSubtreesOf: (roots: readonly object[]) => readonly object[];
   /**
    * The node itself and every ancestor above it, DEEPEST FIRST.
    *
@@ -306,8 +335,8 @@ let commits = 0;
  */
 export function commitSurfaceOps(
   rootTag: IRootTag | undefined,
-  surface: object,
-  others: readonly (readonly [IRootTag, object])[] = [],
+  surface: IMutationHandle,
+  others: readonly (readonly [IRootTag, IMutationHandle])[] = [],
 ): void {
   commits += 1;
   // No host: the ops STAY PENDING. Draining them here would be silent data loss — a surface created
