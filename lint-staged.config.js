@@ -37,16 +37,51 @@ function tscBuildForStaged(files) {
   const touched = new Set();
   for (const file of files) {
     const relPath = relative(process.cwd(), file);
-    const pkg = TS_PACKAGES.find(p => relPath === p || relPath.startsWith(`${p}/`));
+    const pkg = TS_PACKAGES.find(
+      p => relPath === p || relPath.startsWith(`${p}/`),
+    );
     if (pkg !== undefined) touched.add(pkg);
   }
   return touched.size > 0 ? [`tsc --build ${[...touched].join(' ')}`] : [];
 }
 
+// packages/cli/templates/** is excluded from eslint.config.js's own `ignores`, but that ignore
+// list never gets consulted here: those template files are copies of a *generated app's*
+// config (CommonJS eslint.config.js/.prettierrc.js under a package.json that says "type":
+// "module"), so the moment eslint/prettier are asked to touch one directly, ESLint's flat-config
+// loader treats it as the nearest ancestor config for itself and tries to import it as ESM,
+// crashing on its own `require()`. Filtering them out of the file list before the tools ever see
+// them — same reasoning lint-staged already applies to examples/*, just needed explicitly here
+// because packages/cli/templates lives inside a glob that otherwise matches it. The bare
+// `*.{ts,js,json}` rule below is the one that actually needs this: lint-staged's matcher turns
+// on `matchBase` for any pattern with no `/`, so `*.js` matches a `.prettierrc.js` at ANY depth,
+// not just at the repo root.
+function excludingCliTemplates(files) {
+  return files.filter(
+    file =>
+      !relative(process.cwd(), file).startsWith('packages/cli/templates/'),
+  );
+}
+
+function eslintAndPrettier(files) {
+  const targets = excludingCliTemplates(files);
+  return targets.length > 0
+    ? [
+        `eslint --fix ${targets.join(' ')}`,
+        `prettier --write ${targets.join(' ')}`,
+      ]
+    : [];
+}
+
+function prettierOnly(files) {
+  const targets = excludingCliTemplates(files);
+  return targets.length > 0 ? [`prettier --write ${targets.join(' ')}`] : [];
+}
+
 export default {
-  '{core,adapters,packages}/**/*.{ts,tsx}': ['eslint --fix', 'prettier --write'],
-  '{core,adapters,packages}/**/*.{js,json}': 'prettier --write',
-  '*.{ts,js,json}': 'prettier --write',
+  '{core,adapters,packages}/**/*.{ts,tsx}': eslintAndPrettier,
+  '{core,adapters,packages}/**/*.{js,json}': prettierOnly,
+  '*.{ts,js,json}': prettierOnly,
   '**/*.{ts,tsx}': tscBuildForStaged,
   '{**/package.json,pnpm-workspace.yaml}': () => 'syncpack lint',
 };

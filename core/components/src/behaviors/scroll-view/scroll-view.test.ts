@@ -309,6 +309,24 @@ describe('decelerationRate reaches Fabric as a number', () => {
   });
 });
 
+// why: these are pure-native ViewConfig props RN's own ScrollView.js does no JS-side computation
+// on (unlike decelerationRate/stickyHeaderIndices above) — ownerFold's `{...props}` spread is
+// the whole story, but nothing named that claim per-prop until now (RN-parity sweep, verify pass).
+describe('pure-native scroll props reach Fabric untouched', () => {
+  it.each([
+    ['pagingEnabled', true],
+    ['snapToInterval', 100],
+    ['snapToOffsets', [0, 100, 250]],
+    ['snapToAlignment', 'start'],
+    ['keyboardShouldPersistTaps', 'always'],
+    ['contentInsetAdjustmentBehavior', 'automatic'],
+    ['automaticallyAdjustKeyboardInsets', true],
+  ] as const)('%s', (key, value) => {
+    const { commit } = mountScroll(SCROLL_VIEW_TAG, { [key]: value });
+    expect(commit().owner.props[key]).toEqual(value);
+  });
+});
+
 // THE AXIS, THE BOUNCE PAIR AND `nestedScrollEnabled` ALL LEFT THIS FILE on 2026-09-18, four
 // describes at once, and the grouping is the point rather than tidiness.
 //

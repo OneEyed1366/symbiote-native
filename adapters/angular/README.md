@@ -26,9 +26,9 @@ npm install @symbiote-native/angular react-native @angular/core
 ```
 
 `react-native` and `@angular/core` (**>=20**, for stable zoneless change detection) stay your app's
-own top-level dependencies. There's no `create-symbiote` scaffolder yet, so the AOT pipeline
-(`ngc --watch` alongside Metro — see [Run it](#run-it)) and the Metro config come from
-[`examples/angular`](../../examples/angular) rather than a generator.
+own top-level dependencies. `npx @symbiote-native/cli new` wires the AOT pipeline (`ngc --watch`
+alongside Metro — see [Run it](#run-it)) and the Metro config for a new app; wiring them into an
+existing one still follows [`examples/angular`](../../examples/angular) rather than a generator.
 
 ---
 
@@ -89,7 +89,8 @@ reference canaries, standalone components, zoneless change detection.
 ## Parity — and the one gap
 
 Angular reaches the same 21+ primitives, runtime modules, `Animated` on both drivers, gestures,
-accessibility, and the `VirtualizedList` family as React and Vue. That parity is **structural, not
+accessibility, and the `VirtualizedList` family as React and Vue, verified on-device on iOS and
+Android. That parity is **structural, not
 hand-copied**: the component logic (state machines + render functions) is written **once** in
 `@symbiote-native/components`, and Angular supplies only its lifecycle (`Renderer2` + zoneless change
 detection + the descriptor→`createElement` bridge).

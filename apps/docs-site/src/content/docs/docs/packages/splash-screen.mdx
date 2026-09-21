@@ -33,6 +33,10 @@ the same native module.
 npm install @symbiote-native/splash-screen
 ```
 
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --splash-screen` (or
+`add --splash-screen` in an existing app) installs and wires this for you — see
+[`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
+
 `@symbiote-native/splash-screen` itself is a workspace package (`packages/splash-screen`), not
 yet published — add it as a workspace dependency the same way the examples do. It ships as the
 sole autolinked native proxy for `react-native-bootsplash` (`react-native.config.cjs` +

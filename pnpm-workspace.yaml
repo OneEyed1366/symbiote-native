@@ -165,6 +165,14 @@ catalog:
   husky: ^9.1.7
   lint-staged: ^17.0.8
   syncpack: ^15.3.2
+
+  # packages/cli's own CLI toolchain — mirrors create-vue's zero-runtime-deps
+  # shape (bundled via rolldown at publish time, devDependencies only). See
+  # packages/cli/README.md.
+  '@clack/prompts': ^1.7.0
+  picocolors: ^1.1.1
+  rolldown: 1.2.0
+
   postcss: ^8.4.49
   postcss-value-parser: ^4.2.0
   # CSS-Modules renaming / `composes` / `:global()` for core/css-parser. MPL-2.0 while this repo

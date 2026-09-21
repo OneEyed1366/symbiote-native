@@ -21,6 +21,10 @@ mounting `App` - `nativeFabricUIManager` is driven directly, RN's own renderer n
 the [Solid adapter README](../../adapters/solid) for the full surface this app exercises and
 what's verified on which platform.
 
+> This canary predates `@symbiote-native/cli` and is for in-repo development. To start a new app
+> with Expo-backed packages wired in, use
+> `npx @symbiote-native/cli new --framework solid --<package>` instead.
+
 ## Run
 
 ```sh

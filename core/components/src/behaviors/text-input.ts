@@ -24,6 +24,7 @@ import {
   blurTextInput,
   dispatchViewCommand,
   dlog,
+  focusTextInput,
   propOf,
   propsOf,
   registerHostBehavior,
@@ -264,11 +265,13 @@ function attachAfterCommit(node: ISymbioteNode): void {
   state.isMirrorFreshlySeeded = true;
 
   if (props.autoFocus !== true) return;
-  // Driven in JS rather than as a native prop, exactly as RN does it
-  // (TextInput.js:538 -> TextInputState.focusInput). The native command is idempotent if the input
-  // is already focused.
+  // Driven in JS rather than as a native `autoFocus` prop (RN's own ViewConfigs DO declare one —
+  // `RCTTextInputViewConfig.js`/`AndroidTextInputNativeComponent.js` — but we don't forward it, so
+  // this is the one mechanism that focuses the input). Routed through `focusTextInput`, not a raw
+  // command, so an autoFocused input also updates the app-wide tracker `Keyboard.dismiss()` reads —
+  // a raw command left it unset until the native focus event round-tripped back.
   dlog('TextInput behavior: autoFocus -> focus command');
-  dispatchViewCommand(node, 'focus', []);
+  focusTextInput(node);
 }
 
 // The controlled handshake. A plain prop re-push would race the user's keystrokes — native may have
@@ -307,6 +310,10 @@ function afterCommit(node: ISymbioteNode): void {
 }
 
 function detach(node: ISymbioteNode): void {
+  // RN blurs a focused input on unmount (TextInput.js's useLayoutEffect cleanup) so native
+  // and the app-wide focus tracker don't outlive a node that's gone. `blurTextInput` already
+  // no-ops when this node isn't the currently-focused one.
+  blurTextInput(node);
   states.delete(node);
 }
 
@@ -328,7 +335,10 @@ export function buildTextInputHandle(node: ISymbioteNode): ITextInputHandle {
     measureLayout: (relativeTo, onSuccess, onFail) =>
       node.measureLayout(relativeTo, onSuccess, onFail),
     setNativeProps: nativeProps => node.setNativeProps(nativeProps),
-    focus: () => dispatchViewCommand(node, 'focus', []),
+    // Through TextInputState, NOT a raw command — RN's `ReactNativeElement.focus()` routes a text
+    // input through `TextInputState.focusTextInput` for the same reason blur below does: app-wide
+    // tracking, plus the already-focused/`editable: false` no-op RN's own guard carries.
+    focus: () => focusTextInput(node),
     // Through TextInputState, NOT a raw command — the same route the component path takes
     // (`react/.../text-input/index.ts`, "so the app-wide focus tracking clears too"). The native
     // `blur` event also clears the tracking via this behavior's own listener, so a raw command

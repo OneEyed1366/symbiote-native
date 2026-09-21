@@ -1,0 +1,22 @@
+{
+  "devDependencies": {
+    "@babel/core": "^7.25.2",
+    "@babel/preset-env": "^7.25.3",
+    "@babel/runtime": "^7.25.0",
+    "@react-native-community/cli": "20.1.0",
+    "@react-native-community/cli-platform-android": "20.1.0",
+    "@react-native-community/cli-platform-ios": "20.1.0",
+    "@react-native/codegen": "0.86.0",
+    "@react-native/eslint-config": "0.86.0",
+    "@react-native/gradle-plugin": "0.86.0",
+    "@symbiote-native/css-parser": "latest",
+    "eslint": "^8.19.0",
+    "less": "^4.6.7",
+    "prettier": "^3.9.1",
+    "sass": "^1.101.0",
+    "stylus": "^0.64.0"
+  },
+  "engines": {
+    "node": ">= 22.11.0"
+  }
+}

@@ -22,6 +22,7 @@ import {
   isSameShallowStyle,
   nextSiblingOf,
   parentOf,
+  propOf,
   registerBeforeFlush,
   removeChild,
   routeProp,
@@ -99,6 +100,47 @@ const READ_BACK_EVENTS: ReadonlySet<string> = new Set(['refresh']);
 const STYLE_CACHE = 16;
 
 type IReadBackListener = (event: unknown) => unknown;
+
+// `listen(VALUE_CHANGE_EVENT)` can be called TWICE for the SAME logical `(valueChange)`/`[(value)]`
+// binding on a MATCHED element — Angular's own compiled output-binding codegen wires one listener,
+// `ValueChangeElement.ngOnInit`'s manual bridge wires a second (`lowered-two-way-value.test.ts`,
+// "delivers a bound handler exactly once per change"). Those two must DEDUPE (last one replaces,
+// not composes — firing both double-delivers the identical value). A genuinely different explicit
+// `[onValueChange]` app-level handler (routed here via `ngOnChanges`'s generic per-input loop) must
+// instead be PRESERVED and called alongside the bridge, or it silently stops firing the moment
+// `[(value)]`/`(valueChange)` is also bound. This set is what tells the two cases apart.
+const bridgedValueChangeHandlers = new WeakSet<IReadBackListener>();
+
+// The genuinely explicit `[onValueChange]` app handler for a node, if one is bound — read LIVE by
+// the composed forward function on every event rather than captured once at compose time. That is
+// what makes handler installation order-independent: `ngOnChanges` (the explicit handler) and the
+// two `listen(VALUE_CHANGE_EVENT)` calls (the bridge, see below) can happen in any interleaving —
+// at initial mount OR on a later `[onValueChange]` rebind (`ngOnChanges` again, same code path,
+// routed through `setProperty`) — without one silently overwriting the other's closure.
+const explicitValueChangeHandlers = new WeakMap<
+  ISymbioteNode,
+  IReadBackListener
+>();
+
+function composeValueChangeHandler(
+  target: ISymbioteNode,
+  bridgeCallback: (event: unknown) => boolean | void,
+): IReadBackListener {
+  const forwardValue = withChangeDetection(target, (event: unknown) => {
+    explicitValueChangeHandlers.get(target)?.(event);
+    if (isSymbioteEvent(event)) {
+      if ('text' in event) return bridgeCallback(event.text);
+      if ('value' in event) return bridgeCallback(event.value);
+    }
+    return bridgeCallback(event);
+  });
+  bridgedValueChangeHandlers.add(forwardValue);
+  return forwardValue;
+}
+
+function isReadBackListener(value: unknown): value is IReadBackListener {
+  return typeof value === 'function';
+}
 
 function withChangeDetection(
   node: IHostElement,
@@ -626,6 +668,27 @@ export class SymbioteRenderer implements Renderer2 {
       this.surface.requestCommit();
       return;
     }
+    // `ngOnChanges` routes every `[onValueChange]` write here (both the initial bind and any
+    // later rebind to a new function reference) — never through `listen()`. When the write is a
+    // genuinely explicit app handler (not a prior bridge's own forward function), update the live
+    // slot `composeValueChangeHandler`'s forward function reads on every event; when a bridge is
+    // already installed on this node, that's ALL that's needed — the installed forward function
+    // picks the new handler up on its own, no re-route. Without this, a rebind after mount would
+    // silently kill the `[(value)]` two-way sync the moment it overwrote the composed prop raw.
+    if (name === VALUE_CHANGE_PROP) {
+      if (isReadBackListener(value) && !bridgedValueChangeHandlers.has(value)) {
+        explicitValueChangeHandlers.set(el, value);
+      } else {
+        explicitValueChangeHandlers.delete(el);
+      }
+      const current = propOf(el, VALUE_CHANGE_PROP);
+      const bridgeActive =
+        isReadBackListener(current) && bridgedValueChangeHandlers.has(current);
+      if (bridgeActive) {
+        this.surface.requestCommit();
+        return;
+      }
+    }
     this.flushStyling();
     routeProp(el, name, this.wrapCallback(el, name, value));
     this.surface.requestCommit();
@@ -690,15 +753,31 @@ export class SymbioteRenderer implements Renderer2 {
     // unwrap that field back to a bare value before handing it to Angular's callback, or `text =
     // $event` would assign the whole event object instead of the typed string/boolean.
     if (eventName === VALUE_CHANGE_EVENT) {
-      const forwardValue = withChangeDetection(target, (event: unknown) => {
-        if (isSymbioteEvent(event)) {
-          if ('text' in event) return callback(event.text);
-          if ('value' in event) return callback(event.value);
-        }
-        return callback(event);
-      });
-      routeProp(target, VALUE_CHANGE_PROP, forwardValue);
-      return () => routeProp(target, VALUE_CHANGE_PROP, undefined);
+      // `ngOnChanges` may already have written an explicit `[onValueChange]` binding onto this
+      // same prop key via `routeProp` (`setProperty`'s generic reflect loop) — seed the live
+      // explicit-handler slot from it, unless what's there is a PRIOR bridge's own forward
+      // function (the Angular-vs-manual-bridge double-registration this branch already dedupes,
+      // `listen(VALUE_CHANGE_EVENT)` fires twice per element — see `bridgedValueChangeHandlers`).
+      // Composing with the explicit handler (never replacing it) is the RN-parity behavior: RN's
+      // `onChange` always fires regardless of whether `value` is controlled.
+      const currentOnValueChange = propOf(target, VALUE_CHANGE_PROP);
+      if (
+        isReadBackListener(currentOnValueChange) &&
+        !bridgedValueChangeHandlers.has(currentOnValueChange)
+      ) {
+        explicitValueChangeHandlers.set(target, currentOnValueChange);
+      }
+      routeProp(
+        target,
+        VALUE_CHANGE_PROP,
+        composeValueChangeHandler(target, callback),
+      );
+      return () =>
+        routeProp(
+          target,
+          VALUE_CHANGE_PROP,
+          explicitValueChangeHandlers.get(target),
+        );
     }
     const listener = READ_BACK_EVENTS.has(eventName)
       ? withChangeDetection(target, callback)

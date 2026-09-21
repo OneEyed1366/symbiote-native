@@ -18,6 +18,10 @@ filled in; the user presses send, edits, or discards it.
 npm install @symbiote-native/sms
 ```
 
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --sms` (or
+`add --sms` in an existing app) installs and wires this for you — see
+[`@symbiote-native/cli`](../cli).
+
 `expo-sms` and `expo-modules-core` come along as regular, pinned dependencies — never install
 either yourself, and never add the `expo` meta-package to this project (it bundles its own
 Metro/Babel pipeline that conflicts with this project's own).

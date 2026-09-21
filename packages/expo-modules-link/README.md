@@ -19,6 +19,11 @@ project more than once.
 npm install @symbiote-native/expo-modules-link
 ```
 
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --expo-modules` (or
+`add --expo-modules` in an existing app) installs and wires this for you — see
+[`@symbiote-native/cli`](../cli). Picking any individual Expo-backed package (`--battery`,
+`--sensors`, ...) pulls this in automatically too.
+
 Then wire the `postinstall` hook so every install re-runs the linker:
 
 ```json

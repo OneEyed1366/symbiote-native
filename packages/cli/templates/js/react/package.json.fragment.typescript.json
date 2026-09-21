@@ -1,0 +1,11 @@
+{
+  "scripts": {
+    "pretypecheck": "css-dts .",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@react-native/typescript-config": "0.86.0",
+    "@types/react": "^19.2.0",
+    "typescript": "~6.0.0"
+  }
+}

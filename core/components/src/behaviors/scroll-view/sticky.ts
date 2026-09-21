@@ -72,6 +72,7 @@ import {
 
 import { descriptorFor } from '../../component-names';
 import { attachStickyScroll } from '../../scroll-view-commands';
+import { markScrollObserved } from './responder';
 import {
   createInitialStickyState,
   reduceSticky,
@@ -292,6 +293,10 @@ export function handleOwnerScroll(
   owner: ISymbioteNode,
   event: ISymbioteEvent,
 ): void {
+  // RN's `_handleScroll` (`ScrollView.js:1145-1147`) sets this unconditionally too — nothing reads
+  // it unless this node actually holds the responder, so an unconditional set on every scroll is
+  // exactly as safe here as it is there. See `./responder.ts`.
+  markScrollObserved(owner);
   const sticky = stickyOwners.get(owner);
   // Skipped while the offset rides the UI thread: the native attach already drives the value every
   // frame, so writing it again from a JS event is a redundant graph update at a WORSE rate.

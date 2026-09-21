@@ -37,7 +37,10 @@ import {
   propOf,
   propsOf,
 } from '@symbiote-native/engine';
+import { resolveButtonDisabled } from '../view/render-button';
 import {
+  asAccessibilityState,
+  booleanOr,
   createPressBehavior,
   type IDisabledResolver,
   type IPressConfigRefinement,
@@ -157,6 +160,17 @@ const refine: IPressConfigRefinement = (node, config) => {
   };
 };
 
+// TouchableOpacity.js:186-189 — `disabled ?? aria-disabled ?? accessibilityState.disabled`, the
+// same three-way answer Button resolves, just never wired to this tag's OWN registration before.
+// Without it, a caller who sets only `accessibilityState={{disabled: true}}` (no `disabled` prop)
+// gets the greyed-out RN look but a press that still fires here — RN suppresses it.
+const touchableOpacityDisabled: IDisabledResolver = props =>
+  resolveButtonDisabled(
+    booleanOr(props.disabled),
+    booleanOr(props['aria-disabled']),
+    asAccessibilityState(props.accessibilityState),
+  );
+
 /**
  * The behavior as PARTS, so a tag that is a TouchableOpacity plus something — `button`, which RN
  * builds as exactly that (Button.js:283) — composes the fade instead of re-implementing it.
@@ -261,7 +275,7 @@ function onOwnedListenerChange(node: ISymbioteNode, name: string): void {
 
 // Idempotent: an adapter entry may be imported more than once in a bundle.
 export function registerTouchableOpacityBehavior(): void {
-  const touchable = createTouchableOpacityBehavior();
+  const touchable = createTouchableOpacityBehavior(touchableOpacityDisabled);
   registerHostBehavior(TOUCHABLE_OPACITY_TAG, {
     ...touchable,
     onOwnedListenerChange,

@@ -1,0 +1,29 @@
+{
+  "dependencies": {
+    "@symbiote-native/android": "latest",
+    "@symbiote-native/angular": "latest",
+    "@symbiote-native/engine": "latest",
+    "@angular/core": "^22",
+    "@angular/common": "^22",
+    "@angular/compiler": "^22",
+    "@angular/forms": "^22",
+    "rxjs": "^7.8.1",
+    "react-native": "0.86.0",
+    "react": "19.2.3"
+  },
+  "devDependencies": {
+    "@angular/compiler-cli": "^22",
+    "@react-native/babel-preset": "0.86.0",
+    "@react-native/metro-config": "0.86.0"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "ng:build": "ngc -p tsconfig.angular.json",
+    "dev": "symbiote-angular-dev --reset-cache",
+    "start": "symbiote-angular-dev",
+    "android": "ngc -p tsconfig.angular.json && react-native run-android",
+    "ios": "ngc -p tsconfig.angular.json && react-native run-ios",
+    "pretypecheck": "css-dts .",
+    "typecheck": "ngc -p tsconfig.angular.json --noEmit"
+  }
+}

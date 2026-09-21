@@ -39,6 +39,9 @@ export default defineConfig(
       '**/codegen-specs/**',
       '**/*.tsbuildinfo',
       'examples/**',
+      // @symbiote-native/cli's scaffold templates — verbatim-copied RN app config/source, same
+      // reason as examples/** above (own formatting/lint once copied into a generated app).
+      'packages/cli/templates/**',
     ],
   },
 

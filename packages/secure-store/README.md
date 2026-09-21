@@ -16,6 +16,10 @@ autolinking picks up the native module).
 npm install @symbiote-native/secure-store
 ```
 
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --secure-store` (or
+`add --secure-store` in an existing app) installs and wires this for you — see
+[`@symbiote-native/cli`](../cli).
+
 `expo-secure-store` and `expo-modules-core` come along as regular, pinned dependencies — never
 install either yourself, and never add the `expo` meta-package to this project (it bundles its
 own Metro/Babel pipeline that conflicts with this project's own).

@@ -241,6 +241,29 @@ describe('touchable-highlight host behavior', () => {
     expect(onPressOut).toHaveBeenCalledTimes(1);
   });
 
+  // TouchableHighlight.js:194-197 resolves `disabled ?? accessibilityState.disabled` for its OWN
+  // Pressability config (no `aria-disabled` fallback here — RN itself omits it for this one
+  // primitive, unlike Opacity/Button/NativeFeedback). This stays a JS-side assertion: unlike the
+  // style/focusable cases below, gating `onPress` itself is the press machine's job, never the
+  // engine's payload rule.
+  it('suppresses the press from accessibilityState.disabled alone', async () => {
+    const onPress = vi.fn();
+    registerTouchableHighlightBehavior();
+    const node = makeTouchable();
+    routeProp(node, 'testID', TEST_ID);
+    routeProp(node, 'onPress', onPress);
+    routeProp(node, 'accessibilityState', { disabled: true });
+    mount(node);
+    await settle();
+
+    pressIn(node);
+    listenerOf(node, 'press')(TOUCH);
+    listenerOf(node, 'pressOut')(TOUCH);
+    await settle();
+
+    expect(onPress).not.toHaveBeenCalled();
+  });
+
   // THE TWO STYLE CASES LEFT ON 2026-09-18 — "applies a custom underlayColor and activeOpacity" and
   // "defaults to black at 0.85 opacity when unset". They are the only ones here that asked what a
   // showing underlay LOOKS like rather than when it shows, and that is `foldTouchableHighlightUnderlay`

@@ -18,7 +18,7 @@
     "typecheck": "tsc --build",
     "typecheck:watch": "tsc --build --watch",
     "clean:build": "node scripts/clean-build-outputs.mjs",
-    "prepublish-build": "pnpm run clean:build && pnpm run typecheck && pnpm run fix-esm-extensions && pnpm run copy-svelte-sources && pnpm run emit-svelte-declarations && pnpm --filter './{core,adapters,packages}/*' --if-present run ng:build",
+    "prepublish-build": "pnpm run clean:build && pnpm run typecheck && pnpm run fix-esm-extensions && pnpm run copy-svelte-sources && pnpm run emit-svelte-declarations && pnpm --filter './{core,adapters,packages}/*' --if-present run ng:build && pnpm --filter './{core,adapters,packages}/*' --if-present run build",
     "build": "pnpm run prepublish-build && pnpm run docs:build",
     "fix-esm-extensions": "node scripts/fix-esm-extensions.mjs",
     "copy-svelte-sources": "node scripts/copy-svelte-sources.mjs",

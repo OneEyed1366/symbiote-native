@@ -19,6 +19,10 @@ plain re-exports of the same `core`.
 npm install @symbiote-native/standard-web-crypto @symbiote-native/crypto
 ```
 
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --standard-web-crypto`
+(or `add --standard-web-crypto` in an existing app) installs and wires this for you — see
+[`@symbiote-native/cli`](../cli).
+
 `@symbiote-native/crypto` comes along as a regular dependency and does the actual native random-byte
 generation — see [its README](../crypto/README.md) for `expo-crypto`'s own native autolinking
 requirements (already satisfied in any app that already wires up `@symbiote-native/crypto` or

@@ -35,6 +35,13 @@ instead.
 npm install @symbiote-native/slider @react-native-community/slider
 ```
 
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --slider` (or
+`add --slider` in an existing app) installs and wires this for you — see
+[`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
+
+`@symbiote-native/slider` itself is a workspace package (`packages/slider`), not yet published — add it
+as a workspace dependency the same way the examples do.
+
 <Aside type="caution">
   `@react-native-community/slider` ships a React component (`Slider.tsx`) built
   on hooks. Never import that component directly in a non-React adapter — it

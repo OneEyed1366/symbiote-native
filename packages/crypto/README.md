@@ -14,6 +14,10 @@ no hook/composable/service to wrap — every adapter's entry point is a plain re
 npm install @symbiote-native/crypto
 ```
 
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --crypto` (or
+`add --crypto` in an existing app) installs and wires this for you — see
+[`@symbiote-native/cli`](../cli).
+
 `expo-crypto` and `expo-modules-core` come along as regular dependencies, pinned to exact
 versions — never install either yourself, and never add the `expo` meta-package to your project
 (it bundles its own Metro/Babel pipeline, which conflicts with this project's own).

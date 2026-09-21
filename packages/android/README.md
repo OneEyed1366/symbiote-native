@@ -14,7 +14,9 @@ npm install @symbiote-native/android
 ```
 
 Autolinked automatically by RN's Gradle plugin — see
-[No JS/TS API of its own](#no-jsts-api-of-its-own) below.
+[No JS/TS API of its own](#no-jsts-api-of-its-own) below. Every app scaffolded by
+`npx @symbiote-native/cli new` carries this package already, no separate flag needed — see
+[`@symbiote-native/cli`](../cli).
 
 ## What it re-provides
 

@@ -438,6 +438,7 @@ export {
   setInputFocused,
   setInputBlurred,
   blurTextInput,
+  focusTextInput,
 } from './text-input-state';
 export { LayoutAnimation } from './layout-animation';
 export type {

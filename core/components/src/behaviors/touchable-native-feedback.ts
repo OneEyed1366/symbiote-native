@@ -69,14 +69,30 @@ import {
   type ISymbioteNode,
 } from '@symbiote-native/engine';
 
+import { resolveButtonDisabled } from '../view/render-button';
 import {
+  asAccessibilityState,
   attachPressMachine,
+  booleanOr,
   detachPressMachine,
+  type IDisabledResolver,
   type IPressConfigRefinement,
 } from './pressable';
 import type { IPressMachineConfig } from '../state/pressable';
 
 export const TOUCHABLE_NATIVE_FEEDBACK_TAG = 'touchable-native-feedback';
+
+// TouchableNativeFeedback.js:214-221 — `disabled != null ? disabled : (aria-disabled ??
+// accessibilityState.disabled)`, read by the OWNER's Pressability config (:213), same three-way
+// answer Button/Opacity resolve. The clone's own `accessibilityState`/`focusable` already use the
+// RAW `disabled` prop correctly (RN does too, :311-321,:369-371) — only the press machine, which
+// lives on the CHILD and reads the OWNER, was missing this.
+const touchableNativeFeedbackDisabled: IDisabledResolver = props =>
+  resolveButtonDisabled(
+    booleanOr(props.disabled),
+    booleanOr(props['aria-disabled']),
+    asAccessibilityState(props.accessibilityState),
+  );
 
 // Read once, like `./button`'s: the platform cannot change under a running app.
 const IS_ANDROID = Platform.OS === 'android';
@@ -226,6 +242,7 @@ function arm(owner: ISymbioteNode, child: ISymbioteNode): void {
   attachPressMachine(child, {
     source: owner,
     refine: nativeFeedbackRefinement,
+    disabledOf: touchableNativeFeedbackDisabled,
   });
   for (const name of FORWARDED_LISTENERS) {
     forwardListener(

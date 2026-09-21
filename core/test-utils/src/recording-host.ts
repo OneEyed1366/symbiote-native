@@ -60,6 +60,22 @@ type IRecorded = {
   props: Record<string, unknown>;
   parent: IRecorded | undefined;
   children: IRecorded[];
+  // Set once, at the commit that first lands this node, and never cleared by a later removal — the
+  // real engine's own `node->committed` (a landed `ShadowNode` pointer) works the same way, which is
+  // what lets a behavior's PARTING write during the teardown sweep still reach a node `removeChild`
+  // just detached but a commit hasn't finished disposing of yet. Walking the live parent chain here
+  // instead answered `undefined` the moment the sweep ran, because `OP_REMOVE_CHILD` had already cut
+  // the link a few lines above it in the same `flushOps()`.
+  //
+  // The NUMERIC rootTag `createSurface(rootTag)` was called with — `OP_COMMIT`'s own slot `a`
+  // (`recordCommit(rootTag, surface)`, mutation-buffer.ts), carried straight through rather than
+  // invented. This is NOT the same unknown as the native Fabric `tag`: a rootTag is a JS-level
+  // surface identifier the app chose, present on the op stream from the start, while a Fabric tag is
+  // minted by the native differ this host never talks to. Conflating the two into one `NO_TAG`
+  // sentinel was a real past bug — `requestCommitForRoot`'s targeted-commit path reads exactly this
+  // field to know which surface to re-commit, and every root reading the SAME sentinel made every
+  // targeted commit silently name the wrong surface.
+  committedRootTag: number | undefined;
 };
 
 export type IRecordingHost = ITreeHost & {
@@ -224,16 +240,6 @@ const NO_TAG = -1;
 
 export function createRecordingHost(): IRecordingHost {
   let recorded = new WeakMap<object, IRecorded>();
-  let committedSurfaces = new WeakSet<IRecorded>();
-  // The NUMERIC rootTag `createSurface(rootTag)` was called with — `OP_COMMIT`'s own slot `a`
-  // (`recordCommit(rootTag, surface)`, mutation-buffer.ts), carried straight through rather than
-  // invented. This is NOT the same unknown as the native Fabric `tag`: a rootTag is a JS-level
-  // surface identifier the app chose, present on the op stream from the start, while a Fabric tag
-  // is minted by the native differ this host never talks to. Conflating the two into one `NO_TAG`
-  // sentinel was the actual bug — `requestCommitForRoot`'s targeted-commit path reads exactly this
-  // field to know which surface to re-commit, and every root reading the SAME sentinel made every
-  // targeted commit silently name the wrong surface.
-  let committedSurfaceRootTags = new WeakMap<IRecorded, number>();
   let eventHandler: IEventHandler | undefined;
   // The WeakMap above cannot be enumerated, and `find` has to start somewhere. Strong references,
   // so `forget()` is what a long file calls to stop this growing — the same deal `installFabric`'s
@@ -254,6 +260,14 @@ export function createRecordingHost(): IRecordingHost {
     const at = parent.children.indexOf(node);
     if (at >= 0) parent.children.splice(at, 1);
     node.parent = undefined;
+  };
+
+  // Lands a rootTag onto a whole subtree at OP_COMMIT, the same moment the real engine hands every
+  // node in the walk its own `ShadowNode`. `committedRootTag` never gets cleared afterwards, so a
+  // node removed after this still answers `committedRecordOf` — see that field's own comment.
+  const markCommitted = (node: IRecorded, rootTag: number): void => {
+    node.committedRootTag = rootTag;
+    for (const child of node.children) markCommitted(child, rootTag);
   };
 
   const host: IRecordingHost = {
@@ -300,6 +314,7 @@ export function createRecordingHost(): IRecordingHost {
           props,
           parent: undefined,
           children: [],
+          committedRootTag: undefined,
         };
         recorded.set(handle, node);
         created.push(node);
@@ -390,9 +405,7 @@ export function createRecordingHost(): IRecordingHost {
             break;
           case OP_COMMIT: {
             host.commits += 1;
-            const surfaceNode = at(b);
-            committedSurfaces.add(surfaceNode);
-            committedSurfaceRootTags.set(surfaceNode, a);
+            markCommitted(at(b), a);
             break;
           }
           default:
@@ -421,18 +434,24 @@ export function createRecordingHost(): IRecordingHost {
      *
      * `handle` is the authored node and `tag` is `NO_TAG`, so a test reading either gets something
      * obviously not-from-Fabric rather than a plausible number. `rootTag` is real, not invented —
-     * see `committedSurfaceRootTags`'s own comment for why the JS-level surface identifier is a
+     * see `IRecorded.committedRootTag`'s own comment for why the JS-level surface identifier is a
      * different unknown from the native Fabric tag.
+     *
+     * Read off `committedRootTag` (set once per node at the commit that landed it, never cleared),
+     * not a live walk to a committed root — `removeChild` cuts the parent link before a behavior's
+     * teardown sweep runs in the SAME commit, so a walk answers `undefined` for exactly the node a
+     * parting write (`TextInput`'s unmount blur) needs to still reach. `node->committed` in the real
+     * engine works the same way, and for the same reason.
      */
     committedRecordOf(handle: object): ICommittedRecord | undefined {
-      let node: IRecorded | undefined = recorded.get(handle);
-      if (node === undefined) return undefined;
-      while (node.parent !== undefined) node = node.parent;
-      if (!committedSurfaces.has(node)) return undefined;
+      const node = recorded.get(handle);
+      if (node === undefined || node.committedRootTag === undefined) {
+        return undefined;
+      }
       return {
         handle,
         tag: NO_TAG,
-        rootTag: committedSurfaceRootTags.get(node) ?? NO_TAG,
+        rootTag: node.committedRootTag,
       };
     },
     /**
@@ -583,8 +602,6 @@ export function createRecordingHost(): IRecordingHost {
 
     forget(): void {
       recorded = new WeakMap();
-      committedSurfaces = new WeakSet();
-      committedSurfaceRootTags = new WeakMap();
       created = [];
       host.reset();
     },

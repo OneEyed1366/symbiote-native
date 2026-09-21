@@ -1,17 +1,32 @@
 // TouchableHighlight as an ENGINE-NODE behavior, so it can be an intrinsic tag instead of a
 // framework component (`.claude/rules/host-primitive-tier.md`, tier 2).
 //
-// ONE NODE, THE SAME SIMPLIFICATION EVERY WRAPPER ALREADY SHIPS. RN's own TouchableHighlight
+// ONE NODE, THE SAME SIMPLIFICATION EVERY WRAPPER ALREADY SHIPPED. RN's own TouchableHighlight
 // renders a container View (the responder, the underlay backgroundColor, the whole accessibility
 // fold) and CLONES an extra opacity style onto its single child (TouchableHighlight.js:281-320,
-// `_createExtraStyles` + `cloneElement`) — closer to TouchableNativeFeedback's clone-onto-child
-// shape than to TouchableOpacity's true single node. Every wrapper (Svelte's own comment: "ITEM 7
-// IS DELIBERATELY NOT FIXED HERE... exactly as Solid and Angular decided") folds BOTH the underlay
-// and the child opacity onto the ONE node instead, because splitting them needs a child to target
-// and a framework component holding an opaque children snippet/slot cannot reach one safely. This
-// port keeps that already-shipped, already-cross-adapter simplification rather than reopening it —
-// `render-touchable-highlight.ts`'s own header says the shared layer "takes no position on where
-// they land", so this is a legitimate placement choice, not a new shortcut.
+// `_createExtraStyles` + `cloneElement`). This tag folds both onto the ONE node instead, in
+// `foldTouchableHighlightUnderlay` (`SymbioteFabricProps.cpp`) now — see that rule's own header.
+//
+// KNOWN GAP, and it predates both this port and the fix it reverts. Composing `opacity` onto the
+// SAME node as the underlay's `backgroundColor` fades the underlay itself, so `underlayColor:
+// 'black'` paints grey rather than black — every adapter's wrapper shipped this, and the rule's own
+// header above says so on purpose ("The port keeps that, it does not reopen it"). A 2026-09-15 fix
+// (fd39750b) closed it pointwise, in JS, on this one tag; this revert returns to the shared
+// (buggy) behavior every adapter already had, which is correct for THIS merge — a merge that also
+// changes behavior is unattributable.
+//
+// The reason the old header gave for not splitting it — "needs a child to target and a framework
+// component holding an opaque children slot cannot reach one safely" — no longer holds: that was
+// true of JS wrappers, not of the engine. The DESCENDANT seam this needs already exists: a rule
+// keyed on `IOwner.tagName`, the same shape `foldCloneOntoChild` uses to reach a
+// TouchableNativeFeedback child's own `fabricProps()` call and write onto ITS payload — the write
+// `IFirstChild` cannot do, since that seam only reads a child, from the PARENT's own call.
+//
+// TODO: what actually blocks it is one missing field. `IOwner` carries `{ props, tagName,
+// hasPressListener }`; the child would need the owner's `underlayShown` too (currently only on
+// `ISelf`, the node's own state) to decide whether to paint at all. Closing this is a new
+// descendant-keyed rule plus that one field on `IOwner`, not a `foldTouchableHighlightUnderlay`
+// rewrite.
 //
 // WHAT IS SHARED AND WHAT IS NEW. The underlay show/hide state machine
 // (createHighlightUnderlayHandlers/createHighlightUnderlayRuntime, `../state/touchable`) is already
@@ -38,7 +53,10 @@ import {
   type ISymbioteNode,
   propOf,
 } from '@symbiote-native/engine';
+import { resolveButtonDisabled } from '../view/render-button';
 import {
+  asAccessibilityState,
+  booleanOr,
   createPressBehavior,
   type IDisabledResolver,
   type IPressConfigRefinement,
@@ -50,6 +68,17 @@ import {
   type IHighlightUnderlayRuntime,
 } from '../state/touchable';
 export const TOUCHABLE_HIGHLIGHT_TAG = 'touchable-highlight';
+
+// TouchableHighlight.js:194-197 — `disabled ?? accessibilityState.disabled` (RN omits aria-disabled
+// here, unlike Opacity/Button/NativeFeedback — an upstream inconsistency this matches rather than
+// "fixes"). Without it, `accessibilityState={{disabled: true}}` alone greys the label but a press
+// still fires here.
+const touchableHighlightDisabled: IDisabledResolver = props =>
+  resolveButtonDisabled(
+    booleanOr(props.disabled),
+    undefined,
+    asAccessibilityState(props.accessibilityState),
+  );
 
 interface IHighlightState {
   shown: boolean;
@@ -203,7 +232,9 @@ export function createTouchableHighlightBehavior(
 
 // Idempotent: an adapter entry may be imported more than once in a bundle.
 export function registerTouchableHighlightBehavior(): void {
-  const touchable = createTouchableHighlightBehavior();
+  const touchable = createTouchableHighlightBehavior(
+    touchableHighlightDisabled,
+  );
   // Spread whole: the tag used to override `attach` purely to bind a per-node `payloadFold`, and
   // with the underlay rule in the engine there is nothing left to add.
   registerHostBehavior(TOUCHABLE_HIGHLIGHT_TAG, {

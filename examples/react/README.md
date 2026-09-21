@@ -19,6 +19,9 @@ the surface's `rootTag`, and `@symbiote-native/react`'s `mount` takes over from 
 README](../../adapters/react) for the full surface this app exercises and what's verified on which
 platform.
 
+> This canary predates `@symbiote-native/cli` and is for in-repo development. To start a new app,
+> use `npx @symbiote-native/cli new --framework react` instead.
+
 ## Run
 
 ```sh

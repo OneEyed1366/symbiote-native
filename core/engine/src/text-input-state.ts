@@ -3,7 +3,7 @@
 // Keyboard.dismiss can blur whatever holds focus without a ref, exactly how RN's
 // dismissKeyboard() works (blurTextInput(currentlyFocusedInput())).
 
-import { dispatchViewCommand } from './imperative';
+import { dispatchViewCommand, propOf } from './imperative';
 import { dlog } from './debug';
 import type { ISymbioteNode } from './node';
 
@@ -25,10 +25,23 @@ export function setInputBlurred(node: ISymbioteNode): void {
 }
 
 // Imperative blur: drive the native `blur` view command and drop the tracked focus.
-// Used by TextInput.blur() and Keyboard.dismiss().
+// Used by TextInput.blur() and Keyboard.dismiss(). A no-op if this node isn't the
+// currently-focused one — mirrors RN's TextInputState.blurTextInput, which guards the
+// same way so blurring an already-unfocused input never reaches native.
 export function blurTextInput(node: ISymbioteNode | null): void {
-  if (node === null) return;
+  if (node === null || currentlyFocused !== node) return;
   dlog('TextInputState.blurTextInput -> blur command');
   dispatchViewCommand(node, 'blur', []);
   setInputBlurred(node);
+}
+
+// Imperative focus: RN's `ReactNativeElement.focus()` routes a text input through
+// `TextInputState.focusTextInput`, not a raw command — same guard as blur, plus a check
+// this side of the pair also carries: already-focused or `editable: false` is a no-op.
+export function focusTextInput(node: ISymbioteNode | null): void {
+  if (node === null) return;
+  if (currentlyFocused === node || propOf(node, 'editable') === false) return;
+  dlog('TextInputState.focusTextInput -> focus command');
+  setInputFocused(node);
+  dispatchViewCommand(node, 'focus', []);
 }

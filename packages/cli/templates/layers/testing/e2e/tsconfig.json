@@ -1,0 +1,7 @@
+{
+  "extends": "@react-native/typescript-config",
+  "compilerOptions": {
+    "types": ["jest", "detox", "node"]
+  },
+  "include": ["**/*.ts"]
+}

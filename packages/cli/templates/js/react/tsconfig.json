@@ -1,0 +1,18 @@
+{
+  "extends": "@react-native/typescript-config",
+  "compilerOptions": {
+    // @react-native/typescript-config's own base unconditionally sets types:["jest"] — an empty
+    // array here is a real override (not just "no opinion"), needed because @types/jest is only
+    // resolvable once --testing installs it; omitting this key entirely would inherit the
+    // base's ["jest"] through `extends` and fail with "Cannot find type definition file 'jest'".
+    "types": [],
+    // The adapter owns its own JSX namespace (adapters/react/src/jsx-runtime.ts) — without this,
+    // `<view>`/`<text>` are unknown intrinsics to tsc.
+    "jsxImportSource": "@symbiote-native/react",
+    "plugins": [{ "name": "@symbiote-native/css-parser/typescript-plugin" }]
+  },
+  "include": ["**/*.ts", "**/*.tsx"],
+  // e2e/ ships its own complete tsconfig.json (jest + detox + node) — excluded here so this root
+  // config, which has no reason to typecheck it, doesn't also need jest's globals declared.
+  "exclude": ["**/node_modules", "**/Pods", "e2e"]
+}

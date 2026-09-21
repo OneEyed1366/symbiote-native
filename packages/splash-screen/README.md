@@ -13,6 +13,10 @@ primitives — there is no `ViewConfig` to register, only lifecycle to port per 
 npm install @symbiote-native/splash-screen
 ```
 
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --splash-screen` (or
+`add --splash-screen` in an existing app) installs and wires this for you — see
+[`@symbiote-native/cli`](../cli).
+
 Only this package — never `react-native-bootsplash` directly. `@symbiote-native/splash-screen`
 depends on it and ships as the sole autolinked native proxy (`react-native.config.cjs` +
 `symbiote-splash-screen.podspec`), the same one-dependency packaging as `@symbiote-native/slider`

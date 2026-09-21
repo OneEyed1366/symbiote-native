@@ -87,6 +87,14 @@ describe('resolveDisabledAccessibilityState', () => {
     const state = { selected: true };
     expect(resolveDisabledAccessibilityState(state, undefined)).toBe(state);
   });
+
+  // Ported from RN's Pressable-test.js ("should overwrite accessibilityState with value of
+  // disabled prop"): a caller-supplied `accessibilityState={{disabled: false}}` must not survive
+  // an authored `disabled={true}` — the prop always wins over a stale/contradictory a11y state.
+  it('overwrites an explicit accessibilityState.disabled with the disabled prop', () => {
+    const result = resolveDisabledAccessibilityState({ disabled: false }, true);
+    expect(result).toEqual({ disabled: true });
+  });
 });
 
 function makeHandlers(calls: string[]): IPressHandlers {

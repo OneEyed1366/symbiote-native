@@ -15,6 +15,10 @@ mount/unmount lifecycle (`useClipboard`).
 npm install @symbiote-native/clipboard
 ```
 
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --clipboard` (or
+`add --clipboard` in an existing app) installs and wires this for you — see
+[`@symbiote-native/cli`](../cli).
+
 Depends on `expo-clipboard` and `expo-modules-core` directly (regular dependencies, pinned to an
 exact version — never a caret range, since this package's `core/` is hand-ported against one
 specific native API shape and a newer resolve could silently drift the two apart). Never install

@@ -87,6 +87,10 @@ import {
   type IContentSize,
 } from '../../view/render-scroll-view';
 import {
+  installResponderPredicates,
+  RESPONDER_OWNED_LISTENERS,
+} from './responder';
+import {
   handleOwnerScroll,
   markScrollOwner,
   reconcileStickyIndices,
@@ -288,7 +292,12 @@ function scrollBehavior(
     // view unconditionally and calls the app's own handler from inside them, and `node.listeners`
     // is single-slot — so a behavior that installed either without owning it would silently evict
     // the app's.
-    ownedListeners: ['contentSizeChange', 'scroll', 'layout'],
+    ownedListeners: [
+      'contentSizeChange',
+      'scroll',
+      'layout',
+      ...RESPONDER_OWNED_LISTENERS,
+    ],
     slotProps: SLOT_PROPS,
     slotDerived: [...SLOT_DERIVED, ...(platform.slotDerived ?? [])],
     claimedChildren: { [REFRESH_CONTROL]: platform.claimMode },
@@ -302,6 +311,7 @@ function scrollBehavior(
       setBehaviorListener(node, 'scroll', event =>
         handleOwnerScroll(node, event),
       );
+      installResponderPredicates(node);
     },
     onOwnedListenerChange: syncOwnedListener,
     // The one beat at which the app's children are all present — `stickyHeaderIndices` addresses
