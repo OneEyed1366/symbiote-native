@@ -1,13 +1,14 @@
 ---
-'@symbiote-native/engine': major
+'@symbiote-native/engine': minor
 '@symbiote-native/test-utils': minor
 ---
 
 Cut what a removal costs: a narrower teardown walk, a real `firstChildOf`, and a cheaper batch
 boundary.
 
-`ITreeHost` gains two required members, which is why this is a major. A host implementing the type
-by hand must add both; every host shipped here already has them.
+`ITreeHost` gains two required members. The type is an internal seam, exported to be read rather
+than implemented outside this repo, so a new required member lands in a minor; both hosts shipped
+here already have them.
 
 - `firstChildOf` answers with one handle instead of `childrenOf(handle)[0]`. The old spelling read a
   list of N, then N-1, then N-2, so emptying a parent the way `solid-js/universal` does crossed
