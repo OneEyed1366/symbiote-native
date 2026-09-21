@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/cli",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Create a native iOS/Android app in Vue, Svelte, Solid, Angular or React, on React Native's own Fabric renderer. Scaffolds a new app, or wires SymbioteNative into an existing bare React Native one.",
   "keywords": [
     "react-native",
