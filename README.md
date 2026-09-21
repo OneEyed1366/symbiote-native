@@ -60,7 +60,7 @@ What each framework needs in the build differs, and the CLI writes it for you:
 | [Solid](./adapters/solid)     | `@symbiote-native/solid`   | its `babel-preset` listed **last** in Metro's presets                                                                                                                     |
 
 Every adapter is [on npm](https://www.npmjs.com/org/symbiote-native) at `2.0.x`, and the scope
-publishes **37 packages** in all. Beyond the five adapters and the shared core, 27 companion
+publishes **37 packages** in all. Beyond the five adapters and the shared core, 28 companion
 packages cover navigation, third-party native views, and Expo-module wrappers for device, sensor
 and permission APIs. Each lives under [`packages/`](./packages) with its own README.
 
@@ -152,39 +152,14 @@ The costs:
   package gets a thin agnostic wrapper written here: no native code, no forking, a few hundred
   lines. Cheap per package, but manual, so the covered surface grows one library at a time.
 
-<details>
-<summary>Evidence behind that table, with dates</summary>
-
-Latest npm releases, read from the registry on 2026-09-20.
-
-**NativeScript** lists six flavors in its own docs, and five of the six are current:
-
-| Flavor  | Package                                 | Latest              |
-| ------- | --------------------------------------- | ------------------- |
-| JS / TS | `@nativescript/core`                    | 9.1.2, Sep 16 2026  |
-| Angular | `@nativescript/angular`                 | 22.0.1, Aug 24 2026 |
-| Vue     | `nativescript-vue`                      | 3.1.2, Sep 15 2026  |
-| Solid   | `@nativescript-community/solid-js`      | 0.1.2, Aug 15 2026  |
-| Svelte  | `@nativescript-community/svelte-native` | 1.0.32, Apr 9 2026  |
-| React   | `react-nativescript`                    | 5.0.0, Aug 2023     |
-
-The original `svelte-native` (1.0.29, Nov 2024) is the abandoned one; the maintained fork is the
-`@nativescript-community` package above. React is their stale flavor, not Svelte.
-
-**Hippy** ships React actively, `@hippy/react` 3.3.5 (Aug 4 2026), in QQ, QQ Music and Tencent News.
-Its Vue packages lag: `@hippy/vue` and `@hippy/vue-next` both sit at 3.3.2 from Feb 17 2025.
-
-**Lynx** launched Mar 2025 and moves fast, `@lynx-js/react` 0.126.1 (Sep 11 2026). Vue Lynx is real
-rather than a prototype: `vue-lynx` 0.5.1 (Jul 2026), its own docs site, `npm create vue-lynx`, and
-Composition API, SFCs, Vue Router and Pinia. Pre-1.0, and Lynx says non-React flavors are already
-about half its usage.
+Their multi-framework support is real and current, not a claim we are discounting: NativeScript
+maintains five live flavors, Hippy ships React in QQ and Tencent News, and Vue Lynx has its own docs
+site and about half of Lynx's usage. The row that differs is whose native layer runs underneath.
 
 The wrapping cost has one mechanism behind it: a library's JS component calls React hooks in its own
 body, so under a non-React adapter the dispatcher is null and it throws. The _native view_ is
 unaffected. [`@symbiote-native/slider`](./packages/slider) is the reference shape for reaching one
 without importing the library's React component.
-
-</details>
 
 ---
 
@@ -296,29 +271,6 @@ The harness is JavaScriptCore rather than Hermes, a test host rather than a real
 the runner applies no app-level Babel lowering. Read it as a sound comparison of the six columns
 _against each other_ on one ruler, and re-measure on device before quoting a ratio against stock.
 
-<details>
-<summary>The last full on-device run, from a release that no longer ships</summary>
-
-Taken on the **JS retained-tree** engine, before the tree moved into C++. iOS 26.5 simulator,
-Release, 1 000 rows, all mounted. Kept because the device is the real instrument and this is the most
-recent reading from it, but the architecture underneath has been replaced. Do not read it as current.
-
-| Operation      | stock RN |             Solid |            Svelte |               Vue |             React |          Angular |
-| -------------- | -------: | ----------------: | ----------------: | ----------------: | ----------------: | ---------------: |
-| Create 1 000   |    257.3 | **195.7 / 0.76x** | **205.0 / 0.80x** | **228.7 / 0.89x** |     264.7 / 1.03x |    367.2 / 1.43x |
-| Replace all    |    256.3 | **229.3 / 0.89x** | **214.0 / 0.83x** | **238.1 / 0.93x** |     266.3 / 1.04x |    460.2 / 1.80x |
-| Append 1 000   |    415.0 | **204.3 / 0.49x** | **223.1 / 0.54x** | **229.0 / 0.55x** | **390.2 / 0.94x** |    438.2 / 1.06x |
-| Partial update |     33.6 |  **11.8 / 0.35x** |  **15.4 / 0.46x** |  **19.2 / 0.57x** |  **26.1 / 0.78x** |     39.1 / 1.16x |
-| Remove row     |    121.4 |  **10.4 / 0.09x** |   **8.6 / 0.07x** |  **10.1 / 0.08x** |  **98.6 / 0.81x** | **18.3 / 0.15x** |
-| Swap 2 rows    |      9.6 |   **6.1 / 0.64x** |   **8.4 / 0.88x** |   **8.7 / 0.91x** |      35.3 / 3.68x |     18.4 / 1.92x |
-| Select row     |      7.3 |   **5.5 / 0.75x** |      14.7 / 2.01x |       8.4 / 1.15x |       7.9 / 1.08x |     10.5 / 1.44x |
-| Clear          |     10.7 |   **9.1 / 0.85x** |      12.6 / 1.18x |      14.1 / 1.32x |   **8.7 / 0.81x** |     44.2 / 4.13x |
-
-React's `Swap` is the one row that survives the architecture change: 3.68x here against 1.33x on the
-table above, the same cause in both, and the explanation above applies to each.
-
-</details>
-
 ---
 
 ## How It Works
@@ -385,39 +337,6 @@ reference surface; Reanimated is the largest remaining gap and is not started.
 The bar for "done" is the canary, not a percentage. RN's surface is effectively unbounded, so the
 example apps are the working spec and they stay green.
 
-<details>
-<summary>Milestones, and what each step proved</summary>
-
-Make **React** the known-good driver first, then add one framework at a time on an already validated
-core, so a break in a new adapter isolates to _that adapter_ rather than the native pipe or the
-commit engine. The framework axis and the platform axis are independent: each new adapter inherits
-the platform axis as it lands.
-
-| #      | Milestone                | What it proves                                                                                                                                                       | Status  |
-| ------ | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| **M0** | Monorepo scaffold        | pnpm workspaces, engine + react packages, headless harness                                                                                                           | done    |
-| **M1** | React canary on iOS      | native pipe, clone-on-write engine, event to recommit                                                                                                                | done    |
-| **M2** | React to RN parity       | the canary's full primitive, prop and event surface on the agnostic core, green on iOS + Android                                                                     | done    |
-| M2.1   | Primitive surface        | `View`/`Text`/`ScrollView`/`TextInput`/`Modal`/`FlatList` through the engine, on device                                                                              | done    |
-| M2.2   | Runtime modules          | `Platform`/`StyleSheet`/`Dimensions`/`Appearance` + imperative `Alert`/`Share`/`Linking`/`Keyboard`                                                                  | done    |
-| M2.3   | `Animated`, both drivers | JS + native driver; native offload proven by freezing the JS thread                                                                                                  | done    |
-| M2.4   | Third-party native views | `@react-native-community/slider` via runtime ViewConfig derivation, zero SymbioteNative metadata                                                                     | done    |
-| M2.5   | Gestures and events      | responder lifecycle, capture to bubble, `Pressable`/`Touchable*`/`PanResponder`, a11y prop layer                                                                     | done    |
-| M2.6   | Long-tail prop edges     | continuous hardening as the canary surface widens, never a gate on M2                                                                                                | ongoing |
-| **M3** | Vue adapter              | `createRenderer` + nodeOps, first non-React framework, same canary surface                                                                                           | done    |
-| M3.1   | Shared component layer   | `VirtualizedList` family and component logic extracted, inherited by every adapter                                                                                   | done    |
-| **M4** | Angular adapter          | `Renderer2`/`RendererFactory2` + DOM-less bootstrap, AOT through a Metro-compatible linker                                                                           | done    |
-| **M5** | App-ready ecosystem      | the minimal third-party surface a real app needs, built once against the agnostic core                                                                               | ongoing |
-| M5.1   | Navigation               | a framework-agnostic navigation core over `react-native-screens`. `react-navigation`'s UI is React-only, so this is a genuine shared component rather than a wrapper | done    |
-| M5.2   | Native-module wrappers   | 22 shipped (Clipboard, Haptics, Sensors, Battery, Device and more), autolinked; persistent storage and safe-area edges still open                                    | ongoing |
-| M5.3   | Reanimated               | the largest remaining gap, saved for last: a full worklet-driven animation layer                                                                                     | planned |
-| **M6** | Svelte adapter           | a DOM shim over stock compiled Svelte output, third non-React framework, full parity                                                                                 | done    |
-| **M7** | Solid adapter            | `solid-js/universal`'s `createRenderer`, fourth non-React framework, full parity                                                                                     | done    |
-| **M8** | Web _(stretch)_          | the same trees rendered to the web as a default platform target                                                                                                      | maybe   |
-| **DX** | `@symbiote-native/cli`   | one command scaffolds a working app, pinning `react-native` at the app root so app code names only `@symbiote-native/*`                                              | done    |
-
-</details>
-
 ---
 
 ## Testing
@@ -435,17 +354,6 @@ Fabric renderer as a baseline arm. A second host build compiles the Android bran
 platform-split rule is tested in a build that actually contains it.
 
 Commands, layers and what each one covers: [CONTRIBUTING.md](./CONTRIBUTING.md).
-
----
-
-## FAQ
-
-**Is this a fork of React Native?** No. `react-native` is consumed as an ordinary dependency and its
-native C++/Obj-C++/JNI sources are never touched. Only the JS renderer is replaced.
-
-**Why React first, if the goal is framework independence?** React is a known-good driver. Validating
-the native pipe and the commit engine against it first means that when a later adapter breaks, the
-failure isolates to _that adapter_ rather than the native stack underneath it.
 
 ---
 

@@ -437,8 +437,7 @@ evaluating its argument.
 The milestones separate the risks: **R1** native pipe/bootstrap/slot, **R2** the
 engine's mutation→clone-on-write commit path, **R3** event→recommit, **R4** a
 non-React framework driving the engine (proves the core is genuinely
-framework-agnostic). Authoritative milestone
-table lives in [`README.md`](./README.md).
+framework-agnostic). What ships today is summarised in [`README.md`](./README.md)'s Status section.
 
 **M1 + M2 — React, done (alpha).** `@symbiote-native/react`: a `react-reconciler` host
 config in **mutation mode** (`supportsMutation: true`, `appendChild`/`insertBefore`/
