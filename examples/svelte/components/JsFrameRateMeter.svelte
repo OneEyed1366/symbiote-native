@@ -56,6 +56,10 @@
   const EMPTY_COMMIT_SAMPLE: ICommitProfile = {
     commits: 0,
     propWrites: 0,
+    nodesCreated: 0,
+    applyCalls: 0,
+    applyMs: 0,
+    decodeMs: 0,
   };
 
   let { accent }: { accent: string } = $props();

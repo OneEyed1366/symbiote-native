@@ -59,6 +59,21 @@ import { loadStockRenderer } from './stock-renderer';
    which drifts a disable-next-line off target; see this file's own header for why it's a require */
 const TextInput =
   require('react-native/Libraries/Components/TextInput/TextInput').default;
+// THE SAME CORRECTION THE INPUT ALREADY TOOK, applied to the other four nodes of the row. This file
+// wrote `h('RCTView')` and `h('RCTText')` — Fabric view names with no component above them — where
+// no React Native app writes anything but `<View>` and `<Text>`, so the baseline was priced against
+// a row nobody ships. `stock-row-components-cost.itest.tsx` measures it on the byte-identical
+// census: 135 ms for the bare names against 171 for these, i.e. **~33 ms of a thousand-row create**
+// that the published stock column never paid.
+//
+// `<View>` and NOT `<Pressable>` for the two cells, although `examples/bare-rn:404` mounts pressables
+// there: every adapter arm in this directory builds its cells from a plain `view` tag
+// (`react-suite.itest.tsx:46`), and an arm that carried a press machine none of its counterparts
+// carry would be the same substitution again, pointing the other way. That row is measured too, in
+// the same fixture, and costs a further ~68 ms — the number to reach for when the subject is the
+// DEVICE baseline rather than this suite.
+const View = require('react-native/Libraries/Components/View/View').default;
+const Text = require('react-native/Libraries/Text/Text').default;
 /* eslint-enable @typescript-eslint/no-require-imports */
 
 const Row = memo(function RowView({
@@ -69,17 +84,17 @@ const Row = memo(function RowView({
   isSelected: boolean;
 }): ReturnType<typeof h> {
   const label = (text: string): ReturnType<typeof h> =>
-    h('RCTText', { ellipsizeMode: 'tail' }, text);
+    h(Text, { ellipsizeMode: 'tail' }, text);
 
   return h(
-    'RCTView',
+    View,
     {
       style: isSelected ? SELECTED_ROW_STYLE : ROW_STYLE,
-      nativeID: `row-${row.id}`,
+      // No id prop — the row is kept concrete by `ROW_STYLE`'s background, as on the device screen.
     },
     label(String(row.id)),
-    h('RCTView', { style: CELL_STYLE }, label(row.label)),
-    h('RCTView', { style: CELL_STYLE }, label('x')),
+    h(View, { style: CELL_STYLE }, label(row.label)),
+    h(View, { style: CELL_STYLE }, label('x')),
     h(TextInput, { style: INPUT_STYLE, value: row.label }),
   );
 });
@@ -139,6 +154,8 @@ describe('the benchmark screen through stock React Native', () => {
       // `ReactFabric.render` mounts straight into the root where `createSurface` puts a container
       // under it — the same one-node difference `CLAUDE.md` records as `createNode 10001 vs 10000`.
       chrome: 2,
+      // The baseline half of the mutation comparison — see the React arm for what it is for.
+      countsMutations: true,
       apply: state => {
         render(
           h(

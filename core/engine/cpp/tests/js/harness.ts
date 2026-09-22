@@ -29,6 +29,9 @@ declare const __symbioteTester: {
   ) => void;
   commands: () => IRecordedCommand[];
   mountingLogs: () => string[];
+  commitNumber: () => number;
+  heapInfo: () => Record<string, number>;
+  collectGarbage: () => void;
   reset: () => void;
   print: (line: string) => void;
 };
@@ -194,6 +197,30 @@ export function shapeOf(view: IMountedView): string {
 }
 
 /**
+ * A committed subtree as `name{key=value,…}(children…)` — every node, every prop, no tags.
+ *
+ * The one thing the mutation oracle cannot compare. `StubViewTree::recordMutation` writes a line
+ * holding `type`, `nativeID` and `index` and NOTHING ELSE, so two arms can agree mutation for
+ * mutation and still hand the platform different payloads — and on a device the payload is what
+ * `updateProps:oldProps:` costs, field by differing field.
+ *
+ * Tag-free on purpose: two arms number their nodes differently and always will, so a dump carrying
+ * tags can only ever differ. Keys are sorted for the same reason — `getDebugProps` builds its list
+ * in each props class's own order, and a diff must not turn on it.
+ *
+ * INCOMPLETE, with the same caveat as `IMountedView.props`: `getDebugProps` is a hand-written
+ * selection that also omits any value equal to its default. A key present here is real; a key absent
+ * says nothing. So this compares arms against EACH OTHER, and proves no absolute claim about either.
+ */
+export function payloadOf(node: ICommittedNode): string {
+  const props = Object.keys(node.props)
+    .sort()
+    .map(key => `${key}=${node.props[key]}`)
+    .join(',');
+  return `${node.viewName}{${props}}(${node.children.map(payloadOf).join('')})`;
+}
+
+/**
  * The mounted view carrying this `testID`, or undefined.
  *
  * This is the read most migrated tests want, and it replaces `fabric.appRoot().children[i]…` rather
@@ -243,6 +270,80 @@ export function commands(): IRecordedCommand[] {
  */
 export function mountingLogs(): string[] {
   return __symbioteTester.mountingLogs();
+}
+
+/**
+ * The shadow tree's running commit number — a step's own commit count is the delta across it.
+ *
+ * The one headless instrument that speaks about a cost living PAST `completeRoot`, where the
+ * device's overhead sits and where the mutation oracle goes blind: each commit signals the mounting
+ * thread, and on a device that is `RCTMountingManager` creating and configuring `UIView`s on the
+ * main thread. Two renderers can emit an identical mutation list and still cost differently there
+ * if one of them splits it across more commits.
+ *
+ * NOT a transaction count, which reads 1 whatever happens — `MountingCoordinator::pullTransaction`
+ * diffs the base revision against the latest, so intermediate commits collapse and the loop that
+ * pulls them counts the caller's own drains.
+ */
+export function commitNumber(): number {
+  return __symbioteTester.commitNumber();
+}
+
+/**
+ * The engine's heap and GC counters — `hermes_totalAllocatedBytes`, `hermes_allocatedBytes`,
+ * `hermes_heapSize`, `hermes_numCollections`, `hermes_peakAllocatedBytes`, `hermes_peakLiveAfterGC`.
+ *
+ * The axis every other instrument here is blind to. A wall clock prices the work a commit does; what
+ * that work ALLOCATES is a second cost, paid later and elsewhere, and a device heap pays it far more
+ * often than a Mac does. `numCollections` and cumulative allocation are what a renderer comparison
+ * on Hermes turns on — see the octane thread linked from the measurement skill.
+ *
+ * EMPTY ON JAVASCRIPTCORE: jsi's default `getHeapInfo` returns an empty map, so a reader gets
+ * nothing rather than a wrong number. Check before dividing.
+ */
+export function heapInfo(): Record<string, number> {
+  return __symbioteTester.heapInfo();
+}
+
+/** A full collection, so a measurement starts from a known floor. */
+export function collectGarbage(): void {
+  __symbioteTester.collectGarbage();
+}
+
+/**
+ * What the differ told the platform to do since the last read, keyed `Kind/ComponentName`.
+ *
+ * The drain is included, because `mountingLogs()` without it reads empty forever: until a
+ * transaction is pulled the commit exists only as a shadow-tree revision and the differ has not run.
+ *
+ * Why the TYPE is in the key and not only the kind: a total cannot say whether an arm told the host
+ * about a row or about everything inside it, and that distinction is the only reason to count at
+ * all. `StubViewTree` quotes the component name (`type: "View"`), so the quotes are part of the
+ * pattern rather than decoration — drop them and every line falls through to `?`.
+ */
+export function countMutations(): Map<string, number> {
+  mounted();
+  const counts = new Map<string, number>();
+  for (const log of mountingLogs()) {
+    const kind = log.slice(0, log.indexOf(' '));
+    const type = /type: "([A-Za-z0-9_]+)"/.exec(log)?.[1] ?? '?';
+    const key = `${kind}/${type}`;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return counts;
+}
+
+/** `countMutations()` as one sorted line, for a `print`. */
+export function mutationSummary(counts: Map<string, number>): string {
+  let total = 0;
+  for (const count of counts.values()) total += count;
+  return (
+    `total=${total} :: ` +
+    [...counts.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([key, count]) => `${key}=${count}`)
+      .join(' ')
+  );
 }
 
 declare const __symbioteFlushTimers: (rounds?: number) => void;

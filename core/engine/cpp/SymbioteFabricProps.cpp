@@ -2573,6 +2573,10 @@ dynamic fabricProps(
   dynamic aliasResolved;
   if (isTextInput) {
     aliasResolved = foldTextInputAliases(*bag, component == kMultilineTextInput);
+    // `TextInput.js:583` — `props.accessible !== false`, handed to both the singleline and the
+    // multiline view (`:703`, `:772`). The same shape as the Text rule below, and found the same
+    // way: diffing one bench row's committed payload against React Native's own.
+    aliasResolved["accessible"] = boolAt(aliasResolved, "accessible").value_or(true);
     bag = &aliasResolved;
   }
 
@@ -2598,6 +2602,19 @@ dynamic fabricProps(
     const bool optedOut =
         scaling != nullptr && scaling->isBool() && scaling->getBool() == false;
     textDefaulted["allowFontScaling"] = !optedOut;
+    // `Text.js:145` — `accessible !== false` on iOS, the same "only a literal false opts out" shape
+    // as the two above. Android resolves it off the press handlers instead, which is a behavior's
+    // job and not this rule's.
+    textDefaulted["accessible"] = boolAt(textDefaulted, "accessible").value_or(true);
+    // `Text.js:547` puts this in the component's own default STYLE, and its comment says why:
+    // "native components have historically acted like overflow: hidden ... to let client
+    // differentiate with overflow: 'visible'". Written at the TOP LEVEL rather than into the style
+    // slot so an authored `style.overflow` still beats it — `addStyle` hoists the slot over this
+    // payload after the copy loop below, which is what makes it a fallback rather than an override.
+    const dynamic *overflow = textDefaulted.get_ptr("overflow");
+    if (overflow == nullptr || overflow->isNull()) {
+      textDefaulted["overflow"] = "hidden";
+    }
     bag = &textDefaulted;
   }
 

@@ -247,6 +247,7 @@ export type INativeEngineBindings = {
     valueEntries: number;
     valueConversions: number;
     applyMs: number;
+    liveNodes: number;
     stringDecodeMs: number;
     structureMs: number;
     holdHandleMs: number;

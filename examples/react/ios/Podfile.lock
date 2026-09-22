@@ -1426,7 +1426,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - react-native-safe-area-context (5.9.1):
+  - react-native-safe-area-context (5.10.0):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -1438,8 +1438,8 @@ PODS:
     - React-graphics
     - React-ImageManager
     - React-jsi
-    - react-native-safe-area-context/common (= 5.9.1)
-    - react-native-safe-area-context/fabric (= 5.9.1)
+    - react-native-safe-area-context/common (= 5.10.0)
+    - react-native-safe-area-context/fabric (= 5.10.0)
     - React-NativeModulesApple
     - React-RCTFabric
     - React-renderercss
@@ -1450,7 +1450,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - react-native-safe-area-context/common (5.9.1):
+  - react-native-safe-area-context/common (5.10.0):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -1472,7 +1472,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - react-native-safe-area-context/fabric (5.9.1):
+  - react-native-safe-area-context/fabric (5.10.0):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -1892,7 +1892,7 @@ PODS:
     - React-utils (= 0.86.0)
     - ReactNativeDependencies
   - ReactNativeDependencies (0.86.0)
-  - symbiote-engine (0.4.0):
+  - symbiote-engine (1.1.0):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -1914,31 +1914,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - symbiote-navigation (3.0.0):
-    - hermes-engine
-    - RCTRequired
-    - RCTTypeSafety
-    - React-Core
-    - React-Core-prebuilt
-    - React-debug
-    - React-Fabric
-    - React-featureflags
-    - React-graphics
-    - React-ImageManager
-    - React-jsi
-    - React-NativeModulesApple
-    - React-RCTFabric
-    - React-RCTImage
-    - React-renderercss
-    - React-rendererdebug
-    - React-utils
-    - ReactCodegen
-    - ReactCommon/turbomodule/bridging
-    - ReactCommon/turbomodule/core
-    - ReactNativeDependencies
-    - symbiote-navigation/common (= 3.0.0)
-    - Yoga
-  - symbiote-navigation/common (3.0.0):
+  - symbiote-navigation (5.0.0):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -1960,8 +1936,32 @@ PODS:
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
+    - symbiote-navigation/common (= 5.0.0)
     - Yoga
-  - symbiote-slider (6.0.0):
+  - symbiote-navigation/common (5.0.0):
+    - hermes-engine
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-Core-prebuilt
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-RCTImage
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - ReactNativeDependencies
+    - Yoga
+  - symbiote-slider (8.0.0):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -1982,9 +1982,9 @@ PODS:
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
-    - symbiote-slider/common (= 6.0.0)
+    - symbiote-slider/common (= 8.0.0)
     - Yoga
-  - symbiote-slider/common (6.0.0):
+  - symbiote-slider/common (8.0.0):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -2006,7 +2006,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - symbiote-splash-screen (4.0.0):
+  - symbiote-splash-screen (6.0.0):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -2278,7 +2278,7 @@ EXTERNAL SOURCES:
 
 SPEC CHECKSUMS:
   FBLazyVector: b3e7ad108f0d882e30445c5527d774e3fd432f3d
-  hermes-engine: 884ef1001b700845ccafeec69b326c63f0419e51
+  hermes-engine: 895c46115977b3bbaf08b0f39dada772cafd038a
   RCTDeprecation: 2a74a2c57675e64419bd89078efde81f7c1de90b
   RCTRequired: 30451112e6fef4e6f31b4e7eee0845156e35e4b0
   RCTSwiftUI: 5aaf0b07e747ba749dc6acc94d8bd41eea4b570f
@@ -2316,7 +2316,7 @@ SPEC CHECKSUMS:
   React-Mapbuffer: ce449ccdf3b80384415b925606be8a4bdcfc65d3
   React-microtasksnativemodule: 2eb3f49d0d8e77b5343455eccd057010b8d38b6b
   React-mutationobservernativemodule: f0a0d5ae9b51caf7becbeabf836d716cfedb6bf2
-  react-native-safe-area-context: 8368d1052ccc8fe8725adfb6a83498c8bdb48250
+  react-native-safe-area-context: 0dd5d7db903a6289e798e934356cd80cf23a31d3
   React-NativeModulesApple: a092d89b58f635ebfab88048b0eda9fb516819fd
   React-networking: 968bbbe73590149feb1e72b2af4f6a68e4796ece
   React-oscompat: 0b72a7e926954a0415ccd83e0748b6561fe45367
@@ -2352,10 +2352,10 @@ SPEC CHECKSUMS:
   ReactCodegen: afe0d436ee089d7bea6418429d8312b1d23a6801
   ReactCommon: d5c1bb4427bf51c443de5926aac332c89ddd9363
   ReactNativeDependencies: fa0a54b3f5319ae0e3b9aff32bfee7a424b88e66
-  symbiote-engine: 5d3a500bcfb9124e09d4250fa78a7e01f40db6cf
-  symbiote-navigation: d890a373b5ad88847887ed53cc6205edc9e2bbdb
-  symbiote-slider: f866475c11d02613eb3d32f3bfeb9670b6e559cf
-  symbiote-splash-screen: 082b03d52ce7abc1d965eb356d808eae3cccba66
+  symbiote-engine: 221ddf6ca2eda0280580bf5b9352bd52b66556b0
+  symbiote-navigation: 8a59b78061baaa09a5305f69e366d8eb71e65710
+  symbiote-slider: 77d85d1444328223d83362a138ec67d3cfdef8e5
+  symbiote-splash-screen: 834dd595865708063ae243cec79c3e3b55f5cfe3
   Yoga: fe50ab299e578f397fef753cf309c6703a4db29b
 
 PODFILE CHECKSUM: 52535ff777e36b58e86c45571b57df53c0378d71

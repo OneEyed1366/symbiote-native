@@ -1312,6 +1312,21 @@ function isStyleRecord(value: unknown): value is Record<string, unknown> {
  * `standing` cannot leave a key unaccounted for.
  */
 export function isSameShallowStyle(next: unknown, standing: unknown): boolean {
+  // THE SAME OBJECT IS THE SAME STYLE, and saying so first is worth a line: without it a re-push of
+  // a hoisted constant — the commonest shape there is, and what Solid does on every signal change
+  // because it has no diff — allocates TWO key arrays and walks them to reach the same answer.
+  // Measured on Hermes (`style-write-cost.itest.ts`): the walk to this guard cost 1.12 us
+  // per write against a 0.84 us buffer write, so the compare was dearer than the write it protects.
+  // With this line, 0.32.
+  //
+  // IT CHANGES NOTHING OBSERVABLE, and that was break-tested rather than assumed. Inverting it — an
+  // identical object reporting "changed" — leaves all 1 044 unit tests and all 512 itests green,
+  // because `pushClassStyle`'s own `isAlreadyPublished` catches the republish downstream:
+  // `sharedStylePair` memoizes the pair by the explicit object, so the array it rebuilds is
+  // identity-equal to the one standing. The saving is the two key arrays and the walk, and nothing
+  // else. A speed change with no behaviour signature has to be justified by a measurement alone
+  // (method §8), which is why the number above is in this comment rather than in a commit message.
+  if (next === standing) return isStyleRecord(next);
   if (!isStyleRecord(next) || !isStyleRecord(standing)) return false;
   const keys = Object.keys(next);
   if (keys.length !== Object.keys(standing).length) return false;

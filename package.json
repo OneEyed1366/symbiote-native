@@ -43,10 +43,11 @@
     "trust:publishers": "node scripts/trust-publishers.mjs",
     "test:vitest": "vitest run",
     "test:node": "node scripts/run-node-tests.mjs",
-    "test:cpp": "cmake -S core/engine/cpp/tests -B core/engine/cpp/tests/build && cmake --build core/engine/cpp/tests/build -j 8 && ctest --test-dir core/engine/cpp/tests/build --output-on-failure",
+    "test:cpp": "cmake -S core/engine/cpp/tests -B core/engine/cpp/tests/build -DSYMBIOTE_JS_ENGINE=hermes && cmake --build core/engine/cpp/tests/build -j 8 && ctest --test-dir core/engine/cpp/tests/build --output-on-failure",
     "test:itest": "pnpm run test:cpp && node scripts/run-itests.mjs",
-    "bench:itest": "cmake -S core/engine/cpp/tests -B core/engine/cpp/tests/build-release -DCMAKE_BUILD_TYPE=Release -DRN_ENABLE_DEBUG_STRING_CONVERTIBLE=ON && cmake --build core/engine/cpp/tests/build-release -j 8 && SYMBIOTE_ITEST_BUILD=build-release node scripts/run-itests.mjs",
-    "test:android": "cmake -S core/engine/cpp/tests -B core/engine/cpp/tests/build-android -DSYMBIOTE_PLATFORM_ANDROID=ON && cmake --build core/engine/cpp/tests/build-android -j 8 --target symbiote_tester && SYMBIOTE_ITEST_BUILD=build-android node scripts/run-itests.mjs"
+    "bench:itest": "cmake -S core/engine/cpp/tests -B core/engine/cpp/tests/build-release -DCMAKE_BUILD_TYPE=Release -DRN_ENABLE_DEBUG_STRING_CONVERTIBLE=ON -DSYMBIOTE_JS_ENGINE=hermes && cmake --build core/engine/cpp/tests/build-release -j 8 && SYMBIOTE_ITEST_BUILD=build-release node scripts/run-itests.mjs",
+    "bench:itest:jsc": "cmake -S core/engine/cpp/tests -B core/engine/cpp/tests/build-release-jsc -DCMAKE_BUILD_TYPE=Release -DRN_ENABLE_DEBUG_STRING_CONVERTIBLE=ON -DSYMBIOTE_JS_ENGINE=jsc && cmake --build core/engine/cpp/tests/build-release-jsc -j 8 && SYMBIOTE_ITEST_BUILD=build-release-jsc node scripts/run-itests.mjs",
+    "test:android": "cmake -S core/engine/cpp/tests -B core/engine/cpp/tests/build-android -DSYMBIOTE_PLATFORM_ANDROID=ON -DSYMBIOTE_JS_ENGINE=hermes && cmake --build core/engine/cpp/tests/build-android -j 8 --target symbiote_tester && SYMBIOTE_ITEST_BUILD=build-android node scripts/run-itests.mjs"
   },
   "devDependencies": {
     "@babel/core": "catalog:",

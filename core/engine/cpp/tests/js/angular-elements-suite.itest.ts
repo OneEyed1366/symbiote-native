@@ -45,7 +45,7 @@
 // AND THE DIRECTIVE IS DEARER WHILE WRITING LESS, which is the fact that decides what to do about
 // it. `setAngularProfileDetail` on the create step of each arm, same tree, same ten-node row:
 //
-//   this arm    style=4000            ellipsizeMode=6000  testID=1000  value=1000  #text=2000
+//   this arm    style=4000            ellipsizeMode=6000  value=1000  #text=2000
 //   bare arm    style.height=2000 style.flex=2000 style.flexDirection=1000
 //               style.paddingLeft=1000 style.width=1000   ellipsizeMode=3000 …
 //
@@ -117,7 +117,6 @@ Component({
   template: `
     <view
       [style]="isSelected ? selectedRowStyle : rowStyle"
-      [testID]="'row-' + row.id"
     >
       <text ellipsizeMode="tail">{{ row.id }}</text>
       <view [style]="cellStyle"

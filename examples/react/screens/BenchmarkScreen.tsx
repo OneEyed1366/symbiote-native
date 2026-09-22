@@ -1,4 +1,12 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { FlatList, SectionList, type ISection } from '@symbiote-native/react';
 import {
   readCommitProfile,
@@ -240,16 +248,22 @@ type IBenchResult = {
 // Create 1 000, so a propWrites that differs between adapters on the SAME step is work the screen
 // is generating, not a cost of the platform.
 //
-// Two counts and no milliseconds. The walk numbers went with the walk — the tree lives in C++ and
-// JS holds only a command buffer, so what applying it costs is not readable from here.
+// Counts, and the two milliseconds that only a device can answer: what the single crossing costs
+// end to end and how much of it is reading the buffer out of JS. Headless that read is ~4 ms of
+// ~48; Hermes is a different JSI implementation and no fixture can price its array reads.
 const EMPTY_STEP_PROFILE: ICommitProfile = {
   commits: 0,
   propWrites: 0,
+  nodesCreated: 0,
+  applyCalls: 0,
+  applyMs: 0,
+  decodeMs: 0,
 };
 
 const EMPTY_FABRIC_PROFILE: IFabricCallProfile = {
   calls: {},
   propKeys: {},
+  createsByView: {},
   totalCalls: 0,
   totalPropKeys: 0,
 };
@@ -270,12 +284,39 @@ function formatFabric(profile: IFabricCallProfile | undefined): string {
   return `${create}/${append}/${clones}`;
 }
 
+// What the totals above cannot answer once two arms disagree: WHICH view one of them never asks
+// Fabric for. A row is ten native views by construction on both sides, so a createNode total of
+// 9 001 against 10 000 is a missing node per row, and only a per-name tally says which.
+function formatCreatesByView(profile: IFabricCallProfile | undefined): string {
+  if (profile === undefined) return '—';
+  const entries = Object.entries(profile.createsByView).sort(
+    ([, left], [, right]) => right - left,
+  );
+  if (entries.length === 0) return 'none';
+  return entries.map(([viewName, count]) => `${viewName} ${count}`).join(' · ');
+}
+
 // One row of the fixed-order suite. `startRows` is recorded rather than derived because it is the
 // number the whole suite exists to pin down - a duration is meaningless without it.
 type ISuiteEntry = {
   op: IBenchOpId;
   label: string;
   durationMs: number;
+  /**
+   * The same step stopped where the STOCK screen stops it, one React phase later.
+   *
+   * `durationMs` above stops in the engine's post-commit hook, which fires inside
+   * `resetAfterCommit` — that is the only point every adapter shares, since Vue, Svelte and Angular
+   * commit on a microtask and no React phase means anything to them. `examples/bare-rn` has no such
+   * hook and stops in a `useLayoutEffect`, which React runs in `commitLayoutEffects`, AFTER
+   * `resetAfterCommit`. The two are one phase apart, and its cost is not nothing on that side: its
+   * row is built from RN's own `<Pressable>` and `<TextInput>`, which attach refs and run their own
+   * layout work, where ours is tags with no React component at all.
+   *
+   * So the comparison against stock reads THIS column and the cross-adapter comparison reads the
+   * one above. One number per definition of done, each compared only to its own counterpart.
+   */
+  settledMs: number;
   startRows: number;
   profile: ICommitProfile;
   fabric: IFabricCallProfile;
@@ -538,6 +579,9 @@ export function BenchmarkScreen() {
     settle: (durationMs: number) => void;
   } | null>(null);
   const seqRef = useRef(0);
+  // The second stopwatch — same start, stopped one React phase later. See `ISuiteEntry.settledMs`.
+  const layoutStartedAtRef = useRef<number | undefined>(undefined);
+  const lastSettledMsRef = useRef<number>(SUITE_TIMED_OUT);
   // Filled by the post-commit hook, read by `timed` right after its own `await runStep(mutate)`.
   // A ref rather than a resolved value so the change stays off every other runStep call site;
   // steps are serialized, and `timed` awaits the progress step BEFORE the measured one, so the
@@ -585,7 +629,9 @@ export function BenchmarkScreen() {
       commitProfileGate.isHeldByBenchmark = true;
       readCommitProfile();
       readFabricCallProfile();
-      pendingRef.current = { startedAt: performance.now(), settle };
+      const startedAt = performance.now();
+      pendingRef.current = { startedAt, settle };
+      layoutStartedAtRef.current = startedAt;
       mutate();
     });
   }, []);
@@ -632,6 +678,23 @@ export function BenchmarkScreen() {
     registerPostCommit(onCommitted);
     return () => unregisterPostCommit(onCommitted);
   }, []);
+
+  // The SECOND stopwatch, and the one the stock screen's number is comparable to. React runs layout
+  // effects in `commitLayoutEffects`, immediately after the `resetAfterCommit` where our engine's
+  // post-commit hook fires — so this lands one phase later, exactly where `examples/bare-rn` stops
+  // its own clock. No dependency array, for the reason that screen states: every measured mutation
+  // is a setState on THIS component, so every step's commit runs this exactly once.
+  //
+  // It cannot resolve the step's promise — the post-commit hook already did, one phase ago — so it
+  // leaves its reading in a ref that `timed` picks up. That ordering is safe rather than lucky: the
+  // hook calls `resolve`, and a promise callback is a microtask, so it cannot run until the whole
+  // synchronous commit (this effect included) has finished.
+  useLayoutEffect(() => {
+    const startedAt = layoutStartedAtRef.current;
+    if (startedAt === undefined) return;
+    layoutStartedAtRef.current = undefined;
+    lastSettledMsRef.current = performance.now() - startedAt;
+  });
 
   // The guards below keep an operation from recording a measurement of nothing - an empty list,
   // or an index krausest's fixed row numbers put past the end of a short one.
@@ -789,6 +852,7 @@ export function BenchmarkScreen() {
         op,
         label,
         durationMs,
+        settledMs: lastSettledMsRef.current,
         startRows,
         profile: lastStepProfileRef.current,
         fabric: lastFabricProfileRef.current,
@@ -919,6 +983,11 @@ export function BenchmarkScreen() {
   const allDurations = new Map(
     suiteResults[MOUNT_MODE.All].map(entry => [entry.op, entry.durationMs]),
   );
+  // The all-mounted run stopped one React phase later — the column `examples/bare-rn`'s number is
+  // comparable to. See `ISuiteEntry.settledMs`.
+  const settledDurations = new Map(
+    suiteResults[MOUNT_MODE.All].map(entry => [entry.op, entry.settledMs]),
+  );
   const virtualizedDurations = new Map(
     suiteResults[MOUNT_MODE.Virtualized].map(entry => [
       entry.op,
@@ -1017,6 +1086,7 @@ export function BenchmarkScreen() {
             <view className="bench-compare-row">
               <text className="bench-compare-label" />
               <text className="bench-compare-head-cell">ALL MOUNTED</text>
+              <text className="bench-compare-head-cell">VS STOCK</text>
               <text className="bench-compare-head-cell">VIRTUALIZED</text>
             </view>
             {SUITE_STEPS.map(step => (
@@ -1028,6 +1098,9 @@ export function BenchmarkScreen() {
                 <text className="bench-compare-label">{step.label}</text>
                 <text className="bench-compare-cell">
                   {formatDuration(allDurations.get(step.op))}
+                </text>
+                <text className="bench-compare-cell">
+                  {formatDuration(settledDurations.get(step.op))}
                 </text>
                 <text className="bench-compare-cell">
                   {formatDuration(virtualizedDurations.get(step.op))}
@@ -1048,6 +1121,10 @@ export function BenchmarkScreen() {
               <text className="bench-compare-label" />
               <text className="bench-compare-head-cell">WRITES</text>
               <text className="bench-compare-head-cell">COMMITS</text>
+              <text className="bench-compare-head-cell">NODES</text>
+              <text className="bench-compare-head-cell">CROSSINGS</text>
+              <text className="bench-compare-head-cell">APPLY</text>
+              <text className="bench-compare-head-cell">DECODE</text>
             </view>
             {SUITE_STEPS.map(step => {
               const profile = allProfiles.get(step.op);
@@ -1064,11 +1141,23 @@ export function BenchmarkScreen() {
                   <text className="bench-compare-cell">
                     {profile === undefined ? '—' : String(profile.commits)}
                   </text>
+                  <text className="bench-compare-cell">
+                    {profile === undefined ? '—' : String(profile.nodesCreated)}
+                  </text>
+                  <text className="bench-compare-cell">
+                    {profile === undefined ? '—' : String(profile.applyCalls)}
+                  </text>
+                  <text className="bench-compare-cell">
+                    {profile === undefined ? '—' : profile.applyMs.toFixed(1)}
+                  </text>
+                  <text className="bench-compare-cell">
+                    {profile === undefined ? '—' : profile.decodeMs.toFixed(1)}
+                  </text>
                 </view>
               );
             })}
             <text className="note-text">
-              {`Captured around each timed step, with the frame meter held so its own read-and-reset cannot eat them. Every adapter builds the same ${SUITE_ROWS * NATIVE_VIEWS_PER_ROW + 1}-node tree for Create, so a WRITES that differs between adapters is work this screen is generating — not a cost of the platform. COMMITS must read 1; anything higher means a foreign commit landed inside the window. There is no ms here and no node count: the tree lives in C++ and JS only fills a command buffer, so what the host spends applying it is invisible from JS. It was instrumented once, end to end, and the commit structure held nothing actionable, so it all came out again. The stock comparison below reads a surface instead of our own window, which is why it survived.`}
+              {`Captured around each timed step, with the frame meter held so its own read-and-reset cannot eat them. NODES counts the fresh Fabric families this step minted, read from the engine's own C++ walk — the census, and the number to check BEFORE any millisecond: a Create that is not ${SUITE_ROWS * NATIVE_VIEWS_PER_ROW} here is not the workload this screen claims, whatever the constant above says. It is also what the stock baseline counts by wrapping createNode, which makes the two comparable; the FABRIC CALLS table below cannot do that any more, because our creates are issued from C++ and never pass through the JS binding it wraps. WRITES prices the layer above: prop writes this screen pushed at the engine, so a WRITES that differs between adapters is work the screen is generating, not a cost of the platform. COMMITS must read 1; anything higher means a foreign commit landed inside the window. CROSSINGS is how many times the buffer was applied into C++, and it must not scale with the tree: a create reads 2 headless, asserted in commit-profile-census.itest.ts. A read of the tree is a batch boundary, so anything navigating what it is inserting turns one crossing into one per mutation — at 1.5-4.4 us of prologue each, ten thousand of those is tens of milliseconds that NODES and WRITES both read as perfectly normal. APPLY and DECODE are the two numbers this screen exists to take, because a fixture cannot: APPLY is the whole crossing in C++ and DECODE is the part of it that reads the buffer out of JS through JSI. Our crossing is ONE call carrying a 12 000-entry array that C++ walks element by element; stock's is ten thousand calls carrying scalars. On the harness's JavaScriptCore that walk is ~4 ms of a ~48 ms APPLY. Hermes is a different JSI implementation and nothing headless can price its array reads. READ THE SHARE, NOT THE MILLISECOND: a phone is slower at everything, so DECODE growing in absolute terms proves nothing. On JavaScriptCore DECODE is 8% of APPLY — 4.0 ms of 49.0 on a thousand-row Create, 571 ns per decoded node. If that share holds here, the single crossing is innocent whatever the clock says; if DECODE has become a third of APPLY, reading the buffer element by element through JSI is most of what this device costs us over stock.`}
             </text>
           </view>
         )}
@@ -1101,6 +1190,13 @@ export function BenchmarkScreen() {
                 </view>
               );
             })}
+            <text className="section-label">CREATE 1 000 · BY VIEW NAME</text>
+            <text
+              testID="bench-fabric-creates-by-view"
+              className="bench-compare-cell"
+            >
+              {formatCreatesByView(allFabricProfiles.get(BENCH_OP.Create))}
+            </text>
             <text className="note-text">
               {`Counted by wrapping global.nativeFabricUIManager before the engine binds it — the one surface this canary and the stock-React-Native baseline (examples/bare-rn) genuinely share, and therefore the only like-for-like number between them. The ENGINE table above has no counterpart over there: stock has no command buffer to count. Read as two questions. CREATE/APPEND/CLONE answers "does one stack ask Fabric to do MORE"; PROP KEYS answers the other half, "or the same number of times with fatter payloads". The wrapper costs one JS call per crossing and is therefore in every timing on this screen — the comparison holds only because the other side carries the identical wrapper.`}
             </text>

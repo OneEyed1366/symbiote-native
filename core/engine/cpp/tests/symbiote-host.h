@@ -9,16 +9,28 @@
  * and `op-projection.ts` cannot have, however carefully either is written: they answer from their
  * own bookkeeping.
  *
- * JavaScriptCore rather than Hermes because macOS carries it and React Native already ships the
- * binding (`ReactCommon/jsc/JSCRuntime.cpp`). Nothing on the tree path is engine-specific; what
- * matters is that the values crossing into `applyOps` are real JS values.
+ * JavaScriptCore by DEFAULT because macOS carries it and React Native already ships the binding
+ * (`ReactCommon/jsc/JSCRuntime.cpp`). Nothing on the tree path is engine-specific; what matters is
+ * that the values crossing into `applyOps` are real JS values.
+ *
+ * HERMES IS THE OTHER HALF, and it is not hypothetical: configure with
+ * `-DSYMBIOTE_JS_ENGINE=hermes` and the same binary hosts the engine a device runs, against the
+ * universal macOS `hermesvm.framework` the `hermes-engine` pod already unpacks. It is a SECOND
+ * RULER and never a column beside the JavaScriptCore ones — Hermes has no JIT, so the two tables
+ * have different floors and a ratio is only ever read inside one of them.
  */
 
 #pragma once
 
 #include "SymbioteEngineBindings.h"
 
+#include <jsi/instrumentation.h>
+
+#ifdef SYMBIOTE_USE_HERMES
+#include <hermes/hermes.h>
+#else
 #include <JSCRuntime.h>
+#endif
 #include <react/renderer/componentregistry/ComponentDescriptorProviderRegistry.h>
 #include <react/renderer/components/image/ImageComponentDescriptor.h>
 #include <react/renderer/components/modal/ModalHostViewComponentDescriptor.h>
@@ -109,9 +121,36 @@ class CommandRecorder final : public UIManagerDelegate {
   void uiManagerDidClearPendingSnapshots() override {}
 };
 
+/**
+ * The only engine-specific line in the harness, and it is deliberately the only one: everything
+ * below this point talks to `jsi::Runtime` and cannot tell which engine answered.
+ */
+inline std::unique_ptr<facebook::jsi::Runtime> makeRuntime() {
+#ifdef SYMBIOTE_USE_HERMES
+  // `ES6BlockScoping` DEFAULTS TO FALSE and must be turned on here, which is not a preference:
+  // without it Hermes gives a `let` or `const` declared in a loop ONE binding for every iteration,
+  // so each closure made inside `for (const one of cases)` sees the last value. The harness's own
+  // `report()` is such a loop, and the symptom was a run that executed the last case of a file once
+  // per case and reported it as that many passes — a plausible wrong answer rather than an error.
+  //
+  // React Native never meets this because its Babel preset lowers block scoping on the way to a
+  // device; our bundler does not, and esbuild refuses to lower `const` on its own ("Transforming
+  // const to the configured target environment is not supported yet"), so the flag is the door.
+  //
+  // WHAT IT COSTS, and it belongs in any timing taken here: a device runs a Babel-LOWERED bundle
+  // with this flag off, so the Hermes arm's codegen is not byte-for-byte the device's. It is a
+  // second ruler either way (no JIT), and this is one more reason its numbers never join the
+  // JavaScriptCore table.
+  return facebook::hermes::makeHermesRuntime(
+      ::hermes::vm::RuntimeConfig::Builder().withES6BlockScoping(true).build());
+#else
+  return facebook::jsc::makeJSCRuntime();
+#endif
+}
+
 class Host {
  public:
-  Host() : runtime_(facebook::jsc::makeJSCRuntime()) {
+  Host() : runtime_(makeRuntime()) {
     contextContainer_ = std::make_shared<ContextContainer>();
 
     // Events reach JS the way they reach it on a device, because the pipeline is React Native's own
@@ -227,6 +266,46 @@ class Host {
 
   /** How many views the stub platform holds, the root included. */
   size_t size() const { return mounted_.size(); }
+
+  /**
+   * The engine's own heap and GC counters — cumulative allocation, live bytes, collections.
+   *
+   * The axis every instrument in this harness has been blind to. A wall clock prices the work a
+   * commit does; on Hermes the ALLOCATION that work leaves behind is a separate cost, paid later and
+   * elsewhere, and a small device heap pays it far more often than a Mac does. Hermes reports
+   * `totalAllocatedBytes`, `allocatedBytes`, `heapSize`, `numCollections` and two peaks here.
+   *
+   * EMPTY ON JAVASCRIPTCORE, and that is jsi's own default rather than a failure
+   * (`jsi.cpp:307` returns an empty map) — a reader gets nothing rather than a wrong number, and a
+   * fixture skips on an empty map.
+   */
+  std::unordered_map<std::string, int64_t> heapInfo() {
+    return runtime_->instrumentation().getHeapInfo(false);
+  }
+
+  /** A full collection, so a measurement can start from a known floor. */
+  void collectGarbage() { runtime_->instrumentation().collectGarbage("itest"); }
+
+  /**
+   * The shadow tree's own sequential commit number — how many times JS has committed, in total.
+   *
+   * COUNTING TRANSACTIONS DOES NOT ANSWER THIS, which was tried first and read 1 everywhere.
+   * `MountingCoordinator::pullTransaction` diffs `baseRevision_` against `lastRevision_`, and every
+   * commit merely overwrites `lastRevision_` — so a pull yields ONE transaction whatever happened in
+   * between, and a `while (pullTransaction())` loop counts the caller's own drains.
+   *
+   * The commit number is the upstream fact that a transaction count cannot recover. On a device it
+   * is what schedules mounting work: each commit signals the mounting thread, and only commits the
+   * main thread failed to keep up with are collapsed into one transaction. So a renderer committing
+   * several times per logical update pays several main-thread passes there and nothing extra here.
+   */
+  ShadowTreeRevision::Number commitNumber() const {
+    ShadowTreeRevision::Number number = 0;
+    uiManager_->getShadowTreeRegistry().visit(kSurfaceId, [&](const ShadowTree &shadowTree) {
+      number = shadowTree.getCurrentRevision().number;
+    });
+    return number;
+  }
 
   /** What the platform was told to do since the last read — React Native's own wording. */
   std::vector<std::string> mountingLogs() { return mounted_.takeMountingLogs(); }

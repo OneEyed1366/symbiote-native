@@ -12,10 +12,7 @@
   let { row, isSelected } = $props();
 </script>
 
-<view
-  style={isSelected ? SELECTED_ROW_STYLE : ROW_STYLE}
-  testID={`row-${row.id}`}
->
+<view style={isSelected ? SELECTED_ROW_STYLE : ROW_STYLE}>
   <text ellipsizeMode="tail">{String(row.id)}</text>
   <view style={CELL_STYLE}>
     <text ellipsizeMode="tail">{row.label}</text>

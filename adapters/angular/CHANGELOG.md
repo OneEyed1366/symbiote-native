@@ -1,5 +1,14 @@
 # @symbiote-native/angular
 
+## 3.0.2
+
+### Patch Changes
+
+- [`564870f`](https://github.com/OneEyed1366/symbiote-native/commit/564870ffabb61b3b778fcf18600b1c5f40d62ac2) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Walk props bags with `Object.keys` instead of `Object.entries` on the per-node paths. `entries` allocates the outer array and a two-element array per key before the loop starts; `keys` allocates one array of strings, and the value is a property read the adapter is about to make anyway. Measured on `-O` Hermes over a four-key bag: 0.42 us against 0.23, so ~0.19 us per node - about 1.9 ms of a thousand-row create. No behaviour change; `applyUpdate`'s sibling loop already used `Object.keys`.
+
+- Updated dependencies [[`3de549b`](https://github.com/OneEyed1366/symbiote-native/commit/3de549b2ab9785c845a1f3acd5626d85d2b9b9e4)]:
+  - @symbiote-native/components@3.0.1
+
 ## 3.0.1
 
 ### Patch Changes

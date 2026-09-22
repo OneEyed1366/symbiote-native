@@ -40,7 +40,9 @@ const Row = memo(function RowView({
     'view',
     {
       style: isSelected ? SELECTED_ROW_STYLE : ROW_STYLE,
-      testID: `row-${row.id}`,
+      // NO ID PROP, deliberately, and the same in every arm: the row is kept concrete by the
+      // background in `ROW_STYLE`, which is what the device screen's row carries. `nativeID` and
+      // `testID` are not interchangeable with it or with each other — see `ROW_STYLE`.
     },
     label(String(row.id)),
     h('view', { style: CELL_STYLE }, label(row.label)),
@@ -81,6 +83,10 @@ describe('the benchmark screen through the React adapter', () => {
       name: 'react',
       // The root, the container `createSurface` puts under it, and the screen's own wrapper.
       chrome: 3,
+      // Paired with the stock arm's, and only with it: the two columns commit the same tree, so the
+      // differ has to hand the host the same work — and a difference here would be UI-thread cost
+      // this whole directory prices at zero.
+      countsMutations: true,
       readTelemetry: () => readSurfaceTelemetry(ROOT_TAG),
       apply: state => {
         apply(state);
