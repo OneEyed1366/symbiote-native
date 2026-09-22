@@ -465,7 +465,16 @@ avenue is not worth re-walking.
                  byte-for-byte a device's",
   hazards: ["the framework is a pod-install artefact, not a tracked dependency — a CMake target
              into examples/*/ios/Pods breaks on a clean clone, which is why configure FAILS rather
-             than falling back to JavaScriptCore",
+             than falling back to JavaScriptCore. THIS BROKE CI the moment Hermes became the
+             default: a runner does `pnpm install --ignore-scripts` and never `pod install`.
+             Fixed by `scripts/fetch-hermes.mjs` — the pod is `Pre-built`, so what CocoaPods does
+             is fetch ONE Maven tarball (hermes-ios-<version>-hermes-ios-release.tar.gz, ~27 MB,
+             version from react-native/sdks/hermes-engine/version.properties) and unpack it.
+             CMake now searches `.hermes/destroot` after the examples glob"
+            -> "when a build step starts depending on a native artefact, ask what produces it on a
+                runner BEFORE the ruler changes; ccache is unaffected — ReactCommon's ~700 objects
+                compile with unchanged flags and still hit, only the handful of TUs that gained
+                -DSYMBIOTE_USE_HERMES recompile",
             "the JSI ABI must match — Hermes ships jsi/ headers in destroot and our C++ compiles
              against ReactCommon's. A jsi::Runtime vtable from one header set against a dylib built
              from the other is UB that will not look like one; it will look like a wrong number",
