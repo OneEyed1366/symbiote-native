@@ -1,0 +1,158 @@
+{
+  "name": "@symbiote-native/sqlite",
+  "version": "0.1.0",
+  "description": "expo-sqlite wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, Svelte, Solid, and Angular adapters. Database / Statement / Session (transactions, changesets), a Bun-style SQL tagged-template helper, and a SQLite-backed key-value store.",
+  "license": "MIT",
+  "keywords": [
+    "react-native",
+    "symbiote-native",
+    "expo-sqlite",
+    "react",
+    "vue",
+    "svelte",
+    "solid",
+    "angular",
+    "sqlite",
+    "database",
+    "storage"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OneEyed1366/symbiote-native.git",
+    "directory": "packages/sqlite"
+  },
+  "homepage": "https://github.com/OneEyed1366/symbiote-native/tree/master/packages/sqlite#readme",
+  "bugs": {
+    "url": "https://github.com/OneEyed1366/symbiote-native/issues"
+  },
+  "author": "Andrey Prokopenko <psevdoproger@gmail.com>",
+  "type": "module",
+  "main": "src/core/index.ts",
+  "module": "src/core/index.ts",
+  "types": "src/core/index.ts",
+  "exports": {
+    ".": "./src/core/index.ts",
+    "./kv-store": "./src/core/storage.ts",
+    "./react": "./src/react/index.ts",
+    "./vue": "./src/vue/index.ts",
+    "./svelte": "./src/svelte/index.ts",
+    "./solid": "./src/solid/index.ts",
+    "./angular": {
+      "types": "./build-ngc/angular/index.d.ts",
+      "react-native": "./build-ngc/angular/index.js",
+      "default": "./src/angular/index.ts"
+    }
+  },
+  "files": [
+    "src",
+    "build",
+    "build-ngc",
+    "native-link.json",
+    "!src/**/*.test.*",
+    "!src/**/*.spec.*",
+    "!src/**/*.detox.*",
+    "!src/core/native-fakes.ts",
+    "!src/core/better-sqlite3-ambient.d.ts"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "main": "./build/core/index.js",
+    "module": "./build/core/index.js",
+    "types": "./build/core/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./build/core/index.d.ts",
+        "default": "./build/core/index.js"
+      },
+      "./kv-store": {
+        "types": "./build/core/storage.d.ts",
+        "default": "./build/core/storage.js"
+      },
+      "./react": {
+        "types": "./build/react/index.d.ts",
+        "default": "./build/react/index.js"
+      },
+      "./vue": {
+        "types": "./build/vue/index.d.ts",
+        "default": "./build/vue/index.js"
+      },
+      "./svelte": {
+        "types": "./build/svelte/index.d.ts",
+        "default": "./build/svelte/index.js"
+      },
+      "./solid": {
+        "types": "./build/solid/index.d.ts",
+        "default": "./build/solid/index.js"
+      },
+      "./angular": {
+        "types": "./build-ngc/angular/index.d.ts",
+        "default": "./build-ngc/angular/index.js"
+      }
+    }
+  },
+  "scripts": {
+    "prepare": "pnpm run ng:build",
+    "clean": "rm -rf build-ngc",
+    "ng:build": "pnpm run clean && ngc -p tsconfig.angular.json",
+    "typecheck": "tsc --build",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\""
+  },
+  "dependencies": {
+    "expo-sqlite": "catalog:",
+    "expo-modules-core": "catalog:",
+    "await-lock": "catalog:"
+  },
+  "peerDependencies": {
+    "react-native": ">=0.86",
+    "react": ">=19.0.0",
+    "vue": ">=3.5.0",
+    "@vue/runtime-core": "^3.5.13",
+    "svelte": ">=5.56.0",
+    "solid-js": ">=1.9.0",
+    "@angular/core": ">=20",
+    "@angular/common": ">=20"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "vue": {
+      "optional": true
+    },
+    "@vue/runtime-core": {
+      "optional": true
+    },
+    "svelte": {
+      "optional": true
+    },
+    "solid-js": {
+      "optional": true
+    },
+    "@angular/core": {
+      "optional": true
+    },
+    "@angular/common": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-reconciler": "catalog:",
+    "better-sqlite3": "catalog:",
+    "typescript": "catalog:",
+    "react": "catalog:",
+    "react-reconciler": "catalog:",
+    "vue": "catalog:",
+    "@vue/runtime-core": "catalog:",
+    "svelte": "catalog:",
+    "solid-js": "catalog:",
+    "@angular/core": "catalog:",
+    "@angular/common": "catalog:",
+    "@angular/compiler": "catalog:",
+    "@angular/compiler-cli": "catalog:",
+    "@symbiote-native/svelte": "workspace:*",
+    "@symbiote-native/engine": "workspace:*",
+    "@symbiote-native/test-utils": "workspace:*"
+  }
+}
