@@ -92,7 +92,6 @@ import {
   gateWanted,
   injectGateDemandAbove,
   provideGateDemand,
-  type IGateDemand,
   type IGatedAccessibilityEvent,
 } from '../../gate-demand';
 export type { IVSectionContext, IVSectionItemContext } from './directives';
