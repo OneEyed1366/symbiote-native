@@ -1,9 +1,8 @@
 # @symbiote-native/cli
 
 Scaffolds a new [SymbioteNative](../../README.md) app (`new`) or extends an already-scaffolded
-one with more of `new`'s optional layers (`add`) — closing the gap the root README's
-["Try It In Your Own App"](../../README.md#try-it-in-your-own-app) section otherwise documents
-as a manual process.
+one with more of `new`'s optional layers (`add`) — the command the root README's own
+[Install](../../README.md#install) section leads with.
 
 ## Install
 
@@ -108,8 +107,9 @@ fast-`npx`-cold-start reason create-vue avoids one — it still supports `--flag
 ## Status
 
 Real and verified against scaffolded-app fixtures: argv parsing, every interactive prompt,
-package-manager/framework autodetection, the full `templates/` tree (6 frameworks × all 26
-optional layers), and `add`'s idempotent native-file text-splices.
+package-manager/framework autodetection, the full `templates/` tree (every framework × every
+optional layer in [`templates/layers`](templates/layers)), and `add`'s idempotent native-file
+text-splices.
 
 Not wired in yet: the root `pnpm run build`/`prepublish-build` pipeline doesn't invoke this
 package's `rolldown` build — every other publishable package goes through `tsc --build` +
@@ -117,8 +117,8 @@ package's `rolldown` build — every other publishable package goes through `tsc
 
 ## References
 
-- Root [`README.md`](../../README.md) — the "Try It In Your Own App" section this package
-  replaces.
+- Root [`README.md`](../../README.md) — its [Install](../../README.md#install) section leads
+  with this package.
 - [`templates/layers/README.md`](templates/layers/README.md) — the full layer list.
 - `symbiote-create-cli` skill — design history: why `add` extends rather than bootstraps, the
   layering model, and the real bugs a systematic `examples/*` diff found while building this.
