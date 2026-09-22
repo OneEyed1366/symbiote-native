@@ -11,13 +11,27 @@ re-exports of the same `core`.
 
 ## Install
 
+**New app:**
+
+```bash
+npx @symbiote-native/cli new my-app --local-auth
+```
+
+**Existing SymbioteNative app:**
+
+```bash
+npx @symbiote-native/cli add --local-auth
+```
+
+Either way: installs `@symbiote-native/local-auth` and wires the native autolinking automatically — see
+[`@symbiote-native/cli`](../cli).
+
+<details>
+<summary>Manual install (no CLI — installing and wiring native autolinking by hand)</summary>
+
 ```bash
 npm install @symbiote-native/local-auth
 ```
-
-Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --local-auth` (or
-`add --local-auth` in an existing app) installs and wires this for you — see
-[`@symbiote-native/cli`](../cli).
 
 `expo-local-authentication` and `expo-modules-core` come along as regular dependencies, pinned
 to exact versions — never install either yourself, and never add the `expo` meta-package to
@@ -47,6 +61,8 @@ just add the strings your app's own Info.plist/manifest needs:
 - iOS — `NSFaceIDUsageDescription` in `Info.plist` (without it, iOS silently falls back to the
   device passcode instead of prompting FaceID).
 - Android — `USE_BIOMETRIC` in `AndroidManifest.xml`.
+
+</details>
 
 ## Shape
 

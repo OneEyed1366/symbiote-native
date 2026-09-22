@@ -13,13 +13,27 @@ are plain re-exports of the same `core`.
 
 ## Install
 
+**New app:**
+
+```bash
+npx @symbiote-native/cli new my-app --device
+```
+
+**Existing SymbioteNative app:**
+
+```bash
+npx @symbiote-native/cli add --device
+```
+
+Either way: installs `@symbiote-native/device` and wires the native autolinking automatically — see
+[`@symbiote-native/cli`](../cli).
+
+<details>
+<summary>Manual install (no CLI — installing and wiring native autolinking by hand)</summary>
+
 ```bash
 npm install @symbiote-native/device
 ```
-
-Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --device` (or
-`add --device` in an existing app) installs and wires this for you — see
-[`@symbiote-native/cli`](../cli).
 
 `expo-device` and `expo-modules-core` come along as regular dependencies, pinned to exact
 versions — never install either yourself, and never add the `expo` meta-package to your project
@@ -45,6 +59,8 @@ implementation: `examples/expo-react/ios/Podfile` and
 
 `expo-device` needs no runtime permission on either platform — every constant and function here
 reads plain system/build information, nothing gated by a permission prompt.
+
+</details>
 
 ## Shape
 

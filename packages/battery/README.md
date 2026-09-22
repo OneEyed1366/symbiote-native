@@ -12,13 +12,27 @@ depended on directly and never the `expo` meta-package, why the upstream JS is h
 
 ## Install
 
+**New app:**
+
+```bash
+npx @symbiote-native/cli new my-app --battery
+```
+
+**Existing SymbioteNative app:**
+
+```bash
+npx @symbiote-native/cli add --battery
+```
+
+Either way: installs `@symbiote-native/battery` and wires the native autolinking automatically — see
+[`@symbiote-native/cli`](../cli).
+
+<details>
+<summary>Manual install (no CLI — installing and wiring native autolinking by hand)</summary>
+
 ```bash
 npm install @symbiote-native/battery
 ```
-
-Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --battery` (or
-`add --battery` in an existing app) installs and wires this for you — see
-[`@symbiote-native/cli`](../cli).
 
 Depends on `expo-battery` and `expo-modules-core` directly (regular dependencies, pinned to exact
 versions — never a caret range, since this package's `core/` is hand-ported against one specific
@@ -44,6 +58,8 @@ Full mechanics — the Podfile pieces that normally ship inside the `expo` packa
 peer-dependency exclusion list — live in the `symbiote-expo-native-module` skill. Reference
 implementation: `examples/expo-react/ios/Podfile` and
 `examples/expo-react/android/app/src/main/java/com/canaryexpo/MainApplication.kt`.
+
+</details>
 
 No platform permission string is needed for battery's basic surface —
 `isBatteryOptimizationEnabledAsync` reads an Android-only system state with no runtime permission
