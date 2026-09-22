@@ -35,6 +35,13 @@ import SecureStoreScreen from './screens/SecureStoreScreen.vue';
 import SharingScreen from './screens/SharingScreen.vue';
 import WebBrowserScreen from './screens/WebBrowserScreen.vue';
 import SmsScreen from './screens/SmsScreen.vue';
+import LocationScreen from './screens/LocationScreen.vue';
+import MediaLibraryScreen from './screens/MediaLibraryScreen.vue';
+import FileSystemScreen from './screens/FileSystemScreen.vue';
+import AudioScreen from './screens/AudioScreen.vue';
+import NotificationsScreen from './screens/NotificationsScreen.vue';
+import BackgroundTasksScreen from './screens/BackgroundTasksScreen.vue';
+import SqliteScreen from './screens/SqliteScreen.vue';
 import { ROUTE_NAME } from './routes';
 import { LINE_COLOR } from './navigation-lines';
 
@@ -334,6 +341,97 @@ onMounted(() => hide());
         title: 'SMS',
         headerShown: true,
         headerTintColor: LINE_COLOR.sms,
+        headerTranslucent: true,
+        headerTitleColor: '#ffffff',
+        headerStyle: { backgroundColor: '#0b1622' },
+        headerUserInterfaceStyle: 'dark',
+      }"
+    />
+    <Screen
+      :name="ROUTE_NAME.Location"
+      :component="LocationScreen"
+      :options="{
+        title: 'Location',
+        headerShown: true,
+        headerTintColor: LINE_COLOR.location,
+        headerTranslucent: true,
+        headerTitleColor: '#ffffff',
+        headerStyle: { backgroundColor: '#0b1622' },
+        headerUserInterfaceStyle: 'dark',
+      }"
+    />
+    <Screen
+      :name="ROUTE_NAME.MediaLibrary"
+      :component="MediaLibraryScreen"
+      :options="{
+        title: 'Media Library',
+        headerShown: true,
+        headerTintColor: LINE_COLOR['media-library'],
+        headerTranslucent: true,
+        headerTitleColor: '#ffffff',
+        headerStyle: { backgroundColor: '#0b1622' },
+        headerUserInterfaceStyle: 'dark',
+      }"
+    />
+    <Screen
+      :name="ROUTE_NAME.FileSystem"
+      :component="FileSystemScreen"
+      :options="{
+        title: 'File System',
+        headerShown: true,
+        headerTintColor: LINE_COLOR['file-system'],
+        headerTranslucent: true,
+        headerTitleColor: '#ffffff',
+        headerStyle: { backgroundColor: '#0b1622' },
+        headerUserInterfaceStyle: 'dark',
+      }"
+    />
+    <Screen
+      :name="ROUTE_NAME.Audio"
+      :component="AudioScreen"
+      :options="{
+        title: 'Audio',
+        headerShown: true,
+        headerTintColor: LINE_COLOR.audio,
+        headerTranslucent: true,
+        headerTitleColor: '#ffffff',
+        headerStyle: { backgroundColor: '#0b1622' },
+        headerUserInterfaceStyle: 'dark',
+      }"
+    />
+    <Screen
+      :name="ROUTE_NAME.Notifications"
+      :component="NotificationsScreen"
+      :options="{
+        title: 'Notifications',
+        headerShown: true,
+        headerTintColor: LINE_COLOR.notifications,
+        headerTranslucent: true,
+        headerTitleColor: '#ffffff',
+        headerStyle: { backgroundColor: '#0b1622' },
+        headerUserInterfaceStyle: 'dark',
+      }"
+    />
+    <Screen
+      :name="ROUTE_NAME.BackgroundTasks"
+      :component="BackgroundTasksScreen"
+      :options="{
+        title: 'Background Tasks',
+        headerShown: true,
+        headerTintColor: LINE_COLOR['background-tasks'],
+        headerTranslucent: true,
+        headerTitleColor: '#ffffff',
+        headerStyle: { backgroundColor: '#0b1622' },
+        headerUserInterfaceStyle: 'dark',
+      }"
+    />
+    <Screen
+      :name="ROUTE_NAME.Sqlite"
+      :component="SqliteScreen"
+      :options="{
+        title: 'SQLite',
+        headerShown: true,
+        headerTintColor: LINE_COLOR.sqlite,
         headerTranslucent: true,
         headerTitleColor: '#ffffff',
         headerStyle: { backgroundColor: '#0b1622' },

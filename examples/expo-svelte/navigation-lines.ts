@@ -28,6 +28,13 @@ export const NAV_LINE = {
   Sharing: 'sharing',
   WebBrowser: 'web-browser',
   Sms: 'sms',
+  Location: 'location',
+  MediaLibrary: 'media-library',
+  FileSystem: 'file-system',
+  Audio: 'audio',
+  Notifications: 'notifications',
+  BackgroundTasks: 'background-tasks',
+  Sqlite: 'sqlite',
 } as const;
 
 export type INavLine = (typeof NAV_LINE)[keyof typeof NAV_LINE];
@@ -84,6 +91,29 @@ export const LINE_COLOR: Record<INavLine, string> = {
   [NAV_LINE.WebBrowser]: '#0369a1',
   // Olive — @symbiote-native/sms, deeper than StoreReview's lime.
   [NAV_LINE.Sms]: '#65a30d',
+  // Royal blue — @symbiote-native/location. A map-pin blue distinct from Cellular's brighter blue
+  // and WebBrowser's sky-toned blue.
+  [NAV_LINE.Location]: '#1d4ed8',
+  // Deep pink/magenta — @symbiote-native/media-library. Distinct from Application's pink
+  // (#ec4899) and Sharing's fuchsia (#d946ef).
+  [NAV_LINE.MediaLibrary]: '#db2777',
+  // Forest green — @symbiote-native/file-system. Distinct from Battery's bright green
+  // (#22c55e) and Localization's emerald (#10b981).
+  [NAV_LINE.FileSystem]: '#15803d',
+  // Fresh grass green — @symbiote-native/audio. Sits in the H~90-140 gap between StoreReview's
+  // lime (#84cc16) and Battery's green (#22c55e); no other line lands there.
+  [NAV_LINE.Audio]: '#3aa824',
+  // Hot magenta — @symbiote-native/notifications. Sits in the H~292-330 gap between Sharing's
+  // fuchsia (#d946ef) and Application's pink (#ec4899).
+  [NAV_LINE.Notifications]: '#e236c6',
+  // Olive-gold — @symbiote-native/background-fetch + @symbiote-native/background-task +
+  // @symbiote-native/task-manager. Sits in the H~48-84 gap between Brightness' gold (#facc15)
+  // and StoreReview's lime (#84cc16).
+  [NAV_LINE.BackgroundTasks]: '#9fad1f',
+  // Deep plum — @symbiote-native/sqlite. Redmean-distance-checked against every line above
+  // (min ~175, next-nearest is Sharing's fuchsia at H~292 but far lighter/more saturated) —
+  // the largest separation of any candidate tried, well clear of the crowded green/blue band.
+  [NAV_LINE.Sqlite]: '#701a75',
 };
 
 export type INavLineInfo = {
@@ -202,4 +232,39 @@ export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
     label: 'WEB BROWSER LINE',
   },
   [ROUTE_NAME.Sms]: { line: NAV_LINE.Sms, code: 'SM', label: 'SMS LINE' },
+  [ROUTE_NAME.Location]: {
+    line: NAV_LINE.Location,
+    code: 'LC',
+    label: 'LOCATION LINE',
+  },
+  [ROUTE_NAME.MediaLibrary]: {
+    line: NAV_LINE.MediaLibrary,
+    code: 'ML',
+    label: 'MEDIA LIBRARY LINE',
+  },
+  [ROUTE_NAME.FileSystem]: {
+    line: NAV_LINE.FileSystem,
+    code: 'FS',
+    label: 'FILE SYSTEM LINE',
+  },
+  [ROUTE_NAME.Audio]: {
+    line: NAV_LINE.Audio,
+    code: 'AU',
+    label: 'AUDIO LINE',
+  },
+  [ROUTE_NAME.Notifications]: {
+    line: NAV_LINE.Notifications,
+    code: 'NT',
+    label: 'NOTIFICATIONS LINE',
+  },
+  [ROUTE_NAME.BackgroundTasks]: {
+    line: NAV_LINE.BackgroundTasks,
+    code: 'BG',
+    label: 'BACKGROUND TASKS LINE',
+  },
+  [ROUTE_NAME.Sqlite]: {
+    line: NAV_LINE.Sqlite,
+    code: 'SQ',
+    label: 'SQLITE LINE',
+  },
 };
