@@ -143,9 +143,9 @@ project owning its runtime can change it.
 
 The costs:
 
-- **Angular is the slowest of the five**, though no longer by much: 1.06x stock on a create-shaped
-  row where Solid is 0.69x. Most of what is left is Angular's own per-component machinery rather
-  than the adapter. The numbers are [below](#how-fast-against-stock-react-native).
+- **Angular is the slowest of the five**: 0.90x stock on a create-shaped row where Solid is 0.63x.
+  Most of what is left is Angular's own per-component machinery rather than the adapter. The numbers
+  are [below](#how-fast-against-stock-react-native).
 - **Ecosystem packages are wrapped by hand, one at a time.** The _native view_ comes for free,
   through the same ViewConfig path as our own primitives, with zero SymbioteNative metadata. The JS
   surface around it does not, because a library's own component body is React internally. So each
@@ -199,77 +199,98 @@ same split a browser makes.
 
 ## How Fast, Against Stock React Native
 
-Freeing you from React is worth nothing if the app gets slower. So `examples/bare-rn` is plain
-React Native 0.86 driven by **React's own Fabric renderer**, carrying a port of the same benchmark
-screen. It holds zero `@symbiote-native/*` dependencies on purpose: being untouched by this project
-is the only thing it is for.
+Freeing you from React is worth nothing if the app gets slower. `examples/bare-rn` is plain React
+Native 0.86 on React's own Fabric renderer, carrying a port of the same benchmark screen and zero
+`@symbiote-native/*` dependencies. Being untouched by this project is the only thing it is for.
 
-**What is measured.** The [js-framework-benchmark](https://github.com/krausest/js-framework-benchmark)
-operation list, the same one web frameworks are ranked with. Each row builds ten native views (three
-`View`, three `Text`, three raw text nodes, a `TextInput`), so a run commits just over 10 000 nodes:
-10 002 for stock, 10 003 for an adapter, which mounts one container view of its own.
+The workload is the [js-framework-benchmark](https://github.com/krausest/js-framework-benchmark)
+operation list. Each row builds ten native views (three `View`, three `Text`, three raw text nodes, a
+`TextInput`), so a run commits just over 10 000 nodes: 10 002 for stock, 10 003 for an adapter, which
+mounts a container view of its own.
 
-**How it is kept honest.**
+### On a device
 
-- **Read the counters before the milliseconds.** Two columns whose node or prop-key counts differ
-  are not one workload, and the ms mean nothing. This has caught real errors in both directions:
-  a stock app not rebuilt after the row gained a node, and an adapter whose "win" was a step that
-  committed nothing.
-- **Release builds only.** The same comparison read 13% _faster_ in Debug and 30% slower in Release.
-  The sign of the headline metric flips.
-- **One ruler, one sitting.** Every column below was taken back to back in a single run.
-- **Small-ms rows carry no verdict.** Two builds of unchanged code drifted 4% on `Create` and 6x on
-  `Clear`, so `Select`, `Swap` and `Clear` need a repeat before they mean anything.
+iPhone 17 / iOS 26.5 simulator, Release, 2026-09-22. Best of three to five runs per column, minimum
+taken. Ratio is ours over stock.
 
-### The numbers
+| 1 000 rows | stock RN |          React |           Vue |         Solid |        Svelte |       Angular |
+| ---------- | -------: | -------------: | ------------: | ------------: | ------------: | ------------: |
+| Create     |    278.1 |  228.1 / 0.82x | 231.4 / 0.83x | 201.3 / 0.72x | 200.8 / 0.72x | 407.1 / 1.46x |
+| Replace    |    289.0 |  252.6 / 0.87x | 254.6 / 0.88x | 218.7 / 0.76x | 268.5 / 0.93x | 428.7 / 1.48x |
+| Partial    |     33.2 |   20.2 / 0.61x |  15.5 / 0.47x |  10.7 / 0.32x |  14.2 / 0.43x |  22.3 / 0.67x |
+| Select     |     10.8 |    5.9 / 0.55x |   4.8 / 0.44x |   5.5 / 0.51x |   8.4 / 0.78x |  15.7 / 1.45x |
+| Swap       |     10.7 |   27.8 / 2.60x |   7.4 / 0.69x |   5.4 / 0.50x |   7.0 / 0.65x |  17.1 / 1.60x |
+| Remove     |    126.3 |   36.4 / 0.29x |   6.3 / 0.05x |   9.3 / 0.07x |   7.5 / 0.06x |  18.5 / 0.15x |
+| Append     |    398.0 |  292.8 / 0.74x | 252.4 / 0.63x | 203.7 / 0.51x | 197.6 / 0.50x | 428.2 / 1.08x |
+| Clear      |     10.8 |   13.9 / 1.29x |  11.7 / 1.08x |  11.8 / 1.09x |  10.6 / 0.98x |  44.0 / 4.07x |
 
-Headless, 1 000 rows, `bench:itest` Release build, one sitting. The stock column is React's own
-Fabric renderer running in the same harness. Ratio is ours over stock, so **below 1.00 is faster
-than stock React Native**. Bold marks a row we win.
+`Remove` is where the architecture is worth the most: one row out of a thousand costs stock 126.3 ms
+against 6.3-18.5 for an adapter. The reason is a node count, not a millisecond. A persistent renderer
+hands Fabric a rebuilt path, so it re-lays out ~7 000 Yoga nodes where we replace one slot and it
+re-lays out ~1 000.
 
-| 1 000 rows | stock RN |             React |               Vue |             Solid |            Svelte |           Angular |
-| ---------- | -------: | ----------------: | ----------------: | ----------------: | ----------------: | ----------------: |
-| Create     |    153.9 | **127.2 / 0.83x** |     155.4 / 1.01x | **106.0 / 0.69x** | **115.7 / 0.75x** |     162.7 / 1.06x |
-| Replace    |    162.6 | **137.8 / 0.85x** |     169.5 / 1.04x | **113.3 / 0.70x** | **131.1 / 0.81x** |     181.0 / 1.11x |
-| Partial    |     35.0 |  **10.3 / 0.29x** |  **13.0 / 0.37x** |   **6.8 / 0.19x** |   **9.0 / 0.26x** |  **10.3 / 0.29x** |
-| Select     |     13.8 |      13.9 / 1.01x |      13.7 / 0.99x |      15.3 / 1.11x |      13.6 / 0.99x |      13.8 / 1.00x |
-| Swap       |     17.8 |      23.7 / 1.33x |   **6.4 / 0.36x** |   **6.4 / 0.36x** |   **7.0 / 0.39x** |   **5.6 / 0.31x** |
-| Remove     |     20.5 |   **5.4 / 0.26x** |   **5.0 / 0.24x** |   **5.4 / 0.26x** |   **5.5 / 0.27x** |   **5.7 / 0.28x** |
-| Append     |    186.0 | **136.3 / 0.73x** | **153.1 / 0.82x** | **115.3 / 0.62x** | **131.3 / 0.71x** | **172.7 / 0.93x** |
-| Clear      |     14.8 |      16.6 / 1.12x |      20.9 / 1.41x |      28.9 / 1.95x |      16.2 / 1.09x |      22.3 / 1.51x |
+Angular is the one adapter above stock, and it is Angular rather than the adapter: its row is a live
+component instance (an LView, a DI scope, two `EventEmitter`s, ~81 us each) where the other four lower
+to an intrinsic tag. A simulator charges more for exactly that.
 
-No column carries an exemption: every arm above writes the same props and commits the same tree, and
-each row asserts that before it reads a millisecond.
+React's `Swap` is the mutation-mode tax. We drive React's reconciler in mutation mode against stock's
+persistent mode, deliberately, so the clone-on-write path cannot be quietly skipped. The engine is
+3.3 ms of that row and not one prop write crosses; ~15 ms is React's own mutation commit with a host
+config doing nothing. No other adapter pays it.
 
-**Mutating a mounted tree is where this architecture pays.** Removing one row of a thousand lands
-every adapter 3.6-4x under stock and swapping two lands the non-React ones 2.6-3.2x under. The reason
-shows up as a node count before it shows up as a millisecond: on those rows Fabric re-lays out ~7 000
-Yoga nodes for stock against ~1 000 for us, because a persistent renderer hands it a rebuilt path
-where we replace one slot.
+Only the React column stops its clock where stock does, in a `useLayoutEffect`. The other four stop in
+the engine's post-commit hook one phase earlier, because Vue, Svelte, Solid and Angular commit on a
+microtask and no React phase means anything to them. React prices that phase at 6.6 ms of its own
+`Create`, so read those four as a floor.
 
-React's `Swap` is the one loss, and it is not the engine's: the engine is 3.3 ms of the 23.7 and not
-a single prop write crosses. Both sides run the _same_ reconciler, and what differs is that we drive
-it in **mutation** mode against stock's persistent mode. That was deliberate, so the clone-on-write
-path could not be quietly skipped, and about 15 ms of the gap is React's own mutation commit with a
-host config doing nothing at all. The other four adapters emit their moves straight into the engine
-and never pay it.
+**The single JSI crossing holds up on hardware.** Our commit carries a 12 000-entry `Int32Array` that
+C++ walks element by element; stock's is ten thousand calls carrying scalars. If reading that buffer
+were the expensive half, decode would dominate the crossing. It is 1.8% of it, against 8% on
+JavaScriptCore, and a step stays at one crossing rather than fragmenting into one per mutation.
 
-**Create-shaped rows are no longer a loss.** Solid, Svelte and React are 0.69-0.83x of
-stock on `Create`, Vue sits on the line, and Angular's 1.06x is mostly Angular's own machinery rather
-than the adapter: measured against an inlined row, a per-row component instance costs about 81 us in
-LViews, DI scopes and `EventEmitter`s. That is an app author's choice the adapter cannot remove.
+### Headless
 
-`Clear` is the row where every adapter still trails, and it splits cleanly. Our engine is 3-5 ms of
-it; the remaining 13-23 ms is each framework disposing 2 000 component instances, which on React's
-arm is the same 14.6 ms that makes up stock's entire step. Svelte's and React's framework halves are
-already at or under stock's whole `Clear`, so what is left there is not ours to win.
+`bench:itest` Release on Hermes as `hermesc -O` bytecode, the engine and the compiler a release app
+ships. Best of three, one arm per run, one sitting, 2026-09-22. Stock is React's own Fabric renderer
+in the same harness driving React Native's own `<View>` and `<Text>`.
 
-`Select` is flat across all six because it is Fabric's: a layout-dirty style change on one row of a
-thousand re-lays out the whole tree, and it does so for stock's renderer exactly as for ours.
+| 1 000 rows | stock RN |         React |           Vue |         Solid |        Svelte |       Angular |
+| ---------- | -------: | ------------: | ------------: | ------------: | ------------: | ------------: |
+| Create     |    125.2 | 102.2 / 0.82x | 100.9 / 0.81x |  78.3 / 0.63x |  89.3 / 0.71x | 113.0 / 0.90x |
+| Replace    |    137.1 | 111.7 / 0.81x | 122.6 / 0.89x |  91.7 / 0.67x | 123.7 / 0.90x | 123.1 / 0.90x |
+| Partial    |     18.7 |   8.6 / 0.46x |   8.3 / 0.44x |   6.5 / 0.35x |   7.1 / 0.38x |   6.1 / 0.33x |
+| Select     |     11.7 |  12.0 / 1.03x |  12.6 / 1.08x |  15.7 / 1.34x |  11.9 / 1.02x |  11.1 / 0.95x |
+| Swap       |     13.6 |  22.5 / 1.65x |   4.6 / 0.34x |   6.1 / 0.45x |   4.8 / 0.35x |   4.3 / 0.32x |
+| Remove     |     15.7 |   5.0 / 0.32x |   4.8 / 0.31x |   7.2 / 0.46x |   3.9 / 0.25x |   4.0 / 0.25x |
+| Append     |    137.1 | 122.5 / 0.89x | 116.9 / 0.85x | 105.7 / 0.77x | 108.1 / 0.79x | 131.8 / 0.96x |
+| Clear      |     16.2 |  12.2 / 0.75x |  15.3 / 0.94x |  16.0 / 0.99x |  15.9 / 0.98x |  23.1 / 1.43x |
 
-The harness is JavaScriptCore rather than Hermes, a test host rather than a real Fabric pipeline, and
-the runner applies no app-level Babel lowering. Read it as a sound comparison of the six columns
-_against each other_ on one ruler, and re-measure on device before quoting a ratio against stock.
+The headless ruler transfers to hardware for four of the five adapters: React 0.82 to 0.82 on `Create`,
+Vue 0.81 to 0.83, Svelte 0.71 to 0.72, Solid 0.63 to 0.72. Angular is the one that does not (0.90 to
+1.46), which is what a component instance per row costs once a real pipeline is underneath it.
+
+`Clear` is each framework disposing 2 000 component instances; our engine is 3-5 ms of it. `Select` is
+flat across all six because it is Fabric's: a layout-dirty style change on one row re-lays out the
+whole tree, for stock's renderer exactly as for ours.
+
+No column carries an exemption. Every arm writes the same props and commits the same tree, and each
+row asserts that before it reads a millisecond.
+
+### How it is kept honest
+
+- **Counters before milliseconds.** Two columns whose node or prop-key counts differ are not one
+  workload. This has caught a stock app not rebuilt after the row gained a node, and an adapter whose
+  "win" was a step that committed nothing.
+- **Release only.** The same comparison read 13% _faster_ in Debug and 30% slower in Release. The sign
+  of the headline metric flips.
+- **One ruler, one sitting, minimum of N.** Timing noise only ever adds, so the minimum is the reading
+  and a mean carries every interruption into the ratio.
+
+Both tables have been corrected more than once, always by finding the ruler wrong rather than the
+code: a JavaScriptCore harness for an engine that ships Hermes, a harness that skipped Hermes's
+optimizer, a stock column built from Fabric view names instead of the components a real app renders,
+and two benchmark screens stopping their clocks a React phase apart. The method above is what those
+cost.
 
 ---
 
@@ -333,6 +354,12 @@ the engine into Fabric, proven on device.
 **What is still catching up:** `@symbiote-native/cli` has just landed and has little mileage on it
 yet; the long-tail prop surface keeps widening; Android is at canary parity while iOS stays the
 reference surface; Reanimated is the largest remaining gap and is not started.
+
+**Angular is the slowest adapter, and on a device it is the only one slower than stock** (1.46x on a
+thousand-row create, 4.07x on `Clear`; the other four run 0.72-0.83x). The cost is Angular's own, not
+the adapter's: a row component instance is about 81 us in LViews, DI scopes and `EventEmitter`s,
+measured against the identical row inlined, and `Clear` is Angular tearing 2 000 of them down while
+the engine's share of that step is 2.4-3.8 ms on every adapter alike.
 
 The bar for "done" is the canary, not a percentage. RN's surface is effectively unbounded, so the
 example apps are the working spec and they stay green.
