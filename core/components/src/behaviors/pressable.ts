@@ -330,7 +330,25 @@ function dispatch(
 //
 // The engine event names, not the `onX` prop spellings. `buildPressableListeners` speaks the prop
 // spelling, so the two are mapped here rather than guessed at either end.
-const KEY_BY_EVENT: ReadonlyMap<string, string> = new Map([
+/**
+ * Engine event name -> the app-facing callback key its dispatcher routes to.
+ *
+ * AN ARRAY OF PAIRS RATHER THAN A `Map`, and the reason is measured rather than stylistic.
+ * `installListeners` below is the only reader, and it runs once per node that carries a press
+ * machine — which is every `<TextInput>` on the screen, not just every `<Pressable>`. A `for…of` over
+ * a `Map` builds a fresh two-element array per entry for the destructuring to read back: seven
+ * allocations per node, for seven fixed pairs that never change. The tuples here already exist, so
+ * the same loop allocates nothing but its iterator.
+ *
+ * Priced on `-O` Hermes by `text-input-attach-ladder.itest.ts`, one pass over the seven pairs:
+ * `Map` 1.04 us, this 0.39, two parallel arrays 0.29. The parallel arrays are cheapest and give up
+ * the pairing, which is not worth 0.1 us on a table that a drift would silently unwire.
+ *
+ * NOT the same list as `createPressBehavior`'s `ownedListeners`, and they must not be merged: that
+ * one is every name the machine takes as an INPUT (`pressMove` and `longPress` included), this one
+ * is only the names it installs a dispatcher for.
+ */
+const EVENT_KEY_PAIRS: ReadonlyArray<readonly [string, string]> = [
   ['press', 'onPress'],
   ['pressIn', 'onPressIn'],
   ['pressOut', 'onPressOut'],
@@ -338,10 +356,10 @@ const KEY_BY_EVENT: ReadonlyMap<string, string> = new Map([
   ['responderMove', 'onResponderMove'],
   ['responderTerminationRequest', 'onResponderTerminationRequest'],
   ['responderGrant', 'onResponderGrant'],
-]);
+];
 
 function installListeners(node: ISymbioteNode, state: IBehaviorState): void {
-  for (const [event, key] of KEY_BY_EVENT) {
+  for (const [event, key] of EVENT_KEY_PAIRS) {
     setBehaviorListener(node, event, symbioteEvent =>
       dispatch(node, state, key, [symbioteEvent]),
     );
