@@ -10,6 +10,9 @@ build-android/
 build-release-jsc/
 build-hermes/
 build-os/
+# the hermes-engine destroot `scripts/fetch-hermes.mjs` unpacks — the same Maven tarball CocoaPods
+# fetches, for a checkout with no Pods tree (CI). Never tracked: it is a 27 MB binary artefact.
+.hermes/
 dist/
 *.tsbuildinfo
 

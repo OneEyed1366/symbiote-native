@@ -298,6 +298,19 @@ jobs:
 
       - run: ccache --zero-stats
 
+      # The tester is hosted on HERMES, which means it links `hermesvm.framework` out of the
+      # `hermes-engine` pod — a `pod install` artefact, and there is no Pods tree on a runner. The
+      # pod is `Pre-built`, so the fetch is one Maven tarball (~27 MB) and no CocoaPods at all.
+      # Without it the CMake configure fails outright rather than falling back to JavaScriptCore,
+      # which is deliberate: a green run that measured the other engine is the worst outcome here.
+      # Keyed on the lockfile because that is what moves when React Native's Hermes version does.
+      - uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.hermes
+          key: hermes-destroot-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - run: node scripts/fetch-hermes.mjs
+
       - run: pnpm run test:itest
 
       # The Android arm in the SAME job, deliberately, and the sharing is the whole argument: it

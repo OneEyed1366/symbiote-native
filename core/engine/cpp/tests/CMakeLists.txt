@@ -322,8 +322,13 @@ set(SYMBIOTE_HERMES_DESTROOT "" CACHE PATH "hermes-engine pod destroot; searched
 
 if(SYMBIOTE_JS_ENGINE STREQUAL "hermes")
   if(SYMBIOTE_HERMES_DESTROOT STREQUAL "")
+    # A built example first, because that is the one a developer already has and the one whose
+    # configuration their app actually runs. `.hermes/destroot` is the fetched fallback
+    # (`node scripts/fetch-hermes.mjs`) — the same Maven tarball CocoaPods unpacks, for a checkout
+    # with no Pods tree at all. CI has no Pods tree.
     file(GLOB _hermes_destroots
       ${CMAKE_CURRENT_SOURCE_DIR}/../../../../examples/*/ios/Pods/hermes-engine/destroot)
+    list(APPEND _hermes_destroots ${CMAKE_CURRENT_SOURCE_DIR}/../../../../.hermes/destroot)
     foreach(_candidate ${_hermes_destroots})
       if(EXISTS ${_candidate}/Library/Frameworks/macosx/hermesvm.framework)
         set(SYMBIOTE_HERMES_DESTROOT ${_candidate})
@@ -333,8 +338,9 @@ if(SYMBIOTE_JS_ENGINE STREQUAL "hermes")
   endif()
   if(SYMBIOTE_HERMES_DESTROOT STREQUAL "")
     message(FATAL_ERROR
-      "SYMBIOTE_JS_ENGINE=hermes but no hermes-engine destroot was found. It arrives with "
-      "`pod install` in any example: examples/<app>/ios/Pods/hermes-engine/destroot. Pass "
+      "SYMBIOTE_JS_ENGINE=hermes but no hermes-engine destroot was found. Either run "
+      "`node scripts/fetch-hermes.mjs`, or `pod install` in any example "
+      "(examples/<app>/ios/Pods/hermes-engine/destroot), or pass "
       "-DSYMBIOTE_HERMES_DESTROOT=<path> to point at one explicitly.")
   endif()
   message(STATUS "Hermes destroot: ${SYMBIOTE_HERMES_DESTROOT}")
