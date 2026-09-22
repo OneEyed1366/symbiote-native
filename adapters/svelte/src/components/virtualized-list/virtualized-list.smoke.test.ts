@@ -13,7 +13,6 @@ import { STICKY_HEADER_TAG } from '@symbiote-native/components';
 import {
   createLiveTree,
   installRecordingFabric,
-  payloadOf,
   type ILiveNode,
 } from '@symbiote-native/test-utils';
 // See scroll-view.smoke.test.ts: mounting through `../../render` skips `index.ts`, so the host

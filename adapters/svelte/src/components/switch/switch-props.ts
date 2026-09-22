@@ -11,7 +11,6 @@
 // it out of `$props()` — this primitive is a bare tag, not one. Two-way binding is the plain
 // controlled-prop pattern instead, same as every other adapter and RN itself: `value={x}
 // onValueChange={(e) => (x = e.value)}`.
-import type { IClassNameValue } from '@symbiote-native/engine';
 import type { ISwitchProps as ISwitchBaseProps } from '@symbiote-native/components';
 import type { ISvelteClassValue } from '../../class-value';
 

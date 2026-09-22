@@ -26,7 +26,7 @@
 // (`.claude/rules/test-harness-false-greens.md` §14).
 import { afterAll, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
-import { readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
 import {

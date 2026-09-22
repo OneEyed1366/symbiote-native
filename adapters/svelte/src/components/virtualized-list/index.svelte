@@ -109,6 +109,10 @@
 
   // The one folded state cell — the Svelte twin of Vue's plain listState / React's stateRef.
   const listState: IListState<ItemT> = createInitialListState<ItemT>();
+  // Plain Map by design, like listState above: separatorVersion (below) is the manual
+  // invalidation signal a read tracks — a SvelteMap would double-track and still miss nothing,
+  // but adds reactive overhead this hot path doesn't need.
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity
   const separatorOverrides = new Map<number, Partial<ISeparatorProps<ItemT>>>();
   let viewableTimer: ReturnType<typeof setTimeout> | null = null;
   let batchTimer: ReturnType<typeof setTimeout> | null = null;

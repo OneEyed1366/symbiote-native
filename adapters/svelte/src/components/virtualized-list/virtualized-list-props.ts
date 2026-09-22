@@ -11,7 +11,6 @@
 import type { Snippet } from 'svelte';
 import {
   ARIA_ALIAS_KEYS,
-  type IClassNameValue,
   type IStyleProp,
   type ISymbioteEvent,
   type ISymbioteNode,

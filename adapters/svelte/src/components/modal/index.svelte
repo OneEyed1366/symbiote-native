@@ -35,6 +35,10 @@
 
   let rawProps: IModalProps = $props();
 
+  // Not a $derived candidate despite the $state+$effect shape below: modalReducer folds over the
+  // PREVIOUS `state` (self-referential — $derived can't read the value it's replacing) and must
+  // run POST-render (see the effect's own comment) so the keep-alive frame survives a commit.
+  // eslint-disable-next-line svelte/prefer-writable-derived
   let state = $state(createInitialModalState(rawProps.visible === true));
 
   const resolved = $derived(resolveAccessibilityProps(rawProps));

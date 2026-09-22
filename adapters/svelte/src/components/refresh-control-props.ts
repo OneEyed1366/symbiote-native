@@ -4,11 +4,7 @@
 // prop (svelte-adapter-dom-shim skill §3g(c)), unlike Vue which re-wires it through a typed
 // `refresh` emit.
 import type { Snippet } from 'svelte';
-import type {
-  IClassNameValue,
-  IStyleProp,
-  IViewStyle,
-} from '@symbiote-native/engine';
+import type { IStyleProp, IViewStyle } from '@symbiote-native/engine';
 import type {
   IAccessibilityProps,
   IAriaProps,
