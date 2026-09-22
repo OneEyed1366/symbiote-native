@@ -90,7 +90,8 @@ function timeArm(
     }
     surface.appendChild(standing);
   }
-  if (bystanders > 0 || standingRows > 0) {
+  const warmed = bystanders > 0 || standingRows > 0;
+  if (warmed) {
     surface.commit();
     mounted();
   }
@@ -103,7 +104,14 @@ function timeArm(
   // Drained so the warm-up commit above is not billed to the timed one. Read directly rather than
   // through `readCommitProfile`, which folds the same telemetry in and would zero it first — the
   // phase split is what this arm is for, and it lives only here.
-  readSurfaceTelemetry(ROOT_TAG);
+  //
+  // ONLY WHEN A COMMIT HAS ACTUALLY LANDED, and the guard is not defensive. `readSurfaceTelemetry`
+  // reaches `TransactionTelemetry::getCommitStartTime`, which ASSERTS a commit has started — so on
+  // the baseline arm, where nothing was committed above, the read aborts the process in the assert
+  // build (`react_native_assert failure: commitStartTime_ != kTelemetryUndefinedTimePoint`) and
+  // reads an undefined time point in the release one. It went unnoticed because this fixture was
+  // only ever run on `bench:itest`, where the assert is compiled out and the wrong number is silent.
+  if (warmed) readSurfaceTelemetry(ROOT_TAG);
   const startedAt = performance.now();
   for (const row of rows) appendChild(list, row);
   surface.appendChild(list);

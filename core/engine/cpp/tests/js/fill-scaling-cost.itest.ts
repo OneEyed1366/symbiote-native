@@ -40,6 +40,11 @@ const ROOT_TAG = 1;
 const SIZES = [500, 2_000, 8_000, 32_000];
 const SAMPLES = 3;
 
+// Children per container, chosen to clear Yoga's 16 384 debug ceiling with room rather than to sit
+// under it — see `fill()`. Every arm is bucketed the same way, so the shape is constant across the
+// ladder and only the count varies, which is what a scaling question needs.
+const BUCKET = 4_000;
+
 const NODE_STYLE = { height: 44, flexDirection: 'row', paddingLeft: 10 };
 
 /**
@@ -55,11 +60,31 @@ function fill(count: number): number {
   const list = createElement('RCTView');
   routeProp(list, 'style', { flex: 1 });
 
+  // Yoga's debug build asserts that a child list stays under 16 384
+  // (`YogaLayoutableShadowNode.cpp:1036`, `ensureYogaChildrenLookFine`), and the widest arm here is
+  // 32 000 — so a flat list aborted `test:itest` while passing `bench:itest`, where the assert is
+  // compiled out. The nodes are spread over buckets instead, BUILT BEFORE THE CLOCK STARTS so the
+  // timed loop below is byte-for-byte the one it was: one create, one style write, one append per
+  // node. Which parent receives the append cannot change its cost — the engine records an op and
+  // keeps no child list in JS — so the per-node column is unaffected.
+  const buckets = [];
+  for (let at = 0; at < count; at += BUCKET) {
+    const bucket = createElement('RCTView');
+    routeProp(bucket, 'style', { flex: 1 });
+    appendChild(list, bucket);
+    buckets.push(bucket);
+  }
+
+  let remaining = count;
   const startedAt = performance.now();
-  for (let at = 0; at < count; at += 1) {
-    const node = createElement('RCTView');
-    routeProp(node, 'style', NODE_STYLE);
-    appendChild(list, node);
+  for (const bucket of buckets) {
+    const upTo = remaining < BUCKET ? remaining : BUCKET;
+    for (let at = 0; at < upTo; at += 1) {
+      const node = createElement('RCTView');
+      routeProp(node, 'style', NODE_STYLE);
+      appendChild(bucket, node);
+    }
+    remaining -= upTo;
   }
   const wall = performance.now() - startedAt;
 
