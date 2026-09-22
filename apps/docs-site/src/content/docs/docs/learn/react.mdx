@@ -15,15 +15,16 @@ import { useState } from 'react';
 
 export default function App() {
   const [count, setCount] = useState(0);
+  const [pressed, setPressed] = useState(false);
 
   return (
     <view className="root">
-      <pressable onPress={() => setCount(value => value + 1)}>
-        {({ pressed }) => (
-          <text className={pressed ? 'pressed' : 'label'}>
-            Count is {count}
-          </text>
-        )}
+      <pressable
+        onPress={() => setCount(value => value + 1)}
+        onPressIn={() => setPressed(true)}
+        onPressOut={() => setPressed(false)}
+      >
+        <text className={pressed ? 'pressed' : 'label'}>Count is {count}</text>
       </pressable>
     </view>
   );
@@ -62,8 +63,11 @@ React uses the React Native-style surface:
 - events are callback props like `onPress` and `onValueChange` (shared by
   `Switch` and `TextInput`, both firing with the native event as a second
   argument — `TextInput`'s is `(text, event)`, `Switch`'s is `(value, event)`);
-- dynamic children use render functions, for example `Pressable` children can be
-  `(state) => ReactNode`;
+- press state is not a render prop: `pressable` is a host tag, so mirror it into
+  local state off `onPressIn`/`onPressOut`, or take it from a functional
+  `style={({ pressed }) => …}`;
+- render functions stay where a framework element is genuinely the return value,
+  for example `FlatList`'s `renderItem`;
 - imperative APIs use React refs, for example `ref.current?.focus()` on
   `TextInput`;
 - app code imports from `@symbiote-native/react`, while the consuming app still pins

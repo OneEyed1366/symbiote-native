@@ -5,24 +5,29 @@ description: Press feedback in React, Vue, Angular, Svelte, and Solid.
 
 import { Tabs, TabItem } from '@astrojs/starlight/components';
 
-`pressable` shares the same press state machine across every adapter. React is
-the only one that still exposes the transient `pressed` state through a
-children render function — on the other four, a bare host tag has no such
-channel, so the app mirrors `pressed` into its own local state off
-`onPressIn`/`onPressOut` instead. Angular's press events are a real
-`@Output()`.
+`pressable` shares the same press state machine across every adapter, and on all
+five it is a bare host tag — there is no component body to call a children render
+function, so `pressed` never arrives that way. Every adapter mirrors it into its
+own local state off `onPressIn`/`onPressOut` instead. Angular's press events are a
+real `@Output()`.
 
 <Tabs syncKey="framework">
   <TabItem label="React">
     ```tsx
     import './Pressable.css';
 
+    import { useState } from 'react';
+
     export function PressableLabel() {
+      const [pressed, setPressed] = useState(false);
+
       return (
-        <pressable onPress={() => console.log('pressed')}>
-          {({ pressed }) => (
-            <text className={pressed ? 'down' : 'up'}>{pressed ? 'Release' : 'Press me'}</text>
-          )}
+        <pressable
+          onPress={() => console.log('pressed')}
+          onPressIn={() => setPressed(true)}
+          onPressOut={() => setPressed(false)}
+        >
+          <text className={pressed ? 'down' : 'up'}>{pressed ? 'Release' : 'Press me'}</text>
         </pressable>
       );
     }
