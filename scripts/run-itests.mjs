@@ -837,7 +837,12 @@ function runTester(bundle) {
       stderr += chunk;
     });
     child.on('error', reject);
-    child.on('close', status => resolve({ status, stdout, stderr }));
+    // `close` reports (code, signal) and the signal is the half that used to be dropped: a process
+    // killed by one exits with code `null`, so a caller reading only the code sees "not zero" and
+    // learns nothing else. Both are carried.
+    child.on('close', (status, signal) =>
+      resolve({ status, signal, stdout, stderr }),
+    );
   });
 }
 
@@ -936,7 +941,12 @@ try {
       logLevel: 'silent',
     });
     // Counted as BUILD time, not run time: it is the step a release app does at build time too.
-    bundles.push(wantsBytecode ? await compileToBytecode(bundle) : bundle);
+    // Paired with its SOURCE file, because a bundle path is a flattened temp name and the only
+    // thing a reader can act on is which test file died.
+    bundles.push({
+      file,
+      bundle: wantsBytecode ? await compileToBytecode(bundle) : bundle,
+    });
     buildMs += performance.now() - buildStart;
   }
 
@@ -944,8 +954,8 @@ try {
   // Every bundle is queued at once — the limiter caps how many run concurrently — and printing
   // still walks them in submission order, so output stays grouped exactly as the sequential run
   // printed it even though completion order underneath is whatever finishes first.
-  const runPromises = bundles.map(bundle =>
-    limitTestRun(() => runTester(bundle)),
+  const runPromises = bundles.map(({ file, bundle }) =>
+    limitTestRun(() => runTester(bundle).then(run => ({ ...run, file }))),
   );
   for (const runPromise of runPromises) {
     const run = await runPromise;
@@ -953,9 +963,24 @@ try {
       if (line.startsWith('FAIL ')) failed += 1;
       console.log(line);
     }
-    if (run.status !== 0) {
+    if (run.status !== 0 || run.signal !== null) {
       failed += 1;
-      console.error(run.stderr.trim());
+      // A CRASH HAS TO NAME ITSELF, and this used to print `run.stderr.trim()` and nothing else.
+      // When the tester dies on a SIGNAL the exit code is `null` rather than a number, so the
+      // `status !== 0` above is true while stderr is EMPTY — a killed process writes nothing. CI run
+      // 35716368308 was exactly that: 541 passes, no FAIL line anywhere, one blank line, exit 1, and
+      // no way to tell which of 119 files had died or why. The file name and the signal are the two
+      // facts a reader needs and the two this branch was throwing away.
+      const how =
+        run.signal !== null
+          ? `killed by ${run.signal}`
+          : `exit status ${run.status}`;
+      console.error(
+        `CRASH ${path.relative(testsDir, run.file)} — ${how}${
+          run.stdout.trim() === '' ? ', no output' : ''
+        }`,
+      );
+      if (run.stderr.trim() !== '') console.error(run.stderr.trim());
     }
   }
   runMs += performance.now() - runStart;
