@@ -1,0 +1,72 @@
+{
+  "android": {
+    "gradleProjectName": "expo-notifications",
+    "modules": [
+      {
+        "importPath": "expo.modules.notifications.notifications.background.ExpoBackgroundNotificationTasksModule",
+        "className": "ExpoBackgroundNotificationTasksModule",
+        "nativeName": "ExpoBackgroundNotificationTasksModule"
+      },
+      {
+        "importPath": "expo.modules.notifications.badge.BadgeModule",
+        "className": "BadgeModule",
+        "nativeName": "ExpoBadgeModule"
+      },
+      {
+        "importPath": "expo.modules.notifications.notifications.categories.ExpoNotificationCategoriesModule",
+        "className": "ExpoNotificationCategoriesModule",
+        "nativeName": "ExpoNotificationCategoriesModule"
+      },
+      {
+        "importPath": "expo.modules.notifications.notifications.channels.NotificationChannelGroupManagerModule",
+        "className": "NotificationChannelGroupManagerModule",
+        "nativeName": "ExpoNotificationChannelGroupManager"
+      },
+      {
+        "importPath": "expo.modules.notifications.notifications.channels.NotificationChannelManagerModule",
+        "className": "NotificationChannelManagerModule",
+        "nativeName": "ExpoNotificationChannelManager"
+      },
+      {
+        "importPath": "expo.modules.notifications.permissions.NotificationPermissionsModule",
+        "className": "NotificationPermissionsModule",
+        "nativeName": "ExpoNotificationPermissionsModule"
+      },
+      {
+        "importPath": "expo.modules.notifications.notifications.presentation.ExpoNotificationPresentationModule",
+        "className": "ExpoNotificationPresentationModule",
+        "nativeName": "ExpoNotificationPresenter"
+      },
+      {
+        "importPath": "expo.modules.notifications.notifications.scheduling.NotificationScheduler",
+        "className": "NotificationScheduler",
+        "nativeName": "ExpoNotificationScheduler"
+      },
+      {
+        "importPath": "expo.modules.notifications.notifications.emitting.NotificationsEmitter",
+        "className": "NotificationsEmitter",
+        "nativeName": "ExpoNotificationsEmitter"
+      },
+      {
+        "importPath": "expo.modules.notifications.notifications.handling.NotificationsHandler",
+        "className": "NotificationsHandler",
+        "nativeName": "ExpoNotificationsHandlerModule"
+      },
+      {
+        "importPath": "expo.modules.notifications.tokens.PushTokenModule",
+        "className": "PushTokenModule",
+        "nativeName": "ExpoPushTokenManager"
+      },
+      {
+        "importPath": "expo.modules.notifications.serverregistration.ServerRegistrationModule",
+        "className": "ServerRegistrationModule",
+        "nativeName": "NotificationsServerRegistrationModule"
+      },
+      {
+        "importPath": "expo.modules.notifications.topics.TopicSubscriptionModule",
+        "className": "TopicSubscriptionModule",
+        "nativeName": "ExpoTopicSubscriptionModule"
+      }
+    ]
+  }
+}
