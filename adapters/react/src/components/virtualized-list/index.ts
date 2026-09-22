@@ -385,7 +385,7 @@ export function VirtualizedList<ItemT>(
       );
       setCommandedOffset(target);
     },
-    [],
+    [scrollHandle],
   );
 
   // dispatch and runEffects are mutually recursive (a schedule-refill / fire-viewable effect
