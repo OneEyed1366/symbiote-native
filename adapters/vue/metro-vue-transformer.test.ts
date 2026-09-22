@@ -13,7 +13,6 @@
 // (unsupported lang) sits inside its feature's describe, asserting the specific error message.
 import { describe, expect, it } from 'vitest';
 import metroVueTransformer from './metro-vue-transformer.cjs';
-import { HOST_PRIMITIVES } from '@symbiote-native/components/host-primitives';
 
 const {
   compileSfc,
