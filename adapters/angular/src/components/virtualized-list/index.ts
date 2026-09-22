@@ -34,6 +34,7 @@ import {
   EventEmitter,
   Input,
   Output,
+  TemplateRef,
   ViewChild,
   computed,
   inject,
@@ -267,7 +268,7 @@ interface IWindowCell<ItemT> {
               [style]="cellStyle"
             >
               <ng-container
-                [vListOutlet]="itemDir?.templateRef"
+                [vListOutlet]="cellTemplate"
                 [vListOutletContext]="forcedStickyCell.context"
               ></ng-container>
             </sticky-header>
@@ -282,12 +283,12 @@ interface IWindowCell<ItemT> {
                 [style]="cellStyle"
               >
                 <ng-container
-                  [vListOutlet]="itemDir?.templateRef"
+                  [vListOutlet]="cellTemplate"
                   [vListOutletContext]="cell.context"
                 ></ng-container>
                 @if (cell.separatorContext !== undefined) {
                   <ng-container
-                    [vListOutlet]="separatorDir?.templateRef"
+                    [vListOutlet]="separatorTemplate"
                     [vListOutletContext]="cell.separatorContext"
                   ></ng-container>
                 }
@@ -298,12 +299,12 @@ interface IWindowCell<ItemT> {
                 [style]="cellStyle"
               >
                 <ng-container
-                  [vListOutlet]="itemDir?.templateRef"
+                  [vListOutlet]="cellTemplate"
                   [vListOutletContext]="cell.context"
                 ></ng-container>
                 @if (cell.separatorContext !== undefined) {
                   <ng-container
-                    [vListOutlet]="separatorDir?.templateRef"
+                    [vListOutlet]="separatorTemplate"
                     [vListOutletContext]="cell.separatorContext"
                   ></ng-container>
                 }
@@ -351,7 +352,7 @@ interface IWindowCell<ItemT> {
               [style]="cellStyle"
             >
               <ng-container
-                [vListOutlet]="itemDir?.templateRef"
+                [vListOutlet]="cellTemplate"
                 [vListOutletContext]="forcedStickyCell.context"
               ></ng-container>
             </sticky-header>
@@ -373,12 +374,12 @@ interface IWindowCell<ItemT> {
                 [style]="cellStyle"
               >
                 <ng-container
-                  [vListOutlet]="itemDir?.templateRef"
+                  [vListOutlet]="cellTemplate"
                   [vListOutletContext]="cell.context"
                 ></ng-container>
                 @if (cell.separatorContext !== undefined) {
                   <ng-container
-                    [vListOutlet]="separatorDir?.templateRef"
+                    [vListOutlet]="separatorTemplate"
                     [vListOutletContext]="cell.separatorContext"
                   ></ng-container>
                 }
@@ -389,12 +390,12 @@ interface IWindowCell<ItemT> {
                 [style]="cellStyle"
               >
                 <ng-container
-                  [vListOutlet]="itemDir?.templateRef"
+                  [vListOutlet]="cellTemplate"
                   [vListOutletContext]="cell.context"
                 ></ng-container>
                 @if (cell.separatorContext !== undefined) {
                   <ng-container
-                    [vListOutlet]="separatorDir?.templateRef"
+                    [vListOutlet]="separatorTemplate"
                     [vListOutletContext]="cell.separatorContext"
                   ></ng-container>
                 }
@@ -549,6 +550,20 @@ export class VirtualizedList<ItemT = unknown>
   @ContentChild(VListEmptyDirective) emptyDir?: VListEmptyDirective;
   @ContentChild(VListSeparatorDirective)
   separatorDir?: VListSeparatorDirective<ItemT>;
+
+  // A wrapping list (FlatList) hands its app's cell/separator templates straight in, so a cell is
+  // one outlet deep instead of a wrapper outlet around the app's own; each wins over projection.
+  @Input() itemTemplate?: TemplateRef<IVListItemContext<ItemT>>;
+  @Input() itemSeparatorTemplate?: TemplateRef<IVListSeparatorContext<ItemT>>;
+
+  get cellTemplate(): TemplateRef<IVListItemContext<ItemT>> | undefined {
+    return this.itemTemplate ?? this.itemDir?.templateRef;
+  }
+
+  get separatorTemplate():
+    TemplateRef<IVListSeparatorContext<ItemT>> | undefined {
+    return this.itemSeparatorTemplate ?? this.separatorDir?.templateRef;
+  }
 
   // The inner scroll TAG's own engine node — a template ref on a bare intrinsic hands back the
   // host node directly (`isSymbioteNode(elementRef.nativeElement)`, matching `anchorHostStyle`'s
@@ -1041,7 +1056,7 @@ export class VirtualizedList<ItemT = unknown>
       this.headerDir !== undefined,
       this.footerDir !== undefined,
       this.emptyDir !== undefined,
-      this.separatorDir !== undefined,
+      this.separatorTemplate !== undefined,
     ];
     const previous = this.lastRecompute;
     this.lastRecompute = recomputeInputs;
@@ -1076,7 +1091,7 @@ export class VirtualizedList<ItemT = unknown>
     const m = this.listState.metrics;
     this.itemCount = m.count;
     const hasHeader = this.headerDir !== undefined;
-    const hasSeparators = this.separatorDir !== undefined;
+    const hasSeparators = this.separatorTemplate !== undefined;
     const stickySet =
       this.stickyHeaderIndices !== undefined
         ? new Set(this.stickyHeaderIndices)
