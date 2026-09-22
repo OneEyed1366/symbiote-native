@@ -267,6 +267,7 @@ type ISuiteEntry = {
 const EMPTY_FABRIC_PROFILE: IFabricCallProfile = {
   calls: {},
   propKeys: {},
+  createsByView: {},
   totalCalls: 0,
   totalPropKeys: 0,
 };
@@ -286,6 +287,18 @@ function formatFabric(profile: IFabricCallProfile | undefined): string {
     (profile.calls.cloneNodeWithNewProps ?? 0) +
     (profile.calls.cloneNodeWithNewChildrenAndProps ?? 0);
   return `${create}/${append}/${clones}`;
+}
+
+// What the totals above cannot answer once two arms disagree: WHICH view one of them never asks
+// Fabric for. A row is ten native views by construction on both sides, so a createNode total of
+// 9 001 against 10 000 is a missing node per row, and only a per-name tally says which.
+function formatCreatesByView(profile: IFabricCallProfile | undefined): string {
+  if (profile === undefined) return '—';
+  const entries = Object.entries(profile.createsByView).sort(
+    ([, left], [, right]) => right - left,
+  );
+  if (entries.length === 0) return 'none';
+  return entries.map(([viewName, count]) => `${viewName} ${count}`).join(' · ');
 }
 
 // The suite's fixed order, shared by the runner and the comparison table below, so a step can
@@ -1047,6 +1060,13 @@ export function BenchmarkScreen() {
                 </View>
               );
             })}
+            <Text style={styles.sectionLabel}>CREATE 1 000 · BY VIEW NAME</Text>
+            <Text
+              testID="bench-fabric-creates-by-view"
+              style={styles.benchCompareCell}
+            >
+              {formatCreatesByView(allFabricProfiles.get(BENCH_OP.Create))}
+            </Text>
             <Text style={styles.noteText}>
               {`Counted by wrapping global.nativeFabricUIManager before the app mounts — the one surface this baseline and the SymbioteNative canaries genuinely share, and therefore the only like-for-like number between them. Their engine's own counters (nodesVisited, propWrites) have no equivalent here: stock has no reconcile walk to count. Read as two questions. CREATE/APPEND/CLONE answers "does one stack ask Fabric to do MORE"; PROP KEYS answers the other half, "or the same number of times with fatter payloads". The wrapper costs one JS call per crossing and is therefore in every timing on this screen — the comparison holds only because the other side carries the identical wrapper.`}
             </Text>
@@ -1141,7 +1161,6 @@ export function BenchmarkScreen() {
             )}
           />
         )}
-
 
         <Text
           style={styles.sectionLabel}
