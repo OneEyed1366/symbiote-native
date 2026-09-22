@@ -259,11 +259,11 @@ function escapeXmlAttribute(value) {
   return escapeXml(value).replace(/"/g, '&quot;');
 }
 
-// The bounds of the `<application ...>` opening tag. Scanning for the first unquoted ">" rather
-// than matching a regex: RN's own template puts "${usesCleartextTraffic}" in an attribute, and
-// a manifest is free to put a ">" inside one.
-function findApplicationTag(content) {
-  const match = /<application(?=[\s>/])/.exec(content);
+// The bounds of a `<tagName ...>` opening tag. Scanning for the first unquoted ">" rather than
+// matching a regex: RN's own template puts "${usesCleartextTraffic}" in an attribute, and a
+// manifest is free to put a ">" inside one.
+function findTag(content, tagName) {
+  const match = new RegExp(`<${tagName}(?=[\\s>/])`).exec(content);
   if (!match) return null;
 
   let quote = null;
@@ -277,6 +277,10 @@ function findApplicationTag(content) {
     else if (char === '>') return { start: match.index, end: i };
   }
   return null;
+}
+
+function findApplicationTag(content) {
+  return findTag(content, 'application');
 }
 
 function readXmlAttribute(tagText, name) {
@@ -347,6 +351,127 @@ function patchAndroidManifest(appRoot, entries) {
   applyIfChanged(manifestPath, content, next);
 }
 
+function readManifestPermissions(content) {
+  return new Set([...content.matchAll(/<uses-permission\s[^>]*android:name="([^"]+)"/g)].map((match) => match[1]));
+}
+
+// Sibling of patchAndroidManifest for root-level `<uses-permission>` elements rather than
+// `<application>` attributes. Same additive policy: an existing permission, however it got there,
+// is left alone - this only ever ADDS a missing one, right after the `<manifest>` tag opens.
+//
+// Every entry here is something the PACKAGE'S OWN AndroidManifest.xml deliberately does NOT
+// carry, so autolinking's ordinary merge never adds it - typically because requesting it triggers
+// Play Console policy review for every consumer (FOREGROUND_SERVICE_LOCATION,
+// FOREGROUND_SERVICE_MICROPHONE, ACCESS_BACKGROUND_LOCATION, ...), so a package only lists one
+// here when it wants EVERY consumer to request it unconditionally - see each package's own
+// native-link.json and README for which permissions it deliberately leaves for the app to add by
+// hand instead (matching whatever upstream's own config-plugin defaults to `false`).
+function patchAndroidManifestPermissions(appRoot, entries) {
+  const wanted = new Set();
+  for (const entry of entries) {
+    const permissions = entry.manifest.android && entry.manifest.android.manifestPermissions;
+    if (!permissions) continue;
+    for (const permission of permissions) wanted.add(permission);
+  }
+  if (wanted.size === 0) return;
+
+  const manifestPath = path.join(appRoot, 'android', 'app', 'src', 'main', 'AndroidManifest.xml');
+  if (!fs.existsSync(manifestPath)) {
+    dlog('AndroidManifest.xml not found, skipping permissions');
+    return;
+  }
+
+  const content = fs.readFileSync(manifestPath, 'utf8');
+  const existing = readManifestPermissions(content);
+  const missing = [...wanted].filter((permission) => !existing.has(permission)).sort();
+  if (missing.length === 0) return;
+
+  const tag = findTag(content, 'manifest');
+  if (!tag) {
+    warn(`${manifestPath} has no <manifest> element, skipping permissions`);
+    return;
+  }
+
+  const lines = missing.map((permission) => `  <uses-permission android:name="${permission}" />`).join('\n');
+  const next = `${content.slice(0, tag.end + 1)}\n${lines}${content.slice(tag.end + 1)}`;
+
+  applyIfChanged(manifestPath, content, next);
+}
+
+function readManifestServiceNames(content) {
+  return new Set([...content.matchAll(/<service\s[^>]*android:name="([^"]+)"/g)].map((match) => match[1]));
+}
+
+function buildServiceXml(service, indent) {
+  const attrs = [
+    `android:name="${escapeXmlAttribute(service.name)}"`,
+    `android:exported="${service.exported === true ? 'true' : 'false'}"`,
+  ];
+  if (service.foregroundServiceType) {
+    attrs.push(`android:foregroundServiceType="${escapeXmlAttribute(service.foregroundServiceType)}"`);
+  }
+  const openTag = `${indent}<service ${attrs.join(' ')}`;
+  if (!service.intentFilterActions || service.intentFilterActions.length === 0) {
+    return `${openTag} />`;
+  }
+  const actions = service.intentFilterActions
+    .map((action) => `${indent}    <action android:name="${escapeXmlAttribute(action)}" />`)
+    .join('\n');
+  return `${openTag}>\n${indent}  <intent-filter>\n${actions}\n${indent}  </intent-filter>\n${indent}</service>`;
+}
+
+// Sibling of patchAndroidManifestPermissions for a whole `<service>` ELEMENT rather than one
+// `<uses-permission>` string — needed because a foreground service's native class is often not
+// declared in the package's own AndroidManifest.xml either (unlike location's LocationTaskService,
+// which ships in expo-location's own manifest and merges automatically): upstream's config-plugin
+// adds it dynamically at `expo prebuild` time (e.g. expo-audio's AudioControlsService /
+// AudioRecordingService, see plugin/src/withAudio.ts), which this project's static manifest-merge
+// approach has no equivalent of until a package lists it here. Additive by `android:name`
+// presence, same idempotency policy as every other patcher in this file.
+function patchAndroidManifestServices(appRoot, entries) {
+  const wanted = new Map();
+  for (const entry of entries) {
+    const services = entry.manifest.android && entry.manifest.android.manifestServices;
+    if (!services) continue;
+    for (const service of services) {
+      if (!wanted.has(service.name)) wanted.set(service.name, service);
+    }
+  }
+  if (wanted.size === 0) return;
+
+  const manifestPath = path.join(appRoot, 'android', 'app', 'src', 'main', 'AndroidManifest.xml');
+  if (!fs.existsSync(manifestPath)) {
+    dlog('AndroidManifest.xml not found, skipping services');
+    return;
+  }
+
+  const content = fs.readFileSync(manifestPath, 'utf8');
+  const existing = readManifestServiceNames(content);
+  const missing = [...wanted.values()]
+    .filter((service) => !existing.has(service.name))
+    .sort((a, b) => (a.name < b.name ? -1 : 1));
+  if (missing.length === 0) return;
+
+  const tag = findApplicationTag(content);
+  if (!tag) {
+    warn(`${manifestPath} has no <application> element, skipping services`);
+    return;
+  }
+  if (content[tag.end - 1] === '/') {
+    warn(`${manifestPath}'s <application> is self-closing, skipping services`);
+    return;
+  }
+
+  const lastNewline = content.lastIndexOf('\n', tag.start);
+  const tagIndent = /^[ \t]*/.exec(content.slice(lastNewline + 1, tag.start))[0];
+  const indent = `${tagIndent}  `;
+  const blocks = missing.map((service) => buildServiceXml(service, indent)).join('\n');
+  const insertAt = tag.end + 1;
+  const next = `${content.slice(0, insertAt)}\n${blocks}${content.slice(insertAt)}`;
+
+  applyIfChanged(manifestPath, content, next);
+}
+
 function readPlistString(content, key) {
   const keyIndex = content.indexOf(`<key>${key}</key>`);
   if (keyIndex === -1) return null;
@@ -410,6 +535,75 @@ function patchInfoPlist(appRoot, entries) {
   applyIfChanged(plistPath, content, next);
 }
 
+// Finds the `<key>NAME</key>` + `<array>…</array>` pair for an array-valued Info.plist key.
+// Returns each item's raw (unescaped) string plus where the array closes, so a caller can append
+// missing items without disturbing what's already there.
+function readPlistArray(content, key) {
+  const keyTag = `<key>${key}</key>`;
+  const keyIndex = content.indexOf(keyTag);
+  if (keyIndex === -1) return null;
+  const arrayOpenIndex = content.indexOf('<array>', keyIndex + keyTag.length);
+  const arrayCloseIndex = arrayOpenIndex === -1 ? -1 : content.indexOf('</array>', arrayOpenIndex);
+  if (arrayOpenIndex === -1 || arrayCloseIndex === -1) return null;
+  const inner = content.slice(arrayOpenIndex + '<array>'.length, arrayCloseIndex);
+  const items = [...inner.matchAll(/<string>([\s\S]*?)<\/string>/g)].map((match) => match[1]);
+  return { arrayCloseIndex, items };
+}
+
+// Sibling of patchInfoPlist for the one shape it cannot express: an ARRAY-valued key
+// (UIBackgroundModes, BGTaskSchedulerPermittedIdentifiers, …) — a plain <string> would produce
+// an invalid plist. Multiple packages can want the SAME key (background-fetch and background-task
+// both add to UIBackgroundModes), so every package's items merge into one array instead of the
+// last writer winning. Same additive policy as patchInfoPlist: an item already present, however it
+// got there, is never removed or reordered.
+function patchInfoPlistArrays(appRoot, entries) {
+  const wanted = new Map();
+  for (const entry of entries) {
+    const arrayKeys = entry.manifest.ios && entry.manifest.ios.infoPlistArrayKeys;
+    if (!arrayKeys) continue;
+    for (const [key, items] of Object.entries(arrayKeys)) {
+      if (!wanted.has(key)) wanted.set(key, new Set());
+      for (const item of items) wanted.get(key).add(item);
+    }
+  }
+  if (wanted.size === 0) return;
+
+  const plistPath = findInfoPlistFile(appRoot);
+  if (!plistPath) {
+    dlog('Info.plist not found, skipping iOS array keys');
+    return;
+  }
+
+  const content = fs.readFileSync(plistPath, 'utf8');
+  let next = content;
+
+  for (const [key, itemsSet] of [...wanted].sort((a, b) => (a[0] < b[0] ? -1 : 1))) {
+    const wantedItems = [...itemsSet];
+    const existing = readPlistArray(next, key);
+
+    if (existing === null) {
+      const plistCloseIndex = next.lastIndexOf('</plist>');
+      const dictCloseIndex = next.lastIndexOf('</dict>', plistCloseIndex === -1 ? undefined : plistCloseIndex);
+      if (dictCloseIndex === -1) {
+        warn(`${plistPath} has no closing </dict>, skipping ${key}`);
+        continue;
+      }
+      const itemLines = wantedItems.map((item) => `\t\t<string>${escapeXml(item)}</string>`).join('\n');
+      const block = `\t<key>${key}</key>\n\t<array>\n${itemLines}\n\t</array>\n`;
+      next = next.slice(0, dictCloseIndex) + block + next.slice(dictCloseIndex);
+      continue;
+    }
+
+    const missing = wantedItems.filter((item) => !existing.items.includes(item));
+    if (missing.length === 0) continue;
+
+    const missingLines = missing.map((item) => `\t\t<string>${escapeXml(item)}</string>\n`).join('');
+    next = next.slice(0, existing.arrayCloseIndex) + missingLines + next.slice(existing.arrayCloseIndex);
+  }
+
+  applyIfChanged(plistPath, content, next);
+}
+
 // Safe to run any number of times, and after an uninstall.
 function linkApp(explicitAppRoot) {
   const appRoot = explicitAppRoot || findAppRoot();
@@ -422,7 +616,10 @@ function linkApp(explicitAppRoot) {
   patchBuildGradle(appRoot, entries);
   patchMainApplication(appRoot, entries);
   patchAndroidManifest(appRoot, entries);
+  patchAndroidManifestPermissions(appRoot, entries);
+  patchAndroidManifestServices(appRoot, entries);
   patchInfoPlist(appRoot, entries);
+  patchInfoPlistArrays(appRoot, entries);
 }
 
 module.exports = {
@@ -434,5 +631,8 @@ module.exports = {
   patchBuildGradle,
   patchMainApplication,
   patchAndroidManifest,
+  patchAndroidManifestPermissions,
+  patchAndroidManifestServices,
   patchInfoPlist,
+  patchInfoPlistArrays,
 };
