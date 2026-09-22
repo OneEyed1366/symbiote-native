@@ -16,23 +16,36 @@ vi.mock('../prompts.js', async importOriginal => ({
   ...(await importOriginal<typeof import('../prompts.js')>()),
   resolveAddLayers: vi.fn(),
   resolveAddOverwrite: vi.fn(),
+  resolveGrantSelection: vi.fn(),
   resolvePackageManager: vi.fn(),
 }));
 vi.mock('../add-layers.js', () => ({
   addLayersToApp: vi.fn(),
 }));
+// discoveredBundlesFromLayers stays real (pure, trivial — same reasoning as
+// explicitLayersFromFlags below) — only applyBundle needs mocking, since it writes files.
+vi.mock('../grant-bundles.js', async importOriginal => ({
+  ...(await importOriginal<typeof import('../grant-bundles.js')>()),
+  applyBundle: vi.fn(),
+}));
 vi.mock('@clack/prompts', () => ({
   intro: vi.fn(),
   outro: vi.fn(),
+  note: vi.fn(),
 }));
 
 const clack = await import('@clack/prompts');
 const { detectSymbioteFrameworkFromDependencies, readCwdDependencies } =
   await import('../detect-framework.js');
 const { detectAddedLayers } = await import('../detect-added-layers.js');
-const { resolveAddLayers, resolveAddOverwrite, resolvePackageManager } =
-  await import('../prompts.js');
+const {
+  resolveAddLayers,
+  resolveAddOverwrite,
+  resolveGrantSelection,
+  resolvePackageManager,
+} = await import('../prompts.js');
 const { addLayersToApp } = await import('../add-layers.js');
+const { applyBundle } = await import('../grant-bundles.js');
 const { NotSymbioteAppError } = await import('../errors.js');
 const { resolveFrameworkForAdd, runAdd } = await import('./add.js');
 
@@ -182,6 +195,108 @@ describe('runAdd', () => {
   // The overwrite policy (TTY confirm / --force / non-interactive skip) lives in resolveAddOverwrite
   // — this proves runAdd actually wires the real --force flag into it rather than hardcoding a
   // choice of its own.
+  //
+  // why: a developer who just added `audio` won't know it also offers an optional,
+  // policy-sensitive Android bundle unless `add` OFFERS it right there — printing a command to run
+  // later is bad DX (the previous shape this replaces), so `add` asks interactively and applies
+  // the developer's actual choice, same as `grant` itself would.
+  it('offers to grant a bundle for a newly-applied package that has one, and applies what was picked', async () => {
+    mockEligibleApp();
+    vi.mocked(resolveAddLayers).mockResolvedValue(['audio']);
+    vi.mocked(addLayersToApp).mockResolvedValue({
+      appliedLayers: ['audio'],
+      skippedLayers: [],
+    });
+    const bundle = {
+      id: 'recording',
+      label: 'Background audio recording',
+      warning: 'w',
+      nextSteps: 'n',
+    };
+    vi.mocked(resolveGrantSelection).mockResolvedValue([
+      { packageName: '@symbiote-native/audio', bundle },
+    ]);
+
+    await runAdd({ ...BASE_PARSED, expoPackages: new Set(['audio']) });
+
+    expect(applyBundle).toHaveBeenCalledWith(process.cwd(), bundle);
+    expect(clack.note).toHaveBeenCalledWith(
+      expect.stringContaining(bundle.warning),
+      bundle.label,
+    );
+    const outroText = vi
+      .mocked(clack.outro)
+      .mock.calls.map(([message]) => message)
+      .join('\n');
+    expect(outroText).toContain(bundle.label);
+  });
+
+  // why: declining every offered bundle is an informed choice, not a failure — nothing should be
+  // applied, and repeating a "run grant later" hint the developer just answered would be noise.
+  it('applies nothing when the developer declines every offered bundle', async () => {
+    mockEligibleApp();
+    vi.mocked(resolveAddLayers).mockResolvedValue(['audio']);
+    vi.mocked(addLayersToApp).mockResolvedValue({
+      appliedLayers: ['audio'],
+      skippedLayers: [],
+    });
+    vi.mocked(resolveGrantSelection).mockResolvedValue([]);
+
+    await runAdd({ ...BASE_PARSED, expoPackages: new Set(['audio']) });
+
+    expect(applyBundle).not.toHaveBeenCalled();
+    const outroText = vi
+      .mocked(clack.outro)
+      .mock.calls.map(([message]) => message)
+      .join('\n');
+    expect(outroText).not.toContain('grant');
+  });
+
+  // why: a piped/CI `add` can't pop an interactive multiselect — resolveGrantSelection fails fast
+  // in that case (its own documented contract), and `add` must not let that abort the whole
+  // command. It falls back to the printed hint so the developer still hears about it later.
+  it('falls back to a printed hint when resolveGrantSelection cannot ask (non-interactive)', async () => {
+    mockEligibleApp();
+    vi.mocked(resolveAddLayers).mockResolvedValue(['audio']);
+    vi.mocked(addLayersToApp).mockResolvedValue({
+      appliedLayers: ['audio'],
+      skippedLayers: [],
+    });
+    vi.mocked(resolveGrantSelection).mockRejectedValue(
+      new CliUsageError('not interactive'),
+    );
+
+    await runAdd({ ...BASE_PARSED, expoPackages: new Set(['audio']) });
+
+    expect(applyBundle).not.toHaveBeenCalled();
+    const outroText = vi
+      .mocked(clack.outro)
+      .mock.calls.map(([message]) => message)
+      .join('\n');
+    expect(outroText).toContain('@symbiote-native/cli grant audio');
+  });
+
+  // why: a package with no optional bundle (e.g. battery) has nothing to ask about — must not pop
+  // an empty prompt or print a hint that leads nowhere (`grant battery` would just report
+  // "nothing to grant").
+  it('does not ask or hint at `grant` for a package with no optional manifest bundle', async () => {
+    mockEligibleApp();
+    vi.mocked(resolveAddLayers).mockResolvedValue(['battery']);
+    vi.mocked(addLayersToApp).mockResolvedValue({
+      appliedLayers: ['battery'],
+      skippedLayers: [],
+    });
+
+    await runAdd({ ...BASE_PARSED, expoPackages: new Set(['battery']) });
+
+    expect(resolveGrantSelection).not.toHaveBeenCalled();
+    const outroText = vi
+      .mocked(clack.outro)
+      .mock.calls.map(([message]) => message)
+      .join('\n');
+    expect(outroText).not.toContain('grant');
+  });
+
   it('wires the testing-overwrite confirm through to resolveAddOverwrite with --force', async () => {
     mockEligibleApp();
     vi.mocked(resolveAddLayers).mockResolvedValue(['testing']);
