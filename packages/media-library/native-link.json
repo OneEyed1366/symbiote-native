@@ -1,0 +1,26 @@
+{
+  "android": {
+    "gradleProjectName": "expo-media-library",
+    "modules": [
+      {
+        "importPath": "expo.modules.medialibrary.MediaLibraryModule",
+        "className": "MediaLibraryModule",
+        "nativeName": "ExpoMediaLibrary"
+      },
+      {
+        "importPath": "expo.modules.medialibrary.next.MediaLibraryNextModule",
+        "className": "MediaLibraryNextModule",
+        "nativeName": "ExpoMediaLibraryNext"
+      }
+    ],
+    "manifestApplicationAttributes": {
+      "android:requestLegacyExternalStorage": "true"
+    }
+  },
+  "ios": {
+    "infoPlistKeys": {
+      "NSPhotoLibraryUsageDescription": "Allow $(PRODUCT_NAME) to access your photos.",
+      "NSPhotoLibraryAddUsageDescription": "Allow $(PRODUCT_NAME) to save photos."
+    }
+  }
+}
