@@ -27,11 +27,28 @@ function isSupportedTypedArray(value: ArrayBufferView): value is ITypedArray {
   );
 }
 
+// Upstream's own getRandomValues.ts enforces this per the W3C spec
+// (https://www.w3.org/TR/WebCryptoAPI/#Crypto-method-getRandomValues) regardless of what the
+// underlying native call can actually handle — @symbiote-native/crypto's getRandomValues has no
+// length limit of its own, so without this check an oversized view would sail straight through to
+// the native module instead of failing the same way a real Web Crypto implementation does.
+const MAX_RANDOM_BYTES = 65_536;
+
+class QuotaExceededError extends Error {
+  override name = 'QuotaExceededError';
+  code = 22; // QUOTA_EXCEEDED_ERR
+}
+
 class Crypto implements IWebCrypto {
   getRandomValues<TArray extends ArrayBufferView>(values: TArray): TArray {
     if (!isSupportedTypedArray(values)) {
       throw new TypeError(
         'The provided ArrayBuffer view is not a supported integer-typed array',
+      );
+    }
+    if (values.byteLength > MAX_RANDOM_BYTES) {
+      throw new QuotaExceededError(
+        `The ArrayBuffer view's byte length (${values.byteLength}) exceeds the number of bytes of entropy available via this API (${MAX_RANDOM_BYTES})`,
       );
     }
     return getNativeRandomValues(values);
