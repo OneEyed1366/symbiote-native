@@ -94,7 +94,7 @@ export const prefersReducedMotion = /*@__PURE__*/ new MediaQuery(
 `MediaQuery`'s constructor calls `window.matchMedia`, which React Native does not
 define. The `/*@__PURE__*/` annotation lets a tree-shaking bundler drop that line when
 `prefersReducedMotion` is unused, but Metro does not tree-shake by default, so
-`import { Tween } from 'svelte/motion'` can fail at import time rather than at first
+importing `Tween` from `svelte/motion` can fail at import time rather than at first
 use. Reach for `Animated` from `@symbiote-native/svelte` for animation, and
 `orientation` / `createWidthQuery` / `useColorScheme` where you would have used a media
 query. Context (`setContext`/

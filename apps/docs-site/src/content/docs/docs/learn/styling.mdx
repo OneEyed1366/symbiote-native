@@ -378,7 +378,13 @@ needs any of the three.
 There is no DOM, so there is nothing for a browser selector to match —
 pseudo-classes (`:hover`, `:focus`, `:nth-child`), media queries, and
 `animation` have no RN target and are dropped at build time, not silently
-misapplied. Tailwind CSS is not supported. Everything else — plain CSS
+misapplied. `:active` is the single exception, and it is not a general opening
+of CSS state: a press is the one state the engine itself tracks, so `.btn:active`
+compiles to a token beside `.btn` and wins the cascade exactly as its specificity
+says. Nothing else in that family follows — there is no hover or focus for it to
+mirror. Prefer `onPressIn`/`onPressOut` in the examples you write; reach for
+`:active` when the pressed look is purely visual and you want it resolved without
+a render. Tailwind CSS is not supported. Everything else — plain CSS
 (including `box-shadow`, `transform`, `filter`, `transform-origin`, and
 `background-image`), CSS Modules, and the SCSS/Less/Stylus preprocessors
 above — is a stable, build-time-only compile step: no CSS engine, no selector
