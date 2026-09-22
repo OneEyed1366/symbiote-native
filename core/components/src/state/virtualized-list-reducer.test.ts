@@ -354,7 +354,9 @@ describe('reduceList commit — batch fill', () => {
   it('schedules a refill when the throttled window lags the target', () => {
     // A big list so the window is a real subset. windowSize 3 keeps the target small; a scroll
     // shifts it to an overlapping window that maxToRenderPerBatch 1 cannot reach in one step, so the
-    // throttled window lags the target and a refill must be scheduled.
+    // throttled window lags the target and a refill must be scheduled. initialNumToRender 2 makes the
+    // first paint (RN's initial region, 0..1) the settled window itself, so the scrolled target
+    // (2..4) is reached by GROWING one cell per tick - the lag this case is about.
     const bigData = Array.from({ length: 100 }, (_value, i) => `item-${i}`);
     const inputs = baseInputs({
       data: bigData,
@@ -362,6 +364,7 @@ describe('reduceList commit — batch fill', () => {
       getItemCount: (): number => bigData.length,
       windowSize: 3,
       maxToRenderPerBatch: 1,
+      initialNumToRender: 2,
     });
     const state = stepTo(
       settled(inputs, 100),

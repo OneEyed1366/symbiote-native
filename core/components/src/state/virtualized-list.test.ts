@@ -16,6 +16,7 @@ import {
   buildOffsets,
   computeWindow,
   throttleWindow,
+  initialRenderRegion,
   isCellViewable,
   offsetForIndex,
   averageMeasuredLength,
@@ -657,15 +658,42 @@ describe('computeWindow', () => {
   });
 });
 
+describe('initialRenderRegion', () => {
+  // why: RN's first paint of a list is `initialNumToRender` cells from `initialScrollIndex`
+  // (`VirtualizedList._initialRenderRegion`), whatever the viewport would hold.
+  it('spans initialNumToRender cells from the start', () => {
+    expect(initialRenderRegion(1_000, undefined, 10)).toEqual({
+      first: 0,
+      last: 9,
+    });
+  });
+
+  it('starts at initialScrollIndex', () => {
+    expect(initialRenderRegion(1_000, 50, 10)).toEqual({ first: 50, last: 59 });
+  });
+
+  // why: a list shorter than the region paints what it has, never an index past its end.
+  it('stops at the last item', () => {
+    expect(initialRenderRegion(5, undefined, 10)).toEqual({
+      first: 0,
+      last: 4,
+    });
+    expect(initialRenderRegion(5, 9, 10)).toEqual({ first: 4, last: 4 });
+  });
+});
+
 describe('throttleWindow', () => {
-  // why: throttleWindow only clamps growth off a REAL previous window — the sentinel empty
-  // window (last < first, before anything has rendered) must pass the target through unchanged
-  // or the very first paint would be throttled down to nothing.
-  it('passes the target through unchanged when there is no previous window yet', () => {
-    const target = { first: 0, last: 19 };
-    expect(throttleWindow(target, { first: 0, last: NO_INDEX }, 10)).toEqual(
-      target,
-    );
+  // why: with no previous window (the list just received data) RN paints its initial region, not
+  // the whole viewport window - 10 rows where the window for a 420pt viewport holds ~125. The rest
+  // fills in batch by batch. Painting the target at once made every first paint ~12x heavier.
+  it('paints the initial region when there is no previous window yet', () => {
+    const target = { first: 0, last: 124 };
+    expect(
+      throttleWindow(target, { first: 0, last: NO_INDEX }, 10, {
+        first: 0,
+        last: 9,
+      }),
+    ).toEqual({ first: 0, last: 9 });
   });
 
   // why: incremental fill grows the window by at most maxToRenderPerBatch cells per side per
