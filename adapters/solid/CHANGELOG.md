@@ -1,5 +1,12 @@
 # @symbiote-native/solid
 
+## 3.0.1
+
+### Patch Changes
+
+- Updated dependencies [[`3de549b`](https://github.com/OneEyed1366/symbiote-native/commit/3de549b2ab9785c845a1f3acd5626d85d2b9b9e4)]:
+  - @symbiote-native/components@3.0.1
+
 ## 3.0.0
 
 ### Minor Changes

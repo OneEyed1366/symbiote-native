@@ -1,5 +1,11 @@
 # @symbiote-native/components
 
+## 3.0.1
+
+### Patch Changes
+
+- [`3de549b`](https://github.com/OneEyed1366/symbiote-native/commit/3de549b2ab9785c845a1f3acd5626d85d2b9b9e4) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Install the press machine's dispatchers from an array of pairs rather than a `Map`. Iterating a `Map` builds a fresh two-element array per entry for the destructuring to read back, and the loop runs once per node carrying a press machine - every `<TextInput>`, not just every `<Pressable>`. Measured on `-O` Hermes: ~0.7 us per input off a node that cost ~7.4. No behaviour change.
+
 ## 3.0.0
 
 ### Major Changes
