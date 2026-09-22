@@ -1,5 +1,6 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
+import starlightLlmsTxt from 'starlight-llms-txt';
 
 const base = '/';
 
@@ -9,12 +10,123 @@ export default defineConfig({
   integrations: [
     starlight({
       title: 'SymbioteNative',
-      description: 'Framework-agnostic React Native renderer for real native iOS and Android apps.',
+      description:
+        'Framework-agnostic React Native renderer for real native iOS and Android apps.',
       favicon: '/symbiote.svg',
       logo: {
         src: './src/assets/symbiote-logo.svg',
       },
       customCss: ['./src/styles/tokens.css', './src/styles/starlight.css'],
+      // Adds the Copy-for-agent actions row under the title.
+      components: { PageTitle: './src/components/PageTitle.astro' },
+      plugins: [
+        starlightLlmsTxt({
+          projectName: 'SymbioteNative',
+          description:
+            'A framework-agnostic renderer for real native iOS and Android apps. It keeps React Native\u2019s native stack \u2014 Fabric, JSI, Yoga, Hermes \u2014 and replaces only the JavaScript renderer, so Vue, Angular, Svelte and Solid drive native views directly, not through React.',
+          details: [
+            'Application code imports from `@symbiote-native/<framework>`, never from `react-native` \u2014 but `react-native` and `react` stay explicit top-level dependencies of the app, because they are the runtime singleton and the Metro version anchor.',
+            'A React Native library that ships a JS *component* (`react-native-*`, `@react-native-community/*`) works only under the React adapter; on any other adapter it reaches a null hook dispatcher and throws. Native views reach other adapters through a `@symbiote-native/*` wrapper package instead.',
+            'Each adapter is written in its own idiom \u2014 React hooks, Vue composables, Angular `Renderer2`, Svelte runes, Solid signals \u2014 so do not translate one adapter\u2019s example line-by-line into another.',
+          ].join('\n\n'),
+          // One set per adapter, so a Vue app's agent ingests the Vue corpus alone rather than
+          // five frameworks' worth of near-identical examples.
+          customSets: [
+            {
+              label: 'React',
+              description:
+                'Everything needed to write a SymbioteNative app with React',
+              paths: [
+                'docs',
+                'docs/quick-start',
+                'docs/how-it-works',
+                'docs/ai-agents',
+                'docs/learn/react',
+                'docs/api/react',
+                'docs/api/components',
+                'docs/api/core',
+                'docs/howtos/**',
+                'docs/navigation/**',
+              ],
+            },
+            {
+              label: 'Vue',
+              description:
+                'Everything needed to write a SymbioteNative app with Vue',
+              paths: [
+                'docs',
+                'docs/quick-start',
+                'docs/how-it-works',
+                'docs/ai-agents',
+                'docs/learn/vue',
+                'docs/api/vue',
+                'docs/api/components',
+                'docs/api/core',
+                'docs/howtos/**',
+                'docs/navigation/**',
+              ],
+            },
+            {
+              label: 'Angular',
+              description:
+                'Everything needed to write a SymbioteNative app with Angular',
+              paths: [
+                'docs',
+                'docs/quick-start',
+                'docs/how-it-works',
+                'docs/ai-agents',
+                'docs/learn/angular',
+                'docs/api/angular',
+                'docs/api/components',
+                'docs/api/core',
+                'docs/howtos/**',
+                'docs/navigation/**',
+              ],
+            },
+            {
+              label: 'Svelte',
+              description:
+                'Everything needed to write a SymbioteNative app with Svelte',
+              paths: [
+                'docs',
+                'docs/quick-start',
+                'docs/how-it-works',
+                'docs/ai-agents',
+                'docs/learn/svelte',
+                'docs/api/svelte',
+                'docs/api/components',
+                'docs/api/core',
+                'docs/howtos/**',
+                'docs/navigation/**',
+              ],
+            },
+            {
+              label: 'Solid',
+              description:
+                'Everything needed to write a SymbioteNative app with Solid',
+              paths: [
+                'docs',
+                'docs/quick-start',
+                'docs/how-it-works',
+                'docs/ai-agents',
+                'docs/learn/solid',
+                'docs/api/solid',
+                'docs/api/components',
+                'docs/api/core',
+                'docs/howtos/**',
+                'docs/navigation/**',
+              ],
+            },
+          ],
+          optionalLinks: [
+            {
+              label: 'GitHub repository',
+              url: 'https://github.com/OneEyed1366/symbiote-native',
+              description: 'Source, examples for all five adapters, and issues',
+            },
+          ],
+        }),
+      ],
       head: [
         {
           // Yandex.Webmaster site verification. The `docs` subdomain is a CNAME to
@@ -30,7 +142,11 @@ export default defineConfig({
         },
         {
           tag: 'link',
-          attrs: { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: true },
+          attrs: {
+            rel: 'preconnect',
+            href: 'https://fonts.gstatic.com',
+            crossorigin: true,
+          },
         },
         {
           tag: 'link',
@@ -162,6 +278,7 @@ export default defineConfig({
             { label: 'What is SymbioteNative?', slug: 'docs' },
             { label: 'Quick start', slug: 'docs/quick-start' },
             { label: 'How it works', slug: 'docs/how-it-works' },
+            { label: 'Use with an AI agent', slug: 'docs/ai-agents' },
           ],
         },
         {
@@ -186,22 +303,46 @@ export default defineConfig({
             { label: 'Style a component', slug: 'docs/howtos/styling' },
             { label: 'Animate a value', slug: 'docs/howtos/animations' },
             { label: 'Handle press/change events', slug: 'docs/howtos/events' },
-            { label: 'Two-way bind a value', slug: 'docs/howtos/two-way-binding' },
-            { label: 'Share content across surfaces', slug: 'docs/howtos/portals-and-tunnels' },
-            { label: 'Write platform-specific code', slug: 'docs/howtos/platform-code' },
-            { label: 'Wrap a third-party native view', slug: 'docs/howtos/third-party-views' },
+            {
+              label: 'Two-way bind a value',
+              slug: 'docs/howtos/two-way-binding',
+            },
+            {
+              label: 'Share content across surfaces',
+              slug: 'docs/howtos/portals-and-tunnels',
+            },
+            {
+              label: 'Write platform-specific code',
+              slug: 'docs/howtos/platform-code',
+            },
+            {
+              label: 'Wrap a third-party native view',
+              slug: 'docs/howtos/third-party-views',
+            },
             {
               label: 'Wire up an Expo native module',
               slug: 'docs/howtos/expo-native-module-setup',
             },
-            { label: 'Add a native splash screen', slug: 'docs/howtos/splash-screen' },
-            { label: 'Turn on diagnostic logging', slug: 'docs/howtos/debugging' },
+            {
+              label: 'Add a native splash screen',
+              slug: 'docs/howtos/splash-screen',
+            },
+            {
+              label: 'Turn on diagnostic logging',
+              slug: 'docs/howtos/debugging',
+            },
             {
               label: 'Refs and attachments in Svelte',
               slug: 'docs/howtos/svelte-refs-and-attachments',
             },
-            { label: 'Catch render errors (Svelte)', slug: 'docs/howtos/error-boundaries' },
-            { label: 'Reactivity in Solid', slug: 'docs/howtos/solid-reactivity' },
+            {
+              label: 'Catch render errors (Svelte)',
+              slug: 'docs/howtos/error-boundaries',
+            },
+            {
+              label: 'Reactivity in Solid',
+              slug: 'docs/howtos/solid-reactivity',
+            },
           ],
         },
         {
@@ -263,13 +404,22 @@ export default defineConfig({
             { label: 'Device', slug: 'docs/packages/device' },
             { label: 'Application', slug: 'docs/packages/application' },
             { label: 'Crypto', slug: 'docs/packages/crypto' },
-            { label: 'Standard web crypto', slug: 'docs/packages/standard-web-crypto' },
+            {
+              label: 'Standard web crypto',
+              slug: 'docs/packages/standard-web-crypto',
+            },
             { label: 'System UI', slug: 'docs/packages/system-ui' },
             { label: 'Store review', slug: 'docs/packages/store-review' },
             { label: 'Keep awake', slug: 'docs/packages/keep-awake' },
-            { label: 'Screen orientation', slug: 'docs/packages/screen-orientation' },
+            {
+              label: 'Screen orientation',
+              slug: 'docs/packages/screen-orientation',
+            },
             { label: 'Localization', slug: 'docs/packages/localization' },
-            { label: 'Tracking transparency', slug: 'docs/packages/tracking-transparency' },
+            {
+              label: 'Tracking transparency',
+              slug: 'docs/packages/tracking-transparency',
+            },
             { label: 'Secure store', slug: 'docs/packages/secure-store' },
             { label: 'Sharing', slug: 'docs/packages/sharing' },
             { label: 'Web browser', slug: 'docs/packages/web-browser' },
