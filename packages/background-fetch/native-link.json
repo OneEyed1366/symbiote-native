@@ -1,0 +1,15 @@
+{
+  "android": {
+    "gradleProjectName": "expo-background-fetch",
+    "modules": [
+      {
+        "importPath": "expo.modules.backgroundfetch.BackgroundFetchModule",
+        "className": "BackgroundFetchModule",
+        "nativeName": "ExpoBackgroundFetch"
+      }
+    ]
+  },
+  "ios": {
+    "infoPlistArrayKeys": { "UIBackgroundModes": ["fetch"] }
+  }
+}
