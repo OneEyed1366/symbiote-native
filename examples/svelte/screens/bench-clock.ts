@@ -39,6 +39,7 @@ export const EMPTY_STEP_PROFILE: IStepProfile = {
 export const EMPTY_FABRIC_PROFILE: IFabricCallProfile = {
   calls: {},
   propKeys: {},
+  createsByView: {},
   totalCalls: 0,
   totalPropKeys: 0,
 };

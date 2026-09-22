@@ -245,6 +245,7 @@ const EMPTY_STEP_PROFILE: IStepProfile = {
 const EMPTY_FABRIC_PROFILE: IFabricCallProfile = {
   calls: {},
   propKeys: {},
+  createsByView: {},
   totalCalls: 0,
   totalPropKeys: 0,
 };

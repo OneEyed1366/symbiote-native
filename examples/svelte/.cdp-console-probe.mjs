@@ -4,9 +4,12 @@ const url = process.argv[2];
 const deadline = Date.now() + 20000;
 
 function connect() {
-  const ws = new WebSocket(url, { headers: { Origin: 'http://localhost:8081' } });
+  const ws = new WebSocket(url, {
+    headers: { Origin: 'http://localhost:8081' },
+  });
   let id = 1;
-  const send = (method, params = {}) => ws.send(JSON.stringify({ id: id++, method, params }));
+  const send = (method, params = {}) =>
+    ws.send(JSON.stringify({ id: id++, method, params }));
 
   ws.on('open', () => {
     console.log('[connected]');
@@ -14,11 +17,11 @@ function connect() {
     send('Log.enable');
   });
 
-  ws.on('message', (data) => {
+  ws.on('message', data => {
     const msg = JSON.parse(data.toString());
     if (msg.method === 'Runtime.consoleAPICalled') {
       const text = (msg.params.args || [])
-        .map((a) => a.value ?? a.description ?? JSON.stringify(a))
+        .map(a => a.value ?? a.description ?? JSON.stringify(a))
         .join(' ');
       console.log(`[console.${msg.params.type}] ${text}`);
     } else if (msg.method === 'Runtime.exceptionThrown') {
@@ -28,7 +31,7 @@ function connect() {
     }
   });
 
-  ws.on('error', (err) => {
+  ws.on('error', err => {
     console.log('[ws-error]', err.message);
     if (Date.now() < deadline) setTimeout(connect, 200);
   });

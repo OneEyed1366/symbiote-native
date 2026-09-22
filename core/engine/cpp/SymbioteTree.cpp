@@ -327,7 +327,27 @@ struct Node : jsi::NativeState {
   //
   // The reference applier has no such window (a JS child's `parent` reference keeps the parent
   // alive), so nothing headless can reach this and there is no test to write for it.
+  /**
+   * How many nodes this process is holding, right now.
+   *
+   * The one reading nothing else can produce. Ownership here is JS-anchored — `children` is strong,
+   * `parent` is raw, and a node lives while a parent holds it or while JS names it through
+   * `NativeState` — so "JS gave its half back" IMPLIES the C++ half went with it. That is an
+   * inference from the ownership model, and the shape it would miss is the one
+   * software-mansion/react-native-reanimated#10527 describes: a container keyed by surface that
+   * nothing empties, holding a root alive after the surface is gone. We have no such container; this
+   * counter is what turns "we have no such container" from a reading of the code into a reading of
+   * the process.
+   *
+   * Not atomic, and deliberately: a commit walk is single-threaded, and the counter exists for a
+   * test rather than for a report anything acts on.
+   */
+  static inline int64_t live = 0;
+
+  Node() { live += 1; }
+
   ~Node() {
+    live -= 1;
     for (const NodePtr &child : children) {
       // A HOLE, from a detach nothing has read past yet. The destructor is the one reader that does
       // not compact first: compaction renumbers, and renumbering a vector whose owner is being
@@ -2578,6 +2598,10 @@ jsi::Value Tree::readSurfaceTelemetry(
   result.setProperty(
       runtime, "valueConversions", jsi::Value(static_cast<double>(walkCost_.valueConversions)));
   result.setProperty(runtime, "applyMs", millis(walkCost_.applyNs));
+  // NOT DRAINED ON READ, unlike every counter around it: this is a level rather than a total, and a
+  // level that zeroed itself when read would answer about nothing. `retention-after-clear.itest.ts`
+  // reads it across cycles.
+  result.setProperty(runtime, "liveNodes", jsi::Value(static_cast<double>(Node::live)));
   result.setProperty(runtime, "stringDecodeMs", millis(walkCost_.stringDecodeNs));
   result.setProperty(runtime, "structureMs", millis(walkCost_.structureNs));
   result.setProperty(runtime, "holdHandleMs", millis(walkCost_.holdHandleNs));

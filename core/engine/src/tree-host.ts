@@ -315,6 +315,12 @@ export function flushOps(): void {
 // Commits this window, for readCommitProfile below.
 let commits = 0;
 
+// A surface to ask for this window's node counts. They live in C++ and this profile is id-less, so
+// the window has to keep a tag to ask WITH, and exactly one: `walkCost_` is file-scope in
+// `SymbioteTree.cpp`, shared by every surface and drained on read, so asking a second surface in the
+// same window reads zeroes and a sum would be wrong rather than merely redundant.
+let lastCommittedTag: IRootTag | undefined;
+
 /**
  * Record a surface's commit and drain the buffer into the host.
  *
@@ -369,7 +375,10 @@ export function commitSurfaceOps(
   // `undefined` means this surface no longer OWNS its root — a re-mount on the same rootTag took
   // it. Its ops still drain, because a teardown is what carries the removals; completing the root
   // would hand Fabric the dead surface's emptied tree over the live one's.
-  if (rootTag !== undefined) recordCommit(rootTag, surface);
+  if (rootTag !== undefined) {
+    recordCommit(rootTag, surface);
+    lastCommittedTag = rootTag;
+  }
   host.applyOps(takeBatch());
   noteCommitDrained();
 }
@@ -394,10 +403,67 @@ export function commitSurfaceOps(
 export interface ICommitProfile {
   commits: number;
   propWrites: number;
+  /**
+   * Fresh Fabric families minted in this window — the SAME quantity a stock React Native app counts
+   * by wrapping `global.nativeFabricUIManager.createNode`, and the only like-for-like census left
+   * between the two stacks: our creates are issued from C++ (`SymbioteTree.cpp`,
+   * `uiManager.createNode`) and never touch that global, so a JS wrapper over it reads zero here by
+   * construction. Two arms whose node counts differ are not one workload, whatever their
+   * milliseconds say, so this belongs next to the writes rather than behind a surface id.
+   */
+  nodesCreated: number;
+  /**
+   * How many times `applyOps` was ENTERED for this window — the number of JSI crossings the buffer
+   * actually cost, as against the one the architecture promises.
+   *
+   * A whole create should read 2. It reads more when something READS the tree while the tree is
+   * being built, because a read is a batch boundary: the buffer has to drain before the answer can
+   * be given, so a framework navigating what it is inserting enters `applyOps` once per mutation.
+   * `small-batch-crossing-cost.itest.ts` prices an empty prologue at 1.5-4.4 us, so ten thousand
+   * boundaries is tens of milliseconds that no node count and no write count can see — which is
+   * exactly the shape of a cost that shows up on a device and not in a fixture.
+   */
+  applyCalls: number;
+  /**
+   * `applyOps` end to end, and the part of it that reads the buffer out of JS.
+   *
+   * THE ONE QUESTION A DEVICE HAS TO ANSWER and a fixture cannot. Our crossing is a single call
+   * carrying a 12 000-entry array that C++ walks element by element through JSI; stock's is ten
+   * thousand calls carrying scalars. On the harness's JavaScriptCore that walk is ~4 ms of a ~48 ms
+   * `applyOps`. Hermes is a different JSI implementation with different array-read costs and nothing
+   * headless can price it, so the number has to be read on a phone — near 4 ms and the buffer is
+   * innocent, tens of milliseconds and it is most of the gap the device reports.
+   */
+  applyMs: number;
+  decodeMs: number;
 }
 
+/**
+ * NOTE: reading this now DRAINS the surface telemetry too — `nodesCreated` is folded in from
+ * `readSurfaceTelemetry`, which zeroes on read in C++. A sampler polling this on an interval
+ * therefore empties what a later `readSurfaceTelemetry` call would have reported.
+ */
 export function readCommitProfile(): ICommitProfile {
-  const snapshot = { commits, propWrites: takePropStats().writes };
+  // ONE read, not two: `readSurfaceTelemetry` zeroes the C++ accumulator, so asking it twice hands
+  // the second caller zeroes and the field would read as "the buffer never crossed".
+  //
+  // Gated on a commit having LANDED in this window, and not merely on a tag being known. Fabric's
+  // `TransactionTelemetry::getCommitStartTime` asserts that a commit has started, so asking a
+  // surface that has not committed since the last read aborts the process in a debug build and
+  // reads an undefined time point in a release one. The window's own `commits` is the only thing
+  // that answers "is there anything to ask about" without asking.
+  const telemetry =
+    commits === 0 || lastCommittedTag === undefined
+      ? undefined
+      : readSurfaceTelemetry(lastCommittedTag);
+  const snapshot = {
+    commits,
+    propWrites: takePropStats().writes,
+    nodesCreated: telemetry?.nodesCreated ?? 0,
+    applyCalls: telemetry?.applyCalls ?? 0,
+    applyMs: telemetry?.applyMs ?? 0,
+    decodeMs: telemetry?.decodeMs ?? 0,
+  };
   commits = 0;
   return snapshot;
 }
@@ -513,6 +579,15 @@ export type ISurfaceTelemetry = {
    * `stringDecodeMs` / `structureMs` is what the op loop itself costs — the books close here.
    */
   applyMs: number;
+  /**
+   * How many nodes the C++ tree is holding right now — a LEVEL, not a total, and the one counter
+   * here that is not drained on read.
+   *
+   * What it is for: JS ownership anchors the C++ side (a node lives while a parent holds it or while
+   * JS names it through `NativeState`), so a heap reading proves the JS half was released and only
+   * infers the other. This is the other half as a reading.
+   */
+  liveNodes: number;
   stringDecodeMs: number;
   /** Every append / insert / remove op together. */
   structureMs: number;

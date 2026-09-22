@@ -98,6 +98,61 @@ describe('reading back the payload a commit sent', () => {
     expect(payload.allowFontScaling).toBe(true);
   });
 
+  // why: THE OTHER TWO DEFAULTS RN'S OWN `<Text>` APPLIES, and we did not — found by diffing the
+  // committed payload of one bench row against React Native's
+  // (`row-payload-parity.itest.tsx`), which is a comparison the mutation oracle cannot make: a
+  // mounting log carries `type`, `nativeID` and `index` and no props at all.
+  //
+  // `Text.js:145` resolves `accessible` as `accessible !== false` on iOS, and `:547` puts
+  // `overflow: 'hidden'` in the component's own default style — "native components have
+  // historically acted like overflow: hidden", their words, so an app can tell that apart from an
+  // explicit `visible`. Both are user-agent rules in the sense
+  // `<platform_behavior_is_a_tag_rule_in_cpp>` names: they apply to every app, so they belong to the
+  // platform rather than to a component in any one adapter.
+  //
+  // It is a PARITY gap and not only a benchmark one, which is the order the two matter in: an app
+  // on this engine got a text node VoiceOver treats differently and that does not clip. The
+  // benchmark consequence follows from it — seven props per row that stock pays and we did not, so
+  // every adapter column in the suite was read on a lighter row than the baseline.
+  it('marks a text node accessible and clipping, as RN own Text does', () => {
+    const text = commit('RCTText', 'text', {});
+
+    const payload = committedPayloadOf(text);
+    if (payload === undefined) throw new Error('the text committed no payload');
+
+    expect(payload.accessible).toBe(true);
+    expect(payload.overflow).toBe('hidden');
+  });
+
+  // why: both are FALLBACKS, the same as the two above — and `overflow` is the one that has to be
+  // spelled as a style, since that is where RN puts it and where an app's own `overflow: 'visible'`
+  // arrives to beat it.
+  it('lets an authored accessible and overflow beat the platform defaults', () => {
+    const chosen = commit('RCTText', 'text', {
+      accessible: false,
+      style: { overflow: 'visible' },
+    });
+    const payload = committedPayloadOf(chosen);
+    if (payload === undefined) throw new Error('the text committed no payload');
+
+    expect(payload.accessible).toBe(false);
+    expect(payload.overflow).toBe('visible');
+  });
+
+  // why: THE SAME DEFAULT ON THE OTHER HALF OF THE ROW, found in the same payload diff.
+  // `TextInput.js:583` resolves `props.accessible !== false` and hands it to both the singleline and
+  // the multiline view (`:703`, `:772`) — the identical shape, so it belongs beside the Text rule
+  // rather than in any adapter.
+  it('marks a text input accessible, as RN own TextInput does', () => {
+    const input = commit('RCTSinglelineTextInputView', 'text-input', {});
+
+    const payload = committedPayloadOf(input);
+    if (payload === undefined)
+      throw new Error('the text input committed no payload');
+
+    expect(payload.accessible).toBe(true);
+  });
+
   // why: a default is a FALLBACK, never an override — the half a payload-time rule can get wrong in
   // a way a seed could not, since a seed ran before the author's write and simply lost. `clip` is a
   // real RN mode rather than an absent value, so it has to survive rather than be re-defaulted.

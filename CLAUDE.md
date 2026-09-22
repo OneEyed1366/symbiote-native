@@ -505,10 +505,13 @@ it holds the Tier A/B/C split, the three modules that must stay ported, the two 
 
 ## Performance, against stock React Native
 
-Every adapter is at or under stock on the create-shaped rows except Angular's 1.06x, and 2.6-4x
-under it on everything that mutates a mounted tree except React's `Swap`. The engine itself costs
-LESS than a bare `nativeFabricUIManager` driver that does nothing but call Fabric (0.90x), so an
-adapter's remaining deficit is its own reconciler, not ours.
+Every adapter is under stock on the create-shaped rows, and 2.6-4x under it on everything that
+mutates a mounted tree except React's `Swap`. The engine itself costs LESS than a bare
+`nativeFabricUIManager` driver that does nothing but call Fabric (0.90x), so an adapter's remaining
+deficit is its own reconciler, not ours. **On device the same holds** — React reads 0.82x on a
+thousand-row create against `examples/bare-rn` (2026-09-22, one run, best-of-N pending); the
+long-standing "1.25x slower on a device" is withdrawn, it was the two benchmark screens stopping
+their clocks a React phase apart.
 
 Three rules that hold whatever is being measured:
 

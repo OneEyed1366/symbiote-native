@@ -86,8 +86,10 @@ export class DescriptorOutlet implements OnChanges, OnDestroy {
   private createElement(descriptor: IDescriptor): IRenderedElement {
     const node = this.renderer.createElement(descriptor.type);
     const props = { ...descriptor.props };
-    for (const [key, value] of Object.entries(props)) {
-      this.renderer.setProperty(node, key, value);
+    // `Object.keys` rather than `Object.entries` — `entries` allocates a pair array per key up front,
+    // and this runs once per rendered descriptor element. See `object-iteration-cost.itest.ts`.
+    for (const key of Object.keys(props)) {
+      this.renderer.setProperty(node, key, props[key]);
     }
 
     const children = descriptor.children.map(child => this.createChild(child));
@@ -155,7 +157,8 @@ export class DescriptorOutlet implements OnChanges, OnDestroy {
         this.renderer.setProperty(rendered.node, key, undefined);
       }
     }
-    for (const [key, value] of Object.entries(nextProps)) {
+    for (const key of Object.keys(nextProps)) {
+      const value = nextProps[key];
       if (!Object.is(prevProps[key], value)) {
         this.renderer.setProperty(rendered.node, key, value);
       }

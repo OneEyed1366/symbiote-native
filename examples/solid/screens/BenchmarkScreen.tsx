@@ -243,11 +243,16 @@ interface IBenchResult {
 const EMPTY_STEP_PROFILE: ICommitProfile = {
   commits: 0,
   propWrites: 0,
+  nodesCreated: 0,
+  applyCalls: 0,
+  applyMs: 0,
+  decodeMs: 0,
 };
 
 const EMPTY_FABRIC_PROFILE: IFabricCallProfile = {
   calls: {},
   propKeys: {},
+  createsByView: {},
   totalCalls: 0,
   totalPropKeys: 0,
 };

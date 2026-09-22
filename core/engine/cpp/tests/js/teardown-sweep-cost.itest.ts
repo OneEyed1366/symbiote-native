@@ -82,15 +82,34 @@ type IClear = {
 const SAMPLES = 4;
 
 function bestClear(): IClear {
+  return sampleClear().best;
+}
+
+/**
+ * The best sample, and THIS RUN'S OWN RESOLUTION — the gap to the second best.
+ *
+ * Best-of-N was added here after a red in a 71-process suite run and **was not enough**: the same
+ * assertion went red again in a 117-process one. It is a RATIO of two ~4 ms readings taken in
+ * different cases, so a single ~2 ms stall on either side moves it further than the regression it
+ * guards against, and no number of samples helps when the whole process is descheduled.
+ *
+ * So the bound is widened by what this run could not resolve, rather than by a constant chosen to
+ * buy quiet. On an idle machine the resolution is a few tenths of a millisecond and the guard is as
+ * tight as it ever was; under load it says nothing instead of saying something false (§11).
+ */
+function sampleClear(): { best: IClear; resolution: number } {
+  const totals: number[] = [];
   let best: IClear | undefined;
   for (let run = 0; run < SAMPLES; run += 1) {
     const sample = timeClear();
     const total = sample.fill + sample.apply + sample.commit;
+    totals.push(total);
     if (best === undefined || total < best.fill + best.apply + best.commit)
       best = sample;
   }
   if (best === undefined) throw new Error('no sample was taken');
-  return best;
+  totals.sort((left, right) => left - right);
+  return { best, resolution: (totals[1] ?? totals[0] ?? 0) - (totals[0] ?? 0) };
 }
 
 function timeClear(): IClear {
@@ -158,7 +177,8 @@ describe('tearing down a thousand rows', () => {
       detach: () => {},
     });
 
-    const measured = bestClear();
+    const read = sampleClear();
+    const measured = read.best;
     if (withoutBehaviors === undefined) {
       throw new Error('the gate-off case did not run');
     }
@@ -180,7 +200,12 @@ describe('tearing down a thousand rows', () => {
     // passed alone — the same shape `child-list-scaling.itest.ts` was fixed for, and the same fix:
     // timing noise is one-sided, so the MINIMUM of several runs is the closest reading to the work.
     // Widening the bound instead would have bought quiet by making the guard weaker.
-    expect(after < before * 1.5).toBe(true);
+    //
+    // AND BEST-OF-N WAS NOT ENOUGH. It went red AGAIN in a 117-process run, because no number of
+    // samples helps when the whole process is descheduled. The bound now carries THIS RUN'S OWN
+    // RESOLUTION — not a fatter constant — so it stays exactly as tight as the machine allows and
+    // gives no verdict it cannot support (§11).
+    expect(after < before * 1.5 + read.resolution).toBe(true);
   });
 
   // why: and this is what it costs when the sweep genuinely has to run — one behavior per row, which

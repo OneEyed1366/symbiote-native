@@ -642,7 +642,7 @@ function timeArm(component: IArm): IArmReading {
   };
 }
 
-describe('what a matched element directive costs on JavaScriptCore', () => {
+describe('what a matched element directive costs', () => {
   // why: THE WHOLE FILE. If a directive is ~1 us per element here as it is under vitest, then the
   // 69 ms between the two bench arms is not directives and the next fix is aimed at the wrong thing.
   // If it is ~7 us, the probe is a V8 measurement of a JSC problem and must never size a change.
@@ -784,13 +784,33 @@ describe('what a matched element directive costs on JavaScriptCore', () => {
     //
     // ONE EXCEPTION, and it is a correctness claim rather than a performance one: the hyphenated
     // spelling must not be CHEAPER than the bare one, because cheaper means no directive matched it
-    // and an app writing it has silently lost every check. The bound is deliberately loose — half
-    // the measured hole (86 ms) — so it cannot fail on a busy machine and cannot miss the hole.
-    const HOLE = 40;
-    expect(
-      read('full').wall - read('aliased').wall,
-      'the hyphenated spelling matched no directive — see the selector in elements.ts',
-    ).toBeLessThan(HOLE);
+    // and an app writing it has silently lost every check.
+    //
+    // THE BOUND IS A RATIO, and both of the absolute forms it replaces were the defect.
+    //
+    // `HOLE = 40` ms was set against a measured hole of 86 while the arms print a spread of ±50-63 —
+    // a bound tighter than the noise it sits in, which is not a claim. Rewriting it against this
+    // run's own RESOLUTION did not help either: resolution is sample-to-sample jitter WITHIN an arm,
+    // and the failure mode here is an arm that is UNIFORMLY slow, which has a small spread and a
+    // wrong wall. The arms run sequentially, so the load between them is not observable from inside
+    // either one.
+    //
+    // A ratio was the third attempt and it flipped too — 0.678 against a 0.7 bound, on a run where
+    // nothing was wrong. The arms are sequential, so a uniform slowdown is not uniform ACROSS them.
+    //
+    // SO THIS STOPS BEING A GATE, which is the same conclusion §18h reached and the same one three
+    // fixtures written this week reached: **a timing comparison inside a 117-process suite is a
+    // print, read from a solo invocation.** Four bounds in a row were tried and every one bought
+    // either a false red or a claim too weak to catch the hole.
+    //
+    // THE CORRECTNESS HALF IS NOT LOST — it never needed a clock. The case below mounts both
+    // spellings and asserts the aliased one carries the same committed payload as the bare one, which
+    // is what "a directive matched it" actually means; a selector hole shows up there as a missing
+    // fold rather than as a suspiciously fast arm.
+    print(
+      `THE HOLE CHECK        aliased/full = ${(read('aliased').wall / read('full').wall).toFixed(2)} ` +
+        `— a print, not a gate; the payload case below is the real one`,
+    );
   });
 
   // why: an aliased tag that lost its host behavior would commit a tree that looks identical and is
