@@ -42,6 +42,7 @@ import {
   resolveAverageLength,
   resolveItemKey,
   throttleWindow,
+  initialRenderRegion,
   wrapFixedLayout,
   type ICellLayout,
   type IViewToken,
@@ -303,6 +304,11 @@ function deriveMetrics<ItemT>(
     target,
     state.committedWindow,
     inputs.maxToRenderPerBatch,
+    initialRenderRegion(
+      count,
+      inputs.initialScrollIndex,
+      inputs.initialNumToRender,
+    ),
   );
   state.committedWindow = throttled;
   state.metrics = {

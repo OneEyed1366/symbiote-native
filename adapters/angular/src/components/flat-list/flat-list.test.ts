@@ -6,6 +6,7 @@ import {
   installRecordingFabric,
 } from '@symbiote-native/test-utils';
 
+import { readAngularProfile } from '../../diagnostics';
 import { mount, unmount } from '../../render';
 import { FlatList } from './index';
 import {
@@ -13,6 +14,7 @@ import {
   VListFooterDirective,
   VListHeaderDirective,
   VListItemDirective,
+  VListSeparatorDirective,
 } from '../virtualized-list/directives';
 
 const ROOT_TAG = 904;
@@ -101,5 +103,101 @@ describe('FlatList', () => {
     for (let index = 0; index < rows.length; index += 1) {
       expect(texts).toContain(`row-${index}`);
     }
+  });
+});
+
+@Component({
+  selector: 'symbiote-flatlist-cells-host',
+  standalone: true,
+  imports: [FlatList, VListItemDirective],
+  template: `
+    <FlatList
+      [data]="rows"
+      [keyExtractor]="keyExtractor"
+      [getItemLayout]="getItemLayout"
+      [style]="{ height: 150 }"
+    >
+      <ng-template vListItem let-item>
+        <text>{{ item.n }}</text>
+      </ng-template>
+    </FlatList>
+  `,
+})
+class FlatListCellsHost {
+  rows = rows;
+  keyExtractor = (item: IRow): string => item.id;
+  getItemLayout = (
+    _data: unknown,
+    index: number,
+  ): { length: number; offset: number; index: number } => ({
+    length: 30,
+    offset: 30 * index,
+    index,
+  });
+}
+
+describe('a single-column FlatList', () => {
+  // why: every cell outlet is an embedded view + a directive instance + a view container, and a
+  // list pays it per visible row on every replace. A single column has no row packing to do, so
+  // the app's item template must reach VirtualizedList's cell directly - one outlet per cell, not
+  // a FlatList wrapper outlet around the app's own.
+  it('stamps each cell through exactly one outlet', async () => {
+    readAngularProfile();
+    mount(ROOT_TAG, FlatListCellsHost);
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
+
+    expect(readAngularProfile().outletCreates).toBe(rows.length);
+  });
+});
+
+@Component({
+  selector: 'symbiote-flatlist-separator-host',
+  standalone: true,
+  imports: [FlatList, VListItemDirective, VListSeparatorDirective],
+  template: `
+    <FlatList
+      [data]="rows"
+      [keyExtractor]="keyExtractor"
+      [getItemLayout]="getItemLayout"
+      [style]="{ height: 150 }"
+    >
+      <ng-template vListItem let-item>
+        <text>{{ item.n }}</text>
+      </ng-template>
+      <ng-template vListSeparator let-leadingItem="leadingItem">
+        <text [testID]="'sep-' + leadingItem?.n">-</text>
+      </ng-template>
+    </FlatList>
+  `,
+})
+class FlatListSeparatorHost {
+  rows = rows;
+  keyExtractor = (item: IRow): string => item.id;
+  getItemLayout = (
+    _data: unknown,
+    index: number,
+  ): { length: number; offset: number; index: number } => ({
+    length: 30,
+    offset: 30 * index,
+    index,
+  });
+}
+
+describe('a single-column FlatList separator', () => {
+  // why: RN's ItemSeparatorComponent sits between two items and receives the item above it as
+  // leadingItem; none follows the last item of the data.
+  it('renders between items, carrying the item above it', async () => {
+    mount(ROOT_TAG, FlatListSeparatorHost);
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
+
+    const separators = live
+      .findAllLive(live.appRoot(), node =>
+        String(node.payload.testID).startsWith('sep-'),
+      )
+      .map(node => node.payload.testID);
+
+    expect(separators).toEqual(rows.slice(0, -1).map(row => `sep-${row.n}`));
   });
 });

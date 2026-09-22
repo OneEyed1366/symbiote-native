@@ -13,9 +13,10 @@
 // flat-list.test.ts). Fixed for both column modes:
 //   * Single column (numColumns <= 1): FlatList captures the app's `<ng-template vListItem>` (and
 //     vListHeader/vListFooter/vListEmpty/vListSeparator) with its OWN @ContentChild — a single,
-//     direct projection hop, which always resolves — then re-authors equivalent `<ng-template>`s on
-//     `<VirtualizedList>`, forwarding the captured templateRef + context through
-//     VListOutletDirective. Item/index/separators pass through 1:1 (no row wrapping).
+//     direct projection hop, which always resolves. The per-cell item and separator templates go
+//     straight in through VirtualizedList's `[itemTemplate]`/`[itemSeparatorTemplate]`, so a cell
+//     is ONE outlet deep (a re-stamp doubled every cell's embedded views); the once-per-list
+//     header/footer/empty slots are still re-stamped.
 //   * Multi column (numColumns > 1): same re-stamp, but the app's vListItem is typed for ItemT
 //     while the virtualized stream is rows (IRow<ItemT>), so a plain passthrough couldn't work
 //     regardless. The row vListItem lays out the N columns side by side (each cell stamps the
@@ -110,15 +111,6 @@ const NOOP_SEPARATORS: ISeparators = {
   unhighlight: (): void => undefined,
   updateProps: (): void => undefined,
 };
-
-// Angular cannot preserve VListSeparatorDirective<ItemT>'s type parameter across this re-stamp
-// reuse (the directive is matched structurally in FlatList's own template with no explicit type
-// argument to pin ItemT to, so `let-leadingItem`/`let-trailingItem` arrive typed `unknown`) — even
-// though VirtualizedList's own buildSeparatorContext always supplies a real ItemT value. The
-// narrowest possible I/O-boundary cast for that gap; not a general-purpose unknown-to-T narrowing.
-function asItem<ItemT>(value: unknown): ItemT | undefined {
-  return value as ItemT | undefined;
-}
 
 // Re-export the shared list types + the authoring directives so the app can import the cell/slot
 // directives alongside FlatList (mirrors how virtualized-list/index re-exports them).
@@ -313,18 +305,9 @@ export type IFlatListInputs<ItemT> = Omit<
         [testID]="testID"
         [style]="resolvedStyle"
         [contentContainerStyle]="contentContainerStyle"
+        [itemTemplate]="itemDir?.templateRef"
+        [itemSeparatorTemplate]="separatorDir?.templateRef"
       >
-        <ng-template
-          vListItem
-          let-item
-          let-index="index"
-          let-separators="separators"
-        >
-          <ng-container
-            [vListOutlet]="itemDir?.templateRef"
-            [vListOutletContext]="{ $implicit: item, index, separators }"
-          ></ng-container>
-        </ng-template>
         @if (headerDir !== undefined) {
           <ng-template vListHeader>
             <ng-container [vListOutlet]="headerDir.templateRef"></ng-container>
@@ -338,21 +321,6 @@ export type IFlatListInputs<ItemT> = Omit<
         @if (emptyDir !== undefined) {
           <ng-template vListEmpty>
             <ng-container [vListOutlet]="emptyDir.templateRef"></ng-container>
-          </ng-template>
-        }
-        @if (separatorDir !== undefined) {
-          <ng-template
-            vListSeparator
-            let-highlighted="highlighted"
-            let-leadingItem="leadingItem"
-            let-trailingItem="trailingItem"
-          >
-            <ng-container
-              [vListOutlet]="separatorDir.templateRef"
-              [vListOutletContext]="
-                itemSeparatorContext(highlighted, leadingItem, trailingItem)
-              "
-            ></ng-container>
           </ng-template>
         }
       </VirtualizedList>
@@ -580,22 +548,6 @@ export class FlatList<ItemT = unknown>
       trailingItem: isRow<ItemT>(trailingRow)
         ? firstItemOfRow(trailingRow)
         : undefined,
-    };
-  }
-
-  // Single-column separator context: leadingItem/trailingItem are already real items (no row
-  // wrapper to narrow through — see the asItem boundary comment above).
-  itemSeparatorContext(
-    highlighted: unknown,
-    leadingItem: unknown,
-    trailingItem: unknown,
-  ): IVListSeparatorContext<ItemT> {
-    const isHighlighted = highlighted === true;
-    return {
-      $implicit: isHighlighted,
-      highlighted: isHighlighted,
-      leadingItem: asItem<ItemT>(leadingItem),
-      trailingItem: asItem<ItemT>(trailingItem),
     };
   }
 

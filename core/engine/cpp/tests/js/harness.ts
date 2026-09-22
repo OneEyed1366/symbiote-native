@@ -32,6 +32,8 @@ declare const __symbioteTester: {
   commitNumber: () => number;
   heapInfo: () => Record<string, number>;
   collectGarbage: () => void;
+  startProfiling: (hz: number) => boolean;
+  stopProfiling: (path: string) => boolean;
   reset: () => void;
   print: (line: string) => void;
 };
@@ -308,6 +310,16 @@ export function heapInfo(): Record<string, number> {
 /** A full collection, so a measurement starts from a known floor. */
 export function collectGarbage(): void {
   __symbioteTester.collectGarbage();
+}
+
+/** Hermes's sampling profiler; false on JavaScriptCore. Pair with `stopProfiling`. */
+export function startProfiling(hz: number): boolean {
+  return __symbioteTester.startProfiling(hz);
+}
+
+/** Stop sampling and write a Chrome-format trace to `path`. */
+export function stopProfiling(path: string): boolean {
+  return __symbioteTester.stopProfiling(path);
 }
 
 /**

@@ -1,11 +1,10 @@
-// `[style]` carrying an RN StyleProp ARRAY, which is the shape Angular's own styling engine cannot
-// represent: it decomposes the value key by key, so `applyStyling` uses each array element as a
-// style KEY and throws inside change detection. Device-diagnosed 2026-09-02 on ImageBackground.
+// The two style bindings a tag takes, each reaching the node whole.
 //
-// What makes it work is that `SymbioteElement` DECLARES `style` as an input, so a matched element
-// claims the binding at compile time and it never reaches that engine — it arrives at
-// `Renderer2.setProperty` like any other prop. This file mounts through the real directive and
-// asserts the array survives; `bare-intrinsic-tag.test.ts` holds the unmatched arm that throws.
+// `[style]` is Angular's styling binding: an OBJECT is decomposed by Angular's own engine into
+// per-key `Renderer2.setStyle` calls, which the renderer merges back into one style. An RN StyleProp
+// ARRAY cannot pass there (`applyStyling` takes each member as a style key and throws - device-
+// diagnosed 2026-09-02 on ImageBackground), so it travels as `[styleProp]`, a plain property the
+// renderer routes to `style`. `bare-intrinsic-tag.test.ts` holds the array-in-`[style]` arm that throws.
 import '@angular/compiler';
 import { CUSTOM_ELEMENTS_SCHEMA, Component } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -25,17 +24,25 @@ const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
 @Component({
-  selector: 'style-input-host',
+  selector: 'style-prop-host',
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  // The whole array, not one element class: the tag directives are withheld from runtime matching,
-  // and what claims `[style]` is `SymbioteStyleHost`, which rides this list and is reachable no other
-  // way. See `../style-host.ts` for why an attribute selector on `[style]` cannot do it.
+  imports: [SYMBIOTE_ELEMENTS],
+  template: `<view testID="probe" [styleProp]="style"></view>`,
+})
+class StylePropHost {
+  readonly style = [{ opacity: 0.5 }, { width: 12 }];
+}
+
+@Component({
+  selector: 'style-object-host',
+  standalone: true,
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [SYMBIOTE_ELEMENTS],
   template: `<view testID="probe" [style]="style"></view>`,
 })
-class StyleInputHost {
-  readonly style = [{ opacity: 0.5 }, { width: 12 }];
+class StyleObjectHost {
+  readonly style = { opacity: 0.5, width: 12 };
 }
 
 // Finds the NODE first and reads its style second: returning the style from the walk makes
@@ -54,13 +61,26 @@ function probeNode(): ILiveNode {
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-describe('[style] on a matched element', () => {
-  it('commits as the node style, array and all', async () => {
-    mount(ROOT_TAG, StyleInputHost);
+describe('a style binding on a tag', () => {
+  // why: an RN StyleProp array is what an app merges styles with; it must land flattened.
+  it('commits a [styleProp] array as the node style', async () => {
+    mount(ROOT_TAG, StylePropHost);
     await tick();
 
     // Style declarations are hoisted into the payload itself, so there is no `style` key to read
     // — the two array members landing flattened IS the proof the binding was routed as a style.
+    expect(probeNode().payload).toEqual({
+      testID: 'probe',
+      opacity: 0.5,
+      width: 12,
+    });
+  });
+
+  // why: `[style]` with an object is the plain Angular spelling and must keep working unclaimed.
+  it('commits a [style] object as the node style', async () => {
+    mount(ROOT_TAG, StyleObjectHost);
+    await tick();
+
     expect(probeNode().payload).toEqual({
       testID: 'probe',
       opacity: 0.5,

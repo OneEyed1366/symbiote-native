@@ -28,11 +28,42 @@ import {
   committedShape,
   committedTags,
   countMutations,
+  dispatchEvent,
   expect,
+  heapInfo,
+  mounted,
   mutationSummary,
+  type IMountedView,
   print,
   commitNumber,
+  startProfiling,
+  stopProfiling,
 } from './harness';
+
+// Set by the runner from `SYMBIOTE_PROFILE_DIR`. Non-empty -> every step is sampled into
+// `<dir>/<arm>-<step>.json`. Sampling perturbs the clock, so never read a RESULT from such a run.
+declare const __SYMBIOTE_PROFILE_DIR__: string;
+const PROFILE_HZ = 10_000;
+
+type IHeapReading = {
+  readonly allocated: number;
+  readonly collections: number;
+};
+
+/**
+ * Cumulative JS allocation and collection count, or undefined on JavaScriptCore (empty heap map).
+ *
+ * Cumulative on purpose: the DELTA across a step is exact without forcing a collection, so reading
+ * it outside the stopwatch leaves the wall clock untouched. Bytes are the device-side cost a wall
+ * clock here cannot see (§18j) — a phone's heap collects far more often than this host's.
+ */
+function readHeap(): IHeapReading | undefined {
+  const info = heapInfo();
+  const allocated = info.hermes_totalAllocatedBytes;
+  const collections = info.hermes_numCollections;
+  if (allocated === undefined || collections === undefined) return undefined;
+  return { allocated, collections };
+}
 
 export const ROOT_TAG = 1;
 
@@ -269,7 +300,77 @@ export type IBenchDriver = {
    * headless-versus-device divergence lives — and that is worth pinning either way.
    */
   readonly countsMutations?: boolean;
+  /**
+   * The rows sit in a `FlatList` (the device screen's VIRTUALIZED mode), so a step mounts only the
+   * window, not every row. The node census and the write oracle assume every row is mounted and are
+   * replaced by a ROW census: one `TextInput` per mounted row, whatever cell wrapper each list adds.
+   * Stock's count is the reference an adapter must match (`VIRTUALIZED_ROWS`).
+   */
+  readonly virtualized?: boolean;
 };
+
+/** The device screen's list viewport (`examples/bare-rn` `benchRowsViewport`). */
+export const VIEWPORT_HEIGHT = 420;
+export const ROW_HEIGHT = ROW_STYLE.height;
+export const VIEWPORT_WIDTH = 390;
+
+/**
+ * Rows React Native's own `FlatList` holds once its window has filled (stock arm, 2026-09-22) —
+ * `announceListLayout` delivers the layout events, and the batches run inside the step. An adapter
+ * mounting a different number is running a different window, not a faster list.
+ */
+export const VIRTUALIZED_ROWS: Partial<Record<IStep, number>> = {
+  create: 125,
+  replace: 125,
+  partial: 125,
+  select: 125,
+  swap: 125,
+  remove: 125,
+  append: 125,
+  clear: 0,
+};
+
+const MOUNTED_ROW_MARKER = /TextInput\(/g;
+
+function mountedRowCount(): number {
+  return committedShape().match(MOUNTED_ROW_MARKER)?.length ?? 0;
+}
+
+/**
+ * Deliver the layout events a device's next frame would, for the list and its content container.
+ *
+ * The harness dispatches no layout events of its own, and a virtualized list sizes its window from
+ * two of them: the scroll view's `onLayout` (viewport) and the content container's, which RN's
+ * ScrollView turns into `onContentSizeChange`. RN's list will not grow past `initialNumToRender`
+ * until it has both; ours reads content length off `getItemLayout` and grows regardless. Sending
+ * both, after every commit, lets EVERY arm fill its window, so the row census compares one workload.
+ * The frames are the ones Yoga already computed, so a list is told nothing the platform does not hold.
+ */
+export function announceListLayout(): void {
+  const find = (view: IMountedView): IMountedView | undefined => {
+    if (/ScrollView/.test(view.viewName)) return view;
+    for (const child of view.children) {
+      const hit = find(child);
+      if (hit !== undefined) return hit;
+    }
+    return undefined;
+  };
+  const list = find(mounted());
+  if (list === undefined)
+    throw new Error('no scroll view is mounted to lay out');
+  dispatchEvent(list.tag, 'topLayout', { layout: list.layout });
+  const content = list.children[0];
+  if (content !== undefined)
+    dispatchEvent(content.tag, 'topLayout', { layout: content.layout });
+}
+
+/** A `ListRenderItem`-shaped key for an item layout of fixed-height rows. */
+export function rowItemLayout(
+  _data: unknown,
+  index: number,
+): { length: number; offset: number; index: number } {
+  return { length: ROW_HEIGHT, offset: ROW_HEIGHT * index, index };
+}
 
 let nextId = 1;
 
@@ -438,6 +539,7 @@ let lastCommitNumber = 0;
  */
 export async function runBenchSuite(driver: IBenchDriver): Promise<void> {
   const timings = new Map<IStep, number>();
+  const allocations = new Map<IStep, IHeapReading>();
   let state: IBenchState = { rows: [], selectedId: undefined };
 
   // DRAINED, not read: the counters zero on read, so the empty mount's walk and apply have to come
@@ -450,16 +552,37 @@ export async function runBenchSuite(driver: IBenchDriver): Promise<void> {
   const step = async (name: IStep, next: IBenchState): Promise<void> => {
     state = next;
 
+    const isProfiling =
+      __SYMBIOTE_PROFILE_DIR__ !== '' && startProfiling(PROFILE_HZ);
+    const heapBefore = readHeap();
     const startedAt = performance.now();
     await driver.apply(state);
     const wall = performance.now() - startedAt;
+    const heapAfter = readHeap();
+    if (isProfiling)
+      stopProfiling(`${__SYMBIOTE_PROFILE_DIR__}/${driver.name}-${name}.json`);
     timings.set(name, wall);
+    if (heapBefore !== undefined && heapAfter !== undefined)
+      allocations.set(name, {
+        allocated: heapAfter.allocated - heapBefore.allocated,
+        collections: heapAfter.collections - heapBefore.collections,
+      });
 
     // READ ONCE: the counters zero on read, so asking twice gives the second caller zeroes.
     const telemetry = driver.readTelemetry?.();
     const nodes = committedTags().length;
     print(`${telemetryLine(driver, name, wall, telemetry)} nodes=${nodes}`);
     if (driver.countsMutations === true) print(mutationLine(driver.name, name));
+
+    if (driver.virtualized === true) {
+      // THE ROW CENSUS: how many rows the list actually mounted. Stock's reading is the reference.
+      const rows = mountedRowCount();
+      print(`VROWS ${driver.name} ${name}=${rows}`);
+      const expected = VIRTUALIZED_ROWS[name];
+      if (expected !== undefined) expect(rows).toBe(expected);
+      else if (state.rows.length > 0) expect(rows).toBeGreaterThan(0);
+      return;
+    }
 
     // THE ORACLE, and it is read before any millisecond is quoted: a step that built no rows commits
     // nothing and reads as instant.
@@ -517,4 +640,16 @@ export async function runBenchSuite(driver: IBenchDriver): Promise<void> {
         name => `${name}=${(timings.get(name) ?? 0).toFixed(1)}`,
       ).join(' '),
   );
+  // KB allocated per step and the collections it triggered. Deterministic where the wall clock is
+  // not, so two arms compare here to the kilobyte in one run.
+  if (allocations.size > 0)
+    print(
+      `ALLOC ${driver.name} ` +
+        STEP_ORDER.map(name => {
+          const reading = allocations.get(name);
+          return reading === undefined
+            ? `${name}=?`
+            : `${name}=${(reading.allocated / 1_024).toFixed(0)}KB/${reading.collections}gc`;
+        }).join(' '),
+    );
 }

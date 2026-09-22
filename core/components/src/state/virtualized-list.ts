@@ -288,16 +288,37 @@ export function computeWindow(
   return { first, last };
 }
 
+// RN's `VirtualizedList._initialRenderRegion`: `initialNumToRender` cells from
+// `initialScrollIndex`, clamped to the data. What a list paints before it has a window of its own.
+export function initialRenderRegion(
+  count: number,
+  initialScrollIndex: number | undefined,
+  initialNumToRender: number,
+): { first: number; last: number } {
+  const first = Math.max(
+    FIRST_INDEX,
+    Math.min(count - 1, Math.floor(initialScrollIndex ?? FIRST_INDEX)),
+  );
+  return { first, last: Math.min(count, first + initialNumToRender) - 1 };
+}
+
 // Clamp a freshly computed window against the previously-committed one so at most
 // maxToRenderPerBatch new cells are added on each side per tick (RN's incremental fill).
 // The window grows toward the target over successive batch ticks rather than snapping in
 // one render: cheaper first paint on a big jump.
+//
+// With NO previous window - the list just received data - RN paints its initial region and grows
+// from there (`_createRenderMask` adds `_initialRenderRegion` to a window constrained from empty),
+// even when the viewport is already known. Snapping to the target instead mounted ~125 rows where
+// RN mounts 10 on a 420pt viewport (`stock-virtualized-suite.itest.tsx`).
 export function throttleWindow(
   target: { first: number; last: number },
   previous: { first: number; last: number },
   maxToRenderPerBatch: number,
+  initialRegion: { first: number; last: number },
 ): { first: number; last: number } {
-  if (previous.last < previous.first) return target;
+  if (previous.last < previous.first)
+    return initialRegion.last < initialRegion.first ? target : initialRegion;
   const first = Math.max(target.first, previous.first - maxToRenderPerBatch);
   const last = Math.min(target.last, previous.last + maxToRenderPerBatch);
   // Never present an empty window when the target is non-empty.

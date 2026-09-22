@@ -58,7 +58,6 @@ import {
 } from './change-detection-flush';
 import { SymbioteCallbackHost } from './callback-host';
 import { withholdFromRuntimeMatching } from './runtime-matching';
-import { SymbioteStyleHost } from './style-host';
 import type {
   IActivityIndicatorProps,
   IImageProps,
@@ -190,44 +189,21 @@ export abstract class SymbioteElement implements OnChanges {
   @Input() shouldRasterizeIOS?: IElementProps['shouldRasterizeIOS'];
   @Input()
   needsOffscreenAlphaCompositing?: IElementProps['needsOffscreenAlphaCompositing'];
-  // Declared, and the reason is the one `element-props.ts` used to give for NOT declaring it —
-  // reversed by measurement. `[style]` on an element with no directive input reaches Angular's own
-  // CSS styling engine (`ɵɵstyleMap`), which cannot represent an RN StyleProp: an ARRAY decomposes
-  // into numeric-index keys and a FUNCTION — the press-state callback this ecosystem writes — dies
-  // in `toStylingKeyValueArray` as "ASSERTION ERROR: Unsupported styling type: function", taking
-  // the whole enclosing template update with it. Device-reported 2026-09-11: every `ActionButton`
-  // in examples/angular painted as an empty bordered box, because the throw aborted the update
-  // before its `<text>` child was ever reached.
-  //
-  // A declared input CLAIMS the binding at compile time, so it never reaches the styling engine —
-  // the same mechanism the primitive host COMPONENTS have always relied on
-  // (`primitives/shared.ts`), which is why `<Pressable [style]>` worked and its replacement tag did
-  // not. `[style.borderWidth.px]` is a different instruction (`ɵɵstyleProp`) and is untouched: it
-  // still reaches `Renderer2.setStyle`, which merges per key.
+  // `[style]` and `[class]` are declared for the TYPE CHECK only. Withheld from run-time matching, no
+  // input claims them, so Angular's own styling engine decomposes them into `setStyle`/`addClass`
+  // exactly as on a DOM element - which is why `style` is typed as the object/string that engine can
+  // hold. An RN style ARRAY or press-state FUNCTION throws in there ("indexOf is not a function",
+  // "Unsupported styling type: function"), so it is `[styleProp]`: an ordinary property binding the
+  // renderer routes to `style` whole. A claim would cost a directive instance per element.
   //
   // The press-state callback rides the BASE type rather than `PressableElement` alone: a subclass
   // cannot widen an inherited property, and only the pressables have a `pressed` to read — so on
-  // any other tag the engine resolves it at `pressed: false` and the looseness is in the type, not
-  // in what commits.
+  // any other tag the engine resolves it at `pressed: false`.
   @Input() style?: IElementProps['style'];
+  @Input() styleProp?: IElementProps['styleProp'];
 
-  /**
-   * Declared so Angular SHADOWS the `[class]` binding into it instead of decomposing the string.
-   *
-   * A styling binding goes to a directive input when the directive declares that exact public name
-   * — `setShadowStylingInputFlags` sets `hasClassInput`/`hasStyleInput` off the input map, and
-   * `checkStylingMap` then hands the whole value over and never calls the renderer per key
-   * (`view/directives.ts`, `instructions/styling.ts`). `style` has been declared here all along and
-   * is shadowed; `class` was not, so every `[class]` reached the renderer one TOKEN at a time — on
-   * the element-directive path as much as the bare one. Measured at ~3.3 us per class binding
-   * (`adapter-create-cost.itest.ts`, "prices the class channel"), on the channel every example app
-   * uses for its static look.
-   *
-   * `[class.foo]` and `[ngClass]` are NOT shadowed and keep arriving as `addClass`, so a node can
-   * now be told its classes both ways at once; the renderer unions the two sources
-   * (`classStringFor`). Typed as a string rather than RN's `className`, because that is what
-   * `ɵɵclassMap` hands over after it concatenates any static `class=` prefix.
-   */
+  // `ɵɵclassMap` hands over a string after joining any static `class=` prefix; `[class.foo]` and
+  // `[ngClass]` arrive as `addClass`. The renderer unions both sources (`classStringFor`).
   @Input() class?: string;
 
   // The flat-bag spelling of the events below. `(press)` and `[onPress]` are both supported and
@@ -422,6 +398,7 @@ export class TextElement extends SymbioteElement {
   // initializer is what TS2612 asks for to accept a redeclaration as deliberate; `declare` would
   // be the other answer and cannot carry a decorator.
   @Input() override style?: ITextElementProps['style'] = undefined;
+  @Input() override styleProp?: ITextElementProps['styleProp'] = undefined;
   @Input() numberOfLines?: ITextElementProps['numberOfLines'];
   @Input() ellipsizeMode?: ITextElementProps['ellipsizeMode'];
   @Input() selectable?: ITextElementProps['selectable'];
@@ -927,39 +904,27 @@ export const SYMBIOTE_ELEMENTS = [
   // bind one and carries the `ChangeDetectorRef` their wrapper needs. It rides this list for the same
   // reason the accessors do, and `elements.test.ts` subtracts it from the tag-coverage check by name.
   SymbioteCallbackHost,
-  // The other attribute-matched one: it claims `[style]` and `[class]` so an RN style ARRAY never
-  // reaches Angular's styling engine, which cannot represent one and throws. See `style-host.ts`.
-  SymbioteStyleHost,
 ] as const;
 
 // THE DIRECTIVES THAT GO ON MATCHING, and the list is the exceptions rather than the rule.
 //
-// A tag directive here is, with four exceptions, nothing but `@Input()` declarations over one
-// inherited `ngOnChanges` that forwards each of them to the renderer — which is the call
-// `ɵɵproperty` makes directly on an element nothing claimed. So the instance buys a compile-time
-// check at ~8.5-9.4 us of run time per element, and `./runtime-matching` keeps the check while
-// dropping the instance.
+// EVERY TAG DIRECTIVE IS WITHHELD. Each is `@Input()` declarations over one inherited `ngOnChanges`
+// forwarding to the renderer (the call `ɵɵproperty` makes directly on an unclaimed element), so the
+// instance bought a compile-time check at ~8 us of run time per element.
 //
-// These four cannot go, because they DO something when they are built:
+// The read-back tags (text-input, text-input-multiline, switch, refresh-control) need a synchronous
+// view flush; the renderer marks them at creation and the flush finds their view lazily
+// (`change-detection-flush.ts`). `[(value)]` reaches the renderer's `listen('valueChange')` bridge.
 //
-//   text-input, text-input-multiline, switch   `ValueChangeElement` — listens for the engine's value
-//                                              event and registers a view flush, which is what stops
-//                                              a controlled value being undone inside one microtask
-//   refresh-control                            `ReadBackElement`, the same flush for the same reason
-//
-// The two form accessors and `SymbioteCallbackHost` are absent from both lists deliberately: they
-// match on an ATTRIBUTE rather than a tag, so they already land only where they are needed.
+// `[style]`/`[class]` stay unclaimed as on a DOM element (see `SymbioteElement.style`). What still
+// matches is selected on an ATTRIBUTE an app writes: the two form accessors and
+// `SymbioteCallbackHost`.
 withholdFromRuntimeMatching(
   SYMBIOTE_ELEMENTS.filter(
     directive =>
-      directive !== TextInputElement &&
-      directive !== MultilineTextInputElement &&
-      directive !== SwitchElement &&
-      directive !== RefreshControlElement &&
       directive !== TextInputValueAccessor &&
       directive !== SwitchValueAccessor &&
-      directive !== SymbioteCallbackHost &&
-      directive !== SymbioteStyleHost,
+      directive !== SymbioteCallbackHost,
   ),
 );
 

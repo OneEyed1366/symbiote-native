@@ -32,16 +32,61 @@
 // notification, so it cannot open that window at all. It is also the narrower answer — the only
 // view that has to be re-checked is the one holding the binding.
 //
-// The flush is registered by the element DIRECTIVE, which is the only thing here that owns a
-// `ChangeDetectorRef` for that view. A tag written under `CUSTOM_ELEMENTS_SCHEMA` with no directive
-// matched therefore gets no flush and keeps the stale-read behaviour — the directive is the
-// supported route (`[(value)]` is NG8007 without it), and this leaf has no way to reach a view it
-// was never handed.
+// THE VIEW IS FOUND FROM THE NODE, at the moment an event needs it, not injected per element. Ivy
+// patches `__ngContext__` onto every view's root elements and every directive host, so the nearest
+// patched ancestor names the LView that declares the element - the one holding its `[value]`. A
+// `ViewRef` over that LView is what `inject(ChangeDetectorRef)` would have handed out, built only
+// for the element that fired, which is what let the read-back tags drop their directive instance
+// (`element-directive-free.test.ts`). Projected content resolves to the view it is PROJECTED into,
+// Angular's own discovery limit; the listener's `markForCheck` still reaches the declaring view.
 //
 // When a fourth behavior starts reading an app value back, it needs a name in the renderer's
 // `READ_BACK_*` sets — the census is `queueMicrotask` / `afterCommit` in
 // `core/components/src/behaviors`.
+import {
+  ɵViewRef as ViewRef,
+  ɵgetLContext as getLContext,
+} from '@angular/core';
+import {
+  isSymbioteNode,
+  parentOf,
+  reportUncaughtError,
+} from '@symbiote-native/engine';
+
 const viewFlushes = new WeakMap<object, () => void>();
+
+// Nodes whose view is found lazily when they flush. Anything else keeps the no-op an unregistered
+// node always had - `flushViewFor` also runs after every wrapped `on*` prop, and a press must not
+// start paying a synchronous re-check it never needed.
+const readBackNodes = new WeakSet<object>();
+
+export function markReadBackNode(node: object): void {
+  readBackNodes.add(node);
+}
+
+// Ivy's monkey-patch key (`render3/interfaces/context.ts`, `MONKEY_PATCH_KEY_NAME`).
+const NG_CONTEXT = '__ngContext__';
+
+/** The LView-backed ref for the view that declares `node`, or undefined outside any view. */
+function viewRefOf(node: object): ViewRef<unknown> | undefined {
+  let patched: object | undefined = node;
+  while (patched !== undefined && !(NG_CONTEXT in patched))
+    patched = isSymbioteNode(patched) ? parentOf(patched) : undefined;
+  if (patched === undefined) return undefined;
+  const lView = getLContext(patched)?.lView;
+  return lView === undefined || lView === null ? undefined : new ViewRef(lView);
+}
+
+// REPORTED, NOT RETHROWN: this is the one change detection outside `ApplicationRef.tick()`'s error
+// boundary, called from inside a native event dispatch where a throw becomes `RCTFatal`. Same
+// channel `SymbioteErrorHandler` reports through.
+function detectChangesReported(view: ViewRef<unknown>): void {
+  try {
+    view.detectChanges();
+  } catch (error: unknown) {
+    reportUncaughtError(error, { origin: 'angular flush' });
+  }
+}
 
 const ON_PREFIX = /^on[A-Z]/;
 
@@ -135,14 +180,12 @@ export function createCallbackWrapper(node: unknown): ICallbackWrapper {
  * element on JavaScriptCore (`core/engine/cpp/tests/js/angular-directive-cost.itest.ts`), so a
  * thousand-row screen paid for ten thousand `ViewRef`s to serve none.
  *
- * `SymbioteCallbackHost` registers here instead, and it MATCHES on the callback attributes rather
- * than being injected — so an element with no `on*` binding neither instantiates it nor pays for it.
- * Measured as the whole trade, selector included: -3.9 / -9.3 / -25.5 ms over ten thousand elements.
+ * Only a composed component's host directive registers here (`primitives/shared.ts`); a TAG's
+ * view is found from the node when its callback fires (`markViewFor`), so no element pays an
+ * injection for a callback it may never carry.
  *
- * Separate from `viewFlushes` deliberately. They come from different directives, on overlapping but
- * different sets of tags, and they are not the same instruction: this one SCHEDULES and reaches every
- * ancestor, that one re-checks ONE view synchronously. Collapsing them into a single entry would make
- * whichever directive registered last decide which of the two an element gets.
+ * Separate from `viewFlushes` deliberately: this one SCHEDULES and reaches every ancestor, that one
+ * re-checks ONE view synchronously.
  */
 const viewMarkers = new WeakMap<object, IViewMarker>();
 
@@ -156,7 +199,10 @@ export function unregisterViewMarker(node: object): void {
 
 export function markViewFor(node: unknown): void {
   if (typeof node !== 'object' || node === null) return;
-  viewMarkers.get(node)?.markForCheck();
+  // A composed component's host directive registers its own ref; a TAG registers nothing and has its
+  // view found here, only when a callback actually fires (see the header).
+  const marker = viewMarkers.get(node) ?? viewRefOf(node);
+  marker?.markForCheck();
 }
 
 export function registerViewFlush(node: object, flush: () => void): void {
@@ -169,5 +215,12 @@ export function unregisterViewFlush(node: object): void {
 
 export function flushViewFor(node: unknown): void {
   if (typeof node !== 'object' || node === null) return;
-  viewFlushes.get(node)?.();
+  const registered = viewFlushes.get(node);
+  if (registered !== undefined) {
+    registered();
+    return;
+  }
+  if (!readBackNodes.has(node)) return;
+  const view = viewRefOf(node);
+  if (view !== undefined) detectChangesReported(view);
 }
