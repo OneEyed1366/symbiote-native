@@ -5,6 +5,11 @@ build-ngc/
 build-release/
 # and the ANDROID twin — same sources, `#ifdef ANDROID` compiled in (`pnpm run test:android`)
 build-android/
+# and the JavaScriptCore twin — the second ruler, kept because a JIT inverts conclusions rather than
+# scaling them (`pnpm run bench:itest:jsc`). Hermes is what the other three build.
+build-release-jsc/
+build-hermes/
+build-os/
 dist/
 *.tsbuildinfo
 

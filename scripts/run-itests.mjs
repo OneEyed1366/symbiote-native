@@ -64,6 +64,15 @@ if (typeof setTimeout !== "function") {
   };
   globalThis.setInterval = globalThis.setTimeout;
   globalThis.clearInterval = globalThis.clearTimeout;
+  // HERMES NEEDS THIS ONE BY NAME. Its Promise implementation lives in \`InternalBytecode.js\` and
+  // schedules every resolution through \`setImmediate\`, so on the Hermes host the first \`await\`
+  // anywhere dies with "Property 'setImmediate' doesn't exist" — pointing at bytecode, which reads
+  // like an engine fault and is a missing host facility. JavaScriptCore never asked because its
+  // promises resolve on their own microtask queue.
+  globalThis.setImmediate = function (task) {
+    return globalThis.setTimeout(task, 0);
+  };
+  globalThis.clearImmediate = globalThis.clearTimeout;
   globalThis.__symbioteFlushTimers = function (rounds) {
     var left = typeof rounds === "number" ? rounds : 32;
     while (pending.length > 0 && left-- > 0) {
@@ -94,6 +103,27 @@ if (typeof globalThis.performance === "undefined") {
     const started = Date.now();
     globalThis.performance = { now: function () { return Date.now() - started; } };
   }
+}
+// JavaScriptCore carries a \`console\`; Hermes does not, and on a device React Native installs one.
+// A fixture that captures \`console.error\` to prove the stock renderer stayed quiet — the trap
+// \`stock-suite.itest.tsx\` records — dies at module scope without it, naming a property rather than
+// the missing platform. Routed through the tester's own \`print\` so anything written is visible in
+// the run rather than swallowed.
+if (typeof globalThis.console === "undefined") {
+  const say = function (level) {
+    return function () {
+      const parts = [];
+      for (let at = 0; at < arguments.length; at++) parts.push(String(arguments[at]));
+      const tester = globalThis.__symbioteTester;
+      const line = level + ": " + parts.join(" ");
+      if (tester !== undefined && typeof tester.print === "function") tester.print(line);
+    };
+  };
+  globalThis.console = {
+    log: say("log"), info: say("info"), warn: say("warn"),
+    error: say("error"), debug: say("debug"), trace: say("trace"),
+    group: say("group"), groupEnd: function () {}, table: say("table"),
+  };
 }
 if (typeof globalThis.window === "undefined") globalThis.window = globalThis;
 if (typeof globalThis.navigator === "undefined") {
@@ -198,6 +228,52 @@ const RN_SOURCE =
  */
 const PLATFORM_EXTENSIONS_DIRECTIVE = '@symbiote-platform-extensions';
 
+/**
+ * Count what a STOCK arm asks Fabric to create, by view name — the headless twin of
+ * `examples/*​/fabric-call-counter.ts`, and the only way to take that number here.
+ *
+ * WHY IT HAS TO LIVE IN THE BANNER. A fixture that installs the wrapper itself reads zero on every
+ * arm: `require('…/ReactFabric-prod')` inside a bundle is not the lazy call it looks like, and React
+ * has already destructured `nativeFabricUIManager.createNode` into a module-scope local before the
+ * first test body runs. The banner is the only code that runs earlier.
+ *
+ * WHY IT IS OPT-IN. The global holds a JSI HostObject and `UIManagerBinding::getBinding` casts it
+ * back on every commit, so an `Object.create` view of it standing there is a process that dies with
+ * nothing in the log the moment C++ looks. Installed for every bundle, it would take the engine arms
+ * down. A file asks for it with `@symbiote-count-fabric-calls` and owes one call to
+ * `__symbioteRestoreFabric()` once the renderer has loaded — React keeps the counting function it
+ * captured, C++ gets its HostObject back, and both halves are satisfied.
+ *
+ * The same directive-rather-than-filename choice as the platform extensions above: it greps, and a
+ * rename does not change behaviour.
+ */
+const FABRIC_COUNT_DIRECTIVE = '@symbiote-count-fabric-calls';
+
+const FABRIC_COUNT_PRELUDE = `
+(function () {
+  var original = globalThis.nativeFabricUIManager;
+  if (original === undefined || original === null) return;
+  var createNode = original.createNode;
+  if (typeof createNode !== "function") return;
+  var counts = Object.create(null);
+  var view = Object.create(original);
+  var counting = function () {
+    var name = arguments[1];
+    if (typeof name === "string") counts[name] = (counts[name] || 0) + 1;
+    return createNode.apply(original, arguments);
+  };
+  // A rest/arguments function reports \`length === 0\`, and the engine feature-detects the batched
+  // clone bindings BY ARITY (\`core/engine/src/fabric.ts\`). Copy the host's own.
+  Object.defineProperty(counting, "length", { value: createNode.length });
+  view.createNode = counting;
+  globalThis.nativeFabricUIManager = view;
+  globalThis.__symbioteFabricCreates = counts;
+  globalThis.__symbioteRestoreFabric = function () {
+    globalThis.nativeFabricUIManager = original;
+  };
+})();
+`;
+
 const RN_IMPORTER = /[/\\]node_modules[/\\](react-native|@react-native[/\\])/;
 const RELATIVE_REQUEST = /^\.\.?[/\\]/;
 
@@ -208,15 +284,21 @@ const platformExtensionCache = new Map();
 const reactNativePlatformExtensions = {
   name: 'react-native-platform-extensions',
   setup(build) {
-    build.onResolve({ filter: RELATIVE_REQUEST }, ({ path: request, importer, resolveDir }) => {
-      if (!RN_IMPORTER.test(importer)) return undefined;
-      const key = `${resolveDir}\0${request}`;
-      if (platformExtensionCache.has(key)) return platformExtensionCache.get(key);
-      const candidate = path.resolve(resolveDir, `${request}.ios.js`);
-      const resolved = existsSync(candidate) ? { path: candidate } : undefined;
-      platformExtensionCache.set(key, resolved);
-      return resolved;
-    });
+    build.onResolve(
+      { filter: RELATIVE_REQUEST },
+      ({ path: request, importer, resolveDir }) => {
+        if (!RN_IMPORTER.test(importer)) return undefined;
+        const key = `${resolveDir}\0${request}`;
+        if (platformExtensionCache.has(key))
+          return platformExtensionCache.get(key);
+        const candidate = path.resolve(resolveDir, `${request}.ios.js`);
+        const resolved = existsSync(candidate)
+          ? { path: candidate }
+          : undefined;
+        platformExtensionCache.set(key, resolved);
+        return resolved;
+      },
+    );
   },
 };
 
@@ -320,11 +402,14 @@ const solidJsx = {
           // compiles the JSX. Two passes rather than one because babel cannot parse TypeScript
           // without a preset this workspace does not install, and because the split is exactly how
           // the real pipelines are built — tsc preserves, the app's babel compiles.
-          const typescript = await esbuild.transform(readFileSync(file, 'utf8'), {
-            loader: 'tsx',
-            jsx: 'preserve',
-            sourcefile: file,
-          });
+          const typescript = await esbuild.transform(
+            readFileSync(file, 'utf8'),
+            {
+              loader: 'tsx',
+              jsx: 'preserve',
+              sourcefile: file,
+            },
+          );
           const out = await babel.transformAsync(typescript.code, {
             filename: file.replace(/\.tsx$/, '.jsx'),
             babelrc: false,
@@ -418,7 +503,10 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
  * `@symbiote-native/vue/runtime-helpers`), so it runs here in Node exactly as it does in Metro's
  * worker — nothing about it needs a filesystem inside the JSI runtime, only this build step.
  */
-const vueTransformerPath = path.join(root, 'adapters/vue/metro-vue-transformer.cjs');
+const vueTransformerPath = path.join(
+  root,
+  'adapters/vue/metro-vue-transformer.cjs',
+);
 
 // Same fix as Svelte's compiler load: one dynamic `import()` for the whole run, not one per `.vue`
 // file.
@@ -577,6 +665,82 @@ const binary = path.join(
 );
 
 /**
+ * `SYMBIOTE_ITEST_BYTECODE=1` compiles each bundle with `hermesc -O` and runs the BYTECODE, which is
+ * what a device runs and what this harness has never measured.
+ *
+ * `runtime.evaluateJavaScript(StringBuffer(source))` makes Hermes compile at load, and that compile
+ * does NOT run the optimizer — measured 2026-09-22, a plain counting loop reads identically off
+ * source and off `hermesc -O0` bytecode, and 2.7x faster off `hermesc -O`. A release app ships
+ * `.hbc` built with `-O`, so every JS-side figure this directory has ever published is an `-O0`
+ * figure. It is not a uniform scale factor either: `-O` left the RAW Fabric arm untouched (25.4 vs
+ * 26.4 ms — its cost is JSI calls into C++) and nearly halved our own fill (34.1 -> 17.5), because
+ * the optimizer works on exactly what the buffer is made of, JS loops and small function calls.
+ *
+ * `-Xes6-block-scoping` IS NOT OPTIONAL and its absence does not look like a compiler flag.
+ * `symbiote-host.h` builds the runtime with `withES6BlockScoping(true)`, which only reaches code the
+ * RUNTIME compiles; `hermesc` defaults it off, so `const one` in a `for…of` stops being per-iteration
+ * and every closure in `report()`'s case chain captures the LAST case. The run then reports that one
+ * case N times and every earlier arm as "did not run" — a wrong ANSWER rather than an error, which is
+ * the worst shape a harness defect has. A single-case fixture passes happily, which is how this hides.
+ */
+const wantsBytecode = process.env.SYMBIOTE_ITEST_BYTECODE === '1';
+
+/**
+ * `hermesc`, out of whichever example has run `pod install`.
+ *
+ * It ships inside the `hermes-engine` pod rather than on npm, so there is no version to pin here —
+ * and that is the point: it is the SAME compiler the app build uses, from the same pod as the
+ * `hermesvm.framework` the tester links against. A mismatched pair would compile bytecode the
+ * runtime refuses, which at least fails loudly.
+ */
+function findHermesc() {
+  const examples = path.join(root, 'examples');
+  if (!existsSync(examples)) return undefined;
+  for (const entry of readdirSync(examples, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const candidate = path.join(
+      examples,
+      entry.name,
+      'ios/Pods/hermes-engine/destroot/bin/hermesc',
+    );
+    if (existsSync(candidate)) return candidate;
+  }
+  return undefined;
+}
+
+const hermesc = wantsBytecode ? findHermesc() : undefined;
+if (wantsBytecode && hermesc === undefined) {
+  console.error(
+    'SYMBIOTE_ITEST_BYTECODE=1 but no hermesc found — run `pod install` in any example first',
+  );
+  process.exit(2);
+}
+
+function compileToBytecode(bundle) {
+  const out = `${bundle.replace(/\.js$/, '')}.hbc`;
+  return new Promise((resolve, reject) => {
+    const child = spawn(hermesc, [
+      '-Xes6-block-scoping',
+      '-O',
+      '-emit-binary',
+      '-out',
+      out,
+      bundle,
+    ]);
+    let stderr = '';
+    child.stderr.on('data', chunk => {
+      stderr += chunk;
+    });
+    child.on('error', reject);
+    child.on('close', status =>
+      status === 0
+        ? resolve(out)
+        : reject(new Error(`hermesc failed on ${bundle}:\n${stderr.trim()}`)),
+    );
+  });
+}
+
+/**
  * `*.android.itest.ts` runs ONLY against `build-android`, and everything else runs only against the
  * other builds. A hard split rather than a filter in one direction, because each arm's fixtures
  * assume their own platform: an Android fixture asserts keys the default build never writes, and the
@@ -645,10 +809,12 @@ function createLimiter(max) {
     if (active >= max || queue.length === 0) return;
     active += 1;
     const { fn, resolve, reject } = queue.shift();
-    fn().then(resolve, reject).finally(() => {
-      active -= 1;
-      pump();
-    });
+    fn()
+      .then(resolve, reject)
+      .finally(() => {
+        active -= 1;
+        pump();
+      });
   };
   return fn =>
     new Promise((resolve, reject) => {
@@ -688,7 +854,10 @@ try {
     // different subdirectories would otherwise write over each other's bundle.
     const bundle = path.join(
       out,
-      `${path.relative(testsDir, file).replace(/[\\/]/g, '__').replace(/\.tsx?$/, '')}.js`,
+      `${path
+        .relative(testsDir, file)
+        .replace(/[\\/]/g, '__')
+        .replace(/\.tsx?$/, '')}.js`,
     );
     await esbuild.build({
       entryPoints: [file],
@@ -733,12 +902,16 @@ try {
           useDefineForClassFields: false,
         },
       },
-      banner: { js: PLATFORM_PRELUDE },
+      banner: {
+        js:
+          PLATFORM_PRELUDE +
+          (readFileSync(file, 'utf8').includes(FABRIC_COUNT_DIRECTIVE)
+            ? FABRIC_COUNT_PRELUDE
+            : ''),
+      },
       define: {
         __DEV__: isBenchBuild ? 'false' : 'true',
-        'process.env.NODE_ENV': isBenchBuild
-          ? '"production"'
-          : '"development"',
+        'process.env.NODE_ENV': isBenchBuild ? '"production"' : '"development"',
       },
       // ANGULAR'S OWN DEV SWITCH IS A THIRD ONE — neither `__DEV__` nor `NODE_ENV` reaches it, and
       // `initNgDevMode` turns itself ON when the global is undefined (`ng_dev_mode.ts:85`). Every
@@ -762,15 +935,18 @@ try {
       ],
       logLevel: 'silent',
     });
+    // Counted as BUILD time, not run time: it is the step a release app does at build time too.
+    bundles.push(wantsBytecode ? await compileToBytecode(bundle) : bundle);
     buildMs += performance.now() - buildStart;
-    bundles.push(bundle);
   }
 
   const runStart = performance.now();
   // Every bundle is queued at once — the limiter caps how many run concurrently — and printing
   // still walks them in submission order, so output stays grouped exactly as the sequential run
   // printed it even though completion order underneath is whatever finishes first.
-  const runPromises = bundles.map(bundle => limitTestRun(() => runTester(bundle)));
+  const runPromises = bundles.map(bundle =>
+    limitTestRun(() => runTester(bundle)),
+  );
   for (const runPromise of runPromises) {
     const run = await runPromise;
     for (const line of run.stdout.split('\n').filter(Boolean)) {
@@ -784,8 +960,17 @@ try {
   }
   runMs += performance.now() - runStart;
 } finally {
-  rmSync(out, { recursive: true, force: true });
+  // `SYMBIOTE_KEEP_BUNDLES=1` leaves them on disk and says where. A stack trace out of the tester
+  // names a line in the BUNDLE, and without the file that line number is unreadable — which is a
+  // debugging wall every time a failure is about module order rather than about the test.
+  if (process.env.SYMBIOTE_KEEP_BUNDLES === '1') {
+    console.error(`BUNDLES ${out}`);
+  } else {
+    rmSync(out, { recursive: true, force: true });
+  }
 }
 
-console.error(`PROFILE build=${buildMs.toFixed(0)}ms run=${runMs.toFixed(0)}ms files=${found.length}`);
+console.error(
+  `PROFILE build=${buildMs.toFixed(0)}ms run=${runMs.toFixed(0)}ms files=${found.length}`,
+);
 process.exit(failed > 0 ? 1 : 0);

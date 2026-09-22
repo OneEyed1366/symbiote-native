@@ -199,6 +199,34 @@ void install(Host &host) {
          return jsi::Value(runtime, out);
        });
 
+  // The shadow tree's running commit number — a step's own commit count is the delta across it.
+  // Not a transaction count: see `Host::commitNumber` for why those are not the same question.
+  bind("commitNumber", 0,
+       [&host](jsi::Runtime &, const jsi::Value &, const jsi::Value *, size_t) {
+         return jsi::Value(static_cast<double>(host.commitNumber()));
+       });
+
+  // The engine's heap and GC counters, as Hermes reports them. Empty on JavaScriptCore by jsi's own
+  // default, so a fixture reads an empty object rather than a wrong number.
+  bind("heapInfo", 0,
+       [&host](jsi::Runtime &runtime, const jsi::Value &, const jsi::Value *, size_t) {
+         auto info = host.heapInfo();
+         auto out = jsi::Object(runtime);
+         for (const auto &entry : info) {
+           out.setProperty(runtime, entry.first.c_str(),
+                           jsi::Value(static_cast<double>(entry.second)));
+         }
+         return jsi::Value(runtime, out);
+       });
+
+  // A full collection, so a measurement can start from a known floor rather than from whatever the
+  // previous case left standing.
+  bind("collectGarbage", 0,
+       [&host](jsi::Runtime &, const jsi::Value &, const jsi::Value *, size_t) {
+         host.collectGarbage();
+         return jsi::Value::undefined();
+       });
+
   bind("reset", 0, [&host](jsi::Runtime &, const jsi::Value &, const jsi::Value *, size_t) {
     host.reset();
     return jsi::Value::undefined();
@@ -260,9 +288,16 @@ int main(int argc, char **argv) {
     runtime.evaluateJavaScript(std::make_shared<jsi::StringBuffer>(read(argv[1])), argv[1]);
 
     // Cases may be ASYNC — most adapter tests are — and C++ cannot await. So the file collects its
-    // results and this drains until it says it is finished: run the queued timers, then return to
-    // JavaScriptCore, which drains microtasks whenever the stack empties. Bounded, because a test
-    // that never settles has to fail rather than hang.
+    // results and this drains until it says it is finished: run the queued timers, then let the
+    // engine drain its microtasks. Bounded, because a test that never settles has to fail rather
+    // than hang.
+    //
+    // THE EXPLICIT DRAIN IS NOT OPTIONAL, and which engine is hosting decides whether forgetting it
+    // shows. JavaScriptCore drains its microtask queue by itself whenever the JS stack empties, so
+    // this loop worked for years without asking. Hermes does not — the host owns the queue there,
+    // which is why React Native's own runtime drains it per tick — and without this call a Hermes
+    // run advances the case chain in the wrong interleaving and re-reports the last case instead of
+    // failing. A wrong ANSWER rather than an error, which is the worst shape a harness defect has.
     constexpr int kDrainRounds = 1'000;
     for (int round = 0; round < kDrainRounds; round++) {
       auto done = runtime.global().getProperty(runtime, "__symbioteDone");
@@ -271,6 +306,7 @@ int main(int argc, char **argv) {
       if (flush.isObject() && flush.getObject(runtime).isFunction(runtime)) {
         flush.getObject(runtime).getFunction(runtime).call(runtime);
       }
+      runtime.drainMicrotasks();
     }
 
     auto results = runtime.global().getProperty(runtime, "__symbioteResults");
