@@ -42,7 +42,7 @@ function Row(props: { row: IBenchRow; isSelected: boolean }): JSX.Element {
   return (
     <view
       style={props.isSelected ? SELECTED_ROW_STYLE : ROW_STYLE}
-      testID={`row-${props.row.id}`}
+      // No id prop — the row is kept concrete by `ROW_STYLE`'s background, as on the device screen.
     >
       <text ellipsizeMode="tail">{String(props.row.id)}</text>
       <view style={CELL_STYLE}>

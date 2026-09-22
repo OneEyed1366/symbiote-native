@@ -60,7 +60,6 @@ Component({
   template: `
     <view
       [style]="isSelected ? selectedRowStyle : rowStyle"
-      [testID]="'row-' + row.id"
     >
       <text ellipsizeMode="tail">{{ row.id }}</text>
       <view [style]="cellStyle"

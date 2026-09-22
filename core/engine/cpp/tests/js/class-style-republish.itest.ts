@@ -142,6 +142,29 @@ describe('republishing an unchanged class or style, against the real differ', ()
     );
   });
 
+  // why: THE SAME CLAIM FOR A STYLE THE KEY WALK REFUSES TO COMPARE. `isSameShallowStyle` is
+  // shallow and conservative — a nested value (a transform list, a shadow, a style array) reports
+  // "not the same" rather than being compared deeply, because a deep compare would cost the size of
+  // the style — so the case above, whose style is four scalars, proves nothing about this one.
+  //
+  // It holds for a different reason than that case does, and the difference is the point: the key
+  // walk refuses this style, and `pushClassStyle`'s `isAlreadyPublished` catches the republish
+  // downstream because `sharedStylePair` memoizes the pair by the explicit object. The contract —
+  // the same object is the same style, whatever is nested inside it — was therefore true and
+  // untested, which is the state that lets a later change to either guard break it silently.
+  it('does not re-mount the view when a style holding a nested value is the same reference', () => {
+    const hoisted = { margin: 2, transform: [{ scale: 1.5 }] };
+    const node = mountSettled();
+    routeProp(node, 'style', hoisted);
+    surface.commit();
+    mounted();
+    mountingLogs();
+
+    expect(probeWasUpdated(() => routeProp(node, 'style', hoisted))).toBe(
+      false,
+    );
+  });
+
   // The restore path, and the whole reason the guard keys on the published ARRAY rather than on
   // the parts alone. setNativeProps writes the style slot past the parts as a flattened OBJECT,
   // clobbering the declarative style; the next declarative write is what puts it back. A
