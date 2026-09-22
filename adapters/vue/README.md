@@ -21,18 +21,77 @@ mutation-oriented framework driving the already-validated engine.
 ## Install
 
 ```bash
+npx @symbiote-native/cli new my-app --framework vue --vue-flavor sfc   # or --vue-flavor tsx
+```
+
+One command, nothing to wire by hand: scaffolds the Metro config (the SFC transformer, or the TSX
+Babel plugin below), the entry seam below, and `@symbiote-native/vue`/`react-native`/`vue` as your
+app's own dependencies.
+
+<details>
+<summary>Manual install (no generator — an existing app, or you want to wire it yourself)</summary>
+
+```bash
 npm install @symbiote-native/vue react-native vue
 ```
 
 `react-native` and `vue` stay your app's own top-level dependencies — this package only replaces
-the JS renderer that drives them. **TSX** needs nothing beyond the install above; **SFC**
-additionally needs a Metro transformer for `.vue` files (see
-[`examples/vue-sfc`](../../examples/vue-sfc)'s `metro.config.js`) — `npx @symbiote-native/cli new`
-wires this for a new app; an existing app still needs it copied in by hand.
+the JS renderer that drives them. **SFC** additionally needs a Metro transformer for `.vue` files
+— see [`examples/vue-sfc`](../../examples/vue-sfc)'s `metro.config.js`.
+
+**TSX** needs one more Babel plugin beyond the install above, or a dev-mode Vue warning can crash
+the mount to a blank screen. RN's dev React-JSX transform tags every `JSXElement` with `__self`/
+`__source` (inert under React); `@vue/babel-plugin-jsx` copies them verbatim into the vnode's
+props, and at module scope `__self`'s `this` is the Hermes global `HostObject` — the first Vue dev
+warning that formats that prop for a component trace throws reading `Symbol.toStringTag` off it,
+unwinding the whole mount. Strip both attributes on `JSXOpeningElement` exit, after Babel's
+`__self`/`__source` plugins add them but before `@vue/babel-plugin-jsx` reads them (see
+[`examples/vue-tsx`](../../examples/vue-tsx)'s `babel.config.js`, `stripReactJsxDevAttrs`) — SFC
+doesn't need this, since its compiler never sees RN's React-JSX transform at all.
+
+</details>
 
 ---
 
 ## Use it
+
+The app is ordinary Vue. The primitives are TAGS — `<view>`, `<text>`, `<pressable>` — so there is
+nothing to import for them at all; both Vue compilers resolve them as elements and the renderer
+maps each to its Fabric view. Styling is a CSS class (a plain `.css` file in TSX, an SFC's own
+`<style>` block otherwise) — the convention every example app here follows. A tap→increment
+counter, authored in TSX:
+
+```jsx
+import { ref } from '@vue/runtime-core';
+import './App.css';
+
+export default {
+  setup() {
+    const count = ref(0);
+    return () => (
+      <safe-area-view class="screen">
+        <text>Taps: {count.value}</text>
+        <pressable onPress={() => count.value++}>
+          <text>Tap me</text>
+        </pressable>
+      </safe-area-view>
+    );
+  },
+};
+```
+
+```css
+/* App.css */
+.screen {
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+```
+
+<details>
+<summary>Native entry point (index.js) — already scaffolded by <code>npx @symbiote-native/cli new --framework vue</code></summary>
 
 The zero-config entry mirrors real Vue's own `createApp(App).mount(...)` idiom and wires the same
 RN-backed host seams React's `registerApp` does — this is what
@@ -41,6 +100,11 @@ actually use:
 
 ```js
 // index.js
+
+// Registers host behaviors (Image, Pressable, Switch, ...) that /bootstrap alone doesn't
+// reach; deleting this breaks them silently (Metro's production inlineRequires makes a
+// side-effect-only barrel import go lazy, see register.ts).
+import '@symbiote-native/vue';
 import { createApp } from '@symbiote-native/vue/bootstrap';
 import App from './App';
 import { name as appName } from './app.json';
@@ -66,27 +130,7 @@ RNAppRegistry.registerRunnable(appName, ({ rootTag }) => {
 });
 ```
 
-The app is ordinary Vue. The primitives are TAGS — `<view>`, `<text>`, `<pressable>` — so there is
-nothing to import for them at all; both Vue compilers resolve them as elements and the renderer
-maps each to its Fabric view. A tap→increment counter, authored in TSX:
-
-```jsx
-import { ref } from '@vue/runtime-core';
-
-export default {
-  setup() {
-    const count = ref(0);
-    return () => (
-      <view style={{ padding: 24 }}>
-        <text>Taps: {count.value}</text>
-        <pressable onPress={() => count.value++}>
-          <text>Tap me</text>
-        </pressable>
-      </view>
-    );
-  },
-};
-```
+</details>
 
 ### Two example apps
 
@@ -101,9 +145,9 @@ the demo above is the first one running on the iOS simulator:
 
 ## Parity — and the one gap
 
-Both adapters reach the same primitives, runtime modules, `Animated` on both drivers, gestures,
-accessibility, and the `VirtualizedList` family, verified on-device on iOS and Android. That
-parity is **structural, not hand-copied**: the
+Vue reaches the same primitives, runtime modules, `Animated` on both drivers, gestures,
+accessibility, and the `VirtualizedList` family as React, Svelte, Solid, and Angular, verified
+on-device on iOS and Android. That parity is **structural, not hand-copied**: the
 component logic (state machines + render functions) is written **once** in `@symbiote-native/components`,
 and each adapter supplies only its lifecycle (Vue's `ref`/`watch` + the descriptor→`h()` bridge).
 
