@@ -45,6 +45,16 @@ against 27 ms for 10 000 appends. It once put `materialize` at 61% of a create w
 reported a complexity in list width that does not exist off the harness. A number whose ORDER is
 right and whose SHAPE is wrong survives review; that is what makes this worse than no number.
 
+**And it runs the other way too: a new fixture must be run under `test:itest` before it lands, not
+only under `bench:itest`.** The assert build compiles guards the shipping build does not, and two
+fixtures written this way went straight to CI and ABORTED there (2026-09-22): `fill-scaling-cost`
+tripped Yoga's 16 384 child-list ceiling on its widest arm, and `surface-width-cost` read
+`readSurfaceTelemetry` on a surface that had not committed, which asserts in
+`TransactionTelemetry::getCommitStartTime`. The second is the instructive one — in Release that same
+read returns an UNDEFINED TIME POINT and prints it, so the fixture had been quoting a garbage number
+for its baseline arm the whole time. **The assert build is not a stricter ruler, it is the only one
+that tells you the fixture is wrong.**
+
 ## The method, in the order it must be applied
 
 ### 1. Read the counters before the milliseconds
@@ -878,11 +888,17 @@ even before the engine differed.
                       32000 122.8     3.84   3.94x",
   verdict: "flat across 64x, factors within 0.2 of linear, three sittings. #1294 is not our
             situation and there is no slow path behind the 1.5x",
-  under_bytecode: "re-taken on -O (§21) the curve reads flat to 8 000 and +35% at 32 000 —
-                   1.66 / 1.65 / 1.77 / 2.34 us. Nothing about the code changed: the JS halved and
-                   the SAME absolute collector cost stopped being hidden by it. Verdict unchanged
-                   (the benchmark's 10 000 nodes sit at the flat end); the gate widened 2x -> 3x
-                   for that reason rather than to pass",
+  under_bytecode: "re-taken on -O (§21) the curve reads flat to 8 000 and rises at 32 000 —
+                   1.665 / 1.725 / 1.861 / 2.580 us. Nothing about the code changed: the JS halved
+                   and the SAME absolute collector cost stopped being hidden by it. Verdict
+                   unchanged (the benchmark's 10 000 nodes sit at the flat end); the gate widened
+                   2x -> 3x for that reason rather than to pass",
+  bucketed_2026_09_22: "the nodes are now spread over containers of 4 000 rather than one flat list.
+                        Yoga's debug build asserts a child list under 16 384
+                        (YogaLayoutableShadowNode.cpp:1036), so the 32 000 arm ABORTED test:itest
+                        while passing bench:itest. The containers are built before the clock starts
+                        and the timed loop is unchanged; the figures above are the post-bucketing
+                        re-take (32 000 read 2.34 flat, 2.58 bucketed)",
   break_test: "an `at`-proportional inner loop in the fill: 10.8 -> 29.6 -> 104 -> 417 us,
                16x per 4x step, failing with an assertion rather than a throw",
   keep: "a symptom match needs an ORDER, not a direction. Everything is slower without a JIT, so
