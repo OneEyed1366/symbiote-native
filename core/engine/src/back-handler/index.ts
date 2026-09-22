@@ -26,13 +26,7 @@ const DEVICE_BACK_EVENT = 'hardwareBackPress';
 
 // The public event names callers subscribe to. `backPress` is RN's legacy alias
 // for `hardwareBackPress`; both map to the same chain.
-const BACK_PRESS_EVENT = {
-  backPress: 'backPress',
-  hardwareBackPress: 'hardwareBackPress',
-} as const;
-
-export type IBackPressEventName =
-  (typeof BACK_PRESS_EVENT)[keyof typeof BACK_PRESS_EVENT];
+export type IBackPressEventName = 'backPress' | 'hardwareBackPress';
 
 // A handler returns true to consume the back press (stop the chain); any
 // falsy/void result lets earlier-registered handlers run, and ultimately the

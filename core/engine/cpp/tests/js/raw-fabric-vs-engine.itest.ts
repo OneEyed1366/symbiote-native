@@ -80,7 +80,6 @@ import {
 
 const ROOT_TAG = 1;
 const ROWS = 1_000;
-const NODES_PER_ROW = 10;
 
 // Hoisted exactly as a payload reaches Fabric: React Native flattens `style` into the top-level
 // props object before it crosses JSI (`ReactNativeAttributePayload.addNestedProperty`), and so does

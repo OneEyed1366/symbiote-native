@@ -10,8 +10,6 @@ import { getNativeModule } from '../native-modules';
 import {
   ACTION_SHEET_MANAGER,
   type INativeActionSheetManager,
-  type IShareActionSheetIOSOptions,
-  type IShareActionSheetError,
 } from '../action-sheet-ios';
 import {
   validateContent,

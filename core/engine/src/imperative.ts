@@ -13,7 +13,6 @@
 
 import { dlog, isDebug } from './debug';
 import type {
-  IFabricNode,
   IMeasureInWindowOnSuccess,
   IMeasureLayoutOnSuccess,
   IMeasureOnSuccess,
