@@ -1,0 +1,253 @@
+---
+title: SQLite
+description: expo-sqlite wrapped for every SymbioteNative adapter — Database/Statement/Session, a Bun-style SQL tagged-template helper, a SQLite-backed key-value store, and a per-adapter Provider.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+`@symbiote-native/sqlite` wraps
+[`expo-sqlite`](https://github.com/expo/expo/tree/main/packages/expo-sqlite) for every
+SymbioteNative adapter — `Database`, `Statement`, `Session` (transactions and changesets), a
+Bun-style SQL tagged-template helper, and a SQLite-backed key-value store. Unlike
+[audio](/docs/packages/audio/)'s JSI `SharedObject` subclasses, expo-sqlite's native classes are
+plain constructors exposed on the native module — this package's wrapper classes hold a native
+instance and forward to it.
+
+Every adapter ships its own idiomatic `<SQLiteProvider>`/context equivalent, reachable from its own
+subpath. Each subpath also re-exports the full core barrel, so importing from
+`@symbiote-native/sqlite/react` (etc.) is a strict superset of importing from the package root.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | ✅ live |
+| Android     | ✅ live |
+
+| Framework adapter | Support |
+| ------------------ | ------- |
+| React              | ✅ live |
+| Vue                | ✅ live |
+| Angular            | ✅ live |
+| Svelte             | ✅ live |
+| Solid              | ✅ live |
+
+## Installation
+
+```sh
+npm install @symbiote-native/sqlite
+```
+
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --sqlite` (or
+`add --sqlite` in an existing app) installs and wires this for you — see
+[`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
+
+`expo-sqlite` and `expo-modules-core` come along as regular dependencies, pinned to exact
+versions — never install either yourself, and never add the `expo` meta-package to your project.
+`await-lock` is a real runtime dependency of the key-value store, not a native-only placeholder.
+
+<Aside type="danger" title="Native setup is required before first use">
+  Follow [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first.
+  `expo-sqlite` compiles its own vendored SQLite amalgamation from source per
+  platform rather than linking the OS's system library — expect the first
+  `pod install`/Android build touching this package to be noticeably
+  heavier. That's expected, not a broken build.
+</Aside>
+
+## Usage
+
+```ts
+import { openDatabaseAsync } from '@symbiote-native/sqlite';
+
+const db = await openDatabaseAsync('app.db');
+await db.execAsync('CREATE TABLE IF NOT EXISTS todos (id INTEGER PRIMARY KEY, title TEXT)');
+await db.runAsync('INSERT INTO todos (title) VALUES (?)', 'Buy milk');
+const todos = await db.getAllAsync<{ id: number; title: string }>('SELECT * FROM todos');
+```
+
+The SQL tagged-template helper, Bun-style, automatically parameterized:
+
+```ts
+const users = await db.sql<User>`SELECT * FROM users WHERE age > ${21}`;
+const rows = await db.sql`SELECT name, age FROM users`.values(); // [["Alice", 30], ...]
+const user = await db.sql<User>`SELECT * FROM users WHERE id = ${id}`.first();
+for await (const user of db.sql<User>`SELECT * FROM users`.each()) {
+  /* ... */
+}
+```
+
+Transactions:
+
+```ts
+await db.withTransactionAsync(async () => {
+  await db.runAsync('UPDATE accounts SET balance = balance - ? WHERE id = ?', 100, from);
+  await db.runAsync('UPDATE accounts SET balance = balance + ? WHERE id = ?', 100, to);
+}); // rolls back and re-throws if the task throws
+```
+
+The key-value store, from its own subpath (kept separate since it pulls in `await-lock` and opens
+its own database lazily — an app that only wants `Database`/`Statement`/`sql` shouldn't pay for
+that transitively):
+
+```ts
+import { AsyncStorage } from '@symbiote-native/sqlite/kv-store';
+
+await AsyncStorage.setItem('token', 'secret');
+const token = await AsyncStorage.getItem('token'); // string | null
+```
+
+### `onInit`
+
+Exposed directly on `openDatabaseAsync`/`openDatabaseSync`, called once right after the native
+handle opens — a "run this once right after open" hook that works even where there's no view-tree
+context to hang a Provider off:
+
+```ts
+const db = await openDatabaseAsync('app.db', {
+  onInit: async db => {
+    await db.execAsync('CREATE TABLE IF NOT EXISTS todos (id INTEGER PRIMARY KEY, title TEXT)');
+  },
+});
+```
+
+Every Provider below forwards its own `onInit` prop straight into `openDatabaseAsync` rather than
+calling it a second time. `openDatabaseSync`'s `onInit` must be synchronous — it rejects (throws)
+if given one that returns a `Promise`, rather than silently racing it.
+
+## Provider / context
+
+Each adapter's Provider opens the database once (closing and reopening if its config props
+change), renders nothing until it resolves, and hands the open `SQLiteDatabase` to descendants. On
+failure it calls `onError` if given, else the failure propagates through whatever error channel is
+idiomatic to that framework.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { SQLiteProvider, useSQLiteContext } from '@symbiote-native/sqlite/react';
+
+    <SQLiteProvider databaseName="app.db" onInit={migrate}>
+      <Main />
+    </SQLiteProvider>;
+
+    function Main() {
+      const db = useSQLiteContext();
+      // ...
+    }
+    ```
+
+    `useSuspense` is also supported — `<Suspense>` shows its fallback instead of the Provider
+    rendering `null`.
+
+  </TabItem>
+  <TabItem label="Vue">
+    ```ts
+    import { SQLiteProvider, useSQLiteContext } from '@symbiote-native/sqlite/vue';
+    // <SQLiteProvider database-name="app.db"><Main /></SQLiteProvider> in a template
+    // useSQLiteContext() inside a descendant's setup()
+    ```
+
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { SqliteService, provideSqliteDatabase } from '@symbiote-native/sqlite/angular';
+
+    // app config / module providers:
+    provideSqliteDatabase({ databaseName: 'app.db', onInit: migrate });
+
+    // any component/service:
+    constructor(private readonly sqlite: SqliteService) {}
+    // this.sqlite.database() — an Angular resource()-backed signal
+    ```
+
+    DI, not a template Provider — this project's established Angular idiom for context-like state.
+
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script>
+      import { SQLiteProvider, useSQLiteContext } from '@symbiote-native/sqlite/svelte';
+    </script>
+
+    <SQLiteProvider databaseName="app.db">
+      <Main />
+    </SQLiteProvider>
+    ```
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { SQLiteProvider, useSQLiteContext } from '@symbiote-native/sqlite/solid';
+
+    <SQLiteProvider databaseName="app.db">
+      <Main />
+    </SQLiteProvider>;
+    ```
+
+  </TabItem>
+</Tabs>
+
+None of the five ports upstream's `assetSource` option (see "Deliberately out of scope" below).
+React's `useSuspense` has no equivalent on the other four adapters — a deliberate framework-idiom
+divergence, not a gap.
+
+## API
+
+```ts
+openDatabaseAsync(name, options?): Promise<SQLiteDatabase>
+openDatabaseSync(name, options?): SQLiteDatabase
+deleteDatabaseAsync(name) / deleteDatabaseSync(name): void
+
+class SQLiteDatabase {
+  execAsync(source) / execSync(source): void
+  runAsync(source, ...params) / runSync(source, ...params): { lastInsertRowId, changes }
+  getFirstAsync / getFirstSync<T>(source, ...params): T | null
+  getAllAsync / getAllSync<T>(source, ...params): T[]
+  getEachAsync<T>(source, ...params): AsyncIterableIterator<T>
+  prepareAsync / prepareSync(source): SQLiteStatement
+  withTransactionAsync(task): Promise<void>
+  withExclusiveTransactionAsync(task): Promise<void>
+  createSessionAsync(dbName?): Promise<SQLiteSession>
+  sql<T>(strings, ...params): SQLiteTaggedQuery<T>                    // .values() / .first() / .each()
+  serializeAsync / deserializeAsync
+  closeAsync() / closeSync(): void
+}
+
+class SQLiteStatement { executeAsync / executeSync; finalizeAsync / finalizeSync }
+class SQLiteSession { createChangesetAsync / applyChangesetAsync / invertChangesetAsync; finalizeAsync }
+```
+
+Plus the full `I`-prefixed native type surface (`native-database.ts`/`native-statement.ts`/
+`native-session.ts`, ported type-only) and `SQLiteStorage`/`AsyncStorage`/`Storage` at
+`/kv-store`.
+
+## Error handling
+
+Native errors surface as a plain thrown `Error`/rejected `Promise` — no custom error-class
+hierarchy.
+
+| Message contains | Triggered by |
+| ----------------- | ------------ |
+| `Could not open database` / invalid path | `sqlite3_open` failed for the resolved path |
+| `Database '<name>' not found` | Deleting a database that was never opened / doesn't exist on disk |
+| `Unable to delete database '<name>' that is currently open` | `deleteDatabaseAsync`/`Sync` on a still-open connection — close it first |
+| `Unable to delete the database file for '<name>' database` | The file delete itself failed after the open-connection check passed |
+| `Access to closed resource` | Any call on a database/statement/session after `close*`/`finalize*` |
+| `Invalid bind parameter` | A bind value's type the C binding layer can't marshal |
+| `Invalid arguments: ...` | A malformed call into the native layer |
+| `ERR_INTERNAL_SQLITE_ERROR` (code) / raw SQLite message | SQLite itself rejected the statement — malformed SQL, constraint violation, etc. |
+| `Unsupported operations` | An operation the current build (e.g. a non-libSQL build calling `syncLibSQL()`) doesn't support |
+
+## Deliberately out of scope
+
+- **The `assetSource` bundled-database-file option** — needs `expo-asset`, which this project
+  doesn't depend on. A file-copy-based alternative through
+  [`@symbiote-native/file-system`](/docs/packages/file-system/)'s `File`/`Directory` API is
+  possible but not wired here.
+- **The `expo-sqlite/plugin` config plugin** (libSQL/`sqlite-vec` extension bundling) — manual
+  per-app native configuration, same convention as
+  [notifications](/docs/packages/notifications/)'s push setup.
+  `bundledExtensions`/`loadExtensionAsync`/`loadExtensionSync` are still exported and work against
+  whatever extensions your app's own native build actually bundles.
+- **`importAssetDatabaseAsync`** — layers on the `assetSource` exclusion above.
+- **Web-only surfaces** — this project targets iOS + Android only.
+- **DevTools browser-extension wiring** — no equivalent in this project.
