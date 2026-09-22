@@ -32,7 +32,7 @@ const TILE_BASE_STYLE: IViewStyle = { borderWidth: 2, borderRadius: 8 };
   template: `
     <pressable
       testID="pg-hostbinding-tile"
-      [style]="innerStyle"
+      [styleProp]="innerStyle"
       (press)="toggle()"
     >
       <text class="rstyle-tile-text">{{

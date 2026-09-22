@@ -371,14 +371,11 @@ describe('[style] on a tag', () => {
     expect(node?.payload.opacity).toBe(1);
   });
 
-  // `SYMBIOTE_ELEMENTS` AND NOT `[ViewElement]`, which is what this arm used to pass. The tag
-  // directives are withheld from runtime matching now (`./runtime-matching`), so what claims
-  // `[style]` is `SymbioteStyleHost` — a separate directive that rides the array and is reachable no
-  // other way. Naming one element class here would type-check and then throw on the device, which is
-  // exactly why the individual exports were removed from the package barrel.
-  it('takes an ARRAY when the element directives are imported', async () => {
+  // why: an RN StyleProp may be an ARRAY; `[styleProp]` is an ordinary property binding, so it
+  // reaches the renderer whole and needs no directive instance to claim it.
+  it('takes an ARRAY through [styleProp]', async () => {
     const { node, thrown } = await mountTemplate(
-      `<view testID="probe" [style]="[{ opacity: 1 }, { margin: 2 }]"></view>`,
+      `<view testID="probe" [styleProp]="[{ opacity: 1 }, { margin: 2 }]"></view>`,
       NO_ERRORS_SCHEMA,
       [...SYMBIOTE_ELEMENTS],
     );
@@ -386,14 +383,14 @@ describe('[style] on a tag', () => {
     expect(node?.payload).toMatchObject({ opacity: 1, margin: 2 });
   });
 
-  // The control, and the reason `SymbioteElement` declares `style` at all: a declared input CLAIMS
-  // the binding at compile time so it never reaches the styling engine. Without the directive,
-  // ɵɵstyleMap parses its argument as a CSS string and calls `.indexOf` on it. Keeping both arms is
-  // what makes the case above a measurement rather than an assumption.
-  it('and throws inside Angular without it', async () => {
+  // why: `[style]` is Angular's own styling binding, decomposed key by key exactly as on a DOM
+  // element, and Angular cannot represent an array there - the same limit a browser app has. Nothing
+  // in the adapter claims it any more, with or without the element directives imported.
+  it('rejects an array in [style], as Angular does on any element', async () => {
     const { thrown } = await mountTemplate(
       `<view testID="probe" [style]="[{ opacity: 1 }]"></view>`,
       NO_ERRORS_SCHEMA,
+      [...SYMBIOTE_ELEMENTS],
     );
     expect(thrown).toContain('indexOf is not a function');
   });

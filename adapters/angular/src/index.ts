@@ -9,8 +9,8 @@
 // `@Component`s on the `view` and `text` SELECTORS — a second mechanism on the same tags
 // `SYMBIOTE_ELEMENTS` covers, kept for one stated reason their own header gives: "Declaring `style`
 // as a real Angular input prevents Angular's CSS style engine from decomposing RN `StyleProp`
-// arrays". `SymbioteStyleHost` does exactly that now, for every tag, at a directive's cost rather
-// than a component's.
+// arrays". A tag takes an array or press-state callback as `[styleProp]`, a plain property binding
+// with no instance behind it.
 //
 // An app loses nothing it cannot spell better: `@ViewChild('ref')` on a template reference returns
 // Angular's own `ElementRef<IHostInstance>`, whose `nativeElement` IS the engine host node — the same
@@ -146,10 +146,9 @@ export { setImageSourceResolver } from './components';
 //
 // They were removed on 2026-09-18 and put back the same hour. The reason to remove them is real: a
 // withheld tag directive (`./runtime-matching`) is a compile-time declaration and nothing else, so
-// what makes `<view [style]="[a, b]">` work at RUN time is `SymbioteStyleHost`, and what makes
-// `<view [onPress]="fn">` work at all is `SymbioteCallbackHost` claiming the name before
-// `setDomProperty` throws NG0306. Both ride this array. A narrow `imports: [ViewElement]` type-checks
-// and then fails on a device the first time the app writes an array style.
+// what makes `<view [onPress]="fn">` work at all is `SymbioteCallbackHost` claiming the name before
+// `setDomProperty` throws NG0306. It rides this array, so a narrow `imports: [ViewElement]`
+// type-checks and then fails on a device the first time the app binds an `on*` prop.
 //
 // WHAT PUTS THEM BACK is NG3004: `Unable to import directive ViewElement — the symbol is not
 // exported from index.d.ts`. ngtsc resolves every directive reachable through an imported array to an
@@ -198,7 +197,6 @@ export {
   CALLBACK_ATTRIBUTE_SELECTOR,
   SymbioteCallbackHost,
 } from './callback-host';
-export { STYLE_HOST_SELECTOR, SymbioteStyleHost } from './style-host';
 export type {
   IElementProps,
   IStickyHeaderElementProps,

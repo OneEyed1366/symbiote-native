@@ -8,13 +8,9 @@
 // differ, since a bare tag takes children from the template and a handle from `#ref`, so neither
 // `children` nor `ref` appears here.
 //
-// `style` IS declared, reversing what this comment said until 2026-09-11. Leaving it to Angular's
-// styling engine was not the conservative choice it reads as: an array decomposes into
-// numeric-index keys there and a press-state CALLBACK throws out of `toStylingKeyValueArray`,
-// aborting the enclosing template update — which is what an app writes, and what every deleted
-// wrapper component accepted. The claim that a directive can reclaim it "solely by executing a
-// linked AOT artifact" was answered rather than assumed: `elements.test.ts` compiles the binding
-// through real ngtsc and runs the LINKED output. See `SymbioteElement.style`.
+// `style` and `styleProp` are TWO bindings. `[style]` is Angular's styling binding: an object or CSS
+// string, as on a DOM element, unclaimed because a claim is a directive instance per element. An RN
+// array or press-state callback throws in that engine, so it travels as `[styleProp]`.
 import type {
   IAccessibilityProps,
   IAriaProps,
@@ -31,6 +27,17 @@ import type {
 
 type IEventHandler = (event: ISymbioteEvent) => void;
 
+/**
+ * What `[style]` carries on a tag: Angular's own styling binding, decomposed key by key into
+ * `Renderer2.setStyle` exactly as on a DOM element. A style OBJECT or a CSS string - never an array
+ * or a function, which that engine cannot represent. Those are `[styleProp]`.
+ */
+export type IAngularStyleBinding<TStyle> = TStyle | string | null | undefined;
+
+/** RN's full StyleProp, press-state callback included: the `[styleProp]` binding. */
+export type IElementStyleProp =
+  IStyleProp<IViewStyle> | ((state: IPressState) => IStyleProp<IViewStyle>);
+
 export interface IElementProps
   extends IAccessibilityProps, IAriaProps, IResponderProps {
   /** RN's modern W3C-named alias for `nativeID`; the renderer folds it (`PROP_ALIASES`). */
@@ -43,13 +50,14 @@ export interface IElementProps
   renderToHardwareTextureAndroid?: boolean;
   shouldRasterizeIOS?: boolean;
   needsOffscreenAlphaCompositing?: boolean;
+  style?: IAngularStyleBinding<IViewStyle>;
   /**
-   * The press-state callback is in the union because a subclass cannot widen an
-   * inherited property and `<pressable>`/`<touchable-*>` are the tags that take one; on every other
-   * tag the engine resolves it at `pressed: false`.
+   * An RN StyleProp as ONE property binding: arrays, falsy entries, and the press-state callback.
+   * The callback is in the union because a subclass cannot widen an inherited property and
+   * `<pressable>`/`<touchable-*>` are the tags that take one; on every other tag the engine resolves
+   * it at `pressed: false`.
    */
-  style?:
-    IStyleProp<IViewStyle> | ((state: IPressState) => IStyleProp<IViewStyle>);
+  styleProp?: IElementStyleProp;
   onPress?: IEventHandler;
   onPressIn?: IEventHandler;
   onPressOut?: IEventHandler;
@@ -63,7 +71,8 @@ export interface IElementProps
 /** Text's own surface on top of the shared one. `onTextLayout` is an event, so it is not here. */
 export interface ITextElementProps {
   /** Narrows the shared `style` so `fontSize` / `fontWeight` type-check on a `<text>`. */
-  style?: IStyleProp<ITextStyle>;
+  style?: IAngularStyleBinding<ITextStyle>;
+  styleProp?: IStyleProp<ITextStyle>;
   numberOfLines?: number;
   ellipsizeMode?: 'head' | 'middle' | 'tail' | 'clip';
   selectable?: boolean;
