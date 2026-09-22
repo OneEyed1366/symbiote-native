@@ -61,7 +61,6 @@ function timeOnce(arm) {
   arm.mount();
   // The layout read is deliberate. Without it the framework's own work is timed while style and
   // layout for 10 000 nodes lands after the clock stops — which flatters whichever arm defers more.
-  // eslint-disable-next-line no-unused-expressions
   arm.container.offsetHeight;
   return performance.now() - started;
 }
