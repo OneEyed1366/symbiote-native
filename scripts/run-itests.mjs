@@ -317,10 +317,19 @@ const reactNativePlatformExtensions = {
  * the rest of the suite nothing.
  */
 const RN_INITIALIZE_CORE = /ReactNativePrivateInitializeCore(\.js)?$/;
+// The `react-native` barrel reaches RN's experimental virtual-collection components through lazy
+// getters, and esbuild bundles them anyway - where `VirtualCollectionView.js` imports a
+// `VirtualViewMode` its sibling does not export and the build fails. `@react-native/virtualized-
+// lists` imports that barrel, so any stock `FlatList` arm hits it. Nothing headless renders one.
+const RN_VIRTUAL_COLLECTION = /virtualcollection\//;
 
 const stubReactNativeBootstrap = {
   name: 'stub-react-native-initialize-core',
   setup(build) {
+    build.onResolve({ filter: RN_VIRTUAL_COLLECTION }, ({ path: request }) => ({
+      path: request,
+      namespace: 'rn-initialize-core-stub',
+    }));
     build.onResolve({ filter: RN_INITIALIZE_CORE }, ({ path: request }) => ({
       path: request,
       namespace: 'rn-initialize-core-stub',
@@ -914,9 +923,16 @@ try {
             ? FABRIC_COUNT_PRELUDE
             : ''),
       },
+      // RN's development FlatList reaches LogBox, whose chevrons are `.png` requires; nothing here
+      // paints an image, so they bundle as empty modules.
+      loader: { '.png': 'empty' },
       define: {
         __DEV__: isBenchBuild ? 'false' : 'true',
         'process.env.NODE_ENV': isBenchBuild ? '"production"' : '"development"',
+        // Where `runBenchSuite` writes a Hermes sampling-profile per step; empty = no profiling.
+        __SYMBIOTE_PROFILE_DIR__: JSON.stringify(
+          process.env.SYMBIOTE_PROFILE_DIR ?? '',
+        ),
       },
       // ANGULAR'S OWN DEV SWITCH IS A THIRD ONE — neither `__DEV__` nor `NODE_ENV` reaches it, and
       // `initNgDevMode` turns itself ON when the global is undefined (`ng_dev_mode.ts:85`). Every

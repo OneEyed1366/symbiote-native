@@ -287,6 +287,36 @@ class Host {
   void collectGarbage() { runtime_->instrumentation().collectGarbage("itest"); }
 
   /**
+   * Hermes's sampling profiler around a window of JS, dumped as a Chrome trace.
+   *
+   * A wall clock says a step is slow, a heap reading says it is not allocation; this names the
+   * FUNCTIONS. Returns false on JavaScriptCore, which has no equivalent here.
+   */
+  bool startProfiling(double hz) {
+#ifdef SYMBIOTE_USE_HERMES
+    static_cast<facebook::hermes::HermesRuntime &>(*runtime_).registerForProfiling();
+    hermesRoot().enableSamplingProfiler(hz);
+    return true;
+#else
+    (void)hz;
+    return false;
+#endif
+  }
+
+  bool stopProfiling(const std::string &path) {
+#ifdef SYMBIOTE_USE_HERMES
+    auto &root = hermesRoot();
+    root.dumpSampledTraceToFile(path);
+    root.disableSamplingProfiler();
+    static_cast<facebook::hermes::HermesRuntime &>(*runtime_).unregisterForProfiling();
+    return true;
+#else
+    (void)path;
+    return false;
+#endif
+  }
+
+  /**
    * The shadow tree's own sequential commit number — how many times JS has committed, in total.
    *
    * COUNTING TRANSACTIONS DOES NOT ANSWER THIS, which was tried first and read 1 everywhere.
@@ -434,6 +464,14 @@ class Host {
   const std::vector<RecordedCommand> &commands() const { return commandRecorder_.commands; }
 
  private:
+#ifdef SYMBIOTE_USE_HERMES
+  // Static lifetime per `makeHermesRootAPI`'s own contract, so a reference is safe to hand out.
+  static facebook::hermes::IHermesRootAPI &hermesRoot() {
+    return *jsi::castInterface<facebook::hermes::IHermesRootAPI>(
+        facebook::hermes::makeHermesRootAPI());
+  }
+#endif
+
   std::shared_ptr<const ShadowNode> findByTag(Tag tag) const {
     std::shared_ptr<const ShadowNode> found;
     const auto walk = [&](const auto &self, const ShadowNode &node) -> void {
