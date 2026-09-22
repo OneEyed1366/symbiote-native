@@ -1,19 +1,16 @@
-// ScrollView: the imperative + style-routing module (framework-agnostic, no 3-layer split:
-// ScrollView has no state machine). The imperative handle, the layout/visual style split for
-// the Android RefreshControl wrap, the scroll-event guard/forwarder, and the native sticky
-// scroll-attach are all platform- and framework-invariant, so they live here. The adapter
-// supplies the lifecycle (the node getter, the effect) and re-exports these.
+// ScrollView: the imperative + event-routing module (framework-agnostic, no 3-layer split:
+// ScrollView has no state machine). The imperative handle, the scroll-event guard/forwarder, and
+// the native sticky scroll-attach are platform- and framework-invariant, so they live here. The
+// Android RefreshControl wrap's style split moved out — see the note below. The adapter supplies
+// the lifecycle (the node getter, the effect) and re-exports these.
 
 import {
   attachNativeEvent,
   dlog,
-  flattenStyle,
   isSymbioteEvent,
   type AnimatedValue,
-  type IStyleProp,
   type ISymbioteEvent,
   type ISymbioteNode,
-  type IViewStyle,
 } from '@symbiote-native/engine';
 
 type IScrollHandler = (event: ISymbioteEvent) => void;

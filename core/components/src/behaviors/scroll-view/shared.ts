@@ -94,7 +94,6 @@ import {
   type ISymbioteEvent,
   type ISymbioteNode,
   type IViewStyle,
-  setProp,
 } from '@symbiote-native/engine';
 
 import { descriptorFor } from '../../component-names';
@@ -186,8 +185,7 @@ export const REFRESH_CONTROL = descriptorFor('refresh-control').component;
 
 // `rowStyle` USED TO BE A PARAMETER HERE and is not one any more: the content node's row direction
 // is decided in the engine from that node's OWN tag (`horizontal-scroll-content`), so this builder
-// no longer needs to know the axis to build it. `scrollBehavior` still derives `horizontal` from the
-// row style for the things that DO still need it in JS.
+// no longer needs to know the axis to build it.
 function buildContent(contentIntrinsic: ISymbioteIntrinsic) {
   return (node: ISymbioteNode): ISymbioteNode => {
     const descriptor = descriptorFor(contentIntrinsic);
@@ -301,9 +299,6 @@ function scrollBehavior(
   rowStyle: IViewStyle | undefined,
   platform: IScrollPlatform,
 ): IHostBehavior {
-  // The row style is the horizontal tag's constant and nothing else carries it, so it IS the axis —
-  // deriving keeps the two from ever disagreeing about which behavior this is.
-  const horizontal = rowStyle !== undefined;
   return {
     // `scroll` and `layout` are owned for the collision reason rather than because the behavior
     // consumes them: RN's ScrollView installs `_handleScroll` and `_handleLayout` on the native

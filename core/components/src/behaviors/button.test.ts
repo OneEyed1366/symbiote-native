@@ -177,7 +177,7 @@ describe('button host behavior', () => {
     mount(node);
     await settle();
 
-    const { host, text } = subtreeOf(TEST_ID);
+    const { host } = subtreeOf(TEST_ID);
     // `title` is redirected by `SLOT_PROPS` before it can land here, which is a REDIRECT and stays
     // observable from this host. Its neighbour `color` is a strip and is not: that, the role, the
     // `touchSoundDisabled` rename and the `importantForAccessibility` promotion are all
