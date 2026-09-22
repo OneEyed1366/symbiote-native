@@ -184,6 +184,14 @@ and put the bound between them (1.5x real against 1.10x broken -> assert 1.25x).
 in the comment is also what stops the next person from "tidying" the factor away. And the only way to
 know which of the two you have written is to break it and watch — the bare form looks identical.
 
+**A RATIO MARGIN IS CALIBRATED PER BUILD.** CI runs the ASSERT build, which triples a plain create
+(2.2 us against 0.65) while an additive cost stays put, so a 1.25x margin measured on `build-release`
+fails a real 1.17x there — it passed for days only because the gap sat inside the bar
+(`create-element-ladder`, 2026-09-23). Gate a release-calibrated ratio on `__DEV__ === false`; on the
+assert build print it. And when a change moves an adapter CONTRACT (what the renderer is called with),
+run the whole `test:itest`, not only the fixtures you touched: a counter pinned to the old contract
+(`adapter-create-cost`'s class channel) lives in a file you did not open.
+
 ### 12. Two harness facts that cost a day each
 
 - **Every React arm ran the DEVELOPMENT React** until the defines were made to follow the build
