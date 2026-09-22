@@ -11,8 +11,15 @@ import { dirname, join } from 'node:path';
 
 const SCHEMA = {
   document: ['android', 'ios'],
-  android: ['gradleProjectName', 'modules', 'manifestApplicationAttributes'],
-  ios: ['infoPlistKeys'],
+  android: [
+    'gradleProjectName',
+    'modules',
+    'manifestApplicationAttributes',
+    'manifestPermissions',
+    'manifestServices',
+    'optionalManifestBundles',
+  ],
+  ios: ['infoPlistKeys', 'infoPlistArrayKeys'],
   module: ['importPath', 'className', 'nativeName'],
 };
 
@@ -37,17 +44,23 @@ function collectTypeScript(dir, found = []) {
   return found;
 }
 
-// Every name the package's own JS could pass to requireNativeModule(). Both spellings the repo
-// uses reach it: the literal inline, and the `const EXPO_X_MODULE_NAME = 'ExpoX'` a call site
-// references. Reading every quoted identifier out of those files keeps the check permissive on
-// purpose — it exists to catch a typo, and a rule that cries wolf gets disabled.
+// Every name the package's own JS could pass to requireNativeModule() or its optional twin,
+// requireOptionalNativeModule() (expo-modules-core, used for a legacy module that may not be
+// present — e.g. file-system's ExponentFileSystem). Both spellings the repo uses reach it: the
+// literal inline, and the `const EXPO_X_MODULE_NAME = 'ExpoX'` a call site references. Reading
+// every quoted identifier out of those files keeps the check permissive on purpose — it exists to
+// catch a typo, and a rule that cries wolf gets disabled.
 function declaredNativeNames(packageDir) {
   const srcDir = join(packageDir, 'src');
   if (!existsSync(srcDir)) return undefined;
   const names = new Set();
   for (const file of collectTypeScript(srcDir)) {
     const source = readFileSync(file, 'utf8');
-    if (!source.includes('requireNativeModule')) continue;
+    if (
+      !source.includes('requireNativeModule') &&
+      !source.includes('requireOptionalNativeModule')
+    )
+      continue;
     for (const [, literal] of source.matchAll(/'([A-Za-z][A-Za-z0-9_]*)'/g))
       names.add(literal);
   }
