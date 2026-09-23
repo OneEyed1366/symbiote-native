@@ -1,5 +1,25 @@
 # @symbiote-native/angular
 
+## 3.1.0
+
+### Minor Changes
+
+- [`7c15933`](https://github.com/OneEyed1366/symbiote-native/commit/7c15933f329fbeca9c643f366f7161fd23a9896e) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Tags carry no directive at run time. `SymbioteStyleHost` and `STYLE_HOST_SELECTOR` are removed. `[style]` on a tag is Angular's own styling binding and takes an object or a CSS string, as on a DOM element. An RN style array or a press-state callback goes through `[styleProp]`. A thousand-row create allocates about 10% less.
+
+### Patch Changes
+
+- [`26775bc`](https://github.com/OneEyed1366/symbiote-native/commit/26775bce65788f9074dcb10460f8cf683be5ed70) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - - Every adapter keeps an iOS Modal mounted until native dismiss, then calls `onDismiss`.
+  - Every adapter sends `isInvertedVirtualizedList` for inverted lists.
+  - Svelte and Angular lists forward `removeClippedSubviews` and `nestedScrollEnabled` to their ScrollView. React, Vue and Solid list prop types now declare `nestedScrollEnabled`.
+  - A bare boolean attribute (`<view accessible>`, `nested-scroll-enabled`) now reaches native as `true` in Vue templates and on Svelte tags. Before, it arrived as `""`, which Android rejects.
+
+- [`f305d61`](https://github.com/OneEyed1366/symbiote-native/commit/f305d6127aeabe749d07476877ba55690451a4ba) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - A single-column `FlatList` stamps each cell through one outlet instead of two, and its separator receives every key `separators.updateProps` set, as in RN. A `[style]` object shared by many rows is published without building a fresh object per row.
+
+- [#83](https://github.com/OneEyed1366/symbiote-native/pull/83) [`564870f`](https://github.com/OneEyed1366/symbiote-native/commit/564870ffabb61b3b778fcf18600b1c5f40d62ac2) Thanks [@github-actions](https://github.com/apps/github-actions)! - Walk props bags with `Object.keys` instead of `Object.entries` on the per-node paths. `entries` allocates the outer array and a two-element array per key before the loop starts; `keys` allocates one array of strings, and the value is a property read the adapter is about to make anyway. Measured on `-O` Hermes over a four-key bag: 0.42 us against 0.23, so ~0.19 us per node - about 1.9 ms of a thousand-row create. No behaviour change; `applyUpdate`'s sibling loop already used `Object.keys`.
+
+- Updated dependencies [[`fba54ee`](https://github.com/OneEyed1366/symbiote-native/commit/fba54ee2d39a3b2ea12bb11a846b32658e3f8902), [`d4f46e7`](https://github.com/OneEyed1366/symbiote-native/commit/d4f46e7ca1601aa469b5c8c5ab97f8a8217c968f), [`3de549b`](https://github.com/OneEyed1366/symbiote-native/commit/3de549b2ab9785c845a1f3acd5626d85d2b9b9e4)]:
+  - @symbiote-native/components@3.1.0
+
 ## 3.0.1
 
 ### Patch Changes

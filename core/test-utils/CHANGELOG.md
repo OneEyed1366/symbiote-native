@@ -1,5 +1,12 @@
 # @symbiote-native/test-utils
 
+## 0.4.1
+
+### Patch Changes
+
+- Updated dependencies [[`b463e81`](https://github.com/OneEyed1366/symbiote-native/commit/b463e81665268cfdb0489b384559079bc0f51109), [`15ef569`](https://github.com/OneEyed1366/symbiote-native/commit/15ef5691fab269b55a8eb233a07025c6ef15b384), [`15ef569`](https://github.com/OneEyed1366/symbiote-native/commit/15ef5691fab269b55a8eb233a07025c6ef15b384), [`2168a5e`](https://github.com/OneEyed1366/symbiote-native/commit/2168a5ed82e161fad5627c678d4c527a7e328fcc), [`1b5c9d1`](https://github.com/OneEyed1366/symbiote-native/commit/1b5c9d1cc1abcd90b4e7aed0c1c6c130aeac5d45)]:
+  - @symbiote-native/engine@1.2.0
+
 ## 0.4.0
 
 ### Minor Changes
