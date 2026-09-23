@@ -105,6 +105,8 @@ jobs:
   # version PR counts from the versions npm already holds. A hand merge once
   # dropped the previous bumps, and the release collided with published
   # versions and silently skipped 9 packages. A conflict fails this job.
+  # Pushes over a deploy key: the develop ruleset lets DeployKey bypass it, and
+  # a personal repo cannot list GitHub Actions as a bypass actor.
   sync-develop:
     needs: release
     if: github.event_name == 'push'
@@ -114,6 +116,7 @@ jobs:
         with:
           ref: develop
           fetch-depth: 0
+          ssh-key: ${{ secrets.SYNC_DEPLOY_KEY }}
 
       - name: Merge master into develop
         env:
