@@ -39,7 +39,9 @@ import type { JSX } from '../jsx-runtime';
 import {
   createDescriptorShapeGuard,
   createInitialModalState,
+  isModalVisible,
   modalReducer,
+  modalVisibilityAction,
   renderModal,
   resolveAccessibilityProps,
   shouldRenderModal,
@@ -53,6 +55,7 @@ import {
 } from '@symbiote-native/components';
 import {
   dlog,
+  Platform,
   type IClassNameValue,
   type IStyleProp,
   type ISymbioteEvent,
@@ -121,6 +124,7 @@ const HANDLED_PROPS = [
   'style',
   'class',
   'children',
+  'onDismiss',
 ] as const;
 
 const shape = createDescriptorShapeGuard('Modal');
@@ -128,7 +132,7 @@ const shape = createDescriptorShapeGuard('Modal');
 export function Modal(props: IModalProps): JSX.Element {
   const [local, rest] = splitProps(props, HANDLED_PROPS);
 
-  const isVisible = (): boolean => local.visible === true;
+  const isVisible = (): boolean => isModalVisible(local.visible);
 
   // The keep-alive seed is a mount-time value by contract (createInitialModalState: a modal that
   // starts visible is rendered, one that starts hidden contributes no node), so this one read
@@ -137,21 +141,20 @@ export function Modal(props: IModalProps): JSX.Element {
     createInitialModalState(isVisible()),
   );
 
-  // createEffect, not createRenderEffect: it runs AFTER the render that used the OLD state, which
-  // is the position React's useEffect, Vue's flush:'post' watch and Svelte's $effect all occupy —
-  // so a visible→hidden transition renders once more with isRendered still true (the keep-alive
-  // frame) before this drops it. A render effect would unmount immediately and kill the keep-alive.
-  // The reducer is identity-stable, so the mount run and any no-op transition write the same object
-  // back and nothing downstream recomputes.
-  //
-  // As on Svelte, and for the same reason: under this adapter's microtask-coalesced requestCommit()
-  // the whole cascade settles inside one flush, so the keep-alive frame is real but never lands as
-  // its own Fabric commit the way React's synchronous per-render commit makes it.
+  // Arms the iOS keep-alive on show; a hide is left to the native dismiss (state/modal.ts). The
+  // reducer is identity-stable, so the mount run writes the same object back.
   createEffect(() => {
-    setState(current =>
-      modalReducer(current, isVisible() ? { type: 'show' } : { type: 'hide' }),
-    );
+    const action = modalVisibilityAction(isVisible());
+    if (action !== undefined)
+      setState(current => modalReducer(current, action));
   });
+
+  // Modal.js: onDismiss is iOS-only — it drops the keep-alive, then tells the app.
+  const handleDismiss = (): void => {
+    if (Platform.OS !== 'ios') return;
+    setState(current => modalReducer(current, { type: 'hide' }));
+    local.onDismiss?.();
+  };
 
   const shouldRender = (): boolean => shouldRenderModal(isVisible(), state());
 
@@ -177,7 +180,10 @@ export function Modal(props: IModalProps): JSX.Element {
       navigationBarTranslucent: local.navigationBarTranslucent,
       allowSwipeDismissal: local.allowSwipeDismissal,
       style: local.style,
-      passthrough: resolveAccessibilityProps(rest),
+      passthrough: {
+        ...resolveAccessibilityProps(rest),
+        onDismiss: handleDismiss,
+      },
     });
 
   // root = modal > [container]; the user children nest UNDER the container View, never as

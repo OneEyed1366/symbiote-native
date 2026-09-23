@@ -9,9 +9,9 @@ import { injectStackNavigation } from '@symbiote-native/navigation/angular';
   template: `
     <safe-area-view [style]="styles.screen">
       <view [style]="styles.brandRow">
-        <image [style]="[styles.brandLogo, styles.brandLogoReact]" resizeMode="contain" [source]="reactNativeLogo"></image>
+        <image [styleProp]="[styles.brandLogo, styles.brandLogoReact]" resizeMode="contain" [source]="reactNativeLogo"></image>
         <image [style]="styles.plusIcon" resizeMode="contain" [source]="plusIcon"></image>
-        <image [style]="[styles.brandLogo, styles.brandLogoAngular]" resizeMode="contain" [source]="angularLogo"></image>
+        <image [styleProp]="[styles.brandLogo, styles.brandLogoAngular]" resizeMode="contain" [source]="angularLogo"></image>
       </view>
 
       <text [style]="styles.title">Welcome to SymbioteNative!</text>

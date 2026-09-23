@@ -247,6 +247,8 @@
   scrollEventThrottle={props.scrollEventThrottle}
   keyboardShouldPersistTaps={props.keyboardShouldPersistTaps}
   keyboardDismissMode={props.keyboardDismissMode}
+  removeClippedSubviews={props.removeClippedSubviews}
+  nestedScrollEnabled={props.nestedScrollEnabled}
   style={props.style}
   contentContainerStyle={props.contentContainerStyle}
   class={props.class}

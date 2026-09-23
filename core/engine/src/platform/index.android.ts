@@ -6,6 +6,7 @@
 
 import {
   createConstantsResolver,
+  gatedIsTesting,
   type IPlatformSelectSpec,
   type IPlatformStatic,
 } from './shared';
@@ -83,15 +84,13 @@ export const Platform: IPlatformStatic<IPlatformConstantsAndroid> = {
     return false;
   },
 
-  // RN gates this behind __DEV__; shared has no __DEV__ flag, so we read the native
-  // flag directly: a release build's native module reports false anyway.
   get isTesting(): boolean {
-    return resolveConstants()?.isTesting ?? false;
+    return gatedIsTesting(resolveConstants());
   },
 
   get isDisableAnimations(): boolean {
     const constants = resolveConstants();
-    return constants?.isDisableAnimations ?? constants?.isTesting ?? false;
+    return constants?.isDisableAnimations ?? gatedIsTesting(constants);
   },
 
   get isMacCatalyst(): boolean {

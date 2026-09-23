@@ -26,6 +26,7 @@ import {
   createElement,
   createSurface,
   readSurfaceTelemetry,
+  routeProp,
   setProp,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
@@ -56,6 +57,27 @@ function commit(tag: string, props: Record<string, unknown>): ICommitted {
 
 const vertical = (props: Record<string, unknown>): ICommitted =>
   commit('scroll-view', props);
+
+// Through `routeProp`, which is the path that diverts an owned `on*` into the listener stash and
+// sends its existence bit — `setProp` would land a function in the bag instead.
+function routed(
+  props: Record<string, unknown>,
+): Readonly<Record<string, unknown>> {
+  const surface = createSurface(ROOT_TAG);
+  const node: ISymbioteNode = createElement(
+    'RCTScrollView',
+    false,
+    'scroll-view',
+  );
+  for (const [name, value] of Object.entries(props))
+    routeProp(node, name, value);
+  surface.appendChild(node);
+  surface.commit();
+  mounted();
+  const payload = committedPayloadOf(node);
+  if (payload === undefined) throw new Error('nothing committed');
+  return payload;
+}
 const horizontal = (props: Record<string, unknown>): ICommitted =>
   commit('horizontal-scroll-view', props);
 
@@ -78,13 +100,54 @@ describe('what a scroll view sends native', () => {
     expect(vertical({ style: { flexGrow: 0 } }).payload.flexGrow).toBe(0);
   });
 
-  // why: RN's own default (`ScrollView.js`). On Android it is what lets an inner scroller consume
-  // the gesture before a scrolling parent sees it; without it nested lists fight.
-  it('defaults nestedScrollEnabled to true and lets false through', () => {
-    expect(vertical({}).payload.nestedScrollEnabled).toBe(true);
+  // why: ScrollView.js:1801-1804 — Android's ReactScrollView emits momentum events only when
+  // `sendMomentumEvents` is on, and RN turns it on exactly when the app wired one of the two.
+  it('asks native for momentum events only when the app listens for one', () => {
+    expect(routed({}).sendMomentumEvents).toBe(false);
+    expect(routed({ onMomentumScrollEnd: () => {} }).sendMomentumEvents).toBe(
+      true,
+    );
+    expect(routed({ onMomentumScrollBegin: () => {} }).sendMomentumEvents).toBe(
+      true,
+    );
+  });
+
+  // why: ScrollView.js:1806-1808 — both default to true, only an explicit false turns them off.
+  it('defaults snapToStart and snapToEnd on', () => {
+    const payload = vertical({}).payload;
+    expect(payload.snapToStart).toBe(true);
+    expect(payload.snapToEnd).toBe(true);
+    expect(vertical({ snapToEnd: false }).payload.snapToEnd).toBe(false);
+  });
+
+  // why: ScrollView.js:1797-1799 — sticky headers need every scroll frame, so the throttle is 1.
+  it('throttles to every frame while headers stick', () => {
+    expect(
+      vertical({ stickyHeaderIndices: [0], scrollEventThrottle: 100 }).payload
+        .scrollEventThrottle,
+    ).toBe(1);
+    expect(
+      vertical({ scrollEventThrottle: 100 }).payload.scrollEventThrottle,
+    ).toBe(100);
+  });
+
+  // why: endFillColor is a colorAttribute in RN's view config; native reads an int.
+  it('commits endFillColor as a colour int', () => {
+    expect(
+      typeof vertical({ endFillColor: '#ff0000' }).payload.endFillColor,
+    ).toBe('number');
+  });
+
+  // why: RN defaults it only under the Android refresh wrap (`ScrollView.js:1862`); a plain
+  // scroller sends what the app authored and nothing else (native default: off).
+  it('leaves nestedScrollEnabled unset on a plain scroller and lets an authored value through', () => {
+    expect(vertical({}).payload.nestedScrollEnabled).toBe(undefined);
     expect(
       vertical({ nestedScrollEnabled: false }).payload.nestedScrollEnabled,
     ).toBe(false);
+    expect(
+      vertical({ nestedScrollEnabled: true }).payload.nestedScrollEnabled,
+    ).toBe(true);
   });
 
   // why: the axis comes from the tag and ONLY from the tag. The horizontal tag must announce itself

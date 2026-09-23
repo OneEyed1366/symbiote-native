@@ -322,7 +322,7 @@ const overlayTunnel = createTunnel();
         <pressable
           testID="angular-pressable"
           (press)="increment()"
-          [style]="pressableStyle"
+          [styleProp]="pressableStyle"
           accessibilityLabel="Angular pressable counter"
         >
           <text class="pressable-label">press me (also +1)</text>
@@ -353,7 +353,7 @@ const overlayTunnel = createTunnel();
           [hitSlop]="{ top: 0, bottom: 40, left: 0, right: 0 }"
           [pressRetentionOffset]="{ top: 0, bottom: 80, left: 0, right: 0 }"
           [onPressMove]="onRetentionMove"
-          [style]="retentionStyle"
+          [styleProp]="retentionStyle"
         >
           <text testID="angular-retention-readout" class="info-text">
             drag me · dx {{ retentionMove.dx }} · dy {{ retentionMove.dy }}
@@ -366,6 +366,7 @@ const overlayTunnel = createTunnel();
           [data]="mvcpItems"
           [keyExtractor]="mvcpKeyExtractor"
           [maintainVisibleContentPosition]="mvcpConfig"
+          [nestedScrollEnabled]="true"
           class="box-list160"
         >
           <ng-template vListItem let-item>
@@ -688,6 +689,7 @@ export class CanaryScreen implements OnInit, OnDestroy {
   readonly scrollAnimatedProps = {
     onScroll: this.onParityScroll,
     scrollEventThrottle: 16,
+    nestedScrollEnabled: true,
   };
 
   get volumePercent(): number {

@@ -16,8 +16,7 @@
 //                         behaviors/scroll-view/shared.ts). Horizontal scroll is a separate native
 //                         ViewManager on Android, so the axis is the tag; a prop contradicting it
 //                         is dropped with a dlog. Typed here for parity and for a ported app.
-//   nestedScrollEnabled   defaults to `true` in the behavior, on both platforms, which every
-//                         wrapper used to write by hand.
+//   nestedScrollEnabled   defaults to `true` only under an Android RefreshControl, as in RN.
 //
 // NO `refreshControl` PROP, deliberately — write a `<refresh-control>` CHILD instead; the
 // behavior claims it and places it per platform. Nothing reads a prop by that name, so typing one

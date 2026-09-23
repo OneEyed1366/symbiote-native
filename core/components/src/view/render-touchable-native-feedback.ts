@@ -24,17 +24,9 @@ export interface IRippleBackground {
 export type INativeFeedbackBackground =
   IThemeAttrBackground | IRippleBackground;
 
-// Native foreground ripple is Android-only (API 23+). RN gates this on Platform.OS === 'android'
-// && Platform.Version >= 23. Version is a string on iOS (where the gate is irrelevant) and a
-// number on Android, so guard the type at runtime before the numeric compare, no cast.
-const ANDROID_FOREGROUND_MIN_VERSION = 23;
-
+// TouchableNativeFeedback.js:202 — the OS alone; RN's minSdk is past the old API-23 gate.
 export function canUseNativeForeground(): boolean {
-  return (
-    Platform.OS === 'android' &&
-    typeof Platform.Version === 'number' &&
-    Platform.Version >= ANDROID_FOREGROUND_MIN_VERSION
-  );
+  return Platform.OS === 'android';
 }
 
 export function selectableBackground(
@@ -57,8 +49,8 @@ export function selectableBackgroundBorderless(
   };
 }
 
-// RN runs the color string through processColor (→ a native int); we have no native bridge here,
-// so we keep the string and let Android resolve it. A null color is the documented "no tint".
+// RN runs the color through processColor here; we keep the string and the engine's Android rule
+// converts it (Java reads it with getInt, a string would fail). A null color is "no tint".
 export function rippleBackground(
   color: string,
   borderless: boolean,
@@ -69,8 +61,7 @@ export function rippleBackground(
 
 // `backgroundProps` WAS HERE AND IS GONE (2026-09-18). It mapped the resolved background plus
 // `useForeground` onto the native slot Android reads, and that is the `#ifdef ANDROID` tail of
-// `foldCloneOntoChild` in `SymbioteFabricProps.cpp` — api-level gate included, since
-// `Platform.Version` on Android IS the api level and `androidApiLevel()` reads the same number.
+// `foldCloneOntoChild` in `SymbioteFabricProps.cpp`.
 //
 // A JS COPY OF A RULE THAT RUNS IN C++, with no runtime caller and no test, reachable only through
 // the package barrel. Found by asking what each `Platform.OS` branch still left in

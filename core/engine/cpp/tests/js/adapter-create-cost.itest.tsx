@@ -1255,6 +1255,7 @@ describe('what a reconciler adds to a create', () => {
     ];
     const walls = new Map<string, number>();
     const writes = new Map<string, number>();
+    const published = new Map<string, number>();
     for (const [name, component] of arms) {
       warmAngular(component);
       unmountAngular(ROOT_TAG);
@@ -1268,6 +1269,7 @@ describe('what a reconciler adds to a create', () => {
       const profile = readAngularProfile();
       writes.set(name, profile.rendererWrites);
       const telemetry = readSurfaceTelemetry(ROOT_TAG);
+      published.set(name, telemetry?.setProps ?? 0);
       print(
         `DEBUG ${name.padEnd(9)} wall=${(walls.get(name) ?? 0).toFixed(1)} ms ` +
           `nodes=${committedTags().length} setProps=${telemetry?.setProps ?? 0} ` +
@@ -1281,21 +1283,16 @@ describe('what a reconciler adds to a create', () => {
         `(${(((bound - shadowed) * 1000) / 7002).toFixed(2)} us/binding)`,
     );
 
-    // THE COUNTER IS THE VERDICT HERE, NOT THE CLOCK, and the reason is that the fix made the two
-    // arms identical: with `class` declared as an input on `SymbioteElement`, `[class]` is shadowed
-    // into it and reaches the renderer as ONE call, exactly as `[classTest]` does. So the ms row
-    // above is now expected to be noise — and it reads 19.8 one run and -63.8 the next, which is
-    // what noise looks like in a fixture that mounts twice with a teardown between.
-    //
-    // What is exact: `rendererWrites` was 9 000 on the `class` arm and 8 000 on the input arm before
-    // the input was declared — 1 000 extra calls for the one row class that carries two tokens,
-    // every one of them `ɵɵclassMap` decomposing a string the renderer would rather have whole.
-    // Both read 8 000 now. A gap reopening here means the shadow stopped firing, which no test that
-    // reads committed props can see.
+    // THE COUNTERS ARE THE VERDICT HERE, NOT THE CLOCK. Nothing claims `[class]` on a tag, so
+    // `ɵɵclassMap` decomposes it as on a DOM element: one `addClass` per TOKEN, and the row class
+    // carries two, so the class arm makes ROWS more renderer calls than the input arm. The renderer
+    // coalesces a node's tokens into one publish, so what reaches the ENGINE must be identical; a
+    // gap there means the class run stopped coalescing, which no test reading committed props sees.
     const classWrites = writes.get('class') ?? 0;
     const inputWrites = writes.get('classprop') ?? 0;
-    expect(classWrites).toBe(inputWrites);
-    expect(classWrites).toBe(ROWS * 7 + ROWS);
+    expect(inputWrites).toBe(ROWS * 7 + ROWS);
+    expect(classWrites).toBe(inputWrites + ROWS);
+    expect(published.get('class')).toBe(published.get('classprop'));
 
     // THE ORACLE. Both arms bind the same strings to the same 7 002 elements; only the NAME differs.
     expect(committedTags().length).toBe(ROWS * 7 + 3);

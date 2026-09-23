@@ -36,9 +36,10 @@ interface INativeStatusBarManager {
 // __turboModuleProxy is installed. Non-enforcing: a declarative StatusBar must NOT crash the
 // whole render if the module can't resolve.
 //
-// Simplification vs RN: RN maintains a prop-merge stack so nested StatusBars compose
-// (deepest/last wins); we direct-apply a single component's props, which is correct for one
-// StatusBar and a fine first cut.
+// TODO(rn-parity): each StatusBar applies its props directly. RN keeps a stack instead:
+// `_propsStack` over `_defaultProps`, unmount restores the previous entry, one batched native
+// update, public push/pop/replaceStackEntry, `showHideTransition`, and static setters that warn
+// on the wrong platform. Port it for both platforms and all 5 adapters.
 export function applyStatusBarProps(props: IStatusBarProps): void {
   const {
     barStyle,

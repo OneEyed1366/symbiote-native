@@ -1,0 +1,92 @@
+---
+title: Use with an AI agent
+description: Feed SymbioteNative's docs to Claude Code, Cursor, Codex or Copilot — llms.txt corpora, per-page Markdown, and a paste-ready rules block.
+---
+
+Every coding agent was trained before SymbioteNative existed. Asked for a native
+screen it writes React Native: a `View` from `react-native`, `StyleSheet.create`,
+a `react-native-*` component library. All three are wrong here, and nothing in its
+training says so. Give it a corpus, the Markdown twin of the page it needs, and a
+rules file.
+
+## Hand it the docs
+
+| URL                                                                            | What it is                                                                | Size    |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------- | ------- |
+| [`/llms.txt`](https://docs.symbiote-native.dev/llms.txt)                       | The index — every set below, described so an agent can pick               | ~4 KB   |
+| [`/llms-full.txt`](https://docs.symbiote-native.dev/llms-full.txt)             | The entire documentation as one Markdown file                             | ~900 KB |
+| [`/llms-small.txt`](https://docs.symbiote-native.dev/llms-small.txt)           | The same, with non-essential content stripped                             | ~800 KB |
+| [`/_llms-txt/react.txt`](https://docs.symbiote-native.dev/_llms-txt/react.txt) | One framework only — swap `react` for `vue`, `angular`, `svelte`, `solid` | ~260 KB |
+
+Prefer the single-framework set. Five adapters' worth of near-identical examples
+in one context window is how an agent writes Vue's `@press` into a React file.
+
+```sh
+# Claude Code, Codex, Gemini CLI — anything that can read a URL
+> Read https://docs.symbiote-native.dev/_llms-txt/vue.txt before you touch this project.
+```
+
+## Any page as Markdown
+
+Append `.md` to any docs URL for that page's source, no HTML chrome:
+
+```
+https://docs.symbiote-native.dev/docs/learn/vue/  ->  .../docs/learn/vue.md
+```
+
+The same thing sits under every page title: a Copy for agent button, a Markdown
+link, and a one-click hand-off to ChatGPT, Claude, Cursor or Copilot.
+
+## Pin the rules
+
+A corpus is read once; a rules file stays in front of the agent. Paste this into
+`AGENTS.md`, `CLAUDE.md`, or `.cursor/rules/symbiote.md` at your project root:
+
+```md
+# SymbioteNative
+
+This app renders real native iOS/Android views through SymbioteNative, not
+through React Native's own renderer and not through a WebView. Docs:
+https://docs.symbiote-native.dev/llms.txt
+
+- Import from `@symbiote-native/<framework>` (`react` | `vue` | `angular` |
+  `svelte` | `solid`). NEVER import from `react-native` in app code.
+- `react-native` (>=0.86) and `react` still stay top-level dependencies of the
+  app — they are the runtime singleton and the Metro version anchor. Do not
+  remove them, do not import from them.
+- Primitives are lowercase intrinsic tags, not imported components: `view`,
+  `text`, `pressable`, `image`, `image-background`, `scroll-view`, `text-input`,
+  `switch`, `activity-indicator`, `safe-area-view`, `modal`, `refresh-control`,
+  `input-accessory-view`, `button`, `touchable-opacity`,
+  `touchable-native-feedback`, `touchable-without-feedback`,
+  `touchable-highlight`, `sticky-header`. React/Vue/Svelte/Solid need no import;
+  Angular needs `imports: [SYMBIOTE_ELEMENTS]` on the component.
+- Events follow the framework's own idiom: `onPress` (React, Svelte, Solid),
+  `@press` (Vue), `(press)` (Angular).
+- `pressable` has no render-prop/slot child. Track pressed state yourself with
+  `onPressIn`/`onPressOut` (Angular: `(pressIn)`/`(pressOut)`).
+- `FlatList`, `SectionList`, `VirtualizedList`, `VirtualizedSectionList` and
+  `KeyboardAvoidingView` ARE imported from the adapter package — their render
+  item returns a framework element, which a tag cannot express.
+- Style with a CSS class (`className` on React, `class`/`[class]` elsewhere,
+  or an SFC `<style>` block). `StyleSheet.create` from the adapter works too.
+- A React Native library shipping a JS component (`react-native-*`,
+  `@react-native-community/*`) runs ONLY under the React adapter — its body
+  calls React hooks. On Vue/Angular/Svelte/Solid use a `@symbiote-native/*`
+  wrapper package instead; if none exists, the component is off-limits.
+- Scaffold: `npx @symbiote-native/cli new my-app --framework <framework>`.
+```
+
+Trim it to your framework. A short rules file gets followed; a long one gets
+skimmed.
+
+## When it still writes React Native
+
+Point it at the page, not at the whole corpus:
+
+```
+> That's React Native, not SymbioteNative. Read
+> https://docs.symbiote-native.dev/docs/api/components.md and rewrite it.
+```
+
+A single page as `.md` is a few thousand tokens and beats re-ingesting 900 KB.

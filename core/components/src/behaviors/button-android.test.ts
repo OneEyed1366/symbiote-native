@@ -156,18 +156,19 @@ describe('button host behavior on Android', () => {
 
     const { host, label } = subtreeOf(TEST_ID);
     expect(countNodes(host)).toBe(3);
-    // The label still carries the app's title — WHERE it lands is this case's subject, and that is
-    // the hop `subtreeOf` proves. The UPPERCASING left on 2026-09-18: it is `foldButtonLabel` in
-    // `SymbioteFabricProps.cpp`, behind `#ifdef ANDROID`, and this suite runs against neither an
-    // Android build nor the C++ payload builder — it mocks `Platform.OS`, which the rule no longer
-    // reads. Asserting 'SAVE' here would now be asserting a mock of nothing.
-    //
-    // NOT REPLACED, and that is the honest state: the identity branch is pinned in
-    // `core/engine/cpp/tests/js/button-derived-payload.itest.ts`, the Android branch is pinned
-    // NOWHERE, exactly like `android_ripple` and `decelerationRate`'s constants. A compile-time
-    // branch needs a build that compiles it.
-    expect(label?.payload.text).toBe('Save');
+    // The label carries the app's title, uppercased: Android's `title.toUpperCase()` is applied in
+    // JS at the slot redirect (`slotValueFor`), which is what this mocked `Platform.OS` steers.
+    expect(label?.payload.text).toBe('SAVE');
     expect(node.childHost).toBeDefined();
+  });
+
+  // why: Button.js:352-353 — Android renders `title.toUpperCase()`, JavaScript's full-Unicode
+  // uppercase, so a Cyrillic or German title uppercases too (ß -> SS).
+  it('uppercases the title with full Unicode, as JS toUpperCase does', async () => {
+    mountButton({ title: 'Сохранить straße' });
+    await settle();
+
+    expect(subtreeOf(TEST_ID).label?.payload.text).toBe('СОХРАНИТЬ STRASSE');
   });
 
   // THE MATERIAL LOOK LEFT THIS FILE ON 2026-09-18 AND HAS A BETTER HOME, which is the first time in

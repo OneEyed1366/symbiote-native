@@ -1,5 +1,11 @@
 # @symbiote-native/cli
 
+## 0.1.2
+
+### Patch Changes
+
+- [`7c15933`](https://github.com/OneEyed1366/symbiote-native/commit/7c15933f329fbeca9c643f366f7161fd23a9896e) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - The Angular templates pass style arrays through `[styleProp]`.
+
 ## 0.1.1
 
 ### Patch Changes

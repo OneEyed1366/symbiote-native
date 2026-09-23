@@ -98,6 +98,8 @@ export interface IVirtualizedListProps<ItemT>
   scrollEventThrottle?: number;
   keyboardShouldPersistTaps?: boolean | 'always' | 'never' | 'handled';
   keyboardDismissMode?: 'none' | 'on-drag' | 'interactive';
+  removeClippedSubviews?: boolean;
+  nestedScrollEnabled?: boolean;
   style?: IStyleProp<IViewStyle>;
   contentContainerStyle?: IStyleProp<IViewStyle>;
   class?: ISvelteClassValue;

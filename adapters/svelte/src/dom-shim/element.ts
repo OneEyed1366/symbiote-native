@@ -33,6 +33,7 @@ import {
 import { descriptorFor } from '@symbiote-native/components';
 import { normalizeSvelteClass } from '../class-value';
 import {
+  BOOLEAN_PROP_NAMES,
   CANONICAL_BY_LOWER,
   CANONICAL_PROP_NAMES,
 } from './canonical-prop-names';
@@ -171,7 +172,12 @@ export class ShimElement extends ShimElementBase {
   // one we do not know) is handed on untouched. See `canonical-prop-names.ts`.
   setAttribute(name: string, value: unknown): void {
     (this.attributes ??= new Map()).set(name, value);
-    this.writeBagKey(CANONICAL_BY_LOWER.get(name) ?? name, value);
+    const canonical = CANONICAL_BY_LOWER.get(name) ?? name;
+    // `<view accessible>` arrives as "" — the HTML shorthand for true on a boolean prop.
+    this.writeBagKey(
+      canonical,
+      value === '' && BOOLEAN_PROP_NAMES.has(canonical) ? true : value,
+    );
   }
 
   getAttribute(name: string): unknown {

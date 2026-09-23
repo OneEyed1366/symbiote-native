@@ -16,8 +16,12 @@ const {
   parseCache,
   compileScript,
   registerTS,
+  babelParse,
 } = require('@vue/compiler-sfc');
-const { createCompoundExpression } = require('@vue/compiler-core');
+const {
+  createCompoundExpression,
+  createSimpleExpression,
+} = require('@vue/compiler-core');
 
 // A bare-specifier type import (`import type { X } from '@symbiote-native/navigation/vue'`) needs
 // real node_modules resolution to turn the specifier into a file path - compileScript's own `fs`
@@ -145,6 +149,51 @@ function trimReflowedTextNodeTransform(node) {
 
 // Shared with ./babel-jsx.cjs: Vue's two compilers must give one answer to element-vs-component.
 const INTRINSIC_TAGS = require('./intrinsic-tags.cjs');
+
+const SYMBIOTE_SOURCE_PREFIX = '@symbiote-native/';
+
+// Local names the file imports from any `@symbiote-native/*` package (`FlatList`, `Animated`).
+function symbioteImportsOf(descriptor) {
+  const locals = new Set();
+  for (const block of [descriptor.script, descriptor.scriptSetup]) {
+    if (block == null) continue;
+    const plugins = block.lang === 'ts' || block.lang === 'tsx' ? ['typescript'] : [];
+    const program = babelParse(block.content, { sourceType: 'module', plugins }).program;
+    for (const statement of program.body) {
+      if (
+        statement.type !== 'ImportDeclaration' ||
+        !statement.source.value.startsWith(SYMBIOTE_SOURCE_PREFIX)
+      )
+        continue;
+      for (const specifier of statement.specifiers) locals.add(specifier.local.name);
+    }
+  }
+  return locals;
+}
+
+// Vue casts a bare attribute to `true` only for a prop declared Boolean. Our tags and components
+// declare none, so `nested-scroll-enabled` reached Android as "" and the ViewManager threw
+// `String cannot be cast to Boolean`. The app's own components keep Vue's semantics.
+function createBareBooleanNodeTransform(symbioteLocals) {
+  const isOurs = tag =>
+    INTRINSIC_TAGS.has(tag) || symbioteLocals.has(tag.split('.')[0]);
+  return function bareBooleanNodeTransform(node) {
+    if (node.type !== 1 /* NodeTypes.ELEMENT */ || !isOurs(node.tag)) return;
+    node.props = node.props.map(prop =>
+      prop.type === 6 /* NodeTypes.ATTRIBUTE */ && prop.value === undefined
+        ? {
+            type: 7 /* NodeTypes.DIRECTIVE */,
+            name: 'bind',
+            rawName: `:${prop.name}`,
+            arg: createSimpleExpression(prop.name, true, prop.loc),
+            exp: createSimpleExpression('true', false, prop.loc, 3 /* CAN_STRINGIFY */),
+            modifiers: [],
+            loc: prop.loc,
+          }
+        : prop,
+    );
+  };
+}
 
 
 // A short, stable id per file, used as the SFC scope id regardless of whether the file has
@@ -307,7 +356,10 @@ async function compileSfc(src, filename) {
 
   // Scoped-class rewriting is skipped entirely (not even passed to the compiler) when nothing in
   // this file is scoped, so a .vue with only unscoped/no styles adds no runtime cost.
-  const nodeTransforms = [trimReflowedTextNodeTransform];
+  const nodeTransforms = [
+    trimReflowedTextNodeTransform,
+    createBareBooleanNodeTransform(symbioteImportsOf(descriptor)),
+  ];
   if (scopedClassNames.size > 0)
     nodeTransforms.push(createScopeClassNodeTransform(scopedClassNames));
   // UNCONDITIONAL, and covering EVERY intrinsic rather than the ones this file happens to import.

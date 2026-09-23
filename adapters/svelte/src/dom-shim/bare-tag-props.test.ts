@@ -127,6 +127,28 @@ describe('a bare intrinsic tag', () => {
     expect(props.nativeID).toBe('ident');
     expect(props.id).toBeUndefined();
   });
+
+  // why: `<view accessible>` on a tag with no hyphen rides the static template as `accessible=""`.
+  // A boolean prop has no "" value, so it is the HTML shorthand for true — and Android's
+  // ViewManager threw `String cannot be cast to Boolean` on the "" (device-seen, AccessibilityDemo).
+  it('reads a bare boolean attribute as true', async () => {
+    const element = new ShimElement('view');
+    element.setAttribute('testID', 'bare');
+    element.setAttribute('accessible', '');
+    await mount(element);
+
+    expect(committedPropsOf('bare').accessible).toBe(true);
+  });
+
+  // why: a string prop's "" is a real value, not the shorthand.
+  it('keeps an empty string on a string prop', async () => {
+    const element = new ShimElement('view');
+    element.setAttribute('testID', 'bare');
+    element.setAttribute('accessibilityLabel', '');
+    await mount(element);
+
+    expect(committedPropsOf('bare').accessibilityLabel).toBe('');
+  });
 });
 
 describe('a bare tag and the prop bag', () => {

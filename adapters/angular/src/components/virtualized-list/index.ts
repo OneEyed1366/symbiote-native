@@ -34,6 +34,7 @@ import {
   EventEmitter,
   Input,
   Output,
+  TemplateRef,
   ViewChild,
   computed,
   inject,
@@ -183,6 +184,8 @@ export interface IVirtualizedListProps<ItemT>
   scrollEventThrottle?: number;
   keyboardShouldPersistTaps?: boolean | 'always' | 'never' | 'handled';
   keyboardDismissMode?: 'none' | 'on-drag' | 'interactive';
+  removeClippedSubviews?: boolean;
+  nestedScrollEnabled?: boolean;
   style?: IStyleProp<IViewStyle>;
   contentContainerStyle?: IStyleProp<IViewStyle>;
 }
@@ -267,7 +270,7 @@ interface IWindowCell<ItemT> {
               [style]="cellStyle"
             >
               <ng-container
-                [vListOutlet]="itemDir?.templateRef"
+                [vListOutlet]="cellTemplate"
                 [vListOutletContext]="forcedStickyCell.context"
               ></ng-container>
             </sticky-header>
@@ -282,12 +285,12 @@ interface IWindowCell<ItemT> {
                 [style]="cellStyle"
               >
                 <ng-container
-                  [vListOutlet]="itemDir?.templateRef"
+                  [vListOutlet]="cellTemplate"
                   [vListOutletContext]="cell.context"
                 ></ng-container>
                 @if (cell.separatorContext !== undefined) {
                   <ng-container
-                    [vListOutlet]="separatorDir?.templateRef"
+                    [vListOutlet]="separatorTemplate"
                     [vListOutletContext]="cell.separatorContext"
                   ></ng-container>
                 }
@@ -298,12 +301,12 @@ interface IWindowCell<ItemT> {
                 [style]="cellStyle"
               >
                 <ng-container
-                  [vListOutlet]="itemDir?.templateRef"
+                  [vListOutlet]="cellTemplate"
                   [vListOutletContext]="cell.context"
                 ></ng-container>
                 @if (cell.separatorContext !== undefined) {
                   <ng-container
-                    [vListOutlet]="separatorDir?.templateRef"
+                    [vListOutlet]="separatorTemplate"
                     [vListOutletContext]="cell.separatorContext"
                   ></ng-container>
                 }
@@ -351,7 +354,7 @@ interface IWindowCell<ItemT> {
               [style]="cellStyle"
             >
               <ng-container
-                [vListOutlet]="itemDir?.templateRef"
+                [vListOutlet]="cellTemplate"
                 [vListOutletContext]="forcedStickyCell.context"
               ></ng-container>
             </sticky-header>
@@ -373,12 +376,12 @@ interface IWindowCell<ItemT> {
                 [style]="cellStyle"
               >
                 <ng-container
-                  [vListOutlet]="itemDir?.templateRef"
+                  [vListOutlet]="cellTemplate"
                   [vListOutletContext]="cell.context"
                 ></ng-container>
                 @if (cell.separatorContext !== undefined) {
                   <ng-container
-                    [vListOutlet]="separatorDir?.templateRef"
+                    [vListOutlet]="separatorTemplate"
                     [vListOutletContext]="cell.separatorContext"
                   ></ng-container>
                 }
@@ -389,12 +392,12 @@ interface IWindowCell<ItemT> {
                 [style]="cellStyle"
               >
                 <ng-container
-                  [vListOutlet]="itemDir?.templateRef"
+                  [vListOutlet]="cellTemplate"
                   [vListOutletContext]="cell.context"
                 ></ng-container>
                 @if (cell.separatorContext !== undefined) {
                   <ng-container
-                    [vListOutlet]="separatorDir?.templateRef"
+                    [vListOutlet]="separatorTemplate"
                     [vListOutletContext]="cell.separatorContext"
                   ></ng-container>
                 }
@@ -500,6 +503,8 @@ export class VirtualizedList<ItemT = unknown>
   @Input() scrollEventThrottle?: number;
   @Input() keyboardShouldPersistTaps?: boolean | 'always' | 'never' | 'handled';
   @Input() keyboardDismissMode?: 'none' | 'on-drag' | 'interactive';
+  @Input() removeClippedSubviews?: boolean;
+  @Input() nestedScrollEnabled?: boolean;
   @Input() style?: IStyleProp<IViewStyle>;
   @Input() contentContainerStyle?: IStyleProp<IViewStyle>;
   @Input() testID?: string;
@@ -549,6 +554,20 @@ export class VirtualizedList<ItemT = unknown>
   @ContentChild(VListEmptyDirective) emptyDir?: VListEmptyDirective;
   @ContentChild(VListSeparatorDirective)
   separatorDir?: VListSeparatorDirective<ItemT>;
+
+  // A wrapping list (FlatList) hands its app's cell/separator templates straight in, so a cell is
+  // one outlet deep instead of a wrapper outlet around the app's own; each wins over projection.
+  @Input() itemTemplate?: TemplateRef<IVListItemContext<ItemT>>;
+  @Input() itemSeparatorTemplate?: TemplateRef<IVListSeparatorContext<ItemT>>;
+
+  get cellTemplate(): TemplateRef<IVListItemContext<ItemT>> | undefined {
+    return this.itemTemplate ?? this.itemDir?.templateRef;
+  }
+
+  get separatorTemplate():
+    TemplateRef<IVListSeparatorContext<ItemT>> | undefined {
+    return this.itemSeparatorTemplate ?? this.separatorDir?.templateRef;
+  }
 
   // The inner scroll TAG's own engine node — a template ref on a bare intrinsic hands back the
   // host node directly (`isSymbioteNode(elementRef.nativeElement)`, matching `anchorHostStyle`'s
@@ -739,6 +758,11 @@ export class VirtualizedList<ItemT = unknown>
       scrollEventThrottle: this.scrollEventThrottle,
       keyboardShouldPersistTaps: this.keyboardShouldPersistTaps,
       keyboardDismissMode: this.keyboardDismissMode,
+      // RN's VirtualizedList spreads its props onto the ScrollView, this one included.
+      removeClippedSubviews: this.removeClippedSubviews,
+      nestedScrollEnabled: this.nestedScrollEnabled,
+      // VirtualizedList.js:1111 — Android moves the scrollbar back after the `scale: -1` flip.
+      isInvertedVirtualizedList: this.isInverted ? true : undefined,
       contentOffset: this.commandedOffset,
       // `stickyHeaderIndices` is deliberately NOT forwarded — it numbers the scroll view's PAINT
       // children, and a windowed list paints a header, a spacer and a slice, so the positions move
@@ -1041,7 +1065,7 @@ export class VirtualizedList<ItemT = unknown>
       this.headerDir !== undefined,
       this.footerDir !== undefined,
       this.emptyDir !== undefined,
-      this.separatorDir !== undefined,
+      this.separatorTemplate !== undefined,
     ];
     const previous = this.lastRecompute;
     this.lastRecompute = recomputeInputs;
@@ -1076,7 +1100,7 @@ export class VirtualizedList<ItemT = unknown>
     const m = this.listState.metrics;
     this.itemCount = m.count;
     const hasHeader = this.headerDir !== undefined;
-    const hasSeparators = this.separatorDir !== undefined;
+    const hasSeparators = this.separatorTemplate !== undefined;
     const stickySet =
       this.stickyHeaderIndices !== undefined
         ? new Set(this.stickyHeaderIndices)
@@ -1087,8 +1111,9 @@ export class VirtualizedList<ItemT = unknown>
       : this.contentContainerStyle;
     this.resolvedStyle = flattenStyle([
       anchorHostStyle(this.elementRef),
+      // VirtualizedList.js: `[inversionStyle, style]` — the app's style can override the flip.
       this.isInverted
-        ? [this.style, this.isHorizontal ? INVERTED_X_STYLE : INVERTED_Y_STYLE]
+        ? [this.isHorizontal ? INVERTED_X_STYLE : INVERTED_Y_STYLE, this.style]
         : this.style,
     ]);
     this.cellStyle = this.isInverted

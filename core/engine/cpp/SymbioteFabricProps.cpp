@@ -68,6 +68,7 @@ constexpr const char *kTextComponent = "RCTText";
 constexpr const char *kAndroidSwitchComponent = "AndroidSwitch";
 constexpr const char *kSinglelineTextInput = "RCTSinglelineTextInputView";
 constexpr const char *kMultilineTextInput = "RCTMultilineTextInputView";
+constexpr const char *kAndroidTextInput = "AndroidTextInput";
 
 // Colour props must reach Fabric as platform ints. `fromRawValueShared.h` parses a CSS STRING only
 // when `enableNativeCSSParsing()` is on, and it defaults to FALSE — an unparsed string falls
@@ -108,6 +109,8 @@ const std::unordered_set<std::string> kColorProps = {
     "trackColorForTrue",
     "trackColorForFalse",
     "trackTintColor",
+    // ScrollView's Android fill below the content (`ScrollViewNativeComponent.js`: colorAttribute).
+    "endFillColor",
 };
 
 // ── COLOUR ───────────────────────────────────────────────────────────────────────────────────────
@@ -180,16 +183,36 @@ std::optional<uint32_t> parseCssColor(const std::string &text) {
  * style uses, this runs per colour key per node per commit, and it is twenty lines.
  */
 dynamic processColorValue(const dynamic &value) {
+  if (value.isObject()) {
+    // `DynamicColorIOS`: `PlatformColorParser.mm` reads each branch as an already-processed int,
+    // so RN's `processColorObject` processes them in JS. A string left here paints nothing.
+    const auto tuple = value.find("dynamic");
+    if (tuple == value.items().end() || !tuple->second.isObject()) return value;
+    dynamic branches = dynamic::object();
+    for (const auto &[branch, color] : tuple->second.items())
+      branches[branch] = processColorValue(color);
+    dynamic out = value;
+    out["dynamic"] = std::move(branches);
+    return out;
+  }
   if (!value.isString()) return value;
   const std::string &text = value.getString();
   const std::optional<uint32_t> parsed = (!text.empty() && text[0] == '#')
       ? parseHexColor(std::string_view(text).substr(1))
       : parseCssColor(text);
   if (!parsed.has_value()) return value;
+#ifdef ANDROID
+  // SIGNED on Android, as RN's `processColor` does (`normalizedColor | 0x0`): the props also reach
+  // Java ViewManagers as a Double, and Kotlin's `toInt()` SATURATES an unsigned 0xff...... to
+  // 0x7fffffff — every opaque background became translucent white while C++-read text colours
+  // stayed right.
+  return dynamic(static_cast<int64_t>(static_cast<int32_t>(*parsed)));
+#else
   // Widened rather than reinterpreted: RN's `processColor` yields an UNSIGNED 32-bit ARGB, and
   // `fromRawValueShared` reads it back as `(int64_t)value` before shifting. A signed narrowing here
   // would make every colour with alpha 0x80 or above negative.
   return dynamic(static_cast<int64_t>(*parsed));
+#endif
 }
 
 dynamic processValue(const std::string &key, const dynamic &value) {
@@ -530,6 +553,7 @@ const std::unordered_map<std::string, std::string> &enterKeyHintToReturnKeyType(
   return *table;
 }
 
+#ifdef ANDROID
 /** RN's W3C autocomplete -> Android `autoComplete` map, TextInput.js:828. */
 const std::unordered_map<std::string, std::string> &autoCompleteWebToAndroid() {
   static const auto *table = new std::unordered_map<std::string, std::string>{
@@ -566,7 +590,7 @@ const std::unordered_map<std::string, std::string> &autoCompleteWebToAndroid() {
   };
   return *table;
 }
-
+#else
 /** RN's W3C autocomplete -> iOS `textContentType` map, TextInput.js:862. */
 const std::unordered_map<std::string, std::string> &autoCompleteWebToTextContentType() {
   static const auto *table = new std::unordered_map<std::string, std::string>{
@@ -609,6 +633,7 @@ const std::unordered_map<std::string, std::string> &autoCompleteWebToTextContent
   };
   return *table;
 }
+#endif
 
 /** The string a key holds, or null when it is absent or is not a string. */
 const std::string *stringAt(const dynamic &props, const char *key) {
@@ -630,6 +655,31 @@ std::optional<bool> boolAt(const dynamic &props, const char *key) {
   const dynamic *found = props.get_ptr(key);
   if (found == nullptr || !found->isBool()) return std::nullopt;
   return found->getBool();
+}
+
+/** Any value but `null` / absent — RN's `!= null`. */
+const dynamic *presentAt(const dynamic &props, const char *key) {
+  const dynamic *found = props.get_ptr(key);
+  if (found == nullptr || found->isNull()) return nullptr;
+  return found;
+}
+
+/**
+ * A colour an app authored, in ANY ColorValue shape RN accepts: a string, a number, or an opaque
+ * PlatformColor / DynamicColorIOS object. Reading only strings dropped every PlatformColor silently.
+ */
+const dynamic *colorAt(const dynamic &props, const char *key) {
+  return presentAt(props, key);
+}
+
+/** `colorAt`, then JS truthiness, for RN's `if (color)` sites: `''`, `0` and `false` are absent. */
+const dynamic *truthyColorAt(const dynamic &props, const char *key) {
+  const dynamic *found = colorAt(props, key);
+  if (found == nullptr) return nullptr;
+  if (found->isBool() && !found->getBool()) return nullptr;
+  if (found->isString() && found->getString().empty()) return nullptr;
+  if (found->isNumber() && found->asDouble() == 0) return nullptr;
+  return found;
 }
 
 /** A safe lookup: the mapped token, or null when the map has no entry. The caller owns the fallback. */
@@ -671,8 +721,11 @@ std::string foldSubmitBehavior(
 dynamic foldTextInputAliases(const dynamic &props, bool isMultiline) {
   dynamic out = props;
 
+  // THE WEB SPELLING WINS (TextInput.js:919-937): `inputMode ? map[inputMode] : keyboardType`, and
+  // the same for `enterKeyHint` and `readOnly`. An unmapped token resolves to nothing, as RN's map
+  // lookup does, rather than falling back to the native prop.
   const std::string *inputMode = stringAt(props, "inputMode");
-  if (inputMode != nullptr && out.get_ptr("keyboardType") == nullptr) {
+  if (inputMode != nullptr && !inputMode->empty()) {
     // `search` is the ONE token RN resolves per platform (TextInput.js:815-825): iOS has a dedicated
     // search keyboard whose return key is a magnifier, every other host falls back to the default.
     if (*inputMode == "search") {
@@ -684,21 +737,41 @@ dynamic foldTextInputAliases(const dynamic &props, bool isMultiline) {
     } else {
       const std::string *mapped = mappedToken(inputModeToKeyboardType(), *inputMode);
       if (mapped != nullptr) out["keyboardType"] = *mapped;
+      else out.erase("keyboardType");
     }
   }
 
   const std::string *enterKeyHint = stringAt(props, "enterKeyHint");
-  if (enterKeyHint != nullptr && out.get_ptr("returnKeyType") == nullptr) {
+  if (enterKeyHint != nullptr && !enterKeyHint->empty()) {
     const std::string *mapped = mappedToken(enterKeyHintToReturnKeyType(), *enterKeyHint);
     if (mapped != nullptr) out["returnKeyType"] = *mapped;
+    else out.erase("returnKeyType");
   }
 
   // The web spelling is the NEGATION of the native one. Getting it backwards makes every read-only
   // field editable, silently.
   const std::optional<bool> readOnly = boolAt(props, "readOnly");
-  if (readOnly.has_value() && out.get_ptr("editable") == nullptr) {
-    out["editable"] = !*readOnly;
+  if (readOnly.has_value()) out["editable"] = !*readOnly;
+
+  // TextInput.js:708-711 — `rows ?? numberOfLines`, and `focusable` resolved and ALWAYS sent:
+  // `tabIndex !== undefined ? !tabIndex : focusable !== false`.
+  const dynamic *rows = presentAt(props, "rows");
+  if (rows != nullptr) out["numberOfLines"] = *rows;
+  const dynamic *tabIndex = props.get_ptr("tabIndex");
+  if (tabIndex != nullptr) {
+    out["focusable"] = tabIndex->isNumber() ? tabIndex->asDouble() == 0 : tabIndex->isNull();
+  } else {
+    out["focusable"] = boolAt(props, "focusable") != std::optional<bool>(false);
   }
+  // TextInput.js:904 — `allowFontScaling = true`.
+  if (props.get_ptr("allowFontScaling") == nullptr) out["allowFontScaling"] = true;
+
+#ifdef ANDROID
+  // TextInput.js:728,734 — Android-only defaults: `autoCapitalize || 'sentences'`, `placeholder ?? ''`.
+  const std::string *capitalize = stringAt(props, "autoCapitalize");
+  if (capitalize == nullptr || capitalize->empty()) out["autoCapitalize"] = "sentences";
+  if (presentAt(props, "placeholder") == nullptr) out["placeholder"] = "";
+#endif
 
   out["submitBehavior"] = foldSubmitBehavior(
       stringAt(props, "submitBehavior"), boolAt(props, "blurOnSubmit"), isMultiline);
@@ -713,24 +786,26 @@ dynamic foldTextInputAliases(const dynamic &props, bool isMultiline) {
     }
   }
 
-  // RN resolves BOTH native props from the one W3C token (TextInput.js:938). Android reads
-  // `autoComplete` and iOS reads `textContentType`; each is inert on the other platform, so emitting
-  // both is safe and is what keeps this fold platform-agnostic. A token with no Android entry falls
-  // back to ITSELF (RN's `?? autoComplete`); one with no iOS entry leaves `textContentType` unset.
+  // TextInput.js:938-954, split per platform: Android sends the mapped token as `autoComplete` (a
+  // token with no entry falls back to ITSELF, `?? autoComplete`) and derives no `textContentType`;
+  // iOS sends NO `autoComplete` and derives `textContentType` when none is authored.
   const std::string *autoComplete = stringAt(props, "autoComplete");
+#ifdef ANDROID
   if (autoComplete != nullptr) {
     const std::string *android = mappedToken(autoCompleteWebToAndroid(), *autoComplete);
     out["autoComplete"] = android != nullptr ? *android : *autoComplete;
-    if (out.get_ptr("textContentType") == nullptr) {
-      const std::string *ios = mappedToken(autoCompleteWebToTextContentType(), *autoComplete);
-      if (ios != nullptr) out["textContentType"] = *ios;
-    }
   }
+#else
+  out.erase("autoComplete");
+  if (autoComplete != nullptr && presentAt(props, "textContentType") == nullptr) {
+    const std::string *ios = mappedToken(autoCompleteWebToTextContentType(), *autoComplete);
+    if (ios != nullptr) out["textContentType"] = *ios;
+  }
+#endif
 
-  // `inputMode: 'none'` is how the web spells "focusable but no keyboard".
-  if (inputMode != nullptr && out.get_ptr("showSoftInputOnFocus") == nullptr) {
-    out["showSoftInputOnFocus"] = *inputMode != "none";
-  }
+  // `inputMode: 'none'` is how the web spells "focusable but no keyboard" — and it wins
+  // (`inputMode == null ? showSoftInputOnFocus : inputMode !== 'none'`).
+  if (inputMode != nullptr) out["showSoftInputOnFocus"] = *inputMode != "none";
 
   // ANDROID ONLY, and that is F-76 rather than tidiness: iOS's `RCTSinglelineTextInputView`
   // ViewConfig does not declare `underlineColorAndroid` at all, so RN's own
@@ -749,6 +824,8 @@ dynamic foldTextInputAliases(const dynamic &props, bool isMultiline) {
   out.erase("enterKeyHint");
   out.erase("readOnly");
   out.erase("blurOnSubmit");
+  out.erase("rows");
+  out.erase("tabIndex");
   return out;
 }
 
@@ -1096,8 +1173,20 @@ dynamic foldRefreshWrapperProps(const dynamic &props, const IFirstChild &child) 
  * not know throws nothing, logs nothing and paints nothing, so the strip is only ever visible in a
  * payload test.
  */
-dynamic foldScrollViewProps(const dynamic &props, bool isHorizontal, bool isWrapped) {
+dynamic foldScrollViewProps(
+    const dynamic &props,
+    bool isHorizontal,
+    bool isWrapped,
+    bool hasMomentumListener) {
   dynamic out = props;
+
+  // `ScrollView.js:1797-1808`. Android's ReactScrollView emits momentum events only with
+  // `sendMomentumEvents` on; sticky headers need every scroll frame; snap edges default on.
+  out["sendMomentumEvents"] = hasMomentumListener;
+  const dynamic *sticky = props.get_ptr("stickyHeaderIndices");
+  if (sticky != nullptr && sticky->isArray() && !sticky->empty()) out["scrollEventThrottle"] = 1;
+  out["snapToStart"] = boolAt(props, "snapToStart") != std::optional<bool>(false);
+  out["snapToEnd"] = boolAt(props, "snapToEnd") != std::optional<bool>(false);
 
   const dynamic *authored = props.get_ptr("style");
   // WRAPPED IS A DIFFERENT COMPOSITION, not an extra one: on Android a RefreshControl becomes this
@@ -1112,7 +1201,8 @@ dynamic foldScrollViewProps(const dynamic &props, bool isHorizontal, bool isWrap
       ? splitScrollViewStyle(isHorizontal, authored).inner
       : composeUnder(scrollViewBaseStyle(isHorizontal), authored);
 
-  out["nestedScrollEnabled"] = boolAt(props, "nestedScrollEnabled").value_or(true);
+  // `ScrollView.js:1862` — defaulted only under the refresh wrap; elsewhere the authored value alone.
+  if (isWrapped) out["nestedScrollEnabled"] = boolAt(props, "nestedScrollEnabled").value_or(true);
 
   const std::optional<bool> authoredAxis = boolAt(props, "horizontal");
   if (authoredAxis.has_value() && *authoredAxis != isHorizontal) {
@@ -1235,6 +1325,20 @@ dynamic foldScrollContentProps(
     out["style"] = std::move(composed);
   }
   if (preserves) out["collapsableChildren"] = false;
+
+  // `ScrollView.js:1740-1745` — the scroller's clipping flag, forced off on Android while any header
+  // sticks (clipping breaks sticky headers there).
+  const dynamic *clipped = ownerProps != nullptr ? presentAt(*ownerProps, "removeClippedSubviews") : nullptr;
+#ifdef ANDROID
+  const dynamic *sticky = ownerProps != nullptr ? ownerProps->get_ptr("stickyHeaderIndices") : nullptr;
+  if (sticky != nullptr && sticky->isArray() && !sticky->empty()) {
+    out["removeClippedSubviews"] = false;
+  } else if (clipped != nullptr) {
+    out["removeClippedSubviews"] = *clipped;
+  }
+#else
+  if (clipped != nullptr) out["removeClippedSubviews"] = *clipped;
+#endif
   return out;
 }
 
@@ -1479,8 +1583,8 @@ dynamic foldActivityIndicatorSpinnerProps(
   out["animating"] = boolAt(props, "animating").value_or(true);
   out["hidesWhenStopped"] = boolAt(props, "hidesWhenStopped").value_or(true);
 
-  const dynamic *color = props.get_ptr("color");
-  if (color == nullptr || !color->isString()) {
+  // Any ColorValue the app wrote stands (RN defaults only an absent one).
+  if (colorAt(props, "color") == nullptr) {
     if (isAndroidProgressBar) out.erase("color");
     else out["color"] = kSpinnerIosDefaultColor;
   }
@@ -1519,38 +1623,6 @@ dynamic foldActivityIndicatorSpinnerProps(
  * tint, the Android view style) read it off `propsOf(node)`, which this cannot reach. That
  * separation is what makes the strip safe here and unsafe one layer up.
  */
-/**
- * Button's TITLE, as it is rendered: uppercase on Android, verbatim everywhere else
- * (`Button.js:352-353`).
- *
- * `#ifdef ANDROID` rather than a view-name branch, and for the reason `decelerationRate`'s constants
- * take one: there is no name to read. A raw text commits as `RCTRawText` on both platforms — unlike
- * `Switch`/`AndroidSwitch`, where the two platforms genuinely are two Fabric components and the wire
- * already says which. So the Android arm is unreachable headless, like `android_ripple`'s, and that
- * is a recorded gap rather than a hidden one.
- *
- * ASCII-only, deliberately, and it is upstream's own behaviour rather than a shortcut: RN calls
- * JavaScript's `String.prototype.toUpperCase`, which is full Unicode, so a Cyrillic or Greek label
- * uppercases there and would not here. Left ASCII because the alternative is dragging ICU into the
- * engine for a label that is uppercased only on Android, and a wrong-case label is a cosmetic
- * difference on one platform rather than a broken control. Recorded so it is a decision.
- */
-dynamic foldButtonLabel(const dynamic &props) {
-#ifdef ANDROID
-  const dynamic *text = props.get_ptr("text");
-  if (text == nullptr || !text->isString()) return props;
-  std::string upper = text->asString();
-  for (char &character : upper)
-    character = static_cast<char>(
-        std::toupper(static_cast<unsigned char>(character)));
-  dynamic out = props;
-  out["text"] = std::move(upper);
-  return out;
-#else
-  return props;
-#endif
-}
-
 /**
  * Button's own `disabled`, which is three questions where a plain touchable asks one:
  * `props.disabled ?? aria-disabled ?? accessibilityState.disabled` (`Button.js:331,337`).
@@ -1631,8 +1703,8 @@ dynamic foldButtonLabelStyle(
 #else
   style["color"] = kIosButtonBlue;
   style["fontSize"] = kIosButtonFontSize;
-  const dynamic *color = owner->get_ptr("color");
-  if (color != nullptr && color->isString()) style["color"] = *color;
+  const dynamic *color = truthyColorAt(*owner, "color");
+  if (color != nullptr) style["color"] = *color;
 #endif
 
   const std::optional<bool> disabled = buttonDisabled(*owner);
@@ -1655,35 +1727,12 @@ dynamic foldButtonLabelStyle(
 }
 
 #ifdef ANDROID
-// `TouchableNativeFeedback.js` via `Platform.Version >= 23` — foreground ripples need API 23.
-constexpr int kAndroidForegroundMinVersion = 23;
-
 // `Button.js:394-437`, one constant per literal so a value cannot drift silently.
 constexpr int kAndroidButtonElevation = 4;
 constexpr int kAndroidDisabledElevation = 0;
 constexpr int kAndroidButtonBorderRadius = 2;
 constexpr const char *kAndroidButtonBlue = "#2196F3";
 constexpr const char *kAndroidDisabledBackground = "#dfdfdf";
-
-/**
- * The running device's API level, and the one line of the Android branch a HOST build cannot have.
- *
- * `android_get_device_api_level` is the NDK's, so it exists when `__ANDROID__` is defined — which the
- * real toolchain sets and the test host's `-DANDROID` does not. That split is the point rather than
- * a workaround: the rule's LOGIC becomes testable in the Android arm of the test host
- * (`tests/CMakeLists.txt`, `SYMBIOTE_PLATFORM_ANDROID`) while the query itself stays the device's.
- *
- * The host answers with the minimum RN supports, so the arm exercises the branch an app on a modern
- * device takes. The other branch is reachable only on a device old enough to need it, which is where
- * it always was.
- */
-int androidApiLevel() {
-#ifdef __ANDROID__
-  return android_get_device_api_level();
-#else
-  return kAndroidForegroundMinVersion;
-#endif
-}
 
 // RN's `TouchableNativeFeedback.SelectableBackground()` with no ripple radius, which is what its
 // body falls back to when the app passes no `background` (`:343-348`), and what Button's own view
@@ -1740,8 +1789,8 @@ dynamic foldButtonProps(
   dynamic style = dynamic::object();
   style["elevation"] = kAndroidButtonElevation;
   style["borderRadius"] = kAndroidButtonBorderRadius;
-  const std::string *color = stringAt(authored, "color");
-  style["backgroundColor"] = color != nullptr ? *color : kAndroidButtonBlue;
+  const dynamic *color = truthyColorAt(authored, "color");
+  style["backgroundColor"] = color != nullptr ? *color : dynamic(kAndroidButtonBlue);
   if (buttonDisabled(authored).value_or(false)) {
     style["elevation"] = kAndroidDisabledElevation;
     style["backgroundColor"] = kAndroidDisabledBackground;
@@ -1808,24 +1857,27 @@ const std::array<const char *, 12> kPressableMachineKeys = {
  * onto its OWN View (`Pressable.js:251`), which is why one node carries it and no inner view is
  * needed.
  *
- * The colour stays a STRING, as the JS this replaces left it: `nativeBackgroundAndroid` is a nested
- * object and the payload's colour processing is keyed on top-level names, so converting here would be
- * a change to the rule rather than a move of it. Android resolves the string; `null` is its
- * documented "no tint".
+ * The colour is converted HERE, as RN's `useAndroidRippleForView.js:58` does with `processColor`:
+ * the dict is nested, so the top-level colour pass never sees it, and `ReactDrawableHelper.getColor`
+ * reads it with `getInt` — a string there is a native type error, not a resolved colour. `null` is
+ * the documented "no tint". A PlatformColor object passes through, as `processColor` leaves it.
  *
- * STILL MISSING, and it always was: RN also dispatches `Commands.hotspotUpdate(x, y)` on
- * pressIn/pressMove and `Commands.setPressed` on pressIn/pressOut, which is what makes the ripple
- * originate at the touch point. Neither the old wrapper nor the behavior ever sent them.
+ * `:57` — no ripple at all unless color, borderless or radius is set.
  */
 #ifdef ANDROID
 void applyAndroidRipple(dynamic &out, const dynamic &config) {
+  const dynamic *color = colorAt(config, "color");
+  const dynamic *borderless = presentAt(config, "borderless");
+  const dynamic *radius = presentAt(config, "radius");
+  if (color == nullptr && borderless == nullptr && radius == nullptr) return;
+
   dynamic background = dynamic::object();
   background["type"] = "RippleAndroid";
-  const std::string *color = stringAt(config, "color");
-  background["color"] = color != nullptr ? dynamic(*color) : dynamic(nullptr);
+  background["color"] = color != nullptr ? processColorValue(*color) : dynamic(nullptr);
   background["borderless"] = boolAt(config, "borderless").value_or(false);
-  const dynamic *radius = config.get_ptr("radius");
-  if (radius != nullptr && radius->isNumber()) background["rippleRadius"] = *radius;
+  if (radius != nullptr) background["rippleRadius"] = *radius;
+  const dynamic *alpha = presentAt(config, "alpha");
+  background["alpha"] = alpha != nullptr ? *alpha : dynamic(nullptr);
 
   out[boolAt(config, "foreground").value_or(false) ? "nativeForegroundAndroid"
                                                   : "nativeBackgroundAndroid"] =
@@ -2042,12 +2094,13 @@ dynamic foldCloneOntoChild(
     dynamic background = authored != nullptr && authored->isObject()
         ? *authored
         : selectableItemBackground();
-    // `canUseNativeForeground()` — RN's own guard, and `Platform.Version` on Android IS the API
-    // level, so the JS check and this one read the same number.
-    out[boolAt(source, "useForeground").value_or(false) &&
-                androidApiLevel() >= kAndroidForegroundMinVersion
-            ? "nativeForegroundAndroid"
-            : "nativeBackgroundAndroid"] = std::move(background);
+    // `TouchableNativeFeedback.Ripple(color)` leaves the colour a string; RN's factory runs it
+    // through `processColor`, and Java reads it with `getInt` (see `applyAndroidRipple`).
+    if (dynamic *rippleColor = background.get_ptr("color")) *rippleColor = processColorValue(*rippleColor);
+    // `:402-405` — `canUseNativeForeground()` is `Platform.OS === 'android'`, true on this branch.
+    out[boolAt(source, "useForeground").value_or(false) ? "nativeForegroundAndroid"
+                                                        : "nativeBackgroundAndroid"] =
+        std::move(background);
   }
 #endif
   return out;
@@ -2195,6 +2248,17 @@ dynamic resolveImageSources(const dynamic &props) {
 dynamic foldImageProps(const dynamic &props, bool ariaHiddenIsTrue) {
   dynamic out = props;
   out["source"] = resolveImageSources(props);
+#ifdef ANDROID
+  // `ReactImageView.setSource` ignores headers inside a source; only the top-level `headers` prop
+  // reaches the request (`Image.android.js` lifts `source_[0].headers`). RN lifts them only when
+  // `source_` is an array; a single object source's own headers were already dropped at write time
+  // (`image-source-write.ts`), the one place its authored shape is still visible.
+  const dynamic &sources = out["source"];
+  if (sources.isArray() && !sources.empty() && sources.at(0).isObject()) {
+    const dynamic *headers = sources.at(0).get_ptr("headers");
+    if (headers != nullptr && headers->isObject()) out["headers"] = *headers;
+  }
+#endif
 
   // `ImageProps.js:195,202` — the size aliases are STYLE, not props, and an explicit style key wins.
   // RN spells it `{width, height}, ...style`, so they go UNDER.
@@ -2259,7 +2323,16 @@ dynamic foldImageProps(const dynamic &props, bool ariaHiddenIsTrue) {
   const dynamic *defaultSource = props.get_ptr("defaultSource");
   if (defaultSource != nullptr && defaultSource->isArray() &&
       defaultSource->size() > 0) {
+#ifdef ANDROID
+    // `Image.android.js` sends `defaultSource_.uri`: `ReactImageManager.setDefaultSource` takes a
+    // `String?`, and a map there is a native type error.
+    const dynamic &first = defaultSource->at(0);
+    const std::string *uri = first.isObject() ? stringAt(first, "uri") : nullptr;
+    if (uri != nullptr) out["defaultSource"] = *uri;
+    else out.erase("defaultSource");
+#else
     out["defaultSource"] = defaultSource->at(0);
+#endif
   }
 
   for (const char *key : kImageConsumedKeys) out.erase(key);
@@ -2291,11 +2364,11 @@ dynamic foldSwitchProps(const dynamic &props, bool isAndroidSwitch) {
   const bool isOn = boolAt(props, "value").value_or(false);
 
   const dynamic *trackColor = props.get_ptr("trackColor");
-  const std::string *trackFalse = nullptr;
-  const std::string *trackTrue = nullptr;
+  const dynamic *trackFalse = nullptr;
+  const dynamic *trackTrue = nullptr;
   if (trackColor != nullptr && trackColor->isObject()) {
-    trackFalse = stringAt(*trackColor, "false");
-    trackTrue = stringAt(*trackColor, "true");
+    trackFalse = colorAt(*trackColor, "false");
+    trackTrue = colorAt(*trackColor, "true");
   }
 
   const std::optional<bool> disabled = boolAt(props, "disabled");
@@ -2338,7 +2411,7 @@ dynamic foldSwitchProps(const dynamic &props, bool isAndroidSwitch) {
 
     if (trackFalse != nullptr) out["trackColorForFalse"] = *trackFalse;
     if (trackTrue != nullptr) out["trackColorForTrue"] = *trackTrue;
-    const std::string *tint = isOn ? trackTrue : trackFalse;
+    const dynamic *tint = isOn ? trackTrue : trackFalse;
     if (tint != nullptr) out["trackTintColor"] = *tint;
     // `:230` destructures the iOS colour names out of what reaches this view. They are keys it does
     // not declare.
@@ -2359,7 +2432,7 @@ dynamic foldSwitchProps(const dynamic &props, bool isAndroidSwitch) {
     // `StyleSheet.compose` exactly: `alignSelf` UNDER the app's style (an app that writes
     // `alignSelf: 'stretch'` still wins), the pill OVER it.
     const dynamic *authoredStyle = props.get_ptr("style");
-    const std::string *iosBackground = stringAt(props, "ios_backgroundColor");
+    const dynamic *iosBackground = colorAt(props, "ios_backgroundColor");
     dynamic composed = dynamic::array();
     dynamic intrinsic = dynamic::object();
     // `:267` — a stock iOS switch keeps its intrinsic width instead of stretching to its
@@ -2383,7 +2456,7 @@ dynamic foldSwitchProps(const dynamic &props, bool isAndroidSwitch) {
     out["accessibilityRole"] = "switch";
   }
 
-  const std::string *thumbColor = stringAt(props, "thumbColor");
+  const dynamic *thumbColor = colorAt(props, "thumbColor");
   if (thumbColor != nullptr) out["thumbTintColor"] = *thumbColor;
 
   // None of the three authored names is a native prop, and leaving one in the payload is how a
@@ -2409,15 +2482,9 @@ dynamic fabricProps(
     dynamic out = dynamic::object();
     const dynamic *text = props.get_ptr("text");
     if (text != nullptr) out["text"] = *text;
-    // THE ONE TAG RULE ON THIS PATH, and a raw text is a stranger place for one than it looks. It
-    // has no props an app can write — the object above is the whole payload — but its CONTENT can
-    // still be the platform's decision rather than the app's, which is exactly what Button's title
-    // is: rendered uppercase on Android and verbatim everywhere else (`Button.js:352-353`). That is
-    // a user-agent choice about a control, so it belongs here and not in the app's string.
-    //
-    // Guarded on the tag rather than applied to every raw text, obviously — and the tag reaches a
-    // raw text at all because `createRawText` now takes one, for this.
-    if (tagName == "button-label") out = foldButtonLabel(out);
+    // Button's Android uppercase is NOT here: RN uses JavaScript's full-Unicode `toUpperCase`, which
+    // this host (no ICU) cannot match, so it runs in JS at the slot redirect
+    // (`behaviors/button.ts`, `slotValueFor`).
     return out;
   }
 
@@ -2485,7 +2552,8 @@ dynamic fabricProps(
     tagResolved = foldScrollViewProps(
         *bag,
         tagName == "horizontal-scroll-view",
-        owner.tagName != nullptr && std::strcmp(owner.tagName, "refresh-control") == 0);
+        owner.tagName != nullptr && std::strcmp(owner.tagName, "refresh-control") == 0,
+        self.hasMomentumListener);
     bag = &tagResolved;
   } else if (tagName == "refresh-control") {
     tagResolved = foldRefreshWrapperProps(*bag, firstChild);
@@ -2559,8 +2627,12 @@ dynamic fabricProps(
   }
 
   dynamic valueFolded;
-  const bool isTextInput =
-      component == kSinglelineTextInput || component == kMultilineTextInput;
+  // Android commits BOTH text-input tags as one `AndroidTextInput`, so there the TAG says which one
+  // it is; the iOS names say it themselves.
+  const bool isTextInput = component == kSinglelineTextInput ||
+      component == kMultilineTextInput || component == kAndroidTextInput;
+  const bool isMultilineTextInput = component == kMultilineTextInput ||
+      (component == kAndroidTextInput && tagName == "text-input-multiline");
   if (isTextInput &&
       (bag->get_ptr("value") != nullptr || bag->get_ptr("defaultValue") != nullptr)) {
     valueFolded = foldTextInputValue(*bag);
@@ -2572,7 +2644,7 @@ dynamic fabricProps(
   // which is what makes this a rule rather than a mapping.
   dynamic aliasResolved;
   if (isTextInput) {
-    aliasResolved = foldTextInputAliases(*bag, component == kMultilineTextInput);
+    aliasResolved = foldTextInputAliases(*bag, isMultilineTextInput);
     // `TextInput.js:583` — `props.accessible !== false`, handed to both the singleline and the
     // multiline view (`:703`, `:772`). The same shape as the Text rule below, and found the same
     // way: diffing one bench row's committed payload against React Native's own.
@@ -2602,10 +2674,22 @@ dynamic fabricProps(
     const bool optedOut =
         scaling != nullptr && scaling->isBool() && scaling->getBool() == false;
     textDefaulted["allowFontScaling"] = !optedOut;
-    // `Text.js:145` — `accessible !== false` on iOS, the same "only a literal false opts out" shape
-    // as the two above. Android resolves it off the press handlers instead, which is a behavior's
-    // job and not this rule's.
+    // `Text.js:145-150` — `accessible !== false` on iOS; on Android an unset value follows the
+    // press handlers (`onPress != null || onLongPress != null`), whose presence is a listener bit.
+#ifdef ANDROID
+    textDefaulted["accessible"] =
+        boolAt(textDefaulted, "accessible").value_or(self.hasPressOrLongPressListener);
+#else
     textDefaulted["accessible"] = boolAt(textDefaulted, "accessible").value_or(true);
+#endif
+    // `Text.js:152-163` — a pressable, enabled text with no role of its own is announced as a link.
+    const bool isPressable =
+        (self.hasPressOrLongPressListener || self.hasStartShouldSetResponder) &&
+        buttonDisabled(props) != std::optional<bool>(true);
+    if (isPressable && presentAt(textDefaulted, "accessibilityRole") == nullptr &&
+        presentAt(props, "role") == nullptr) {
+      textDefaulted["accessibilityRole"] = "link";
+    }
     // `Text.js:547` puts this in the component's own default STYLE, and its comment says why:
     // "native components have historically acted like overflow: hidden ... to let client
     // differentiate with overflow: 'visible'". Written at the TOP LEVEL rather than into the style

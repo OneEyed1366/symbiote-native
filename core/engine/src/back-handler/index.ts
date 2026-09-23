@@ -38,7 +38,21 @@ export type IBackPressEventName =
 // falsy/void result lets earlier-registered handlers run, and ultimately the
 // native default. RN passes a HardwareBackPressEvent; we keep the signature
 // event-less since the slot has no Event class yet and handlers ignore it.
-export type IBackPressHandler = () => boolean | null | undefined | void;
+// RN's HardwareBackPressEvent is a DOM `Event`; handlers read `type` and `timeStamp` off it.
+export type IHardwareBackPressEvent = {
+  readonly type: typeof DEVICE_BACK_EVENT;
+  readonly timeStamp: number;
+};
+
+export type IBackPressHandler = (
+  event: IHardwareBackPressEvent,
+) => boolean | null | undefined | void;
+
+function nativeTimeStamp(nativeEvent: unknown): number | undefined {
+  if (typeof nativeEvent !== 'object' || nativeEvent === null) return undefined;
+  const timeStamp: unknown = Reflect.get(nativeEvent, 'timeStamp');
+  return typeof timeStamp === 'number' ? timeStamp : undefined;
+}
 
 // The native DeviceEventManager: a single method that triggers Android's default
 // back behavior (finishing the activity / exiting the app).
@@ -78,10 +92,14 @@ function getEmitter() {
 
 // Run handlers last-registered-first; the first to return true consumes the press
 // and the rest are skipped. If none consume it, fall through to the native default.
-function dispatchBackPress(): void {
+function dispatchBackPress(nativeEvent?: unknown): void {
+  const event: IHardwareBackPressEvent = {
+    type: DEVICE_BACK_EVENT,
+    timeStamp: nativeTimeStamp(nativeEvent) ?? performance.now(),
+  };
   for (let i = backPressSubscriptions.length - 1; i >= 0; i--) {
     const handler = backPressSubscriptions[i];
-    if (handler !== undefined && isHandled(handler())) {
+    if (handler !== undefined && isHandled(handler(event))) {
       dlog(`BackHandler: back press consumed by handler ${i}`);
       return;
     }
@@ -123,18 +141,14 @@ class BackHandlerImpl {
       },
     };
   }
-
-  // Legacy unsubscribe kept for RN parity. The modern path is the subscription's
-  // remove() returned by addEventListener.
-  removeEventListener(
-    _eventName: IBackPressEventName,
-    handler: IBackPressHandler,
-  ): void {
-    const index = backPressSubscriptions.indexOf(handler);
-    if (index !== -1) {
-      backPressSubscriptions.splice(index, 1);
-    }
-  }
 }
 
 export const BackHandler = new BackHandlerImpl();
+
+// Subscribes to `hardwareBackPress` up front, as RN does when BackHandler.android.js loads: Android
+// exits only when JS answers the event with invokeDefaultBackPressHandler, so an app with no handler
+// of its own would otherwise have a dead back button. Called by the host bootstrap, not at module
+// load — a barrel-reached module's load-time side effect does not run in a release bundle.
+export function installBackHandler(): void {
+  getEmitter();
+}

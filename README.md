@@ -130,7 +130,7 @@ older than we are.
 | **NativeScript**   | its own runtime and bindings         | JS/TS, Angular, Vue, Solid, Svelte, React | leaving RN's ecosystem for its own                      |
 | **Hippy**          | its own C++ DOM and layout engine    | React, Vue                                | leaving RN's ecosystem for Tencent's                    |
 | **Lynx**           | its own engine (PrimJS, dual-thread) | React, Vue                                | an 18-month-old ecosystem, mostly hand-written bridging |
-| **SymbioteNative** | **stock, unforked React Native**     | React, Vue 3, Angular, Svelte, Solid      | ecosystem packages are wrapped by hand                  |
+| **SymbioteNative** | **stock, unforked React Native**     | React, Vue 3, Angular, Svelte, Solid      | ecosystem packages are wrapped by hand, Angular is slower than stock                 |
 
 The difference is the row you read first. All three alternatives wrote their own native layer, so
 picking one means adopting its ecosystem too. As far as we have verified, SymbioteNative is the only
@@ -143,7 +143,7 @@ project owning its runtime can change it.
 
 The costs:
 
-- **Angular is the slowest of the five**: 0.90x stock on a create-shaped row where Solid is 0.63x.
+- **Angular is slower than stock**: 1.15x stock on a create-shaped row where Solid is 0.72x.
   Most of what is left is Angular's own per-component machinery rather than the adapter. The numbers
   are [below](#how-fast-against-stock-react-native).
 - **Ecosystem packages are wrapped by hand, one at a time.** The _native view_ comes for free,
@@ -215,17 +215,17 @@ taken. Ratio is ours over stock.
 
 | 1 000 rows | stock RN |          React |           Vue |         Solid |        Svelte |       Angular |
 | ---------- | -------: | -------------: | ------------: | ------------: | ------------: | ------------: |
-| Create     |    278.1 |  228.1 / 0.82x | 231.4 / 0.83x | 201.3 / 0.72x | 200.8 / 0.72x | 407.1 / 1.46x |
-| Replace    |    289.0 |  252.6 / 0.87x | 254.6 / 0.88x | 218.7 / 0.76x | 268.5 / 0.93x | 428.7 / 1.48x |
-| Partial    |     33.2 |   20.2 / 0.61x |  15.5 / 0.47x |  10.7 / 0.32x |  14.2 / 0.43x |  22.3 / 0.67x |
-| Select     |     10.8 |    5.9 / 0.55x |   4.8 / 0.44x |   5.5 / 0.51x |   8.4 / 0.78x |  15.7 / 1.45x |
-| Swap       |     10.7 |   27.8 / 2.60x |   7.4 / 0.69x |   5.4 / 0.50x |   7.0 / 0.65x |  17.1 / 1.60x |
-| Remove     |    126.3 |   36.4 / 0.29x |   6.3 / 0.05x |   9.3 / 0.07x |   7.5 / 0.06x |  18.5 / 0.15x |
-| Append     |    398.0 |  292.8 / 0.74x | 252.4 / 0.63x | 203.7 / 0.51x | 197.6 / 0.50x | 428.2 / 1.08x |
-| Clear      |     10.8 |   13.9 / 1.29x |  11.7 / 1.08x |  11.8 / 1.09x |  10.6 / 0.98x |  44.0 / 4.07x |
+| Create     |    278.1 |  228.1 / 0.82x | 231.4 / 0.83x | 201.3 / 0.72x | 200.8 / 0.72x | 320.3 / 1.15x |
+| Replace    |    289.0 |  252.6 / 0.87x | 254.6 / 0.88x | 218.7 / 0.76x | 268.5 / 0.93x | 351.5 / 1.22x |
+| Partial    |     33.2 |   20.2 / 0.61x |  15.5 / 0.47x |  10.7 / 0.32x |  14.2 / 0.43x |  23.5 / 0.71x |
+| Select     |     10.8 |    5.9 / 0.55x |   4.8 / 0.44x |   5.5 / 0.51x |   8.4 / 0.78x |  15.3 / 1.42x |
+| Swap       |     10.7 |   27.8 / 2.60x |   7.4 / 0.69x |   5.4 / 0.50x |   7.0 / 0.65x |  17.9 / 1.67x |
+| Remove     |    126.3 |   36.4 / 0.29x |   6.3 / 0.05x |   9.3 / 0.07x |   7.5 / 0.06x |  19.2 / 0.15x |
+| Append     |    398.0 |  292.8 / 0.74x | 252.4 / 0.63x | 203.7 / 0.51x | 197.6 / 0.50x | 336.8 / 0.85x |
+| Clear      |     10.8 |   13.9 / 1.29x |  11.7 / 1.08x |  11.8 / 1.09x |  10.6 / 0.98x |  39.9 / 3.69x |
 
 `Remove` is where the architecture is worth the most: one row out of a thousand costs stock 126.3 ms
-against 6.3-18.5 for an adapter. The reason is a node count, not a millisecond. A persistent renderer
+against 6.3-19.2 for an adapter. The reason is a node count, not a millisecond. A persistent renderer
 hands Fabric a rebuilt path, so it re-lays out ~7 000 Yoga nodes where we replace one slot and it
 re-lays out ~1 000.
 
@@ -267,7 +267,7 @@ in the same harness driving React Native's own `<View>` and `<Text>`.
 
 The headless ruler transfers to hardware for four of the five adapters: React 0.82 to 0.82 on `Create`,
 Vue 0.81 to 0.83, Svelte 0.71 to 0.72, Solid 0.63 to 0.72. Angular is the one that does not (0.90 to
-1.46), which is what a component instance per row costs once a real pipeline is underneath it.
+1.15), which is what a component instance per row costs once a real pipeline is underneath it.
 
 `Clear` is each framework disposing 2 000 component instances; our engine is 3-5 ms of it. `Select` is
 flat across all six because it is Fabric's: a layout-dirty style change on one row re-lays out the
@@ -355,8 +355,8 @@ the engine into Fabric, proven on device.
 yet; the long-tail prop surface keeps widening; Android is at canary parity while iOS stays the
 reference surface; Reanimated is the largest remaining gap and is not started.
 
-**Angular is the slowest adapter, and on a device it is the only one slower than stock** (1.46x on a
-thousand-row create, 4.07x on `Clear`; the other four run 0.72-0.83x). The cost is Angular's own, not
+**Angular is the slowest adapter, and on a device it is the only one slower than stock** (1.15x on a
+thousand-row create, 3.69x on `Clear`; the other four run 0.72-0.83x). The cost is Angular's own, not
 the adapter's: a row component instance is about 81 us in LViews, DI scopes and `EventEmitter`s,
 measured against the identical row inlined, and `Clear` is Angular tearing 2 000 of them down while
 the engine's share of that step is 2.4-3.8 ms on every adapter alike.

@@ -33,11 +33,27 @@ export const IMAGE_SOURCE_PROPS: ReadonlySet<string> = new Set([
  * whatever it is handed, and a tag with no image behavior must keep its props verbatim — the
  * control case in `image-payload.itest.ts` is what holds that line.
  */
-export function resolveImageSourceProp(value: unknown): unknown {
+export function resolveImageSourceProp(
+  value: unknown,
+  dropsSingleSourceHeaders = false,
+): unknown {
   if (value === undefined || value === null) return value;
   if (typeof value !== 'number' && typeof value !== 'object') return value;
   const resolved = resolveImageSource(value);
-  return Array.isArray(resolved) ? resolved : [resolved];
+  if (Array.isArray(resolved)) return resolved;
+  // Android `source` only: `Image.android.js` lifts headers to the native `headers` prop just for an
+  // ARRAY source, and ReactImageView ignores per-source headers, so RN sends none for a single
+  // object. Wrapping here erases that shape, so its headers go here too.
+  if (
+    dropsSingleSourceHeaders &&
+    typeof resolved === 'object' &&
+    resolved !== null &&
+    'headers' in resolved
+  ) {
+    const { headers: _dropped, ...rest } = resolved;
+    return [rest];
+  }
+  return [resolved];
 }
 
 // `ReactImageView.setShouldNotifyLoadEvents` (Android) — `downloadListener` stays `null`, and

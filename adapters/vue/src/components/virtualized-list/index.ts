@@ -147,6 +147,8 @@ export interface IVirtualizedListProps<ItemT> {
   scrollEventThrottle?: number;
   keyboardShouldPersistTaps?: boolean | 'always' | 'never' | 'handled';
   keyboardDismissMode?: 'none' | 'on-drag' | 'interactive';
+  removeClippedSubviews?: boolean;
+  nestedScrollEnabled?: boolean;
   style?: IStyleProp<IViewStyle>;
   contentContainerStyle?: IStyleProp<IViewStyle>;
   // The remaining passthrough tail (raw scroll above, keyboard, accessibility, testID, …) is
@@ -886,8 +888,9 @@ export const VirtualizedList = defineComponent(
       const resolvedContentContainerStyle: IStyleProp<IViewStyle> = p.horizontal
         ? [p.contentContainerStyle, { width: m.total }]
         : p.contentContainerStyle;
+      // VirtualizedList.js: `[inversionStyle, style]` — the app's style can override the flip.
       const resolvedStyle: IStyleProp<IViewStyle> | undefined = p.inverted
-        ? [p.style, p.horizontal ? INVERTED_X_STYLE : INVERTED_Y_STYLE]
+        ? [p.horizontal ? INVERTED_X_STYLE : INVERTED_Y_STYLE, p.style]
         : p.style;
 
       // `horizontal` is NOT in the bag: the axis is the TAG (`horizontal-scroll-view`), so passing
@@ -903,6 +906,8 @@ export const VirtualizedList = defineComponent(
       // The raw scroll-lifecycle callbacks (onScrollBeginDrag/…) and scrollEventThrottle are NOT in
       // PROP_KEYS, so they already ride through via ...p.forwarded. The keyboard props come from
       // typed props (PROP_KEYS), so re-set them explicitly here (only when provided).
+      // VirtualizedList.js:1111 — Android moves the scrollbar back after the `scale: -1` flip.
+      if (p.inverted) scrollProps.isInvertedVirtualizedList = true;
       if (p.keyboardShouldPersistTaps !== undefined) {
         scrollProps.keyboardShouldPersistTaps = p.keyboardShouldPersistTaps;
       }

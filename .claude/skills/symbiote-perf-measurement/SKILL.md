@@ -184,6 +184,14 @@ and put the bound between them (1.5x real against 1.10x broken -> assert 1.25x).
 in the comment is also what stops the next person from "tidying" the factor away. And the only way to
 know which of the two you have written is to break it and watch — the bare form looks identical.
 
+**A RATIO MARGIN IS CALIBRATED PER BUILD.** CI runs the ASSERT build, which triples a plain create
+(2.2 us against 0.65) while an additive cost stays put, so a 1.25x margin measured on `build-release`
+fails a real 1.17x there — it passed for days only because the gap sat inside the bar
+(`create-element-ladder`, 2026-09-23). Gate a release-calibrated ratio on `__DEV__ === false`; on the
+assert build print it. And when a change moves an adapter CONTRACT (what the renderer is called with),
+run the whole `test:itest`, not only the fixtures you touched: a counter pinned to the old contract
+(`adapter-create-cost`'s class channel) lives in a file you did not open.
+
 ### 12. Two harness facts that cost a day each
 
 - **Every React arm ran the DEVELOPMENT React** until the defines were made to follow the build
@@ -1244,6 +1252,11 @@ Clear      10.8    13.9 1.29    11.7 1.08    11.8 1.09    10.6 0.98    44.0 4.07
 
 Best of three to five per column, minimum taken.
 
+**Angular re-read 2026-09-23** (same simulator, best-of-4, after the tag directives, `StyleHost`
+and the `[style]` renderer rework): Create 320.3, Replace 351.5, Partial 23.5, Select 15.3, Swap
+17.9, Remove 19.2, Append 336.8, Clear 39.9 — the build-shaped rows ~20% down, the small ones flat.
+Stock was NOT re-run that sitting, so 1.15x / 1.22x / 0.85x against the 278.1 above are indicative.
+
 **`Remove` reads 8x higher on stock than headless predicted, and that is the thesis rather than
 noise** — it survived best-of-N on every column. Headless the row is 15.7 against 3.9-7.2 (2-4x); on
 device it is 126.3 against 6.3-18.5 (7-20x). §4 already held the mechanism as a node count — stock
@@ -1477,6 +1490,7 @@ Recorded so they are not re-derived. Each was measured.
 | presize or recycle the buffer's four side tables                   | `side-table-growth-cost.itest.ts` (§18i): growing from empty is **24-25 ns/entry and FLAT** (24 at 3 000, 24 at 12 000 — doubling amortises completely), recycling a warm array reads the same 24, and `new Array(n)` + index writes is **42 ns, 1.7x WORSE**. There is no growth cost to remove, and the obvious fix is an anti-optimisation.                                                                                                                                             |
 | intern `PropNameID`s / cache `UIManagerBinding::getBinding`        | 1.8% of the prologue — **and reverted**: both keyed on `&runtime`, which treats an ADDRESS as a lifetime. `symbiote_tree_tests` builds a JSCRuntime per case, so it aborted in `~JSCRuntime` with a dangling API string. Green on `bench:itest`, red on CI.                                                                                                                                                                                                                                |
 | eliminate Solid's 2 000 drains                                     | ~4 ms of 23.6, for a JS-side child cache the architecture exists to refuse                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| answer `parentOf` from the PENDING op instead of draining          | Angular's virtualized FlatList drains once per cell (the outlet anchor is placed in the batch it is read in): 152/127 batches on create/replace against React's 26/2. Tried 2026-09-23 (`placementPending` as child→parent map, `remove` of an unknown node still drains): batches fell to exactly 26/2 and the wall moved 40.3→38.9 / 35.5→34.3, inside the spread. **A crossing count is not a cost** — `applyOps` time is the ops. Reverted.                                               |
 | `if (tagName.empty())` skip over the rule chain                    | a few tenths of a ms against a ~2.5 ms arm spread — unmeasurable here                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | intrusive linked list for `insertBefore`                           | would make insert/remove/`nextSiblingOf` all O(1), but we BEAT stock on `Swap` — the core data structure does not get replaced over a row nobody has lost                                                                                                                                                                                                                                                                                                                                  |
 | move the torn-down mark into C++                                   | buys the 1.7 ms crossing and costs one per INSERT (~9 000 on a create, today a `WeakSet` miss)                                                                                                                                                                                                                                                                                                                                                                                             |
@@ -1487,6 +1501,95 @@ Recorded so they are not re-derived. Each was measured.
 
 **A monotone-gate pair can never carry an assertion** (see method §9), so the registry-miss result is
 a print in its fixture, not a bound.
+
+## NativeScript-Angular is not a faster reference (researched 2026-09-22, source-read, not measured)
+
+Source in `.vendors/nativescript/{NativeScript,angular,ios,android}`. Same Angular on top — LView, DI,
+per-row component — so our Angular `Create` 1.46x is paid there too; NS adds its own costs underneath:
+
+```
+crossing   per prop, synchronous: Property setter -> [setNative] (core/ui/core/properties/index.ts:367)
+           first apply also READS native via getDefault(); _batchUpdate dedupes, still 1 call/prop
+call       V8 FunctionTemplate -> objc_getClass(string) -> hash lookups -> respondsToSelector -> libffi
+           (ios/NativeScript/runtime/Interop.mm:1624); JS proxy + Persistent + retain per new UIView
+engine     V8 LITE MODE on iOS = jitless (runtime/Runtime.mm:332) — same no-JIT position as Hermes
+layout     iOS in JS (layouts/stack-layout/index.ios.ts), sizeThatFits + setFrame crossing per node;
+           Android in Java (ui-mobile-base widgets)
+css        selector match per view in onLoaded (styling/style-scope.ts:739), JS
+estimate   ~5-15 crossings per node on create; no single-crossing commit anywhere
+```
+
+No NS-vs-Fabric benchmark exists (2025-2026); all published NS numbers are vendor, ≤2022, old-bridge RN.
+NS's real answer to a 1 000-row list is `ListView` virtualization (only visible rows get a component),
+not a faster renderer. **Do not cite NS as evidence our Angular deficit is architectural.**
+
+## Instruments added 2026-09-22
+
+```
+ALLOC line     runBenchSuite prints KB allocated + GCs per step (hermes_totalAllocatedBytes delta,
+               read outside the stopwatch). Deterministic — compare arms to the KB in one run
+profiler       SYMBIOTE_PROFILE_DIR=<dir> -> Hermes sampling trace per step (bench-suite) or per
+               tag create (primitive-suite); `node scripts/prof-top.mjs <trace> [N] [regex]` gives
+               self/inclusive %. Never read RESULT/PRIM from a profiled run
+primitive-suite  <arm>-primitive-suite.itest.ts: 19 app-facing tags x create/update/swap/remove/
+               clear, PINNED nodesPerItem census. Arms: angular (SYMBIOTE_ELEMENTS), vue
+```
+
+Measured with them (Hermes -O, 2026-09-22):
+- Angular allocates LESS than every adapter on the row bench (18.9-21.5 MB create vs 20-22.6 Vue/
+  Solid/Svelte, 45 stock). GC is not Angular's problem; its gap is CPU in the tick.
+- A row COMPONENT costs ~6 us + 1.3 KB/row (`angular-inline-row-suite` vs elements). Inline rows
+  make select/swap WORSE (no OnPush boundary). The old "81 us per row instance" is dev-mode/JSC.
+- Engine commit is identical across adapters (~354 vs ~352 samples Angular/Vue); the whole Angular
+  delta is the framework phase (711 vs 387 samples on create).
+- Per @for item Angular costs ~5 us + 1.2 KB over Vue even on a one-node item (primitive `view`
+  11.9 vs 6.8 ms) — embedded LView + container insertion + an update pass per item. Runtime-only
+  work cannot reach it (`<angular_no_template_transform>`).
+- Outliers on EVERY adapter: touchable-opacity (56-78 ms, 25-28 MB / 1 000) and button (70-93 ms,
+  26-28 MB). Engine/components-side, not Angular.
+- Hidden `modal` commits a ModalHostView on every adapter; RN commits nothing (`Modal.js:280-288`).
+
+## Angular's per-node cost: a runtime answer to a compile-time question (researched 2026-09-22)
+
+A browser `<div>` gets NO runtime entity: ngtsc checks it against `DomElementSchemaRegistry` (a static
+table, hardcoded — `ngtsc/typecheck/src/checker.ts:244`, not pluggable), and the element pays only
+`createElement` + `setProperty`. Directive matching runs once per TView (first create pass), never per
+row. Our `SYMBIOTE_ELEMENTS` is one `@Directive` per tag, added for TYPE-CHECKING only — and it ships
+to runtime `dependencies`, instantiating per element: 86.6 ms / 1 000 rows (`angular-elements-suite`).
+
+```
+done        directives typecheck-only via RUNTIME def mutation (`withholdFromRuntimeMatching`, no
+            build step — build-time stripping is banned, `<angular_no_template_transform>`). All
+            tag directives withheld incl. the read-back four (2026-09-22: flush finds the view
+            lazily via ɵgetLContext + ɵViewRef, `change-detection-flush.ts`)
+            SymbioteStyleHost DELETED (2026-09-22). `[style]` = object/string through Angular's
+            own styling engine (typed so ngtsc rejects an array/function); an RN array or
+            press-state callback is `[styleProp]`, a plain property the renderer routes to
+            `style`. Shipping shape (ng-elements) now allocates what the bare arm does:
+            create 21 476 -> 19 315 KB. Zero directive instances per tag
+            (`element-directive-free.test.ts`); only attribute-matched CallbackHost/form
+            accessors remain, where an app binds `[on*]`/ngModel
+styling     Angular's own styling engine is the next-largest per-element cost: a `[style]` OBJECT
+            costs ~640 B + ~1.8 us per element over `[styleProp]` with the same object (primitive
+            `view` 2 499 vs 1 858 KB, 12.6 vs 10.8 ms / 1 000). Only an input claim avoids it, and
+            a claim is a TAG directive (a `[style]` selector never matches: the matcher skips style
+            markers) at 5-9 us on EVERY element — dearer than the engine. Renaming `[style]` at
+            build time is banned (`<angular_no_template_transform>`, reconfirmed 2026-09-23), and
+            **telling apps to write `[styleProp]` instead is banned too** — nobody writes it. So
+            `[style]` is THE path and the only lever is the renderer's own half of its cost
+            (`openStyleRun` / `canonicalStyle` / `flushStyling`); `[styleProp]` stays only for what
+            `[style]` cannot carry (RN arrays, press callbacks). Renderer half priced 2026-09-23 by
+            stubbing `setStyle`: 11.5 -> 10.0 ms / 1 000 `view`, most of it the publish `[styleProp]`
+            pays too. Taken: a fresh node's keys are matched against a published style chosen by the
+            FIRST key (Angular sends keys SORTED), no accumulator unless they diverge — ALLOC `view`
+            2 499 -> 2 179 KB, ng-v 6 387 -> 6 021 KB; wall unmoved within the spread
+row comp    2 LView (embedded + component) + createRenderer/destroy per instance — Angular's, not ours;
+            the only removal is a build-time inline of the row into @for, which NOBODY has shipped
+prior art   angular-three: tags under CUSTOM_ELEMENTS_SCHEMA, no per-node directive (renderer.ts:190)
+            krausest: every Angular entry writes the row inline in @for — row-component cost unmeasured
+cheap wins  `(out)` on a component host also fires our renderer.listen (wasted); predeclare
+            `__ngContext__` on the node (hidden-class transition per host)
+```
 
 ## Where this came from
 

@@ -35,7 +35,9 @@ import { registerScrollViewBehaviors, type IScrollPlatform } from './shared';
 
 const android: IScrollPlatform = {
   claimMode: 'wrap',
-  slotDerived: ['style'],
+  // `stickyHeaderIndices`: the content view's clipping is forced off under sticky headers on
+  // Android only (`ScrollView.js:1740-1745`), so only here does it dirty the slot.
+  slotDerived: ['style', 'stickyHeaderIndices'],
 };
 
 export function registerScrollViewBehavior(): void {

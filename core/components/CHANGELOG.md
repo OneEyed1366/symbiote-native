@@ -1,10 +1,24 @@
 # @symbiote-native/components
 
-## 3.0.1
+## 3.1.0
+
+### Minor Changes
+
+- [`fba54ee`](https://github.com/OneEyed1366/symbiote-native/commit/fba54ee2d39a3b2ea12bb11a846b32658e3f8902) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Component behavior matches React Native 0.86 on both platforms.
+
+  - Pressable `android_ripple` and TouchableNativeFeedback send the ripple's view commands, so the ripple animates.
+  - Inverted lists flip with `scale: -1` on Android, and the app's style overrides the flip.
+  - On iOS, Modal stays mounted until native `onDismiss`. `visible` defaults to `true`.
+  - Button uppercases its Android title with the full Unicode `toUpperCase`.
+  - ScrollView dismisses the keyboard on `on-drag` on Android, trusts no keyboard event below API 30, and applies RN's `removeClippedSubviews` rules to the content view.
+  - TextInput's `rejectResponderTermination` applies on iOS. InputAccessoryView warns off iOS.
+  - The new press-machine option `cancelableOf` resolves `cancelable` per tag.
 
 ### Patch Changes
 
-- [`3de549b`](https://github.com/OneEyed1366/symbiote-native/commit/3de549b2ab9785c845a1f3acd5626d85d2b9b9e4) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Install the press machine's dispatchers from an array of pairs rather than a `Map`. Iterating a `Map` builds a fresh two-element array per entry for the destructuring to read back, and the loop runs once per node carrying a press machine - every `<TextInput>`, not just every `<Pressable>`. Measured on `-O` Hermes: ~0.7 us per input off a node that cost ~7.4. No behaviour change.
+- [`d4f46e7`](https://github.com/OneEyed1366/symbiote-native/commit/d4f46e7ca1601aa469b5c8c5ab97f8a8217c968f) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - `VirtualizedList` paints `initialNumToRender` cells from `initialScrollIndex` on its first render, as RN does, then grows to the viewport window by batches.
+
+- [#83](https://github.com/OneEyed1366/symbiote-native/pull/83) [`3de549b`](https://github.com/OneEyed1366/symbiote-native/commit/3de549b2ab9785c845a1f3acd5626d85d2b9b9e4) Thanks [@github-actions](https://github.com/apps/github-actions)! - Install the press machine's dispatchers from an array of pairs rather than a `Map`. Iterating a `Map` builds a fresh two-element array per entry for the destructuring to read back, and the loop runs once per node carrying a press machine - every `<TextInput>`, not just every `<Pressable>`. Measured on `-O` Hermes: ~0.7 us per input off a node that cost ~7.4. No behaviour change.
 
 ## 3.0.0
 

@@ -20,6 +20,9 @@ import { dlog } from '../debug';
 // The one event symbiote observes: an incoming deep link. RN's LinkingEventDefinitions.
 const URL_EVENT = 'url';
 
+// The `nullthrows` package's message, which RN's Linking surfaces for a missing native module.
+const NULLTHROWS_MESSAGE = 'Got unexpected null or undefined';
+
 export interface IUrlEvent {
   url: string;
 }
@@ -60,7 +63,7 @@ export interface ILinkingStatic {
 export interface ILinkingPlatform {
   moduleName: string;
   sendIntent(
-    module: INativeLinkingModule | null,
+    requireModule: () => INativeLinkingModule,
     action: string,
     extras?: IIntentExtra[],
   ): Promise<void>;
@@ -112,10 +115,15 @@ export function createLinking(platform: ILinkingPlatform): ILinkingStatic {
     return emitter;
   }
 
-  function moduleUnavailable(): Error {
-    return new Error(
-      `Linking: ${platform.moduleName} native module unavailable`,
-    );
+  // RN's `nullthrows(NativeModule)`: a missing module throws SYNCHRONOUSLY, with that package's
+  // message, from every method (Linking.js).
+  function requireModule(): INativeLinkingModule {
+    const module = getModule();
+    if (module === null) {
+      dlog(`Linking: ${platform.moduleName} unavailable -> throw`);
+      throw new Error(NULLTHROWS_MESSAGE);
+    }
+    return module;
   }
 
   return {
@@ -129,36 +137,28 @@ export function createLinking(platform: ILinkingPlatform): ILinkingStatic {
     openURL(url) {
       validateUrl(url);
       dlog(`Linking.openURL -> ${url}`);
-      const module = getModule();
-      if (module === null) return Promise.reject(moduleUnavailable());
-      return module.openURL(url);
+      return requireModule().openURL(url);
     },
 
     canOpenURL(url) {
       validateUrl(url);
       dlog(`Linking.canOpenURL -> ${url}`);
-      const module = getModule();
-      if (module === null) return Promise.reject(moduleUnavailable());
-      return module.canOpenURL(url);
+      return requireModule().canOpenURL(url);
     },
 
     getInitialURL() {
       dlog('Linking.getInitialURL');
-      const module = getModule();
-      if (module === null) return Promise.resolve(null);
-      return module.getInitialURL();
+      return requireModule().getInitialURL();
     },
 
     openSettings() {
       dlog('Linking.openSettings');
-      const module = getModule();
-      if (module === null) return Promise.reject(moduleUnavailable());
-      return module.openSettings();
+      return requireModule().openSettings();
     },
 
     sendIntent(action, extras) {
       dlog(`Linking.sendIntent -> ${action}`);
-      return platform.sendIntent(getModule(), action, extras);
+      return platform.sendIntent(requireModule, action, extras);
     },
   };
 }

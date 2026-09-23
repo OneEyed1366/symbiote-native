@@ -44,6 +44,8 @@ const ACCESSIBILITY_MODULE = 'AccessibilityManager';
 // 1:1; the indirection exists only so the mapping stays explicit (Android renames them).
 const IOS_DEVICE_EVENT: Partial<Record<IAccessibilityChangeEventName, string>> =
   {
+    // RN's deprecated alias (AccessibilityInfo.js EventNames).
+    change: 'screenReaderChanged',
     screenReaderChanged: 'screenReaderChanged',
     reduceMotionChanged: 'reduceMotionChanged',
     boldTextChanged: 'boldTextChanged',

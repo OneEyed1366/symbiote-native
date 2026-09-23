@@ -58,7 +58,6 @@
 import {
   SLOT_DERIVED_ALL,
   appListenerFor,
-  dispatchViewCommand,
   markPropsDirty,
   Platform,
   registerHostBehavior,
@@ -75,6 +74,7 @@ import {
   attachPressMachine,
   booleanOr,
   detachPressMachine,
+  withNativeFeedbackCommands,
   type IDisabledResolver,
   type IPressConfigRefinement,
 } from './pressable';
@@ -141,12 +141,6 @@ const PRESS_LISTENERS: readonly string[] = [
 // because the four factories that produce it (`render-touchable-native-feedback.ts`) are ours and
 // the payload is not a place to re-validate what a typed factory already built.
 
-// TouchableNativeFeedback.js:280 — `locationX ?? 0`. The bag is raw Fabric payload, so guard.
-function hotspotAt(nativeEvent: Record<string, unknown>, key: string): number {
-  const value = nativeEvent[key];
-  return typeof value === 'number' ? value : 0;
-}
-
 /**
  * TNF's own Pressability config, applied to whatever node carries the responder.
  *
@@ -167,33 +161,8 @@ export const nativeFeedbackRefinement: IPressConfigRefinement = (
   node,
   config,
 ): IPressMachineConfig => {
-  if (!IS_ANDROID) return { ...config, minPressDuration: 0 };
-  const hotspot = (event: ISymbioteEvent): void => {
-    dispatchViewCommand(node, 'hotspotUpdate', [
-      hotspotAt(event.nativeEvent, 'locationX'),
-      hotspotAt(event.nativeEvent, 'locationY'),
-    ]);
-  };
-  return {
-    ...config,
-    minPressDuration: 0,
-    onPressIn(event: ISymbioteEvent): void {
-      // RN's order: hotspot first, so the ripple starts where the finger is rather than at centre.
-      hotspot(event);
-      dispatchViewCommand(node, 'setPressed', [true]);
-      config.onPressIn?.(event);
-    },
-    onPressMove(event: ISymbioteEvent): void {
-      hotspot(event);
-      // RN drops the app's own onPressMove here; ours forwards it, because on a tag that callback
-      // is the app's and iOS already delivers it.
-      config.onPressMove?.(event);
-    },
-    onPressOut(event: ISymbioteEvent): void {
-      dispatchViewCommand(node, 'setPressed', [false]);
-      config.onPressOut?.(event);
-    },
-  };
+  const floorless = { ...config, minPressDuration: 0 };
+  return IS_ANDROID ? withNativeFeedbackCommands(node, floorless) : floorless;
 };
 
 // `cloneFold` LEFT THIS FILE ON 2026-09-18 — it is `foldCloneOntoChild` in

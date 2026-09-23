@@ -467,8 +467,15 @@ export function installEventHandler(): void {
       if (topLevelType === TOUCH_START) {
         // The ternary is gone with the gate: `isSymbioteNode(instanceHandle)` was re-asked here
         // three lines after the early return above already proved it.
-        if (isDebug())
+        if (isDebug()) {
           dlog(`event ${TOUCH_START} on ${instanceHandle.component}`);
+          // A responder surviving into a one-touch start lost its end/cancel. If it is an ancestor
+          // of the target, this whole tap goes to it and the release finally clears it.
+          if (currentResponder !== undefined)
+            dlog(
+              `touchStart while ${currentResponder.component} still holds the responder`,
+            );
+        }
         // Update the touch bank, then attach it so responder handlers (PanResponder)
         // read each touch's own previous->current delta; RN records before dispatch.
         recordTouchTrack('start', nativeEvent);
@@ -606,6 +613,10 @@ export function installEventHandler(): void {
       }
 
       if (topLevelType === TOUCH_CANCEL) {
+        // Android: a ScrollView whose scroller has not finished (fling tail, spring-back) intercepts
+        // the next down natively, and the tap reaches JS as start + cancel with no press.
+        if (isDebug())
+          dlog(`event ${TOUCH_CANCEL} on ${instanceHandle.component}`);
         recordTouchTrack('end', nativeEvent);
         attachTouchHistory(nativeEvent);
         // A cancel is scoped to the finger(s) removed from `touches`, just like an end. An unrelated

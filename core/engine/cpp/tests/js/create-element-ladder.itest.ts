@@ -48,6 +48,10 @@ import { registerTextInputBehavior } from '@symbiote-native/components';
 
 import { describe, expect, it, print, report } from './harness';
 
+// `false` on `build-release` (`scripts/run-itests.mjs`), `true` on the assert build CI runs.
+declare const __DEV__: boolean;
+const isBenchBuild = __DEV__ === false;
+
 /** A thousand-row create's worth of elements. */
 const NODES = 10_000;
 const SAMPLES = 5;
@@ -361,9 +365,15 @@ describe('a create, taken apart with the engine s own functions', () => {
     // attach machinery is +0.33 (0.98 vs 0.65, a factor of 1.5) and the unregistered break is +0.07
     // (a factor of 1.10), so 1.25 sits between them with room on both sides.
     //
-    // AND IT STILL ONLY FIRES OUTSIDE THE BAR, against the SAME-CASE plain arm.
+    // AND IT STILL ONLY FIRES OUTSIDE THE BAR, against the SAME-CASE plain arm, and only on the
+    // bench build it was calibrated on. The assert build triples the plain create (2.2 us on CI) while
+    // the machinery stays ~0.3, so the real ratio there is ~1.15 and the 1.25 margin fails it.
     const machineryBar = Math.max(emptyRead.resolution, plainRead.resolution);
-    if (empty - plainRead.wall > machineryBar) {
+    if (!isBenchBuild) {
+      print(
+        'DEBUG ATTACH machinery on the assert build: margin is release-only, no verdict',
+      );
+    } else if (empty - plainRead.wall > machineryBar) {
       expect(each(empty)).toBeGreaterThan(each(plainRead.wall) * 1.25);
     } else {
       print(

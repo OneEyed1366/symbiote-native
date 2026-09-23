@@ -209,13 +209,38 @@ a platform difference has a name. `android_ripple` sits on an ordinary `RCTView`
 tell, so it stays `#ifdef` — and is covered by `pnpm run test:android`, the second host build. All
 twelve `#ifdef ANDROID` sites are in `SymbioteFabricProps.cpp`, which includes only `folly/dynamic.h`
 and our own headers, so the define is scoped to that one translation unit
-(`SYMBIOTE_PLATFORM_ANDROID`); defining it target-wide is the version that does not build. One line
-genuinely cannot cross — `android_get_device_api_level` is the NDK's, so `androidApiLevel()` answers
-with RN's minimum on a host: a rule's logic and a rule's platform CALL are separable.
+(`SYMBIOTE_PLATFORM_ANDROID`); defining it target-wide is the version that does not build. An NDK
+call (`__ANDROID__`, not `ANDROID`) cannot run on the host; keep it out of a rule's logic. The old
+`androidApiLevel()` foreground gate is gone: RN 0.86's `canUseNativeForeground()` is OS-only.
 
 Android fixtures split by suffix (`*.android.itest.ts`) and the split is hard in **both** directions —
 an Android fixture asserts keys the default build never writes, and the default fixtures assert their
 absence.
+
+**An Android fixture must commit the ANDROID component name.** `AndroidTextInput` for both
+text-input tags, `AndroidSwitch`, etc. (`component-names/index.android.ts`). A rule gated on a
+component name and tested under the iOS name passes on the host and never runs on a device: the
+whole TextInput rule set (controlled `value`, `submitBehavior`, aliases) was dead on Android that way.
+
+**A rule C++ cannot compute exactly stays in JS.** Button's Android title is RN's
+`title.toUpperCase()` — full Unicode; the host has no ICU. It runs at the slot redirect
+(`IHostBehavior.slotValueFor`), not as an ASCII approximation in C++.
+
+**A colour int is SIGNED on Android, unsigned on iOS** (RN `processColor.js`: `| 0x0`). Java
+ViewManagers read props as a Double and Kotlin `toInt()` saturates an unsigned `0xff...` to
+`0x7fffffff`: every background turned translucent white, and the Android fixtures had locked the
+unsigned value in. Derive an Android expectation from RN's JS, never from the iOS literal.
+An opaque `PlatformColor` is `{ semantic }` on iOS, `{ resource_paths }` on Android; the C++ seam
+forwards it as-is. EXCEPT `DynamicColorIOS`: native reads each `dynamic.*` branch as a processed int,
+so the seam processes them (a string paints nothing; `opaque-color-payload.itest.ts`).
+
+**Java ViewManagers cast booleans strictly:** `""` red-boxes Android (`String cannot be cast to
+Boolean`), iOS tolerates it. A bare attribute arrives as `""` in two places, both fixed 2026-09-23:
+Vue (casts only a DECLARED Boolean prop; `createBareBooleanNodeTransform` in
+`metro-vue-transformer.cjs`) and Svelte on a hyphen-less tag (`<view accessible>` goes through the
+template as `accessible=""`; the DOM shim maps it via the derived `BOOLEAN_PROP_NAMES`). JSX, Svelte
+components and hyphenated tags pass `true`. Angular static attributes are always strings: use
+`[prop]="true"`.
 
 ## Testing a rule
 

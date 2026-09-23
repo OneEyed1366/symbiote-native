@@ -262,6 +262,31 @@ describe('what a switch sends native, resolved by the engine', () => {
     expect(payload.trackTintColor).toBe(0xff_81_b0_ff);
   });
 
+  // why: RN passes trackColor/thumbColor/ios_backgroundColor through as ANY ColorValue
+  // (Switch.js:187-188,245-278), so a PlatformColor must reach native as the opaque object.
+  it('carries PlatformColor track and thumb colours on both platforms', () => {
+    const off = { resource_paths: ['@android:color/black'] };
+    const on = { resource_paths: ['@android:color/white'] };
+    const thumb = { resource_paths: ['?android:attr/colorAccent'] };
+    const android = commitAndroid({
+      value: true,
+      trackColor: { false: off, true: on },
+      thumbColor: thumb,
+    }).payload;
+    expect(android.trackColorForFalse).toEqual(off);
+    expect(android.trackColorForTrue).toEqual(on);
+    expect(android.trackTintColor).toEqual(on);
+    expect(android.thumbTintColor).toEqual(thumb);
+
+    const semanticOn = { semantic: ['systemGreen'] };
+    const semanticOff = { semantic: ['systemGray'] };
+    const ios = commit({
+      trackColor: { false: semanticOff, true: semanticOn },
+    }).payload;
+    expect(ios.onTintColor).toEqual(semanticOn);
+    expect(ios.tintColor).toEqual(semanticOff);
+  });
+
   // why: THE CONTROL. Every absence assertion above would be satisfied by a payload with no rule at
   // all, so pin that the same props on a behaviorless tag are untouched.
   it('folds nothing on a tag with no behavior', () => {

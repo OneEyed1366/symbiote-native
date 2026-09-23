@@ -1,10 +1,14 @@
-// Modal: the logic half (framework-agnostic). RN keeps the modal mounted through its exit
-// animation (Modal.js _shouldShowModal: visible===true || state.isRendered===true) so the
-// native onDismiss event can arrive before the node unmounts. `isRendered` is PURELY that
-// keep-alive; it never itself fires onDismiss (on Fabric onDismiss is a real native
-// DirectEvent delivered via the host's onDismiss prop). The reducer mirrors RN's guarded
-// transitions: arm the keep-alive on show, drop it on hide. The adapter drives the transition
-// AFTER its render (React useEffect / Vue post-flush watch) so one keep-alive frame survives.
+// Modal logic, framework-agnostic. On iOS RN keeps the modal mounted through its exit animation
+// until native onDismiss arrives (Modal.js _shouldShowModal); only that event drops the
+// keep-alive, then the app's onDismiss runs. Android has no dismiss event: `visible` alone.
+
+import { Platform } from '@symbiote-native/engine';
+
+// Modal.js `defaultProps.visible = true`: defaultProps fill only `undefined`, so an unset
+// `visible` shows and an explicit `false`/`null` hides.
+export function isModalVisible(visible: unknown): boolean {
+  return visible === undefined || visible === true;
+}
 
 export type IModalState = {
   isRendered: boolean;
@@ -37,12 +41,20 @@ export function modalReducer(
   }
 }
 
-// The visible gate with the keep-alive: a fully hidden modal (not visible AND no longer
-// rendered) contributes no node, exactly as RN's render returns null when _shouldShowModal()
-// is false.
+// Modal.js `_shouldShowModal`: iOS keeps the node through its exit animation until the native
+// dismiss drops the keep-alive; Android shows on `visible` alone.
 export function shouldRenderModal(
   isVisible: boolean,
   state: IModalState,
+  os: string = Platform.OS,
 ): boolean {
-  return isVisible || state.isRendered;
+  return os === 'ios' ? isVisible || state.isRendered : isVisible;
+}
+
+// Modal.js componentDidUpdate: false->true arms the keep-alive; true->false does NOTHING — only the
+// native `onDismiss` (iOS) drops it, via `{type: 'hide'}` from the adapter's dismiss handler.
+export function modalVisibilityAction(
+  isVisible: boolean,
+): IModalAction | undefined {
+  return isVisible ? { type: 'show' } : undefined;
 }

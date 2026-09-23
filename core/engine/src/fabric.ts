@@ -147,6 +147,27 @@ interface IFabricHost extends Omit<
     children: readonly IFabricNode[],
     newProps: IFabricProps,
   ): IFabricNode;
+  findShadowNodeByTag_DEPRECATED?(tag: number): IFabricNode | null;
+}
+
+/**
+ * An accessibility event addressed by a bare native TAG, the way RN's bridgeless
+ * `UIManager.sendAccessibilityEvent` does it: resolve the tag to its committed shadow node, then send.
+ * An unknown tag is dropped, as RN drops it (with a log rather than a throw).
+ */
+export function sendAccessibilityEventByTag(
+  tag: number,
+  eventType: string,
+): void {
+  const host = globalThis.nativeFabricUIManager;
+  const node = host?.findShadowNodeByTag_DEPRECATED?.(tag);
+  if (host === undefined || node === undefined || node === null) {
+    dlog(
+      `sendAccessibilityEvent("${eventType}") dropped: no view with tag #${tag}`,
+    );
+    return;
+  }
+  host.sendAccessibilityEvent(node, eventType);
 }
 
 declare global {

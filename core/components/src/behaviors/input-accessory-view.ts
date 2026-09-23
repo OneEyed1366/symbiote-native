@@ -31,8 +31,8 @@
 // tagged node rather than per primitive.
 //
 // PLATFORM. This is the only primitive in its group that is not platform-invariant in what it
-// COMMITS TO: `input-accessory-view` resolves to `RCTInputAccessoryView` on iOS and to a
-// plain `RCTView` on Android. The fold itself is platform-invariant on purpose.
+// COMMITS TO: `input-accessory-view` resolves to `RCTInputAccessoryView` on iOS and to the void
+// component on Android. The fold itself is platform-invariant on purpose.
 //
 // FIXED (2026-09-20). `InputAccessoryView.js` on Android does `console.warn('<InputAccessoryView>
 // is only supported on iOS.'); return null` — the WHOLE component, children included, renders
@@ -50,16 +50,19 @@
 // `core/components/src/component-names/index.android.ts`'s per-platform table, the same seam
 // `ANCHOR_COMPONENT` already used — this behavior file needed no change at all.
 import {
+  Platform,
   registerHostBehavior,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
 
 export const INPUT_ACCESSORY_VIEW_TAG = 'input-accessory-view';
 
-// Required by IHostBehavior and deliberately empty: this primitive owns no per-node runtime.
-// Written out rather than shared with a `noop` so the emptiness reads as a decision.
+// `InputAccessoryView.js:110-113` — off iOS it warns and renders nothing (the void component).
+// RN warns per render; once per node is the nearest beat a tag has.
 function attach(_node: ISymbioteNode): void {
-  // nothing to set up
+  if (Platform.OS !== 'ios') {
+    console.warn('<InputAccessoryView> is only supported on iOS.');
+  }
 }
 
 function detach(_node: ISymbioteNode): void {

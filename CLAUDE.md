@@ -126,6 +126,15 @@ single module's platform/shared variants; this governs the top-level category
 grouping of `src/`).
 </adapter_src_follows_framework_idioms>
 
+<angular_no_template_transform>
+**Banned (2026-09-22): any build-time rewrite of an Angular template or of the compiled
+`ɵɵngDeclareComponent` metadata to buy speed** — no lowering, no row inlining, no stripping
+`dependencies`, no `[style]` renaming. The developer writes plain declarative Angular and the
+adapter wins at RUN time only (renderer, engine, def mutation at module load such as
+`withholdFromRuntimeMatching`). The existing pre-link plugin only registers selectors; it does
+not change what a template compiles to, and it must stay that way.
+</angular_no_template_transform>
+
 <adapters_reach_full_feature_parity>
 **P0 — MANDATORY, NO EXCEPTIONS.** Every component / primitive / runtime module
 ships at **full feature-parity across ALL adapters**. A "minimal", "basic",

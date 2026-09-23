@@ -206,6 +206,8 @@ export interface IVirtualizedListProps<ItemT>
   scrollEventThrottle?: number;
   keyboardShouldPersistTaps?: boolean | 'always' | 'never' | 'handled';
   keyboardDismissMode?: 'none' | 'on-drag' | 'interactive';
+  removeClippedSubviews?: boolean;
+  nestedScrollEnabled?: boolean;
   horizontal?: boolean;
   inverted?: boolean;
   style?: IStyleProp<IViewStyle>;
@@ -928,12 +930,15 @@ export function createVirtualizedList(): IVirtualizedListComponent {
     const outerBag = withStableKeys(() => {
       const bag: Record<string, unknown> = {
         ...resolveAccessibilityProps(accessibilityRest),
-        style: [props.style, invertedStyle()],
+        // VirtualizedList.js: `[inversionStyle, style]` — the app's style can override the flip.
+        style: [invertedStyle(), props.style],
         class: props.class,
         contentContainerStyle: contentContainerStyleForContent(),
         onLayout: onViewportLayout,
         onScroll: scrollHandler(),
       };
+      // VirtualizedList.js:1111 — Android moves the scrollbar back after the `scale: -1` flip.
+      if (props.inverted === true) bag.isInvertedVirtualizedList = true;
       // forwarding's throttle, not the raw prop: it folds in the sticky-mode default (1 native / 16
       // JS-fallback), without which a header rebuilt off too-sparse scroll events pins late.
       if (forwarding().scrollEventThrottle !== undefined)

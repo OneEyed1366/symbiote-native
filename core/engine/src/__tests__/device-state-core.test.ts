@@ -28,6 +28,9 @@ const fakeDeviceInfo = {
 };
 const fakeAppState = {
   getConstants: () => ({ initialAppState: 'active' }),
+  // NativeAppState spec: required, and AppState calls it once its emitter exists.
+  getCurrentAppState: (success: (state: { app_state: string }) => void): void =>
+    success({ app_state: 'active' }),
   addListener: (): void => {},
   removeListeners: (): void => {},
 };

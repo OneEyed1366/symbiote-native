@@ -16,7 +16,7 @@ import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
       [testID]="testID"
       (press)="press.emit()"
       class="action-button"
-      [style]="buttonStyle"
+      [styleProp]="buttonStyle"
     >
       <text class="action-button-text" [style]="textStyle">{{ title }}</text>
     </pressable>

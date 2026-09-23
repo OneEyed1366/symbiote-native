@@ -19,10 +19,12 @@ import {
   type FC,
   type ReactNode,
 } from 'react';
-import { dlog, type ISymbioteEvent } from '@symbiote-native/engine';
+import { dlog, Platform, type ISymbioteEvent } from '@symbiote-native/engine';
 import {
   createInitialModalState,
+  isModalVisible,
   modalReducer,
+  modalVisibilityAction,
   renderModal,
   resolveAccessibilityProps,
   shouldRenderModal,
@@ -90,25 +92,33 @@ export const Modal: FC<IModalProps> = rawProps => {
     style,
     className,
     children,
+    onDismiss,
     ...passthrough
   } = resolveAccessibilityProps(rawProps);
 
-  // The iOS keep-alive: the effect runs AFTER this render, so a visible→hidden transition keeps the
-  // node mounted for one frame (state.isRendered still true here) before the next render unmounts it,
-  // the same shape as RN's componentDidUpdate setState (see state/modal.ts).
+  // The iOS keep-alive (state/modal.ts): armed on show, dropped only by the native dismiss below.
+  const isVisible = isModalVisible(visible);
   const [state, dispatch] = useReducer(
     modalReducer,
-    visible === true,
+    isVisible,
     createInitialModalState,
   );
   useEffect(() => {
-    dispatch(visible === true ? { type: 'show' } : { type: 'hide' });
-  }, [visible]);
+    const action = modalVisibilityAction(isVisible);
+    if (action !== undefined) dispatch(action);
+  }, [isVisible]);
 
-  if (!shouldRenderModal(visible === true, state)) {
+  if (!shouldRenderModal(isVisible, state)) {
     dlog('Modal hidden -> no node committed');
     return null;
   }
+
+  // Modal.js: onDismiss is iOS-only — it drops the keep-alive, then tells the app.
+  const handleDismiss = (): void => {
+    if (Platform.OS !== 'ios') return;
+    dispatch({ type: 'hide' });
+    onDismiss?.();
+  };
 
   const root = renderModal({
     visible,
@@ -122,7 +132,7 @@ export const Modal: FC<IModalProps> = rawProps => {
     navigationBarTranslucent,
     allowSwipeDismissal,
     style,
-    passthrough,
+    passthrough: { ...passthrough, onDismiss: handleDismiss },
   });
 
   // root = modal > [container]; the user children nest UNDER the container View, never as

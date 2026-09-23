@@ -66,6 +66,7 @@ import {
   anyImageLoadEventListenerWired,
   resolveImageSourceProp,
 } from './image-source-write';
+import { Platform } from './platform';
 // A cycle, deliberately: `imperative.ts` imports this module for the node shape, and the prototype
 // methods below call back into it. Neither side touches the other at module-evaluation time - only
 // inside a function body - so every loader (tsc, vitest, Metro) resolves it fine. The alternative
@@ -823,7 +824,10 @@ export function writeProp(
   if (key === 'style' || key === 'activeStyle') {
     written = resolveStructuredStyle(value);
   } else if (node.resolvesImageSources && IMAGE_SOURCE_PROPS.has(key)) {
-    written = resolveImageSourceProp(value);
+    written = resolveImageSourceProp(
+      value,
+      key === 'source' && Platform.OS === 'android',
+    );
   }
   if (typeof written === 'function') {
     let bag = functionProps.get(node);
@@ -937,6 +941,13 @@ export function setBehaviorListener(
     setProp(node, flagProp, listener === undefined ? undefined : true);
 }
 
+// The unowned names whose presence a platform rule reads. See `setEventListener`.
+const PRESSABILITY_NAMES: ReadonlySet<string> = new Set([
+  'press',
+  'longPress',
+  'startShouldSetResponder',
+]);
+
 export function setEventListener(
   node: ISymbioteNode,
   name: string,
@@ -968,6 +979,13 @@ export function setEventListener(
     if (flagged !== undefined)
       setProp(node, flagged, isHandler ? true : undefined);
     return;
+  }
+  // A plain `<text>` presses through the engine's own synthesis, with no behavior owning the
+  // names, yet its payload depends on whether it is pressable (Text.js:145-163: Android
+  // `accessible`, the `link` role). Same bit as the owned path, on the flip only.
+  if (PRESSABILITY_NAMES.has(name)) {
+    const wasWired = node.listeners?.has(name) === true;
+    if (wasWired !== isHandler) recordSetOwnedListener(node, name, isHandler);
   }
   if (isHandler) {
     const handler = value;
@@ -1600,10 +1618,11 @@ export function routeProp(
       // `style` holding a string, which is not a style and is dropped with nothing red. React's
       // wrapper resolves the name itself (components/scroll-view/shared.ts), so this gap could
       // only ever show on the tag path.
+      const slotValueFor = node.hostBehavior?.slotValueFor;
       routeProp(
         node.childHost,
         slotKey === 'style' && typeof value === 'string' ? 'class' : slotKey,
-        value,
+        slotValueFor === undefined ? value : slotValueFor(slotKey, value),
       );
       return;
     }

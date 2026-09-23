@@ -37,7 +37,10 @@ android {
 
     externalNativeBuild {
       cmake {
-        arguments "-DANDROID_STL=c++_shared"
+        // REACT_NATIVE_DIR: the app's own react-native (the plugin's `reactNativeDir`), so CMake can
+        // reach the one ReactCommon header the prefab does not ship (see CMakeLists.txt).
+        arguments "-DANDROID_STL=c++_shared",
+            "-DREACT_NATIVE_DIR=${project.extensions.getByName('react').reactNativeDir.get().asFile.absolutePath}"
       }
     }
   }

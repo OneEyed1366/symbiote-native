@@ -227,6 +227,19 @@ void install(Host &host) {
          return jsi::Value::undefined();
        });
 
+  // Hermes's sampling profiler over a window; false on JavaScriptCore. The trace is Chrome's format.
+  bind("startProfiling", 1,
+       [&host](jsi::Runtime &, const jsi::Value &, const jsi::Value *args, size_t count) {
+         const double hz = count > 0 && args[0].isNumber() ? args[0].getNumber() : 1000;
+         return jsi::Value(host.startProfiling(hz));
+       });
+
+  bind("stopProfiling", 1,
+       [&host](jsi::Runtime &runtime, const jsi::Value &, const jsi::Value *args, size_t count) {
+         if (count == 0 || !args[0].isString()) return jsi::Value(false);
+         return jsi::Value(host.stopProfiling(args[0].getString(runtime).utf8(runtime)));
+       });
+
   bind("reset", 0, [&host](jsi::Runtime &, const jsi::Value &, const jsi::Value *, size_t) {
     host.reset();
     return jsi::Value::undefined();

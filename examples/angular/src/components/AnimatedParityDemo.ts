@@ -19,6 +19,7 @@ import {
   PanResponder,
   SYMBIOTE_ELEMENTS,
 } from '@symbiote-native/angular';
+import { ActionButton } from './ActionButton';
 
 // static look compiled at build time by @symbiote-native/css-parser
 import './AnimatedParityDemo.css';
@@ -33,7 +34,7 @@ const SCROLL_DURATION_MS = 180;
 @Component({
   selector: 'AnimatedParityDemo',
   standalone: true,
-  imports: [SYMBIOTE_ELEMENTS, AnimatedView],
+  imports: [SYMBIOTE_ELEMENTS, AnimatedView, ActionButton],
   template: `
     <view class="section-nested">
       <text class="section-label"
@@ -64,12 +65,12 @@ const SCROLL_DURATION_MS = 180;
           [style]="{ transform: [{ translateX: follow }] }"
         ></AnimatedView>
       </view>
-      <button
+      <ActionButton
         testID="track-btn"
         title="Move target (follower chases)"
         (press)="moveLead()"
         color="#dd0031"
-      ></button>
+      ></ActionButton>
 
       <view class="collapse-frame">
         <AnimatedView
@@ -82,20 +83,20 @@ const SCROLL_DURATION_MS = 180;
       </view>
       <view class="row-tight">
         <view class="flex-1">
-          <button
+          <ActionButton
             testID="scroll-down-btn"
             title="Scroll ↓"
             (press)="scrollBy(40)"
             color="#38b2ac"
-          ></button>
+          ></ActionButton>
         </view>
         <view class="flex-1">
-          <button
+          <ActionButton
             testID="scroll-up-btn"
             title="Scroll ↑"
             (press)="scrollBy(-40)"
             color="#38b2ac"
-          ></button>
+          ></ActionButton>
         </view>
       </view>
     </view>

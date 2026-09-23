@@ -81,8 +81,22 @@ import {
   createCallbackWrapper,
   flushViewFor,
   isWrappableCallback,
+  markReadBackNode,
   type ICallbackWrapper,
 } from '../change-detection-flush';
+
+// The tags whose behavior reads the app's answer back inside the event's own turn - the three
+// behaviors `../change-detection-flush` names, plus the multiline spelling of the input. Marked at
+// creation so a flush finds their view lazily instead of a directive instance per element.
+const READ_BACK_TAGS: ReadonlySet<string> = new Set([
+  'text-input',
+  'text-input-multiline',
+  'switch',
+  'refresh-control',
+]);
+
+// The property binding an RN StyleProp travels as; see `SymbioteElement.style`.
+const STYLE_PROP_BINDING = 'styleProp';
 
 // The app callbacks an engine behavior READS BACK inside the same microtask turn, as an Angular
 // `(event)` binding — `valueChange` is handled in `listen` on its own, since it also needs the field
@@ -253,6 +267,13 @@ export class SymbioteRenderer implements Renderer2 {
   // free of a second guard.
   private pendingStyleNode: ISymbioteNode | undefined;
   private pendingStyle: Record<string, unknown> = {};
+  // A node with no standing style is matched against a published style key by key, as Angular hands
+  // the keys over, and builds nothing while they match. Rows sharing a style then skip the
+  // accumulator and the shallow compare's two key arrays (~320 B a `view` on create). The first
+  // mismatch materializes the accumulator from the keys matched so far.
+  private matchCandidate: Record<string, unknown> | undefined;
+  private matchCandidateSize = 0;
+  private readonly matchedKeys: string[] = [];
   private pendingClassNode: ISymbioteNode | undefined;
   private readonly releaseBeforeFlush: () => void;
 
@@ -303,10 +324,20 @@ export class SymbioteRenderer implements Renderer2 {
   private flushStyling(): void {
     const styled = this.pendingStyleNode;
     if (styled !== undefined) {
-      const style = this.pendingStyle;
       this.pendingStyleNode = undefined;
-      this.pendingStyle = {};
-      routeProp(styled, 'style', this.canonicalStyle(style));
+      const candidate = this.matchCandidate;
+      if (
+        candidate !== undefined &&
+        this.matchedKeys.length === this.matchCandidateSize
+      ) {
+        this.matchCandidate = undefined;
+        routeProp(styled, 'style', candidate);
+      } else {
+        this.materializeMatch();
+        const style = this.pendingStyle;
+        this.pendingStyle = {};
+        routeProp(styled, 'style', this.canonicalStyle(style));
+      }
     }
     const classed = this.pendingClassNode;
     if (classed !== undefined) {
@@ -362,6 +393,8 @@ export class SymbioteRenderer implements Renderer2 {
    * this simply stops sharing — it never stops being correct.
    */
   private readonly publishedStyles: Record<string, unknown>[] = [];
+  // Key count of each entry above, index for index: how a key-by-key match knows it is complete.
+  private readonly publishedSizes: number[] = [];
 
   /** A published object equal to this one, or this one — which then becomes the published copy. */
   private canonicalStyle(
@@ -373,24 +406,82 @@ export class SymbioteRenderer implements Renderer2 {
       if (at > 0) {
         this.publishedStyles.splice(at, 1);
         this.publishedStyles.unshift(known);
+        this.publishedSizes.unshift(this.publishedSizes.splice(at, 1)[0]);
       }
       return known;
     }
     this.publishedStyles.unshift(style);
-    if (this.publishedStyles.length > STYLE_CACHE) this.publishedStyles.pop();
+    this.publishedSizes.unshift(Object.keys(style).length);
+    if (this.publishedStyles.length > STYLE_CACHE) {
+      this.publishedStyles.pop();
+      this.publishedSizes.pop();
+    }
     return style;
+  }
+
+  /** Open this node's style run (closing any other); a no-op when it is already the open one. */
+  private openRun(el: ISymbioteNode): void {
+    if (this.pendingStyleNode === el) return;
+    this.flushStyling();
+    this.pendingStyleNode = el;
+    // Seeded from what is STANDING, because Angular sends only the keys that changed — an update
+    // that moves one key must not drop the rest.
+    const current = getExplicitStyle(el);
+    if (isRecord(current)) {
+      this.pendingStyle = { ...current };
+      return;
+    }
+    this.isChoosingCandidate = true;
+    this.matchedKeys.length = 0;
+  }
+
+  // The FIRST key picks the candidate: a row alternates styles (row, cell, cell, input), so the
+  // front entry is usually the neighbour's.
+  private isChoosingCandidate = false;
+
+  private chooseCandidate(key: string, value: unknown): void {
+    this.isChoosingCandidate = false;
+    if (value === undefined) return;
+    for (let at = 0; at < this.publishedStyles.length; at += 1) {
+      const known = this.publishedStyles[at];
+      if (!Object.is(known[key], value)) continue;
+      this.matchCandidate = known;
+      this.matchCandidateSize = this.publishedSizes[at] ?? 0;
+      return;
+    }
+  }
+
+  /** Stop matching: write the keys matched so far into the accumulator the run goes on with. */
+  private materializeMatch(): void {
+    this.isChoosingCandidate = false;
+    const candidate = this.matchCandidate;
+    if (candidate === undefined) return;
+    this.matchCandidate = undefined;
+    for (const key of this.matchedKeys) this.pendingStyle[key] = candidate[key];
   }
 
   /** The accumulator for this node's style run, opening one (and closing any other) if needed. */
   private openStyleRun(el: ISymbioteNode): Record<string, unknown> {
-    if (this.pendingStyleNode === el) return this.pendingStyle;
-    this.flushStyling();
-    // Seeded from what is STANDING, because Angular sends only the keys that changed — an update
-    // that moves one key must not drop the rest.
-    const current = getExplicitStyle(el);
-    this.pendingStyle = isRecord(current) ? { ...current } : {};
-    this.pendingStyleNode = el;
+    this.openRun(el);
+    this.materializeMatch();
     return this.pendingStyle;
+  }
+
+  private writeStyle(el: ISymbioteNode, key: string, value: unknown): void {
+    this.openRun(el);
+    if (this.isChoosingCandidate) this.chooseCandidate(key, value);
+    const candidate = this.matchCandidate;
+    if (
+      candidate !== undefined &&
+      value !== undefined &&
+      Object.is(candidate[key], value) &&
+      !this.matchedKeys.includes(key)
+    ) {
+      this.matchedKeys.push(key);
+      return;
+    }
+    this.materializeMatch();
+    this.pendingStyle[key] = value;
   }
 
   createElement(name: string): IHostNode {
@@ -442,6 +533,7 @@ export class SymbioteRenderer implements Renderer2 {
     if (isDebug()) {
       dlog(`angular createElement ${name} -> ${descriptor.component}`);
     }
+    if (READ_BACK_TAGS.has(engineName)) markReadBackNode(node);
     return toPublicInstance(node);
   }
 
@@ -653,7 +745,7 @@ export class SymbioteRenderer implements Renderer2 {
     if (isSurface(el)) return;
     countAngular('rendererWrites');
     noteAngularStyleWrite(style);
-    this.openStyleRun(el)[style] = value;
+    this.writeStyle(el, style, value);
     this.surface.requestCommit();
   }
 
@@ -709,7 +801,11 @@ export class SymbioteRenderer implements Renderer2 {
       }
     }
     this.flushStyling();
-    routeProp(el, name, this.wrapCallback(el, name, value));
+    // `[styleProp]` IS `style`, carried as a plain property so an RN array or press-state callback
+    // reaches the engine whole instead of Angular's styling engine. Binding it beside `[style]` on one
+    // element makes the later write win - they are one prop.
+    const propName = name === STYLE_PROP_BINDING ? 'style' : name;
+    routeProp(el, propName, this.wrapCallback(el, propName, value));
     this.surface.requestCommit();
   }
 

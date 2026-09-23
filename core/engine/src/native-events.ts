@@ -10,6 +10,7 @@
 
 import { dlog } from './debug';
 import { runWrapped } from './dispatch';
+import { invariant } from './invariant';
 
 // Bridgeless host hooks. `RN$registerCallableModule(name, factory)` exposes a JS
 // module the native side can call; `RN$Bridgeless` confirms we are on the new
@@ -93,6 +94,10 @@ export interface IDeviceEventSource {
     eventType: string,
     listener: (payload: unknown) => void,
   ): IEventSubscription;
+  // RN's DeviceEventEmitter has these; NativeEventEmitter.removeAllListeners / emit use them.
+  removeAllListeners?(eventType: string): void;
+  listenerCount?(eventType: string): number;
+  emit?(eventType: string, ...args: unknown[]): void;
 }
 
 let injectedSource: IDeviceEventSource | undefined;
@@ -191,5 +196,32 @@ export class NativeEventEmitter {
         this.module?.removeListeners(1);
       },
     };
+  }
+
+  // RN's NativeEventEmitter.emit: a JS-side emit onto the same device bus native feeds.
+  emit(eventType: string, ...args: unknown[]): void {
+    if (injectedSource !== undefined) {
+      injectedSource.emit?.(eventType, ...args);
+      return;
+    }
+    emit(eventType, ...args);
+  }
+
+  // RN's NativeEventEmitter.removeAllListeners: EVERY listener of the event on the device bus goes,
+  // not only this emitter's, and the module counter drops by that many.
+  removeAllListeners(eventType: string): void {
+    invariant(
+      eventType != null,
+      '`NativeEventEmitter.removeAllListener()` requires a non-null argument.',
+    );
+    if (injectedSource !== undefined) {
+      this.module?.removeListeners(
+        injectedSource.listenerCount?.(eventType) ?? 0,
+      );
+      injectedSource.removeAllListeners?.(eventType);
+      return;
+    }
+    this.module?.removeListeners(listeners.get(eventType)?.size ?? 0);
+    listeners.delete(eventType);
   }
 }

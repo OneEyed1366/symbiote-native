@@ -12,6 +12,16 @@ function baseProps(over: Partial<IModalViewProps> = {}): IModalViewProps {
   return { passthrough: {}, ...over };
 }
 
+describe('renderModal — RN defaultProps', () => {
+  // why: Modal.js `defaultProps = {hardwareAccelerated: false, visible: true}` reach the native
+  // host resolved, not unset.
+  it('sends hardwareAccelerated false and visible true when the app sets neither', () => {
+    const props = renderModal(baseProps()).props;
+    expect(props.hardwareAccelerated).toBe(false);
+    expect(props.visible).toBe(true);
+  });
+});
+
 describe('renderModal — default shape (RN Modal-itest.js "default values")', () => {
   it('paints an absolutely-positioned modal host wrapping a flex-filling white container', () => {
     const descriptor = renderModal(baseProps());
@@ -95,7 +105,7 @@ describe('renderModal — passthrough and explicit fields', () => {
     expect(descriptor.props.animationType).toBe('slide');
   });
 
-  it('forwards the platform-only props (RN Modal-itest.js "props") by name, undefined when omitted', () => {
+  it('forwards the platform-only props (RN Modal-itest.js "props") by name, unset when omitted (hardwareAccelerated has a false default)', () => {
     const withPlatformProps = renderModal(
       baseProps({
         supportedOrientations: ['portrait'],
@@ -113,7 +123,7 @@ describe('renderModal — passthrough and explicit fields', () => {
 
     const withoutThem = renderModal(baseProps());
     expect(withoutThem.props.supportedOrientations).toBe(undefined);
-    expect(withoutThem.props.hardwareAccelerated).toBe(undefined);
+    expect(withoutThem.props.hardwareAccelerated).toBe(false);
   });
 });
 
