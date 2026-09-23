@@ -130,7 +130,7 @@ older than we are.
 | **NativeScript**   | its own runtime and bindings         | JS/TS, Angular, Vue, Solid, Svelte, React | leaving RN's ecosystem for its own                      |
 | **Hippy**          | its own C++ DOM and layout engine    | React, Vue                                | leaving RN's ecosystem for Tencent's                    |
 | **Lynx**           | its own engine (PrimJS, dual-thread) | React, Vue                                | an 18-month-old ecosystem, mostly hand-written bridging |
-| **SymbioteNative** | **stock, unforked React Native**     | React, Vue 3, Angular, Svelte, Solid      | ecosystem packages are wrapped by hand, Angular is the slowest of the five                  |
+| **SymbioteNative** | **stock, unforked React Native**     | React, Vue 3, Angular, Svelte, Solid      | ecosystem packages are wrapped by hand, Angular is slower than stock                 |
 
 The difference is the row you read first. All three alternatives wrote their own native layer, so
 picking one means adopting its ecosystem too. As far as we have verified, SymbioteNative is the only
@@ -143,7 +143,7 @@ project owning its runtime can change it.
 
 The costs:
 
-- **Angular is the slowest of the five**: 0.90x stock on a create-shaped row where Solid is 0.63x.
+- **Angular is slower than stock**: 1.15x stock on a create-shaped row where Solid is 0.72x.
   Most of what is left is Angular's own per-component machinery rather than the adapter. The numbers
   are [below](#how-fast-against-stock-react-native).
 - **Ecosystem packages are wrapped by hand, one at a time.** The _native view_ comes for free,
