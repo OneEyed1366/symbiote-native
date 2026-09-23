@@ -32,6 +32,8 @@ permissions:
   contents: write
   pull-requests: write
   id-token: write
+  # checks.yml's gate reads the merged PR head's check runs to skip re-verifying its tree.
+  checks: read
 
 jobs:
   # Same three jobs ci.yml runs for fast PR feedback, re-run here so `needs:
@@ -63,7 +65,10 @@ jobs:
           registry-url: https://registry.npmjs.org
           cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
+      # `--ignore-scripts`: `prepare` would AOT-build every package here, and `prepublish-build`
+      # cleans and rebuilds all of it. Packing runs each package's `prepack`/`prepare` anyway, which
+      # is where `codegen-specs/` comes from.
+      - run: pnpm install --frozen-lockfile --ignore-scripts
 
       # Opens/updates a "chore: version packages" PR when unreleased changesets
       # exist on master; once that PR is merged, this same step runs `publish`
@@ -105,6 +110,8 @@ jobs:
   # version PR counts from the versions npm already holds. A hand merge once
   # dropped the previous bumps, and the release collided with published
   # versions and silently skipped 9 packages. A conflict fails this job.
+  # Pushes over a deploy key: the develop ruleset lets DeployKey bypass it, and
+  # a personal repo cannot list GitHub Actions as a bypass actor.
   sync-develop:
     needs: release
     if: github.event_name == 'push'
@@ -114,6 +121,7 @@ jobs:
         with:
           ref: develop
           fetch-depth: 0
+          ssh-key: ${{ secrets.SYNC_DEPLOY_KEY }}
 
       - name: Merge master into develop
         env:

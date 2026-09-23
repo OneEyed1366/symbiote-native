@@ -39,7 +39,7 @@
     "prepare": "husky",
     "changeset": "changeset",
     "version-packages": "changeset version",
-    "release": "pnpm run build && changeset publish",
+    "release": "pnpm run prepublish-build && changeset publish",
     "trust:publishers": "node scripts/trust-publishers.mjs",
     "test:vitest": "vitest run",
     "test:node": "node scripts/run-node-tests.mjs",
