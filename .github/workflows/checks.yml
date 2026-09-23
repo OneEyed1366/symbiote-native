@@ -35,15 +35,36 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       tree: ${{ steps.tree.outputs.hash }}
-      cache-hit: ${{ steps.restore.outputs.cache-hit }}
+      cache-hit: ${{ steps.restore.outputs.cache-hit == 'true' || steps.merged.outputs.verified == 'true' }}
       bundle-tree: ${{ steps.bundle-tree.outputs.hash }}
       bundle-cache-hit: ${{ steps.restore-bundle.outputs.cache-hit }}
       bundle-arms: ${{ steps.arms.outputs.list }}
     steps:
+      # Depth 2 brings both parents of a merge commit, which the `merged` step compares against.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - id: tree
         run: echo "hash=$(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
+
+      # The cache below never hits on master after a PR merge: a cache saved by a PR run is scoped
+      # to refs/pull/N/merge, and master cannot read it. So a merge commit whose tree equals its PR
+      # head's asks the Checks API instead: `Mark tree as passed` succeeding on that head means this
+      # exact tree passed everything. Any failure to answer (no second parent, a different tree, no
+      # token scope) reads as "not verified" and runs the checks.
+      - id: merged
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          verified=false
+          if head=$(git rev-parse -q --verify 'HEAD^2') &&
+             [ "$(git rev-parse 'HEAD^2^{tree}')" = "$(git rev-parse 'HEAD^{tree}')" ]; then
+            passed=$(gh api "repos/$GITHUB_REPOSITORY/commits/$head/check-runs?check_name=Checks%20/%20Mark%20tree%20as%20passed" \
+              --jq '[.check_runs[] | select(.app.slug == "github-actions" and .conclusion == "success")] | length' || echo 0)
+            [ "${passed:-0}" -gt 0 ] && verified=true
+          fi
+          echo "verified=$verified" >> "$GITHUB_OUTPUT"
 
       # lookup-only: checks whether the key exists without downloading anything — there is no
       # content to restore, the key's existence IS the answer.

@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/solid",
-  "version": "3.0.0",
+  "version": "3.0.2",
   "description": "SymbioteNative's Solid adapter — a solid-js/universal createRenderer driving real native iOS/Android views through the same engine as every other adapter.",
   "keywords": [
     "react-native",

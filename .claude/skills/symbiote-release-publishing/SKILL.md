@@ -265,6 +265,22 @@ re-added to `ignore`.
 under "workspace tooling"), like every other dev tool in this repo — see
 `symbiote-dependency-catalog`.
 
+## A green release can publish nothing: version collision (measured 2026-09-23)
+
+If a merge from `master` into `develop` drops the previous "Version Packages" bumps,
+`changeset version` recomputes from the old versions and lands on numbers npm already holds.
+`changeset publish` then only warns `is not being published because version X is already
+published` and exits 0. Release #84 shipped 3 of 12 packages this way; the new engine and
+adapter code sat under 22.09's 1.2.0 / 3.0.1.
+
+- Before merging a release PR, check each `newVersion` with `npm view <pkg>@<v> version`.
+  Any hit is a collision.
+- After a release, grep the log for `already published`, not only for `published`.
+- Fix: a new changeset for every collided package, which bumps it past npm. That includes a
+  package whose source did not change: `workspace:*` publishes as an EXACT pin, so the npm copy
+  still depends on the old sibling (navigation 5.0.1 pinned `components` 3.0.1). Check with
+  `npm view <pkg>@latest dependencies`, not with a source diff.
+
 ## A MINOR on a 0.x `engine` is a MAJOR for the whole repo (measured 2026-09-21)
 
 Every publishable package peers `"@symbiote-native/engine": "workspace:^"`, and `^0.5.0` does not
@@ -296,16 +312,23 @@ been recorded as one), which retires the cascade: `^1.0.0` covers `1.1.0`.
 "build": "pnpm run prepublish-build && pnpm run docs:build",
 "changeset": "changeset",                 // pnpm changeset — author a changeset for a PR
 "version-packages": "changeset version",  // bump versions + changelogs from pending changesets
-"release": "pnpm run build && changeset publish",
+"release": "pnpm run prepublish-build && changeset publish",
 "trust:publishers": "node scripts/trust-publishers.mjs"
 ```
 
-`release` explicitly re-runs the full build (typecheck → ESM-extension fix →
-Angular/slider AOT → docs) before publishing rather than trusting `prepare`
-ran recently — publishing must be idempotent from a cold checkout.
-`prepublish-build` is split out from `build` specifically so the canary flow
-below can reuse the package-relevant steps without also building the
-unrelated docs site.
+`release` re-runs the package build (typecheck → ESM-extension fix → AOT) before publishing
+rather than trusting `prepare` ran recently — publishing must be idempotent from a cold checkout.
+It skips docs (2026-09-24): the docs site is changeset-ignored and `docs.yml` deploys it.
+
+The release job installs with `--ignore-scripts` for the same reason `checks.yml` does:
+`prepare` would AOT every package only for `prepublish-build` to clean and redo it. Nothing is
+lost — `pnpm pack`/`publish` run each package's `prepack` + `prepare` themselves (pnpm 11.9
+source), which is also what regenerates the gitignored `codegen-specs/` the tarball ships.
+
+On master, `checks.yml`'s gate skips re-verifying a merge commit whose tree equals its PR head's
+when `Checks / Mark tree as passed` succeeded on that head (Checks API, `checks: read` in
+`release.yml`). The tree-hash cache cannot answer there: a PR run's cache is scoped to
+`refs/pull/N/merge` and master cannot read it.
 
 `pnpm run trust:publishers` (`scripts/trust-publishers.mjs`) configures npm's
 GitHub-OIDC trusted publishing for every publishable package in one loop —

@@ -32,6 +32,8 @@ permissions:
   contents: write
   pull-requests: write
   id-token: write
+  # checks.yml's gate reads the merged PR head's check runs to skip re-verifying its tree.
+  checks: read
 
 jobs:
   # Same three jobs ci.yml runs for fast PR feedback, re-run here so `needs:
@@ -63,7 +65,10 @@ jobs:
           registry-url: https://registry.npmjs.org
           cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
+      # `--ignore-scripts`: `prepare` would AOT-build every package here, and `prepublish-build`
+      # cleans and rebuilds all of it. Packing runs each package's `prepack`/`prepare` anyway, which
+      # is where `codegen-specs/` comes from.
+      - run: pnpm install --frozen-lockfile --ignore-scripts
 
       # Opens/updates a "chore: version packages" PR when unreleased changesets
       # exist on master; once that PR is merged, this same step runs `publish`
@@ -100,6 +105,32 @@ jobs:
             --target "${{ github.sha }}" \
             --title "Release ${DATE}" \
             --notes "$BODY"
+
+  # Merges master back into develop after every push to master, so the next
+  # version PR counts from the versions npm already holds. A hand merge once
+  # dropped the previous bumps, and the release collided with published
+  # versions and silently skipped 9 packages. A conflict fails this job.
+  # Pushes over a deploy key: the develop ruleset lets DeployKey bypass it, and
+  # a personal repo cannot list GitHub Actions as a bypass actor.
+  sync-develop:
+    needs: release
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: develop
+          fetch-depth: 0
+          ssh-key: ${{ secrets.SYNC_DEPLOY_KEY }}
+
+      - name: Merge master into develop
+        env:
+          HUSKY: '0'
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git merge origin/master -m "Merge branch 'master' into develop"
+          git push origin develop
 
   # Manual: dispatched with the `develop` branch selected, opens a version-bump
   # PR from that branch straight into master (changesets/action's `branch`
