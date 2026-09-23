@@ -14,8 +14,7 @@
 //                         ViewManager on Android, so the axis is the tag; a prop contradicting it
 //                         is dropped with a dlog rather than producing a shape RN cannot make.
 //                         Typed here for parity, and for an app porting from RN.
-//   nestedScrollEnabled   defaults to `true` in the behavior, on both platforms, which is what
-//                         every wrapper used to write by hand.
+//   nestedScrollEnabled   defaults to `true` only under an Android RefreshControl, as in RN.
 //
 // `children` is a `ReactNode`, so this type is per-adapter by construction
 // (<prop_types_split_agnostic_vs_per_adapter>).

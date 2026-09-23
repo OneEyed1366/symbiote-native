@@ -24,6 +24,7 @@ import {
   expandRowViewability,
   firstItemOfRow,
   lastItemOfRow,
+  removeClippedSubviewsOrDefault,
   rowKeyExtractor,
   type IRow,
   type ISeparatorProps,
@@ -34,6 +35,7 @@ import {
   type IScrollViewHandle,
 } from '@symbiote-native/components';
 import {
+  Platform,
   dlog,
   resolveClassName,
   type ISymbioteNode,
@@ -181,7 +183,15 @@ export const FlatList = defineComponent(
         footer: slots.footer,
         empty: slots.empty,
       };
-      const forwarded = normalizeVueAttrs(attrs);
+      const normalizedAttrs = normalizeVueAttrs(attrs);
+      // FlatList.js always sends it, defaulted per platform.
+      const forwarded = {
+        ...normalizedAttrs,
+        removeClippedSubviews: removeClippedSubviewsOrDefault(
+          normalizedAttrs.removeClippedSubviews,
+          Platform.OS,
+        ),
+      };
 
       dlog(`Vue FlatList over ${data.length} items, ${numColumns} column(s)`);
 

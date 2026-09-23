@@ -184,6 +184,8 @@ export interface IVirtualizedListProps<ItemT>
   scrollEventThrottle?: number;
   keyboardShouldPersistTaps?: boolean | 'always' | 'never' | 'handled';
   keyboardDismissMode?: 'none' | 'on-drag' | 'interactive';
+  removeClippedSubviews?: boolean;
+  nestedScrollEnabled?: boolean;
   style?: IStyleProp<IViewStyle>;
   contentContainerStyle?: IStyleProp<IViewStyle>;
 }
@@ -501,6 +503,8 @@ export class VirtualizedList<ItemT = unknown>
   @Input() scrollEventThrottle?: number;
   @Input() keyboardShouldPersistTaps?: boolean | 'always' | 'never' | 'handled';
   @Input() keyboardDismissMode?: 'none' | 'on-drag' | 'interactive';
+  @Input() removeClippedSubviews?: boolean;
+  @Input() nestedScrollEnabled?: boolean;
   @Input() style?: IStyleProp<IViewStyle>;
   @Input() contentContainerStyle?: IStyleProp<IViewStyle>;
   @Input() testID?: string;
@@ -754,6 +758,11 @@ export class VirtualizedList<ItemT = unknown>
       scrollEventThrottle: this.scrollEventThrottle,
       keyboardShouldPersistTaps: this.keyboardShouldPersistTaps,
       keyboardDismissMode: this.keyboardDismissMode,
+      // RN's VirtualizedList spreads its props onto the ScrollView, this one included.
+      removeClippedSubviews: this.removeClippedSubviews,
+      nestedScrollEnabled: this.nestedScrollEnabled,
+      // VirtualizedList.js:1111 — Android moves the scrollbar back after the `scale: -1` flip.
+      isInvertedVirtualizedList: this.isInverted ? true : undefined,
       contentOffset: this.commandedOffset,
       // `stickyHeaderIndices` is deliberately NOT forwarded — it numbers the scroll view's PAINT
       // children, and a windowed list paints a header, a spacer and a slice, so the positions move
@@ -1102,8 +1111,9 @@ export class VirtualizedList<ItemT = unknown>
       : this.contentContainerStyle;
     this.resolvedStyle = flattenStyle([
       anchorHostStyle(this.elementRef),
+      // VirtualizedList.js: `[inversionStyle, style]` — the app's style can override the flip.
       this.isInverted
-        ? [this.style, this.isHorizontal ? INVERTED_X_STYLE : INVERTED_Y_STYLE]
+        ? [this.isHorizontal ? INVERTED_X_STYLE : INVERTED_Y_STYLE, this.style]
         : this.style,
     ]);
     this.cellStyle = this.isInverted

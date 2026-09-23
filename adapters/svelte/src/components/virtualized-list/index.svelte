@@ -154,6 +154,8 @@
       scrollEventThrottle: props.scrollEventThrottle,
       keyboardShouldPersistTaps: props.keyboardShouldPersistTaps,
       keyboardDismissMode: props.keyboardDismissMode,
+      removeClippedSubviews: props.removeClippedSubviews,
+      nestedScrollEnabled: props.nestedScrollEnabled,
       style: props.style,
       contentContainerStyle: props.contentContainerStyle,
       class: props.class,
@@ -437,11 +439,12 @@
     };
   });
 
+  // VirtualizedList.js: `[inversionStyle, style]` — the app's style can override the flip.
   const resolvedStyle = $derived(
     narrowed.inverted
       ? [
-          narrowed.style,
           narrowed.horizontal ? INVERTED_X_STYLE : INVERTED_Y_STYLE,
+          narrowed.style,
         ]
       : narrowed.style,
   );
@@ -482,6 +485,13 @@
     }
     if (narrowed.keyboardDismissMode !== undefined)
       bag.keyboardDismissMode = narrowed.keyboardDismissMode;
+    // RN's VirtualizedList spreads its props onto the ScrollView, this one included.
+    if (narrowed.removeClippedSubviews !== undefined)
+      bag.removeClippedSubviews = narrowed.removeClippedSubviews;
+    if (narrowed.nestedScrollEnabled !== undefined)
+      bag.nestedScrollEnabled = narrowed.nestedScrollEnabled;
+    // VirtualizedList.js:1111 — Android moves the scrollbar back after the `scale: -1` flip.
+    if (narrowed.inverted === true) bag.isInvertedVirtualizedList = true;
     // `stickyHeaderIndices` is deliberately NOT forwarded. The behavior honours it by numbering the
     // owner's own PAINT children, and this list's indices are into the DATA stream — a windowed
     // list paints a spacer, a header and a slice, so index 3 of the data is almost never paint

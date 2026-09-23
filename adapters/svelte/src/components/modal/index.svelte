@@ -6,9 +6,7 @@
   // @symbiote-native/components and are shared verbatim with React/Vue (core/components/src/
   // state/modal.ts + view/render-modal.ts); Svelte supplies only the lifecycle:
   //   - $state over the keep-alive reducer (switchReducer's twin: modalReducer)
-  //   - a POST-render $effect driving the visible->hidden transition (Svelte's $effect runs
-  //     after the DOM update, the same "one keep-alive frame survives" timing as React's
-  //     useEffect / Vue's flush:'post' watch)
+  //   - a $effect arming the keep-alive on show, and the native dismiss dropping it (iOS)
   //   - the descriptor bridge: renderModal() always paints the SAME fixed shape (one
   //     modal host wrapping one view container — only prop VALUES vary,
   //     never structure, per svelte-adapter-dom-shim skill §15), so rather than building a
@@ -24,40 +22,38 @@
 <script lang="ts">
   import {
     createInitialModalState,
+    isModalVisible,
     modalReducer,
+    modalVisibilityAction,
     renderModal,
     resolveAccessibilityProps,
     shouldRenderModal,
   } from '@symbiote-native/components';
-  import { dlog } from '@symbiote-native/engine';
+  import { dlog, Platform } from '@symbiote-native/engine';
   import { createAttachmentsSync } from '../../runes/attachments';
   import type { ShimElement } from '../../dom-shim';
 
   let rawProps: IModalProps = $props();
 
-  let state = $state(createInitialModalState(rawProps.visible === true));
+  let state = $state(createInitialModalState(isModalVisible(rawProps.visible)));
 
   const resolved = $derived(resolveAccessibilityProps(rawProps));
-  const isVisible = $derived(resolved.visible === true);
+  const isVisible = $derived(isModalVisible(resolved.visible));
   const shouldRender = $derived(shouldRenderModal(isVisible, state));
 
-  // POST-render, mirroring state/modal.ts's contract: fires after the DOM update following the
-  // render that used the OLD state, so a visible->hidden transition keeps the node mounted one
-  // more frame (state.isRendered still true) before the NEXT render drops it. The reducer is
-  // identity-stable, so a no-op transition — including this effect's own first run on mount —
-  // triggers no extra render.
-  //
-  // Under this adapter's microtask-coalesced requestCommit() (element.ts's `p` setter), Svelte
-  // settles the whole visible->hidden cascade within the SAME microtask flush that processes the
-  // triggering prop change, so the keep-alive frame genuinely happens (a render sees
-  // isVisible=false with isRendered still true before this effect flips it) but isn't observable
-  // as its own committed Fabric frame the way React's per-render synchronous commit makes it.
+  // Arms the iOS keep-alive on show; a hide is left to the native dismiss (state/modal.ts). The
+  // reducer is identity-stable, so the mount run triggers no extra render.
   $effect(() => {
-    state = modalReducer(
-      state,
-      isVisible ? { type: 'show' } : { type: 'hide' },
-    );
+    const action = modalVisibilityAction(isVisible);
+    if (action !== undefined) state = modalReducer(state, action);
   });
+
+  // Modal.js: onDismiss is iOS-only — it drops the keep-alive, then tells the app.
+  function handleDismiss(): void {
+    if (Platform.OS !== 'ios') return;
+    state = modalReducer(state, { type: 'hide' });
+    rawProps.onDismiss?.();
+  }
 
   $effect(() => {
     if (!shouldRender) dlog('Modal hidden -> no node committed');
@@ -82,8 +78,10 @@
       style,
       class: className,
       children: _children,
-      ...passthrough
+      onDismiss: _onDismiss,
+      ...rest
     } = resolved;
+    const passthrough = { ...rest, onDismiss: handleDismiss };
 
     const descriptor = renderModal({
       visible,

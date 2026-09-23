@@ -191,6 +191,7 @@ export interface IVirtualizedListProps<ItemT>
   scrollEventThrottle?: number;
   keyboardShouldPersistTaps?: boolean | 'always' | 'never' | 'handled';
   keyboardDismissMode?: 'none' | 'on-drag' | 'interactive';
+  removeClippedSubviews?: boolean;
   style?: IStyleProp<IViewStyle>;
   contentContainerStyle?: IStyleProp<IViewStyle>;
   // Forwarded onto the inner ScrollView like `style` — resolves through the shared style
@@ -822,12 +823,14 @@ export function VirtualizedList<ItemT>(
   const resolvedContentContainerStyle: IStyleProp<IViewStyle> = horizontal
     ? [contentContainerStyle, { width: total }]
     : contentContainerStyle;
+  // VirtualizedList.js: `[inversionStyle, style]` — the app's style can override the flip.
   const resolvedStyle: IStyleProp<IViewStyle> | undefined = inverted
-    ? [style, horizontal ? INVERTED_X_STYLE : INVERTED_Y_STYLE]
+    ? [horizontal ? INVERTED_X_STYLE : INVERTED_Y_STYLE, style]
     : style;
 
   const scrollProps: IScrollViewProps & {
     onLayout: (event: ISymbioteEvent) => void;
+    isInvertedVirtualizedList?: boolean;
   } = {
     // The list's accessibility surface rides down onto the ScrollView. Spread first so the
     // explicit windowing props below always win.
@@ -841,6 +844,8 @@ export function VirtualizedList<ItemT>(
   // scrolls the two axes with different native ViewManagers. The behavior's own fold deletes the
   // prop and rewrites it from the tag, so passing it would be at best redundant and at worst a
   // contradiction it has to warn about.
+  // VirtualizedList.js:1111 — Android moves the scrollbar back after the `scale: -1` flip.
+  if (inverted) scrollProps.isInvertedVirtualizedList = true;
   if (onScrollBeginDrag !== undefined)
     scrollProps.onScrollBeginDrag = onScrollBeginDrag;
   if (onScrollEndDrag !== undefined)

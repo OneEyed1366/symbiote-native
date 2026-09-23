@@ -14,6 +14,7 @@ import {
   type Ref,
 } from 'react';
 import {
+  Platform,
   dlog,
   resolveClassName,
   type ISymbioteEvent,
@@ -24,6 +25,7 @@ import {
   expandRowViewability,
   firstItemOfRow,
   lastItemOfRow,
+  removeClippedSubviewsOrDefault,
   rowKeyExtractor,
   type IRow,
 } from '@symbiote-native/components';
@@ -108,6 +110,8 @@ export interface IFlatListProps<ItemT> extends IAccessibilityProps, IAriaProps {
   // Forwarded onto the inner VirtualizedList like `style` — resolves through the shared style
   // registry.
   className?: string;
+  // RN defaults it per platform (true on Android); see removeClippedSubviewsOrDefault.
+  removeClippedSubviews?: boolean;
 }
 
 export function FlatList<ItemT>(
@@ -127,8 +131,17 @@ export function FlatList<ItemT>(
     // ItemSeparatorComponent is typed on ItemT; the multi-column stream is IRow<ItemT>, so it is
     // wrapped there to unwrap rows back to items, exactly like viewability above.
     ItemSeparatorComponent,
-    ...rest
+    removeClippedSubviews: authoredRemoveClippedSubviews,
+    ...ownRest
   } = props;
+  // FlatList.js always sends it, defaulted per platform.
+  const rest = {
+    ...ownRest,
+    removeClippedSubviews: removeClippedSubviewsOrDefault(
+      authoredRemoveClippedSubviews,
+      Platform.OS,
+    ),
+  };
 
   dlog(`FlatList over ${data.length} items, ${numColumns} column(s)`);
 

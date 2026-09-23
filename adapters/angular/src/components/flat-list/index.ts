@@ -53,6 +53,7 @@ import {
   expandRowViewability,
   firstItemOfRow,
   lastItemOfRow,
+  removeClippedSubviewsOrDefault,
   rowKeyExtractor,
   type IRow,
   type IScrollViewHandle,
@@ -62,6 +63,7 @@ import {
   type IVirtualizedListHandle,
 } from '@symbiote-native/components';
 import {
+  Platform,
   dlog,
   flattenStyle,
   resolveClassName,
@@ -218,6 +220,8 @@ export type IFlatListInputs<ItemT> = Omit<
         [scrollEventThrottle]="scrollEventThrottle"
         [keyboardShouldPersistTaps]="keyboardShouldPersistTaps"
         [keyboardDismissMode]="keyboardDismissMode"
+        [removeClippedSubviews]="resolvedRemoveClippedSubviews"
+        [nestedScrollEnabled]="nestedScrollEnabled"
         [testID]="testID"
         [style]="resolvedStyle"
         [contentContainerStyle]="contentContainerStyle"
@@ -302,6 +306,8 @@ export type IFlatListInputs<ItemT> = Omit<
         [scrollEventThrottle]="scrollEventThrottle"
         [keyboardShouldPersistTaps]="keyboardShouldPersistTaps"
         [keyboardDismissMode]="keyboardDismissMode"
+        [removeClippedSubviews]="resolvedRemoveClippedSubviews"
+        [nestedScrollEnabled]="nestedScrollEnabled"
         [testID]="testID"
         [style]="resolvedStyle"
         [contentContainerStyle]="contentContainerStyle"
@@ -394,8 +400,18 @@ export class FlatList<ItemT = unknown>
   @Input() scrollEventThrottle?: number;
   @Input() keyboardShouldPersistTaps?: boolean | 'always' | 'never' | 'handled';
   @Input() keyboardDismissMode?: 'none' | 'on-drag' | 'interactive';
+  @Input() removeClippedSubviews?: boolean;
+  @Input() nestedScrollEnabled?: boolean;
   @Input() style?: IStyleProp<IViewStyle>;
   @Input() contentContainerStyle?: IStyleProp<IViewStyle>;
+
+  // FlatList.js always sends it, defaulted per platform.
+  get resolvedRemoveClippedSubviews(): boolean {
+    return removeClippedSubviewsOrDefault(
+      this.removeClippedSubviews,
+      Platform.OS,
+    );
+  }
 
   // The app's cell + slot templates, captured for the multi-column re-stamp path. In the
   // single-column path they are ALSO projected through <ng-content> to the inner list and these

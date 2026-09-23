@@ -177,6 +177,8 @@ export type ISectionListInputs<ItemT> = Omit<
       [scrollEventThrottle]="scrollEventThrottle"
       [keyboardShouldPersistTaps]="keyboardShouldPersistTaps"
       [keyboardDismissMode]="keyboardDismissMode"
+      [removeClippedSubviews]="removeClippedSubviews"
+      [nestedScrollEnabled]="nestedScrollEnabled"
       [style]="resolvedStyle"
       [contentContainerStyle]="contentContainerStyle"
       [testID]="testID"
@@ -343,6 +345,8 @@ export class SectionList<ItemT = unknown>
   @Input() scrollEventThrottle?: number;
   @Input() keyboardShouldPersistTaps?: boolean | 'always' | 'never' | 'handled';
   @Input() keyboardDismissMode?: 'none' | 'on-drag' | 'interactive';
+  @Input() removeClippedSubviews?: boolean;
+  @Input() nestedScrollEnabled?: boolean;
   @Input() style?: IStyleProp<IViewStyle>;
   @Input() contentContainerStyle?: IStyleProp<IViewStyle>;
   @Input() testID?: string;
