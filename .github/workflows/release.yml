@@ -101,6 +101,29 @@ jobs:
             --title "Release ${DATE}" \
             --notes "$BODY"
 
+  # Merges master back into develop after every push to master, so the next
+  # version PR counts from the versions npm already holds. A hand merge once
+  # dropped the previous bumps, and the release collided with published
+  # versions and silently skipped 9 packages. A conflict fails this job.
+  sync-develop:
+    needs: release
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: develop
+          fetch-depth: 0
+
+      - name: Merge master into develop
+        env:
+          HUSKY: '0'
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git merge origin/master -m "Merge branch 'master' into develop"
+          git push origin develop
+
   # Manual: dispatched with the `develop` branch selected, opens a version-bump
   # PR from that branch straight into master (changesets/action's `branch`
   # input sets the PR's base — the checkout stays on whatever branch the
