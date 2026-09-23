@@ -29,6 +29,7 @@
 
 import {
   registerButtonBehavior,
+  registerImageBehavior,
   registerPressableBehavior,
   registerScrollViewBehavior,
   registerTextInputBehavior,
@@ -42,6 +43,7 @@ import {
   createElement,
   createSurface,
   routeProp,
+  setProp,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
 
@@ -54,8 +56,10 @@ registerButtonBehavior();
 registerTouchableNativeFeedbackBehavior();
 registerTextInputBehavior();
 registerScrollViewBehavior();
+registerImageBehavior();
 
-const SINGLELINE = 'RCTSinglelineTextInputView';
+// What Android commits for BOTH text-input tags (`component-names/index.android.ts`).
+const ANDROID_TEXT_INPUT = 'AndroidTextInput';
 
 function commitOne(
   viewName: string,
@@ -103,7 +107,8 @@ describe('the rules that only an Android build compiles', () => {
     }).nativeBackgroundAndroid;
 
     expect(fieldOf(background, 'type')).toBe('RippleAndroid');
-    expect(fieldOf(background, 'color')).toBe('#ff0000');
+    // why: an INT, as RN's processColor leaves it — Java reads the ripple colour with getInt.
+    expect(fieldOf(background, 'color')).toBe(0xff_ff_00_00 | 0);
     expect(fieldOf(background, 'borderless')).toBe(true);
     expect(fieldOf(background, 'rippleRadius')).toBe(12);
   });
@@ -115,7 +120,9 @@ describe('the rules that only an Android build compiles', () => {
       android_ripple: { color: '#ff0000', foreground: true },
     });
 
-    expect(fieldOf(payload.nativeForegroundAndroid, 'color')).toBe('#ff0000');
+    expect(fieldOf(payload.nativeForegroundAndroid, 'color')).toBe(
+      0xff_ff_00_00 | 0,
+    );
     expect(payload.nativeBackgroundAndroid).toBe(undefined);
   });
 
@@ -129,13 +136,47 @@ describe('the rules that only an Android build compiles', () => {
     expect(fieldOf(background, 'color')).toBe(null);
   });
 
+  // why: useAndroidRippleForView.js:66 sends `alpha: alpha ?? null` in the dict.
+  it('carries the ripple alpha, null when unset', () => {
+    const withAlpha = commitOne('RCTView', 'pressable', {
+      android_ripple: { color: '#ff0000', alpha: 0.5 },
+    }).nativeBackgroundAndroid;
+    const without = commitOne('RCTView', 'pressable', {
+      android_ripple: { color: '#ff0000' },
+    }).nativeBackgroundAndroid;
+
+    expect(fieldOf(withAlpha, 'alpha')).toBe(0.5);
+    expect(fieldOf(without, 'alpha')).toBe(null);
+  });
+
+  // why: useAndroidRippleForView.js:57 builds a ripple only when color, borderless or radius is
+  // set; `{foreground: true}` alone installs no background.
+  it('installs no ripple for a config without color, borderless or radius', () => {
+    const payload = commitOne('RCTView', 'pressable', {
+      android_ripple: { foreground: true },
+    });
+
+    expect(payload.nativeForegroundAndroid).toBe(undefined);
+    expect(payload.nativeBackgroundAndroid).toBe(undefined);
+  });
+
+  // why: RN runs the ripple colour through processColor, which passes a PlatformColor through.
+  it('passes a PlatformColor ripple colour through', () => {
+    const platformColor = { resource_paths: ['?attr/colorAccent'] };
+    const background = commitOne('RCTView', 'pressable', {
+      android_ripple: { color: platformColor },
+    }).nativeBackgroundAndroid;
+
+    expect(fieldOf(background, 'color')).toEqual(platformColor);
+  });
+
   // why: `Button.js:394-437`'s Material look, which is `{}` on iOS and the whole style here. Asserted
   // through the committed payload's hoisted keys, which is where a style lands.
   it('paints the Material button style', () => {
     const payload = commitOne('RCTView', 'button', { title: 'Save' });
 
     expect(payload.elevation).toBe(4);
-    expect(payload.backgroundColor).toBe(0xff_21_96_f3);
+    expect(payload.backgroundColor).toBe(0xff_21_96_f3 | 0);
     expect(payload.borderRadius).toBe(2);
   });
 
@@ -147,8 +188,20 @@ describe('the rules that only an Android build compiles', () => {
       color: '#00ff00',
     });
 
-    expect(payload.backgroundColor).toBe(0xff_00_ff_00);
+    expect(payload.backgroundColor).toBe(0xff_00_ff_00 | 0);
     expect(payload.color).toBe(undefined);
+  });
+
+  // why: RN pushes `{backgroundColor: color}` for ANY ColorValue (Button.js:321-325); a
+  // PlatformColor must reach native as the opaque object, not fall back to the Material blue.
+  it('lets a PlatformColor color win over the Material blue', () => {
+    const platformColor = { resource_paths: ['?android:attr/colorAccent'] };
+    const payload = commitOne('RCTView', 'button', {
+      title: 'Save',
+      color: platformColor,
+    });
+
+    expect(payload.backgroundColor).toEqual(platformColor);
   });
 
   // why: disabled greys the button AND flattens it. Both, because a port that kept only the colour
@@ -160,7 +213,7 @@ describe('the rules that only an Android build compiles', () => {
     });
 
     expect(payload.elevation).toBe(0);
-    expect(payload.backgroundColor).toBe(0xff_df_df_df);
+    expect(payload.backgroundColor).toBe(0xff_df_df_df | 0);
   });
 
   // why: the style is REDERIVED on a late write, not frozen at mount. `color` and `disabled` are the
@@ -179,12 +232,12 @@ describe('the rules that only an Android build compiles', () => {
     surface.appendChild(button);
     surface.commit();
     mounted();
-    expect(committedPayloadOf(button)?.backgroundColor).toBe(0xff_21_96_f3);
+    expect(committedPayloadOf(button)?.backgroundColor).toBe(0xff_21_96_f3 | 0);
 
     routeProp(button, 'color', '#ff0000');
     surface.commit();
     mounted();
-    expect(committedPayloadOf(button)?.backgroundColor).toBe(0xff_ff_00_00);
+    expect(committedPayloadOf(button)?.backgroundColor).toBe(0xff_ff_00_00 | 0);
   });
 
   // why: the button's own view gets TNF's default background, because TNF renders no view and clones
@@ -199,27 +252,8 @@ describe('the rules that only an Android build compiles', () => {
     expect(payload.nativeForegroundAndroid).toBe(undefined);
   });
 
-  // why: `Button.js:352-353` renders the title UPPERCASE on Android and verbatim everywhere else. It
-  // hangs on a raw text, which commits as `RCTRawText` on both platforms — so unlike `Switch` there
-  // is no view name to branch on, and this arm is the only place the rule runs outside a device.
-  it('uppercases the button label', () => {
-    const surface = createSurface(ROOT_TAG);
-    const button: ISymbioteNode = createElement('RCTView', false, 'button');
-    routeProp(button, 'title', 'Save');
-    surface.appendChild(button);
-    surface.commit();
-    mounted();
-
-    // THE TREE IS iOS's HERE and that is the arm's one honest limit: `buildStructure` branches on
-    // `Platform.OS`, which is the JS half and still reads the host, so the shape is
-    // `button -> view -> text -> rawtext` rather than Android's three-node one. The RULE is what this
-    // build changes, and the rule keys off the label's TAG, which is the same on both shapes — so
-    // the uppercase is asserted and the missing wrapper is not this case's subject.
-    const [view] = childrenOf(button);
-    const [text] = childrenOf(view);
-    const [label] = childrenOf(text);
-    expect(committedPayloadOf(label)?.text).toBe('SAVE');
-  });
+  // (Button's Android uppercase is JS now — `slotValueFor` in `behaviors/button.ts`, because only
+  // JavaScript's `toUpperCase` is full Unicode — and is asserted in `button-android.test.ts`.)
 
   // why: TouchableNativeFeedback's default background, which is what an app gets when it passes no
   // `background` at all (`:343-348`). A ThemeAttr dict, not a ripple — the two shapes are different
@@ -264,9 +298,11 @@ describe('the rules that only an Android build compiles', () => {
     mounted();
 
     const payload = committedPayloadOf(child);
-    // `useForeground` picks the other slot, and the api-level guard resolves to the minimum RN
-    // supports in a host build — see `androidApiLevel`.
-    expect(fieldOf(payload?.nativeForegroundAndroid, 'color')).toBe('#ff0000');
+    // `useForeground` picks the other slot; `canUseNativeForeground()` is true on any Android.
+    // why: TouchableNativeFeedback.Ripple leaves the colour a string; the rule converts it.
+    expect(fieldOf(payload?.nativeForegroundAndroid, 'color')).toBe(
+      0xff_ff_00_00 | 0,
+    );
     expect(payload?.nativeBackgroundAndroid).toBe(undefined);
     // Neither name may reach Fabric raw: no ViewConfig declares them, so a leak is silent.
     expect(payload?.background).toBe(undefined);
@@ -279,7 +315,9 @@ describe('the rules that only an Android build compiles', () => {
   // ABSENCE (`text-input-payload.itest.ts`, "sends no alias and no android-only key"); this is the
   // half that had no home until the arm existed.
   it('defaults a text input underline to transparent', () => {
-    const payload = commitOne(SINGLELINE, 'text-input', { text: 'input 0' });
+    const payload = commitOne(ANDROID_TEXT_INPUT, 'text-input', {
+      text: 'input 0',
+    });
 
     expect(payload.underlineColorAndroid).toBe(0x00_00_00_00);
   });
@@ -288,11 +326,11 @@ describe('the rules that only an Android build compiles', () => {
   // underline back must be able to ask for it. The `??` is the whole rule and a port that wrote
   // unconditionally would pass the case above and fail only on a device.
   it('lets an authored underline colour win', () => {
-    const payload = commitOne(SINGLELINE, 'text-input', {
+    const payload = commitOne(ANDROID_TEXT_INPUT, 'text-input', {
       underlineColorAndroid: '#00ff00',
     });
 
-    expect(payload.underlineColorAndroid).toBe(0xff_00_ff_00);
+    expect(payload.underlineColorAndroid).toBe(0xff_00_ff_00 | 0);
   });
 
   // why: `search` is the ONE `inputMode` token RN resolves per platform (TextInput.js:815-825) —
@@ -300,11 +338,23 @@ describe('the rules that only an Android build compiles', () => {
   // falls back to the default. Every other token is platform-invariant and asserted on the iOS arm;
   // this is the only row where the two builds must disagree, which is what makes it worth an arm.
   it('falls the search keyboard back to the default', () => {
-    const payload = commitOne(SINGLELINE, 'text-input', {
+    const payload = commitOne('AndroidTextInput', 'text-input', {
       inputMode: 'search',
     });
 
     expect(payload.keyboardType).toBe('default');
+  });
+
+  // why: Android commits BOTH text-input tags as `AndroidTextInput`; RN runs the same TextInput.js
+  // on it — the controlled `value` rides as `text`, and submitBehavior follows the TAG.
+  it('runs the text input rules on the Android component name', () => {
+    const single = commitOne('AndroidTextInput', 'text-input', { value: 'x' });
+    expect(single.text).toBe('x');
+    expect(single.value).toBe(undefined);
+    expect(single.submitBehavior).toBe('blurAndSubmit');
+
+    const multi = commitOne('AndroidTextInput', 'text-input-multiline', {});
+    expect(multi.submitBehavior).toBe('newline');
   });
 
   // why: `snapToAlignment` stops the content node's children collapsing on ANDROID ONLY — RN's gate
@@ -354,6 +404,126 @@ describe('the rules that only an Android build compiles', () => {
     mounted();
 
     expect(committedPayloadOf(content)?.collapsableChildren).toBe(false);
+  });
+
+  // why: TextInput.js:728-735,938-954 — Android defaults `autoCapitalize` to 'sentences' and
+  // `placeholder` to '', maps the W3C autoComplete token for its own native prop, and derives no
+  // `textContentType` (an authored one still passes).
+  it('applies the Android text input defaults and autoComplete mapping', () => {
+    const payload = commitOne('AndroidTextInput', 'text-input', {
+      autoComplete: 'email',
+    });
+    expect(payload.autoCapitalize).toBe('sentences');
+    expect(payload.placeholder).toBe('');
+    expect(payload.autoComplete).toBe('email');
+    expect(payload.textContentType).toBe(undefined);
+
+    const authored = commitOne('AndroidTextInput', 'text-input', {
+      autoCapitalize: 'none',
+      placeholder: 'Name',
+      autoComplete: 'address-line1',
+    });
+    expect(authored.autoCapitalize).toBe('none');
+    expect(authored.placeholder).toBe('Name');
+    expect(authored.autoComplete).toBe('postal-address-region');
+  });
+
+  // why: Text.js:145-150 — on Android an unset `accessible` follows the press handlers
+  // (`onPress != null || onLongPress != null`); an authored value wins.
+  it('makes text accessible on Android only when it is pressable', () => {
+    const textPayload = (props: Record<string, unknown>) => {
+      const surface = createSurface(ROOT_TAG);
+      const node: ISymbioteNode = createElement('RCTText', true, 'text');
+      for (const [name, value] of Object.entries(props))
+        routeProp(node, name, value);
+      surface.appendChild(node);
+      surface.commit();
+      mounted();
+      return committedPayloadOf(node);
+    };
+
+    expect(textPayload({})?.accessible).toBe(false);
+    expect(textPayload({ onPress: () => {} })?.accessible).toBe(true);
+    expect(textPayload({ onLongPress: () => {} })?.accessible).toBe(true);
+    expect(textPayload({ accessible: true })?.accessible).toBe(true);
+  });
+
+  // why: ScrollView.js:1740-1745 — clipping breaks sticky headers on Android, so the content view
+  // is forced to false while any header sticks; without one it carries the scroller's value.
+  it('turns content clipping off under sticky headers', () => {
+    const contentPayload = (props: Record<string, unknown>) => {
+      const surface = createSurface(ROOT_TAG);
+      const owner: ISymbioteNode = createElement(
+        'RCTScrollView',
+        false,
+        'scroll-view',
+      );
+      for (const [name, value] of Object.entries(props))
+        routeProp(owner, name, value);
+      const content = owner.childHost;
+      if (content === undefined)
+        throw new Error('the behavior built no content');
+      appendChild(owner, createElement('RCTView', false, 'view'));
+      surface.appendChild(owner);
+      surface.commit();
+      mounted();
+      return committedPayloadOf(content);
+    };
+
+    expect(
+      contentPayload({ removeClippedSubviews: true, stickyHeaderIndices: [0] })
+        ?.removeClippedSubviews,
+    ).toBe(false);
+    expect(
+      contentPayload({ removeClippedSubviews: true, stickyHeaderIndices: [] })
+        ?.removeClippedSubviews,
+    ).toBe(true);
+  });
+
+  // why: RN's `processColor` hands Android a SIGNED int32 (`| 0x0`). An unsigned opaque colour
+  // reaches Java ViewManagers as a Double that Kotlin's `toInt()` saturates to 0x7fffffff, so every
+  // View background painted translucent white while text colours (read in C++) stayed right.
+  it('commits an opaque colour as a signed int32, as RN does on Android', () => {
+    const payload = commitOne('RCTView', 'view', {
+      style: { backgroundColor: '#0b1220' },
+    });
+
+    expect(payload.backgroundColor).toBe(0xff0b1220 | 0);
+  });
+
+  // why: `Image.android.js` sends `defaultSource_.uri`, and `ReactImageManager.setDefaultSource`
+  // takes a `String?`. A map there is a red-box "Error while updating property 'defaultSource'".
+  it('commits an image defaultSource as its bare uri string', () => {
+    const surface = createSurface(ROOT_TAG);
+    const image: ISymbioteNode = createElement('RCTImageView', false, 'image');
+    setProp(image, 'src', 'https://a/1.png');
+    setProp(image, 'defaultSource', { uri: 'https://a/placeholder.png' });
+    surface.appendChild(image);
+    surface.commit();
+    mounted();
+
+    expect(committedPayloadOf(image)?.defaultSource).toBe(
+      'https://a/placeholder.png',
+    );
+  });
+
+  // why: `ReactImageView.setSource` reads only `uri`/`cache`/sizes from a source map; headers reach
+  // the request ONLY through the top-level `headers` prop, which `Image.android.js` fills from
+  // `source_[0].headers` when the source is an ARRAY (a single object's are dropped at write time,
+  // in JS — see image-source-write.test.ts). Left inside the source, the request goes without them.
+  it('lifts the first source headers to the top-level headers prop', () => {
+    const surface = createSurface(ROOT_TAG);
+    const image: ISymbioteNode = createElement('RCTImageView', false, 'image');
+    setProp(image, 'source', [
+      { uri: 'https://a/1.png', headers: { Authorization: 'Bearer t' } },
+    ]);
+    surface.appendChild(image);
+    surface.commit();
+    mounted();
+
+    expect(fieldOf(committedPayloadOf(image)?.headers, 'Authorization')).toBe(
+      'Bearer t',
+    );
   });
 });
 

@@ -37,38 +37,58 @@ export type IAppStateStatus =
 export type IAppStateEvent =
   (typeof APP_STATE_EVENT)[keyof typeof APP_STATE_EVENT];
 
-// The AppState native module: getConstants (initial state) plus the observe-counters.
+// The AppState native module: constants, the live-state query, and the observe-counters.
 interface INativeAppState extends IEventEmitterModule {
   getConstants(): { initialAppState: string };
+  getCurrentAppState(
+    onSuccess: (data: { app_state: string }) => void,
+    onError: (error: unknown) => void,
+  ): void;
   addListener(eventType: string): void;
   removeListeners(count: number): void;
 }
 
-function isStateChangePayload(value: unknown): value is { app_state: string } {
-  return typeof value === 'object' && value !== null && 'app_state' in value;
+// `appStateData.app_state`, read the way RN reads it: no shape check, `undefined` when absent,
+// and a TypeError on a null payload as the property read would throw.
+function appStateOf(payload: unknown): string | undefined {
+  if (payload === null || payload === undefined) {
+    throw new TypeError(
+      `Cannot read property 'app_state' of ${String(payload)}`,
+    );
+  }
+  const state: unknown = Reflect.get(Object(payload), 'app_state');
+  return typeof state === 'string' ? state : undefined;
 }
 
-// Lazily resolved so importing this module has no native side effect: a headless
-// run without a fake __turboModuleProxy still loads it; resolution happens on first
-// use. `null` when the module isn't linked.
-let currentState: string | null = null;
+// `null` until the module resolves (or when it is not linked), as RN's field starts.
+let currentState: string | null | undefined = null;
 
-// The self-subscription policy that diverges from a plain lazy-resolve+emitter:
-// AppState hydrates `currentState` from the module's initial constants, then keeps it
-// fresh forever via a permanent 'appStateDidChange' listener, so a read after a native
-// change returns the new value even with nobody else listening (RN parity).
+// AppState.js's constructor, run once when the emitter is built: seed from the constant, keep it
+// fresh from 'appStateDidChange', and ask native for the live state — which wins, and is
+// re-emitted to listeners, unless an event arrived first.
 const deviceEventModule = createDeviceEventModule<INativeAppState>({
   moduleName: APP_STATE_MODULE,
   moduleLogPrefix: 'AppState: module',
   onEmitterCreated: (emitter, module) => {
-    if (module !== null) {
-      currentState = module.getConstants().initialAppState;
-    }
+    if (module === null) return;
+    currentState = module.getConstants().initialAppState;
+    let eventUpdated = false;
     emitter.addListener(NATIVE_EVENT.stateDidChange, payload => {
-      if (!isStateChangePayload(payload)) return;
-      dlog(`AppState: ${NATIVE_EVENT.stateDidChange} -> ${payload.app_state}`);
-      currentState = payload.app_state;
+      eventUpdated = true;
+      currentState = appStateOf(payload);
+      dlog(
+        `AppState: ${NATIVE_EVENT.stateDidChange} -> ${String(currentState)}`,
+      );
     });
+    module.getCurrentAppState(
+      data => {
+        if (!eventUpdated && currentState !== data.app_state) {
+          currentState = data.app_state;
+          emitter.emit(NATIVE_EVENT.stateDidChange, data);
+        }
+      },
+      error => dlog(`AppState.getCurrentAppState failed: ${String(error)}`),
+    );
   },
 });
 
@@ -89,29 +109,27 @@ class AppStateImpl {
 
   // The current foreground/background state, populated from getConstants and kept
   // fresh by the change observer. Null until the module resolves (or never linked).
-  get currentState(): string | null {
+  get currentState(): string | null | undefined {
     getEmitter();
     return currentState;
   }
 
-  // Subscribe to an AppState event. Native delivers `appStateDidChange`,
-  // `memoryWarning`, and `appStateFocusChange`; this maps each onto the requested
-  // public event. Never throws; a missing module yields a live-but-silent
-  // subscription (the counters are no-ops without a module).
+  // Subscribe to an AppState event, mapped onto the native `appStateDidChange` /
+  // `memoryWarning` / `appStateFocusChange`. Throws, as RN does, without a module or for an
+  // event it does not know.
   addEventListener(
     type: IAppStateEvent,
     handler: (...args: unknown[]) => void,
   ): IEventSubscription {
+    if (getModule() === null) {
+      throw new Error('Cannot use AppState when `isAvailable` is false.');
+    }
     const eventEmitter = getEmitter();
     dlog(`AppState.addEventListener -> ${type}`);
     switch (type) {
       case APP_STATE_EVENT.change:
-        return eventEmitter.addListener(
-          NATIVE_EVENT.stateDidChange,
-          payload => {
-            if (!isStateChangePayload(payload)) return;
-            handler(payload.app_state);
-          },
+        return eventEmitter.addListener(NATIVE_EVENT.stateDidChange, payload =>
+          handler(appStateOf(payload)),
         );
       case APP_STATE_EVENT.memoryWarning:
         return eventEmitter.addListener(NATIVE_EVENT.memoryWarning, () =>
@@ -119,13 +137,14 @@ class AppStateImpl {
         );
       case APP_STATE_EVENT.focus:
         return eventEmitter.addListener(NATIVE_EVENT.focusChange, hasFocus => {
-          if (hasFocus === true) handler();
+          if (hasFocus) handler();
         });
       case APP_STATE_EVENT.blur:
         return eventEmitter.addListener(NATIVE_EVENT.focusChange, hasFocus => {
-          if (hasFocus === false) handler();
+          if (!hasFocus) handler();
         });
     }
+    throw new Error(`Trying to subscribe to unknown event: ${String(type)}`);
   }
 }
 

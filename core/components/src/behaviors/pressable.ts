@@ -17,13 +17,16 @@
 
 import {
   appListenerFor,
+  dispatchViewCommand,
   dlog,
+  Platform,
   propOf,
   registerHostBehavior,
   requestCommitFor,
   setBehaviorListener,
   setNodePressed,
   type IHostBehavior,
+  type ISymbioteEvent,
   type ISymbioteNode,
   propsOf,
 } from '@symbiote-native/engine';
@@ -75,11 +78,17 @@ export type IDisabledResolver = (
   props: Readonly<Record<string, unknown>>,
 ) => boolean | undefined;
 
+export type ICancelableResolver = (
+  source: ISymbioteNode,
+) => boolean | undefined;
+
 interface IBehaviorState {
   readonly runtime: IPressRuntime;
   readonly host: IPressHost;
   readonly refine: IPressConfigRefinement | undefined;
   readonly disabledOf: IDisabledResolver | undefined;
+  // A tag whose `cancelable` is not the family's rule (TextInput's is platform-split).
+  readonly cancelableOf: ICancelableResolver | undefined;
   // Where the machine READS from, which is not always the node it acts ON. They differ for exactly
   // one shape: a primitive that renders no view of its own and clones onto its single child
   // (`./touchable-native-feedback`). There the props and the app's callbacks are on the OWNER, and
@@ -243,6 +252,60 @@ function configFor(node: ISymbioteNode): IPressMachineConfig {
   };
 }
 
+// Read once: the platform cannot change under a running app.
+const IS_ANDROID = Platform.OS === 'android';
+
+// useAndroidRippleForView.js:57 — a ripple exists only when color, borderless or radius is set.
+function hasAndroidRipple(config: unknown): boolean {
+  if (typeof config !== 'object' || config === null) return false;
+  return (
+    Reflect.get(config, 'color') != null ||
+    Reflect.get(config, 'borderless') != null ||
+    Reflect.get(config, 'radius') != null
+  );
+}
+
+// `locationX ?? 0` (TouchableNativeFeedback.js:280, useAndroidRippleForView.js:83). The bag is raw
+// Fabric payload, so guard.
+function hotspotAt(nativeEvent: Record<string, unknown>, key: string): number {
+  const value = nativeEvent[key];
+  return typeof value === 'number' ? value : 0;
+}
+
+/**
+ * The Android ripple's three view commands around the app's callbacks (TNF :230-252,
+ * useAndroidRippleForView.js:77-104). The JS responder takes the touch before Android's own
+ * pressed handling, so without them the ripple never animates. Hotspot first: it starts under
+ * the finger.
+ */
+export function withNativeFeedbackCommands(
+  node: ISymbioteNode,
+  config: IPressMachineConfig,
+): IPressMachineConfig {
+  const hotspot = (event: ISymbioteEvent): void => {
+    dispatchViewCommand(node, 'hotspotUpdate', [
+      hotspotAt(event.nativeEvent, 'locationX'),
+      hotspotAt(event.nativeEvent, 'locationY'),
+    ]);
+  };
+  return {
+    ...config,
+    onPressIn(event: ISymbioteEvent): void {
+      hotspot(event);
+      dispatchViewCommand(node, 'setPressed', [true]);
+      config.onPressIn?.(event);
+    },
+    onPressMove(event: ISymbioteEvent): void {
+      hotspot(event);
+      config.onPressMove?.(event);
+    },
+    onPressOut(event: ISymbioteEvent): void {
+      dispatchViewCommand(node, 'setPressed', [false]);
+      config.onPressOut?.(event);
+    },
+  };
+}
+
 // Rebuilding at GESTURE START is the whole reason for the dispatcher indirection, and skipping it
 // is a bug that looks like working code. `attach` runs inside `createElement`, before a single
 // prop has been routed — the node holds nothing at all there — so a machine built at attach would
@@ -255,8 +318,11 @@ function rebuild(node: ISymbioteNode, state: IBehaviorState): void {
   // (dispatching a view command needs the committed node, not the one holding the props).
   const source = state.source;
   const base = configFor(source);
+  const refined = state.refine === undefined ? base : state.refine(node, base);
   const handlers = createPressHandlers(
-    state.refine === undefined ? base : state.refine(node, base),
+    IS_ANDROID && hasAndroidRipple(propOf(source, 'android_ripple'))
+      ? withNativeFeedbackCommands(node, refined)
+      : refined,
     state.runtime,
     state.host,
   );
@@ -270,7 +336,7 @@ function rebuild(node: ISymbioteNode, state: IBehaviorState): void {
       : state.disabledOf(sourceProps);
   state.listeners = buildPressableListeners(handlers, {
     disabled: disabled === true ? true : undefined,
-    cancelable: resolveCancelable(source),
+    cancelable: (state.cancelableOf ?? resolveCancelable)(source),
     blockNativeResponder: propOf(source, 'blockNativeResponder') === true,
   });
 }
@@ -389,6 +455,7 @@ export function attachPressMachine(
   options: {
     readonly refine?: IPressConfigRefinement;
     readonly disabledOf?: IDisabledResolver;
+    readonly cancelableOf?: ICancelableResolver;
     readonly source?: ISymbioteNode;
   } = {},
 ): void {
@@ -400,6 +467,7 @@ function attach(
   options: {
     readonly refine?: IPressConfigRefinement;
     readonly disabledOf?: IDisabledResolver;
+    readonly cancelableOf?: ICancelableResolver;
     readonly source?: ISymbioteNode;
   },
 ): void {
@@ -440,6 +508,7 @@ function attach(
     host,
     refine: options.refine,
     disabledOf: options.disabledOf,
+    cancelableOf: options.cancelableOf,
     source: options.source ?? node,
     timers,
     listeners: {},

@@ -14,7 +14,7 @@
 //   iOS      button   RCTView      TouchableOpacity's Animated.View — the responder + the fade
 //            └ view   RCTView      no style at all, and no fold
 //              └ text RCTText      `button-label-text` — foldButtonLabelStyle + RN's Text defaults
-//                └ raw RCTRawText  `button-label`    — foldButtonLabel            FOUR nodes
+//                └ raw RCTRawText  `button-label`    — uppercaseTitle (Android)   FOUR nodes
 //
 //   Android  button   RCTView      the styled button view, CLONED onto: the responder, the ripple
 //            │                     background, the whole a11y fold. No fade, no wrapper.
@@ -229,15 +229,8 @@ const buttonDisabled: IDisabledResolver = props => projectionOf(props).disabled;
 // is the wrapping view, which knows none of it.
 export const BUTTON_LABEL_TEXT_TAG = 'button-label-text';
 
-// The label's own tag. A raw text carrying one looks odd and is not: it has no props an app can
-// write, but its CONTENT is the platform's decision here — RN renders a button's title uppercased on
-// Android and verbatim elsewhere (`Button.js:352-353`), which is a user-agent choice about a control
-// rather than anything the app asked for.
-//
-// That is what the fold here used to do, and it is `foldButtonLabel` in `SymbioteFabricProps.cpp`
-// now, reached off this tag. `button-payload.itest.ts` recorded "a raw text carries no tag at all,
-// so there is nothing for a tag-keyed rule to key on" — true of `createRawText`'s old signature, not
-// of raw texts, and it takes a tag now for exactly this.
+// The label's own tag, on the raw text that holds the title. Its Android uppercase (`Button.js:352`)
+// is `uppercaseTitle` below, in JS: the C++ tag rule it briefly was could only do ASCII.
 export const BUTTON_LABEL_TAG = 'button-label';
 
 // ---- the Android touchable -------------------------------------------------------------------
@@ -366,6 +359,15 @@ function onOwnedListenerChange(node: ISymbioteNode, name: string): void {
   requestCommitFor(node);
 }
 
+// Button.js:352-353 — Android renders `title.toUpperCase()`. Here in JS rather than in the C++ tag
+// rules because only JavaScript's uppercase is full Unicode (Cyrillic, `ß` -> `SS`); the host has
+// no ICU, and an ASCII port left every non-Latin title in its authored case.
+function uppercaseTitle(slotKey: string, value: unknown): unknown {
+  return slotKey === 'text' && typeof value === 'string'
+    ? value.toUpperCase()
+    : value;
+}
+
 // Idempotent: an adapter entry may be imported more than once in a bundle.
 export function registerButtonBehavior(): void {
   // `attach`/`detach` come from the touchable unwrapped: the internal nodes are ordinary children
@@ -378,6 +380,7 @@ export function registerButtonBehavior(): void {
     onOwnedListenerChange,
     slotProps: SLOT_PROPS,
     slotDerived: SLOT_DERIVED,
+    ...(IS_ANDROID ? { slotValueFor: uppercaseTitle } : {}),
   };
   // The two DERIVED nodes' tags, registered with no runtime at all. A tag reaches C++ only through
   // `recordSetTag`, which `attachHostBehavior` emits, so a tag nobody registered carries an empty

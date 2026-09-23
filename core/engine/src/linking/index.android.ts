@@ -13,11 +13,11 @@ export type { IUrlEvent, IIntentExtra } from './shared';
 
 export const Linking = createLinking({
   moduleName: 'IntentAndroid',
-  sendIntent: (module, action, extras) => {
-    if (module === null || module.sendIntent === undefined) {
-      return Promise.reject(
-        new Error('Linking: IntentAndroid native module unavailable'),
-      );
+  // RN: `nullthrows(NativeIntentAndroid).sendIntent(action, extras)`.
+  sendIntent: (requireModule, action, extras) => {
+    const module = requireModule();
+    if (module.sendIntent === undefined) {
+      throw new TypeError('NativeIntentAndroid.sendIntent is not a function');
     }
     return module.sendIntent(action, extras);
   },

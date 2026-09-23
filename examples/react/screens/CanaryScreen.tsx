@@ -539,6 +539,7 @@ export function CanaryScreen() {
           scroll-driven header demo below. */}
         <text className="section-label">MVCP · prepend without jump</text>
         <FlatList
+          nestedScrollEnabled
           data={mvcpItems}
           keyExtractor={item => item.id}
           maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
@@ -600,6 +601,7 @@ export function CanaryScreen() {
         </Animated.View>
         {/* box-list160 is shared with the MVCP FlatList above. */}
         <scroll-view
+          nestedScrollEnabled
           className="box-list160"
           scrollEventThrottle={16}
           onScroll={Animated.event(

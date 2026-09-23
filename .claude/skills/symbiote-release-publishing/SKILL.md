@@ -282,6 +282,9 @@ a `components: major` and was wrong; the cheap check that settles it is the coun
 back, and diff the two `newVersion` maps. Attribution by eye over a 34-package release does not
 work.
 
+**RN-parity removals are a minor** (maintainer's call, 2026-09-23): dropping an API RN itself does
+not have (`BackHandler.removeEventListener`) ships as `minor`, not `major`, so it does not cascade.
+
 `engine` went to `1.0.0` the same day (the C++ tree migration was its breaking change and had never
 been recorded as one), which retires the cascade: `^1.0.0` covers `1.1.0`.
 

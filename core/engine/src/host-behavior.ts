@@ -99,6 +99,10 @@ export interface IHostBehavior {
   // It is a REDIRECT, so nothing has to be marked dirty afterwards: the write lands on the slot and
   // marks the slot. That is the whole reason this is not spelled as a `slotDerived` wildcard.
   readonly slotPropsExcept?: readonly string[];
+  // The value a redirected prop lands with, under its SLOT name. For the one rule the C++ host
+  // cannot express: Button's Android title is `title.toUpperCase()` (Button.js:352), JavaScript's
+  // full-Unicode uppercase — the host has no ICU. Runs per redirected write, never per commit.
+  readonly slotValueFor?: (slotKey: string, value: unknown) => unknown;
   // The slot is a built SIBLING, not a container: the app's children stay on the OWNER and land
   // AFTER it.
   //

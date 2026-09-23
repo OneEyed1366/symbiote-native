@@ -134,6 +134,19 @@ describe('Platform (iOS) — derived getters, each proven against its own fresh 
     expect(fresh.isTesting).toBe(true);
   });
 
+  // why: RN reports isTesting only in a dev build (`if (__DEV__) … return false`, Platform.ios.js),
+  // and isDisableAnimations falls back to that GATED value.
+  it('isTesting and its isDisableAnimations fallback are false in a release build', async () => {
+    const fresh = await loadPlatformWith({ ...fakeConstants, isTesting: true });
+    Object.assign(globalThis, { __DEV__: false });
+    try {
+      expect(fresh.isTesting).toBe(false);
+      expect(fresh.isDisableAnimations).toBe(false);
+    } finally {
+      Object.assign(globalThis, { __DEV__: true });
+    }
+  });
+
   // why: RN's rule is isDisableAnimations ?? isTesting — the native flag, when PRESENT,
   // wins over isTesting even when they disagree.
   it('isDisableAnimations: the native flag wins over isTesting when both are present', async () => {
@@ -221,6 +234,24 @@ describe('Platform (Android)', () => {
   it("OS is the static 'android'", async () => {
     const fresh = await loadAndroidPlatformWith(fakeAndroidConstants);
     expect(fresh.OS).toBe('android');
+  });
+
+  // why: RN reports isTesting only in a dev build (`if (__DEV__) … return false`,
+  // Platform.android.js), and isDisableAnimations falls back to that GATED value. Android's
+  // native flag comes from a system property, not the build type, so a release build must not
+  // leak it.
+  it('isTesting and its isDisableAnimations fallback are false in a release build', async () => {
+    const fresh = await loadAndroidPlatformWith({
+      ...fakeAndroidConstants,
+      isTesting: true,
+    });
+    Object.assign(globalThis, { __DEV__: false });
+    try {
+      expect(fresh.isTesting).toBe(false);
+      expect(fresh.isDisableAnimations).toBe(false);
+    } finally {
+      Object.assign(globalThis, { __DEV__: true });
+    }
   });
 
   describe('select', () => {

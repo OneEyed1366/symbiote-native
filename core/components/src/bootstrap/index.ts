@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import {
   setAssetSourceResolver,
+  installBackHandler,
   setColorProcessor,
   setDeviceEventSource,
   setImageSourceResolver,
@@ -73,6 +74,8 @@ export function bootstrapHost(options: IBootstrapHostOptions = {}): void {
     options.assetSourceResolver ?? defaultImageSourceResolver,
   );
   setDeviceEventSource(options.deviceEventSource ?? DeviceEventEmitter);
+  // After the event source: the back button subscribes through it (see installBackHandler).
+  installBackHandler();
   setNativeViewConfigSource(
     options.nativeViewConfigSource ?? defaultNativeViewConfigSource,
   );

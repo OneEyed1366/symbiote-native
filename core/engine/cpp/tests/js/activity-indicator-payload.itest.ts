@@ -192,6 +192,19 @@ describe('what the native spinner sends', () => {
     );
   });
 
+  // why: RN's `color` is any ColorValue (`color = Platform.OS === 'ios' ? GRAY : null` defaults
+  // only an ABSENT one), so a PlatformColor reaches native instead of being replaced by the default.
+  it('lets a PlatformColor through on either platform', () => {
+    const semantic = { semantic: ['systemRed'] };
+    const resourcePaths = { resource_paths: ['?android:attr/colorAccent'] };
+    expect(spinner(IOS_SPINNER, { color: semantic }).payload.color).toEqual(
+      semantic,
+    );
+    expect(
+      spinner(ANDROID_SPINNER, { color: resourcePaths }).payload.color,
+    ).toEqual(resourcePaths);
+  });
+
   // why: THE PRICE. Both nodes shed their fold entirely — nothing either rule does reads the node,
   // an owner or live state, so unlike the touchables there is no JS half left to keep a trip for.
   it('costs no trip into JS for either node', () => {

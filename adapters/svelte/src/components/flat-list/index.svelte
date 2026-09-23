@@ -17,6 +17,7 @@
     expandRowViewability,
     firstItemOfRow,
     lastItemOfRow,
+    removeClippedSubviewsOrDefault,
     rowKeyExtractor,
     type IRow,
     type ISeparatorProps,
@@ -24,6 +25,7 @@
     type IViewableItemsChangedInfo,
   } from '@symbiote-native/components';
   import {
+    Platform,
     resolveClassName,
     type ISymbioteNode,
   } from '@symbiote-native/engine';
@@ -37,6 +39,11 @@
   import { pickAttachmentProps } from '../../runes/attachments';
 
   let props: IProps<ItemT> = $props();
+
+  // FlatList.js always sends it, defaulted per platform.
+  const removeClippedSubviews = $derived(
+    removeClippedSubviewsOrDefault(props.removeClippedSubviews, Platform.OS),
+  );
 
   // $state.raw: the inner VirtualizedList component instance (its exports), held by identity —
   // same concern as every other handle in this adapter (Switch's hostShim, VirtualizedList's own
@@ -238,6 +245,8 @@
     scrollEventThrottle={props.scrollEventThrottle}
     keyboardShouldPersistTaps={props.keyboardShouldPersistTaps}
     keyboardDismissMode={props.keyboardDismissMode}
+    {removeClippedSubviews}
+    nestedScrollEnabled={props.nestedScrollEnabled}
     style={props.style}
     contentContainerStyle={props.contentContainerStyle}
     class={props.class}
@@ -286,6 +295,8 @@
     scrollEventThrottle={props.scrollEventThrottle}
     keyboardShouldPersistTaps={props.keyboardShouldPersistTaps}
     keyboardDismissMode={props.keyboardDismissMode}
+    {removeClippedSubviews}
+    nestedScrollEnabled={props.nestedScrollEnabled}
     style={props.style}
     contentContainerStyle={props.contentContainerStyle}
     class={props.class}

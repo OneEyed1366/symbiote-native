@@ -83,6 +83,7 @@ export function ParityDemo() {
       <text className="section-label">FlatList · animated scrollToOffset</text>
       <FlatList
         ref={listRef}
+        nestedScrollEnabled
         data={parityRows}
         keyExtractor={item => item.id}
         getItemLayout={(_data, index) => ({
@@ -132,6 +133,7 @@ export function ParityDemo() {
       </text>
       <SectionList
         testID="sticky-section-list"
+        nestedScrollEnabled
         sections={paritySections}
         keyExtractor={item => item.id}
         stickySectionHeadersEnabled

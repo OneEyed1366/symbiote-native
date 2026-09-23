@@ -155,6 +155,8 @@ export type {
 export {
   modalReducer,
   createInitialModalState,
+  isModalVisible,
+  modalVisibilityAction,
   shouldRenderModal,
 } from './state/modal';
 export type { IModalState, IModalAction } from './state/modal';
@@ -401,6 +403,7 @@ export {
   expandRowViewability,
   lastItemOfRow,
   firstItemOfRow,
+  removeClippedSubviewsOrDefault,
 } from './state/flat-list';
 export type { IRow } from './state/flat-list';
 

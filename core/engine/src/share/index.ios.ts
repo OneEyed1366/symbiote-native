@@ -11,8 +11,10 @@ import {
   ACTION_SHEET_MANAGER,
   type INativeActionSheetManager,
 } from '../action-sheet-ios';
+import { isProcessableColor, processColor } from '../platform-color';
 import {
-  validateContent,
+  assertShareArgs,
+  invariant,
   shareActions,
   SHARED_ACTION,
   DISMISSED_ACTION,
@@ -35,40 +37,43 @@ export const Share: IShareStatic = {
     content: IShareContent,
     options: IShareOptions = {},
   ): Promise<IShareAction> {
-    const invalid = validateContent(content);
-    if (invalid !== null) {
-      dlog(`Share.share -> invalid content: ${invalid.message}`);
-      return Promise.reject(invalid);
-    }
+    assertShareArgs(content, options);
     dlog('Share.share (ios)');
-    const manager =
-      getNativeModule<INativeActionSheetManager>(ACTION_SHEET_MANAGER);
-    if (manager === null) {
-      dlog(`Share: "${ACTION_SHEET_MANAGER}" unresolved`);
-      return Promise.reject(
-        new Error('Share: ActionSheetManager native module unavailable'),
-      );
-    }
+    // Share.js's iOS branch: both invariants run INSIDE the executor, so they reject.
     return new Promise((resolve, reject) => {
+      const tintColor = isProcessableColor(options.tintColor)
+        ? processColor(options.tintColor)
+        : undefined;
+      invariant(
+        tintColor == null || typeof tintColor === 'number',
+        'Unexpected color given for options.tintColor',
+      );
+      const manager =
+        getNativeModule<INativeActionSheetManager>(ACTION_SHEET_MANAGER);
+      invariant(
+        manager !== null,
+        'NativeActionSheetManager is not registered on iOS, but it should be.',
+      );
       manager.showShareActionSheetWithOptions(
         {
           message:
             typeof content.message === 'string' ? content.message : undefined,
           url: typeof content.url === 'string' ? content.url : undefined,
           subject: options.subject,
-          tintColor: options.tintColor,
-          anchor: options.anchor,
+          tintColor: typeof tintColor === 'number' ? tintColor : undefined,
+          anchor:
+            typeof options.anchor === 'number' ? options.anchor : undefined,
           excludedActivityTypes: options.excludedActivityTypes,
         },
         error => {
           dlog('Share.share -> failure');
-          reject(new Error(error.message));
+          reject(error);
         },
         (completed, activityType) => {
           dlog(`Share.share -> success completed=${completed}`);
           resolve(
             completed
-              ? { action: SHARED_ACTION, activityType: activityType ?? null }
+              ? { action: SHARED_ACTION, activityType }
               : { action: DISMISSED_ACTION, activityType: null },
           );
         },

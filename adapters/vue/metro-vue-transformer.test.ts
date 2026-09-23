@@ -768,3 +768,48 @@ describe('metro-vue-transformer compileSfc kebab-case class= support', () => {
     );
   });
 });
+
+const SFC_WITH_BARE_ATTRIBUTES = `
+<script setup lang="ts">
+import { Animated, FlatList } from '@symbiote-native/vue';
+import Own from './Own.vue';
+const rows = ['a'];
+</script>
+<template>
+  <view>
+    <scroll-view nested-scroll-enabled />
+    <FlatList :data="rows" inverted />
+    <Animated.ScrollView scroll-enabled />
+    <Own flag />
+    <text-input placeholder="" />
+  </view>
+</template>
+`;
+
+describe('metro-vue-transformer bare boolean attributes', () => {
+  // why: a bare attribute is Vue's boolean shorthand, but Vue casts it to `true` only for a prop the
+  // component declares Boolean. Our tags declare nothing and our components forward attrs, so it
+  // reached native as "" and Android's ViewManager threw `String cannot be cast to Boolean`.
+  it('passes true for a bare attribute on an intrinsic tag', async () => {
+    const code = await compileSfc(SFC_WITH_BARE_ATTRIBUTES, 'Screen.vue');
+    expect(code).toContain('"nested-scroll-enabled": true');
+  });
+
+  it('passes true for a bare attribute on a component imported from @symbiote-native', async () => {
+    const code = await compileSfc(SFC_WITH_BARE_ATTRIBUTES, 'Screen.vue');
+    expect(code).toContain('inverted: true');
+    expect(code).toContain('"scroll-enabled": true');
+  });
+
+  // why: the app's own component keeps Vue's semantics — a bare attribute on a String prop is "".
+  it("leaves a bare attribute on the app's own component to Vue", async () => {
+    const code = await compileSfc(SFC_WITH_BARE_ATTRIBUTES, 'Screen.vue');
+    expect(code).toContain('flag: ""');
+  });
+
+  // why: an explicit empty value is a string, not the shorthand.
+  it('keeps an explicit empty string', async () => {
+    const code = await compileSfc(SFC_WITH_BARE_ATTRIBUTES, 'Screen.vue');
+    expect(code).toContain('placeholder: ""');
+  });
+});

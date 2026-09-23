@@ -366,6 +366,7 @@ const overlayTunnel = createTunnel();
           [data]="mvcpItems"
           [keyExtractor]="mvcpKeyExtractor"
           [maintainVisibleContentPosition]="mvcpConfig"
+          [nestedScrollEnabled]="true"
           class="box-list160"
         >
           <ng-template vListItem let-item>
@@ -688,6 +689,7 @@ export class CanaryScreen implements OnInit, OnDestroy {
   readonly scrollAnimatedProps = {
     onScroll: this.onParityScroll,
     scrollEventThrottle: 16,
+    nestedScrollEnabled: true,
   };
 
   get volumePercent(): number {

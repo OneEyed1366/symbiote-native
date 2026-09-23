@@ -7,12 +7,15 @@
   import {
     PlatformColor,
     DynamicColorIOS,
+    Platform,
     useColorScheme,
   } from '@symbiote-native/svelte';
 
   // useColorScheme returns a boxed getter (Svelte 5's reactivity doesn't survive a bare
   // $state value returned from a plain function) — call once, read `.current` below.
   const scheme = useColorScheme();
+  // DynamicColorIOS throws off iOS, as in RN.
+  const isIos = Platform.OS === 'ios';
 </script>
 
 <view class="section-nested">
@@ -22,20 +25,30 @@
   <view class="row">
     <view
       class="color-tile"
-      style={{ backgroundColor: PlatformColor('systemBlue') }}
+      style={{
+        backgroundColor: PlatformColor(
+          'systemBlue',
+          '@android:color/holo_blue_dark',
+        ),
+      }}
     >
       <text class="tile-label">systemBlue</text>
     </view>
-    <view
-      class="color-tile-bordered"
-      style={{
-        backgroundColor: DynamicColorIOS({ light: '#dbeafe', dark: '#13243a' }),
-        borderColor: PlatformColor('separator'),
-      }}
-    >
-      <text class="bold-label" style={{ color: PlatformColor('label') }}>
-        dynamic
-      </text>
-    </view>
+    {#if isIos}
+      <view
+        class="color-tile-bordered"
+        style={{
+          backgroundColor: DynamicColorIOS({
+            light: '#dbeafe',
+            dark: '#13243a',
+          }),
+          borderColor: PlatformColor('separator'),
+        }}
+      >
+        <text class="bold-label" style={{ color: PlatformColor('label') }}>
+          dynamic
+        </text>
+      </view>
+    {/if}
   </view>
 </view>

@@ -9,10 +9,13 @@
 import {
   PlatformColor,
   DynamicColorIOS,
+  Platform,
   useColorScheme,
 } from '@symbiote-native/vue';
 
 const scheme = useColorScheme();
+// DynamicColorIOS throws off iOS, as in RN.
+const isIos = Platform.OS === 'ios';
 </script>
 
 <template>
@@ -25,11 +28,17 @@ const scheme = useColorScheme();
     <view class="row">
       <view
         class="color-tile"
-        :style="{ backgroundColor: PlatformColor('systemBlue') }"
+        :style="{
+          backgroundColor: PlatformColor(
+            'systemBlue',
+            '@android:color/holo_blue_dark',
+          ),
+        }"
       >
         <text class="tile-label"> systemBlue </text>
       </view>
       <view
+        v-if="isIos"
         class="color-tile-bordered"
         :style="{
           backgroundColor: DynamicColorIOS({

@@ -145,6 +145,8 @@ export interface IVirtualizedSectionListProps<ItemT>
   scrollEventThrottle?: number;
   keyboardShouldPersistTaps?: boolean | 'always' | 'never' | 'handled';
   keyboardDismissMode?: 'none' | 'on-drag' | 'interactive';
+  removeClippedSubviews?: boolean;
+  nestedScrollEnabled?: boolean;
   style?: IStyleProp<IViewStyle>;
   contentContainerStyle?: IStyleProp<IViewStyle>;
 }
@@ -212,6 +214,8 @@ export type IVirtualizedSectionListInputs<ItemT> = Omit<
       [scrollEventThrottle]="scrollEventThrottle"
       [keyboardShouldPersistTaps]="keyboardShouldPersistTaps"
       [keyboardDismissMode]="keyboardDismissMode"
+      [removeClippedSubviews]="removeClippedSubviews"
+      [nestedScrollEnabled]="nestedScrollEnabled"
       [style]="resolvedStyle"
       [contentContainerStyle]="contentContainerStyle"
       [testID]="testID"
@@ -374,6 +378,8 @@ export class VirtualizedSectionList<ItemT = unknown>
   @Input() scrollEventThrottle?: number;
   @Input() keyboardShouldPersistTaps?: boolean | 'always' | 'never' | 'handled';
   @Input() keyboardDismissMode?: 'none' | 'on-drag' | 'interactive';
+  @Input() removeClippedSubviews?: boolean;
+  @Input() nestedScrollEnabled?: boolean;
   @Input() style?: IStyleProp<IViewStyle>;
   @Input() contentContainerStyle?: IStyleProp<IViewStyle>;
   @Input() testID?: string;

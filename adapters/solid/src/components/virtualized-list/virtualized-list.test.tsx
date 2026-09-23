@@ -1423,12 +1423,9 @@ describe('Solid VirtualizedList on the engine', () => {
       ).toBe(1);
     });
 
-    // why: RN's ScrollView defaults nestedScrollEnabled to true (`nestedScrollEnabled ?? true`), and
-    // Android needs the flag for a scrollable nested inside another to get gesture arbitration at
-    // all. A list that hand-authors its scroll host — as this one does, to wrap sticky cells itself —
-    // does not inherit that default for free, and the symptom is Android-only: only the outer page
-    // scrolls, the list never moves.
-    it('defaults nestedScrollEnabled on, the way RN ScrollView does', async () => {
+    // why: the scroll view's rules (nestedScrollEnabled's refresh-wrap default among them) run in the
+    // engine; a list that hand-authors its scroll host must still commit one for them to land on.
+    it('commits a scroll view for the engine scroll rules to land on', async () => {
       mount(ROOT_TAG, () => (
         <VirtualizedList<IRow>
           data={DATA}

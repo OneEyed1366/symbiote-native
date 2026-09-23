@@ -128,7 +128,11 @@ const SLOT_PROPS: Readonly<Record<string, string>> = {
 
 // Owner props the SLOT's payload reads. Declared so a write to one dirties the slot — see
 // `IHostBehavior.slotDerived` for why nothing else makes that happen.
-const SLOT_DERIVED = ['maintainVisibleContentPosition', 'snapToAlignment'];
+const SLOT_DERIVED = [
+  'maintainVisibleContentPosition',
+  'snapToAlignment',
+  'removeClippedSubviews',
+];
 
 // A `<RefreshControl>` written among the app's children is claimed, and WHAT the owner does with
 // it is the one thing that genuinely differs per platform — see the platform files. Resolved
@@ -148,9 +152,8 @@ export const REFRESH_CONTROL = descriptorFor('refresh-control').component;
 // intrinsic from; an app that also writes `horizontal` on the vertical tag is contradicting the
 // element it chose, and the tag wins.
 //
-// `nestedScrollEnabled` defaults ON because every wrapper writes it on every ScrollView, both
-// platforms. RN itself only defaults it on the Android RefreshControl WRAP path
-// (`ScrollView.js:1862`) — parity here is with the wrapper this behavior replaced.
+// `nestedScrollEnabled` defaults ON only on the Android RefreshControl WRAP path, as RN does
+// (`ScrollView.js:1862`); elsewhere only the authored value is sent.
 // THE OWNER'S FOLD IS GONE (2026-09-18) — `foldScrollViewProps` in `SymbioteFabricProps.cpp`. Every
 // input it had was the node's own bag plus the AXIS, and the axis is the tag (`scroll-view` vs
 // `horizontal-scroll-view`), so it was a tag rule by every criterion: the base style composition,

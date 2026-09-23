@@ -39,20 +39,9 @@ const ANDROID_NAMES: Readonly<Record<ISymbioteIntrinsic, string>> = {
   switch: 'AndroidSwitch',
   'activity-indicator': 'RCTView',
   'activity-indicator-spinner': 'AndroidProgressBar',
-  // KNOWN DIVERGENCE FROM REACT NATIVE, and it is in our favour — recorded 2026-09-01 because it
-  // was arrived at by accident, not decided. Upstream `SafeAreaView.js` is
-  // `Platform.select({ ios: RCTSafeAreaViewNativeComponent, default: View })`, so RN's own JS
-  // renders a plain View on Android and applies NO insets. `RCTSafeAreaView` does exist and is
-  // registered (`ReactSafeAreaViewManager.REACT_CLASS`, wired in `MainReactPackage.kt:149`) and
-  // does real window-inset math — so we inset where RN does not, and an app ported from RN gets
-  // different Android layout with nothing to explain why.
-  //
-  // This table's rule is "the name is the ViewManager's REACT_CLASS", and by that rule the entry is
-  // correct. What nobody checked is whether RN's JS ROUTES there. Left as-is deliberately: insetting
-  // is the better behaviour and RN has deprecated its own component in favour of
-  // react-native-safe-area-context. Invisible to every audit we have, because both of our paths
-  // agree with each other and only disagree with RN — the boundary
-  // `.claude/rules/adapter-parity-audit.md` states about itself.
+  // DELIBERATE DIVERGENCE FROM RN (2026-09-23). RN's `SafeAreaView.js` is a plain View on Android,
+  // with no insets. `RCTSafeAreaView` is registered there too (`ReactSafeAreaViewManager`) and
+  // applies the window insets, so one screen is safe on both platforms.
   'safe-area-view': 'RCTSafeAreaView',
   modal: 'RCTModalHostView',
   'refresh-control': 'AndroidSwipeRefreshLayout',

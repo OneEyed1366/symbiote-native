@@ -79,6 +79,14 @@ class ModalOrientationHostFixture {
 })
 class ModalHiddenHostFixture {}
 
+@Component({
+  selector: 'symbiote-modal-default-host',
+  standalone: true,
+  imports: [Modal],
+  template: `<Modal [testID]="'modal'"><text>Hi</text></Modal>`,
+})
+class ModalDefaultVisibleHostFixture {}
+
 beforeEach(() => {
   capturedHost = undefined;
   capturedOrientationHost = undefined;
@@ -92,6 +100,17 @@ afterEach(() => {
 // why: contract-accurate group name — nothing here throws. A hidden modal renders no node
 // instead of raising an error, and every toggle resolves to a committed value, never a rejection.
 describe('Modal (no throwing path — see file header)', () => {
+  // why: Modal.js `defaultProps.visible = true` — a `<Modal>` without `visible` shows.
+  it('shows a modal written without visible, as RN defaults it', async () => {
+    mount(ROOT_TAG, ModalDefaultVisibleHostFixture);
+    await tick();
+
+    const modal = fabric.find(n => n.props.testID === 'modal');
+    expect(modal).toBeDefined();
+    if (modal === undefined) return;
+    expect(payloadOf(modal.handle).visible).toBe(true);
+  });
+
   it('never commits a modal host node when it starts hidden', async () => {
     // why: shouldRenderModal(isVisible, state) gates on isVisible || state.isRendered; on the
     // FIRST render state.isRendered seeds from the same `visible` value (no keep-alive to fall
@@ -102,13 +121,14 @@ describe('Modal (no throwing path — see file header)', () => {
     expect(fabric.find(n => n.props.testID === 'modal')).toBeUndefined();
   });
 
-  it('unmounts the modal host node once a visible->hidden toggle settles', async () => {
-    // why: the keep-alive exists so native's onDismiss can still arrive, not to keep the node
-    // forever — after the queued reducer + a CD pass run, the hidden modal must actually be gone.
+  it('holds the modal host through the hide and unmounts it on the native dismiss', async () => {
+    // why: Modal.js (iOS) drops the keep-alive ONLY in its onDismiss handler — the node stays
+    // mounted through the native exit animation, then goes.
     mount(ROOT_TAG, ModalHostFixture);
     await tick();
     const modal = fabric.find(n => n.props.testID === 'modal');
     expect(modal).toBeDefined();
+    if (modal === undefined) return;
 
     if (!capturedHost) throw new Error('host was not captured');
     capturedHost.visible.set(false);
@@ -119,7 +139,13 @@ describe('Modal (no throwing path — see file header)', () => {
     // The recording host never forgets a node it once saw created, so residency is read off the
     // engine's own live parent link — undefined once the node is actually detached — not off a
     // search over the creation log, which would report this node resident forever.
-    expect(modal && parentOf(modal.handle)).toBeUndefined();
+    expect(parentOf(modal.handle), 'held for the exit animation').toBeDefined();
+
+    fabric.fireEvent(modal.instanceHandle, 'topDismiss', {});
+    await Promise.resolve();
+    await tick();
+    await tick();
+    expect(parentOf(modal.handle)).toBeUndefined();
   });
 
   it('emits the raw ISymbioteEvent on orientationChange, orientation on nativeEvent', async () => {

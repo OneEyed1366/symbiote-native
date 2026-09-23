@@ -9,9 +9,11 @@ import { compile } from 'svelte/compiler';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
+import { Platform } from '@symbiote-native/engine';
 import {
   createLiveTree,
   installRecordingFabric,
+  payloadOf,
 } from '@symbiote-native/test-utils';
 // See scroll-view.smoke.test.ts: mounting through `../../render` skips `index.ts`, so the host
 // behaviors have to be named here.
@@ -47,6 +49,14 @@ const COLUMNS_ROOT_OUT = join(
   __dirname,
   '.smoke-compiled-flat-columns-root.mjs',
 );
+const CLIPPED_ROOT_OUT = join(
+  __dirname,
+  '.smoke-compiled-flat-clipped-root.mjs',
+);
+const INVERTED_ROOT_OUT = join(
+  __dirname,
+  '.smoke-compiled-flat-inverted-root.mjs',
+);
 
 const fabric = installRecordingFabric();
 const live = createLiveTree(fabric);
@@ -64,6 +74,8 @@ afterEach(() => {
   rmSync(ROOT_OUT, { force: true });
   rmSync(REFRESH_ROOT_OUT, { force: true });
   rmSync(COLUMNS_ROOT_OUT, { force: true });
+  rmSync(CLIPPED_ROOT_OUT, { force: true });
+  rmSync(INVERTED_ROOT_OUT, { force: true });
 });
 
 const COMPILE_OPTIONS = {
@@ -148,6 +160,48 @@ async function loadMountableWithColumns(
   const mod: unknown = await import(`file://${COLUMNS_ROOT_OUT}`);
   if (mod === null || typeof mod !== 'object' || !('default' in mod)) {
     throw new Error('FlatListColumnsRoot.svelte produced no default export');
+  }
+  return mod.default as Component;
+}
+
+async function loadMountableClipped(): Promise<Component> {
+  compileFlatListWithVirtualizedList();
+
+  compileToFile(
+    `<script>
+       import FlatList from './.smoke-compiled-flat-list.mjs';
+       let { data } = $props();
+     </script>
+     {#snippet cell()}{/snippet}
+     <FlatList {data} item={cell} removeClippedSubviews={true} nestedScrollEnabled={true} />`,
+    'FlatListClippedRoot.svelte',
+    CLIPPED_ROOT_OUT,
+  );
+
+  const mod: unknown = await import(`file://${CLIPPED_ROOT_OUT}`);
+  if (mod === null || typeof mod !== 'object' || !('default' in mod)) {
+    throw new Error('FlatListClippedRoot.svelte produced no default export');
+  }
+  return mod.default as Component;
+}
+
+async function loadMountableInverted(): Promise<Component> {
+  compileFlatListWithVirtualizedList();
+
+  compileToFile(
+    `<script>
+       import FlatList from './.smoke-compiled-flat-list.mjs';
+       let { data } = $props();
+     </script>
+     {#snippet cell()}{/snippet}
+     <FlatList {data} item={cell} inverted={true} style={{ transform: [{ rotate: '0deg' }] }} />`,
+    'FlatListInvertedRoot.svelte',
+    INVERTED_ROOT_OUT,
+  );
+
+  const mod: unknown = await import(`file://${INVERTED_ROOT_OUT}`);
+  if (mod === null || typeof mod !== 'object' || !('default' in mod)) {
+    throw new Error('FlatListInvertedRoot.svelte produced no default export');
   }
   return mod.default as Component;
 }
@@ -308,6 +362,66 @@ describe('FlatList (real compiled index.svelte over a real compiled VirtualizedL
       expect(
         scrollView?.children.some(child => child.handle === refresh?.handle),
       ).toBe(true);
+    });
+
+    // why: RN's FlatList ALWAYS sends removeClippedSubviews to its ScrollView, defaulting to
+    // `Platform.OS === 'android'` (FlatList.js) — false on iOS, true on Android — and an authored
+    // value always wins.
+    it('sends removeClippedSubviews defaulted per platform, or the authored value', async () => {
+      const data = ['a', 'b'];
+      // The LAST scroll view created: each remount below builds a fresh one.
+      const scrollPayload = (): Record<string, unknown> | undefined => {
+        const node = fabric
+          .findAll(candidate => candidate.viewName === 'RCTScrollView')
+          .at(-1);
+        return node === undefined ? undefined : payloadOf(node.handle);
+      };
+
+      mount(ROOT_TAG, await loadMountable(), { data });
+      await tick();
+      expect(scrollPayload()?.removeClippedSubviews).toBe(false);
+      unmount(ROOT_TAG);
+
+      const original = Platform.OS;
+      Object.defineProperty(Platform, 'OS', {
+        value: 'android',
+        configurable: true,
+      });
+      try {
+        mount(ROOT_TAG, await loadMountable(), { data });
+        await tick();
+        expect(scrollPayload()?.removeClippedSubviews, 'android default').toBe(
+          true,
+        );
+        unmount(ROOT_TAG);
+      } finally {
+        Object.defineProperty(Platform, 'OS', {
+          value: original,
+          configurable: true,
+        });
+      }
+
+      mount(ROOT_TAG, await loadMountableClipped(), { data });
+      await tick();
+      expect(scrollPayload()?.removeClippedSubviews, 'authored').toBe(true);
+      // RN's VirtualizedList spreads its props onto the ScrollView; a list nested in a vertical
+      // scroller on Android scrolls only with nestedScrollEnabled.
+      expect(scrollPayload()?.nestedScrollEnabled, 'nested scroll').toBe(true);
+    });
+
+    // why: VirtualizedList.js:1111 sends `isInvertedVirtualizedList: inverted` (Android's scrollbar
+    // fix), and composes `[inversionStyle, style]` so the app's own transform wins over the flip.
+    it('marks an inverted list and lets the app style override the flip', async () => {
+      mount(ROOT_TAG, await loadMountableInverted(), { data: ['a', 'b'] });
+      await tick();
+      const node = fabric
+        .findAll(candidate => candidate.viewName === 'RCTScrollView')
+        .at(-1);
+      expect(node, 'a scroll view was committed').toBeDefined();
+      if (node === undefined) return;
+      const payload = payloadOf(node.handle);
+      expect(payload.isInvertedVirtualizedList).toBe(true);
+      expect(payload.transform).toEqual([{ rotate: '0deg' }]);
     });
   });
 });

@@ -49,7 +49,7 @@ export function NativeModulesDemo() {
   const [imageSize, setImageSize] = createSignal('measuring…');
   Image.getSize(LOGO_URI)
     .then(({ width, height }) => setImageSize(`${width}×${height}px`))
-    .catch(() => setImageSize('unavailable'));
+    .catch((error: unknown) => setImageSize(`unavailable: ${String(error)}`));
 
   // Prefetch on a COLD url nothing has loaded: queryCache shows it absent, the button warms it,
   // and a re-query flips the readout — the visible effect.

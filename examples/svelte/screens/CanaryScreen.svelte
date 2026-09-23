@@ -621,6 +621,7 @@
     <text class="section-label">MVCP · prepend without jump</text>
     <FlatList
       testID="mvcp-list"
+      nestedScrollEnabled
       data={mvcpItems}
       keyExtractor={item => item.id}
       maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
@@ -683,6 +684,7 @@
     <!-- box-list160 is shared with the MVCP FlatList above. -->
     <scroll-view
       class="box-list160"
+      nestedScrollEnabled
       scrollEventThrottle={SCROLL_EVENT_THROTTLE_MS}
       p={{ onScroll: onParityScroll }}
     >

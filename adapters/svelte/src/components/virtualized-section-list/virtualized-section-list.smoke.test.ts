@@ -10,7 +10,7 @@ import { compile } from 'svelte/compiler';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
-import { installRecordingFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric, payloadOf } from '@symbiote-native/test-utils';
 // See scroll-view.smoke.test.ts: mounting through `../../render` skips `index.ts`, so the host
 // behaviors have to be named here.
 import '../../register';
@@ -57,6 +57,10 @@ const ROOT_OUT = join(__dirname, '.section-smoke-compiled-root.mjs');
 const WRAPPER_ROOT_OUT = join(
   __dirname,
   '.section-smoke-compiled-wrapper-root.mjs',
+);
+const CLIPPED_ROOT_OUT = join(
+  __dirname,
+  '.section-smoke-compiled-clipped-root.mjs',
 );
 
 const COMPILE_OPTIONS = {
@@ -140,6 +144,7 @@ afterEach(() => {
   rmSync(WRAPPER_OUT, { force: true });
   rmSync(ROOT_OUT, { force: true });
   rmSync(WRAPPER_ROOT_OUT, { force: true });
+  rmSync(CLIPPED_ROOT_OUT, { force: true });
 });
 
 // Mount, then report a real viewport so the windowing math runs off real geometry — the path that
@@ -221,6 +226,31 @@ describe('VirtualizedSectionList getItemLayout (real compiled index.svelte)', ()
           'getItemLayout receives the sections array by identity',
         ).toBe(SECTIONS);
       }
+    });
+
+    // why: RN's SectionList spreads every prop down to its ScrollView; the relay here is
+    // prop-by-prop, so a missing binding at either layer silently drops the prop.
+    it('relays removeClippedSubviews through SectionList to the scroll view', async () => {
+      const root = await loadRoot(
+        `<script>
+           import SectionList from '../section-list/.section-smoke-compiled-section-list.mjs';
+           let { sections } = $props();
+         </script>
+         ${CELL_SNIPPETS}
+         <SectionList {sections} item={cell} {sectionHeader} removeClippedSubviews={true} />`,
+        'ClippedSectionListRoot.svelte',
+        CLIPPED_ROOT_OUT,
+      );
+
+      mount(ROOT_TAG, root, { sections: SECTIONS });
+      await tick();
+
+      const scrollView = fabric
+        .findAll(node => node.viewName === 'RCTScrollView')
+        .at(-1);
+      expect(scrollView, 'inner list committed a scroll view').toBeDefined();
+      if (scrollView === undefined) return;
+      expect(payloadOf(scrollView.handle).removeClippedSubviews).toBe(true);
     });
   });
 });

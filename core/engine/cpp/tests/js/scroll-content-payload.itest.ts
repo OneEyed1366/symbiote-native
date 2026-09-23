@@ -182,6 +182,19 @@ describe('what a scroll content node sends native', () => {
     expect(payload.snapToAlignment).toBe(undefined);
   });
 
+  // why: ScrollView.js:1740-1745 — the content view carries the scroller's removeClippedSubviews
+  // (sticky headers only change that on Android); unset stays unset.
+  it('carries the owner removeClippedSubviews down, sticky headers or not, off Android', () => {
+    expect(
+      vertical({ removeClippedSubviews: true }).payload.removeClippedSubviews,
+    ).toBe(true);
+    expect(
+      vertical({ removeClippedSubviews: true, stickyHeaderIndices: [0] })
+        .payload.removeClippedSubviews,
+    ).toBe(true);
+    expect(vertical({}).payload.removeClippedSubviews).toBe(undefined);
+  });
+
   // why: `collapsable={false}` is UNCONDITIONAL on RN's content view (`ScrollView.js:1747`) — Yoga may
   // collapse a view that only groups children, and a collapsed content node takes the scroll metrics
   // with it. A constant of the tag, so the rule writes it.

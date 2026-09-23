@@ -27,6 +27,7 @@ import {
   dispatchViewCommand,
   dlog,
   focusTextInput,
+  Platform,
   propOf,
   propsOf,
   registerHostBehavior,
@@ -361,7 +362,18 @@ function attach(node: ISymbioteNode): void {
   setBehaviorListener(node, 'selectionChange', event =>
     onSelectionChange(node, event),
   );
-  attachPressMachine(node, { refine: focusOnPress });
+  attachPressMachine(node, {
+    refine: focusOnPress,
+    cancelableOf: textInputCancelable,
+  });
+}
+
+// TextInput.js:597 with its `rejectResponderTermination = true` default (:905): iOS keeps the
+// gesture unless the app opts in; Android hands Pressability `null`, i.e. its own default (yield).
+function textInputCancelable(source: ISymbioteNode): boolean | undefined {
+  if (Platform.OS !== 'ios') return undefined;
+  const reject = propOf(source, 'rejectResponderTermination');
+  return !(reject === undefined || Boolean(reject));
 }
 
 // The first commit is the earliest point where the node has BOTH its props and a Fabric tag. The
