@@ -1,5 +1,11 @@
 # @symbiote-native/slider
 
+## 8.0.2
+
+### Patch Changes
+
+- [#85](https://github.com/OneEyed1366/symbiote-native/pull/85) [`0468bca`](https://github.com/OneEyed1366/symbiote-native/commit/0468bca22da67f9f3f58b2020a5403380cd2c634) Thanks [@github-actions](https://github.com/apps/github-actions)! - Depend on `@symbiote-native/components` 3.1.0. The versions published earlier pinned 3.0.1.
+
 ## 8.0.1
 
 ### Patch Changes

@@ -276,8 +276,10 @@ adapter code sat under 22.09's 1.2.0 / 3.0.1.
 - Before merging a release PR, check each `newVersion` with `npm view <pkg>@<v> version`.
   Any hit is a collision.
 - After a release, grep the log for `already published`, not only for `published`.
-- Fix: a new changeset for every collided package whose code changed, which bumps it past npm.
-  A collided package with no code diff since the old publish needs nothing.
+- Fix: a new changeset for every collided package, which bumps it past npm. That includes a
+  package whose source did not change: `workspace:*` publishes as an EXACT pin, so the npm copy
+  still depends on the old sibling (navigation 5.0.1 pinned `components` 3.0.1). Check with
+  `npm view <pkg>@latest dependencies`, not with a source diff.
 
 ## A MINOR on a 0.x `engine` is a MAJOR for the whole repo (measured 2026-09-21)
 

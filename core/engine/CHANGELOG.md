@@ -1,5 +1,11 @@
 # @symbiote-native/engine
 
+## 1.3.0
+
+### Minor Changes
+
+- [`1e8cd62`](https://github.com/OneEyed1366/symbiote-native/commit/1e8cd62387caded852fbb8e14c04b3195fc2c516) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Ship the Android parity release. Engine 1.2.0 and adapters 3.0.1 were already taken on npm, so the previous release skipped these packages.
+
 ## 1.2.0
 
 ### Minor Changes
