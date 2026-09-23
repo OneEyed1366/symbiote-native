@@ -1,17 +1,26 @@
-// `InputAccessoryView.js` on Android does `console.warn(...); return null` — the whole component,
-// children included, renders NOTHING. Until 2026-09-20 this table resolved the tag to a plain
-// `RCTView`, committing a real, laid-out, potentially visible node plus its whole child subtree — a
-// real divergence from vendor, not a harmless degrade. `VOID_COMPONENT` is the engine primitive that
-// matches vendor exactly: see `core/engine/cpp/tests/js/tree-rules.itest.ts` for the commit-walk
-// contract (a void node contributes neither itself nor its children).
+// Android component names that differ from a ViewManager lookup because RN's JS routes elsewhere.
 import { describe, expect, it } from 'vitest';
 import { VOID_COMPONENT } from '@symbiote-native/engine';
 import { descriptorFor } from './index.android';
 
 describe('input-accessory-view on Android', () => {
+  // why: `InputAccessoryView.js` on Android does `console.warn(...); return null` — the whole
+  // component, children included, renders nothing; VOID_COMPONENT commits neither node nor subtree.
   it('resolves to the void component, matching vendor’s null render', () => {
     expect(descriptorFor('input-accessory-view')).toEqual({
       component: VOID_COMPONENT,
+      isText: false,
+    });
+  });
+});
+
+describe('safe-area-view on Android', () => {
+  // why: a DELIBERATE divergence (decided 2026-09-23). RN's deprecated SafeAreaView is a plain View
+  // on Android and applies no insets; we commit the registered `RCTSafeAreaView`, which does, so a
+  // screen written once is safe on both platforms without react-native-safe-area-context.
+  it('commits the inset-applying RCTSafeAreaView, unlike RN', () => {
+    expect(descriptorFor('safe-area-view')).toEqual({
+      component: 'RCTSafeAreaView',
       isText: false,
     });
   });

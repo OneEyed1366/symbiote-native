@@ -1,5 +1,24 @@
 import { describe, it, expect } from 'vitest';
-import { chunkIntoRows, rowKeyExtractor } from './flat-list';
+import {
+  chunkIntoRows,
+  removeClippedSubviewsOrDefault,
+  rowKeyExtractor,
+} from './flat-list';
+
+describe('removeClippedSubviewsOrDefault', () => {
+  // why: RN's FlatList clips off-screen rows by default on Android only
+  // (`removeClippedSubviews ?? Platform.OS === 'android'`, FlatList.js), with the iOS flag off.
+  it('defaults to true on Android and false on iOS', () => {
+    expect(removeClippedSubviewsOrDefault(undefined, 'android')).toBe(true);
+    expect(removeClippedSubviewsOrDefault(undefined, 'ios')).toBe(false);
+  });
+
+  // why: an authored value always wins, on either platform.
+  it('keeps an authored value', () => {
+    expect(removeClippedSubviewsOrDefault(false, 'android')).toBe(false);
+    expect(removeClippedSubviewsOrDefault(true, 'ios')).toBe(true);
+  });
+});
 
 describe('rowKeyExtractor', () => {
   // why: FlatList.js's `_keyExtractor` joins each item's own key with `:` for numColumns > 1 —

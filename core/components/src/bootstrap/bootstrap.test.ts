@@ -12,6 +12,7 @@ const setColorProcessor = vi.fn();
 const setDeviceEventSource = vi.fn();
 const setNativeViewConfigSource = vi.fn();
 const setImageSourceResolver = vi.fn();
+const installBackHandler = vi.fn();
 
 vi.mock('react-native', () => ({
   processColor: vi.fn(),
@@ -29,6 +30,7 @@ vi.mock('@symbiote-native/engine', () => ({
   setDeviceEventSource,
   setImageSourceResolver,
   setNativeViewConfigSource,
+  installBackHandler,
 }));
 
 const { bootstrapHost } = await import('./index');
@@ -83,6 +85,20 @@ describe('bootstrapHost — explicit overrides (Positive)', () => {
       debug: false,
     });
     expect(globalThis.__SYMBIOTE_DEBUG__).toBe(false);
+  });
+});
+
+describe('bootstrapHost — Android back button (Positive)', () => {
+  // why: Android exits on back only when JS answers `hardwareBackPress`; RN subscribes when
+  // BackHandler.android.js loads, so the host must subscribe at startup — and only after the device
+  // event source exists, or the subscription lands on nothing.
+  it('installs the back handler after wiring the device event source', () => {
+    bootstrapHost({ deviceEventSource: { addListener: vi.fn() } });
+
+    expect(installBackHandler).toHaveBeenCalledTimes(1);
+    expect(installBackHandler.mock.invocationCallOrder[0]).toBeGreaterThan(
+      setDeviceEventSource.mock.invocationCallOrder[0] ?? Infinity,
+    );
   });
 });
 

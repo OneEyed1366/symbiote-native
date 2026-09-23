@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
   createInitialModalState,
+  isModalVisible,
   modalReducer,
+  modalVisibilityAction,
   shouldRenderModal,
 } from './modal';
 
@@ -54,5 +56,36 @@ describe('shouldRenderModal', () => {
 
   it('renders nothing once both visible and the keep-alive have settled false', () => {
     expect(shouldRenderModal(false, { isRendered: false })).toBe(false);
+  });
+
+  // why: Modal.js `_shouldShowModal` — the keep-alive is iOS's; Android shows on `visible` alone.
+  it('ignores the keep-alive on Android', () => {
+    expect(shouldRenderModal(false, { isRendered: true }, 'android')).toBe(
+      false,
+    );
+    expect(shouldRenderModal(true, { isRendered: false }, 'android')).toBe(
+      true,
+    );
+    expect(shouldRenderModal(false, { isRendered: true }, 'ios')).toBe(true);
+  });
+});
+
+describe('modalVisibilityAction', () => {
+  // why: Modal.js componentDidUpdate arms the keep-alive on false->true and does NOTHING on
+  // true->false; only the native dismiss (iOS) drops it, so the exit animation plays out.
+  it('arms on show and leaves a hide to the native dismiss', () => {
+    expect(modalVisibilityAction(true)).toEqual({ type: 'show' });
+    expect(modalVisibilityAction(false)).toBe(undefined);
+  });
+});
+
+describe('isModalVisible', () => {
+  // why: Modal.js `defaultProps.visible = true` — a `<Modal>` written without `visible` shows;
+  // defaultProps fill only `undefined`, so an explicit `false`/`null` hides.
+  it('treats an unset visible as shown and only a literal true otherwise', () => {
+    expect(isModalVisible(undefined)).toBe(true);
+    expect(isModalVisible(true)).toBe(true);
+    expect(isModalVisible(false)).toBe(false);
+    expect(isModalVisible(null)).toBe(false);
   });
 });

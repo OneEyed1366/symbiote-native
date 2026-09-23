@@ -9,9 +9,12 @@ import {
   appListenerFor,
   currentlyFocusedInput,
   blurTextInput,
+  dlog,
+  isDebug,
   isRecord,
   isSymbioteNode,
   Keyboard,
+  Platform,
   propOf,
   setBehaviorListener,
   type ISymbioteEvent,
@@ -74,14 +77,25 @@ function isTextInputNode(node: ISymbioteNode): boolean {
   );
 }
 
-// RN's `_keyboardIsDismissible()` (ScrollView.js:1527-1541). RN also has `_keyboardEventsAreUnreliable()`
-// — a pre-API-30 Android layout-polling fallback — deliberately not ported: modern targets only,
-// and the omission only ever makes this return `false` more readily (never dismisses when RN
-// would not have been sure either), never a false claim.
+// RN's `_keyboardEventsAreUnreliable()` (ScrollView.js:1558-1561): before API 30 Android reports
+// the keyboard only through layout, so its events cannot be trusted.
+const ANDROID_RELIABLE_KEYBOARD_API = 30;
+
+function keyboardEventsAreUnreliable(): boolean {
+  return (
+    Platform.OS === 'android' &&
+    typeof Platform.Version === 'number' &&
+    Platform.Version < ANDROID_RELIABLE_KEYBOARD_API
+  );
+}
+
+// RN's `_keyboardIsDismissible()` (ScrollView.js:1527-1541).
 function keyboardIsDismissible(): boolean {
   const focused = currentlyFocusedInput();
   const hasFocusedTextInput = focused !== null && isTextInputNode(focused);
-  return hasFocusedTextInput && Keyboard.metrics() !== undefined;
+  const softKeyboardMayBeOpen =
+    Keyboard.metrics() !== undefined || keyboardEventsAreUnreliable();
+  return hasFocusedTextInput && softKeyboardMayBeOpen;
 }
 
 // RN's `_softKeyboardIsDetached()` (ScrollView.js:1543-1546).
@@ -125,7 +139,15 @@ function startShouldSetResponderCapture(
   event: ISymbioteEvent,
 ): boolean {
   const state = stateFor(owner);
-  if (isAnimating(state)) return true;
+  // Both claims below take the tap away from the button under the finger, so each one says so.
+  if (isAnimating(state)) {
+    if (isDebug()) {
+      dlog(
+        `ScrollView claims the tap (animating: momentum begin=${state.lastMomentumScrollBeginTime} end=${state.lastMomentumScrollEndTime})`,
+      );
+    }
+    return true;
+  }
   if (propOf(owner, 'disableScrollViewPanResponder') === true) return false;
   if (softKeyboardIsDetached()) return false;
   if (
@@ -133,7 +155,11 @@ function startShouldSetResponderCapture(
     keyboardIsDismissible()
   ) {
     const target = touchTargetOf(event.nativeEvent);
-    if (target !== undefined && !isTextInputNode(target)) return true;
+    if (target !== undefined && !isTextInputNode(target)) {
+      if (isDebug())
+        dlog('ScrollView claims the tap (keyboard up, dismissing it)');
+      return true;
+    }
   }
   return false;
 }
@@ -228,7 +254,24 @@ function handleMomentumScrollEnd(
   if (typeof app === 'function') app(event);
 }
 
+// `ScrollView.js:1284-1295`. Android's native scroller has no `keyboardDismissMode`, so `on-drag`
+// is JS dismissing the keyboard (`dismissKeyboard()`) before the app's own handler runs.
+function handleScrollBeginDrag(
+  owner: ISymbioteNode,
+  event: ISymbioteEvent,
+): void {
+  if (
+    Platform.OS === 'android' &&
+    propOf(owner, 'keyboardDismissMode') === 'on-drag'
+  ) {
+    blurTextInput(currentlyFocusedInput());
+  }
+  const app = appListenerFor(owner, 'scrollBeginDrag');
+  if (typeof app === 'function') app(event);
+}
+
 export const RESPONDER_OWNED_LISTENERS: readonly string[] = [
+  'scrollBeginDrag',
   'startShouldSetResponderCapture',
   'startShouldSetResponder',
   'responderTerminationRequest',
@@ -257,6 +300,9 @@ export function installResponderPredicates(owner: ISymbioteNode): void {
   });
   setBehaviorListener(owner, 'momentumScrollBegin', event => {
     handleMomentumScrollBegin(owner, event);
+  });
+  setBehaviorListener(owner, 'scrollBeginDrag', event => {
+    handleScrollBeginDrag(owner, event);
   });
   setBehaviorListener(owner, 'momentumScrollEnd', event => {
     handleMomentumScrollEnd(owner, event);

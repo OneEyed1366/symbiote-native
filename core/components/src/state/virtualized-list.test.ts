@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createElement, type ISymbioteEvent } from '@symbiote-native/engine';
 import {
+  invertedYStyleFor,
   computeMvcpAdjustment,
   resolveItemKey,
   indexOfItem,
@@ -1152,5 +1153,16 @@ describe('maxMinimumViewTime', () => {
       },
     ];
     expect(maxMinimumViewTime(pairs)).toBe(250);
+  });
+});
+
+describe('invertedYStyleFor', () => {
+  // why: VirtualizedList.js `styles.verticallyInverted` — Android flips with `scale: -1` because
+  // `scaleY: -1` can ANR on API 33+ (react-native#35350); every other platform uses `scaleY`.
+  it('flips with scale on Android and scaleY elsewhere', () => {
+    expect(invertedYStyleFor('android')).toEqual({
+      transform: [{ scale: -1 }],
+    });
+    expect(invertedYStyleFor('ios')).toEqual({ transform: [{ scaleY: -1 }] });
   });
 });
