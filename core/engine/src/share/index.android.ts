@@ -10,12 +10,7 @@
 
 import { dlog } from '../debug';
 import { getNativeModule } from '../native-modules';
-import {
-  validateContent,
-  shareActions,
-  SHARED_ACTION,
-  DISMISSED_ACTION,
-} from './shared';
+import { assertShareArgs, invariant, shareActions } from './shared';
 import type {
   IShareContent,
   IShareOptions,
@@ -37,55 +32,32 @@ interface IShareModuleAndroid {
   ): Promise<{ action: string }>;
 }
 
-// ShareModule.share resolves an untyped value at the native boundary; narrow it before
-// reading `action` (no `as`).
-function isShareResult(value: unknown): value is { action: string } {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'action' in value &&
-    typeof value.action === 'string'
-  );
-}
-
 export const Share: IShareStatic = {
   ...shareActions,
-  // Open the Android share dialog for `content`. Resolves with the user's action
-  // (Android always resolves sharedAction); rejects on invalid content, an unexpected
-  // native result, or a missing module (explicit reject, never a hung Promise).
+  // Share.js's Android branch: every check is a synchronous invariant, and the native result
+  // passes through untouched under `activityType: null`.
   share(
     content: IShareContent,
     options: IShareOptions = {},
   ): Promise<IShareAction> {
-    const invalid = validateContent(content);
-    if (invalid !== null) {
-      dlog(`Share.share -> invalid content: ${invalid.message}`);
-      return Promise.reject(invalid);
-    }
+    assertShareArgs(content, options);
     dlog('Share.share (android)');
     const shareModule = getNativeModule<IShareModuleAndroid>(SHARE_MODULE);
-    if (shareModule === null) {
-      dlog(`Share: "${SHARE_MODULE}" unresolved`);
-      return Promise.reject(
-        new Error('Share: ShareModule native module unavailable'),
-      );
-    }
+    invariant(
+      shareModule !== null,
+      'ShareModule should be registered on Android.',
+    );
+    invariant(
+      content.title == null || typeof content.title === 'string',
+      'Invalid title: title should be a string.',
+    );
     const newContent = {
       title: content.title,
       message:
         typeof content.message === 'string' ? content.message : undefined,
     };
-    return shareModule.share(newContent, options.dialogTitle).then(result => {
-      if (!isShareResult(result)) {
-        dlog('Share.share -> android result missing action');
-        throw new Error('Share: ShareModule returned an unexpected result');
-      }
-      dlog(`Share.share -> android action=${result.action}`);
-      return {
-        action:
-          result.action === DISMISSED_ACTION ? DISMISSED_ACTION : SHARED_ACTION,
-        activityType: null,
-      };
-    });
+    return shareModule
+      .share(newContent, options.dialogTitle)
+      .then(result => ({ activityType: null, ...result }));
   },
 };

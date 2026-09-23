@@ -1,10 +1,6 @@
-// Co-located unit test for the PermissionsAndroid module: it resolves the native
-// module lazily and routes check / request / requestMultiple / shouldShowRequestPermission-
-// Rationale to it, narrowing each native return at the trust boundary, and exposes the frozen
-// PERMISSIONS / RESULTS maps. It MUST degrade gracefully (Android-only, symbiote is
-// iOS-first): with no module, check resolves false and request resolves RESULTS.DENIED
-// without throwing. The native module is faked on `nativeModuleProxy` (bridgeless host-object
-// form).
+// PermissionsAndroid's Android build against RN 0.86: results pass through from the native module,
+// a missing module is RN's invariant, deprecated checkPermission / requestPermission warn and
+// delegate. The module is faked on `nativeModuleProxy` (bridgeless form).
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -40,42 +36,30 @@ afterEach(() => {
   globalThis.nativeModuleProxy = undefined;
 });
 
-describe('PermissionsAndroid (no native module)', () => {
-  it('degrades gracefully: check resolves false and request resolves DENIED, no throw', async () => {
+const NOT_INSTALLED = 'PermissionsAndroid is not installed correctly.';
+
+describe('PermissionsAndroid (no native module) — Negative', () => {
+  // why: RN's `invariant(NativePermissionsAndroid, …)` — check and requestMultiple are plain
+  // functions, so they throw synchronously; request is async, so the same throw rejects.
+  it('check and requestMultiple throw, request rejects, all with RN’s message', async () => {
     globalThis.nativeModuleProxy = undefined;
     vi.resetModules();
-    const { PermissionsAndroid, PERMISSIONS, RESULTS } =
-      await import('./index');
+    const { PermissionsAndroid, PERMISSIONS } = await import('./index.android');
 
-    await expect(PermissionsAndroid.check(PERMISSIONS.CAMERA)).resolves.toBe(
-      false,
+    expect(() => PermissionsAndroid.check(PERMISSIONS.CAMERA)).toThrow(
+      NOT_INSTALLED,
     );
-    await expect(PermissionsAndroid.request(PERMISSIONS.CAMERA)).resolves.toBe(
-      RESULTS.DENIED,
-    );
-  });
-
-  // why: requestMultiple and shouldShowRequestPermissionRationale have the SAME
-  // Android-only degrade obligation as check/request -- each must resolve its own
-  // documented safe default, not just the two methods exercised above.
-  it('requestMultiple resolves {} and shouldShowRequestPermissionRationale resolves false', async () => {
-    globalThis.nativeModuleProxy = undefined;
-    vi.resetModules();
-    const { PermissionsAndroid, PERMISSIONS } = await import('./index');
-
-    await expect(
+    expect(() =>
       PermissionsAndroid.requestMultiple([PERMISSIONS.CAMERA]),
-    ).resolves.toEqual({});
+    ).toThrow(NOT_INSTALLED);
     await expect(
-      PermissionsAndroid.shouldShowRequestPermissionRationale(
-        PERMISSIONS.CAMERA,
-      ),
-    ).resolves.toBe(false);
+      PermissionsAndroid.request(PERMISSIONS.CAMERA),
+    ).rejects.toThrow(NOT_INSTALLED);
   });
 });
 
 describe('PermissionsAndroid (native module present)', () => {
-  async function loadWithFake(): Promise<typeof import('./index')> {
+  async function loadWithFake(): Promise<typeof import('./index.android')> {
     nativeCalls = [];
     const fakePermissionsAndroid = {
       checkPermission: record('checkPermission', true),
@@ -93,7 +77,7 @@ describe('PermissionsAndroid (native module present)', () => {
       PermissionsAndroid: fakePermissionsAndroid,
     };
     vi.resetModules();
-    return import('./index');
+    return import('./index.android');
   }
 
   it('exposes the PERMISSIONS / RESULTS constants on the module and the instance', async () => {
@@ -145,80 +129,51 @@ describe('PermissionsAndroid (native module present)', () => {
     expect(map[PERMISSIONS.ACCESS_FINE_LOCATION]).toBe(RESULTS.DENIED);
   });
 
-  it('shouldShowRequestPermissionRationale resolves the native boolean', async () => {
-    const { PermissionsAndroid, PERMISSIONS } = await loadWithFake();
-
-    await expect(
-      PermissionsAndroid.shouldShowRequestPermissionRationale(
-        PERMISSIONS.CAMERA,
-      ),
-    ).resolves.toBe(false);
-    expect(callsOf('shouldShowRequestPermissionRationale')).toHaveLength(1);
-  });
-
-  // why: toPermissionStatus is the trust-boundary guard between an arbitrary
-  // native string and the closed RESULTS union -- an unrecognized value (a future
-  // Android API level's new status, or a broken native binding) must fail closed
-  // to DENIED, never surface as a bogus status the app doesn't know how to handle.
-  it('check falls back to false for a non-boolean native return', async () => {
-    globalThis.nativeModuleProxy = {
-      PermissionsAndroid: {
-        checkPermission: record('checkPermission', 'not-a-boolean'),
-        requestPermission: record('requestPermission', null),
-        shouldShowRequestPermissionRationale: record(
-          'shouldShowRequestPermissionRationale',
-          null,
-        ),
-        requestMultiplePermissions: record('requestMultiplePermissions', null),
-      },
-    };
-    vi.resetModules();
-    const { PermissionsAndroid, PERMISSIONS } = await import('./index');
-
-    await expect(PermissionsAndroid.check(PERMISSIONS.CAMERA)).resolves.toBe(
+  // why: RN's public surface has no shouldShowRequestPermissionRationale — only request()
+  // consults the native one, internally, for the rationale dialog.
+  it('exposes no shouldShowRequestPermissionRationale, as RN does', async () => {
+    const { PermissionsAndroid } = await loadWithFake();
+    expect('shouldShowRequestPermissionRationale' in PermissionsAndroid).toBe(
       false,
     );
   });
 
-  it('request falls back to DENIED for an unrecognized native status string', async () => {
+  // why: RN returns the native promise as-is — a status it does not know is the app's to see.
+  it('request returns the native status untouched', async () => {
     globalThis.nativeModuleProxy = {
       PermissionsAndroid: {
-        checkPermission: record('checkPermission', true),
         requestPermission: record('requestPermission', 'some_future_status'),
-        shouldShowRequestPermissionRationale: record(
-          'shouldShowRequestPermissionRationale',
-          false,
-        ),
-        requestMultiplePermissions: record('requestMultiplePermissions', {}),
       },
     };
     vi.resetModules();
-    const { PermissionsAndroid, PERMISSIONS, RESULTS } =
-      await import('./index');
+    const { PermissionsAndroid, PERMISSIONS } = await import('./index.android');
 
     await expect(PermissionsAndroid.request(PERMISSIONS.CAMERA)).resolves.toBe(
-      RESULTS.DENIED,
+      'some_future_status',
     );
   });
 
-  it('requestMultiple resolves an empty map for a non-object native return', async () => {
-    globalThis.nativeModuleProxy = {
-      PermissionsAndroid: {
-        checkPermission: record('checkPermission', true),
-        requestPermission: record('requestPermission', 'granted'),
-        shouldShowRequestPermissionRationale: record(
-          'shouldShowRequestPermissionRationale',
-          false,
-        ),
-        requestMultiplePermissions: record('requestMultiplePermissions', null),
-      },
-    };
-    vi.resetModules();
-    const { PermissionsAndroid, PERMISSIONS } = await import('./index');
+  // why: RN keeps the deprecated pair: each warns, checkPermission calls the native check,
+  // requestPermission resolves `request(...) === GRANTED`.
+  it('keeps the deprecated checkPermission / requestPermission with RN’s warnings', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { PermissionsAndroid, PERMISSIONS } = await loadWithFake();
 
     await expect(
-      PermissionsAndroid.requestMultiple([PERMISSIONS.CAMERA]),
-    ).resolves.toEqual({});
+      PermissionsAndroid.checkPermission(PERMISSIONS.CAMERA),
+    ).resolves.toBe(true);
+    await expect(
+      PermissionsAndroid.requestPermission(PERMISSIONS.CAMERA),
+    ).resolves.toBe(true);
+    expect(warn.mock.calls).toEqual([
+      [
+        '"PermissionsAndroid.checkPermission" is deprecated. Use "PermissionsAndroid.check" instead',
+      ],
+      [
+        '"PermissionsAndroid.requestPermission" is deprecated. Use "PermissionsAndroid.request" instead',
+      ],
+    ]);
+    warn.mockRestore();
   });
 });
 
@@ -237,7 +192,7 @@ describe('PermissionsAndroid.request with a rationale', () => {
     requestPermissionResult?: unknown;
     requestPermissionRejects?: boolean;
   }): Promise<{
-    module: typeof import('./index');
+    module: typeof import('./index.android');
     showAlertCalls: IShowAlertCall[];
   }> {
     nativeCalls = [];
@@ -273,7 +228,7 @@ describe('PermissionsAndroid.request with a rationale', () => {
     }
     globalThis.nativeModuleProxy = registeredModules;
     vi.resetModules();
-    return { module: await import('./index'), showAlertCalls };
+    return { module: await import('./index.android'), showAlertCalls };
   }
 
   // why: this is the whole point of passing a rationale -- when the OS recommends
@@ -290,7 +245,8 @@ describe('PermissionsAndroid.request with a rationale', () => {
     const pending = PermissionsAndroid.request(PERMISSIONS.CAMERA, rationale);
     await flushMicrotasks();
     expect(showAlertCalls).toHaveLength(1);
-    expect(showAlertCalls[0].rationale).toBe(rationale);
+    // RN hands the dialog a COPY (`{...rationale}`), so it is the same content, not the object.
+    expect(showAlertCalls[0].rationale).toEqual(rationale);
     // requestPermission must NOT have been called yet -- only after onAction.
     expect(callsOf('requestPermission')).toHaveLength(0);
 

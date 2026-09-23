@@ -228,4 +228,40 @@ describe('Keyboard', () => {
       expect(fabric.commands).toHaveLength(0);
     });
   });
+
+  describe('RN parity (Keyboard.js)', () => {
+    function emit(eventType: string, payload?: unknown): void {
+      if (deviceHub === undefined) throw new Error('no device hub');
+      deviceHub.emit(eventType, payload);
+    }
+
+    // why: RN's KeyboardImpl subscribes to didShow/didHide in its constructor, i.e. the first
+    // time Keyboard is touched — isVisible/metrics work with no listener of the app's own.
+    it('tracks the keyboard from the first Keyboard call, with no app listener', () => {
+      expect(Keyboard.isVisible()).toBe(false);
+      emit('keyboardDidShow', showEvent);
+      expect(Keyboard.isVisible()).toBe(true);
+      expect(Keyboard.metrics()).toEqual(showEvent.endCoordinates);
+    });
+
+    // why: RN animates only when `duration != null && duration !== 0`.
+    it('schedules no layout animation for an event without a duration', () => {
+      const noDuration: IKeyboardEvent = JSON.parse(
+        '{"easing":"keyboard","endCoordinates":{"screenX":0,"screenY":0,"width":1,"height":1}}',
+      );
+      Keyboard.scheduleLayoutAnimation(noDuration);
+      expect(layoutAnimationCalls).toHaveLength(0);
+    });
+
+    // why: RN's removeAllListeners goes to the device emitter itself, so it also drops
+    // Keyboard's own didShow tracking — a later show is no longer seen.
+    it('removeAllListeners drops every listener of the event, the tracking one included', () => {
+      const seen: unknown[] = [];
+      Keyboard.addListener('keyboardDidShow', payload => seen.push(payload));
+      Keyboard.removeAllListeners('keyboardDidShow');
+      emit('keyboardDidShow', showEvent);
+      expect(seen).toEqual([]);
+      expect(Keyboard.isVisible()).toBe(false);
+    });
+  });
 });

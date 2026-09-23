@@ -139,6 +139,15 @@ describe('the android refresh wrap, split by the engine', () => {
     expect(tree.owner.height).toBe(undefined);
   });
 
+  // why: `ScrollView.js:1862` — `nestedScrollEnabled ?? true` on the wrapped scroller, so it
+  // takes the gesture before the refresh parent does; an authored false still wins.
+  it('defaults nestedScrollEnabled on under the wrap', () => {
+    expect(wrapped().owner.nestedScrollEnabled).toBe(true);
+    expect(
+      wrapped({ nestedScrollEnabled: false }).owner.nestedScrollEnabled,
+    ).toBe(false);
+  });
+
   // why: `ScrollView.js:1856` composes the base onto BOTH boxes, and its own comment says why — a
   // wrapper with no explicit layout style otherwise loses `flexGrow` and collapses to its content
   // height inside a flex parent, where RN's grows. Every adapter had dropped it from the wrapper

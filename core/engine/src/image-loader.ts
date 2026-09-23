@@ -100,49 +100,65 @@ function requireLoader(method: string): INativeImageLoader {
   return loader;
 }
 
-// Resolve image dimensions, optionally via success/failure callbacks. Always returns the Promise
-// too (RN returns void when a callback is passed, but a promise-and-callback shape is friendlier
-// and a strict superset).
+// Image.ios.js / Image.android.js: the promise when no success callback is given; otherwise the
+// result goes to the callbacks and nothing is returned, a missing `failure` becoming a warning.
+function deliverSize(
+  promise: Promise<IImageSize>,
+  uri: string,
+  success: ISizeSuccess | undefined,
+  failure: ISizeFailure | undefined,
+): Promise<IImageSize> | undefined {
+  if (typeof success !== 'function') return promise;
+  promise
+    .then(size => success(size.width, size.height))
+    .catch(
+      typeof failure === 'function'
+        ? failure
+        : () => console.warn('Failed to get size for image: ' + uri),
+    );
+  return undefined;
+}
+
+// Overloaded as RN types it: the promise without callbacks, nothing with them.
+function getSize(uri: string): Promise<IImageSize>;
+function getSize(
+  uri: string,
+  success: ISizeSuccess,
+  failure?: ISizeFailure,
+): undefined;
 function getSize(
   uri: string,
   success?: ISizeSuccess,
   failure?: ISizeFailure,
-): Promise<IImageSize> {
+): Promise<IImageSize> | undefined {
   const promise = Promise.resolve()
     .then(() => requireLoader('getSize').getSize(uri))
     .then(toImageSize);
-  if (typeof success === 'function') {
-    promise
-      .then(size => success(size.width, size.height))
-      .catch((error: unknown) => {
-        if (typeof failure === 'function') failure(error);
-        else dlog(`Image.getSize failed for ${uri}: ${String(error)}`);
-      });
-  }
-  return promise;
+  return deliverSize(promise, uri, success, failure);
 }
 
 function getSizeWithHeaders(
   uri: string,
   headers: Record<string, string>,
+): Promise<IImageSize>;
+function getSizeWithHeaders(
+  uri: string,
+  headers: Record<string, string>,
+  success: ISizeSuccess,
+  failure?: ISizeFailure,
+): undefined;
+function getSizeWithHeaders(
+  uri: string,
+  headers: Record<string, string>,
   success?: ISizeSuccess,
   failure?: ISizeFailure,
-): Promise<IImageSize> {
+): Promise<IImageSize> | undefined {
   const promise = Promise.resolve()
     .then(() =>
       requireLoader('getSizeWithHeaders').getSizeWithHeaders(uri, headers),
     )
     .then(toImageSize);
-  if (typeof success === 'function') {
-    promise
-      .then(size => success(size.width, size.height))
-      .catch((error: unknown) => {
-        if (typeof failure === 'function') failure(error);
-        else
-          dlog(`Image.getSizeWithHeaders failed for ${uri}: ${String(error)}`);
-      });
-  }
-  return promise;
+  return deliverSize(promise, uri, success, failure);
 }
 
 // Android keys an in-flight prefetch by a monotonic requestId (so abortRequest can cancel it);

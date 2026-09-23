@@ -20,6 +20,7 @@ export { isBoolean } from '../type-guards';
 // some only ever fire on iOS, some only on Android. On a platform that never emits a
 // given event the subscription is inert (no device event arrives), mirroring RN.
 export type IAccessibilityChangeEventName =
+  | 'change'
   | 'screenReaderChanged'
   | 'reduceMotionChanged'
   | 'boldTextChanged'

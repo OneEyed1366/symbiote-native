@@ -208,6 +208,11 @@ struct ISelf {
   bool hasPressListener = false;
   bool hasAnyPressListener = false;
   bool underlayShown = false;
+  // ScrollView's `sendMomentumEvents`: whether the app wired momentumScrollBegin or -End.
+  bool hasMomentumListener = false;
+  // Text's pressability (`Text.js:145-163`): onPress or onLongPress, and onStartShouldSetResponder.
+  bool hasPressOrLongPressListener = false;
+  bool hasStartShouldSetResponder = false;
 };
 
 folly::dynamic fabricProps(

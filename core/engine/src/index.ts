@@ -460,8 +460,12 @@ export type {
   ILayoutAnimationTypes,
   ILayoutAnimationProperties,
 } from './layout-animation';
-export { BackHandler } from './back-handler';
-export type { IBackPressEventName, IBackPressHandler } from './back-handler';
+export { BackHandler, installBackHandler } from './back-handler';
+export type {
+  IBackPressEventName,
+  IBackPressHandler,
+  IHardwareBackPressEvent,
+} from './back-handler';
 export {
   PermissionsAndroid,
   PERMISSIONS,

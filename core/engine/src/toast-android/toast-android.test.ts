@@ -7,7 +7,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-let ToastAndroid: typeof import('./index').ToastAndroid;
+let ToastAndroid: typeof import('./index.android').ToastAndroid;
 
 let showArgs: [string, number] | undefined;
 let gravityArgs: [string, number, number] | undefined;
@@ -56,7 +56,7 @@ beforeEach(async () => {
   };
 
   vi.resetModules();
-  ({ ToastAndroid } = await import('./index'));
+  ({ ToastAndroid } = await import('./index.android'));
 });
 
 afterEach(() => {
@@ -134,7 +134,7 @@ describe('ToastAndroid (module present, malformed constants payload)', () => {
       return isPresent<T>(module) ? module : null;
     };
     vi.resetModules();
-    const fresh = await import('./index');
+    const fresh = await import('./index.android');
 
     expect(fresh.ToastAndroid.SHORT).toBe(0); // fallback: getConstants() gave a string, not a number
     expect(fresh.ToastAndroid.LONG).toBe(2); // native value used as-is
@@ -148,7 +148,7 @@ describe('ToastAndroid (no module)', () => {
   it('the show* calls are silent no-ops and the constants are still numbers', async () => {
     globalThis.__turboModuleProxy = <T>(_name: string): T | null => null;
     vi.resetModules();
-    const fresh = await import('./index');
+    const fresh = await import('./index.android');
     const toast = fresh.ToastAndroid;
 
     expect(() => {

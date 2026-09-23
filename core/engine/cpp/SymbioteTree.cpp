@@ -18,9 +18,10 @@
 #include <react/renderer/uimanager/primitives.h>
 
 // `react/renderer/dom/` is NOT among the header folders ReactAndroid copies into its prefab
-// (`ReactAndroid/build.gradle.kts` lists uimanager, mounting, core, … and no dom), so including it
-// unconditionally breaks the Android build of this same file. iOS compiles against the full
-// ReactCommon tree and has it.
+// (`ReactAndroid/build.gradle.kts` lists uimanager, mounting, core, … and no dom), though
+// libreactnative.so exports the functions. `android/CMakeLists.txt` copies `DOM.h` from the app's
+// react-native onto the include path; without it this falls back to the throwing stubs. iOS compiles
+// against the full ReactCommon tree and has it.
 //
 // Detected rather than branched on `__ANDROID__`, because the fact is about the TOOLCHAIN'S HEADERS,
 // not about the platform — and it self-heals the day upstream exports the folder. The three
@@ -73,6 +74,13 @@ constexpr int32_t kOpCreateVoid = 13;
 // The owned listener names any platform rule reads, one bit each — see `Node::pressListeners`.
 // `press` is deliberately bit 0 so the `focusable` question is the cheapest of the two.
 constexpr uint8_t kPressListenerPress = 1u << 0;
+// The four press names; `hasAnyPressListener` asks about these and nothing else.
+constexpr uint8_t kPressListenerMask = 0x0f;
+// ScrollView's `sendMomentumEvents` (`ScrollView.js:1801-1804`) asks about either of these two.
+constexpr uint8_t kMomentumListenerMask = (1u << 4) | (1u << 5);
+// Text's pressability (`Text.js:145-163`): onPress / onLongPress, plus onStartShouldSetResponder.
+constexpr uint8_t kTextPressMask = kPressListenerPress | (1u << 3);
+constexpr uint8_t kStartShouldSetResponder = 1u << 6;
 
 /** 0 for a name the host has no rule for, which is nearly all of them. */
 uint8_t pressListenerBit(const std::string &name) {
@@ -80,6 +88,9 @@ uint8_t pressListenerBit(const std::string &name) {
   if (name == "pressIn") return 1u << 1;
   if (name == "pressOut") return 1u << 2;
   if (name == "longPress") return 1u << 3;
+  if (name == "momentumScrollBegin") return 1u << 4;
+  if (name == "momentumScrollEnd") return 1u << 5;
+  if (name == "startShouldSetResponder") return kStartShouldSetResponder;
   return 0;
 }
 
@@ -1055,15 +1066,18 @@ IOwner ownerOf(const Node &node) {
       node.parent->tagName.c_str(),
       (node.parent->pressListeners & kPressListenerPress) != 0,
       node.parent->underlayShown,
-      node.parent->pressListeners != 0};
+      (node.parent->pressListeners & kPressListenerMask) != 0};
 }
 
 /** The node's own non-prop bits, unpacked from the mask the ops maintain. See `ISelf`. */
 ISelf selfOf(const Node &node) {
   return ISelf{
       (node.pressListeners & kPressListenerPress) != 0,
-      node.pressListeners != 0,
-      node.underlayShown};
+      (node.pressListeners & kPressListenerMask) != 0,
+      node.underlayShown,
+      (node.pressListeners & kMomentumListenerMask) != 0,
+      (node.pressListeners & kTextPressMask) != 0,
+      (node.pressListeners & kStartShouldSetResponder) != 0};
 }
 
 /**

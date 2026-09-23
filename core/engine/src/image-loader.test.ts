@@ -97,17 +97,27 @@ afterEach(() => {
 describe('imageStatics', () => {
   describe('Positive', () => {
     it('getSize resolves width/height from the native [width, height] array', async () => {
-      const size = await imageStatics.getSize('https://example.com/a.png');
+      // `.then` straight on the call: without callbacks the TYPE is a promise, not `| undefined`
+      // (an app chains it exactly like this, and a union type fails its compile).
+      const size = await imageStatics
+        .getSize('https://example.com/a.png')
+        .then(result => result);
       expect(size).toEqual({ width: 100, height: 200 });
       expect(capturedGetSize?.uri).toBe('https://example.com/a.png');
     });
 
-    it('getSize also invokes the success callback', async () => {
+    // why: Image.android.js / Image.ios.js — with a success callback RN returns nothing (void);
+    // the result arrives through the callback alone.
+    it('getSize with a success callback returns nothing and calls the callback', async () => {
       let seen: [number, number] | null = null;
-      await imageStatics.getSize('https://example.com/a.png', (w, h) => {
-        seen = [w, h];
-      });
-      expect(seen).toEqual([100, 200]);
+      const returned = imageStatics.getSize(
+        'https://example.com/a.png',
+        (w, h) => {
+          seen = [w, h];
+        },
+      );
+      expect(returned).toBe(undefined);
+      await vi.waitFor(() => expect(seen).toEqual([100, 200]));
     });
 
     // why: the iOS spec resolves a {width, height} OBJECT for this call (unlike getSize's array),
@@ -213,24 +223,42 @@ describe('imageStatics', () => {
       ).rejects.toThrow('unexpected size result from native');
     });
 
-    // why: getSize offers BOTH a callback and a Promise return value (a superset of RN's
-    // callback-only shape) — a caller using only the failure callback must not have the
-    // rejection silently swallowed by the callback branch's own .catch().
-    it('getSize still rejects its returned promise even when a failure callback is provided', async () => {
+    // why: in the callback form RN routes a native failure to `failure` and returns nothing —
+    // there is no promise left to reject unhandled.
+    it('getSize routes a native failure to the failure callback', async () => {
       installFakeImageLoader({
         ...defaultFakeImageLoader(),
         getSize: () => Promise.reject(new Error('native getSize failed')),
       });
       let failureSeen: unknown;
-      const promise = imageStatics.getSize(
+      const returned = imageStatics.getSize(
         'https://example.com/a.png',
         () => undefined,
         error => {
           failureSeen = error;
         },
       );
-      await expect(promise).rejects.toThrow('native getSize failed');
-      expect(failureSeen).toBeInstanceOf(Error);
+      expect(returned).toBe(undefined);
+      await vi.waitFor(() => expect(failureSeen).toBeInstanceOf(Error));
+    });
+
+    // why: with no failure callback RN warns `Failed to get size for image: <url>`.
+    it('getSize warns on failure when no failure callback is given', async () => {
+      installFakeImageLoader({
+        ...defaultFakeImageLoader(),
+        getSize: () => Promise.reject(new Error('native getSize failed')),
+      });
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        imageStatics.getSize('https://example.com/a.png', () => undefined);
+        await vi.waitFor(() =>
+          expect(warn).toHaveBeenCalledWith(
+            'Failed to get size for image: https://example.com/a.png',
+          ),
+        );
+      } finally {
+        warn.mockRestore();
+      }
     });
 
     it('prefetch rejects when native prefetchImage rejects', async () => {
