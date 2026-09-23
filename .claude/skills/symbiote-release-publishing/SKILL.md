@@ -265,6 +265,20 @@ re-added to `ignore`.
 under "workspace tooling"), like every other dev tool in this repo — see
 `symbiote-dependency-catalog`.
 
+## A green release can publish nothing: version collision (measured 2026-09-23)
+
+If a merge from `master` into `develop` drops the previous "Version Packages" bumps,
+`changeset version` recomputes from the old versions and lands on numbers npm already holds.
+`changeset publish` then only warns `is not being published because version X is already
+published` and exits 0. Release #84 shipped 3 of 12 packages this way; the new engine and
+adapter code sat under 22.09's 1.2.0 / 3.0.1.
+
+- Before merging a release PR, check each `newVersion` with `npm view <pkg>@<v> version`.
+  Any hit is a collision.
+- After a release, grep the log for `already published`, not only for `published`.
+- Fix: a new changeset for every collided package whose code changed, which bumps it past npm.
+  A collided package with no code diff since the old publish needs nothing.
+
 ## A MINOR on a 0.x `engine` is a MAJOR for the whole repo (measured 2026-09-21)
 
 Every publishable package peers `"@symbiote-native/engine": "workspace:^"`, and `^0.5.0` does not
