@@ -188,7 +188,8 @@ know which of the two you have written is to break it and watch — the bare for
 (2.2 us against 0.65) while an additive cost stays put, so a 1.25x margin measured on `build-release`
 fails a real 1.17x there — it passed for days only because the gap sat inside the bar
 (`create-element-ladder`, 2026-09-23). Gate a release-calibrated ratio on `__DEV__ === false`; on the
-assert build print it. And when a change moves an adapter CONTRACT (what the renderer is called with),
+assert build print it. The same holds for a SUM of separately timed arms: the ladder's
+`full > alloc + record` read `rest` -15% on a CI runner (2026-09-23) and is now release-only too. And when a change moves an adapter CONTRACT (what the renderer is called with),
 run the whole `test:itest`, not only the fixtures you touched: a counter pinned to the old contract
 (`adapter-create-cost`'s class channel) lives in a file you did not open.
 
