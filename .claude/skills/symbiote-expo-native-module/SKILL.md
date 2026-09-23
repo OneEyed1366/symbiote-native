@@ -234,11 +234,20 @@ reproduced directly in `examples/react/ios/Podfile` rather than worked around.
               fix it, because the Ruby-side exclude filter runs AFTER JS resolve and drops the
               entry every single time regardless of cache state",
     fix: "the moment a package on this exclude list gets its own @symbiote-native/<pkg> wrapper,
-          remove that name from ALL SIX examples/expo-*/ios/Podfile exclude lists (hand-maintained,
-          not generated — grep -rn \"'expo-file-system',\" examples/expo-*/ios/Podfile to find
-          every copy) in the SAME change that ships the wrapper — never as a follow-up",
+          remove that name from ALL SIX examples/expo-*/ios/Podfile exclude lists AND the
+          mirrored ALL SIX examples/expo-*/android/settings.gradle expoAutolinking.exclude
+          lists (both hand-maintained, not generated, and NOT kept in sync with each other
+          automatically despite settings.gradle's own comment saying they share one cause —
+          grep -rn \"'expo-file-system'\" examples/expo-*/ios/Podfile examples/expo-*/android/
+          settings.gradle to find every copy on both platforms) in the SAME change that ships
+          the wrapper — never as a follow-up, and never assume fixing one platform's copy
+          fixed the other's",
     found: "2026-09-11, expo-file-system's next-surface (FileSystemModule) — the exclude entry
-            predated @symbiote-native/file-system by weeks and was never revisited",
+            predated @symbiote-native/file-system by weeks and was never revisited. iOS was
+            fixed that day; Android's settings.gradle mirror was missed and stayed broken
+            until 2026-09-23, when it surfaced as a real `run-android` Gradle failure
+            (\"Project with path ':expo-file-system' could not be found in project ':app'\")
+            — proof the two-file fix instruction above wasn't explicit enough the first time.",
   },
   deployment_target_trap: {
     bug: "ExpoSensors.podspec pins s.platforms={:ios=>'16.4'}, above RN's
