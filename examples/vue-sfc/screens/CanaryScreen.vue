@@ -639,6 +639,7 @@ const rotationStyle = {
         :data="mvcpItems"
         :key-extractor="mvcpKeyExtractor"
         :maintain-visible-content-position="{ minIndexForVisible: 0 }"
+        nested-scroll-enabled
         class="box-list160"
       >
         <template #item="{ item }">
@@ -681,6 +682,7 @@ const rotationStyle = {
       <!-- box-list160 is shared with the MVCP FlatList above. -->
       <Animated.ScrollView
         class="box-list160"
+        nested-scroll-enabled
         :scroll-event-throttle="16"
         @scroll="onParityScroll"
       >
