@@ -8,5 +8,5 @@
 
 - Every adapter keeps an iOS Modal mounted until native dismiss, then calls `onDismiss`.
 - Every adapter sends `isInvertedVirtualizedList` for inverted lists.
-- Svelte and Angular lists forward `removeClippedSubviews` and `nestedScrollEnabled` to their ScrollView.
+- Svelte and Angular lists forward `removeClippedSubviews` and `nestedScrollEnabled` to their ScrollView. React, Vue and Solid list prop types now declare `nestedScrollEnabled`.
 - A bare boolean attribute (`<view accessible>`, `nested-scroll-enabled`) now reaches native as `true` in Vue templates and on Svelte tags. Before, it arrived as `""`, which Android rejects.

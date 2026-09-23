@@ -109,6 +109,7 @@ export interface IVirtualizedSectionListProps<ItemT>
   keyboardShouldPersistTaps?: boolean | 'always' | 'never' | 'handled';
   keyboardDismissMode?: 'none' | 'on-drag' | 'interactive';
   removeClippedSubviews?: boolean;
+  nestedScrollEnabled?: boolean;
   style?: IStyleProp<IViewStyle>;
   contentContainerStyle?: IStyleProp<IViewStyle>;
   // Forwarded onto the inner list like `style` — resolves through the shared style registry.

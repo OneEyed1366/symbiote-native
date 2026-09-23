@@ -207,6 +207,7 @@ export interface IVirtualizedListProps<ItemT>
   keyboardShouldPersistTaps?: boolean | 'always' | 'never' | 'handled';
   keyboardDismissMode?: 'none' | 'on-drag' | 'interactive';
   removeClippedSubviews?: boolean;
+  nestedScrollEnabled?: boolean;
   horizontal?: boolean;
   inverted?: boolean;
   style?: IStyleProp<IViewStyle>;

@@ -148,6 +148,7 @@ export interface IVirtualizedListProps<ItemT> {
   keyboardShouldPersistTaps?: boolean | 'always' | 'never' | 'handled';
   keyboardDismissMode?: 'none' | 'on-drag' | 'interactive';
   removeClippedSubviews?: boolean;
+  nestedScrollEnabled?: boolean;
   style?: IStyleProp<IViewStyle>;
   contentContainerStyle?: IStyleProp<IViewStyle>;
   // The remaining passthrough tail (raw scroll above, keyboard, accessibility, testID, …) is

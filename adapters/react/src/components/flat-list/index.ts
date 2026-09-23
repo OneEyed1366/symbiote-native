@@ -112,6 +112,7 @@ export interface IFlatListProps<ItemT> extends IAccessibilityProps, IAriaProps {
   className?: string;
   // RN defaults it per platform (true on Android); see removeClippedSubviewsOrDefault.
   removeClippedSubviews?: boolean;
+  nestedScrollEnabled?: boolean;
 }
 
 export function FlatList<ItemT>(
