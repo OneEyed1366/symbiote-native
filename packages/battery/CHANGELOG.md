@@ -1,5 +1,11 @@
 # @symbiote-native/battery
 
+## 3.0.1
+
+### Patch Changes
+
+- [#86](https://github.com/OneEyed1366/symbiote-native/pull/86) [`aa17531`](https://github.com/OneEyed1366/symbiote-native/commit/aa175314db0f79474b9ac87bee3e30c4e87a72c4) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - README: Install now leads with `npx @symbiote-native/cli new`/`add` (split into separate "New app"/"Existing app" blocks to avoid an accidental double copy-paste), with the manual `npm install` + native-wiring steps collapsed into a `<details>` block for anyone not using the CLI. Every `--flag` was verified against `expo-package-layers.ts`, and each package's native-wiring claims (Info.plist keys, manifest permissions/services) were cross-checked against its own `native-link.json`.
+
 ## 3.0.0
 
 ### Patch Changes

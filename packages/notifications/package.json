@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/notifications",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "expo-notifications wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, Svelte, Solid, and Angular adapters. Permissions, device/Expo push tokens, scheduling, presentation, badges, Android channels/channel groups, categories, and the background notification task hook.",
   "license": "MIT",
   "repository": {

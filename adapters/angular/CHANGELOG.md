@@ -1,5 +1,15 @@
 # @symbiote-native/angular
 
+## 3.1.1
+
+### Patch Changes
+
+- [#86](https://github.com/OneEyed1366/symbiote-native/pull/86) [`aa17531`](https://github.com/OneEyed1366/symbiote-native/commit/aa175314db0f79474b9ac87bee3e30c4e87a72c4) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - README: the documented native entry point was the low-level `mount`/`AppRegistry.registerRunnable` escape hatch, not the real zero-config `bootstrapApplication` this adapter actually ships (`bootstrap.ts`) and that `cli new` scaffolds — rewritten to lead with it, demoting the low-level path to "for anything the defaults don't cover", matching every other adapter's README shape. Also missing `import '@symbiote-native/angular'`, the bare side-effect import that registers host behaviors. Fixes the opening line and Parity section, both of which only named React and Vue, omitting Svelte and Solid entirely. Corrects the Node requirement (react-native 0.86 needs `>=22.13`, not `>=22.11`), adds the missing `@angular/forms` peer and the `@babel/plugin-transform-class-static-block` requirement, and leads Install with `npx @symbiote-native/cli new`.
+
+- Updated dependencies [[`aa17531`](https://github.com/OneEyed1366/symbiote-native/commit/aa175314db0f79474b9ac87bee3e30c4e87a72c4), [`aa17531`](https://github.com/OneEyed1366/symbiote-native/commit/aa175314db0f79474b9ac87bee3e30c4e87a72c4)]:
+  - @symbiote-native/components@3.1.1
+  - @symbiote-native/css-parser@0.5.1
+
 ## 3.1.0
 
 ### Minor Changes

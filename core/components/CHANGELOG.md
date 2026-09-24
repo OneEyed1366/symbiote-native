@@ -1,5 +1,11 @@
 # @symbiote-native/components
 
+## 3.1.1
+
+### Patch Changes
+
+- [#86](https://github.com/OneEyed1366/symbiote-native/pull/86) [`aa17531`](https://github.com/OneEyed1366/symbiote-native/commit/aa175314db0f79474b9ac87bee3e30c4e87a72c4) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - README: the Usage example called `renderSwitch()`, a function that no longer exists — Switch's render function was retired when painting moved to a host behavior. Replaced with `renderModal()`/`modalReducer`/`createInitialModalState`, the real current three-layer reference component, and corrected the surrounding claim that Switch is the canonical example.
+
 ## 3.1.0
 
 ### Minor Changes
