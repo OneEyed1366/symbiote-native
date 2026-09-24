@@ -17,7 +17,10 @@ export type {
   IDatabaseChangeEvent,
   IOnInitCallback,
   IOpenDatabaseOptions,
+  ISQLiteAssetSource,
 } from './sqlite-database';
+
+export { importDatabaseFromAssetAsync } from './import-database-from-asset';
 
 export { SQLiteStatement } from './sqlite-statement';
 export type {

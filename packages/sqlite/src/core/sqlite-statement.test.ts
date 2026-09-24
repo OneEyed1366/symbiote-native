@@ -7,6 +7,17 @@ import { FAKE_EXPO_SQLITE } from './native-fakes';
 // deliberately not ported (see packages/sqlite/README.md).
 vi.mock('./native-module', () => ({ expoSQLite: FAKE_EXPO_SQLITE }));
 
+// import-database-from-asset.ts pulls in the real @symbiote-native/asset, whose Asset.ts imports
+// RN's Flow-typed resolveAssetSource — same fake every core test importing it uses (see
+// packages/font/src/core/font-loader.test.ts).
+vi.mock('@symbiote-native/asset', () => ({
+  Asset: {
+    fromModule: vi.fn(() => ({
+      downloadAsync: async () => ({ localUri: null }),
+    })),
+  },
+}));
+
 vi.mock('expo-modules-core', () => ({
   Platform: { OS: 'ios' },
 }));

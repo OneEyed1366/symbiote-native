@@ -25,6 +25,22 @@ const FAKE_EXPO_AUDIO = {
 // local-authentication.test.ts use.
 vi.mock('./native-module', () => ({ expoAudio: FAKE_EXPO_AUDIO }));
 
+// resolve-source.ts imports the real @symbiote-native/asset, whose Asset.ts pulls in RN's
+// Flow-typed resolveAssetSource — same fake every core test importing it uses (see
+// packages/font/src/core/font-loader.test.ts).
+class FakeAsset {
+  name = '';
+  uri = '';
+  localUri: string | null = null;
+  downloadAsync = vi.fn(async () => {});
+}
+vi.mock('@symbiote-native/asset', () => ({
+  Asset: Object.assign(FakeAsset, {
+    fromURI: vi.fn(() => new FakeAsset()),
+    fromModule: vi.fn(() => new FakeAsset()),
+  }),
+}));
+
 const mockPlatform = { OS: 'ios' as 'ios' | 'android' };
 vi.mock('expo-modules-core', () => ({ Platform: mockPlatform }));
 

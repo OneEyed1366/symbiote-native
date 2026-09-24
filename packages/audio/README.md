@@ -218,6 +218,12 @@ Plus the full `I`-prefixed type surface ported from upstream's `Audio.types.ts` 
 `AudioModule.types.ts` / `AudioStream.types.ts` / `AudioConstants.ts`, re-exported from the
 barrel — see `src/core/types.ts`.
 
+`IAudioSource` accepts a URI string, a `require('./song.mp3')` module id, an `@symbiote-native/asset`
+`Asset` instance, or a `{ uri | assetId, headers?, name? }` object — matching upstream's full
+`AudioSource` union now that `@symbiote-native/asset` ships. `createAudioPlayer`'s `downloadFirst`
+option is ported too: the player starts with no source and `replace()`s it once
+`Asset.downloadAsync()` resolves a local cache file, same as upstream's `useAudioPlayer`.
+
 ## Deliberately not ported
 
 - **`useAudioPlayer` / `useAudioPlayerStatus` / `useAudioSampleListener` / `useAudioRecorder` /
@@ -227,13 +233,6 @@ barrel — see `src/core/types.ts`.
   hooks are thin wrappers over these plus `useReleasingSharedObject` for cleanup-on-unmount); each
   adapter's own lifecycle wrapper is where a hook/composable/service belongs, per
   `<components_split_logic_view_lifecycle>` in the root project CLAUDE.md. None ship yet.
-- **The `Asset`-instance form of `AudioSource`, and the `downloadFirst` player option.** Upstream
-  resolves both through `expo-asset` (`Asset.fromModule` / `Asset.downloadAsync`), which depends
-  on `expo-constants` and peers on the `expo` meta-package — this project never depends on `expo`
-  (root CLAUDE.md's dependency-scope invariant, and the `symbiote-expo-native-module` skill §1).
-  The plain `number` form (`require('./song.mp3')`) **is** supported — `resolveSource`/
-  `resolveSources` resolve it through RN's own generic `resolveAssetSource`, wired by
-  `bootstrapHost`, no `expo-asset` needed.
 - **`interruptionModeAndroid`** on `IAudioMode` — upstream marks it `@deprecated`, superseded by
   the cross-platform `interruptionMode`.
 - **Web-only surfaces** (`ExpoAudio.web.ts`, `AudioPlayer.web.ts`, `AudioStream.web.ts`,

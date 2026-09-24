@@ -71,6 +71,22 @@ vi.mock('./native-module', () => ({
   },
 }));
 
+// resolve-source.ts imports the real @symbiote-native/asset, whose Asset.ts pulls in RN's
+// Flow-typed resolveAssetSource — same fake every core test importing it uses (see
+// packages/font/src/core/font-loader.test.ts).
+class FakeAsset {
+  name = '';
+  uri = '';
+  localUri: string | null = null;
+  downloadAsync = vi.fn(async () => {});
+}
+vi.mock('@symbiote-native/asset', () => ({
+  Asset: Object.assign(FakeAsset, {
+    fromURI: vi.fn(() => new FakeAsset()),
+    fromModule: vi.fn(() => new FakeAsset()),
+  }),
+}));
+
 const mockPlatform = { OS: 'ios' as 'ios' | 'android' };
 
 // expo-modules-core's real entry transitively imports 'react-native', whose Flow-typed source
@@ -137,6 +153,14 @@ describe('createAudioPlayer', () => {
     expect(player.updateInterval).toBe(100);
     expect(player.keepAudioSessionActive).toBe(true);
     expect(player.preferredForwardBufferDuration).toBe(20);
+  });
+
+  it('downloadFirst starts the player with a null source, then replaces it once downloaded', async () => {
+    const player = createAudioPlayer('track.mp3', { downloadFirst: true });
+    expect(player.source).toBeNull();
+
+    await vi.waitFor(() => expect(replaceCalls.length).toBe(1));
+    expect(replaceCalls[0]).toEqual({ uri: 'track.mp3' });
   });
 });
 

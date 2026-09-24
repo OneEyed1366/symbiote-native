@@ -17,7 +17,7 @@
 // `error()` rather than throwing, exactly like `SQLiteProviderNonSuspense`'s `onError` branch
 // parks it in React state instead of re-throwing.
 //
-// Deliberately excluded, same as `../core`: `assetSource` (needs `expo-asset`, out of scope).
+// `assetSource` reaches `openDatabaseAsync` via `ISqliteConfig.options`, forwarded below.
 // No Suspense equivalent — Angular has none.
 
 import {

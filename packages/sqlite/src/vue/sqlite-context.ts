@@ -4,11 +4,9 @@
 // Vue's own provide/inject, following packages/navigation/src/vue/navigation-context.ts's shape
 // (a symbol-keyed InjectionKey, a `require*` getter that throws with a hook-scoped message).
 //
-// Deliberately excluded, mirroring core's own `IOpenDatabaseOptions` (see core/types.ts):
-// `assetSource` — needs `expo-asset`, out of scope for this package.
+// `assetSource` reaches `openDatabaseAsync` via the `options` prop, not a separate prop here.
 // Deliberately excluded, this pass only: Suspense integration (`useSuspense`). Vue has its own
-// `<Suspense>` + async `setup()` idiom instead of React's `use()`; wiring this Provider into it is
-// a separate, later decision, not a straight port of React's `useSuspense` flag.
+// `<Suspense>`/async `setup()` idiom instead of React's `use()`; wiring it in is a later decision.
 
 import {
   defineComponent,

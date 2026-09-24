@@ -1,6 +1,6 @@
 import { Platform } from 'expo-modules-core';
 import { expoAudio } from './native-module';
-import { resolveSource } from './resolve-source';
+import { resolveSource, resolveSourceWithDownload } from './resolve-source';
 import type {
   IAudioPlayerOptions,
   IAudioSource,
@@ -40,14 +40,27 @@ export function createAudioPlayer(
 ): AudioPlayer {
   const {
     updateInterval = 500,
+    downloadFirst = false,
     keepAudioSessionActive = false,
     preferredForwardBufferDuration = 0,
   } = options;
-  const resolvedSource = resolveSource(source);
-  return new AudioPlayer(
-    resolvedSource,
+  const player = new AudioPlayer(
+    downloadFirst ? null : resolveSource(source),
     updateInterval,
     keepAudioSessionActive,
     preferredForwardBufferDuration,
   );
+
+  if (downloadFirst && source) {
+    resolveSourceWithDownload(source)
+      .then(resolved => {
+        if (resolved) player.replace(resolved);
+      })
+      .catch(() => {
+        const fallback = resolveSource(source);
+        if (fallback) player.replace(fallback);
+      });
+  }
+
+  return player;
 }

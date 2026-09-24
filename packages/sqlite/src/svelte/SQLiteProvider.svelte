@@ -11,9 +11,8 @@
   // resolves later, so the getter is handed out immediately and its underlying `$state` is
   // written once the effect settles.
   //
-  // Deliberately excludes `assetSource` (needs `expo-asset`, out of scope for this package — see
-  // the core layer's own IOnInitCallback doc comment) and `useSuspense` (Svelte has no built-in
-  // Suspense primitive).
+  // `assetSource` reaches `openDatabaseAsync` via `options`, forwarded below — not a separate
+  // prop here. `useSuspense` is not offered: Svelte has no built-in Suspense primitive.
   //
   // Unlike upstream, `onInit` is not called from here — this package's own `openDatabaseAsync`
   // already runs it internally before resolving (see `IOnInitCallback`'s doc comment in

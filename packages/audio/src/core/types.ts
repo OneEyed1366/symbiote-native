@@ -2,16 +2,8 @@
 // RecordingConstants.ts / AudioStream.types.ts / AudioEventKeys.ts, renamed with this repo's
 // `I`-prefix convention for object/union-shaped exported types (enums keep their upstream name,
 // matching packages/local-auth's AuthenticationType/SecurityLevel).
-//
-// `IAudioSource`'s `number` variant (a `require()`'d local asset) IS supported: it resolves via
-// `@symbiote-native/engine`'s `resolveAssetSource` seam, which wraps RN's own generic
-// `Image.resolveAssetSource` — an ordinary Metro asset-registry lookup, nothing image-specific
-// despite the name, and `mp3` is already in Metro's default `assetExts`. Only an actual `Asset`
-// CLASS instance (as opposed to the plain numeric id `require()` returns) is deliberately NOT
-// ported, along with the `downloadFirst` player option — both need `expo-asset`'s own
-// remote-caching layer, which pulls in `expo-constants` and peers on the `expo` meta-package this
-// project never depends on (root CLAUDE.md's dependency-scope invariant, and the
-// `symbiote-expo-native-module` skill §1). See the package README.
+import type { Asset } from '@symbiote-native/asset';
+
 import type { AudioQuality, IOSOutputFormat } from './recording-presets';
 
 /** Audio source information returned from native when reading sources from a queue. */
@@ -20,16 +12,16 @@ export type IAudioSourceInfo = {
   name?: string;
 };
 
-/**
- * A URI string, an object describing a remote/local (by URI) audio source, or the numeric asset
- * id `require('./song.mp3')` produces — resolved via `resolveSource`/`resolveSources`.
- */
+/** A URI, a `require()` module id, an `Asset`, or a source object — see resolve-source.ts. */
 export type IAudioSource =
   | string
   | number
+  | Asset
   | null
   | {
       uri?: string;
+      /** id of a local asset from `require()`; ignored if `uri` is set. */
+      assetId?: number;
       headers?: Record<string, string>;
       name?: string;
     };
@@ -52,6 +44,8 @@ export type IAudioPlayerOptions = {
    * @default 0
    */
   preferredForwardBufferDuration?: number;
+  /** Downloads the source via `Asset` before the native player loads it. @default false */
+  downloadFirst?: boolean;
 };
 
 export type IPreloadOptions = {

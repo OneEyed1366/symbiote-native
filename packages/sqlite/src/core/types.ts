@@ -28,6 +28,16 @@ export type IDatabaseChangeEvent = {
  */
 export type IOnInitCallback = (db: SQLiteDatabase) => Promise<void> | void;
 
+/** A bundled database file to import on first open, via `@symbiote-native/asset`. */
+export type ISQLiteAssetSource = {
+  /** The asset id from `require('./assets/db.db')`. */
+  assetId: number;
+  /** Overwrite the local database file even if it already exists. @default false */
+  forceOverwrite?: boolean;
+};
+
 export type IOpenDatabaseOptions = ISQLiteOpenOptions & {
   onInit?: IOnInitCallback;
+  /** Async-only — see `importDatabaseFromAssetAsync`; ignored by `openDatabaseSync`. */
+  assetSource?: ISQLiteAssetSource;
 };

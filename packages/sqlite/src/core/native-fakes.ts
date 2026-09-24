@@ -352,6 +352,13 @@ export const FAKE_EXPO_SQLITE = {
     async (_path: string): Promise<void> => {},
   ),
   ensureDatabasePathExistsSync: vi.fn((_path: string): void => {}),
+  importAssetDatabaseAsync: vi.fn(
+    async (
+      _databasePath: string,
+      _assetDatabasePath: string,
+      _forceOverwrite: boolean,
+    ): Promise<void> => {},
+  ),
   deleteDatabaseAsync: vi.fn(async (_path: string): Promise<void> => {}),
   deleteDatabaseSync: vi.fn((_path: string): void => {}),
   backupDatabaseAsync: vi.fn(async (): Promise<void> => {

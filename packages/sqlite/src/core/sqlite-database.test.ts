@@ -9,6 +9,16 @@ import { FAKE_EXPO_SQLITE, FakeNativeStatement } from './native-fakes';
 // wraps a REAL better-sqlite3 database (see native-fakes.ts) rather than a hand-rolled stub.
 vi.mock('./native-module', () => ({ expoSQLite: FAKE_EXPO_SQLITE }));
 
+// import-database-from-asset.ts pulls in the real @symbiote-native/asset, whose Asset.ts imports
+// RN's Flow-typed resolveAssetSource — same fake every core test importing it uses (see
+// packages/font/src/core/font-loader.test.ts).
+const assetFromModule = vi.fn(() => ({
+  downloadAsync: async () => ({ localUri: 'file:///cache/bundled.db' }),
+}));
+vi.mock('@symbiote-native/asset', () => ({
+  Asset: { fromModule: assetFromModule },
+}));
+
 vi.mock('expo-modules-core', () => ({
   Platform: { OS: 'ios' },
 }));
@@ -261,6 +271,31 @@ describe('onInit', () => {
     const db = await openDatabaseAsync(`no-on-init-${Math.random()}.db`);
     await db.execAsync('CREATE TABLE t (id INTEGER PRIMARY KEY)');
     await expect(db.getAllAsync('SELECT * FROM t')).resolves.toEqual([]);
+  });
+});
+
+describe('assetSource', () => {
+  it('openDatabaseAsync imports the asset before opening, then opens normally', async () => {
+    const dbName = `asset-source-${Math.random()}.db`;
+    const db = await openDatabaseAsync(dbName, { assetSource: { assetId: 7 } });
+
+    expect(assetFromModule).toHaveBeenCalledWith(7);
+    expect(FAKE_EXPO_SQLITE.importAssetDatabaseAsync).toHaveBeenCalledWith(
+      expect.stringContaining(dbName),
+      'file:///cache/bundled.db',
+      false,
+    );
+    await db.execAsync('CREATE TABLE t (id INTEGER PRIMARY KEY)');
+    await expect(db.getAllAsync('SELECT * FROM t')).resolves.toEqual([]);
+  });
+
+  it('openDatabaseSync rejects assetSource rather than silently ignoring it', () => {
+    expect(() =>
+      openDatabaseSync(`asset-source-sync-${Math.random()}.db`, {
+        assetSource: { assetId: 7 },
+      }),
+    ).toThrow(/openDatabaseAsync instead/);
+    expect(assetFromModule).not.toHaveBeenCalled();
   });
 });
 

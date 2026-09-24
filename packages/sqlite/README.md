@@ -217,12 +217,36 @@ constructor(private readonly sqlite: SqliteService) {}
 // this.sqlite.database() — an Angular `resource()`-backed signal
 ```
 
-None of the five ports upstream's `assetSource` option (see "Deliberately out of scope" below).
+Upstream's `assetSource` (bundling a database from a `require()`'d asset) is not a separate
+Provider prop here — pass it through the existing `options` prop instead, e.g.
+`options={{ assetSource: { assetId: require('./assets/db.db') } }}`, and every one of the five
+Providers picks it up for free, since each already forwards `options` straight into
+`openDatabaseAsync` (see "Bundling a database from an asset" below).
+
 React's `useSuspense` has no equivalent on the other four — Vue/Solid have their own native
 `<Suspense>`/`createResource` primitives an app can compose around the Provider itself if wanted;
 Svelte and Angular have none, and none of the four non-React Providers builds a second opt-in
 code path for it (a deliberate framework-idiom divergence, not a gap — each adapter's own source
 file says so at the top).
+
+## Bundling a database from an asset
+
+`openDatabaseAsync`'s `assetSource` option (and the standalone `importDatabaseFromAssetAsync` it
+calls) mirror upstream's `SQLiteProvider assetSource` prop, ported against
+`@symbiote-native/asset`'s `Asset` class instead of `expo-asset` directly (same pattern as
+`@symbiote-native/font`/`@symbiote-native/audio`):
+
+```ts
+import { openDatabaseAsync } from '@symbiote-native/sqlite';
+
+const db = await openDatabaseAsync('app.db', {
+  assetSource: { assetId: require('./assets/app.db'), forceOverwrite: false },
+});
+```
+
+`Asset.fromModule(assetId).downloadAsync()` runs first, then the downloaded file is copied into
+place before the database opens — async only: `openDatabaseSync` throws if given `assetSource`,
+since the asset download itself is unavoidably async.
 
 ## Error handling
 
@@ -245,20 +269,12 @@ module-only package this project ships. Trigger conditions, from the vendored na
 
 ## Deliberately out of scope
 
-- **The `assetSource` bundled-database-file option**
-  (`openDatabaseAsync(name, options, { assetSource })`) — needs `expo-asset`'s
-  `Asset.fromModule`, which this project deliberately does not depend on (same exclusion class as
-  `@symbiote-native/audio`'s `Asset`-instance form of `AudioSource` — see that package's README).
-  A file-copy-based alternative through [`@symbiote-native/file-system`](../file-system)'s
-  `File`/`Directory` API is possible but not wired here.
 - **The `expo-sqlite/plugin` config plugin** (libSQL / `sqlite-vec` extension bundling config) —
   manual per-app native configuration, same convention as
   [`@symbiote-native/notifications`'s README](../notifications/README.md) documenting manual
   Firebase/entitlement setup. `bundledExtensions`/`loadExtensionAsync`/`loadExtensionSync` are
   still exported and work against whatever extensions your app's own native build actually
   bundles — they just require you to wire that bundling yourself.
-- **`importAssetDatabaseAsync`** — copies a bundled asset database into place at first launch;
-  layers on top of the `assetSource` exclusion above, so it is out of scope for the same reason.
 - **Web-only surfaces** (`ExpoSQLite.web.ts`, `WebStorage.ts`) — this project targets iOS +
   Android only.
 - **expo-sqlite's own DevTools-browser-extension wiring** (`SQLiteDevToolsClient.ts`) — this

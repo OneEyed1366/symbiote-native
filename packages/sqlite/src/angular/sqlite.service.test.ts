@@ -25,6 +25,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FAKE_EXPO_SQLITE } from '../core/native-fakes';
 
 vi.mock('../core/native-module', () => ({ expoSQLite: FAKE_EXPO_SQLITE }));
+vi.mock('@symbiote-native/asset', () => ({
+  Asset: {
+    fromModule: vi.fn(() => ({
+      downloadAsync: async () => ({ localUri: null }),
+    })),
+  },
+}));
 vi.mock('expo-modules-core', () => ({ Platform: { OS: 'ios' } }));
 
 const { SqliteService, provideSqliteDatabase } =

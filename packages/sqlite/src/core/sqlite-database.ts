@@ -21,6 +21,7 @@ import type {
 } from './sqlite-statement';
 import { SQLiteTaggedQuery } from './sqlite-tagged-query';
 import { createDatabasePath } from './path-utils';
+import { importDatabaseFromAssetAsync } from './import-database-from-asset';
 import type {
   IDatabaseChangeEvent,
   IOnInitCallback,
@@ -32,6 +33,7 @@ export type {
   IDatabaseChangeEvent,
   IOnInitCallback,
   IOpenDatabaseOptions,
+  ISQLiteAssetSource,
 } from './types';
 
 /** A SQLite database. */
@@ -496,7 +498,10 @@ export async function openDatabaseAsync(
   options?: IOpenDatabaseOptions,
   directory?: string,
 ): Promise<SQLiteDatabase> {
-  const { onInit, ...openOptions } = options ?? {};
+  const { onInit, assetSource, ...openOptions } = options ?? {};
+  if (assetSource != null) {
+    await importDatabaseFromAssetAsync(databaseName, assetSource, directory);
+  }
   const databasePath = createDatabasePath(databaseName, directory);
   await expoSQLite.ensureDatabasePathExistsAsync(databasePath);
   const nativeDatabase = new expoSQLite.NativeDatabase(
@@ -522,7 +527,12 @@ export function openDatabaseSync(
   options?: IOpenDatabaseOptions,
   directory?: string,
 ): SQLiteDatabase {
-  const { onInit, ...openOptions } = options ?? {};
+  const { onInit, assetSource, ...openOptions } = options ?? {};
+  if (assetSource != null) {
+    throw new Error(
+      'assetSource needs Asset.downloadAsync(), which is async — use openDatabaseAsync instead',
+    );
+  }
   const databasePath = createDatabasePath(databaseName, directory);
   expoSQLite.ensureDatabasePathExistsSync(databasePath);
   const nativeDatabase = new expoSQLite.NativeDatabase(

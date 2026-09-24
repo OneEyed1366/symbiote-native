@@ -92,7 +92,8 @@
   },
   "dependencies": {
     "expo-audio": "catalog:",
-    "expo-modules-core": "catalog:"
+    "expo-modules-core": "catalog:",
+    "@symbiote-native/asset": "workspace:*"
   },
   "peerDependencies": {
     "@symbiote-native/angular": "workspace:^",
