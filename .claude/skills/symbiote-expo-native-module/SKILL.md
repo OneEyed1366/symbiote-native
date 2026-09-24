@@ -248,6 +248,15 @@ reproduced directly in `examples/react/ios/Podfile` rather than worked around.
             until 2026-09-23, when it surfaced as a real `run-android` Gradle failure
             (\"Project with path ':expo-file-system' could not be found in project ':app'\")
             — proof the two-file fix instruction above wasn't explicit enough the first time.",
+    recurred: {
+      date: "2026-09-25", pkgs: ["expo-font", "expo-asset"],
+      scope: "all 6 examples/expo-*/{ios/Podfile,android/settings.gradle}",
+      missed_by: "4 prior 'full parity' passes (source diff, tests, README, CLI registration)
+                  — none touch app-level native config, which lives outside the wrapper package",
+      found_via: "user asked to re-check native-breaking internals, not the audits themselves",
+      lesson: "source/test/doc parity audits don't cover this trap — checking exclude lists is
+               its own required step whenever a package moves phantom -> real wrapper",
+    },
   },
   deployment_target_trap: {
     bug: "ExpoSensors.podspec pins s.platforms={:ios=>'16.4'}, above RN's

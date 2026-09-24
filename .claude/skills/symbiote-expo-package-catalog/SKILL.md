@@ -76,6 +76,8 @@ queue.
 | `@symbiote-native/audio` | `expo-audio` — the shared-object `AudioPlayer`/`AudioRecorder`/`AudioPlaylist`/`AudioStream` classes plus the module-level audio-session/permission/preload functions. React hooks (`useAudioPlayer`, `useAudioRecorder`, …) not ported (framework-specific); neither is the `number`/`Asset`-instance form of `AudioSource` or the `downloadFirst` option (both need `expo-asset`, out of scope — see the package's own README) | `symbiote-expo-native-module` |
 | `@symbiote-native/sqlite` | `expo-sqlite` — `Database`/`Statement`/`Session` (transactions, changesets), a Bun-style SQL tagged-template helper, and a SQLite-backed key-value store (own `/kv-store` subpath). Plain-constructor native classes (`new ExpoSQLite.NativeDatabase(...)`), not `SharedObject`s — simpler than `@symbiote-native/audio`'s port. Full parity: a `<SQLiteProvider>`/`useSQLiteContext` equivalent on every adapter (`./react` `./vue` `./svelte` `./solid`, plus Angular's own `SqliteService`/`provideSqliteDatabase` DI shape on `./angular`). `assetSource`/`importAssetDatabaseAsync` (needs `expo-asset`), the `expo-sqlite/plugin` config plugin (libSQL/`sqlite-vec` bundling), React's `useSuspense` on the other four adapters, and DevTools-browser wiring are out of scope — see the package's own README | `symbiote-expo-native-module` |
 | `@symbiote-native/notifications` | `expo-notifications` — permissions, device/Expo push tokens, scheduling, presentation, badges, Android channels/channel groups, categories, and the `@symbiote-native/task-manager`-backed background-task hook (13 native modules, more than any package this project has wrapped before). No auto push-token server-resync daemon (upstream's `DevicePushTokenAutoRegistration.fx.ts` background retry loop), no `expo-constants`/`expo-application` defaults for `projectId`/`applicationId` (pass explicitly — see the package's own README), no `useLastNotificationResponse` hook (whole surface is adapter-agnostic by design). First package needing real per-app native config beyond the linker's fixed-value contract — Firebase/`google-services.json`, the notification-icon/color meta-data, and the `aps-environment` entitlement are all documented as manual one-time app steps, not generated | `symbiote-expo-native-module` |
+| `@symbiote-native/asset` | `expo-asset` — full parity including the Expo Go / classic-updates / `expo-updates` code paths (naturally inert in this bare-app repo, real ported code not stubs — see the package's own README). Built primarily as `@symbiote-native/font`'s dependency for the `number`/`Asset`-instance `FontSource` forms. **Known gap (2026-09-25): no canary demo screen in any of the 6 `examples/expo-*` apps** — every other shipped package in this table has one; the ~6-framework navigation wiring (routes/nav-lines/menu/App registration per app) is a separate follow-up, out of scope for a source-parity pass | `symbiote-expo-native-module` |
+| `@symbiote-native/font` | `expo-font` — full parity including `unloadAsync`/`unloadAllAsync` (ported and exported for API parity though they always throw `UnavailabilityError` on native — `ExpoFontLoader` has no unload method on iOS/Android, web-only upstream) and `renderToImageAsync` (iOS + Android, not Android-only). Same **known gap** as `@symbiote-native/asset` above: no canary demo screen yet in any example app | `symbiote-expo-native-module` |
 
 **Tier 1 is now fully closed (2026-08-03)** — every Tier 1 row below is shipped except
 `expo-constants` (#9), which stays deliberately skipped (see its own row note). Tier 2 (permission/
@@ -87,7 +89,8 @@ shipped 2026-09-03, `expo-location` (#37) shipped 2026-09-03, `expo-media-librar
 `@symbiote-native/task-manager`, per that package's own README "other background-work packages
 register tasks through" note), `expo-audio` (#33) shipped 2026-09-07, `expo-notifications` (#39)
 shipped 2026-09-07 (13 native modules, first package needing real per-app native config beyond the
-linker's fixed-value contract — see its own README), 19 left.
+linker's fixed-value contract — see its own README), `expo-asset` (#22) and `expo-font` (#21) both
+shipped 2026-09-25 (canary demo screens pending — see their own rows above), 17 left.
 
 ```
 §secure_store_manifest_attrs := {
@@ -137,8 +140,8 @@ from each package's `expo-module.config.json`.
 | ~~18~~ | ~~`expo-secure-store`~~ | M | shipped — see "Already shipped" |
 | ~~19~~ | ~~`expo-sharing`~~ | M | shipped — see "Already shipped" |
 | ~~20~~ | ~~`expo-file-system`~~ | M | shipped — see "Already shipped" |
-| 21 | `expo-font` | M | apple, android, web |
-| 22 | `expo-asset` | M | apple, android, web |
+| ~~21~~ | ~~`expo-font`~~ | M | shipped — see "Already shipped" |
+| ~~22~~ | ~~`expo-asset`~~ | M | shipped — see "Already shipped" |
 | ~~23~~ | ~~`expo-web-browser`~~ | M | shipped — see "Already shipped" |
 | ~~24~~ | ~~`expo-sms`~~ | M | shipped — see "Already shipped" |
 | 25 | `expo-mail-composer` | M | apple, android |
