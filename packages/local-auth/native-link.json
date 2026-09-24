@@ -7,6 +7,10 @@
         "className": "LocalAuthenticationModule",
         "nativeName": "ExpoLocalAuthentication"
       }
+    ],
+    "manifestPermissions": [
+      "android.permission.USE_FINGERPRINT",
+      "android.permission.USE_BIOMETRIC"
     ]
   },
   "ios": {

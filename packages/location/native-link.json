@@ -30,5 +30,11 @@
       "NSMotionUsageDescription": "Allow $(PRODUCT_NAME) to detect your current motion activity."
     },
     "infoPlistArrayKeys": { "UIBackgroundModes": ["location"] }
-  }
+  },
+  "reviewedNonIntrospectableMods": [
+    {
+      "mod": "android.dangerous",
+      "note": "withForegroundServiceIcon's dangerous half runs unconditionally with icon:null by default (expo-location's withLocation.js: `withForegroundServiceIcon(config, { icon: androidForegroundServiceIcon ?? null })`) — with icon:null it only unlinks a previously-written foreground-service icon PNG if one exists (existsSync-gated in removeForegroundServiceIconImageFiles). No-op for every consumer: this repo never sets androidForegroundServiceIcon anywhere."
+    }
+  ]
 }
