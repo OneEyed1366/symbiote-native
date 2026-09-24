@@ -13,6 +13,7 @@ import type { ISymbioteExpoLinkOptionalBundle } from '@symbiote-native/expo-modu
 // already handles any id in here with no per-package code.
 export type IExpoPackageLayerName =
   | 'application'
+  | 'asset'
   | 'audio'
   | 'background-fetch'
   | 'background-task'
@@ -23,6 +24,7 @@ export type IExpoPackageLayerName =
   | 'crypto'
   | 'device'
   | 'file-system'
+  | 'font'
   | 'haptics'
   | 'keep-awake'
   | 'local-auth'
@@ -64,6 +66,7 @@ export const EXPO_PACKAGE_LAYERS: readonly IExpoPackageLayer[] = [
     label: 'Application info',
     symbiotePackage: '@symbiote-native/application',
   },
+  { id: 'asset', label: 'Asset', symbiotePackage: '@symbiote-native/asset' },
   {
     id: 'audio',
     label: 'Audio',
@@ -130,6 +133,7 @@ export const EXPO_PACKAGE_LAYERS: readonly IExpoPackageLayer[] = [
     label: 'File system',
     symbiotePackage: '@symbiote-native/file-system',
   },
+  { id: 'font', label: 'Font', symbiotePackage: '@symbiote-native/font' },
   {
     id: 'haptics',
     label: 'Haptics',
