@@ -5,6 +5,7 @@ import {
   isExpoPackageLayerName,
   type IExpoPackageLayerName,
 } from './expo-package-layers.js';
+import type { IDiscoveredBundle } from './grant-bundles.js';
 import type {
   IAddLayerName,
   IFramework,
@@ -161,6 +162,20 @@ export async function resolveExpoModules(
   return answer;
 }
 
+// Only asked when `new` finds no `.git` directory already — see runNew. No `--flag` short-circuit
+// (unlike resolveExpoModules's `hasExpoModules`): there's no existing CLI flag for this, and the
+// prompt itself IS the whole feature.
+export async function resolveGitInit(): Promise<boolean> {
+  if (!isInteractive()) return false;
+
+  const answer = await clack.confirm({
+    message: 'Initialize a git repository?',
+    initialValue: true,
+  });
+  assertNotCancelled(answer);
+  return answer;
+}
+
 export async function resolveStyling(
   styling: IStylingOption | undefined,
 ): Promise<IStylingOption> {
@@ -294,7 +309,11 @@ export async function resolveFeatures(
     };
   }
 
-  const answer = await clack.multiselect({
+  // Explicit `<string>` — not inferred — because clack's `Option<Value>` distributes over
+  // `Value`, and with `IAddLayerName` this large TS stops matching the registry-derived options
+  // against the distributed union (see `ADD_LAYER_OPTIONS`'s own comment for the same trap).
+  // Nothing here needs the literal union back: `answer` only ever feeds `new Set<string>`.
+  const answer = await clack.multiselect<string>({
     message: 'Which features?',
     options,
     initialValues:
@@ -350,11 +369,8 @@ export type IAddLayerFlags = {
   expoPackages?: ReadonlySet<IExpoPackageLayerName>;
 };
 
-// `satisfies`, not a type annotation: clack's `Option<Value>` is a conditional type that
-// DISTRIBUTES over a union `Value`, so each array element must keep its own literal `value` type
-// (`'navigation'`, not the widened `IAddLayerName`) for `clack.multiselect<IAddLayerName>` below
-// to structurally match it — an explicit `ReadonlyArray<{ value: IAddLayerName; … }>` annotation
-// widens every element's `value` and breaks that match.
+// `satisfies`, not a type annotation, so the array itself stays exhaustiveness-checked against
+// `IAddLayerName` without widening every element's `value` to it.
 const ADD_LAYER_OPTIONS = [
   {
     value: 'navigation',
@@ -384,6 +400,16 @@ const ADD_LAYER_OPTIONS = [
   readonly hint: string;
 }>;
 
+const ADD_LAYER_NAME_SET: ReadonlySet<string> = new Set(
+  ADD_LAYER_OPTIONS.map(option => option.value),
+);
+
+// Narrows clack's `string[]` answer back to `IAddLayerName[]` — see `resolveAddLayers`'s
+// `groupMultiselect<string>` call for why the generic can't just be `IAddLayerName` directly.
+function isAddLayerName(value: string): value is IAddLayerName {
+  return ADD_LAYER_NAME_SET.has(value);
+}
+
 export function explicitLayersFromFlags(
   flags: IAddLayerFlags,
 ): IAddLayerName[] {
@@ -400,12 +426,12 @@ export function explicitLayersFromFlags(
 // Every layer stays listed — an already-added one is disabled (clack greys it out) rather than
 // filtered out, so the menu doesn't shrink for no visible reason.
 //
-// Grouped, not flat, so 26 options have landmarks to scroll by: the 21 Expo packages alone
+// Grouped, not flat, so 36 options have landmarks to scroll by: the 31 Expo packages alone
 // outnumber the rest, so finding "Navigation" used to mean reading past all of them.
 // groupMultiselect returns Value[], same as multiselect — nothing downstream needs to change.
 //
 // No return-type annotation: clack's `Option<Value>` distributes over `Value`, so an annotated
-// (hence widened) return type stops matching it once `IAddLayerName` has 26 members — same trap
+// (hence widened) return type stops matching it once `IAddLayerName` has 36 members — same trap
 // `ADD_LAYER_OPTIONS`'s own comment documents. Left inferred, matching `resolveFeatures`'s own
 // inline array.
 export function buildAddLayerOptions(alreadyAdded: ReadonlySet<IAddLayerName>) {
@@ -486,14 +512,47 @@ export async function resolveAddLayers(
     );
   }
 
-  const answer = await clack.groupMultiselect({
+  // Explicit `<string>` — see `resolveFeatures`'s `multiselect<string>` for why `Value` can't be
+  // inferred as `IAddLayerName` here. `isAddLayerName` narrows the answer back before it reaches
+  // `dropAlreadyAdded`, which does need the real type.
+  const answer = await clack.groupMultiselect<string>({
     message: 'Which features to add?',
     options: buildAddLayerOptions(alreadyAdded),
     required: false,
   });
   assertNotCancelled(answer);
   return withImpliedExpoModules(
-    dropAlreadyAdded(answer, alreadyAdded, hasForce),
+    dropAlreadyAdded(answer.filter(isAddLayerName), alreadyAdded, hasForce),
+  );
+}
+
+// Granting a bundle means requesting a Play-Console-review-triggering permission — that decision
+// has no safe non-interactive default (unlike, say, resolveStyling's "css" fallback), so a piped
+// stdin fails fast rather than silently granting nothing or everything.
+export async function resolveGrantSelection(
+  candidates: readonly IDiscoveredBundle[],
+): Promise<IDiscoveredBundle[]> {
+  if (!isInteractive()) {
+    throw new CliUsageError(
+      'Not running in an interactive terminal — "grant" needs a real choice for each ' +
+        'policy-sensitive bundle, so it cannot run non-interactively.',
+    );
+  }
+
+  const answer = await clack.multiselect<string>({
+    message: 'Which policy-sensitive capabilities should this app request?',
+    options: candidates.map((entry, index) => ({
+      value: String(index),
+      label: entry.bundle.label,
+      hint: entry.packageName,
+    })),
+    required: false,
+  });
+  assertNotCancelled(answer);
+
+  const selectedIndexes = new Set(answer);
+  return candidates.filter((_entry, index) =>
+    selectedIndexes.has(String(index)),
   );
 }
 

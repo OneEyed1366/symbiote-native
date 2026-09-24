@@ -15,13 +15,29 @@ plain re-exports of the same `core`.
 
 ## Install
 
+**New app:**
+
+```bash
+npx @symbiote-native/cli new my-app --standard-web-crypto
+```
+
+**Existing SymbioteNative app:**
+
+```bash
+npx @symbiote-native/cli add --standard-web-crypto
+```
+
+Either way: installs `@symbiote-native/standard-web-crypto` + `@symbiote-native/crypto` and wires
+the latter's native autolinking automatically — see [`@symbiote-native/cli`](../cli). This package
+has no native module of its own; `@symbiote-native/crypto` does the actual native random-byte
+generation.
+
+<details>
+<summary>Manual install (no CLI — installing and wiring native autolinking by hand)</summary>
+
 ```bash
 npm install @symbiote-native/standard-web-crypto @symbiote-native/crypto
 ```
-
-Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --standard-web-crypto`
-(or `add --standard-web-crypto` in an existing app) installs and wires this for you — see
-[`@symbiote-native/cli`](../cli).
 
 `@symbiote-native/crypto` comes along as a regular dependency and does the actual native random-byte
 generation — see [its README](../crypto/README.md) for `expo-crypto`'s own native autolinking
@@ -29,6 +45,8 @@ requirements (already satisfied in any app that already wires up `@symbiote-nati
 `@symbiote-native/device`).
 
 No further native wiring is needed for this package itself — it has no native module of its own.
+
+</details>
 
 ## Shape
 
@@ -41,7 +59,7 @@ src/angular/  @symbiote-native/standard-web-crypto/angular — export * from '..
 
 `./react`, `./vue`, `./svelte`, and `./solid` are `exports`-map aliases straight onto `src/core/` —
 no physical per-framework file, since there's nothing to subscribe to or clean up. (The `webCrypto`
-named re-export used to live only in those three per-framework barrels; it now lives once in
+named re-export used to be duplicated across those per-framework barrels; it now lives once in
 `src/core/index.ts` instead.) `./angular` stays a physical file/subpath since Angular ships
 through a separate `ngc`/AOT build (`build-ngc/`).
 

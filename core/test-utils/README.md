@@ -1,10 +1,10 @@
 # @symbiote-native/test-utils
 
 The **shared fake-Fabric test harness** of [SymbioteNative](../../README.md) — one
-`installFabric()` that puts a fresh, faithful fake `nativeFabricUIManager` on `globalThis` and
-returns a handle to inspect what a renderer committed. It replaces the per-file fake slot every
-headless test used to copy-paste (×65 across the repo) with one implementation, shared by the
-engine, every adapter, and the example apps' own colocated `vitest` suites.
+`installRecordingFabric()` that puts a fresh, faithful fake `nativeFabricUIManager` on
+`globalThis` and returns a handle recording what a renderer did. It replaces the per-file fake
+slot every headless test used to copy-paste (×65 across the repo) with one implementation, shared
+by the engine, every adapter, and the example apps' own colocated `vitest` suites.
 
 > New to SymbioteNative? The [root README](../../README.md) has the architecture and the
 > [Testing](../../README.md#testing) section this package's harness is the foundation of.
@@ -24,10 +24,11 @@ npm install -D @symbiote-native/test-utils
 ## Use it
 
 ```ts
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
+
+const fabric = installRecordingFabric();
 
 test('tap increments the counter', () => {
-  const fabric = installFabric();
   mount(1, createElement(App));
 
   const button = fabric.find(
@@ -35,72 +36,96 @@ test('tap increments the counter', () => {
   );
   fabric.fireEvent(button!.instanceHandle, 'topClick', {});
 
-  expect(fabric.serialize(fabric.committed)).toContain('Taps: 1');
+  expect(fabric.propsOf(button!.handle).testID).toBe('tap-target');
+  fabric.reset();
 });
 ```
 
-Call `installFabric()` ONCE per test file, at module scope, and `.reset()` the handle between
-tests. Do not re-install per test: the engine's `getSlot()` (`core/engine/src/fabric.ts`) reads the
-slot's methods once and caches them for the process lifetime, so a second `installFabric()` after
-anything has committed swaps the global while the engine keeps writing through the handle it
-already bound — the new recorder just stays empty, with nothing to signal why. File-level isolation
-comes from the test runner; `reset()` is what separates tests within a file.
+Call `installRecordingFabric()` ONCE per test file, at module scope, and `.reset()` the handle
+between tests. Do not re-install per test: the engine's `getSlot()` (`core/engine/src/fabric.ts`)
+reads the slot's methods once and caches them for the process lifetime, so a second
+`installRecordingFabric()` after anything has committed swaps the global while the engine keeps
+writing through the handle it already bound — the new recorder just stays empty, with nothing to
+signal why. File-level isolation comes from the test runner; `reset()` is what separates tests
+within a file.
 
-## What `installFabric()` gives you
+## What `installRecordingFabric()` gives you
 
-- **`committed`** — the child set from the most recent `completeRoot`, and **`appRoot()`** — unwraps
-  RN's synthetic `box-none` AppContainer root so a test doesn't re-check that invariant by
-  hand.
-- **`created`** and **`find(predicate)`** — every node ever `createNode`'d this run (clones
-  excluded), and a lookup by predicate (e.g. "the app's own `View` with this `testID`").
+- **`find(predicate)`** and **`findAll(predicate)`** — every AUTHORED node the ops ever named
+  (clones excluded), searched in CREATION order. This is the creation LOG, not a live tree: a node
+  the app removed still answers `find` — see "Reading the live tree" below for a residency
+  question ("is this still mounted") the log can't answer.
 - **`fireEvent(handle, topLevelType, nativeEvent?)`** — delivers a native event to whatever handler
   the renderer registered, the same `instanceHandle` round-trip real Fabric does.
-- **`commands`** and **`counts`** — every imperative command dispatched at a committed node, and
-  call counters (`createNode` / `completeRoot`) for tests asserting "exactly N native nodes".
-- **`serialize(nodes)`** — a committed tree as `RCTView(RCTText(RCTRawText "text"))` shorthand, for
-  a one-line snapshot instead of walking `IFakeNode` by hand.
-- **`reset()`** — zeroes the counters and clears `committed`/`created` (the registered event handler
-  survives), for reusing one `installFabric()` call across several assertions in one test.
+- **`commits`**, **`commands`**, **`responderHandovers`**, **`accessibilityEvents`** — counters and
+  logs of what the engine asked the platform to do, for tests asserting "exactly N commits" or
+  inspecting an imperative call (`dispatchCommand`, `setIsJSResponder`, `sendAccessibilityEvent`).
+- **`reset()`** — clears the recordings and counters (the registered event handler survives), for
+  reusing one `installRecordingFabric()` call across several assertions in one test. **`forget()`**
+  additionally drops the `find`/`findAll` creation log itself — a file that mounts a fresh tree per
+  case and reuses `testID`s needs this, or `find` keeps answering with an earlier case's node.
 
-The fake's persistence semantics are **faithful to real Fabric**, not simplified: every clone gets a
-new identity, `clone*WithNewProps` **merges** the diff onto the previous props exactly like native
-Fabric does with the engine's minimal-diff payload (a removed key arrives as literal `null` and
-stays `null`, so a test can tell "explicitly reset" apart from "never set"), and `appendChild`
-throws on an illegal family reparent. A persistence bug in the fake is fixed once, here, for every
-test that depends on it.
+This host **records what it's handed and derives nothing** — no flattening, no clone protocol, no
+view-name rewriting. `propsOf(handle)` reads the author's own bag (`style` is still an object);
+`payloadOf(handle)` (below) is what the engine would actually hand Fabric. A question about
+committed SHAPE (what Fabric kept, renamed, or flattened) belongs in
+`core/engine/cpp/tests/js` — asking it here gets `undefined`, not a plausible guess.
+
+## Reading the live tree
+
+`createLiveTree(fabric)` is a lens **over** the recording host, for residency questions the
+creation log can't answer (a popped route, an evicted list cell, a portal toggled off) — it walks
+the engine's own live child links, so a removed node stops appearing:
+
+```ts
+import { createLiveTree } from '@symbiote-native/test-utils';
+
+const live = createLiveTree(fabric);
+const root = live.appRoot(); // the app's own box-none root, RN's synthetic AppContainer unwrapped
+expect(live.serialize(root)).toContain('RCTText "Taps: 1"');
+expect(live.texts(root)).toContain('Taps: 1');
+```
+
+- **`appRoot()`** — the app's `box-none` container, unwrapped so a test doesn't re-check that
+  invariant by hand.
+- **`nodeOf(handle)`** — a positional read (`viewName`, `props`, `payload`, `children`) for one
+  handle; **`walkLive`/`findAllLive`/`findLive`** walk from a root, **anchors flattened** (the
+  commit walk's own rule — Svelte leaves an anchor per block, Angular one per composed component).
+- **`serialize(root)`** — a subtree as `RCTView(RCTText(RCTRawText "text"))` shorthand.
+- **`texts(root)`** — every raw text under `root`, in TREE order (what a reordering list can't get
+  from the creation log, which is in creation order).
+- **`outline(root)`** — a depth-indented `viewName` list, for asserting an exact shape.
+
+**`payloadOf(handle)`** (top-level export, also `nodeOf(handle).payload`) is what the engine WOULD
+hand the renderer — style flattened, the aria fold and RN's processors run — as against `props`,
+the author's own bag. Read `padding`, `accessibilityRole`, or a parsed `backgroundSize` off the
+payload, not the props, or the read comes back `undefined` with nothing to explain why.
+
+## Measuring the engine, not the app
+
+**`censusLive(...roots)`** counts a live subtree off the engine's own child links —
+`{ nodes, anchors, nonAnchors }` — for "how many nodes did the adapter allocate" probes, without
+asking any host (works identically against a real device). **`trackHostCrossings(host)`** wraps a
+tree host's own methods in place and counts calls into them (`applyOps` excluded) — for "does the
+dispatch code cross the host once per event, not once per ancestor" assertions.
 
 ## Waiting for async settling
 
 `waitUntil(condition, label, timeoutMs?)` polls once per macrotask until `condition()` holds and
 throws (naming `label`) on timeout — the honest replacement for a fixed `setTimeout` tick count,
 which is only a proxy for "the framework has settled" and breaks under a loaded test run.
-`waitForQuiet(sample, label, stableTicks?, timeoutMs?)` waits until `sample()` returns the same
-value across `stableTicks` consecutive macrotasks and returns that settled value — the shape for
-"work has stopped arriving" (a batched commit, a zoneless change-detection pass, a press-timing
-timer). `advanceTicks(count)` is kept for the genuine "let the queue drain N times" case. Do not
+`waitForQuiet(sample, label, options?)` waits until `sample()` returns the same value across
+`stableTicks` consecutive macrotasks AND `quietMs` of wall time, then returns the settled value —
+the shape for "work has stopped arriving" (a batched commit, a zoneless change-detection pass, a
+press-timing timer). `advanceTicks(count)` and `advanceMs(durationMs?)` are kept for the genuine
+"let the queue drain" case — a fixed number of macrotasks, or a fixed wall-time window. Do not
 raise a tick count to fix a flaky test — that trades a fast failure for a slow one and keeps the
 race; reach for `waitUntil`/`waitForQuiet` instead.
 
-## Committed-payload assertions
-
-`normalizeCommitted(nodes)` strips per-mount identity (`tag`, `instanceHandle`, `parentFamilyTag`)
-from a committed Fabric tree. `expectCommittedProps(tree, testID, expected)` finds the node carrying
-`testID` and requires `expected`'s keys to be present with those values — the check that a per-
-primitive fold RAN. It exists because a bare tag inherits nothing a wrapper component used to do:
-prop defaults, alias renames and bag folds all lived in the wrapper, so one that failed to move down
-is silently dropped (a lost `ellipsizeMode`, a never-applied `id -> nativeID`) with every other test
-green.
-
-Pass the value a fold PRODUCES, never the one the author wrote — `{ nativeID: 'x' }` for an authored
-`id="x"`. An expectation restating the input passes with the fold deleted.
-
-`assertCommittedSomething(tree, name)` is the control: `committed` is `[]` until `completeRoot`
-runs, so a mount that never flushed satisfies almost anything read off it.
-
 ## What it does NOT do
 
-- It is not a mocking framework — there's nothing to configure beyond calling `installFabric()`;
-  the fake always behaves like real Fabric's clone-on-write contract.
+- It is not a mocking framework — there's nothing to configure beyond calling
+  `installRecordingFabric()`; the fake always behaves like real Fabric's clone-on-write contract.
 - It does not stand in for on-device verification — see [Testing](../../README.md#testing) for how
   this headless layer and the on-device `Detox` layer divide the work.
 

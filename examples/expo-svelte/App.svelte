@@ -37,6 +37,13 @@
   import SharingScreen from './screens/SharingScreen.svelte';
   import WebBrowserScreen from './screens/WebBrowserScreen.svelte';
   import SmsScreen from './screens/SmsScreen.svelte';
+  import LocationScreen from './screens/LocationScreen.svelte';
+  import MediaLibraryScreen from './screens/MediaLibraryScreen.svelte';
+  import FileSystemScreen from './screens/FileSystemScreen.svelte';
+  import AudioScreen from './screens/AudioScreen.svelte';
+  import NotificationsScreen from './screens/NotificationsScreen.svelte';
+  import BackgroundTasksScreen from './screens/BackgroundTasksScreen.svelte';
+  import SqliteScreen from './screens/SqliteScreen.svelte';
   import { ROUTE_NAME } from './routes';
   import { LINE_COLOR } from './navigation-lines';
 
@@ -195,5 +202,43 @@
     name={ROUTE_NAME.Sms}
     component={SmsScreen}
     options={demoScreenOptions('SMS', LINE_COLOR.sms)}
+  />
+  <Screen
+    name={ROUTE_NAME.Location}
+    component={LocationScreen}
+    options={demoScreenOptions('Location', LINE_COLOR.location)}
+  />
+  <Screen
+    name={ROUTE_NAME.MediaLibrary}
+    component={MediaLibraryScreen}
+    options={demoScreenOptions('Media Library', LINE_COLOR['media-library'])}
+  />
+  <Screen
+    name={ROUTE_NAME.FileSystem}
+    component={FileSystemScreen}
+    options={demoScreenOptions('File System', LINE_COLOR['file-system'])}
+  />
+  <Screen
+    name={ROUTE_NAME.Audio}
+    component={AudioScreen}
+    options={demoScreenOptions('Audio', LINE_COLOR.audio)}
+  />
+  <Screen
+    name={ROUTE_NAME.Notifications}
+    component={NotificationsScreen}
+    options={demoScreenOptions('Notifications', LINE_COLOR.notifications)}
+  />
+  <Screen
+    name={ROUTE_NAME.BackgroundTasks}
+    component={BackgroundTasksScreen}
+    options={demoScreenOptions(
+      'Background Tasks',
+      LINE_COLOR['background-tasks'],
+    )}
+  />
+  <Screen
+    name={ROUTE_NAME.Sqlite}
+    component={SqliteScreen}
+    options={demoScreenOptions('SQLite', LINE_COLOR.sqlite)}
   />
 </Stack>

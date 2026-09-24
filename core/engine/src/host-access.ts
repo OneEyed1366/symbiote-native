@@ -201,13 +201,13 @@ export function firstChildOf(node: ISymbioteNode): ISymbioteNode | undefined {
 /**
  * The next sibling, or `undefined` at the end of the list.
  *
- * `surface` is required to answer for a TOP-LEVEL node, which has no parent to read the sibling
- * list from — the surface owns that list instead. Passing it for a parented node is harmless and
- * ignored, so a caller with one active surface can pass it unconditionally.
+ * `_surface` is no longer read (see the inline comment below) and answers a top-level node
+ * unconditionally through the host — it stays in the signature only because three adapters
+ * still pass it, so a caller with one active surface can keep passing it unconditionally.
  */
 export function nextSiblingOf(
   node: ISymbioteNode,
-  surface?: SymbioteSurface,
+  _surface?: SymbioteSurface,
 ): ISymbioteNode | undefined {
   // ONE host call, not `parentOf` plus a whole child list.
   //

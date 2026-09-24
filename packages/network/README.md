@@ -13,13 +13,27 @@ depended on directly and never the `expo` meta-package, why the upstream JS is h
 
 ## Install
 
+**New app:**
+
+```bash
+npx @symbiote-native/cli new my-app --network
+```
+
+**Existing SymbioteNative app:**
+
+```bash
+npx @symbiote-native/cli add --network
+```
+
+Either way: installs `@symbiote-native/network` and wires the native autolinking automatically —
+see [`@symbiote-native/cli`](../cli).
+
+<details>
+<summary>Manual install (no CLI — installing and wiring native autolinking by hand)</summary>
+
 ```bash
 npm install @symbiote-native/network
 ```
-
-Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --network` (or
-`add --network` in an existing app) installs and wires this for you — see
-[`@symbiote-native/cli`](../cli).
 
 Depends on `expo-network` and `expo-modules-core` directly (regular dependencies, pinned to exact
 versions — never a caret range, since this package's `core/` is hand-ported against one specific
@@ -50,6 +64,8 @@ implementation: `examples/expo-react/ios/Podfile` and
 No platform permission string is needed for network's surface — connection state, IP address, and
 airplane-mode detection all read system state with no runtime permission prompt on either
 platform.
+
+</details>
 
 ## Shape
 

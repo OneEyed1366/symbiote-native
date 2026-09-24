@@ -143,7 +143,7 @@ export const KeyboardAvoidingView: FC<IKeyboardAvoidingViewProps> = props => {
     return () => {
       for (const subscription of subscriptions) subscription.remove();
     };
-  }, [behavior, keyboardVerticalOffset]);
+  }, [behavior, keyboardVerticalOffset, enabled]);
 
   const handleLayout = (event: ISymbioteEvent): void => {
     const frame = readLayoutFrame(event.nativeEvent.layout);

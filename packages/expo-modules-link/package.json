@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/expo-modules-link",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "Native-module registration for apps using expo-modules-core wrapper packages (sensors, local-auth, haptics, ...). One app-level postinstall scans node_modules for every installed package's native-link.json and regenerates the app's app/build.gradle and MainApplication.kt registration blocks, so a new native module never needs a hand-edit.",
   "keywords": [
     "react-native",
@@ -28,7 +28,10 @@
   "module": "src/index.cjs",
   "types": "src/index.d.ts",
   "exports": {
-    ".": "./src/index.cjs"
+    ".": {
+      "types": "./src/index.d.ts",
+      "default": "./src/index.cjs"
+    }
   },
   "bin": {
     "symbiote-expo-link": "./bin/postinstall.cjs"

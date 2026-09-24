@@ -41,6 +41,13 @@
   --line-sharing: #d946ef;
   --line-web-browser: #0369a1;
   --line-sms: #65a30d;
+  --line-location: #1d4ed8;
+  --line-media-library: #db2777;
+  --line-file-system: #0e7490;
+  --line-audio: #cb8c4d;
+  --line-notifications: #4daccb;
+  --line-background-tasks: #accb4d;
+  --line-sqlite: #3ee619;
 }
 
 .info-text {
@@ -209,6 +216,27 @@
 .line-tag-sms {
   background-color: var(--line-sms);
 }
+.line-tag-location {
+  background-color: var(--line-location);
+}
+.line-tag-media-library {
+  background-color: var(--line-media-library);
+}
+.line-tag-file-system {
+  background-color: var(--line-file-system);
+}
+.line-tag-audio {
+  background-color: var(--line-audio);
+}
+.line-tag-notifications {
+  background-color: var(--line-notifications);
+}
+.line-tag-background-tasks {
+  background-color: var(--line-background-tasks);
+}
+.line-tag-sqlite {
+  background-color: var(--line-sqlite);
+}
 .line-tag-text {
   color: var(--ink);
   font-size: 11px;
@@ -312,6 +340,34 @@
   border-left-width: 3px;
   border-left-color: var(--line-sms);
 }
+.menu-row-location {
+  border-left-width: 3px;
+  border-left-color: var(--line-location);
+}
+.menu-row-media-library {
+  border-left-width: 3px;
+  border-left-color: var(--line-media-library);
+}
+.menu-row-file-system {
+  border-left-width: 3px;
+  border-left-color: var(--line-file-system);
+}
+.menu-row-audio {
+  border-left-width: 3px;
+  border-left-color: var(--line-audio);
+}
+.menu-row-notifications {
+  border-left-width: 3px;
+  border-left-color: var(--line-notifications);
+}
+.menu-row-background-tasks {
+  border-left-width: 3px;
+  border-left-color: var(--line-background-tasks);
+}
+.menu-row-sqlite {
+  border-left-width: 3px;
+  border-left-color: var(--line-sqlite);
+}
 
 .menu-badge {
   width: 34px;
@@ -385,6 +441,27 @@
 }
 .menu-badge-sms {
   background-color: var(--line-sms);
+}
+.menu-badge-location {
+  background-color: var(--line-location);
+}
+.menu-badge-media-library {
+  background-color: var(--line-media-library);
+}
+.menu-badge-file-system {
+  background-color: var(--line-file-system);
+}
+.menu-badge-audio {
+  background-color: var(--line-audio);
+}
+.menu-badge-notifications {
+  background-color: var(--line-notifications);
+}
+.menu-badge-background-tasks {
+  background-color: var(--line-background-tasks);
+}
+.menu-badge-sqlite {
+  background-color: var(--line-sqlite);
 }
 .menu-badge-text {
   color: var(--ink);
@@ -470,6 +547,27 @@
 }
 .menu-row-hint-sms {
   color: var(--line-sms);
+}
+.menu-row-hint-location {
+  color: var(--line-location);
+}
+.menu-row-hint-media-library {
+  color: var(--line-media-library);
+}
+.menu-row-hint-file-system {
+  color: var(--line-file-system);
+}
+.menu-row-hint-audio {
+  color: var(--line-audio);
+}
+.menu-row-hint-notifications {
+  color: var(--line-notifications);
+}
+.menu-row-hint-background-tasks {
+  color: var(--line-background-tasks);
+}
+.menu-row-hint-sqlite {
+  color: var(--line-sqlite);
 }
 
 /* SensorsScreen — one card per @symbiote-native/sensors hook, each rendering its own

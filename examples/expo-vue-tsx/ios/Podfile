@@ -102,7 +102,7 @@ target 'CanaryExpo' do
 
   use_expo_modules!(
     exclude: [
-      'expo', 'expo-asset', 'expo-constants', 'expo-file-system',
+      'expo', 'expo-asset', 'expo-constants',
       'expo-font', '@expo/dom-webview', '@expo/log-box',
     ]
   )

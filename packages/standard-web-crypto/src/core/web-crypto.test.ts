@@ -40,6 +40,28 @@ describe('webCrypto.getRandomValues', () => {
       expect(getRandomValues).toHaveBeenCalledWith(typedArray);
       expect(Array.from(typedArray)).toEqual([7, 7, 7, 7]);
     });
+
+    // why: upstream's own getRandomValues-test.ts sweeps every integer TypedArray constructor —
+    // this pins that the delegation isn't accidentally narrower than the type signature promises.
+    it.each([
+      ['Int8Array', Int8Array],
+      ['Uint8Array', Uint8Array],
+      ['Int16Array', Int16Array],
+      ['Uint16Array', Uint16Array],
+      ['Int32Array', Int32Array],
+      ['Uint32Array', Uint32Array],
+    ])(
+      'delegates a %s to @symbiote-native/crypto',
+      async (_label, TypedArrayCtor) => {
+        const { default: webCrypto } = await import('./web-crypto');
+        const typedArray = new TypedArrayCtor(4);
+
+        const result = webCrypto.getRandomValues(typedArray);
+
+        expect(result).toBe(typedArray);
+        expect(getRandomValues).toHaveBeenCalledWith(typedArray);
+      },
+    );
   });
 
   describe('Negative', () => {
@@ -52,6 +74,74 @@ describe('webCrypto.getRandomValues', () => {
       expect(() =>
         webCrypto.getRandomValues(new DataView(new ArrayBuffer(4))),
       ).toThrow(TypeError);
+      expect(getRandomValues).not.toHaveBeenCalled();
+    });
+
+    it('throws a TypeError for a Float32Array', async () => {
+      const { default: webCrypto } = await import('./web-crypto');
+
+      expect(() => webCrypto.getRandomValues(new Float32Array(4))).toThrow(
+        TypeError,
+      );
+      expect(getRandomValues).not.toHaveBeenCalled();
+    });
+
+    // why: upstream's own getRandomValues ACCEPTS Uint8ClampedArray — ours deliberately narrows
+    // to what @symbiote-native/crypto's ITypedArray can hand to its native module, and the README
+    // documents this exact rejection as intentional. Not an UPSTREAM-BUG: a scoped-down surface.
+    it('throws a TypeError for a Uint8ClampedArray', async () => {
+      const { default: webCrypto } = await import('./web-crypto');
+
+      expect(() => webCrypto.getRandomValues(new Uint8ClampedArray(4))).toThrow(
+        TypeError,
+      );
+      expect(getRandomValues).not.toHaveBeenCalled();
+    });
+
+    it('throws a TypeError for null', async () => {
+      const { default: webCrypto } = await import('./web-crypto');
+
+      // @ts-expect-error -- exercising the runtime guard against a caller ignoring the types
+      expect(() => webCrypto.getRandomValues(null)).toThrow(TypeError);
+    });
+
+    it('throws a TypeError for a plain array', async () => {
+      const { default: webCrypto } = await import('./web-crypto');
+
+      // @ts-expect-error -- exercising the runtime guard against a caller ignoring the types
+      expect(() => webCrypto.getRandomValues([])).toThrow(TypeError);
+    });
+
+    it('throws a TypeError for a plain object', async () => {
+      const { default: webCrypto } = await import('./web-crypto');
+
+      // @ts-expect-error -- exercising the runtime guard against a caller ignoring the types
+      expect(() => webCrypto.getRandomValues({})).toThrow(TypeError);
+    });
+
+    it('throws a TypeError when called with nothing', async () => {
+      const { default: webCrypto } = await import('./web-crypto');
+
+      // @ts-expect-error -- exercising the runtime guard against a caller ignoring the types
+      expect(() => webCrypto.getRandomValues()).toThrow(TypeError);
+    });
+
+    it('throws a QuotaExceededError-shaped error above 65536 bytes', async () => {
+      // why: a real gap fixed as part of this pass — @symbiote-native/crypto's own getRandomValues
+      // has no length limit, so without this check an oversized view reached the native module
+      // unchecked instead of failing the way the W3C spec (and upstream's own wrapper) requires.
+      const { default: webCrypto } = await import('./web-crypto');
+      const oversized = new Uint8Array(65_537);
+
+      let error: unknown;
+      try {
+        webCrypto.getRandomValues(oversized);
+      } catch (thrown) {
+        error = thrown;
+      }
+
+      expect(error).toBeInstanceOf(Error);
+      expect(error).toMatchObject({ name: 'QuotaExceededError', code: 22 });
       expect(getRandomValues).not.toHaveBeenCalled();
     });
   });

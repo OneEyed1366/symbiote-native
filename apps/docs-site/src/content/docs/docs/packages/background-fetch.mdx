@@ -1,0 +1,115 @@
+---
+title: Background fetch
+description: expo-background-fetch wrapped for every SymbioteNative adapter — periodic background execution registered through @symbiote-native/task-manager.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+`@symbiote-native/background-fetch` wraps
+[`expo-background-fetch`](https://github.com/expo/expo/tree/main/packages/expo-background-fetch)
+so every SymbioteNative adapter can register a task that fires periodically in the background. It
+does not define what the task does — define it first with
+[`@symbiote-native/task-manager`](/docs/packages/task-manager/)'s `defineTask`, then register it
+here for periodic execution.
+
+<Aside type="caution" title="Upstream deprecated this API">
+  Apple and Google are both moving from periodic-fetch-style scheduling
+  toward task-scheduling APIs (`BGTaskScheduler` / `WorkManager`). This
+  package is ported because Expo still ships both simultaneously, and an app
+  already built against the old API needs a path onto SymbioteNative. Prefer
+  [`@symbiote-native/background-task`](/docs/packages/background-task/) for
+  new code.
+</Aside>
+
+Every export is a plain async function — no hook/composable/service to wrap, so every adapter's
+entry point is a plain re-export of the same core.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | ✅ live |
+| Android     | ✅ live |
+
+| Framework adapter | Support |
+| ------------------ | ------- |
+| React              | ✅ live |
+| Vue                | ✅ live |
+| Angular            | ✅ live |
+| Svelte             | ✅ live |
+| Solid              | ✅ live |
+
+## Installation
+
+```sh
+npm install @symbiote-native/background-fetch @symbiote-native/task-manager
+```
+
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --background-fetch`
+(or `add --background-fetch` in an existing app) installs and wires this for you — see
+[`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
+
+`expo-background-fetch` and `expo-modules-core` come along as regular dependencies, pinned to
+exact versions — never install them yourself, and never add the `expo` meta-package to your
+project.
+
+<Aside type="danger" title="Native setup is required before first use">
+  Follow [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first. iOS
+  additionally needs `UIBackgroundModes: fetch` in `Info.plist`, wired
+  automatically by the same postinstall step. Android needs no manual step —
+  `RECEIVE_BOOT_COMPLETED` and `WAKE_LOCK` ship in `expo-background-fetch`'s
+  own manifest and merge in automatically.
+</Aside>
+
+## Usage
+
+```ts
+// index.ts, alongside AppRegistry.registerComponent — identical on every adapter
+import { defineTask } from '@symbiote-native/task-manager';
+import { registerTaskAsync, BackgroundFetchResult } from '@symbiote-native/background-fetch';
+
+const SYNC_TASK = 'background-sync';
+
+defineTask(SYNC_TASK, async ({ data, error }) => {
+  if (error) {
+    console.error('background-sync failed:', error);
+    return BackgroundFetchResult.Failed;
+  }
+  const receivedNewData = await runSync(data);
+  return receivedNewData ? BackgroundFetchResult.NewData : BackgroundFetchResult.NoData;
+});
+
+// Somewhere after the task is defined (a settings screen, app bootstrap, …):
+await registerTaskAsync(SYNC_TASK, { minimumInterval: 900 });
+```
+
+```ts
+import { getStatusAsync, unregisterTaskAsync } from '@symbiote-native/background-fetch';
+
+const status = await getStatusAsync();
+await unregisterTaskAsync(SYNC_TASK); // stop receiving background-fetch callbacks for it
+```
+
+Identical import surface on every adapter — `@symbiote-native/background-fetch/react`, `/vue`,
+`/svelte`, `/solid`, `/angular` all re-export the same functions.
+
+## API
+
+```ts
+getStatusAsync(): Promise<BackgroundFetchStatus | null>
+setMinimumIntervalAsync(minimumInterval: number): Promise<void>
+registerTaskAsync(taskName: string, options?: IBackgroundFetchOptions): Promise<void>
+unregisterTaskAsync(taskName: string): Promise<void>
+```
+
+Plus the `BackgroundFetchResult` and `BackgroundFetchStatus` enums and `IBackgroundFetchOptions`.
+
+## Notes
+
+- **`registerTaskAsync` requires the task to already be defined** — it throws if the task named
+  isn't defined yet with `@symbiote-native/task-manager`'s `defineTask`.
+- **`getStatusAsync` resolves `Available` on Android without calling native at all** — Android has
+  no status concept of its own; the native call exists only on iOS.
+- **`setMinimumIntervalAsync` silently no-ops on Android** rather than throwing — there is no
+  native equivalent call there.
+- **Every function warns once, on first call, that this API is deprecated.** It still works; the
+  warning is a nudge toward `@symbiote-native/background-task`, not a functional restriction.

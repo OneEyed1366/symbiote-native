@@ -304,18 +304,8 @@ describe('navigation composables', () => {
         return () => h('text', {}, 'orphan');
       });
 
-      // `mount()` no longer lets a render error escape: adapters/vue/src/render.ts installs a
-      // default `app.config.errorHandler` routing it to the engine's shared reporter, so on a
-      // device this reaches the redbox instead of aborting the AppRegistry runnable mid-bring-up.
-      // The contract is unchanged — an orphaned useRoute() still fails loudly and says so — only
-      // the channel moved, so the assertion follows it.
-      const reportError = vi.fn();
-      Object.assign(globalThis, { ErrorUtils: { reportError } });
-
-      mount(ROOT_TAG, OrphanScreen);
-
-      expect(reportError).toHaveBeenCalled();
-      expect(String(reportError.mock.calls[0]?.[0])).toMatch(
+      expectReportedError(
+        () => mount(ROOT_TAG, OrphanScreen),
         /useRoute must be used within a screen rendered by <Stack>, <Tab>, or <Drawer>/,
       );
     });

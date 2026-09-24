@@ -1,0 +1,17 @@
+{
+  "android": {
+    "gradleProjectName": "expo-file-system",
+    "modules": [
+      {
+        "importPath": "expo.modules.filesystem.legacy.FileSystemLegacyModule",
+        "className": "FileSystemLegacyModule",
+        "nativeName": "ExponentFileSystem"
+      },
+      {
+        "importPath": "expo.modules.filesystem.FileSystemModule",
+        "className": "FileSystemModule",
+        "nativeName": "FileSystem"
+      }
+    ]
+  }
+}

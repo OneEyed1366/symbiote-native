@@ -1,0 +1,150 @@
+---
+title: Location
+description: expo-location wrapped for every SymbioteNative adapter — foreground position, heading, geocoding, motion activity, background updates, and geofencing.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+`@symbiote-native/location` wraps
+[`expo-location`](https://github.com/expo/expo/tree/main/packages/expo-location) so every
+SymbioteNative adapter can read foreground position, heading, and motion activity, geocode
+addresses, and run background location updates or geofencing — registered as tasks through
+[`@symbiote-native/task-manager`](/docs/packages/task-manager/).
+
+Every export is a plain async function or a permission hook with no adapter-specific state — every
+adapter's entry point is a plain re-export of the same core.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | ✅ live |
+| Android     | ✅ live |
+
+| Framework adapter | Support |
+| ------------------ | ------- |
+| React              | ✅ live |
+| Vue                | ✅ live |
+| Angular            | ✅ live |
+| Svelte             | ✅ live |
+| Solid              | ✅ live |
+
+## Installation
+
+```sh
+npm install @symbiote-native/location
+```
+
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --location` (or
+`add --location` in an existing app) installs and wires this for you — see
+[`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
+
+`expo-location` and `expo-modules-core` come along as regular dependencies, pinned to exact
+versions — never install them yourself, and never add the `expo` meta-package to your project.
+
+<Aside type="danger" title="Native setup is required before first use">
+  Follow [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first. Four
+  iOS `Info.plist` usage-description keys are wired automatically with
+  generic default text — override any of them by setting the same key
+  yourself. Android's two base permissions
+  (`ACCESS_COARSE_LOCATION`/`ACCESS_FINE_LOCATION`) ship in
+  `expo-location`'s own manifest and merge in automatically.
+</Aside>
+
+<Aside type="caution" title="Background/motion Android permissions are opt-in">
+  `ACCESS_BACKGROUND_LOCATION`, `FOREGROUND_SERVICE`,
+  `FOREGROUND_SERVICE_LOCATION`, and `ACTIVITY_RECOGNITION` are **not** added
+  automatically — add them to your own `AndroidManifest.xml` if your app
+  calls `startLocationUpdatesAsync`, `startGeofencingAsync`, or the
+  motion-activity functions. Requesting background location triggers Play
+  Console policy review, so it stays a deliberate app choice rather than a
+  package side effect. `UIBackgroundModes: location` on iOS IS wired
+  automatically — without it, iOS silently stops delivering updates once the
+  app backgrounds.
+</Aside>
+
+## Usage
+
+```ts
+import {
+  getCurrentPositionAsync,
+  requestForegroundPermissionsAsync,
+  watchPositionAsync,
+} from '@symbiote-native/location';
+
+const { granted } = await requestForegroundPermissionsAsync();
+if (granted) {
+  const position = await getCurrentPositionAsync();
+  const subscription = await watchPositionAsync({ distanceInterval: 10 }, location => {
+    console.log(location.coords);
+  });
+  // later: subscription.remove();
+}
+```
+
+Background updates and geofencing register a task defined at module scope, since native can
+relaunch the JS bundle headlessly to run it:
+
+```ts
+// index.ts, alongside AppRegistry.registerComponent
+import { defineTask } from '@symbiote-native/task-manager';
+
+const SYNC_TASK = 'background-location-sync';
+
+defineTask(SYNC_TASK, async ({ data, error }) => {
+  if (error) return;
+  const { locations } = data as { locations: unknown[] };
+  await syncLocations(locations);
+});
+```
+
+```ts
+import {
+  requestBackgroundPermissionsAsync,
+  startLocationUpdatesAsync,
+} from '@symbiote-native/location';
+
+const { granted } = await requestBackgroundPermissionsAsync();
+if (granted) {
+  await startLocationUpdatesAsync(SYNC_TASK, { distanceInterval: 100 });
+}
+```
+
+Identical import surface on every adapter — `@symbiote-native/location/react`, `/vue`, `/svelte`,
+`/solid`, `/angular` all re-export the same functions.
+
+## API
+
+```ts
+getProviderStatusAsync(): Promise<ILocationProviderStatus>
+enableNetworkProviderAsync(): Promise<void>                          // android
+getCurrentPositionAsync(options?): Promise<ILocationObject>
+getLastKnownPositionAsync(options?): Promise<ILocationObject | null>
+watchPositionAsync(options, callback, errorHandler?): Promise<ILocationSubscription>
+getHeadingAsync(): Promise<ILocationHeadingObject>
+watchHeadingAsync(callback, errorHandler?): Promise<ILocationSubscription>
+geocodeAsync(address: string): Promise<ILocationGeocodedLocation[]>
+reverseGeocodeAsync(location): Promise<ILocationGeocodedAddress[]>
+getForegroundPermissionsAsync() / requestForegroundPermissionsAsync(): Promise<ILocationPermissionResponse>
+useForegroundPermissions(options?)
+getBackgroundPermissionsAsync() / requestBackgroundPermissionsAsync(): Promise<PermissionResponse>
+useBackgroundPermissions(options?)
+hasServicesEnabledAsync(): Promise<boolean>
+getMotionActivityPermissionsAsync() / requestMotionActivityPermissionsAsync(): Promise<PermissionResponse>
+useMotionActivityPermissions(options?)
+getMotionActivityAsync(): Promise<IMotionActivityObject>
+watchMotionActivityAsync(callback, errorHandler?): Promise<ILocationSubscription>       // foreground only
+isBackgroundLocationAvailableAsync(): Promise<boolean>
+startLocationUpdatesAsync(taskName, options?) / stopLocationUpdatesAsync(taskName) / hasStartedLocationUpdatesAsync(taskName)
+startGeofencingAsync(taskName, regions) / stopGeofencingAsync(taskName) / hasStartedGeofencingAsync(taskName)
+```
+
+Plus the `Accuracy`/`ActivityType`/`GeofencingEventType`/`GeofencingRegionState` enums and the full
+`ILocation*`/`IMotionActivity*` type surface.
+
+## Notes
+
+- **Motion activity needs no location permission at all** — it reads the platform's own activity
+  recognition, gated only by its own `getMotionActivityPermissionsAsync`/
+  `requestMotionActivityPermissionsAsync`.
+- **`watchMotionActivityAsync` is foreground-only** — updates pause while the app is backgrounded
+  and resume when it returns.

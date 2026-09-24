@@ -27,15 +27,12 @@ const WINDOW: IWindowMetrics = {
 
 let PixelRatio: typeof import('./index').PixelRatio;
 let Dimensions: typeof import('../dimensions').Dimensions;
-let deviceHub: IDeviceHub | undefined;
 
 function isPresent<T>(value: unknown): value is T {
   return value !== null && value !== undefined;
 }
 
 beforeEach(async () => {
-  deviceHub = undefined;
-
   const fakeDeviceInfo = {
     getConstants: (): { Dimensions: { window: IWindowMetrics } } => ({
       Dimensions: { window: WINDOW },
@@ -53,7 +50,7 @@ beforeEach(async () => {
     name: string,
     factory: () => IDeviceHub,
   ): void => {
-    if (name === 'RCTDeviceEventEmitter') deviceHub = factory();
+    if (name === 'RCTDeviceEventEmitter') factory();
   };
 
   vi.resetModules();

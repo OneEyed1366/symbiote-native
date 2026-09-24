@@ -1,7 +1,7 @@
 # @symbiote-native/svelte
 
 The **Svelte adapter** for [SymbioteNative](../../README.md) — render real native iOS/Android views
-from Svelte 5, on the _same_ untouched core as React, Vue, and Angular, with React Native's own
+from Svelte 5, on the _same_ untouched core as React, Vue, Solid, and Angular, with React Native's own
 renderer never in the path. Svelte ships no official host-renderer API yet (`createRenderer` is
 still an unmerged PR upstream), so instead of hooking a framework-blessed extension point this
 adapter patches `globalThis`'s DOM classes: stock compiled Svelte client output believes it is
@@ -24,27 +24,71 @@ Svelte is the **sharpest test yet** that the core is genuinely framework-agnosti
 ## Install
 
 ```bash
+npx @symbiote-native/cli new my-app --framework svelte
+```
+
+One command, nothing to wire by hand: every component here is a `.svelte` SFC with no TSX
+alternative, so the Metro wiring below isn't optional — the generator sets it up, plus
+`@symbiote-native/svelte`/`react-native`/`svelte` as your app's own dependencies.
+
+<details>
+<summary>Manual install (no generator — an existing app, or you want to wire it yourself)</summary>
+
+```bash
 npm install @symbiote-native/svelte react-native svelte
 ```
 
 `react-native` and `svelte` stay your app's own top-level dependencies — this package only
-replaces the JS renderer that drives them. Every component is a `.svelte` SFC — there's no TSX
-alternative the way Vue offers — so the Metro wiring below isn't optional. `npx @symbiote-native/cli new`
-sets this up for a new app; wiring it into an existing one still follows
-[`examples/svelte`](../../examples/svelte) rather than a generator:
+replaces the JS renderer that drives them. Follow [`examples/svelte`](../../examples/svelte) for
+both pieces of Metro wiring below; there is no wiring script for an existing app:
 
 - `metro.config.js` — point `babelTransformerPath` at
   `@symbiote-native/svelte/metro-svelte-transformer` (compiles `.svelte` on the way into the
   bundle) and disable `inlineRequires` (see [the gotcha
   below](#a-svelte-specific-gotcha--inlinerequires-vs-the-svelte-runtime)).
-- `svelte.config.js` — registers the `forbidWebOnlyConstructs()` and `scopedStyles()`
-  preprocessors, so `svelte-check` and the editor catch the same things Metro's transformer
-  already guards against at build time, and sets `compilerOptions: { fragments: 'tree', css:
-'external' }`.
+- `svelte.config.js` — registers the `forbidWebOnlyConstructs()`, `scopedStyles()`, and
+  `collapseTextWhitespace()` preprocessors, so `svelte-check` and the editor catch the same things
+  Metro's transformer already guards against at build time (the third one matters beyond
+  diagnostics: without it, a sentence wrapped across source lines for readability ships a literal
+  newline into the native text content — Svelte doesn't collapse it the way a browser or Vue's
+  compiler would). Also sets `compilerOptions: { fragments: 'tree', css: 'external' }` and a
+  `warningFilter` that silences `element_invalid_self_closing_tag` for `<pressable />`-style
+  self-closing primitives.
+
+</details>
 
 ---
 
 ## Use it
+
+The app is ordinary Svelte 5 — the native primitives are plain intrinsic tags, no import needed.
+Styling is a CSS class against the component's own `<style>` block — the convention every example
+app here follows. A tap→increment counter, using runes:
+
+```svelte
+<script lang="ts">
+  let count = $state(0);
+</script>
+
+<safe-area-view class="screen">
+  <text>Taps: {count}</text>
+  <pressable onPress={() => count++}>
+    <text>Tap me</text>
+  </pressable>
+</safe-area-view>
+
+<style>
+  .screen {
+    flex: 1;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+</style>
+```
+
+<details>
+<summary>Native entry point (index.js) — already scaffolded by <code>npx @symbiote-native/cli new --framework svelte</code></summary>
 
 The native entry reaches the _same_ seam as every other adapter. `createApp(App).mount(appName)`
 wires the native-host seams and RN's own `AppRegistry`, then mounts via `@symbiote-native/engine` —
@@ -52,6 +96,11 @@ RN's own renderer is never in the path:
 
 ```js
 // index.js
+
+// Registers host behaviors (Image, Pressable, Switch, ...) that /bootstrap alone doesn't
+// reach; deleting this breaks them silently (Metro's production inlineRequires makes a
+// side-effect-only barrel import go lazy, see register.ts).
+import '@symbiote-native/svelte';
 import { createApp } from '@symbiote-native/svelte/bootstrap';
 import App from './App.svelte';
 import { name as appName } from './app.json';
@@ -59,21 +108,7 @@ import { name as appName } from './app.json';
 createApp(App).mount(appName);
 ```
 
-The app is ordinary Svelte 5 — the native primitives are plain intrinsic tags, no import needed.
-A tap→increment counter, using runes:
-
-```svelte
-<script lang="ts">
-  let count = $state(0);
-</script>
-
-<view style={{ padding: 24 }}>
-  <text>Taps: {count}</text>
-  <pressable onPress={() => count++}>
-    <text>Tap me</text>
-  </pressable>
-</view>
-```
+</details>
 
 The full canary is [`examples/svelte`](../../examples/svelte) — a stock RN 0.86 app whose
 [`App.svelte`](../../examples/svelte/App.svelte) exercises the same surface as the React, Vue, and
@@ -84,8 +119,8 @@ Angular reference canaries.
 ## Parity — and the one gap
 
 Svelte reaches the same primitives, runtime modules, `Animated` on both drivers, gestures,
-accessibility, and the `VirtualizedList` family as React, Vue, and Angular, verified on-device on
-iOS and Android. That parity is **structural, not hand-copied**: the component logic (state
+accessibility, and the `VirtualizedList` family as React, Vue, Solid, and Angular, verified
+on-device on iOS and Android. That parity is **structural, not hand-copied**: the component logic (state
 machines + render functions) is written **once** in `@symbiote-native/components`, and Svelte
 supplies only its lifecycle — runes (`$state` / `$derived` / `$effect`) driving hand-authored
 `.svelte` markup that mirrors each `render-*.ts` directly, rather than a generic descriptor bridge
@@ -124,9 +159,9 @@ guarding it.
 
 ## Run it
 
-[`examples/svelte`](../../examples/svelte) is a stock React Native 0.86 app. Requires Node ≥ 22
-and the [RN environment setup](https://reactnative.dev/docs/set-up-your-environment) (Xcode,
-CocoaPods):
+[`examples/svelte`](../../examples/svelte) is a stock React Native 0.86 app. Requires Node ≥ 22.13
+(react-native 0.86's own `package.json#engines`) and the [RN environment
+setup](https://reactnative.dev/docs/set-up-your-environment) (Xcode, CocoaPods):
 
 ```bash
 cd examples/svelte

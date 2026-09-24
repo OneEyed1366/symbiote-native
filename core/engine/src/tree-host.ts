@@ -14,7 +14,6 @@
 // genuinely absent value are indistinguishable to a caller, and all three degrade.
 
 import type {
-  IFabricNode,
   IMeasureInWindowOnSuccess,
   IMeasureLayoutOnSuccess,
   IMeasureOnSuccess,

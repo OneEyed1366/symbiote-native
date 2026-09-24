@@ -388,6 +388,10 @@ export {
   resolveImageSource,
 } from './image-source-resolver';
 export type { IImageSource, IImageSourceProp } from './image-source-resolver';
+export {
+  setAssetSourceResolver,
+  resolveAssetSource,
+} from './asset-source-resolver';
 export { ActionSheetIOS } from './action-sheet-ios';
 export type {
   IActionSheetIOSOptions,

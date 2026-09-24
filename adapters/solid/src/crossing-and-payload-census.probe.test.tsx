@@ -94,9 +94,6 @@ function formatPayloadCensus(
   ].join('\n')}\n`;
 }
 
-type IDriver = { setRows: (rows: readonly IRow[]) => void };
-let driver: IDriver | undefined;
-
 function BenchmarkRow(props: { row: IRow }): ReturnType<typeof View> {
   return (
     <view class="bench-row">
@@ -114,10 +111,7 @@ function BenchmarkRow(props: { row: IRow }): ReturnType<typeof View> {
 }
 
 function List(props: { count: number }): ReturnType<typeof View> {
-  const [rows, setRows] = createSignal<readonly IRow[]>(
-    ROW_POOL.slice(0, props.count),
-  );
-  driver = { setRows };
+  const [rows] = createSignal<readonly IRow[]>(ROW_POOL.slice(0, props.count));
   return (
     <view testID="list">
       <For each={rows()}>{row => <BenchmarkRow row={row} />}</For>
@@ -127,7 +121,6 @@ function List(props: { count: number }): ReturnType<typeof View> {
 
 beforeEach(() => {
   fabric.reset();
-  driver = undefined;
   clearGlobalStyles();
   registerRules(benchmarkRowRules());
 });

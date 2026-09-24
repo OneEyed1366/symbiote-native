@@ -1,0 +1,22 @@
+{
+  "android": {
+    "gradleProjectName": "expo-task-manager",
+    "modules": [
+      {
+        "importPath": "expo.modules.taskManager.TaskManagerModule",
+        "className": "TaskManagerModule",
+        "nativeName": "ExpoTaskManager"
+      }
+    ],
+    "services": [
+      {
+        "importPath": "expo.modules.constants.ConstantsService",
+        "className": "ConstantsService",
+        "gradleProjectName": "expo-constants"
+      }
+    ]
+  },
+  "ios": {
+    "infoPlistArrayKeys": { "UIBackgroundModes": ["fetch"] }
+  }
+}

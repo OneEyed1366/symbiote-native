@@ -24,11 +24,18 @@ export const NAV_LINE = {
   KeepAwake: 'keep-awake',
   ScreenOrientation: 'screen-orientation',
   Localization: 'localization',
+  Location: 'location',
+  MediaLibrary: 'media-library',
+  FileSystem: 'file-system',
   TrackingTransparency: 'tracking-transparency',
   SecureStore: 'secure-store',
   Sharing: 'sharing',
   WebBrowser: 'web-browser',
   Sms: 'sms',
+  Audio: 'audio',
+  Notifications: 'notifications',
+  BackgroundTasks: 'background-tasks',
+  Sqlite: 'sqlite',
 } as const;
 
 export type INavLine = (typeof NAV_LINE)[keyof typeof NAV_LINE];
@@ -70,6 +77,15 @@ export const LINE_COLOR: Record<INavLine, string> = {
   [NAV_LINE.ScreenOrientation]: '#f43f5e',
   // Emerald — @symbiote-native/localization.
   [NAV_LINE.Localization]: '#10b981',
+  // Royal blue — @symbiote-native/location. A map-pin blue distinct from Cellular's brighter
+  // blue and WebBrowser's sky-toned blue.
+  [NAV_LINE.Location]: '#1d4ed8',
+  // Deep pink/magenta — @symbiote-native/media-library. Distinct from Application's pink
+  // (#ec4899) and Sharing's fuchsia (#d946ef).
+  [NAV_LINE.MediaLibrary]: '#db2777',
+  // Deep pine/teal — @symbiote-native/file-system. Distinct from Clipboard's teal (#14b8a6,
+  // much lighter and more saturated).
+  [NAV_LINE.FileSystem]: '#134e4a',
   // Stone — @symbiote-native/tracking-transparency.
   [NAV_LINE.TrackingTransparency]: '#78716c',
   // Bronze — @symbiote-native/secure-store. Reads as a vault next to LocalAuth's crimson,
@@ -81,6 +97,22 @@ export const LINE_COLOR: Record<INavLine, string> = {
   [NAV_LINE.WebBrowser]: '#0369a1',
   // Olive green — @symbiote-native/sms. Darker than StoreReview's lime so the two read apart.
   [NAV_LINE.Sms]: '#65a30d',
+  // Spring green — @symbiote-native/audio. Fills the hue gap between StoreReview's lime
+  // (#84cc16) and Battery's green (#22c55e).
+  [NAV_LINE.Audio]: '#3fc123',
+  // Orchid/magenta — @symbiote-native/notifications. Sits between Sharing's fuchsia (#d946ef)
+  // and Application/MediaLibrary's pink.
+  [NAV_LINE.Notifications]: '#e236c8',
+  // Light periwinkle — @symbiote-native/task-manager + background-fetch + background-task.
+  // Same hue neighborhood as Crypto's indigo and Haptics' violet, distinguished by being
+  // notably lighter/less saturated — same strategy FileSystem's dark teal uses against
+  // Clipboard's teal.
+  [NAV_LINE.BackgroundTasks]: '#8a78e2',
+  // Goldenrod — @symbiote-native/sqlite. Sits in the one real hue gap left in this palette
+  // (Brightness' yellow at hue 48 to StoreReview/Sms's lime-olive at hue 84-85, ~36deg wide) and
+  // is muted/darker than both — measured minimum RGB distance to every other line here is 45.2,
+  // above the tightest pair already in this palette (LocalAuth/ScreenOrientation at 26.9).
+  [NAV_LINE.Sqlite]: '#a6af1d',
 };
 
 export type INavLineInfo = {
@@ -178,6 +210,21 @@ export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
     code: 'LO',
     label: 'LOCALIZATION LINE',
   },
+  [ROUTE_NAME.Location]: {
+    line: NAV_LINE.Location,
+    code: 'LC',
+    label: 'LOCATION LINE',
+  },
+  [ROUTE_NAME.MediaLibrary]: {
+    line: NAV_LINE.MediaLibrary,
+    code: 'ML',
+    label: 'MEDIA LIBRARY LINE',
+  },
+  [ROUTE_NAME.FileSystem]: {
+    line: NAV_LINE.FileSystem,
+    code: 'FS',
+    label: 'FILE SYSTEM LINE',
+  },
   [ROUTE_NAME.TrackingTransparency]: {
     line: NAV_LINE.TrackingTransparency,
     code: 'TT',
@@ -199,4 +246,20 @@ export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
     label: 'WEB BROWSER LINE',
   },
   [ROUTE_NAME.Sms]: { line: NAV_LINE.Sms, code: 'SM', label: 'SMS LINE' },
+  [ROUTE_NAME.Audio]: { line: NAV_LINE.Audio, code: 'AU', label: 'AUDIO LINE' },
+  [ROUTE_NAME.Notifications]: {
+    line: NAV_LINE.Notifications,
+    code: 'NT',
+    label: 'NOTIFICATIONS LINE',
+  },
+  [ROUTE_NAME.BackgroundTasks]: {
+    line: NAV_LINE.BackgroundTasks,
+    code: 'BG',
+    label: 'BACKGROUND TASKS LINE',
+  },
+  [ROUTE_NAME.Sqlite]: {
+    line: NAV_LINE.Sqlite,
+    code: 'SQ',
+    label: 'SQLITE LINE',
+  },
 };

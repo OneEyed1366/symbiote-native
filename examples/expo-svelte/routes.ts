@@ -27,6 +27,13 @@ export const ROUTE_NAME = {
   Sharing: 'Sharing',
   WebBrowser: 'WebBrowser',
   Sms: 'Sms',
+  Location: 'Location',
+  MediaLibrary: 'MediaLibrary',
+  FileSystem: 'FileSystem',
+  Audio: 'Audio',
+  Notifications: 'Notifications',
+  BackgroundTasks: 'BackgroundTasks',
+  Sqlite: 'Sqlite',
 } as const;
 
 export type IRouteName = (typeof ROUTE_NAME)[keyof typeof ROUTE_NAME];

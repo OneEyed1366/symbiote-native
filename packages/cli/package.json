@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/cli",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Create a native iOS/Android app in Vue, Svelte, Solid, Angular or React, on React Native's own Fabric renderer. Scaffolds a new app, or wires SymbioteNative into an existing bare React Native one.",
   "keywords": [
     "react-native",
@@ -62,6 +62,7 @@
   },
   "devDependencies": {
     "@clack/prompts": "catalog:",
+    "@symbiote-native/expo-modules-link": "workspace:*",
     "@types/node": "catalog:",
     "picocolors": "catalog:",
     "rolldown": "catalog:",

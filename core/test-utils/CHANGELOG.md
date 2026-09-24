@@ -1,5 +1,14 @@
 # @symbiote-native/test-utils
 
+## 0.4.3
+
+### Patch Changes
+
+- [#86](https://github.com/OneEyed1366/symbiote-native/pull/86) [`aa17531`](https://github.com/OneEyed1366/symbiote-native/commit/aa175314db0f79474b9ac87bee3e30c4e87a72c4) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - README: replaced every reference to the deleted `installFabric()` with the real `installRecordingFabric()`/`createRecordingHost()`/`propsOf()` API, removed a "Committed-payload assertions" section documenting functions (`normalizeCommitted`, `expectCommittedProps`) that never existed in source, and added the missing "Reading the live tree" (`createLiveTree`, `walkLive`/`findLive`, `serialize`, `outline`) and "Measuring the engine, not the app" (`censusLive`, `trackHostCrossings`) sections for APIs that shipped with no documentation.
+
+- Updated dependencies []:
+  - @symbiote-native/engine@1.3.0
+
 ## 0.4.2
 
 ### Patch Changes

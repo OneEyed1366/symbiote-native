@@ -20,17 +20,19 @@ supplies only the third:
 
 1. **Logic — `src/state/*.ts`.** A pure reducer `(state, action) => state`, a
    `createInitial*State` factory, and pure predicates. Zero framework, zero render —
-   `switchReducer` / `shouldSnapBack` / `valueFromChange` for `Switch`, `modalReducer` for `Modal`,
-   the `virtualized-list` windowing math for the list family.
+   `modalReducer` for `Modal`, `shouldSnapBack` / `valueFromChange` for `Pressable`'s press
+   machine, the `virtualized-list` windowing math for the list family.
 2. **View — `src/view/render-*.ts`.** A pure function `render*(viewState, platform) => Descriptor`.
    State and visuals enter **only through arguments**; out comes a tree of `Descriptor` nodes
    (`{ type, props, children, key }`, built with `el()` / `txt()`) over the intrinsic primitives
-   (`symbiote-view`, `symbiote-switch`, …). No framework, no state, no events.
+   (`symbiote-view`, `symbiote-scroll-view`, …). No framework, no state, no events.
 3. **Lifecycle — the adapter.** React wires the reducer through `useReducer`/`useLayoutEffect` and
    bridges the `Descriptor` to `React.createElement`; Vue wires it through `ref`/`watch` and
    bridges to `h()`. This is the ONLY part a new adapter has to write.
 
-`Switch` is the canonical reference for a full three-layer component.
+`Modal` is the canonical reference for a full three-layer component. `Switch` used to be — its
+`render*` function is gone now that the painting moved to the `switch` tag's own host behavior
+(see "Host behaviors" below), so only its reducer and prop type still live at this layer.
 
 ### Install
 
@@ -45,28 +47,25 @@ npm install @symbiote-native/components
 ## Usage
 
 Nearly every consumer reaches this package **through an adapter**, not directly — an app imports
-`Switch` from `@symbiote-native/react` (or `@symbiote-native/vue`), and that adapter re-exports the prop
+`Modal` from `@symbiote-native/react` (or `@symbiote-native/vue`), and that adapter re-exports the prop
 types and wires the reducer/render pair from here. Calling the render function directly is what an
 adapter itself does, to build its lifecycle wrapper:
 
 ```ts
 import {
-  renderSwitch,
-  createInitialSwitchState,
-  switchReducer,
+  renderModal,
+  createInitialModalState,
+  modalReducer,
 } from '@symbiote-native/components';
 
 // inside an adapter's own hook/composable:
-const state = createInitialSwitchState();
-const next = switchReducer(state, { type: 'native-reported', value: true });
-const descriptor = renderSwitch(
-  { value: true, disabled: false, passthrough: { onChange, ref } },
-  {
-    trackColorProps: (value, trackColor) => ({
-      /* platform-specific prop names */
-    }),
-  },
-);
+const state = createInitialModalState(visible);
+const next = modalReducer(state, { type: visible ? 'show' : 'hide' });
+const descriptor = renderModal({
+  visible,
+  transparent: false,
+  passthrough: { onDismiss, onRequestClose, ref },
+});
 // descriptor is then handed to the adapter's own descriptorToReact / descriptorToVue bridge
 ```
 

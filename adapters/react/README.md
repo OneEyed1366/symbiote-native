@@ -23,35 +23,62 @@ adapter, not the core.
 ## Install
 
 ```bash
+npx @symbiote-native/cli new my-app --framework react
+```
+
+One command, nothing to wire by hand: scaffolds the Metro config, the entry seam below, and
+`@symbiote-native/react`/`react-native`/`react` as your app's own dependencies.
+
+<details>
+<summary>Manual install (no generator — an existing app, or you want to wire it yourself)</summary>
+
+```bash
 npm install @symbiote-native/react react-native react
 ```
 
 `react-native` and `react` stay your app's own top-level dependencies — SymbioteNative doesn't hide
-them, it only replaces the JS renderer that drives them. `npx @symbiote-native/cli new --framework react`
-scaffolds the Metro config and the `index.js` entry seam below for a new app; wiring them into an
-existing one still follows [`examples/react`](../../examples/react) rather than a generator.
+them, it only replaces the JS renderer that drives them. Follow [`examples/react`](../../examples/react)
+for the Metro config and the entry seam below; there is no wiring script for an existing app.
+
+</details>
 
 ---
 
 ## Use it
 
-The app is ordinary React — the native primitives are plain intrinsic tags, no import needed:
+The app is ordinary React — the native primitives are plain intrinsic tags, no import needed.
+Styling is a CSS class against a plain `.css` file, the convention every example app here
+follows (`StyleSheet.create` still works, but isn't what any example uses):
 
 ```jsx
 import { useState } from 'react';
+import './App.css';
 
 export default function App() {
   const [count, setCount] = useState(0);
   return (
-    <view style={{ padding: 24 }}>
+    <safe-area-view className="screen">
       <text>Taps: {count}</text>
       <pressable onPress={() => setCount(c => c + 1)}>
         <text>Tap me</text>
       </pressable>
-    </view>
+    </safe-area-view>
   );
 }
 ```
+
+```css
+/* App.css */
+.screen {
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+```
+
+<details>
+<summary>Native entry point (index.js) — already scaffolded by <code>npx @symbiote-native/cli new</code></summary>
 
 The zero-config entry wires the RN-backed host seams (colors, images, device events,
 third-party ViewConfigs) and registers the app in one call — this is what
@@ -59,6 +86,11 @@ third-party ViewConfigs) and registers the app in one call — this is what
 
 ```js
 // index.js
+
+// Registers host behaviors (Image, Pressable, Switch, ...) that /bootstrap alone doesn't
+// reach; deleting this breaks them silently (Metro's production inlineRequires makes a
+// side-effect-only barrel import go lazy, see register.ts).
+import '@symbiote-native/react';
 import { registerApp } from '@symbiote-native/react/bootstrap';
 import App from './App';
 import { name as appName } from './app.json';
@@ -90,6 +122,8 @@ AppRegistry.registerRunnable(appName, ({ rootTag }) => {
   mount(rootTag, createElement(App));
 });
 ```
+
+</details>
 
 Either way, the full canary ([`App.tsx`](../../examples/react/App.tsx)) exercises every block of
 the surface below.
@@ -141,8 +175,9 @@ the future scaffolder).
 
 ## Run it
 
-[`examples/react`](../../examples/react) is a stock React Native 0.86 app. Requires Node ≥ 22 and
-the [RN environment setup](https://reactnative.dev/docs/set-up-your-environment) (Xcode, CocoaPods):
+[`examples/react`](../../examples/react) is a stock React Native 0.86 app. Requires Node ≥ 22.13
+(react-native 0.86's own `package.json#engines`) and the [RN environment
+setup](https://reactnative.dev/docs/set-up-your-environment) (Xcode, CocoaPods):
 
 ```bash
 cd examples/react

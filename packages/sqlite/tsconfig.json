@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "build",
+    "types": ["node"]
+  },
+  "include": ["src"],
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "src/**/*.test-helper.ts",
+    "src/core/native-fakes.ts",
+    "src/core/better-sqlite3-ambient.d.ts"
+  ]
+}

@@ -7,6 +7,9 @@ import { addLocaleListener, getLocales, type Locale } from '../../../core';
 
 export function useLocales(): Locale[] {
   const [invalidationKey, invalidate] = useReducer((key: number) => key + 1, 0);
+  // invalidationKey is a pure invalidation signal, never read inside the memo — it exists only to
+  // force a recompute when the native listener fires, matching upstream's identical pattern.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const locales = useMemo(() => getLocales(), [invalidationKey]);
 
   useEffect(() => {

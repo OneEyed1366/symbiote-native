@@ -1,0 +1,181 @@
+---
+title: Audio
+description: expo-audio wrapped for every SymbioteNative adapter — AudioPlayer, AudioRecorder, AudioPlaylist, and AudioStream as JSI-backed SharedObject instances.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+`@symbiote-native/audio` wraps
+[`expo-audio`](https://github.com/expo/expo/tree/main/packages/expo-audio) for every SymbioteNative
+adapter. `AudioPlayer`, `AudioRecorder`, `AudioPlaylist`, and `AudioStream` are JSI-backed
+`SharedObject` instances — per-instance native objects with real state and methods, not one-shot
+functions — so there is no hook/composable/service wrapper here either: every adapter's entry
+point is a plain re-export of the same core, and each app's own lifecycle code decides when to
+create an instance and when to call `.remove()`/`.destroy()`.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | ✅ live |
+| Android     | ✅ live |
+
+| Framework adapter | Support |
+| ------------------ | ------- |
+| React              | ✅ live |
+| Vue                | ✅ live |
+| Angular            | ✅ live |
+| Svelte             | ✅ live |
+| Solid              | ✅ live |
+
+## Installation
+
+```sh
+npm install @symbiote-native/audio
+```
+
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --audio` (or
+`add --audio` in an existing app) installs and wires this for you — see
+[`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
+
+`expo-audio` and `expo-modules-core` come along as regular dependencies, pinned to exact versions
+— never install either yourself, and never add the `expo` meta-package to your project.
+
+<Aside type="danger" title="Native setup is required before first use">
+  Follow [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first.
+  `NSMicrophoneUsageDescription` on iOS is wired automatically with a generic
+  default — override by adding the key yourself first. `UIBackgroundModes:
+  audio` is also wired automatically, since background playback defaults to
+  on; without it iOS suspends playback the moment the app backgrounds.
+</Aside>
+
+<Aside type="caution" title="Android recording permissions are not auto-wired">
+  `RECORD_AUDIO`/`MODIFY_AUDIO_SETTINGS` are out of the linker's
+  manifest-attribute scope — add them to your own `AndroidManifest.xml` if
+  you record audio. Background playback/recording also needs the
+  `AudioControlsService`/`AudioRecordingService` service declarations and
+  `FOREGROUND_SERVICE*` permissions from upstream's own config plugin — copy
+  them by hand.
+</Aside>
+
+## Usage
+
+```ts
+import { createAudioPlayer, PLAYBACK_STATUS_UPDATE, setAudioModeAsync } from '@symbiote-native/audio';
+
+await setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: false });
+
+const player = createAudioPlayer('https://example.com/track.mp3');
+player.play();
+
+const subscription = player.addListener(PLAYBACK_STATUS_UPDATE, status => {
+  console.log(status.currentTime, status.duration, status.playing);
+});
+
+// later, e.g. on unmount:
+subscription.remove();
+player.remove();
+```
+
+Recording:
+
+```ts
+import {
+  AudioRecorder,
+  RECORDING_STATUS_UPDATE,
+  RecordingPresets,
+  requestRecordingPermissionsAsync,
+} from '@symbiote-native/audio';
+
+const { granted } = await requestRecordingPermissionsAsync();
+if (!granted) throw new Error('Microphone permission denied');
+
+const recorder = new AudioRecorder(RecordingPresets.HIGH_QUALITY);
+await recorder.prepareToRecordAsync();
+recorder.record();
+recorder.addListener(RECORDING_STATUS_UPDATE, status => console.log(status));
+// … later
+await recorder.stop();
+```
+
+Playlist and real-time PCM streaming follow the same `create*` + `addListener` shape:
+`createAudioPlaylist({ sources: [...], loop: 'all' })` and `createAudioStream()`. Subscribe to the
+stream with `stream.addListener(AUDIO_STREAM_BUFFER, ...)` after `stream.start()`.
+
+Identical import surface on every adapter — `@symbiote-native/audio/react`, `/vue`, `/svelte`,
+`/solid`, `/angular` all re-export the same classes and functions.
+
+## API
+
+```ts
+class AudioPlayer extends SharedObject {
+  id: string; playing: boolean; muted: boolean; loop: boolean; paused: boolean; isLoaded: boolean;
+  isAudioSamplingSupported: boolean; isBuffering: boolean; currentTime: number; duration: number;
+  volume: number; playbackRate: number; shouldCorrectPitch: boolean; currentStatus: IAudioStatus;
+  play(): void; pause(): void; replace(source: IAudioSource): void;
+  seekTo(seconds, toleranceMillisBefore?, toleranceMillisAfter?): Promise<void>;
+  setPlaybackRate(rate, pitchCorrectionQuality?): void;
+  setAudioSamplingEnabled(enabled: boolean): void;
+  setActiveForLockScreen(active, metadata?, options?): void;
+  updateLockScreenMetadata(metadata: IAudioMetadata): void;
+  clearLockScreenControls(): void;
+  remove(): void;
+}
+createAudioPlayer(source?: IAudioSource, options?: IAudioPlayerOptions): AudioPlayer
+
+class AudioRecorder extends SharedObject {
+  id: string; currentTime: number; isRecording: boolean; uri: string | null;
+  record(options?): void; stop(): Promise<void>; pause(): void;
+  getAvailableInputs(): IRecordingInput[]; getCurrentInput(): Promise<IRecordingInput>;
+  setInput(inputUid: string): void; getStatus(): IRecorderState;
+  prepareToRecordAsync(options?): Promise<void>;
+}
+
+class AudioPlaylist extends SharedObject {
+  id: string; readonly currentIndex: number; readonly trackCount: number;
+  readonly sources: IAudioSourceInfo[]; playing: boolean; muted: boolean; isLoaded: boolean;
+  isBuffering: boolean; currentTime: number; duration: number; volume: number; playbackRate: number;
+  loop: IAudioPlaylistLoopMode; currentStatus: IAudioPlaylistStatus;
+  play(): void; pause(): void; next(): void; previous(): void; skipTo(index: number): void;
+  seekTo(seconds: number): Promise<void>; add(source: IAudioSource): void;
+  insert(source: IAudioSource, index: number): void; remove(index: number): void;
+  clear(): void; destroy(): void;
+}
+createAudioPlaylist(options?: IAudioPlaylistOptions): AudioPlaylist
+
+class AudioStream extends SharedObject {
+  id: string; readonly sampleRate: number; readonly channels: number; readonly isStreaming: boolean;
+  start(): Promise<void>; stop(): void;
+}
+createAudioStream(options?: IAudioStreamOptions): AudioStream
+
+setIsAudioActiveAsync(active: boolean): Promise<void>
+setAudioModeAsync(mode: Partial<IAudioMode>): Promise<void>
+requestRecordingPermissionsAsync(): Promise<PermissionResponse>
+requestNotificationPermissionsAsync(): Promise<PermissionResponse>  // android only, throws elsewhere
+getRecordingPermissionsAsync(): Promise<PermissionResponse>
+preload(source: IAudioSource, options?: IPreloadOptions): Promise<void>
+clearPreloadedSource(source: IAudioSource): Promise<void>
+clearAllPreloadedSources(): Promise<void>
+getPreloadedSources(): Promise<string[]>
+
+RecordingPresets: { HIGH_QUALITY: IRecordingOptions; LOW_QUALITY: IRecordingOptions }
+IOSOutputFormat, AudioQuality  // enums
+
+PLAYBACK_STATUS_UPDATE, AUDIO_SAMPLE_UPDATE, RECORDING_STATUS_UPDATE, PLAYLIST_STATUS_UPDATE,
+TRACK_CHANGED, AUDIO_STREAM_BUFFER, AUDIO_STREAM_STATUS  // event names for .addListener()
+```
+
+Plus the full `I`-prefixed type surface for sources, status, and options.
+
+## What's not ported
+
+- **No `useAudioPlayer`/`useAudioRecorder`/etc. React hooks.** `createAudioPlayer`/
+  `createAudioPlaylist`/`createAudioStream` are the framework-agnostic factories every hook would
+  wrap — build your own lifecycle wrapper around them for your framework of choice.
+- **The `Asset`-instance form of `AudioSource`, and the `downloadFirst` player option.** These need
+  `expo-asset`, which this project never depends on. The plain `number` form
+  (`require('./song.mp3')`) is supported — it resolves through React Native's own generic asset
+  resolution, no `expo-asset` needed.
+- **`interruptionModeAndroid`** — upstream marks it deprecated in favor of the cross-platform
+  `interruptionMode`.
+- **Web-only surfaces** — this project targets iOS + Android only.

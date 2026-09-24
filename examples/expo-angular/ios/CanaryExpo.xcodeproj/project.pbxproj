@@ -342,6 +342,7 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VERSIONING_SYSTEM = "apple-generic";
+				CODE_SIGN_ENTITLEMENTS = CanaryExpo/CanaryExpo.entitlements;
 			};
 			name = Debug;
 		};
@@ -372,6 +373,7 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VERSIONING_SYSTEM = "apple-generic";
+				CODE_SIGN_ENTITLEMENTS = CanaryExpo/CanaryExpo.entitlements;
 			};
 			name = Release;
 		};

@@ -123,7 +123,6 @@ import {
   requestCommitFor,
   type IHostBehavior,
   type ISymbioteNode,
-  setProp,
 } from '@symbiote-native/engine';
 
 import { descriptorFor } from '../component-names';

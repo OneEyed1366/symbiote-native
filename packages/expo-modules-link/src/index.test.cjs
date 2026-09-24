@@ -12,7 +12,11 @@ const {
   patchBuildGradle,
   patchMainApplication,
   patchAndroidManifest,
+  patchAndroidManifestPermissions,
+  patchAndroidManifestServices,
+  patchMainActivityConfigChanges,
   patchInfoPlist,
+  patchInfoPlistArrays,
 } = require('./index.cjs');
 
 // Trimmed to exercise every anchor: the react-android dependency line, the last import, the
@@ -94,6 +98,26 @@ const SENSORS_MANIFEST = {
         importPath: 'expo.modules.sensors.modules.BarometerModule',
         className: 'BarometerModule',
         nativeName: 'ExpoBarometer',
+      },
+    ],
+  },
+};
+
+const TASK_MANAGER_MANIFEST = {
+  android: {
+    gradleProjectName: 'expo-task-manager',
+    modules: [
+      {
+        importPath: 'expo.modules.taskManager.TaskManagerModule',
+        className: 'TaskManagerModule',
+        nativeName: 'ExpoTaskManager',
+      },
+    ],
+    services: [
+      {
+        importPath: 'expo.modules.constants.ConstantsService',
+        className: 'ConstantsService',
+        gradleProjectName: 'expo-constants',
       },
     ],
   },
@@ -211,6 +235,16 @@ test('patchBuildGradle drops the entry of a package that is no longer installed'
   assert.match(after, /expo-local-authentication/, 'the remaining package stays');
 });
 
+test('patchBuildGradle also includes a services entry\'s own gradleProjectName', () => {
+  const appRoot = makeAppRoot();
+
+  patchBuildGradle(appRoot, entriesOf(TASK_MANAGER_MANIFEST));
+  const content = read(appRoot, GRADLE_PATH);
+
+  assert.match(content, /implementation project\(':expo-task-manager'\)/, 'the primary project still lands');
+  assert.match(content, /implementation project\(':expo-constants'\)/, 'the service\'s backing project lands too');
+});
+
 test('patchMainApplication generates both regions, sorted, and is byte-stable on re-run', () => {
   const appRoot = makeAppRoot();
   const entries = entriesOf(SENSORS_MANIFEST, LOCAL_AUTH_MANIFEST);
@@ -230,6 +264,49 @@ test('patchMainApplication generates both regions, sorted, and is byte-stable on
 
   patchMainApplication(appRoot, entries);
   assert.equal(read(appRoot, MAIN_APP_PATH), afterFirst, 're-running must be a no-op');
+});
+
+test('patchMainApplication generates getServices() with its own import, and is byte-stable on re-run', () => {
+  const appRoot = makeAppRoot();
+
+  patchMainApplication(appRoot, entriesOf(TASK_MANAGER_MANIFEST));
+  const afterFirst = read(appRoot, MAIN_APP_PATH);
+
+  assert.match(afterFirst, /^import expo\.modules\.constants\.ConstantsService$/m);
+  assert.match(afterFirst, /^import expo\.modules\.kotlin\.services\.Service$/m, 'the return type\'s own import lands too');
+  assert.match(
+    afterFirst,
+    /override fun getServices\(\): List<Class<out Service>> = listOf\(\n\s+ConstantsService::class\.java,\n\s*\)/,
+  );
+  assert.ok(
+    afterFirst.indexOf(': ModulesProvider {') < afterFirst.indexOf('getModulesMap'),
+    'getServices() is generated above getModulesMap(), inside the class',
+  );
+
+  patchMainApplication(appRoot, entriesOf(TASK_MANAGER_MANIFEST));
+  assert.equal(read(appRoot, MAIN_APP_PATH), afterFirst, 're-running must be a no-op');
+});
+
+test('patchMainApplication regenerates an empty getServices() when no package declares any', () => {
+  const appRoot = makeAppRoot();
+
+  patchMainApplication(appRoot, entriesOf(LOCAL_AUTH_MANIFEST));
+  const content = read(appRoot, MAIN_APP_PATH);
+
+  assert.match(content, /override fun getServices\(\): List<Class<out Service>> = listOf\(\n\s*\)/);
+});
+
+test('patchMainApplication drops a service\'s import and entry once its package is uninstalled', () => {
+  const appRoot = makeAppRoot();
+
+  patchMainApplication(appRoot, entriesOf(TASK_MANAGER_MANIFEST, LOCAL_AUTH_MANIFEST));
+  assert.match(read(appRoot, MAIN_APP_PATH), /ConstantsService/);
+
+  patchMainApplication(appRoot, entriesOf(LOCAL_AUTH_MANIFEST));
+  const after = read(appRoot, MAIN_APP_PATH);
+
+  assert.doesNotMatch(after, /ConstantsService/);
+  assert.match(after, /LocalAuthenticationModule::class\.java to "ExpoLocalAuthentication",/, 'unrelated entries survive');
 });
 
 test('patchMainApplication drops the import and map entry of an uninstalled package', () => {
@@ -327,6 +404,189 @@ test('patchAndroidManifest escapes a quote in a value instead of closing it earl
   assert.match(read(appRoot, ANDROID_MANIFEST_PATH), /android:label="The &quot;Best&quot; App"/);
 });
 
+test('patchMainActivityConfigChanges adds the attribute fresh when MainActivity has none', () => {
+  const appRoot = makeAppRoot();
+
+  patchMainActivityConfigChanges(appRoot, entriesOf({ android: { mainActivityConfigChanges: ['locale', 'layoutDirection'] } }));
+  const afterFirst = read(appRoot, ANDROID_MANIFEST_PATH);
+
+  assert.match(afterFirst, /<activity android:name="\.MainActivity" android:exported="true" android:configChanges="layoutDirection\|locale" \/>/);
+
+  patchMainActivityConfigChanges(appRoot, entriesOf({ android: { mainActivityConfigChanges: ['locale', 'layoutDirection'] } }));
+  assert.equal(read(appRoot, ANDROID_MANIFEST_PATH), afterFirst, 're-running must be a no-op');
+});
+
+test('patchMainActivityConfigChanges unions new tokens into an existing value without duplicating shared ones', () => {
+  const appRoot = makeAppRoot();
+  const manifestPath = path.join(appRoot, ...ANDROID_MANIFEST_PATH);
+  fs.writeFileSync(
+    manifestPath,
+    ANDROID_MANIFEST_FIXTURE.replace(
+      '<activity android:name=".MainActivity" android:exported="true" />',
+      '<activity android:name=".MainActivity" android:exported="true" android:configChanges="keyboard|orientation|uiMode" />',
+    ),
+  );
+
+  patchMainActivityConfigChanges(appRoot, entriesOf({ android: { mainActivityConfigChanges: ['uiMode', 'locale'] } }));
+  const content = fs.readFileSync(manifestPath, 'utf8');
+
+  assert.match(content, /android:configChanges="keyboard\|orientation\|uiMode\|locale"/, 'existing tokens survive in order, new one appended');
+  assert.equal((content.match(/uiMode/g) || []).length, 1, 'a token already present is not duplicated');
+});
+
+test('patchMainActivityConfigChanges does nothing when no package declares any', () => {
+  const appRoot = makeAppRoot();
+  const before = read(appRoot, ANDROID_MANIFEST_PATH);
+
+  patchMainActivityConfigChanges(appRoot, entriesOf(LOCAL_AUTH_MANIFEST, SENSORS_MANIFEST));
+
+  assert.equal(read(appRoot, ANDROID_MANIFEST_PATH), before, 'no entry sets mainActivityConfigChanges');
+});
+
+test('patchAndroidManifestPermissions unions permissions from every package once, right after <manifest>', () => {
+  const appRoot = makeAppRoot();
+  const entries = entriesOf(
+    { android: { manifestPermissions: ['android.permission.FOREGROUND_SERVICE', 'android.permission.FOREGROUND_SERVICE_LOCATION'] } },
+    { android: { manifestPermissions: ['android.permission.FOREGROUND_SERVICE', 'android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK'] } },
+  );
+
+  patchAndroidManifestPermissions(appRoot, entries);
+  const afterFirst = read(appRoot, ANDROID_MANIFEST_PATH);
+
+  assert.match(afterFirst, /<uses-permission android:name="android.permission.FOREGROUND_SERVICE" \/>/);
+  assert.match(afterFirst, /<uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" \/>/);
+  assert.match(afterFirst, /<uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" \/>/);
+  assert.match(afterFirst, /<uses-permission android:name="android.permission.INTERNET" \/>/, 'pre-existing permissions survive');
+  assert.ok(
+    afterFirst.indexOf('FOREGROUND_SERVICE"') < afterFirst.indexOf('INTERNET'),
+    'lands right after <manifest> opens, ahead of whatever was already there',
+  );
+  assert.equal(
+    (afterFirst.match(/FOREGROUND_SERVICE"/g) || []).length,
+    1,
+    'the permission both entries share is added only once',
+  );
+
+  patchAndroidManifestPermissions(appRoot, entries);
+  assert.equal(read(appRoot, ANDROID_MANIFEST_PATH), afterFirst, 're-running must be a no-op');
+});
+
+test('patchAndroidManifestPermissions does nothing when no package declares any', () => {
+  const appRoot = makeAppRoot();
+  const before = read(appRoot, ANDROID_MANIFEST_PATH);
+
+  patchAndroidManifestPermissions(appRoot, entriesOf(LOCAL_AUTH_MANIFEST, SENSORS_MANIFEST));
+
+  assert.equal(read(appRoot, ANDROID_MANIFEST_PATH), before, 'no entry sets manifestPermissions');
+});
+
+test('patchAndroidManifestPermissions keeps a permission the app already declared', () => {
+  const appRoot = makeAppRoot();
+  const manifestPath = path.join(appRoot, ...ANDROID_MANIFEST_PATH);
+  fs.writeFileSync(
+    manifestPath,
+    ANDROID_MANIFEST_FIXTURE.replace(
+      '<uses-permission android:name="android.permission.INTERNET" />',
+      '<uses-permission android:name="android.permission.INTERNET" />\n  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />',
+    ),
+  );
+
+  patchAndroidManifestPermissions(
+    appRoot,
+    entriesOf({ android: { manifestPermissions: ['android.permission.FOREGROUND_SERVICE', 'android.permission.FOREGROUND_SERVICE_LOCATION'] } }),
+  );
+  const content = fs.readFileSync(manifestPath, 'utf8');
+
+  assert.equal(
+    (content.match(/FOREGROUND_SERVICE"/g) || []).length,
+    1,
+    'the already-declared permission is not duplicated',
+  );
+  assert.match(content, /<uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" \/>/, 'the missing one still lands');
+});
+
+const AUDIO_SERVICE_MANIFEST = {
+  android: {
+    manifestServices: [
+      {
+        name: 'expo.modules.audio.service.AudioControlsService',
+        foregroundServiceType: 'mediaPlayback',
+        intentFilterActions: ['androidx.media3.session.MediaSessionService'],
+      },
+    ],
+  },
+};
+
+test('patchAndroidManifestServices adds a service with its intent-filter once, inside <application>', () => {
+  const appRoot = makeAppRoot();
+  const entries = entriesOf(AUDIO_SERVICE_MANIFEST);
+
+  patchAndroidManifestServices(appRoot, entries);
+  const afterFirst = read(appRoot, ANDROID_MANIFEST_PATH);
+
+  assert.match(
+    afterFirst,
+    /<service android:name="expo\.modules\.audio\.service\.AudioControlsService" android:exported="false" android:foregroundServiceType="mediaPlayback">/,
+  );
+  assert.match(
+    afterFirst,
+    /<action android:name="androidx\.media3\.session\.MediaSessionService" \/>/,
+  );
+  assert.match(afterFirst, /<activity android:name="\.MainActivity"/, 'the element body already there survives');
+
+  patchAndroidManifestServices(appRoot, entries);
+  assert.equal(read(appRoot, ANDROID_MANIFEST_PATH), afterFirst, 're-running must be a no-op');
+});
+
+test('patchAndroidManifestServices adds a service with no intent-filter as a self-closing tag', () => {
+  const appRoot = makeAppRoot();
+  const entries = entriesOf({
+    android: {
+      manifestServices: [
+        { name: 'expo.modules.audio.service.AudioRecordingService', foregroundServiceType: 'microphone' },
+      ],
+    },
+  });
+
+  patchAndroidManifestServices(appRoot, entries);
+
+  assert.match(
+    read(appRoot, ANDROID_MANIFEST_PATH),
+    /<service android:name="expo\.modules\.audio\.service\.AudioRecordingService" android:exported="false" android:foregroundServiceType="microphone" \/>/,
+  );
+});
+
+test('patchAndroidManifestServices does nothing when no package declares any', () => {
+  const appRoot = makeAppRoot();
+  const before = read(appRoot, ANDROID_MANIFEST_PATH);
+
+  patchAndroidManifestServices(appRoot, entriesOf(LOCAL_AUTH_MANIFEST, SENSORS_MANIFEST));
+
+  assert.equal(read(appRoot, ANDROID_MANIFEST_PATH), before, 'no entry sets manifestServices');
+});
+
+test('patchAndroidManifestServices skips a service the app already declared under the same name', () => {
+  const appRoot = makeAppRoot();
+  const manifestPath = path.join(appRoot, ...ANDROID_MANIFEST_PATH);
+  fs.writeFileSync(
+    manifestPath,
+    ANDROID_MANIFEST_FIXTURE.replace(
+      '<activity android:name=".MainActivity" android:exported="true" />',
+      '<service android:name="expo.modules.audio.service.AudioControlsService" android:exported="true" />\n    <activity android:name=".MainActivity" android:exported="true" />',
+    ),
+  );
+
+  patchAndroidManifestServices(appRoot, entriesOf(AUDIO_SERVICE_MANIFEST));
+  const content = fs.readFileSync(manifestPath, 'utf8');
+
+  assert.equal(
+    (content.match(/AudioControlsService"/g) || []).length,
+    1,
+    'the hand-written service is not duplicated, even though its attributes differ',
+  );
+  assert.match(content, /android:exported="true"/, "the app's own version is left untouched");
+});
+
 test('patchInfoPlist inserts each permission string once, inside the outer dict', () => {
   const appRoot = makeAppRoot();
   const entries = entriesOf(LOCAL_AUTH_MANIFEST, {
@@ -382,6 +642,114 @@ test('patchInfoPlist keeps a hand-edited description instead of overwriting it',
 
   assert.match(content, /<string>Hand-written copy the store approved\.<\/string>/);
   assert.doesNotMatch(content, /demo local-auth/);
+});
+
+const BACKGROUND_TASK_MANIFEST = {
+  android: {
+    gradleProjectName: 'expo-background-task',
+    modules: [
+      {
+        importPath: 'expo.modules.backgroundtask.BackgroundTaskModule',
+        className: 'BackgroundTaskModule',
+        nativeName: 'ExpoBackgroundTask',
+      },
+    ],
+  },
+  ios: {
+    infoPlistArrayKeys: {
+      UIBackgroundModes: ['processing'],
+      BGTaskSchedulerPermittedIdentifiers: ['com.expo.modules.backgroundtask.processing'],
+    },
+  },
+};
+
+const BACKGROUND_FETCH_MANIFEST = {
+  ios: { infoPlistArrayKeys: { UIBackgroundModes: ['fetch'] } },
+};
+
+test('patchInfoPlistArrays creates a new array key in the outer dict', () => {
+  const appRoot = makeAppRoot();
+
+  patchInfoPlistArrays(appRoot, entriesOf(BACKGROUND_TASK_MANIFEST));
+  const content = read(appRoot, PLIST_PATH);
+
+  assert.match(content, /<key>BGTaskSchedulerPermittedIdentifiers<\/key>\s*<array>\s*<string>com\.expo\.modules\.backgroundtask\.processing<\/string>\s*<\/array>/);
+  assert.match(content, /<key>UIBackgroundModes<\/key>\s*<array>\s*<string>processing<\/string>\s*<\/array>/);
+  assert.match(content, /<key>CFBundleDisplayName<\/key>/, 'pre-existing keys survive');
+});
+
+// background-fetch and background-task both want an entry under the SAME UIBackgroundModes
+// array — the point of the feature is that both land in one array, not one overwriting the
+// other.
+test('patchInfoPlistArrays merges items from multiple packages into one array', () => {
+  const appRoot = makeAppRoot();
+
+  patchInfoPlistArrays(appRoot, entriesOf(BACKGROUND_TASK_MANIFEST, BACKGROUND_FETCH_MANIFEST));
+  const content = read(appRoot, PLIST_PATH);
+
+  const arrayMatch = /<key>UIBackgroundModes<\/key>\s*<array>([\s\S]*?)<\/array>/.exec(content);
+  assert.ok(arrayMatch, 'UIBackgroundModes array must exist');
+  assert.match(arrayMatch[1], /<string>processing<\/string>/);
+  assert.match(arrayMatch[1], /<string>fetch<\/string>/);
+});
+
+test('patchInfoPlistArrays appends a missing item to an array the app already declares, keeping the existing one', () => {
+  const appRoot = makeAppRoot();
+  const plistPath = path.join(appRoot, ...PLIST_PATH);
+  fs.writeFileSync(
+    plistPath,
+    INFO_PLIST_FIXTURE.replace(
+      '<key>CFBundleDisplayName</key>',
+      '<key>UIBackgroundModes</key>\n\t<array>\n\t\t<string>remote-notification</string>\n\t</array>\n\t<key>CFBundleDisplayName</key>',
+    ),
+  );
+
+  patchInfoPlistArrays(appRoot, entriesOf(BACKGROUND_FETCH_MANIFEST));
+  const content = fs.readFileSync(plistPath, 'utf8');
+
+  const arrayMatch = /<key>UIBackgroundModes<\/key>\s*<array>([\s\S]*?)<\/array>/.exec(content);
+  assert.match(arrayMatch[1], /<string>remote-notification<\/string>/, 'the app-declared entry survives');
+  assert.match(arrayMatch[1], /<string>fetch<\/string>/, 'the package entry is appended');
+});
+
+test('patchInfoPlistArrays does not duplicate an item the array already has', () => {
+  const appRoot = makeAppRoot();
+  const plistPath = path.join(appRoot, ...PLIST_PATH);
+  fs.writeFileSync(
+    plistPath,
+    INFO_PLIST_FIXTURE.replace(
+      '<key>CFBundleDisplayName</key>',
+      '<key>UIBackgroundModes</key>\n\t<array>\n\t\t<string>fetch</string>\n\t</array>\n\t<key>CFBundleDisplayName</key>',
+    ),
+  );
+
+  patchInfoPlistArrays(appRoot, entriesOf(BACKGROUND_FETCH_MANIFEST));
+  const content = fs.readFileSync(plistPath, 'utf8');
+
+  assert.equal((content.match(/<string>fetch<\/string>/g) || []).length, 1);
+});
+
+test('patchInfoPlistArrays escapes XML metacharacters in an item', () => {
+  const appRoot = makeAppRoot();
+
+  patchInfoPlistArrays(appRoot, entriesOf({
+    ios: { infoPlistArrayKeys: { LSApplicationQueriesSchemes: ['a&b'] } },
+  }));
+  const content = read(appRoot, PLIST_PATH);
+
+  assert.match(content, /<string>a&amp;b<\/string>/);
+  assert.doesNotMatch(content, /<string>a&b<\/string>/);
+});
+
+test('patchInfoPlistArrays is byte-stable on re-run', () => {
+  const appRoot = makeAppRoot();
+  const entries = entriesOf(BACKGROUND_TASK_MANIFEST, BACKGROUND_FETCH_MANIFEST);
+
+  patchInfoPlistArrays(appRoot, entries);
+  const afterFirst = read(appRoot, PLIST_PATH);
+
+  patchInfoPlistArrays(appRoot, entries);
+  assert.equal(read(appRoot, PLIST_PATH), afterFirst, 're-running must be a no-op');
 });
 
 test('linkApp wires every installed package end to end from one scan', () => {

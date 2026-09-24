@@ -12,8 +12,7 @@
 // fold RN performs in `Button.js:326-331`. The engine folds those for every node
 // (`core/engine/src/accessibility-props.ts`), so repeating it here would fold twice.
 
-import { Platform } from '@symbiote-native/engine';
-import type { IViewStyle, ISymbioteEvent } from '@symbiote-native/engine';
+import type { ISymbioteEvent } from '@symbiote-native/engine';
 import type { IAccessibilityProps, IAriaProps } from '../accessibility-props';
 
 // Author-facing props: the framework-agnostic public surface every adapter exposes. Button has
@@ -36,15 +35,6 @@ export interface IButtonProps extends IAccessibilityProps, IAriaProps {
   nextFocusRight?: number;
   nextFocusUp?: number;
 }
-
-// Button.js:394-437, one constant per literal so a value cannot drift silently. The LABEL's seven
-// went with `resolveButtonTextStyle` on 2026-09-18 — they live in `SymbioteFabricProps.cpp` beside
-// the rule that reads them and are deliberately not duplicated here.
-const ANDROID_BUTTON_BLUE = '#2196F3';
-const ANDROID_DISABLED_BACKGROUND = '#dfdfdf';
-const ANDROID_ELEVATION = 4;
-const ANDROID_DISABLED_ELEVATION = 0;
-const ANDROID_BORDER_RADIUS = 2;
 
 // `BUTTON_ACCESSIBILITY_ROLE` and `resolveButtonImportantForAccessibility` WERE HERE and are gone
 // (2026-09-18). Both are `foldButtonProps` in `SymbioteFabricProps.cpp` now, and neither had a

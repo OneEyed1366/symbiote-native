@@ -22,8 +22,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { defineComponent, h, ref, type VNode } from '@vue/runtime-core';
 import { installRecordingFabric } from '@symbiote-native/test-utils';
-import { readFileSync, writeFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { readFileSync } from 'node:fs';
 
 // By package name, not a relative path — see the sibling probe in `adapters/solid` for what the
 // relative one does to `core/css-parser`'s source tree.

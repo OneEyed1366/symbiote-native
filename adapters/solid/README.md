@@ -19,13 +19,26 @@ Metro, no custom Babel transformer path.
 ## Install
 
 ```bash
+npx @symbiote-native/cli new my-app --framework solid
+```
+
+One command, nothing to wire by hand: scaffolds the Babel preset, Metro config, and
+`jsxImportSource` below, plus `@symbiote-native/solid`/`react-native`/`solid-js` as your app's own
+dependencies.
+
+<details>
+<summary>Manual install (no generator — an existing app, or you want to wire it yourself)</summary>
+
+```bash
 npm install @symbiote-native/solid react-native solid-js
 ```
 
 `react-native` and `solid-js` stay your app's own top-level dependencies — this package only
-replaces the JS renderer that drives them. `npx @symbiote-native/cli new --framework solid` wires
-the Babel preset, Metro config, and `jsxImportSource` below for a new app; wiring them into an
-existing one still follows [`examples/solid`](../../examples/solid) rather than a generator.
+replaces the JS renderer that drives them. Follow [`examples/solid`](../../examples/solid) for the
+Babel preset, Metro config, and `jsxImportSource` below; there is no wiring script for an existing
+app.
+
+</details>
 
 Targets **Solid 1.9**, deliberately not 2.0 (RC as of 2026-08) — 2.0 moves the package to
 `@solidjs/universal`, changes `RendererOptions`, and changes the compiled-output shape. Moving to
@@ -36,29 +49,49 @@ it is a rewrite of `src/renderer.ts`, not a range bump.
 ## Use it
 
 The app is ordinary Solid — the native primitives are plain lowercase intrinsic tags, no import
-needed:
+needed. Styling is a CSS class against a plain `.css` file — the convention every example app
+here follows:
 
 ```jsx
 import { createSignal } from 'solid-js';
+import './App.css';
 
 export default function App() {
   const [count, setCount] = createSignal(0);
   return (
-    <view style={{ padding: 24 }}>
+    <safe-area-view class="screen">
       <text>Taps: {count()}</text>
       <pressable onPress={() => setCount(c => c + 1)}>
         <text>Tap me</text>
       </pressable>
-    </view>
+    </safe-area-view>
   );
 }
 ```
+
+```css
+/* App.css */
+.screen {
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+```
+
+<details>
+<summary>Native entry point (index.js) — already scaffolded by <code>npx @symbiote-native/cli new --framework solid</code></summary>
 
 The zero-config entry wires the RN-backed host seams and registers the app in one call — this is
 what [`examples/solid`](../../examples/solid) actually uses:
 
 ```js
 // index.js
+
+// Registers host behaviors (Image, Pressable, Switch, ...) that /bootstrap alone doesn't
+// reach; deleting this breaks them silently (Metro's production inlineRequires makes a
+// side-effect-only barrel import go lazy, see register.ts).
+import '@symbiote-native/solid';
 import { createApp } from '@symbiote-native/solid/bootstrap';
 import App from './App';
 import { name as appName } from './app.json';
@@ -81,6 +114,8 @@ AppRegistry.registerRunnable(appName, ({ rootTag }) => {
 });
 ```
 
+</details>
+
 `babel.config.js` needs the adapter's preset LAST — Babel applies presets in reverse order, so
 listing it last runs it first, claiming the JSX before RN's own React-JSX transform can:
 
@@ -100,11 +135,11 @@ Nothing rewrites the source on the way there, so this adapter carries no Babel p
 ## `./renderer` is a compiler target, not a convenience export
 
 `babel-preset-solid` with `generate: 'universal'` rewrites JSX into direct calls imported from the
-`moduleName` it was given. So `src/renderer.ts` exports eleven specific names because generated code
+`moduleName` it was given. So `src/renderer.ts` exports twelve specific names because generated code
 imports them; dropping one breaks bundling with a module-not-found on an import nobody wrote. The
-list (`createElement`, `createTextNode`, `insertNode`, `insert`, `setProp`, `use`, `effect`, `memo`,
-`createComponent`, `spread`, `mergeProps`) was verified by compiling representative JSX, not read off
-the docs.
+list (`render`, `createElement`, `createTextNode`, `insertNode`, `insert`, `setProp`, `use`, `effect`,
+`memo`, `createComponent`, `spread`, `mergeProps`) was verified by compiling representative JSX, not
+read off the docs.
 
 ## Three things the universal runtime does that the seam has to answer correctly
 

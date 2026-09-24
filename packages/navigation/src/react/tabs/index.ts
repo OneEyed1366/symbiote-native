@@ -216,8 +216,11 @@ const TabImpl = forwardRef<ITabNavigatorHandle, ITabProps>(
     // object so a setParams-only change (new route object, same key) doesn't spuriously re-fire
     // focus/blur.
     const focusedRouteKey = focusedRoute?.key;
+    // focusedRouteKey is a pure invalidation signal — createNavigationEmitter() takes no
+    // arguments, the key only forces a fresh emitter per focus change (see comment above).
     const routeEmitter = useMemo(
       () => createNavigationEmitter(),
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       [focusedRouteKey],
     );
 

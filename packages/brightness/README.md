@@ -16,13 +16,27 @@ depended on directly and never the `expo` meta-package, why the upstream JS is h
 
 ## Install
 
+**New app:**
+
+```bash
+npx @symbiote-native/cli new my-app --brightness
+```
+
+**Existing SymbioteNative app:**
+
+```bash
+npx @symbiote-native/cli add --brightness
+```
+
+Either way: installs `@symbiote-native/brightness` and wires the native autolinking automatically — see
+[`@symbiote-native/cli`](../cli).
+
+<details>
+<summary>Manual install (no CLI — installing and wiring native autolinking by hand)</summary>
+
 ```bash
 npm install @symbiote-native/brightness
 ```
-
-Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --brightness` (or
-`add --brightness` in an existing app) installs and wires this for you — see
-[`@symbiote-native/cli`](../cli).
 
 `expo-brightness` and `expo-modules-core` come along as regular, pinned dependencies — never
 install either yourself, and never add the `expo` meta-package to this project (it bundles its own
@@ -49,6 +63,8 @@ implementation: `examples/expo-react/android/app/src/main/AndroidManifest.xml` (
 `WRITE_SETTINGS` permission) and
 `examples/expo-react/android/app/src/main/java/com/canaryexpo/MainApplication.kt` (the
 `BrightnessModule` registration) — the Vue and Angular Expo canaries wire the same three layers.
+
+</details>
 
 ## Shape
 
