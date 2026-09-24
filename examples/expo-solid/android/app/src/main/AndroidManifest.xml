@@ -9,6 +9,15 @@
   <uses-permission android:name="android.permission.WRITE_SETTINGS" />
 
   <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+  <!-- @symbiote-native/media-library: getPermissionsAsync/getAlbumsAsync/getAssetsAsync -->
+  <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+  <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+  <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
+  <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+  <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+  <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+  <!-- @symbiote-native/tracking-transparency: getAdvertisingId -->
+  <uses-permission android:name="com.google.android.gms.permission.AD_ID" />
 
   <application
     android:name=".MainApplication"
@@ -30,7 +39,7 @@
     <activity
       android:name=".MainActivity"
       android:label="@string/app_name"
-      android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"
+      android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode|locale|layoutDirection"
       android:launchMode="singleTask"
       android:windowSoftInputMode="adjustResize"
       android:exported="true"

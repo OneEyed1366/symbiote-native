@@ -2032,7 +2032,7 @@ PODS:
     - React-utils (= 0.86.0)
     - ReactNativeDependencies
   - ReactNativeDependencies (0.86.0)
-  - symbiote-engine (1.1.0):
+  - symbiote-engine (1.3.0):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -2054,31 +2054,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - symbiote-navigation (5.0.0):
-    - hermes-engine
-    - RCTRequired
-    - RCTTypeSafety
-    - React-Core
-    - React-Core-prebuilt
-    - React-debug
-    - React-Fabric
-    - React-featureflags
-    - React-graphics
-    - React-ImageManager
-    - React-jsi
-    - React-NativeModulesApple
-    - React-RCTFabric
-    - React-RCTImage
-    - React-renderercss
-    - React-rendererdebug
-    - React-utils
-    - ReactCodegen
-    - ReactCommon/turbomodule/bridging
-    - ReactCommon/turbomodule/core
-    - ReactNativeDependencies
-    - symbiote-navigation/common (= 5.0.0)
-    - Yoga
-  - symbiote-navigation/common (5.0.0):
+  - symbiote-navigation (5.0.2):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -2100,8 +2076,32 @@ PODS:
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
+    - symbiote-navigation/common (= 5.0.2)
     - Yoga
-  - symbiote-splash-screen (6.0.0):
+  - symbiote-navigation/common (5.0.2):
+    - hermes-engine
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-Core-prebuilt
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-RCTImage
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - ReactNativeDependencies
+    - Yoga
+  - symbiote-splash-screen (6.0.2):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -2584,9 +2584,9 @@ SPEC CHECKSUMS:
   ReactCodegen: afe0d436ee089d7bea6418429d8312b1d23a6801
   ReactCommon: d5c1bb4427bf51c443de5926aac332c89ddd9363
   ReactNativeDependencies: fa0a54b3f5319ae0e3b9aff32bfee7a424b88e66
-  symbiote-engine: 221ddf6ca2eda0280580bf5b9352bd52b66556b0
-  symbiote-navigation: 61b4ae1cb73678fcbe52cc7b725c937859579f89
-  symbiote-splash-screen: 834dd595865708063ae243cec79c3e3b55f5cfe3
+  symbiote-engine: f11564fc0d6e5fac804e483c736de127eb9bbe55
+  symbiote-navigation: 173de1023fdb0b7f389fc1de501fb6044d0b0ade
+  symbiote-splash-screen: 0afe05ec203c1fe478a70c71486ae60e7eb4bf2d
   UMAppLoader: 173cb90a3039aa9c1b84bace4487e1907a4a5a39
   Yoga: fe50ab299e578f397fef753cf309c6703a4db29b
 

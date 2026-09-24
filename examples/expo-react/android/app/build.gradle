@@ -127,6 +127,7 @@ dependencies {
     implementation project(':expo-brightness')
     implementation project(':expo-cellular')
     implementation project(':expo-clipboard')
+    implementation project(':expo-constants')
     implementation project(':expo-crypto')
     implementation project(':expo-device')
     implementation project(':expo-file-system')
