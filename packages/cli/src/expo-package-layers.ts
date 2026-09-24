@@ -30,6 +30,7 @@ export type IExpoPackageLayerName =
   | 'local-auth'
   | 'localization'
   | 'location'
+  | 'mail-composer'
   | 'media-library'
   | 'network'
   | 'notifications'
@@ -173,6 +174,11 @@ export const EXPO_PACKAGE_LAYERS: readonly IExpoPackageLayer[] = [
         ],
       },
     ],
+  },
+  {
+    id: 'mail-composer',
+    label: 'Mail composer',
+    symbiotePackage: '@symbiote-native/mail-composer',
   },
   {
     id: 'media-library',

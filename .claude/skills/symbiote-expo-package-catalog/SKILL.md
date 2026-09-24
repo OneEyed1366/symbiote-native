@@ -67,6 +67,7 @@ queue.
 | `@symbiote-native/sharing` | `expo-sharing` (OUTGOING share only — `shareAsync`/`isAvailableAsync`. The incoming half (`useIncomingShare`, `getSharedPayloads`, …) is deliberately NOT ported: it needs an iOS Share Extension target, which upstream's config plugin builds as a second Xcode target with entitlements + an App Group — the same app-extension category as `expo-widgets` in the backlog above) | `symbiote-expo-native-module` |
 | `@symbiote-native/web-browser` | `expo-web-browser` (minus the opt-in `experimentalLauncherActivity` config plugin, and minus the web-only `maybeCompleteAuthSession`) | `symbiote-expo-native-module` |
 | `@symbiote-native/sms` | `expo-sms` | `symbiote-expo-native-module` |
+| `@symbiote-native/mail-composer` | `expo-mail-composer` | `symbiote-expo-native-module` |
 | `@symbiote-native/task-manager` | `expo-task-manager` (no `registerTaskAsync` — upstream has none either; registration is always driven by a consumer module) | `symbiote-expo-native-module` |
 | `@symbiote-native/background-fetch` | `expo-background-fetch` (upstream-deprecated in favor of `expo-background-task`; ported anyway for parity, since Expo still ships both at sdk-57 — see the file-system legacy+modern precedent above) | `symbiote-expo-native-module` |
 | `@symbiote-native/background-task` | `expo-background-task` (`BGTaskScheduler`/`WorkManager`-backed successor to `expo-background-fetch`; both build on `@symbiote-native/task-manager`'s `defineTask`, neither ships one itself) | `symbiote-expo-native-module` |
@@ -90,7 +91,10 @@ shipped 2026-09-03, `expo-location` (#37) shipped 2026-09-03, `expo-media-librar
 register tasks through" note), `expo-audio` (#33) shipped 2026-09-07, `expo-notifications` (#39)
 shipped 2026-09-07 (13 native modules, first package needing real per-app native config beyond the
 linker's fixed-value contract — see its own README), `expo-asset` (#22) and `expo-font` (#21) both
-shipped 2026-09-25 (canary demo screens pending — see their own rows above), 17 left.
+shipped 2026-09-25 (canary demo screens pending — see their own rows above), `expo-mail-composer`
+(#25) shipped 2026-09-25 (native-link.json needed `ios.infoPlistArrayKeys` for
+`LSApplicationQueriesSchemes` — the 22-scheme list `getClients()` needs to query mail apps via
+`canOpenURL`), 16 left.
 
 ```
 §secure_store_manifest_attrs := {
@@ -144,7 +148,7 @@ from each package's `expo-module.config.json`.
 | ~~22~~ | ~~`expo-asset`~~ | M | shipped — see "Already shipped" |
 | ~~23~~ | ~~`expo-web-browser`~~ | M | shipped — see "Already shipped" |
 | ~~24~~ | ~~`expo-sms`~~ | M | shipped — see "Already shipped" |
-| 25 | `expo-mail-composer` | M | apple, android |
+| ~~25~~ | ~~`expo-mail-composer`~~ | M | shipped — see "Already shipped" |
 | 26 | `expo-print` | M | apple, android |
 | 27 | `expo-document-picker` | M | apple, android |
 | 28 | `expo-image-picker` | M | apple, android |

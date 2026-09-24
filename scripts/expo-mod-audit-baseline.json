@@ -208,5 +208,10 @@
     "package": "@symbiote-native/tracking-transparency",
     "path": "android.manifest.manifest.uses-permission.5",
     "verdict": "AD_ID — plugin-only, already declared in native-link.json android.manifestPermissions and present in every example manifest"
+  },
+  {
+    "package": "@symbiote-native/mail-composer",
+    "path": "ios.infoPlist.LSApplicationQueriesSchemes",
+    "verdict": "already declared in native-link.json ios.infoPlistArrayKeys — merges additively with any other package's own LSApplicationQueriesSchemes entries"
   }
 ]
