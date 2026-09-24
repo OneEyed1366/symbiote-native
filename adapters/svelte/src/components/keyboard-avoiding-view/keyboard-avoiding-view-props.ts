@@ -8,7 +8,6 @@
 import type { Snippet } from 'svelte';
 import type {
   ISymbioteEvent,
-  IClassNameValue,
   IStyleProp,
   IViewStyle,
 } from '@symbiote-native/engine';

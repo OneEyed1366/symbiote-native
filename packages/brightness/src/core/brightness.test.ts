@@ -136,6 +136,19 @@ describe('setBrightnessAsync', () => {
       await setBrightnessAsync(-0.5);
       expect(FAKE_NATIVE_BRIGHTNESS.setBrightnessAsync).toHaveBeenCalledWith(0);
     });
+
+    // why: ported from upstream's native test — clamps in BOTH directions, asserted against the
+    // most recent call rather than two separate mocks/tests.
+    it('clamps both above and below range, checked via the most recent call', async () => {
+      await setBrightnessAsync(5);
+      expect(
+        FAKE_NATIVE_BRIGHTNESS.setBrightnessAsync,
+      ).toHaveBeenLastCalledWith(1);
+      await setBrightnessAsync(-1);
+      expect(
+        FAKE_NATIVE_BRIGHTNESS.setBrightnessAsync,
+      ).toHaveBeenLastCalledWith(0);
+    });
   });
 
   describe('Negative', () => {
@@ -146,6 +159,13 @@ describe('setBrightnessAsync', () => {
         'setBrightnessAsync cannot be called with NaN',
       );
       expect(FAKE_NATIVE_BRIGHTNESS.setBrightnessAsync).not.toHaveBeenCalled();
+    });
+
+    // why: ported from upstream's native test — a non-numeric value coerces to NaN under
+    // Math.min/Math.max just like a literal NaN does, so the same guard must catch it too.
+    it('throws a TypeError when called with a non-numeric value', async () => {
+      // @ts-expect-error -- simulating a caller that ignores the number type at runtime
+      await expect(setBrightnessAsync('test')).rejects.toThrow(TypeError);
     });
 
     it('throws an UnavailabilityError-shaped error when the native method is absent', async () => {
@@ -178,6 +198,26 @@ describe('getSystemBrightnessAsync', () => {
     it('delegates to the native module on Android', async () => {
       fakePlatform.OS = 'android';
       await expect(getSystemBrightnessAsync()).resolves.toBe(0.6);
+    });
+
+    // why: ported from upstream's ios/android split tests — pins BOTH halves of the branch in one
+    // place: the platform actually taken must call its own native method AND must not also call
+    // the other platform's.
+    it('calls only getBrightnessAsync on iOS, and only getSystemBrightnessAsync on Android', async () => {
+      fakePlatform.OS = 'ios';
+      await getSystemBrightnessAsync();
+      expect(FAKE_NATIVE_BRIGHTNESS.getBrightnessAsync).toHaveBeenCalled();
+      expect(
+        FAKE_NATIVE_BRIGHTNESS.getSystemBrightnessAsync,
+      ).not.toHaveBeenCalled();
+
+      vi.clearAllMocks();
+      fakePlatform.OS = 'android';
+      await getSystemBrightnessAsync();
+      expect(FAKE_NATIVE_BRIGHTNESS.getBrightnessAsync).not.toHaveBeenCalled();
+      expect(
+        FAKE_NATIVE_BRIGHTNESS.getSystemBrightnessAsync,
+      ).toHaveBeenCalled();
     });
   });
 
@@ -228,6 +268,39 @@ describe('setSystemBrightnessAsync', () => {
         FAKE_NATIVE_BRIGHTNESS.setSystemBrightnessAsync,
       ).toHaveBeenCalledWith(1);
     });
+
+    // why: ported from upstream's android test — clamps in BOTH directions, asserted against the
+    // most recent call rather than two separate mocks/tests.
+    it('clamps both above and below range on Android, checked via the most recent call', async () => {
+      fakePlatform.OS = 'android';
+      await setSystemBrightnessAsync(5);
+      expect(
+        FAKE_NATIVE_BRIGHTNESS.setSystemBrightnessAsync,
+      ).toHaveBeenLastCalledWith(1);
+      await setSystemBrightnessAsync(-1);
+      expect(
+        FAKE_NATIVE_BRIGHTNESS.setSystemBrightnessAsync,
+      ).toHaveBeenLastCalledWith(0);
+    });
+
+    // why: ported from upstream's ios/android split tests — the platform actually taken must call
+    // its own native method AND must not also call the other platform's.
+    it('calls only setBrightnessAsync on iOS, and only setSystemBrightnessAsync on Android', async () => {
+      fakePlatform.OS = 'ios';
+      await setSystemBrightnessAsync(1);
+      expect(FAKE_NATIVE_BRIGHTNESS.setBrightnessAsync).toHaveBeenCalled();
+      expect(
+        FAKE_NATIVE_BRIGHTNESS.setSystemBrightnessAsync,
+      ).not.toHaveBeenCalled();
+
+      vi.clearAllMocks();
+      fakePlatform.OS = 'android';
+      await setSystemBrightnessAsync(1);
+      expect(FAKE_NATIVE_BRIGHTNESS.setBrightnessAsync).not.toHaveBeenCalled();
+      expect(
+        FAKE_NATIVE_BRIGHTNESS.setSystemBrightnessAsync,
+      ).toHaveBeenCalled();
+    });
   });
 
   describe('Negative', () => {
@@ -237,6 +310,13 @@ describe('setSystemBrightnessAsync', () => {
       await expect(setSystemBrightnessAsync(NaN)).rejects.toThrow(
         'setSystemBrightnessAsync cannot be called with NaN',
       );
+    });
+
+    // why: ported from upstream's native test — a non-numeric value coerces to NaN before the
+    // platform branch, same as setBrightnessAsync's guard.
+    it('throws a TypeError when called with a non-numeric value', async () => {
+      // @ts-expect-error -- simulating a caller that ignores the number type at runtime
+      await expect(setSystemBrightnessAsync('test')).rejects.toThrow(TypeError);
     });
 
     it('throws an UnavailabilityError-shaped error on Android when the native method is absent', async () => {

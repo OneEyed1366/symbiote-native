@@ -35,23 +35,26 @@
 
   let rawProps: IModalProps = $props();
 
-  let state = $state(createInitialModalState(isModalVisible(rawProps.visible)));
+  // Not a $derived candidate despite the $state+$effect shape below: modalReducer folds over the
+  // PREVIOUS `state` (self-referential — $derived can't read the value it's replacing) and must
+  // run POST-render (see the effect's own comment) so the keep-alive frame survives a commit.
+  let localState = $state(createInitialModalState(rawProps.visible === true));
 
   const resolved = $derived(resolveAccessibilityProps(rawProps));
   const isVisible = $derived(isModalVisible(resolved.visible));
-  const shouldRender = $derived(shouldRenderModal(isVisible, state));
+  const shouldRender = $derived(shouldRenderModal(isVisible, localState));
 
   // Arms the iOS keep-alive on show; a hide is left to the native dismiss (state/modal.ts). The
   // reducer is identity-stable, so the mount run triggers no extra render.
   $effect(() => {
     const action = modalVisibilityAction(isVisible);
-    if (action !== undefined) state = modalReducer(state, action);
+    if (action !== undefined) localState = modalReducer(localState, action);
   });
 
   // Modal.js: onDismiss is iOS-only — it drops the keep-alive, then tells the app.
   function handleDismiss(): void {
     if (Platform.OS !== 'ios') return;
-    state = modalReducer(state, { type: 'hide' });
+    localState = modalReducer(localState, { type: 'hide' });
     rawProps.onDismiss?.();
   }
 

@@ -136,6 +136,10 @@ import {
 - It does not implement Tailwind CSS — that needs whole-project class scanning and JIT utility
   generation, a fundamentally different shape than "one source file reduces to CSS text", and is
   being designed as a separate, future package.
+- It drops a `:active`/`:hover`/`:focus` rule the same as any other pseudo-class — there is no
+  CSS-class route to a pressed look. `Pressable`'s functional `style={({ pressed }) => ...}` prop
+  is the supported way to style a pressed state; the engine resolves it into a separate style slot
+  outside this pipeline.
 - It supports `scoped` / `:global()` / CSS Modules and SCSS/Sass/Less/Stylus preprocessing —
   including Svelte's own `<style>` block (its preprocessor calls this package's
   `compileScopedCss`, the same compile every Vue `<style scoped>` block goes through) — and it does

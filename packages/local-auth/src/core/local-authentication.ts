@@ -75,7 +75,7 @@ export async function authenticateAsync(
     throw new UnavailabilityError(NATIVE_MODULE_NAME, 'authenticateAsync');
   }
 
-  if (options.promptMessage !== undefined) {
+  if (Object.hasOwn(options, 'promptMessage')) {
     invariant(
       typeof options.promptMessage === 'string' &&
         options.promptMessage.length > 0,

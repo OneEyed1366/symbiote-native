@@ -25,7 +25,6 @@ import {
   parentOf,
   removeChild,
   routeProp,
-  setProp,
   setText,
   textOf,
   toPublicInstance,

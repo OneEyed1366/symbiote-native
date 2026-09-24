@@ -35,6 +35,15 @@
     { "path": "packages/screen-orientation" },
     { "path": "packages/tracking-transparency" },
     { "path": "packages/store-review" },
-    { "path": "packages/system-ui" }
+    { "path": "packages/system-ui" },
+    { "path": "packages/task-manager" },
+    { "path": "packages/background-fetch" },
+    { "path": "packages/background-task" },
+    { "path": "packages/location" },
+    { "path": "packages/media-library" },
+    { "path": "packages/file-system" },
+    { "path": "packages/audio" },
+    { "path": "packages/notifications" },
+    { "path": "packages/sqlite" }
   ]
 }

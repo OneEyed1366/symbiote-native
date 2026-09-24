@@ -104,7 +104,6 @@ import {
   gateWanted,
   injectGateDemandAbove,
   provideGateDemand,
-  type IGateDemand,
   type IGatedAccessibilityEvent,
 } from '../../gate-demand';
 

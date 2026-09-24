@@ -29,6 +29,13 @@ export const NAV_LINE = {
   Sharing: 'sharing',
   WebBrowser: 'web-browser',
   Sms: 'sms',
+  Location: 'location',
+  MediaLibrary: 'media-library',
+  FileSystem: 'file-system',
+  Audio: 'audio',
+  Notifications: 'notifications',
+  BackgroundTasks: 'background-tasks',
+  Sqlite: 'sqlite',
 } as const;
 
 export type INavLine = (typeof NAV_LINE)[keyof typeof NAV_LINE];
@@ -81,6 +88,29 @@ export const LINE_COLOR: Record<INavLine, string> = {
   [NAV_LINE.WebBrowser]: '#0369a1',
   // Olive green - @symbiote-native/sms. Darker than StoreReview's lime so the two read apart.
   [NAV_LINE.Sms]: '#65a30d',
+  // Royal blue - @symbiote-native/location. A map-pin blue distinct from Cellular's brighter blue
+  // and WebBrowser's sky-toned blue.
+  [NAV_LINE.Location]: '#1d4ed8',
+  // Deep pink/magenta — @symbiote-native/media-library. Distinct from Application's pink
+  // (#ec4899) and Sharing's fuchsia (#d946ef).
+  [NAV_LINE.MediaLibrary]: '#db2777',
+  // Deep cyan — @symbiote-native/file-system. Darker than Network's cyan (#06b6d4) and
+  // Clipboard's teal (#14b8a6) so it reads apart from both.
+  [NAV_LINE.FileSystem]: '#0e7490',
+  // Copper/tan — @symbiote-native/audio. Warm analog tone distinct from every existing
+  // red/orange/pink line (measured RGB distance >= 70 from the nearest existing color).
+  [NAV_LINE.Audio]: '#cb8c4d',
+  // Steel cyan-blue — @symbiote-native/notifications. Distinct from Cellular's brighter blue,
+  // Network's cyan, and File System's deep cyan.
+  [NAV_LINE.Notifications]: '#4daccb',
+  // Olive-yellow-green — @symbiote-native/background-fetch + @symbiote-native/background-task +
+  // @symbiote-native/task-manager (one combined demo screen, one line). Distinct from Store
+  // Review's lime and Sms's olive.
+  [NAV_LINE.BackgroundTasks]: '#accb4d',
+  // Chartreuse — @symbiote-native/sqlite. Sits in the one open hue gap between Sms/Store
+  // Review's olive-lime (~85°) and Battery's green (~142°); measured RGB distance >= 74 from
+  // every existing line color, well past the >= 70 bar used for Audio.
+  [NAV_LINE.Sqlite]: '#3ee619',
 };
 
 export type INavLineInfo = {
@@ -199,4 +229,39 @@ export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
     label: 'WEB BROWSER LINE',
   },
   [ROUTE_NAME.Sms]: { line: NAV_LINE.Sms, code: 'SM', label: 'SMS LINE' },
+  [ROUTE_NAME.Location]: {
+    line: NAV_LINE.Location,
+    code: 'LC',
+    label: 'LOCATION LINE',
+  },
+  [ROUTE_NAME.MediaLibrary]: {
+    line: NAV_LINE.MediaLibrary,
+    code: 'ML',
+    label: 'MEDIA LIBRARY LINE',
+  },
+  [ROUTE_NAME.FileSystem]: {
+    line: NAV_LINE.FileSystem,
+    code: 'FS',
+    label: 'FILE SYSTEM LINE',
+  },
+  [ROUTE_NAME.Audio]: {
+    line: NAV_LINE.Audio,
+    code: 'AU',
+    label: 'AUDIO LINE',
+  },
+  [ROUTE_NAME.Notifications]: {
+    line: NAV_LINE.Notifications,
+    code: 'NT',
+    label: 'NOTIFICATIONS LINE',
+  },
+  [ROUTE_NAME.BackgroundTasks]: {
+    line: NAV_LINE.BackgroundTasks,
+    code: 'BG',
+    label: 'BACKGROUND TASKS LINE',
+  },
+  [ROUTE_NAME.Sqlite]: {
+    line: NAV_LINE.Sqlite,
+    code: 'SQ',
+    label: 'SQLITE LINE',
+  },
 };

@@ -62,6 +62,7 @@
   },
   "devDependencies": {
     "@clack/prompts": "catalog:",
+    "@symbiote-native/expo-modules-link": "workspace:*",
     "@types/node": "catalog:",
     "picocolors": "catalog:",
     "rolldown": "catalog:",

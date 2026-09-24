@@ -28,7 +28,10 @@
   "module": "src/index.cjs",
   "types": "src/index.d.ts",
   "exports": {
-    ".": "./src/index.cjs"
+    ".": {
+      "types": "./src/index.d.ts",
+      "default": "./src/index.cjs"
+    }
   },
   "bin": {
     "symbiote-expo-link": "./bin/postinstall.cjs"

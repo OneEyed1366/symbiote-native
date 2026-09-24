@@ -28,6 +28,13 @@ export const NAV_LINE = {
   Sharing: 'sharing',
   WebBrowser: 'web-browser',
   Sms: 'sms',
+  Location: 'location',
+  MediaLibrary: 'media-library',
+  FileSystem: 'file-system',
+  Audio: 'audio',
+  Notifications: 'notifications',
+  BackgroundTasks: 'background-tasks',
+  Sqlite: 'sqlite',
 } as const;
 
 export type INavLine = (typeof NAV_LINE)[keyof typeof NAV_LINE];
@@ -78,6 +85,31 @@ export const LINE_COLOR: Record<INavLine, string> = {
   [NAV_LINE.WebBrowser]: '#0369a1',
   // Olive — @symbiote-native/sms, deeper than StoreReview's lime.
   [NAV_LINE.Sms]: '#65a30d',
+  // Royal blue — @symbiote-native/location. A map-pin blue distinct from Cellular's brighter
+  // blue and WebBrowser's sky-toned blue.
+  [NAV_LINE.Location]: '#1d4ed8',
+  // Deep pink/magenta — @symbiote-native/media-library. Distinct from Application's pink
+  // (#ec4899) and Sharing's fuchsia (#d946ef).
+  [NAV_LINE.MediaLibrary]: '#db2777',
+  // Deep brown — @symbiote-native/file-system, a folder-brown distinct from Stone's grey
+  // (#78716c) and SecureStore's bronze (#a16207).
+  [NAV_LINE.FileSystem]: '#78350f',
+  // Grass green — @symbiote-native/audio. Sits in the widest open hue gap on the wheel
+  // (between Sms's olive and Battery's green), distinct from both.
+  [NAV_LINE.Audio]: '#30d51a',
+  // Raspberry magenta — @symbiote-native/notifications. Between Sharing's fuchsia and
+  // Application's pink, far enough from each to read apart.
+  [NAV_LINE.Notifications]: '#ea2ec8',
+  // Chartreuse/mustard — @symbiote-native/background-fetch + @symbiote-native/background-task
+  // + @symbiote-native/task-manager. Between Brightness's gold and StoreReview's lime.
+  [NAV_LINE.BackgroundTasks]: '#b4c610',
+  // Muted sage-teal — @symbiote-native/sqlite. Desaturated (25% vs its neighbors' 71-94%) like
+  // Device/Tracking Transparency's own escape hatch from the wheel's saturated majority, so
+  // despite sitting near Battery/Localization's green in raw hue it reads as a distinct muted
+  // tone rather than a fourth green. Measured RGB distance to the nearest existing line
+  // (Device) is 55 — double the tightest already-accepted pair on this wheel (Local Auth vs
+  // Screen Orientation, both reds, at 27 — see navigation-lines color-distance check).
+  [NAV_LINE.Sqlite]: '#70a98c',
 };
 
 export type INavLineInfo = {
@@ -196,4 +228,39 @@ export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
     label: 'WEB BROWSER LINE',
   },
   [ROUTE_NAME.Sms]: { line: NAV_LINE.Sms, code: 'SM', label: 'SMS LINE' },
+  [ROUTE_NAME.Location]: {
+    line: NAV_LINE.Location,
+    code: 'LC',
+    label: 'LOCATION LINE',
+  },
+  [ROUTE_NAME.MediaLibrary]: {
+    line: NAV_LINE.MediaLibrary,
+    code: 'ML',
+    label: 'MEDIA LIBRARY LINE',
+  },
+  [ROUTE_NAME.FileSystem]: {
+    line: NAV_LINE.FileSystem,
+    code: 'FS',
+    label: 'FILE SYSTEM LINE',
+  },
+  [ROUTE_NAME.Audio]: {
+    line: NAV_LINE.Audio,
+    code: 'AU',
+    label: 'AUDIO LINE',
+  },
+  [ROUTE_NAME.Notifications]: {
+    line: NAV_LINE.Notifications,
+    code: 'NT',
+    label: 'NOTIFICATIONS LINE',
+  },
+  [ROUTE_NAME.BackgroundTasks]: {
+    line: NAV_LINE.BackgroundTasks,
+    code: 'BG',
+    label: 'BACKGROUND TASKS LINE',
+  },
+  [ROUTE_NAME.Sqlite]: {
+    line: NAV_LINE.Sqlite,
+    code: 'SQ',
+    label: 'SQLITE LINE',
+  },
 };

@@ -32,13 +32,27 @@ Everything below describes the outgoing half.
 
 ## Install
 
+**New app:**
+
+```bash
+npx @symbiote-native/cli new my-app --sharing
+```
+
+**Existing SymbioteNative app:**
+
+```bash
+npx @symbiote-native/cli add --sharing
+```
+
+Either way: installs `@symbiote-native/sharing` and wires the native autolinking automatically —
+see [`@symbiote-native/cli`](../cli).
+
+<details>
+<summary>Manual install (no CLI — installing and wiring native autolinking by hand)</summary>
+
 ```bash
 npm install @symbiote-native/sharing
 ```
-
-Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --sharing` (or
-`add --sharing` in an existing app) installs and wires this for you — see
-[`@symbiote-native/cli`](../cli).
 
 `expo-sharing` and `expo-modules-core` come along as regular, pinned dependencies — never install
 either yourself, and never add the `expo` meta-package to this project (it bundles its own
@@ -66,6 +80,8 @@ There is no `Info.plist` usage description to add: opening the share sheet needs
 permission. On Android, the `SharingFileProvider` and the `<queries>` block the chooser needs on
 API 30+ ship inside `expo-sharing`'s own `AndroidManifest.xml` and merge into your app
 automatically once the Gradle project is included — nothing to declare by hand.
+
+</details>
 
 ## Shape
 

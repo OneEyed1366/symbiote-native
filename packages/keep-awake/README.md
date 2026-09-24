@@ -13,13 +13,27 @@ depended on directly and never the `expo` meta-package, why the upstream JS is h
 
 ## Install
 
+**New app:**
+
+```bash
+npx @symbiote-native/cli new my-app --keep-awake
+```
+
+**Existing SymbioteNative app:**
+
+```bash
+npx @symbiote-native/cli add --keep-awake
+```
+
+Either way: installs `@symbiote-native/keep-awake` and wires the native autolinking automatically
+— see [`@symbiote-native/cli`](../cli).
+
+<details>
+<summary>Manual install (no CLI — installing and wiring native autolinking by hand)</summary>
+
 ```bash
 npm install @symbiote-native/keep-awake
 ```
-
-Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --keep-awake` (or
-`add --keep-awake` in an existing app) installs and wires this for you — see
-[`@symbiote-native/cli`](../cli).
 
 Depends on `expo-keep-awake` and `expo-modules-core` directly (regular dependencies, pinned to
 exact versions — never a caret range, since this package's `core/` is hand-ported against one
@@ -54,6 +68,8 @@ README for the full mechanism. Full mechanics — the Podfile pieces that normal
 
 No platform permission string is needed — keeping the screen awake has no runtime permission
 prompt on either platform.
+
+</details>
 
 ## Shape
 

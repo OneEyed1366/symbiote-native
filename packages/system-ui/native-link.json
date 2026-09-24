@@ -8,5 +8,10 @@
         "nativeName": "ExpoSystemUI"
       }
     ]
+  },
+  "ios": {
+    "infoPlistKeys": {
+      "UIUserInterfaceStyle": "Light"
+    }
   }
 }

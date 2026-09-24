@@ -9,13 +9,28 @@ primitives — there is no `ViewConfig` to register, only lifecycle to port per 
 
 ## Install
 
+**New app:**
+
+```bash
+npx @symbiote-native/cli new my-app --splash-screen
+```
+
+**Existing SymbioteNative app:**
+
+```bash
+npx @symbiote-native/cli add --splash-screen
+```
+
+Either way: installs and wires this for you — see [`@symbiote-native/cli`](../cli).
+
+<details>
+<summary>Manual install</summary>
+
 ```bash
 npm install @symbiote-native/splash-screen
 ```
 
-Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --splash-screen` (or
-`add --splash-screen` in an existing app) installs and wires this for you — see
-[`@symbiote-native/cli`](../cli).
+</details>
 
 Only this package — never `react-native-bootsplash` directly. `@symbiote-native/splash-screen`
 depends on it and ships as the sole autolinked native proxy (`react-native.config.cjs` +
@@ -175,7 +190,9 @@ computeHideAnimationStyles(config, constants, controller): IHideAnimationResult
 ```
 
 Plus `IHideConfig`, `IManifest`, `IHideAnimationConfig`, `IHideAnimationContainerProps`,
-`IHideAnimationImageProps`, `IHideAnimationResult`, `IHideAnimationConstants`.
+`IHideAnimationImageProps`, `IHideAnimationResult`, `IHideAnimationConstants`, and
+`IHideAnimationFailure`/`IHideAnimationFailureStage` — the shape passed to `IHideAnimationConfig`'s
+`onError?`, for when the logo or brand image fails to load.
 
 Each adapter entry point re-exports `hide`/`isVisible` (and the `IHideConfig`/`IManifest`/
 `IHideAnimationConfig`/`IHideAnimationResult` types) unchanged, and adds one lifecycle wrapper

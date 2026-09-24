@@ -213,3 +213,15 @@ describe('isAvailable', () => {
     });
   });
 });
+
+// Ported from upstream's TrackingTransparency-test.native.ts, a basic "every export exists"
+// smoke check. `useTrackingPermissions` is deliberately excluded — this package's README states
+// it's not ported (React-only helper; every adapter hand-rolls its own permission hook instead).
+describe('module exports', () => {
+  it('exports every core function this package ports from upstream', () => {
+    expect(getAdvertisingId).toBeDefined();
+    expect(requestTrackingPermissionsAsync).toBeDefined();
+    expect(getTrackingPermissionsAsync).toBeDefined();
+    expect(isAvailable).toBeDefined();
+  });
+});

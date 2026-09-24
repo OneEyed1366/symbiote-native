@@ -4,7 +4,6 @@
 // @symbiote-native/components — only the render-callback fields below are hand-declared here.
 import type { Snippet } from 'svelte';
 import type {
-  IClassNameValue,
   IStyleProp,
   ISymbioteEvent,
   IViewStyle,

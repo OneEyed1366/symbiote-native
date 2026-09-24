@@ -32,7 +32,7 @@ includeBuild('../node_modules/@react-native/gradle-plugin')
 // peers instead of allow-listing wanted packages, so a genuinely new expo-modules-core package is
 // auto-discovered with zero further edits to this file (see the symbiote-expo-native-module skill).
 expoAutolinking.exclude = [
-  "expo", "expo-asset", "expo-constants", "expo-file-system",
+  "expo", "expo-asset",
   "expo-font", "@expo/dom-webview", "@expo/log-box",
 ]
 expoAutolinking.useExpoModules()

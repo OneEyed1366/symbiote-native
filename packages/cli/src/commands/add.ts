@@ -8,14 +8,22 @@ import {
   readCwdDependencies,
 } from '../detect-framework.js';
 import { CliUsageError, NotSymbioteAppError } from '../errors.js';
+import { expoPackagesWithOptionalManifestBundles } from '../expo-package-layers.js';
 import { getCommand } from '../get-command.js';
+import {
+  applyBundle,
+  discoveredBundlesFromLayers,
+  type IDiscoveredBundle,
+} from '../grant-bundles.js';
 import {
   explicitLayersFromFlags,
   resolveAddLayers,
   resolveAddOverwrite,
+  resolveGrantSelection,
   resolvePackageManager,
 } from '../prompts.js';
 import type { IFramework } from '../types.js';
+import { printGrantedNotes } from './grant-summary.js';
 
 type IAddCommand = Extract<IParsedCommand, { kind: 'add' }>;
 
@@ -119,6 +127,44 @@ export async function runAdd(parsed: IAddCommand): Promise<void> {
         `  import { Stack } from '@symbiote-native/navigation/${framework}';`,
       ),
     );
+  }
+  // Offered here — not just documented under a separate `grant` command the developer has to
+  // already know about — because printing a command to run later is bad DX. applyBundle only
+  // needs the app's own AndroidManifest.xml, which already exists; it doesn't need the package to
+  // be installed yet, so this can apply the developer's choice immediately.
+  const grantable = expoPackagesWithOptionalManifestBundles(
+    new Set(result.appliedLayers),
+  );
+  if (grantable.length > 0) {
+    const candidates = discoveredBundlesFromLayers(grantable);
+    let granted: IDiscoveredBundle[] = [];
+    let asked = false;
+    try {
+      granted = await resolveGrantSelection(candidates);
+      asked = true;
+    } catch (error) {
+      // resolveGrantSelection's own documented contract: it fails fast when there is no terminal
+      // to ask in (piped stdin, CI) — that must not abort the rest of `add`, just fall through to
+      // the printed hint below so the developer still hears about it.
+      if (!(error instanceof CliUsageError)) throw error;
+    }
+
+    if (granted.length > 0) {
+      for (const entry of granted) applyBundle(cwd, entry.bundle);
+      printGrantedNotes(granted);
+      lines.push(
+        '',
+        `Granted: ${granted.map(entry => entry.bundle.label).join(', ')}.`,
+      );
+    } else if (!asked) {
+      lines.push(
+        '',
+        `${grantable.map(layer => layer.label).join(', ')} also offer${grantable.length === 1 ? 's' : ''} optional, policy-sensitive Android permissions — after installing:`,
+        ...grantable.map(layer =>
+          pc.dim(`  npx @symbiote-native/cli grant ${layer.id}`),
+        ),
+      );
+    }
   }
   clack.outro(lines.length > 0 ? lines.join('\n') : 'Nothing changed.');
 }

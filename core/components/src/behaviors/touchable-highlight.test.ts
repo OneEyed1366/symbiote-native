@@ -4,10 +4,7 @@
 // is a way that shape degrades silently to "looks like it works" if it is written as a naive
 // pressed-derived style instead.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  createLiveTree,
-  installRecordingFabric,
-} from '../../../test-utils/src/index';
+import { installRecordingFabric } from '../../../test-utils/src/index';
 import {
   clearHostBehaviors,
   createElement,
@@ -22,7 +19,6 @@ import {
   TOUCHABLE_HIGHLIGHT_TAG,
 } from './touchable-highlight';
 const fabric = installRecordingFabric();
-const live = createLiveTree(fabric);
 let nextRootTag = 7300;
 
 // RN's TouchableHighlight is one View (the underlay + child both fold onto it here — see the

@@ -19,13 +19,27 @@ exactly.
 
 ## Install
 
+**New app:**
+
+```bash
+npx @symbiote-native/cli new my-app --tracking-transparency
+```
+
+**Existing SymbioteNative app:**
+
+```bash
+npx @symbiote-native/cli add --tracking-transparency
+```
+
+Either way: installs `@symbiote-native/tracking-transparency` and wires the native autolinking
+automatically — see [`@symbiote-native/cli`](../cli).
+
+<details>
+<summary>Manual install (no CLI — installing and wiring native autolinking by hand)</summary>
+
 ```bash
 npm install @symbiote-native/tracking-transparency
 ```
-
-Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --tracking-transparency`
-(or `add --tracking-transparency` in an existing app) installs and wires this for you — see
-[`@symbiote-native/cli`](../cli).
 
 `expo-tracking-transparency` and `expo-modules-core` come along as regular, pinned dependencies —
 never install either yourself, and never add the `expo` meta-package to this project (it bundles
@@ -51,6 +65,8 @@ peer-dependency exclusion list — live in the `symbiote-expo-native-module` ski
 native module also pulls in `com.google.android.gms:play-services-ads-identifier:18.0.1`
 transitively via `expo-tracking-transparency`'s own `android/build.gradle` — automatic once the
 module project is included, no extra wiring needed on our side.
+
+</details>
 
 ## Shape
 

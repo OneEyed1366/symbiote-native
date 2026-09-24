@@ -21,6 +21,7 @@ packages:
   - 'apps/*'
 allowBuilds:
   '@parcel/watcher': true
+  better-sqlite3: true
   detox: true
   dtrace-provider: true
   esbuild: true
@@ -326,6 +327,84 @@ catalog:
   expo-sharing: 57.0.8
   expo-web-browser: 57.0.2
   expo-sms: 57.0.1
+  # Same exact-pin reasoning, continuing tier-2: packages/task-manager depends on
+  # expo-task-manager ONLY for its native ios/android folders (JS hand-ported into our own
+  # core). Version verified against .vendors/expo at origin/sdk-57 (57.0.15) and matches the
+  # real npm-published `latest`, same expo-modules-core 57.0.5 peer/runtime line.
+  # unimodules-app-loader is expo-task-manager's own real runtime dependency (not a
+  # devDependency) — Android's headless-boot path (RNHeadlessAppLoader) needs its native folder
+  # too, so it is pinned here for the same "native folder only, autolinks unmodified" reason.
+  expo-task-manager: 57.0.15
+  unimodules-app-loader: 57.0.1
+  # packages/task-manager depends on expo-constants only for its native ConstantsService: legacy
+  # TaskManagerInternalModule reads ConstantsInterface from AppContext's ServicesRegistry for
+  # appScopeKey and throws (NPE) if nothing provides it. Safe standalone - its only real dep is
+  # @expo/env, no metro-config/babel-preset-expo; matches npm latest and the expo-modules-core peer.
+  expo-constants: 57.0.19
+  # Same exact-pin reasoning, continuing tier-2: packages/background-fetch and
+  # packages/background-task depend on their matching expo-* package ONLY for its native
+  # ios/android folders (JS hand-ported into our own core, registration driven through
+  # @symbiote-native/task-manager). Vendored source matches origin/sdk-57 57.0.16, but pinned to
+  # 57.0.15 here: npm's published 57.0.16 of BOTH packages declares a dependency on
+  # expo-task-manager@~57.0.16, a version npm never published (57.0.15 is npm's real latest) —
+  # confirmed via `npm view expo-background-fetch@57.0.16 dependencies` 2026-09-07. That makes
+  # 57.0.16 permanently unresolvable by any pnpm/npm install, workspace-wide, regardless of
+  # --filter scope. 57.0.15's own dependency is expo-task-manager@~57.0.15, matching our
+  # expo-task-manager pin above — same expo-modules-core 57.0.5 peer/runtime line.
+  expo-background-fetch: 57.0.15
+  expo-background-task: 57.0.15
+  # Same exact-pin reasoning, continuing tier-2: packages/location depends on expo-location ONLY
+  # for its native ios/android folders (JS hand-ported into our own core). Version verified
+  # against .vendors/expo at origin/sdk-57 (57.0.15) and matches the real npm-published `latest`,
+  # same expo-modules-core 57.0.5 peer/runtime line. Its Android build.gradle also declares a
+  # real Maven dependency (com.google.android.gms:play-services-location) — resolved by Gradle
+  # itself once the package is autolinked, nothing to pin here for that.
+  expo-location: 57.0.15
+  # Same exact-pin reasoning, continuing tier-2: packages/media-library depends on
+  # expo-media-library ONLY for its native ios/android folders (JS hand-ported into our own
+  # core — legacy function-based API only, the shared-object "Next" API is out of scope, see
+  # the package's own README). Version verified against .vendors/expo at origin/sdk-57
+  # (57.0.4) and matches the real npm-published `latest`, same expo-modules-core 57.0.5
+  # peer/runtime line.
+  expo-media-library: 57.0.4
+  # Same exact-pin reasoning, continuing tier-2: packages/file-system depends on
+  # expo-file-system ONLY for its native ios/android folders (JS hand-ported into our own
+  # core — legacy function-based API only, the newer shared-object File/Directory/Paths API is
+  # out of scope, see the package's own README). Version verified against .vendors/expo at
+  # origin/sdk-57 (57.0.6) and matches the real npm-published `latest`, same expo-modules-core
+  # 57.0.5 peer/runtime line.
+  expo-file-system: 57.0.6
+  # Same exact-pin reasoning, continuing tier-2: packages/audio depends on expo-audio ONLY for
+  # its native ios/android folders (JS hand-ported into our own core — the shared-object
+  # AudioPlayer/AudioRecorder/AudioPlaylist/AudioStream classes, sourced without the `expo-asset`
+  # peer, see the package's own README). Version verified against .vendors/expo at origin/sdk-57
+  # (57.0.4) and matches the real npm-published `latest`, same expo-modules-core 57.0.5
+  # peer/runtime line.
+  expo-audio: 57.0.4
+  # Same exact-pin reasoning, continuing tier-2: packages/notifications depends on
+  # expo-notifications ONLY for its native ios/android folders (JS hand-ported into our own
+  # core — permissions, tokens, scheduling, presentation, badges, Android channels/categories,
+  # and the background-task hook; see the package's own README for what upstream's auto push-
+  # token server-resync daemon and expo-constants/expo-application defaults were deliberately
+  # dropped in favor of). Version verified against .vendors/expo at origin/sdk-57 (57.0.17) and
+  # matches the real npm-published `latest`, same expo-modules-core 57.0.5 peer/runtime line.
+  expo-notifications: 57.0.17
+  # Same exact-pin reasoning, continuing tier-2: packages/sqlite depends on expo-sqlite ONLY for
+  # its native ios/android folders (JS hand-ported into our own core — Database/Statement/Session/
+  # TaggedQuery/kv-store; the JSI SharedObject scare from expo-file-system's "next" surface does
+  # NOT apply here, expo-sqlite's native classes are plain `requireNativeModule` constructors).
+  # Version verified against .vendors/expo at origin/sdk-57 (57.0.2) and matches the real
+  # npm-published `latest`, same expo-modules-core 57.0.5 peer/runtime line. No unpublished-peer
+  # trap like background-fetch/task — its own peerDependencies are all wildcard.
+  expo-sqlite: 57.0.2
+  # expo-sqlite's own real runtime dependency (its kv-store's write-serialization lock) —
+  # pinned to match .vendors/expo's exact vendored version rather than a newer semver-compatible
+  # release, same reasoning as unimodules-app-loader above.
+  await-lock: ^2.2.2
+  # Test-only: backs the headless fakes for expo-sqlite's native Database/Statement/Session
+  # constructors in packages/sqlite's vitest suite (user's explicit choice over node:sqlite).
+  # Never a runtime dependency of the shipped package.
+  better-sqlite3: ^13.0.3
   # Autolinking CLI only (never resolved via the `expo` package) — each native host app needs
   # it as a direct devDependency so its Podfile/settings.gradle can `require.resolve` it; see
   # apps/docs-site's expo-native-module-setup howto. Version verified against .vendors/expo at

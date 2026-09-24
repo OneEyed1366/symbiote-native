@@ -12,13 +12,27 @@ native module).
 
 ## Install
 
+**New app:**
+
+```bash
+npx @symbiote-native/cli new my-app --web-browser
+```
+
+**Existing SymbioteNative app:**
+
+```bash
+npx @symbiote-native/cli add --web-browser
+```
+
+Either way: installs `@symbiote-native/web-browser` and wires the native autolinking automatically — see
+[`@symbiote-native/cli`](../cli).
+
+<details>
+<summary>Manual install (no CLI — installing and wiring native autolinking by hand)</summary>
+
 ```bash
 npm install @symbiote-native/web-browser
 ```
-
-Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --web-browser` (or
-`add --web-browser` in an existing app) installs and wires this for you — see
-[`@symbiote-native/cli`](../cli).
 
 `expo-web-browser` and `expo-modules-core` come along as regular, pinned dependencies — never
 install either yourself, and never add the `expo` meta-package to this project (it bundles its own
@@ -43,6 +57,8 @@ Full mechanics live in the `symbiote-expo-native-module` skill. The per-package 
 on every install. No `Info.plist` usage description is needed, and the `<queries>` entry Android
 needs to see the Custom Tabs service ships inside `expo-web-browser`'s own manifest and merges into
 your app automatically.
+
+</details>
 
 ## Shape
 

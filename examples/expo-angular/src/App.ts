@@ -36,6 +36,13 @@ import { SecureStoreScreen } from './screens/SecureStoreScreen';
 import { SharingScreen } from './screens/SharingScreen';
 import { WebBrowserScreen } from './screens/WebBrowserScreen';
 import { SmsScreen } from './screens/SmsScreen';
+import { LocationScreen } from './screens/LocationScreen';
+import { MediaLibraryScreen } from './screens/MediaLibraryScreen';
+import { FileSystemScreen } from './screens/FileSystemScreen';
+import { AudioScreen } from './screens/AudioScreen';
+import { NotificationsScreen } from './screens/NotificationsScreen';
+import { BackgroundTasksScreen } from './screens/BackgroundTasksScreen';
+import { SqliteScreen } from './screens/SqliteScreen';
 import { LINE_COLOR } from './navigation-lines';
 // Static look lives in App.css — a plain global .css file, compiled at build time by
 // @symbiote-native/css-parser and resolved at runtime through the shared style registry every
@@ -188,6 +195,48 @@ const DARK_HEADER_STYLE = { backgroundColor: '#0b1622' } as const;
         [component]="smsScreen"
         [options]="smsOptions"
       ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="Location"
+        [component]="locationScreen"
+        [options]="locationOptions"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="MediaLibrary"
+        [component]="mediaLibraryScreen"
+        [options]="mediaLibraryOptions"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="FileSystem"
+        [component]="fileSystemScreen"
+        [options]="fileSystemOptions"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="Audio"
+        [component]="audioScreen"
+        [options]="audioOptions"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="Notifications"
+        [component]="notificationsScreen"
+        [options]="notificationsOptions"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="BackgroundTasks"
+        [component]="backgroundTasksScreen"
+        [options]="backgroundTasksOptions"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="Sqlite"
+        [component]="sqliteScreen"
+        [options]="sqliteOptions"
+      ></ng-template>
     </Stack>
   `,
 })
@@ -215,6 +264,13 @@ export class AppComponent implements OnInit {
   readonly sharingScreen = SharingScreen;
   readonly webBrowserScreen = WebBrowserScreen;
   readonly smsScreen = SmsScreen;
+  readonly locationScreen = LocationScreen;
+  readonly mediaLibraryScreen = MediaLibraryScreen;
+  readonly fileSystemScreen = FileSystemScreen;
+  readonly audioScreen = AudioScreen;
+  readonly notificationsScreen = NotificationsScreen;
+  readonly backgroundTasksScreen = BackgroundTasksScreen;
+  readonly sqliteScreen = SqliteScreen;
 
   readonly menuOptions: IAngularScreenOptions = {
     title: 'Expo Modules Demos',
@@ -438,6 +494,76 @@ export class AppComponent implements OnInit {
     title: 'SMS',
     headerShown: true,
     headerTintColor: LINE_COLOR.sms,
+    headerTranslucent: true,
+    headerTitleColor: '#ffffff',
+    headerStyle: DARK_HEADER_STYLE,
+    headerUserInterfaceStyle: 'dark',
+  };
+
+  readonly locationOptions: IAngularScreenOptions = {
+    title: 'Location',
+    headerShown: true,
+    headerTintColor: LINE_COLOR.location,
+    headerTranslucent: true,
+    headerTitleColor: '#ffffff',
+    headerStyle: DARK_HEADER_STYLE,
+    headerUserInterfaceStyle: 'dark',
+  };
+
+  readonly mediaLibraryOptions: IAngularScreenOptions = {
+    title: 'Media Library',
+    headerShown: true,
+    headerTintColor: LINE_COLOR['media-library'],
+    headerTranslucent: true,
+    headerTitleColor: '#ffffff',
+    headerStyle: DARK_HEADER_STYLE,
+    headerUserInterfaceStyle: 'dark',
+  };
+
+  readonly fileSystemOptions: IAngularScreenOptions = {
+    title: 'File System',
+    headerShown: true,
+    headerTintColor: LINE_COLOR['file-system'],
+    headerTranslucent: true,
+    headerTitleColor: '#ffffff',
+    headerStyle: DARK_HEADER_STYLE,
+    headerUserInterfaceStyle: 'dark',
+  };
+
+  readonly audioOptions: IAngularScreenOptions = {
+    title: 'Audio',
+    headerShown: true,
+    headerTintColor: LINE_COLOR.audio,
+    headerTranslucent: true,
+    headerTitleColor: '#ffffff',
+    headerStyle: DARK_HEADER_STYLE,
+    headerUserInterfaceStyle: 'dark',
+  };
+
+  readonly notificationsOptions: IAngularScreenOptions = {
+    title: 'Notifications',
+    headerShown: true,
+    headerTintColor: LINE_COLOR.notifications,
+    headerTranslucent: true,
+    headerTitleColor: '#ffffff',
+    headerStyle: DARK_HEADER_STYLE,
+    headerUserInterfaceStyle: 'dark',
+  };
+
+  readonly backgroundTasksOptions: IAngularScreenOptions = {
+    title: 'Background Tasks',
+    headerShown: true,
+    headerTintColor: LINE_COLOR['background-tasks'],
+    headerTranslucent: true,
+    headerTitleColor: '#ffffff',
+    headerStyle: DARK_HEADER_STYLE,
+    headerUserInterfaceStyle: 'dark',
+  };
+
+  readonly sqliteOptions: IAngularScreenOptions = {
+    title: 'SQLite',
+    headerShown: true,
+    headerTintColor: LINE_COLOR.sqlite,
     headerTranslucent: true,
     headerTitleColor: '#ffffff',
     headerStyle: DARK_HEADER_STYLE,

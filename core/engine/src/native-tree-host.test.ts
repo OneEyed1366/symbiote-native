@@ -14,7 +14,7 @@ import {
   SUPPORTED_NATIVE_VERSION,
   type INativeEngineBindings,
 } from './native-engine';
-import { installNativeTreeHost, nativeTreeHost } from './native-tree-host';
+import { nativeTreeHost } from './native-tree-host';
 import { setTreeHost, treeHost } from './tree-host';
 import { getSlot, resetSlot } from './fabric';
 import type { IMutationBatch } from './mutation-buffer';

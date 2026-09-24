@@ -12,13 +12,27 @@ composable/service to wrap — every adapter's entry point is a plain re-export 
 
 ## Install
 
+**New app:**
+
+```bash
+npx @symbiote-native/cli new my-app --application
+```
+
+**Existing SymbioteNative app:**
+
+```bash
+npx @symbiote-native/cli add --application
+```
+
+Either way: installs `@symbiote-native/application` and wires the native autolinking automatically — see
+[`@symbiote-native/cli`](../cli).
+
+<details>
+<summary>Manual install (no CLI — installing and wiring native autolinking by hand)</summary>
+
 ```bash
 npm install @symbiote-native/application
 ```
-
-Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --application` (or
-`add --application` in an existing app) installs and wires this for you — see
-[`@symbiote-native/cli`](../cli).
 
 `expo-application` and `expo-modules-core` come along as regular dependencies, pinned to exact
 versions — never install either yourself, and never add the `expo` meta-package to your project
@@ -44,6 +58,8 @@ implementation: `examples/expo-react/ios/Podfile` and
 
 No app-level permission strings are needed — every function here reads app/device metadata that
 carries no runtime or manifest permission.
+
+</details>
 
 ## Shape
 

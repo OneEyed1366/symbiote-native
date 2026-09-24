@@ -59,10 +59,10 @@ What each framework needs in the build differs, and the CLI writes it for you:
 | [Svelte](./adapters/svelte)   | `@symbiote-native/svelte`  | a Metro transformer for `.svelte`                                                                                                                                         |
 | [Solid](./adapters/solid)     | `@symbiote-native/solid`   | its `babel-preset` listed **last** in Metro's presets                                                                                                                     |
 
-Every adapter is [on npm](https://www.npmjs.com/org/symbiote-native) at `2.0.x`, and the scope
-publishes **37 packages** in all. Beyond the five adapters and the shared core, 28 companion
-packages cover navigation, third-party native views, and Expo-module wrappers for device, sensor
-and permission APIs. Each lives under [`packages/`](./packages) with its own README.
+Every adapter is [on npm](https://www.npmjs.com/org/symbiote-native). Beyond the five adapters and
+the shared `core/` packages, a growing set of companion packages under [`packages/`](./packages)
+covers navigation, third-party native views, and Expo-module wrappers for device, sensor and
+permission APIs — each with its own README.
 
 ---
 
@@ -93,20 +93,22 @@ simulator. React Native's own renderer is never in the path of any of them:
 </div>
 
 The smallest slice is a tap-to-increment counter. The app is ordinary React, and the native
-primitives are plain intrinsic tags, so nothing is imported for them:
+primitives are plain intrinsic tags, so nothing is imported for them. Styling is a CSS class
+against a plain `.css` file, the convention every example app here follows:
 
 ```jsx
 import { useState } from 'react';
+import './App.css';
 
 export default function App() {
   const [count, setCount] = useState(0);
   return (
-    <view style={{ padding: 24 }}>
+    <safe-area-view className="screen">
       <text>Taps: {count}</text>
       <pressable onPress={() => setCount(c => c + 1)}>
         <text>Tap me</text>
       </pressable>
-    </view>
+    </safe-area-view>
   );
 }
 ```

@@ -116,6 +116,27 @@ describe('Positive — the native module is present and answers', () => {
     });
   });
 
+  it('authenticateAsync forwards every option field unchanged, not just prompt/cancel', async () => {
+    // why: ported from upstream's `uses options` case — promptSubtitle/promptDescription/
+    // fallbackLabel/disableDeviceFallback/requireConfirmation must reach the native module
+    // untouched, since the wrapper only supplies defaults for promptMessage/cancelLabel.
+    const options = {
+      promptMessage: 'Authentication is required',
+      promptSubtitle: 'We need to confirm your identity',
+      promptDescription: 'Use your fingerprint',
+      cancelLabel: 'Abort',
+      fallbackLabel: 'Use passcode',
+      disableDeviceFallback: false,
+      requireConfirmation: true,
+    };
+
+    await authenticateAsync(options);
+
+    expect(
+      FAKE_NATIVE_LOCAL_AUTHENTICATION.authenticateAsync,
+    ).toHaveBeenLastCalledWith(options);
+  });
+
   it('authenticateAsync falls back to the default cancelLabel when given an empty string', async () => {
     // why: unlike promptMessage, cancelLabel carries no invariant guard — an empty string must
     // still resolve to a usable button label rather than shipping blank UI text to native.
@@ -187,6 +208,34 @@ describe('Negative — the native method is missing on this platform', () => {
       'cancelAuthenticate',
       cancelAuthenticate,
     ));
+
+  it('authenticateAsync rejects an explicitly-undefined promptMessage without calling through', async () => {
+    // why: ported from upstream's `throws when an invalid message is used` — the guard keys off
+    // Object.hasOwn, not `!== undefined`, so a caller that explicitly passes `promptMessage:
+    // undefined` (as opposed to omitting the field) must still hit the invariant rather than
+    // silently falling back to the default prompt text.
+    // @ts-expect-error -- simulating a caller that explicitly passes an invalid promptMessage
+    await expect(
+      authenticateAsync({ promptMessage: undefined }),
+    ).rejects.toThrow('`options.promptMessage` must be a non-empty string');
+    expect(
+      FAKE_NATIVE_LOCAL_AUTHENTICATION.authenticateAsync,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('authenticateAsync rejects a non-string promptMessage without calling through', async () => {
+    // why: ported from upstream's `throws when an invalid message is used` — an object or a
+    // number is as invalid as an empty string, and must fail the same guard before native.
+    for (const invalid of [{}, 123]) {
+      // @ts-expect-error -- simulating a caller that passes the wrong type for promptMessage
+      await expect(
+        authenticateAsync({ promptMessage: invalid }),
+      ).rejects.toThrow('`options.promptMessage` must be a non-empty string');
+    }
+    expect(
+      FAKE_NATIVE_LOCAL_AUTHENTICATION.authenticateAsync,
+    ).not.toHaveBeenCalled();
+  });
 
   it('authenticateAsync rejects an empty-string promptMessage without calling through', async () => {
     // why: an explicitly-empty promptMessage is a caller bug (the system prompt would render

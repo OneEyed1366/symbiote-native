@@ -279,6 +279,9 @@
   // Only the focused route's screen is ever mounted (like Tab, unlike Stack which keeps every
   // pushed route alive). One emitter per route.key, created lazily and cached for the navigator's
   // whole lifetime.
+  // Plain Map: a get/set/delete identity cache never read by the reactive graph, not rendered
+  // state — SvelteMap's tracking would be pure overhead here.
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity
   const emitters = new Map<string, INavigationEmitter>();
   function emitterFor(routeKey: string): INavigationEmitter {
     let emitter = emitters.get(routeKey);

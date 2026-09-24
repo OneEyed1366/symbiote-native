@@ -134,20 +134,15 @@ describe('a select-shaped update on a 1 000-row list', () => {
     const select = (globalThis as { __selectRow?: (id: number) => void })
       .__selectRow;
     const hasSelect = typeof select === 'function';
-    const afterMount = setPCalls;
     setPCalls = 0;
     const g = globalThis as {
       __rowBagEvals?: number;
       __isSelEvals?: number;
     };
-    const bagEvalsAtMount = g.__rowBagEvals ?? 0;
-    const isSelEvalsAtMount = g.__isSelEvals ?? 0;
     g.__rowBagEvals = 0;
     g.__isSelEvals = 0;
-    const started = performance.now();
     select?.(500);
     await settle();
-    const elapsed = performance.now() - started;
 
     // Snapshot BEFORE arm 2 mounts, or its 1 000 mount-time evaluations land in these counters.
     const bagEvalsOnSelect = g.__rowBagEvals ?? 0;
