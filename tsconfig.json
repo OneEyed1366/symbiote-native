@@ -44,6 +44,8 @@
     { "path": "packages/file-system" },
     { "path": "packages/audio" },
     { "path": "packages/notifications" },
-    { "path": "packages/sqlite" }
+    { "path": "packages/sqlite" },
+    { "path": "packages/asset" },
+    { "path": "packages/font" }
   ]
 }

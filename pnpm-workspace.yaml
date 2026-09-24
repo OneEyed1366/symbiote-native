@@ -397,6 +397,20 @@ catalog:
   # npm-published `latest`, same expo-modules-core 57.0.5 peer/runtime line. No unpublished-peer
   # trap like background-fetch/task — its own peerDependencies are all wildcard.
   expo-sqlite: 57.0.2
+  # Same exact-pin reasoning, continuing tier-2: packages/asset depends on expo-asset ONLY for
+  # its native ios/android folders (JS hand-ported into our own core, dropping the classic-
+  # updates/Expo-Go branches — see the package's own README). Version verified against
+  # .vendors/expo at origin/sdk-57 (57.0.18) and matches the real npm-published `latest`, same
+  # expo-modules-core 57.0.5 peer/runtime line.
+  expo-asset: 57.0.18
+  # react-native's own dependency (its asset registry) — pinned as a direct dependency of
+  # packages/asset for the same "explicit over transitive" reason as the invariant pin below.
+  '@react-native/assets-registry': 0.86.0
+  # Same exact-pin reasoning, continuing tier-2: packages/font depends on expo-font ONLY for
+  # its native ios/android folders (JS hand-ported into our own core, full FontSource parity via
+  # packages/asset). Version verified against .vendors/expo at origin/sdk-57 (57.0.4) and matches
+  # the real npm-published `latest`, same expo-modules-core 57.0.5 peer/runtime line.
+  expo-font: 57.0.4
   # expo-sqlite's own real runtime dependency (its kv-store's write-serialization lock) —
   # pinned to match .vendors/expo's exact vendored version rather than a newer semver-compatible
   # release, same reasoning as unimodules-app-loader above.

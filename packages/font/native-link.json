@@ -1,0 +1,17 @@
+{
+  "android": {
+    "gradleProjectName": "expo-font",
+    "modules": [
+      {
+        "importPath": "expo.modules.font.FontLoaderModule",
+        "className": "FontLoaderModule",
+        "nativeName": "ExpoFontLoader"
+      },
+      {
+        "importPath": "expo.modules.font.FontUtilsModule",
+        "className": "FontUtilsModule",
+        "nativeName": "ExpoFontUtils"
+      }
+    ]
+  }
+}

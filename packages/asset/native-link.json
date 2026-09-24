@@ -1,0 +1,12 @@
+{
+  "android": {
+    "gradleProjectName": "expo-asset",
+    "modules": [
+      {
+        "importPath": "expo.modules.asset.AssetModule",
+        "className": "AssetModule",
+        "nativeName": "ExpoAsset"
+      }
+    ]
+  }
+}
