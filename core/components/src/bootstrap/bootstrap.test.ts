@@ -12,6 +12,7 @@ const setColorProcessor = vi.fn();
 const setDeviceEventSource = vi.fn();
 const setNativeViewConfigSource = vi.fn();
 const setImageSourceResolver = vi.fn();
+const setAssetSourceResolver = vi.fn();
 const installBackHandler = vi.fn();
 
 vi.mock('react-native', () => ({
@@ -29,6 +30,7 @@ vi.mock('@symbiote-native/engine', () => ({
   setColorProcessor,
   setDeviceEventSource,
   setImageSourceResolver,
+  setAssetSourceResolver,
   setNativeViewConfigSource,
   installBackHandler,
 }));
