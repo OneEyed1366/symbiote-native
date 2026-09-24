@@ -2,6 +2,17 @@ export type ISymbioteExpoLinkAndroidModule = {
   importPath: string;
   className: string;
   nativeName: string;
+  /** True if only reachable via `ModuleRegistry.getModule()`, not `requireNativeModule`. */
+  internal?: boolean;
+};
+
+/** A `Service` registered in `AppContext.ServicesRegistry` (distinct from the manifest `<service>`
+ * below). `gradleProjectName` can differ from the block's own top-level one: a service may belong
+ * to a different native package than the one declaring it (see packages/task-manager). */
+export type ISymbioteExpoLinkAndroidService = {
+  importPath: string;
+  className: string;
+  gradleProjectName: string;
 };
 
 export type ISymbioteExpoLinkManifestService = {
@@ -60,6 +71,11 @@ export type ISymbioteExpoLinkManifest = {
     manifestServices?: ISymbioteExpoLinkManifestService[];
     /** Policy-sensitive bundles a developer can opt into by hand — see the type's own doc. */
     optionalManifestBundles?: ISymbioteExpoLinkOptionalBundle[];
+    /** Tokens to union into MainActivity's `android:configChanges` (e.g. `locale`,
+     * `layoutDirection`) - see expo-localization's `allowDynamicLocaleChangesAndroid`. */
+    mainActivityConfigChanges?: string[];
+    /** Services to register in AppContext's ServicesRegistry - see the type's own doc. */
+    services?: ISymbioteExpoLinkAndroidService[];
   };
   ios?: {
     infoPlistKeys: Record<string, string>;
@@ -82,6 +98,11 @@ export function patchAndroidManifestPermissions(
 ): void;
 /** Adds every `entries[].manifest.android.manifestServices` to the app's AndroidManifest.xml. */
 export function patchAndroidManifestServices(
+  appRoot: string,
+  entries: readonly ISymbioteExpoLinkEntry[],
+): void;
+/** Unions every entry's `mainActivityConfigChanges` into MainActivity's `android:configChanges`. */
+export function patchMainActivityConfigChanges(
   appRoot: string,
   entries: readonly ISymbioteExpoLinkEntry[],
 ): void;

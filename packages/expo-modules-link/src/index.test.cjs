@@ -14,6 +14,7 @@ const {
   patchAndroidManifest,
   patchAndroidManifestPermissions,
   patchAndroidManifestServices,
+  patchMainActivityConfigChanges,
   patchInfoPlist,
   patchInfoPlistArrays,
 } = require('./index.cjs');
@@ -97,6 +98,26 @@ const SENSORS_MANIFEST = {
         importPath: 'expo.modules.sensors.modules.BarometerModule',
         className: 'BarometerModule',
         nativeName: 'ExpoBarometer',
+      },
+    ],
+  },
+};
+
+const TASK_MANAGER_MANIFEST = {
+  android: {
+    gradleProjectName: 'expo-task-manager',
+    modules: [
+      {
+        importPath: 'expo.modules.taskManager.TaskManagerModule',
+        className: 'TaskManagerModule',
+        nativeName: 'ExpoTaskManager',
+      },
+    ],
+    services: [
+      {
+        importPath: 'expo.modules.constants.ConstantsService',
+        className: 'ConstantsService',
+        gradleProjectName: 'expo-constants',
       },
     ],
   },
@@ -214,6 +235,16 @@ test('patchBuildGradle drops the entry of a package that is no longer installed'
   assert.match(after, /expo-local-authentication/, 'the remaining package stays');
 });
 
+test('patchBuildGradle also includes a services entry\'s own gradleProjectName', () => {
+  const appRoot = makeAppRoot();
+
+  patchBuildGradle(appRoot, entriesOf(TASK_MANAGER_MANIFEST));
+  const content = read(appRoot, GRADLE_PATH);
+
+  assert.match(content, /implementation project\(':expo-task-manager'\)/, 'the primary project still lands');
+  assert.match(content, /implementation project\(':expo-constants'\)/, 'the service\'s backing project lands too');
+});
+
 test('patchMainApplication generates both regions, sorted, and is byte-stable on re-run', () => {
   const appRoot = makeAppRoot();
   const entries = entriesOf(SENSORS_MANIFEST, LOCAL_AUTH_MANIFEST);
@@ -233,6 +264,49 @@ test('patchMainApplication generates both regions, sorted, and is byte-stable on
 
   patchMainApplication(appRoot, entries);
   assert.equal(read(appRoot, MAIN_APP_PATH), afterFirst, 're-running must be a no-op');
+});
+
+test('patchMainApplication generates getServices() with its own import, and is byte-stable on re-run', () => {
+  const appRoot = makeAppRoot();
+
+  patchMainApplication(appRoot, entriesOf(TASK_MANAGER_MANIFEST));
+  const afterFirst = read(appRoot, MAIN_APP_PATH);
+
+  assert.match(afterFirst, /^import expo\.modules\.constants\.ConstantsService$/m);
+  assert.match(afterFirst, /^import expo\.modules\.kotlin\.services\.Service$/m, 'the return type\'s own import lands too');
+  assert.match(
+    afterFirst,
+    /override fun getServices\(\): List<Class<out Service>> = listOf\(\n\s+ConstantsService::class\.java,\n\s*\)/,
+  );
+  assert.ok(
+    afterFirst.indexOf(': ModulesProvider {') < afterFirst.indexOf('getModulesMap'),
+    'getServices() is generated above getModulesMap(), inside the class',
+  );
+
+  patchMainApplication(appRoot, entriesOf(TASK_MANAGER_MANIFEST));
+  assert.equal(read(appRoot, MAIN_APP_PATH), afterFirst, 're-running must be a no-op');
+});
+
+test('patchMainApplication regenerates an empty getServices() when no package declares any', () => {
+  const appRoot = makeAppRoot();
+
+  patchMainApplication(appRoot, entriesOf(LOCAL_AUTH_MANIFEST));
+  const content = read(appRoot, MAIN_APP_PATH);
+
+  assert.match(content, /override fun getServices\(\): List<Class<out Service>> = listOf\(\n\s*\)/);
+});
+
+test('patchMainApplication drops a service\'s import and entry once its package is uninstalled', () => {
+  const appRoot = makeAppRoot();
+
+  patchMainApplication(appRoot, entriesOf(TASK_MANAGER_MANIFEST, LOCAL_AUTH_MANIFEST));
+  assert.match(read(appRoot, MAIN_APP_PATH), /ConstantsService/);
+
+  patchMainApplication(appRoot, entriesOf(LOCAL_AUTH_MANIFEST));
+  const after = read(appRoot, MAIN_APP_PATH);
+
+  assert.doesNotMatch(after, /ConstantsService/);
+  assert.match(after, /LocalAuthenticationModule::class\.java to "ExpoLocalAuthentication",/, 'unrelated entries survive');
 });
 
 test('patchMainApplication drops the import and map entry of an uninstalled package', () => {
@@ -328,6 +402,45 @@ test('patchAndroidManifest escapes a quote in a value instead of closing it earl
   }));
 
   assert.match(read(appRoot, ANDROID_MANIFEST_PATH), /android:label="The &quot;Best&quot; App"/);
+});
+
+test('patchMainActivityConfigChanges adds the attribute fresh when MainActivity has none', () => {
+  const appRoot = makeAppRoot();
+
+  patchMainActivityConfigChanges(appRoot, entriesOf({ android: { mainActivityConfigChanges: ['locale', 'layoutDirection'] } }));
+  const afterFirst = read(appRoot, ANDROID_MANIFEST_PATH);
+
+  assert.match(afterFirst, /<activity android:name="\.MainActivity" android:exported="true" android:configChanges="layoutDirection\|locale" \/>/);
+
+  patchMainActivityConfigChanges(appRoot, entriesOf({ android: { mainActivityConfigChanges: ['locale', 'layoutDirection'] } }));
+  assert.equal(read(appRoot, ANDROID_MANIFEST_PATH), afterFirst, 're-running must be a no-op');
+});
+
+test('patchMainActivityConfigChanges unions new tokens into an existing value without duplicating shared ones', () => {
+  const appRoot = makeAppRoot();
+  const manifestPath = path.join(appRoot, ...ANDROID_MANIFEST_PATH);
+  fs.writeFileSync(
+    manifestPath,
+    ANDROID_MANIFEST_FIXTURE.replace(
+      '<activity android:name=".MainActivity" android:exported="true" />',
+      '<activity android:name=".MainActivity" android:exported="true" android:configChanges="keyboard|orientation|uiMode" />',
+    ),
+  );
+
+  patchMainActivityConfigChanges(appRoot, entriesOf({ android: { mainActivityConfigChanges: ['uiMode', 'locale'] } }));
+  const content = fs.readFileSync(manifestPath, 'utf8');
+
+  assert.match(content, /android:configChanges="keyboard\|orientation\|uiMode\|locale"/, 'existing tokens survive in order, new one appended');
+  assert.equal((content.match(/uiMode/g) || []).length, 1, 'a token already present is not duplicated');
+});
+
+test('patchMainActivityConfigChanges does nothing when no package declares any', () => {
+  const appRoot = makeAppRoot();
+  const before = read(appRoot, ANDROID_MANIFEST_PATH);
+
+  patchMainActivityConfigChanges(appRoot, entriesOf(LOCAL_AUTH_MANIFEST, SENSORS_MANIFEST));
+
+  assert.equal(read(appRoot, ANDROID_MANIFEST_PATH), before, 'no entry sets mainActivityConfigChanges');
 });
 
 test('patchAndroidManifestPermissions unions permissions from every package once, right after <manifest>', () => {
