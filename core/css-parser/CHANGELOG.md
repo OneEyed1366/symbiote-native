@@ -1,5 +1,11 @@
 # @symbiote-native/css-parser
 
+## 0.5.1
+
+### Patch Changes
+
+- [#86](https://github.com/OneEyed1366/symbiote-native/pull/86) [`aa17531`](https://github.com/OneEyed1366/symbiote-native/commit/aa175314db0f79474b9ac87bee3e30c4e87a72c4) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - README: documents that `:active`/`:hover`/`:focus` are dropped like any other pseudo-class (the `:active` machinery exists in `selectors.ts` but is deliberately disabled) and points to `Pressable`'s functional `style={({ pressed }) => ...}` prop as the supported way to style a pressed state — previously unstated, leaving the pressed-state gap undocumented.
+
 ## 0.5.0
 
 ### Minor Changes

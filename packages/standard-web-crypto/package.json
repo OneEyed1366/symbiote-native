@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/standard-web-crypto",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "expo-standard-web-crypto ported for SymbioteNative — a Web Crypto API getRandomValues polyfill built on @symbiote-native/crypto's native random source.",
   "license": "MIT",
   "keywords": [

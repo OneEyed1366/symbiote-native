@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/background-fetch",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "expo-background-fetch wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, Svelte, Solid, and Angular adapters. Periodic background fetch, registered through @symbiote-native/task-manager. Deprecated upstream in favor of expo-background-task; ported for parity with what Expo still ships.",
   "license": "MIT",
   "repository": {
