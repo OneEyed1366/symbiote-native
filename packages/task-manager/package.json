@@ -93,6 +93,7 @@
   "dependencies": {
     "expo-task-manager": "catalog:",
     "unimodules-app-loader": "catalog:",
+    "expo-constants": "catalog:",
     "expo-modules-core": "catalog:"
   },
   "peerDependencies": {

@@ -336,6 +336,11 @@ catalog:
   # too, so it is pinned here for the same "native folder only, autolinks unmodified" reason.
   expo-task-manager: 57.0.15
   unimodules-app-loader: 57.0.1
+  # packages/task-manager depends on expo-constants only for its native ConstantsService: legacy
+  # TaskManagerInternalModule reads ConstantsInterface from AppContext's ServicesRegistry for
+  # appScopeKey and throws (NPE) if nothing provides it. Safe standalone - its only real dep is
+  # @expo/env, no metro-config/babel-preset-expo; matches npm latest and the expo-modules-core peer.
+  expo-constants: 57.0.19
   # Same exact-pin reasoning, continuing tier-2: packages/background-fetch and
   # packages/background-task depend on their matching expo-* package ONLY for its native
   # ios/android folders (JS hand-ported into our own core, registration driven through

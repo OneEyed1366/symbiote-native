@@ -7,6 +7,13 @@
         "className": "TaskManagerModule",
         "nativeName": "ExpoTaskManager"
       }
+    ],
+    "services": [
+      {
+        "importPath": "expo.modules.constants.ConstantsService",
+        "className": "ConstantsService",
+        "gradleProjectName": "expo-constants"
+      }
     ]
   },
   "ios": {
