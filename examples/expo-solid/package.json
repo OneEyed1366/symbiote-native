@@ -57,6 +57,8 @@
     "@symbiote-native/notifications": "latest",
     "@symbiote-native/sqlite": "latest",
     "@symbiote-native/task-manager": "latest",
+    "@symbiote-native/font": "latest",
+    "@symbiote-native/asset": "latest",
     "expo": "57.0.14",
     "react": "19.2.3",
     "react-native": "0.86.0",

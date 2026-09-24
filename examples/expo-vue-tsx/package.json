@@ -57,6 +57,8 @@
     "@symbiote-native/notifications": "latest",
     "@symbiote-native/sqlite": "latest",
     "@symbiote-native/task-manager": "latest",
+    "@symbiote-native/font": "latest",
+    "@symbiote-native/asset": "latest",
     "@vue/runtime-core": "^3.5.13",
     "expo": "57.0.14",
     "react": "19.2.3",
