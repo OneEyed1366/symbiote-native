@@ -89,6 +89,7 @@ queue.
 | `@symbiote-native/screen-capture` | `expo-screen-capture` - prevent/allow screen capture (key-counted, matching upstream), an iOS-only app-switcher privacy blur, and a screenshot listener. `usePreventScreenCapture`/`useScreenshotListener`/`usePermissions` not ported (real React hooks, same §11 class as image-picker's dropped hooks). No config plugin; Android's storage-read permissions for screenshot detection ship in its own bundled manifest and auto-merge | `symbiote-expo-native-module` |
 | `@symbiote-native/auth-session` | `expo-auth-session` - ships no native code at all; hand-ported onto `@symbiote-native/web-browser` (auth tab), `@symbiote-native/crypto` (PKCE), `@symbiote-native/application` (default redirect scheme). No `expo-modules-core` dependency, no `native-link.json` (same shape as `standard-web-crypto`). Dropped: the `expo-constants`/`auth.expo.io` proxy flow and `makeRedirectUri`'s manifest-scheme auto-detection (no app manifest exists here - pass `scheme`/`native` explicitly), and every `use*` hook (real React hooks) | `symbiote-expo-native-module` (no-native variant) |
 | `@symbiote-native/calendar` | `expo-calendar` - the **next** shared-object API only (`ExpoCalendar`/`ExpoCalendarEvent`/`ExpoCalendarAttendee`/`ExpoCalendarReminder` classes, full iOS+Android parity), by explicit product decision - the legacy function-based API (upstream's own default entry point) is deliberately NOT ported. Upstream ships no JS reference for `next` at sdk-57 (native Kotlin/Swift `Class()` registrations only), so the wrapper classes were authored from scratch, using `Object.setPrototypeOf` to upgrade native factory-returned instances (same idiom as `@symbiote-native/blob`'s `slice()`) and the `declare class` + static-assigned-after-class-body pattern from `@symbiote-native/file-system`'s next API. Dropped: `useCalendarPermissions`/`useRemindersPermissions` (real React hooks, §11 class) | `symbiote-expo-native-module` |
+| `@symbiote-native/contacts` | `expo-contacts` - both surfaces, matching upstream's own layout: the modern `Contact`/`Group`/`Container` shared-object API (default entry, iOS registers the class as `ContactNext` aliased onto `.Contact`) and the legacy function-based API (`/legacy` subpath). `Group`/`Container` fall back to a stub that throws `Not implemented` on Android (no such concept there). Dropped: `ContactAccessButton` - a real native VIEW component (`requireNativeView`, iOS-only), out of scope for a module-only wrapper per `<third_party_rn_packages_are_react_only>` | `symbiote-expo-native-module` |
 
 **Tier 1 is now fully closed (2026-08-03)** — every Tier 1 row below is shipped except
 `expo-constants` (#9), which stays deliberately skipped (see its own row note). Tier 2 (permission/
@@ -122,7 +123,8 @@ screenshot-detection permissions auto-merge from its own bundled manifest), `exp
 (#43) shipped 2026-09-25 (no native code at all - hand-ported onto three already-shipped
 packages instead of a fourth `expo-*` dependency), `expo-calendar` (#36) shipped 2026-09-25
 (the modern `next` shared-object API only, full iOS+Android parity - legacy deliberately
-excluded), 6 left.
+excluded), `expo-contacts` (#35) shipped 2026-09-25 (both surfaces ported - next default,
+legacy at `/legacy`), 5 left.
 
 ```
 §secure_store_manifest_attrs := {
@@ -186,7 +188,7 @@ from each package's `expo-module.config.json`.
 | ~~32~~ | ~~`expo-speech`~~ | M | shipped - see "Already shipped" |
 | ~~33~~ | ~~`expo-audio`~~ | M | shipped — see "Already shipped" |
 | ~~34~~ | ~~`expo-screen-capture`~~ | M | shipped - see "Already shipped" |
-| 35 | `expo-contacts` | M | apple, android |
+| ~~35~~ | ~~`expo-contacts`~~ | M | shipped - see "Already shipped" |
 | ~~36~~ | ~~`expo-calendar`~~ | M | shipped - see "Already shipped" |
 | ~~37~~ | ~~`expo-location`~~ | M | shipped — see "Already shipped" |
 | ~~38~~ | ~~`expo-media-library`~~ | M | shipped — see "Already shipped" |
@@ -224,12 +226,23 @@ from each package's `expo-module.config.json`.
 
 ## Applying this catalog
 
-1. Pick the next package off the queue (or a user-requested one out of order — the queue is a
+1. Pick the next package off the queue (or a user-requested one out of order - the queue is a
    default, not a lock).
 2. Run `symbiote-new-package-skeleton` to settle the tier (bare-skeleton / core-only / full
    parity) before writing code.
+2.5. **Decide legacy vs next per package, from that package's own upstream source - never carry
+   over the previous package's scope decision.** Check whether upstream ships `src/legacy/` +
+   `src/next/` (or `src/index.ts` vs a `/next` subpath) with real, complete JS on both sides, or
+   only one real surface (the other native-only/absent). Both real -> port both, next as the
+   default entry and legacy as a `/legacy` subpath (media-library/file-system precedent above).
+   Only one real surface -> port that one (calendar precedent: upstream's next had no JS at
+   sdk-57, only native `Class()` registrations, so only the modern surface was authored, from
+   scratch, and legacy was excluded by explicit product decision - that exclusion is
+   calendar-specific, not a standing rule). Confirmed 2026-09-25: `expo-contacts` ships both
+   surfaces for real (`src/legacy/Contacts.ts` and `src/ContactsModule.ts`+`ExpoContactsNext.ts`)
+   - it follows the dual-surface shape, not calendar's next-only shape.
 3. Follow `symbiote-expo-native-module` for **M** entries, `symbiote-third-party-native-view`
    for **V** entries.
-4. Pin any new native npm dependency via a pnpm catalog entry, not a literal version — see `symbiote-dependency-catalog`.
+4. Pin any new native npm dependency via a pnpm catalog entry, not a literal version - see `symbiote-dependency-catalog`.
 5. Update this table's tier/row (strike through or move to a "shipped" note) once a package
-   lands — keep the queue reflecting reality, not the 2026-07-28 snapshot forever.
+   lands - keep the queue reflecting reality, not the 2026-07-28 snapshot forever.

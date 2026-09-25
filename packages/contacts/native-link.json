@@ -1,0 +1,26 @@
+{
+  "android": {
+    "gradleProjectName": "expo-contacts",
+    "modules": [
+      {
+        "importPath": "expo.modules.contacts.ContactsModule",
+        "className": "ContactsModule",
+        "nativeName": "ExpoContacts"
+      },
+      {
+        "importPath": "expo.modules.contacts.next.ContactsNextModule",
+        "className": "ContactsNextModule",
+        "nativeName": "ExpoContactsNext"
+      }
+    ],
+    "manifestPermissions": [
+      "android.permission.READ_CONTACTS",
+      "android.permission.WRITE_CONTACTS"
+    ]
+  },
+  "ios": {
+    "infoPlistKeys": {
+      "NSContactsUsageDescription": "This app uses your contacts to read and manage your address book."
+    }
+  }
+}

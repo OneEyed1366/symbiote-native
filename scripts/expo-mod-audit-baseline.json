@@ -263,5 +263,20 @@
     "package": "@symbiote-native/calendar",
     "path": "android.manifest.manifest.uses-permission.6",
     "verdict": "WRITE_CALENDAR - already declared in native-link.json android.manifestPermissions"
+  },
+  {
+    "package": "@symbiote-native/contacts",
+    "path": "ios.infoPlist.NSContactsUsageDescription",
+    "verdict": "already declared (custom wording) in native-link.json ios.infoPlistKeys"
+  },
+  {
+    "package": "@symbiote-native/contacts",
+    "path": "android.manifest.manifest.uses-permission.5",
+    "verdict": "READ_CONTACTS - already declared in native-link.json android.manifestPermissions"
+  },
+  {
+    "package": "@symbiote-native/contacts",
+    "path": "android.manifest.manifest.uses-permission.6",
+    "verdict": "WRITE_CONTACTS - already declared in native-link.json android.manifestPermissions"
   }
 ]

@@ -24,6 +24,7 @@ export type IExpoPackageLayerName =
   | 'calendar'
   | 'cellular'
   | 'clipboard'
+  | 'contacts'
   | 'crypto'
   | 'device'
   | 'document-picker'
@@ -147,6 +148,11 @@ export const EXPO_PACKAGE_LAYERS: readonly IExpoPackageLayer[] = [
     id: 'clipboard',
     label: 'Clipboard',
     symbiotePackage: '@symbiote-native/clipboard',
+  },
+  {
+    id: 'contacts',
+    label: 'Contacts',
+    symbiotePackage: '@symbiote-native/contacts',
   },
   { id: 'crypto', label: 'Crypto', symbiotePackage: '@symbiote-native/crypto' },
   {
