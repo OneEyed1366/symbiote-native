@@ -1,4 +1,5 @@
 import { UnavailabilityError } from 'expo-modules-core';
+import type { PermissionResponse } from 'expo-modules-core';
 import { expoCalendarNext } from './native-module';
 import type { NativeExpoCalendar } from './native-module';
 import type {
@@ -10,87 +11,88 @@ import type {
   IReminderInput,
   ISource,
 } from './types';
-import { EntityTypes } from './enums';
-import { splitNullableFields, stringifyDateValues } from './utils';
+import type { EntityTypes } from './enums';
+import { stringifyDateValues, stringifyIfDate } from './utils';
 import { ExpoCalendarEvent, upgradeToExpoCalendarEvent } from './event';
 import {
   ExpoCalendarReminder,
   upgradeToExpoCalendarReminder,
 } from './reminder';
 
-const NATIVE_MODULE_NAME = 'Calendar';
-
-// Cannot use `static` keyword in class declaration - matches @symbiote-native/file-system's
-// next/file.ts, which cites a runtime error on classes extending a native SharedObject.
 export class ExpoCalendar extends expoCalendarNext.ExpoCalendar {
-  static getAllAsync: (entityType?: EntityTypes) => Promise<ExpoCalendar[]>;
-  static getByIdAsync: (id: string) => Promise<ExpoCalendar>;
-  static createAsync: (input: ICalendarInput) => Promise<ExpoCalendar>;
-  static getDefaultSync: () => ExpoCalendar;
-  static presentPickerAsync: () => Promise<ExpoCalendar | null>;
-  static getSourcesSync: () => ISource[];
+  override async createEvent(details: IEventInput): Promise<ExpoCalendarEvent> {
+    return upgradeToExpoCalendarEvent(
+      await super.createEvent(stringifyDateValues(details)),
+    );
+  }
 
-  async listEventsAsync(
+  /** @platform ios */
+  override async createReminder(
+    details: IReminderInput,
+  ): Promise<ExpoCalendarReminder> {
+    if (!super.createReminder) {
+      throw new UnavailabilityError('ExpoCalendar', 'createReminder');
+    }
+    return upgradeToExpoCalendarReminder(
+      await super.createReminder(stringifyDateValues(details)),
+    );
+  }
+
+  override async listEvents(
     startDate: Date,
     endDate: Date,
   ): Promise<ExpoCalendarEvent[]> {
-    const events = await this.listEvents(
-      startDate.toISOString(),
-      endDate.toISOString(),
+    if (!startDate) {
+      throw new Error(
+        'listEvents must be called with a startDate (date) to search for events',
+      );
+    }
+    if (!endDate) {
+      throw new Error(
+        'listEvents must be called with an endDate (date) to search for events',
+      );
+    }
+    const events = await super.listEvents(
+      stringifyIfDate(startDate),
+      stringifyIfDate(endDate),
     );
     return events.map(upgradeToExpoCalendarEvent);
   }
 
   /** @platform ios */
-  async listRemindersAsync(
-    startDate?: Date | null,
-    endDate?: Date | null,
-    status?: string | null,
+  override async listReminders(
+    startDate: string | Date | null = null,
+    endDate: string | Date | null = null,
+    status: string | null = null,
   ): Promise<ExpoCalendarReminder[]> {
-    if (!this.listReminders) {
-      throw new UnavailabilityError(NATIVE_MODULE_NAME, 'listRemindersAsync');
+    if (!super.listReminders) {
+      throw new UnavailabilityError('ExpoCalendar', 'listReminders');
     }
-    const reminders = await this.listReminders(
-      startDate ? startDate.toISOString() : null,
-      endDate ? endDate.toISOString() : null,
-      status ?? null,
-    );
+    const reminders = await super.listReminders(startDate, endDate, status);
     return reminders.map(upgradeToExpoCalendarReminder);
   }
 
-  async createEventAsync(input: IEventInput): Promise<ExpoCalendarEvent> {
-    return upgradeToExpoCalendarEvent(
-      await this.createEvent(stringifyDateValues(input)),
-    );
+  override async update(details: ICalendarPatch): Promise<void> {
+    return super.update(stringifyDateValues(details));
   }
 
-  /** @platform ios */
-  async createReminderAsync(
-    input: IReminderInput,
-  ): Promise<ExpoCalendarReminder> {
-    if (!this.createReminder) {
-      throw new UnavailabilityError(NATIVE_MODULE_NAME, 'createReminderAsync');
-    }
-    return upgradeToExpoCalendarReminder(
-      await this.createReminder(stringifyDateValues(input)),
-    );
-  }
-
-  async addEventWithFormAsync(
+  override async addEventWithForm(
     options?: IAddEventWithFormOptions,
   ): Promise<IDialogEventResult> {
-    return this.addEventWithForm(
-      options ? stringifyDateValues(options) : undefined,
+    if (!super.addEventWithForm) {
+      throw new UnavailabilityError('ExpoCalendar', 'addEventWithForm');
+    }
+    return super.addEventWithForm(options && stringifyDateValues(options));
+  }
+
+  override async delete(): Promise<void> {
+    return super.delete();
+  }
+
+  static async get(calendarId: string): Promise<ExpoCalendar> {
+    return upgradeToExpoCalendar(
+      await expoCalendarNext.getCalendarById(calendarId),
     );
-  }
-
-  async updateAsync(patch: ICalendarPatch): Promise<void> {
-    const { record } = splitNullableFields(patch);
-    return this.update(record);
-  }
-
-  async deleteAsync(): Promise<void> {
-    return this.delete();
   }
 }
 
@@ -108,44 +110,88 @@ function upgradeToExpoCalendar(native: NativeExpoCalendar): ExpoCalendar {
   return native;
 }
 
-ExpoCalendar.getAllAsync = async function getAllAsync(
-  entityType?: EntityTypes,
-): Promise<ExpoCalendar[]> {
-  const calendars = await expoCalendarNext.getCalendars(entityType ?? null);
-  return calendars.map(upgradeToExpoCalendar);
-};
-
-ExpoCalendar.getByIdAsync = async function getByIdAsync(
-  id: string,
-): Promise<ExpoCalendar> {
-  return upgradeToExpoCalendar(await expoCalendarNext.getCalendarById(id));
-};
-
-ExpoCalendar.createAsync = async function createAsync(
-  input: ICalendarInput,
-): Promise<ExpoCalendar> {
-  return upgradeToExpoCalendar(await expoCalendarNext.createCalendar(input));
-};
-
-ExpoCalendar.getDefaultSync = function getDefaultSync(): ExpoCalendar {
+/** @platform ios - Android has no single system-managed default calendar. */
+export function getDefaultCalendarSync(): ExpoCalendar {
   if (!expoCalendarNext.getDefaultCalendarSync) {
-    throw new UnavailabilityError(NATIVE_MODULE_NAME, 'getDefaultSync');
+    throw new UnavailabilityError('Calendar', 'getDefaultCalendarSync');
   }
   return upgradeToExpoCalendar(expoCalendarNext.getDefaultCalendarSync());
-};
+}
 
-ExpoCalendar.presentPickerAsync =
-  async function presentPickerAsync(): Promise<ExpoCalendar | null> {
-    if (!expoCalendarNext.presentPicker) {
-      throw new UnavailabilityError(NATIVE_MODULE_NAME, 'presentPickerAsync');
-    }
-    const native = await expoCalendarNext.presentPicker();
-    return native ? upgradeToExpoCalendar(native) : null;
-  };
+export async function getCalendars(
+  entityType?: EntityTypes,
+): Promise<ExpoCalendar[]> {
+  if (!expoCalendarNext.getCalendars) {
+    throw new UnavailabilityError('Calendar', 'getCalendars');
+  }
+  const calendars = await expoCalendarNext.getCalendars(entityType ?? null);
+  return calendars.map(upgradeToExpoCalendar);
+}
 
-ExpoCalendar.getSourcesSync = function getSourcesSync(): ISource[] {
+export async function createCalendar(
+  details: ICalendarInput = {},
+): Promise<ExpoCalendar> {
+  return upgradeToExpoCalendar(await expoCalendarNext.createCalendar(details));
+}
+
+/** @platform ios */
+export async function presentPicker(): Promise<ExpoCalendar | null> {
+  if (!expoCalendarNext.presentPicker) {
+    throw new UnavailabilityError('Calendar', 'presentPicker');
+  }
+  const calendar = await expoCalendarNext.presentPicker();
+  return calendar ? upgradeToExpoCalendar(calendar) : null;
+}
+
+/** Searches events across several calendars at once - use `calendar.listEvents()` for one. */
+export async function listEvents(
+  calendars: (string | ExpoCalendar)[],
+  startDate: Date,
+  endDate: Date,
+): Promise<ExpoCalendarEvent[]> {
+  const calendarIds = calendars.map(calendar =>
+    typeof calendar === 'string' ? calendar : calendar.id,
+  );
+  const events = await expoCalendarNext.listEvents(
+    calendarIds,
+    stringifyIfDate(startDate),
+    stringifyIfDate(endDate),
+  );
+  return events.map(upgradeToExpoCalendarEvent);
+}
+
+export async function requestCalendarPermissions(
+  writeOnly?: boolean,
+): Promise<PermissionResponse> {
+  return expoCalendarNext.requestCalendarPermissions(writeOnly);
+}
+
+export async function getCalendarPermissions(
+  writeOnly?: boolean,
+): Promise<PermissionResponse> {
+  return expoCalendarNext.getCalendarPermissions(writeOnly);
+}
+
+/** @platform ios */
+export async function requestRemindersPermissions(): Promise<PermissionResponse> {
+  if (!expoCalendarNext.requestRemindersPermissions) {
+    throw new UnavailabilityError('Calendar', 'requestRemindersPermissions');
+  }
+  return expoCalendarNext.requestRemindersPermissions();
+}
+
+/** @platform ios */
+export async function getRemindersPermissions(): Promise<PermissionResponse> {
+  if (!expoCalendarNext.getRemindersPermissions) {
+    throw new UnavailabilityError('Calendar', 'getRemindersPermissions');
+  }
+  return expoCalendarNext.getRemindersPermissions();
+}
+
+/** @platform ios - Android has no first-class calendar-sources API. */
+export function getSourcesSync(): ISource[] {
   if (!expoCalendarNext.getSourcesSync) {
-    throw new UnavailabilityError(NATIVE_MODULE_NAME, 'getSourcesSync');
+    throw new UnavailabilityError('Calendar', 'getSourcesSync');
   }
   return expoCalendarNext.getSourcesSync();
-};
+}

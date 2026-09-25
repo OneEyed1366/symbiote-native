@@ -2,6 +2,8 @@ import { requireNativeModule } from 'expo-modules-core';
 import type { PermissionResponse } from 'expo-modules-core';
 import type {
   IDialogEventResult,
+  IOpenEventPresentationOptions,
+  IPresentationOptions,
   IRecurringEventOptions,
   ISource,
 } from './types';
@@ -12,8 +14,8 @@ const EXPO_CALENDAR_NEXT_MODULE_NAME = 'CalendarNext';
 // class`, matching @symbiote-native/file-system's next/native-module.ts (see its own comment
 // for why a plain object type with a `new(...)` signature does not work the same way).
 export declare class NativeExpoCalendar {
-  readonly id?: string;
-  readonly title?: string;
+  readonly id: string;
+  readonly title: string;
   /** @platform android */
   readonly name?: string | null;
   readonly source?: ISource;
@@ -44,20 +46,20 @@ export declare class NativeExpoCalendar {
   readonly accessLevel?: string;
 
   listEvents(
-    startDate: string,
-    endDate: string,
+    startDate: string | Date,
+    endDate: string | Date,
   ): Promise<NativeExpoCalendarEvent[]>;
-  /** @platform ios */
-  listReminders?(
-    startDate: string | null,
-    endDate: string | null,
+  /** @platform ios - typed as always-present, guarded at runtime. */
+  listReminders(
+    startDate: string | Date | null,
+    endDate: string | Date | null,
     status: string | null,
   ): Promise<NativeExpoCalendarReminder[]>;
   createEvent(
     record: Record<string, unknown>,
   ): Promise<NativeExpoCalendarEvent>;
-  /** @platform ios */
-  createReminder?(
+  /** @platform ios - typed as always-present, guarded at runtime. */
+  createReminder(
     record: Record<string, unknown>,
   ): Promise<NativeExpoCalendarReminder>;
   addEventWithForm(
@@ -68,7 +70,7 @@ export declare class NativeExpoCalendar {
 }
 
 export declare class NativeExpoCalendarEvent {
-  readonly id?: string;
+  readonly id: string;
   readonly calendarId?: string;
   readonly title?: string;
   readonly location?: string;
@@ -110,15 +112,15 @@ export declare class NativeExpoCalendarEvent {
   /** @platform android */
   readonly instanceId?: string;
 
-  /** @platform android */
-  createAttendee?(
+  /** @platform android - typed as always-present, guarded at runtime. */
+  createAttendee(
     record: Record<string, unknown>,
   ): Promise<NativeExpoCalendarAttendee>;
   openInCalendar(
-    options?: Record<string, unknown>,
+    options?: IOpenEventPresentationOptions | null,
   ): Promise<IDialogEventResult>;
   editInCalendar(
-    options?: Record<string, unknown>,
+    options?: IPresentationOptions | null,
   ): Promise<IDialogEventResult>;
   getOccurrenceSync(options?: IRecurringEventOptions): NativeExpoCalendarEvent;
   getAttendees(): Promise<NativeExpoCalendarAttendee[]>;

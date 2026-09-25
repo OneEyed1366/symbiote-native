@@ -3,83 +3,53 @@ import { expoCalendarNext } from './native-module';
 import type { NativeExpoCalendarEvent } from './native-module';
 import type {
   IAttendeeInput,
-  IDialogEventResult,
   IEventPatch,
-  IOpenEventPresentationOptions,
-  IPresentationOptions,
   IRecurringEventOptions,
 } from './types';
-import { splitNullableFields, stringifyDateValues } from './utils';
+import { getNullableDetailsFields, stringifyDateValues } from './utils';
 import {
   ExpoCalendarAttendee,
   upgradeToExpoCalendarAttendee,
 } from './attendee';
 
-const NATIVE_MODULE_NAME = 'Calendar';
-
 export class ExpoCalendarEvent extends expoCalendarNext.ExpoCalendarEvent {
-  static async findByIdAsync(id: string): Promise<ExpoCalendarEvent> {
-    return upgradeToExpoCalendarEvent(await expoCalendarNext.getEventById(id));
+  override getOccurrenceSync(
+    options: IRecurringEventOptions = {},
+  ): ExpoCalendarEvent {
+    const occurrence = super.getOccurrenceSync(stringifyDateValues(options));
+    return upgradeToExpoCalendarEvent(occurrence);
   }
 
-  static async findAllAsync(
-    calendarIds: string[],
-    startDate: Date,
-    endDate: Date,
-  ): Promise<ExpoCalendarEvent[]> {
-    const events = await expoCalendarNext.listEvents(
-      calendarIds,
-      startDate.toISOString(),
-      endDate.toISOString(),
-    );
-    return events.map(upgradeToExpoCalendarEvent);
-  }
-
-  /** @platform android */
-  async createAttendeeAsync(
-    input: IAttendeeInput,
-  ): Promise<ExpoCalendarAttendee> {
-    if (!this.createAttendee) {
-      throw new UnavailabilityError(NATIVE_MODULE_NAME, 'createAttendeeAsync');
-    }
-    return upgradeToExpoCalendarAttendee(await this.createAttendee(input));
-  }
-
-  async openInCalendarAsync(
-    options?: IOpenEventPresentationOptions,
-  ): Promise<IDialogEventResult> {
-    return this.openInCalendar(
-      options ? stringifyDateValues(options) : undefined,
-    );
-  }
-
-  async editInCalendarAsync(
-    options?: IPresentationOptions,
-  ): Promise<IDialogEventResult> {
-    return this.editInCalendar(options);
-  }
-
-  /** Resolves a single occurrence of a recurring event. */
-  getOccurrence(options?: IRecurringEventOptions): ExpoCalendarEvent {
-    return upgradeToExpoCalendarEvent(
-      this.getOccurrenceSync(
-        options ? stringifyDateValues(options) : undefined,
-      ),
-    );
-  }
-
-  async getAttendeesAsync(): Promise<ExpoCalendarAttendee[]> {
-    const attendees = await this.getAttendees();
+  override async getAttendees(): Promise<ExpoCalendarAttendee[]> {
+    const attendees = await super.getAttendees();
     return attendees.map(upgradeToExpoCalendarAttendee);
   }
 
-  async updateAsync(patch: IEventPatch): Promise<void> {
-    const { record, nullableFields } = splitNullableFields(patch);
-    return this.update(record, nullableFields);
+  /** @platform android */
+  override async createAttendee(
+    attendee: IAttendeeInput,
+  ): Promise<ExpoCalendarAttendee> {
+    if (!super.createAttendee) {
+      throw new UnavailabilityError('ExpoCalendarEvent', 'createAttendee');
+    }
+    return upgradeToExpoCalendarAttendee(await super.createAttendee(attendee));
   }
 
-  async deleteAsync(): Promise<void> {
-    return this.delete();
+  override async update(details: IEventPatch): Promise<void> {
+    return super.update(
+      stringifyDateValues(details),
+      getNullableDetailsFields(details),
+    );
+  }
+
+  override async delete(): Promise<void> {
+    return super.delete();
+  }
+
+  static async get(eventId: string): Promise<ExpoCalendarEvent> {
+    return upgradeToExpoCalendarEvent(
+      await expoCalendarNext.getEventById(eventId),
+    );
   }
 }
 

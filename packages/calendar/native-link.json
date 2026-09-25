@@ -10,8 +10,7 @@
       {
         "importPath": "expo.modules.calendar.next.CalendarNextModule",
         "className": "CalendarNextModule",
-        "nativeName": "CalendarNext",
-        "internal": true
+        "nativeName": "CalendarNext"
       }
     ],
     "manifestPermissions": [

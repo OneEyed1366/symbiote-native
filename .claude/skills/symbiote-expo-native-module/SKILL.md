@@ -100,11 +100,19 @@ Accepted side effect: the upstream package's `peerDependencies` typically list
 
 ## 3. JS is ported into our own `core`, never imported from upstream
 
-The real upstream JS (e.g. `expo-sensors`' `build/DeviceSensor.js`) does a hard
-`import ... from 'expo'` — if `expo` isn't installed (and per §1 it never is here), that
-import breaks Metro bundling the moment anything reaches it. So the wrapped package is a
-**dependency for its native folder only** — its JS entry point (`main`/`module` in its
-`package.json`) is never imported from our code.
+The real upstream JS (e.g. `expo-sensors`' `build/DeviceSensor.js`, `expo-calendar`'s
+`Calendar.ts`) does a hard `import ... from 'expo'`. Verified 2026-09-25 what that actually
+costs: the named values pulled in (`PermissionStatus`, `createPermissionHook`, etc) are just
+re-exports of `expo-modules-core`, `expo/src/Expo.ts` forwards them verbatim. The real blocker
+is `Expo.ts`'s own first line, `import './Expo.fx'`, an unconditional side-effecting module
+that runs the moment anything is imported from `'expo'` (Metro doesn't tree-shake unused
+exports, so the whole file body executes). `Expo.fx.tsx` overrides
+`AppRegistry.registerComponent('main', ...)` with a placeholder, eagerly loads `expo-asset` to
+monkey-patch RN's image-source resolution, and patches the global error handler, all of which
+fights our own bootstrap (`<native_core_is_untouched>`). So installing `expo` isn't a bundling
+failure, it's a silent runtime hijack. So the wrapped package is a **dependency for its native
+folder only**, its JS entry point (`main`/`module` in its `package.json`) is never imported
+from our code.
 
 Instead, hand-port the class hierarchy into `packages/<lib>/src/core/`, same spirit as
 `packages/splash-screen` porting `react-native-bootsplash`'s pure JS into `core/hide.ts` (see
@@ -1203,6 +1211,35 @@ not yet implemented — this section is the map for whoever ports these next.
          expo-modules-core (grep the resolved package's src/*.ts for `from 'react'`), treat it
          as adapter-only per <third_party_rn_packages_are_react_only> — never assume 'ships from
          expo-modules-core' means framework-agnostic",
+}
+```
+
+## 12. Not every package needs a hand-port - check for a real `'expo'` value import first
+
+```
+§12_reexport_vs_handport_criterion := {
+  found: "2026-09-25, questioning why every package gets hand-ported instead of re-exported",
+  claim_checked: "grepped every shipped-or-considered package's real (non-.web) entry files for
+                  \"from 'expo'\" at sdk-57",
+  zero_hits: [file-system, secure-store, sharing, web-browser, sms, task-manager, auth-session,
+              print, document-picker, mail-composer],
+  nonzero_hits: [sensors, media-library, audio, location, background-fetch, background-task,
+                 notifications, sqlite, calendar, contacts, screen-capture, image-picker]
+                 mostly for PermissionStatus/createPermissionHook/requireNativeModule, which
+                 expo/src/Expo.ts itself just re-exports from expo-modules-core, plus
+                 isRunningInExpoGo/useEvent which exist only in expo, not expo-modules-core,
+  rule: "before hand-porting a new package, read its real top-level entry (not .web.ts) for any
+         VALUE import from 'expo' (type-only is erased, harmless). Zero -> depend on the real
+         published expo-<pkg> directly (already a dep for native-folder discovery per §2) and
+         export * from it, aliasing types to our naming convention if needed - no hand-port, no
+         drift risk. Nonzero -> hand-port stays required, per §3's Expo.fx side-effect finding",
+  deferred_not_rejected: "a local package literally named expo (pnpm override) re-exporting only
+                          the trivial expo-modules-core values, no Expo.fx, would unblock
+                          re-export even for the nonzero-hit list. Deferred - not worth the
+                          resolution-override complexity yet; revisit if hand-port drift becomes
+                          a real maintenance cost",
+  backlog: "the zero_hits packages above are already hand-ported from before this finding -
+            retroactive conversion to re-export is optional cleanup, not yet done",
 }
 ```
 

@@ -1,31 +1,37 @@
-import { UnavailabilityError } from 'expo-modules-core';
+import { Platform, UnavailabilityError } from 'expo-modules-core';
 import { expoCalendarNext } from './native-module';
 import type { NativeExpoCalendarReminder } from './native-module';
 import type { IReminderPatch } from './types';
-import { splitNullableFields } from './utils';
-
-const NATIVE_MODULE_NAME = 'Calendar';
+import { getNullableDetailsFields, stringifyDateValues } from './utils';
 
 /** @platform ios - Android registers this class with no properties or methods. */
 export class ExpoCalendarReminder
   extends expoCalendarNext.ExpoCalendarReminder
 {
-  static async findByIdAsync(id: string): Promise<ExpoCalendarReminder> {
-    if (!expoCalendarNext.getReminderById) {
-      throw new UnavailabilityError(NATIVE_MODULE_NAME, 'findByIdAsync');
+  override async update(details: IReminderPatch): Promise<void> {
+    if (Platform.OS !== 'ios') {
+      throw new UnavailabilityError('ExpoCalendarReminder', 'update');
     }
-    return upgradeToExpoCalendarReminder(
-      await expoCalendarNext.getReminderById(id),
+    return super.update(
+      stringifyDateValues(details),
+      getNullableDetailsFields(details),
     );
   }
 
-  async updateAsync(patch: IReminderPatch): Promise<void> {
-    const { record, nullableFields } = splitNullableFields(patch);
-    return this.update(record, nullableFields);
+  override async delete(): Promise<void> {
+    if (Platform.OS !== 'ios') {
+      throw new UnavailabilityError('ExpoCalendarReminder', 'delete');
+    }
+    return super.delete();
   }
 
-  async deleteAsync(): Promise<void> {
-    return this.delete();
+  static async get(reminderId: string): Promise<ExpoCalendarReminder> {
+    if (Platform.OS !== 'ios' || !expoCalendarNext.getReminderById) {
+      throw new UnavailabilityError('ExpoCalendarReminder', 'get');
+    }
+    return upgradeToExpoCalendarReminder(
+      await expoCalendarNext.getReminderById(reminderId),
+    );
   }
 }
 

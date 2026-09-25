@@ -59,9 +59,9 @@ export type IAlarm = {
   method?: AlarmMethod;
 };
 
-/** Fields for `ExpoCalendar.createAsync()`. */
+/** Fields for `createCalendar()` - all optional, matches upstream's `Partial<Calendar>`. */
 export type ICalendarInput = {
-  title: string;
+  title?: string;
   /** @platform android */
   name?: string;
   source?: ISource;
@@ -87,7 +87,7 @@ export type ICalendarInput = {
   sourceId?: string;
 };
 
-/** Fields for `calendar.updateAsync()`; a field set to `null` clears it natively. */
+/** Fields for `calendar.update()`; a field set to `null` clears it natively. */
 export type ICalendarPatch = {
   title?: string | null;
   /** @platform android */
@@ -101,10 +101,10 @@ export type ICalendarPatch = {
   timeZone?: string | null;
 };
 
-/** Fields for `calendar.createEventAsync()`. */
+/** Fields for `calendar.createEvent()` - all optional, matches upstream's `Omit<Partial<...>>`. */
 export type IEventInput = {
-  startDate: string | Date;
-  endDate: string | Date;
+  startDate?: string | Date;
+  endDate?: string | Date;
   title?: string;
   location?: string;
   timeZone?: string;
@@ -129,12 +129,12 @@ export type IEventInput = {
   guestsCanSeeGuests?: boolean;
 };
 
-/** Fields for `event.updateAsync()`; a field set to `null` clears it natively. */
+/** Fields for `event.update()`; a field set to `null` clears it natively. */
 export type IEventPatch = Partial<{
   [K in keyof IEventInput]: IEventInput[K] | null;
 }>;
 
-/** Fields for `event.createAttendeeAsync()`. @platform android */
+/** Fields for `event.createAttendee()`. @platform android */
 export type IAttendeeInput = {
   name: string;
   role: AttendeeRole;
@@ -143,12 +143,12 @@ export type IAttendeeInput = {
   email: string;
 };
 
-/** Fields for `attendee.updateAsync()`. @platform android */
+/** Fields for `attendee.update()`. @platform android */
 export type IAttendeePatch = Partial<{
   [K in keyof IAttendeeInput]: IAttendeeInput[K] | null;
 }>;
 
-/** Fields for `calendar.createReminderAsync()`. @platform ios */
+/** Fields for `calendar.createReminder()`. @platform ios */
 export type IReminderInput = {
   title?: string;
   location?: string;
@@ -164,7 +164,7 @@ export type IReminderInput = {
   completed?: boolean;
 };
 
-/** Fields for `reminder.updateAsync()`; a field set to `null` clears it natively. @platform ios */
+/** Fields for `reminder.update()`; a field set to `null` clears it natively. @platform ios */
 export type IReminderPatch = Partial<{
   [K in keyof IReminderInput]: IReminderInput[K] | null;
 }>;
@@ -187,7 +187,7 @@ export type IOpenEventPresentationOptions = IPresentationOptions & {
   allowsCalendarPreview?: boolean;
 };
 
-/** Fields for `calendar.addEventWithFormAsync()`. */
+/** Fields for `calendar.addEventWithForm()`. */
 export type IAddEventWithFormOptions = {
   title?: string;
   location?: string;

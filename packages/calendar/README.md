@@ -1,16 +1,18 @@
 # @symbiote-native/calendar
 
 A wrapper package for [SymbioteNative](../../README.md) that makes
-[`expo-calendar`'s `next` API](https://github.com/expo/expo/tree/main/packages/expo-calendar) -
-the modern, `SharedObject`-class-based `ExpoCalendar`/`ExpoCalendarEvent`/
-`ExpoCalendarAttendee`/`ExpoCalendarReminder` surface, full cross-platform (iOS + Android) parity -
-usable from **every** adapter, React, Vue, Svelte, Solid, and Angular, not just React. Built the
-same way as [`@symbiote-native/print`](../print): an `expo-modules-core`-based wrapper (see the
+[`expo-calendar`](https://github.com/expo/expo/tree/main/packages/expo-calendar) - calendar,
+event, reminder, and attendee CRUD, plus the OS-provided event dialogs - usable from **every**
+adapter, React, Vue, Svelte, Solid, and Angular, not just React. Built the same way as
+[`@symbiote-native/print`](../print): an `expo-modules-core`-based wrapper (see the
 `symbiote-expo-native-module` project skill for the full mechanism).
 
-**The legacy function-based API (`Calendar.ts`) is deliberately not ported.** Upstream's own
-default entry point exports it, but this package wraps only the `next` class-based surface - a
-product decision, not a technical limitation.
+**Both of upstream's API surfaces are ported, matching Expo's own layout exactly**: the modern
+`SharedObject`-class `ExpoCalendar`/`ExpoCalendarEvent`/`ExpoCalendarReminder`/
+`ExpoCalendarAttendee` API (default entry, mirroring upstream's own default `Calendar.ts`) and
+the legacy function-based API (`/legacy` subpath, mirroring upstream's `legacy/Calendar.ts`).
+Method names, the static-vs-module-level-function split, and per-field platform availability all
+match upstream's real source (`src/Calendar.ts` and `src/legacy/Calendar.ts` at sdk-57) directly.
 
 ## Install
 
@@ -49,10 +51,9 @@ for the full table; nothing package-specific here.
 
 `native-link.json` declares:
 
-- **Android**: `READ_CALENDAR`/`WRITE_CALENDAR` permissions. The native module we call is
-  `CalendarNext`; the legacy `ExpoCalendar` module is still listed (marked `internal: true`)
-  purely so autolinking stays consistent with the real npm package's
-  `expo-module.config.json` - our JS never calls it.
+- **Android**: `READ_CALENDAR`/`WRITE_CALENDAR` permissions. Both native modules are registered
+  and genuinely called by our JS: `ExpoCalendar` (legacy surface, `/legacy` subpath) and
+  `CalendarNext` (modern surface, default entry).
 - **iOS**: `NSCalendarsUsageDescription`, `NSRemindersUsageDescription`,
   `NSRemindersFullAccessUsageDescription`, `NSCalendarsFullAccessUsageDescription` (custom
   wording; reword to fit the app).
@@ -66,75 +67,93 @@ If write-only calendar access (iOS 17+) is needed, add
 
 </details>
 
-## Platform availability
+## Platform availability (modern API)
 
 | Member | iOS | Android |
 |---|---|---|
-| `ExpoCalendar.getAllAsync/getByIdAsync/createAsync` | yes | yes |
-| `ExpoCalendar.getDefaultSync` | yes | no |
-| `ExpoCalendar.presentPickerAsync` | yes | no |
-| `ExpoCalendar.getSourcesSync` | yes | no |
-| `calendar.listEventsAsync/createEventAsync/addEventWithFormAsync/updateAsync/deleteAsync` | yes | yes |
-| `calendar.listRemindersAsync/createReminderAsync` | yes | no |
-| `event.createAttendeeAsync` | no | yes |
-| `event.openInCalendarAsync/editInCalendarAsync/getOccurrence/getAttendeesAsync/updateAsync/deleteAsync` | yes | yes |
+| `ExpoCalendar` CRUD (`createEvent`/`update`/`addEventWithForm`/`delete`), `listEvents` | yes | yes |
+| `getDefaultCalendarSync`/`presentPicker`/`getSourcesSync` (module-level) | yes | no |
+| `calendar.createReminder`/`listReminders` | yes | no |
+| `event.createAttendee` | no | yes |
+| `event.getOccurrenceSync`/`getAttendees`/`update`/`delete` | yes | yes |
 | `ExpoCalendarReminder` (whole class) | yes | no - no-op class, no properties/methods |
 | `ExpoCalendarAttendee` (whole class) | no - no-op class | yes |
-| `getCalendarPermissionsAsync/requestCalendarPermissionsAsync` | yes | yes |
-| `getRemindersPermissionsAsync/requestRemindersPermissionsAsync` | yes | no |
+| `getCalendarPermissions`/`requestCalendarPermissions` (module-level) | yes | yes |
+| `getRemindersPermissions`/`requestRemindersPermissions` (module-level) | yes | no |
 
-An iOS-only or Android-only method throws `UnavailabilityError` on the other platform - check
-`calendar.listReminders`/`expoCalendarNext.presentPicker` (etc.) for presence before calling if
-the call site needs to run on both.
+An iOS-only or Android-only member throws `UnavailabilityError` on the other platform, or is
+absent from the native ambient - check for presence before calling if the call site must run on
+both.
 
 ## What's not ported
 
-- **The legacy function-based API** (`getCalendarsAsync`/`createEventAsync`/... as free
-  functions) - excluded by product decision, see the top of this README. Do not re-add it here;
-  if it's ever wanted, it belongs in its own `/legacy` subpath, matching
-  `@symbiote-native/media-library`'s and `@symbiote-native/file-system`'s dual-surface precedent.
 - **`useCalendarPermissions`/`useRemindersPermissions`** - real React hooks
   (`createPermissionHook`), same §11 class as image-picker's dropped hooks. Call
-  `getCalendarPermissionsAsync`/`requestCalendarPermissionsAsync` (and the reminders pair)
-  directly instead.
+  `getCalendarPermissions`/`requestCalendarPermissions` (and the reminders pair) directly
+  instead, from either surface.
+- **The deprecated `requestPermissionsAsync`** legacy alias (upstream: "use
+  `requestCalendarPermissionsAsync` instead") - call `requestCalendarPermissionsAsync` directly.
 
 ## Shape
 
 ```
-src/core/enums.ts         every enum (EntityTypes, Frequency, Availability, ...)
-src/core/types.ts         ICalendarInput/Patch, IEventInput/Patch, IAttendeeInput/Patch, ...
-src/core/utils.ts         stringifyDateValues, splitNullableFields (patch -> {record, nullableFields})
-src/core/native-module.ts declare class ambients for the 4 SharedObject classes + module functions
-src/core/calendar.ts      ExpoCalendar - static factories + instance CRUD/list methods
-src/core/event.ts         ExpoCalendarEvent - static finders + instance CRUD/attendee methods
-src/core/attendee.ts      ExpoCalendarAttendee (android-only surface)
-src/core/reminder.ts      ExpoCalendarReminder (ios-only surface)
-src/core/permissions.ts   get/requestCalendarPermissionsAsync, reminders pair (ios only)
-src/angular/              @symbiote-native/calendar/angular
+src/core/                 modern SharedObject API (default entry)
+  enums.ts                 every enum (EntityTypes, Frequency, Availability, ...)
+  types.ts                 ICalendarInput/Patch, IEventInput/Patch, IAttendeeInput/Patch, ...
+  utils.ts                  stringifyDateValues, getNullableDetailsFields
+  native-module.ts          declare class ambients for the 4 SharedObject classes + module fns
+  calendar.ts               ExpoCalendar class + module-level functions (getCalendars, ...)
+  event.ts                  ExpoCalendarEvent - instance CRUD/attendee methods, static get()
+  attendee.ts                ExpoCalendarAttendee (android-only surface)
+  reminder.ts                ExpoCalendarReminder (ios-only surface)
+src/legacy/                legacy function-based API (/legacy subpath)
+  enums.ts                  re-exports src/core/enums.ts - upstream shares one enum source too
+  types.ts                  ICalendar, IEvent, IReminder, IAttendee, IRecurrenceRule, ...
+  native-module.ts          requireNativeModule('ExpoCalendar')
+  calendar.ts                every *Async free function (getCalendarsAsync, createEventAsync, ...)
+src/angular/               @symbiote-native/calendar/angular
 ```
 
-`./react`, `./vue`, `./svelte`, and `./solid` are `exports`-map aliases straight onto `src/core/`.
+`./react`, `./vue`, `./svelte`, and `./solid` are `exports`-map aliases straight onto
+`src/core/`. `./legacy` aliases onto `src/legacy/`; there is no separate Angular build for it,
+matching `@symbiote-native/file-system`'s and `@symbiote-native/media-library`'s dual-surface
+precedent.
 
 Every wrapper class extends its native `SharedObject` base directly
-(`class ExpoCalendarEvent extends expoCalendarNext.ExpoCalendarEvent`). Native factory
-methods/functions return plain native instances; a module-level `upgradeToX(native)` helper
-reassigns the prototype to the wrapper class in place (`Object.setPrototypeOf`) rather than
-calling `new` on the native class, since Android's Kotlin throws on direct construction of
-`ExpoCalendar`/`ExpoCalendarEvent`.
+(`class ExpoCalendarEvent extends expoCalendarNext.ExpoCalendarEvent`), overriding only the
+methods upstream itself overrides (Date stringification, `getNullableDetailsFields`, prototype
+upgrade of a returned native instance, or a platform guard) - everything else (like
+`openInCalendar`/`editInCalendar`) is inherited from the native ambient untouched, exactly as
+upstream leaves it. A module-level `upgradeToX(native)` helper reassigns a returned native
+instance's prototype in place (`Object.setPrototypeOf`) rather than calling `new` on the native
+class, since Android's Kotlin throws on direct construction of `ExpoCalendar`/`ExpoCalendarEvent`.
 
 ## Use it
 
 ```ts
-import { ExpoCalendar, requestCalendarPermissionsAsync } from '@symbiote-native/calendar';
+// modern surface (default)
+import { ExpoCalendar, requestCalendarPermissions } from '@symbiote-native/calendar';
 
-await requestCalendarPermissionsAsync();
-const calendar = await ExpoCalendar.createAsync({ title: 'Work', color: '#4285F4' });
-const event = await calendar.createEventAsync({
+await requestCalendarPermissions();
+const calendar = await ExpoCalendar.get(calendarId);
+const event = await calendar.createEvent({
   title: 'Standup',
   startDate: new Date(),
   endDate: new Date(Date.now() + 30 * 60_000),
 });
-await event.updateAsync({ notes: 'Daily sync' });
+await event.update({ notes: 'Daily sync' });
+```
+
+```ts
+// legacy surface
+import { createEventAsync, requestCalendarPermissionsAsync } from '@symbiote-native/calendar/legacy';
+
+await requestCalendarPermissionsAsync();
+const eventId = await createEventAsync(calendarId, {
+  title: 'Standup',
+  startDate: new Date(),
+  endDate: new Date(Date.now() + 30 * 60_000),
+});
 ```
 
 ## Test it

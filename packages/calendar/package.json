@@ -1,7 +1,7 @@
 {
   "name": "@symbiote-native/calendar",
   "version": "0.1.0",
-  "description": "expo-calendar wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, Svelte, Solid, and Angular adapters. Calendar/event/reminder CRUD and the OS-provided event dialogs.",
+  "description": "expo-calendar wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, Svelte, Solid, and Angular adapters. Both surfaces: the modern ExpoCalendar/ExpoCalendarEvent/ExpoCalendarReminder/ExpoCalendarAttendee API (default entry) and the legacy function-based API (/legacy subpath).",
   "license": "MIT",
   "keywords": [
     "react-native",
@@ -40,7 +40,8 @@
       "types": "./build-ngc/angular/index.d.ts",
       "react-native": "./build-ngc/angular/index.js",
       "default": "./src/angular/index.ts"
-    }
+    },
+    "./legacy": "./src/legacy/index.ts"
   },
   "files": [
     "src",
@@ -81,6 +82,10 @@
         "types": "./build-ngc/angular/index.d.ts",
         "react-native": "./build-ngc/angular/index.js",
         "default": "./src/angular/index.ts"
+      },
+      "./legacy": {
+        "types": "./build/legacy/index.d.ts",
+        "default": "./build/legacy/index.js"
       }
     }
   },

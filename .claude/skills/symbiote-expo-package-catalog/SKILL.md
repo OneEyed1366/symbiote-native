@@ -88,7 +88,7 @@ queue.
 | `@symbiote-native/speech` | `expo-speech` - text-to-speech (`speak`, `getAvailableVoicesAsync`, `isSpeakingAsync`, `stop`, `pause`/`resume` iOS-only). Web-only fields dropped (`WebVoice`, DOM-`SpeechSynthesisEvent`-shaped callbacks, `onMark`/`onPause`/`onResume` - package ships no `"web"` platform anyway). Android's `<queries>` TTS_SERVICE entry ships in its own bundled manifest and auto-merges - no `native-link.json` field exists for it | `symbiote-expo-native-module` |
 | `@symbiote-native/screen-capture` | `expo-screen-capture` - prevent/allow screen capture (key-counted, matching upstream), an iOS-only app-switcher privacy blur, and a screenshot listener. `usePreventScreenCapture`/`useScreenshotListener`/`usePermissions` not ported (real React hooks, same §11 class as image-picker's dropped hooks). No config plugin; Android's storage-read permissions for screenshot detection ship in its own bundled manifest and auto-merge | `symbiote-expo-native-module` |
 | `@symbiote-native/auth-session` | `expo-auth-session` - ships no native code at all; hand-ported onto `@symbiote-native/web-browser` (auth tab), `@symbiote-native/crypto` (PKCE), `@symbiote-native/application` (default redirect scheme). No `expo-modules-core` dependency, no `native-link.json` (same shape as `standard-web-crypto`). Dropped: the `expo-constants`/`auth.expo.io` proxy flow and `makeRedirectUri`'s manifest-scheme auto-detection (no app manifest exists here - pass `scheme`/`native` explicitly), and every `use*` hook (real React hooks) | `symbiote-expo-native-module` (no-native variant) |
-| `@symbiote-native/calendar` | `expo-calendar` - the **next** shared-object API only (`ExpoCalendar`/`ExpoCalendarEvent`/`ExpoCalendarAttendee`/`ExpoCalendarReminder` classes, full iOS+Android parity), by explicit product decision - the legacy function-based API (upstream's own default entry point) is deliberately NOT ported. Upstream ships no JS reference for `next` at sdk-57 (native Kotlin/Swift `Class()` registrations only), so the wrapper classes were authored from scratch, using `Object.setPrototypeOf` to upgrade native factory-returned instances (same idiom as `@symbiote-native/blob`'s `slice()`) and the `declare class` + static-assigned-after-class-body pattern from `@symbiote-native/file-system`'s next API. Dropped: `useCalendarPermissions`/`useRemindersPermissions` (real React hooks, §11 class) | `symbiote-expo-native-module` |
+| `@symbiote-native/calendar` | `expo-calendar` - both surfaces, matching upstream's own layout exactly: the modern `ExpoCalendar`/`ExpoCalendarEvent`/`ExpoCalendarReminder`/`ExpoCalendarAttendee` shared-object API (default entry, upstream's own `src/Calendar.ts`) and the legacy function-based API (`/legacy` subpath, upstream's `src/legacy/Calendar.ts`). Correction 2026-09-25: an earlier pass claimed upstream ships no JS reference for the modern surface at sdk-57 - that was wrong, found by re-reading `src/Calendar.ts` directly (456 lines, real `class ExpoCalendar extends InternalExpoCalendar.ExpoCalendar` with `Object.setPrototypeOf` upgrades, module-level functions for calendar-level operations like `getCalendars`/`createCalendar`/`presentPicker`, and `processColor` on calendar update) - never trust an earlier session's "upstream ships no JS for X" claim without re-checking the actual file tree first. Dropped: `useCalendarPermissions`/`useRemindersPermissions` (real React hooks, §11 class) | `symbiote-expo-native-module` |
 | `@symbiote-native/contacts` | `expo-contacts` - both surfaces, matching upstream's own layout: the modern `Contact`/`Group`/`Container` shared-object API (default entry, iOS registers the class as `ContactNext` aliased onto `.Contact`) and the legacy function-based API (`/legacy` subpath). `Group`/`Container` fall back to a stub that throws `Not implemented` on Android (no such concept there). Dropped: `ContactAccessButton` - a real native VIEW component (`requireNativeView`, iOS-only), out of scope for a module-only wrapper per `<third_party_rn_packages_are_react_only>` | `symbiote-expo-native-module` |
 
 **Tier 1 is now fully closed (2026-08-03)** — every Tier 1 row below is shipped except
@@ -122,8 +122,8 @@ manifest), `expo-screen-capture` (#34) shipped 2026-09-25 (no config plugin; And
 screenshot-detection permissions auto-merge from its own bundled manifest), `expo-auth-session`
 (#43) shipped 2026-09-25 (no native code at all - hand-ported onto three already-shipped
 packages instead of a fourth `expo-*` dependency), `expo-calendar` (#36) shipped 2026-09-25
-(the modern `next` shared-object API only, full iOS+Android parity - legacy deliberately
-excluded), `expo-contacts` (#35) shipped 2026-09-25 (both surfaces ported - next default,
+(both surfaces ported, matching upstream exactly - modern default, legacy at `/legacy`),
+`expo-contacts` (#35) shipped 2026-09-25 (both surfaces ported - next default,
 legacy at `/legacy`), 5 left.
 
 ```
@@ -231,16 +231,23 @@ from each package's `expo-module.config.json`.
 2. Run `symbiote-new-package-skeleton` to settle the tier (bare-skeleton / core-only / full
    parity) before writing code.
 2.5. **Decide legacy vs next per package, from that package's own upstream source - never carry
-   over the previous package's scope decision.** Check whether upstream ships `src/legacy/` +
-   `src/next/` (or `src/index.ts` vs a `/next` subpath) with real, complete JS on both sides, or
-   only one real surface (the other native-only/absent). Both real -> port both, next as the
-   default entry and legacy as a `/legacy` subpath (media-library/file-system precedent above).
-   Only one real surface -> port that one (calendar precedent: upstream's next had no JS at
-   sdk-57, only native `Class()` registrations, so only the modern surface was authored, from
-   scratch, and legacy was excluded by explicit product decision - that exclusion is
-   calendar-specific, not a standing rule). Confirmed 2026-09-25: `expo-contacts` ships both
-   surfaces for real (`src/legacy/Contacts.ts` and `src/ContactsModule.ts`+`ExpoContactsNext.ts`)
-   - it follows the dual-surface shape, not calendar's next-only shape.
+   over the previous package's scope decision, and never conclude "no JS exists" from a folder
+   listing alone.** `git ls-tree -r origin/sdk-57 --name-only` shows the file TREE, not the file
+   CONTENT - a thin top-level shim (`export * from './Calendar'`) looks identical in a listing to
+   a full implementation. Always read the actual top-level entry file (e.g. `src/Calendar.ts`,
+   not just `src/index.ts`) before concluding a surface has no real JS. Default assumption: if
+   both a `legacy/` folder and a real top-level implementation file exist, BOTH are real - port
+   both, next as the default entry and legacy as a `/legacy` subpath (media-library/file-system/
+   contacts/calendar precedent above). Corrected 2026-09-25: an earlier pass wrongly concluded
+   `expo-calendar`'s modern surface had no upstream JS (it does - `src/Calendar.ts`, 456 lines,
+   a real class implementation) and shipped calendar next-only; the mistake was checking only
+   `src/next/index.ts` (a 1-line re-export) instead of the real top-level file. Both packages
+   now correctly ship the dual-surface shape - there is no confirmed single-surface precedent in
+   this catalog yet; treat "only one real surface" as the rare case, not the default guess.
+2.7. **Before hand-porting a package's JS, check for a real `'expo'` value import first** -
+   `symbiote-expo-native-module` skill §12. Zero value imports from `'expo'` in the real entry
+   file -> depend on the published `expo-<pkg>` directly and re-export it, no hand-port. Any
+   value import (`PermissionStatus`, `createPermissionHook`, etc) -> hand-port stays required.
 3. Follow `symbiote-expo-native-module` for **M** entries, `symbiote-third-party-native-view`
    for **V** entries.
 4. Pin any new native npm dependency via a pnpm catalog entry, not a literal version - see `symbiote-dependency-catalog`.

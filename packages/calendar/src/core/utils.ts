@@ -1,3 +1,5 @@
+export function stringifyIfDate(value: Date): string;
+export function stringifyIfDate(value: unknown): unknown;
 export function stringifyIfDate(value: unknown): unknown {
   return value instanceof Date ? value.toISOString() : value;
 }
@@ -28,20 +30,10 @@ export function stringifyDateValues(
   return result;
 }
 
-/** `null` in a patch means "clear natively"; `undefined` means "leave alone" - see native
- * update()'s separate `nullableFields` param. */
-export function splitNullableFields(patch: Record<string, unknown>): {
-  record: Record<string, unknown>;
-  nullableFields: string[];
-} {
-  const record: Record<string, unknown> = {};
-  const nullableFields: string[] = [];
-  for (const [key, value] of Object.entries(patch)) {
-    if (value === null) {
-      nullableFields.push(key);
-    } else if (value !== undefined) {
-      record[key] = stringifyValue(value);
-    }
-  }
-  return { record, nullableFields };
+/** `null` in a patch means "clear natively" - the native `update()` needs the field named
+ * separately, in addition to staying in the stringified record with its `null` value. */
+export function getNullableDetailsFields(
+  details: Record<string, unknown>,
+): string[] {
+  return Object.keys(details).filter(key => details[key] === null);
 }
