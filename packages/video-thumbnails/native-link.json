@@ -1,0 +1,12 @@
+{
+  "android": {
+    "gradleProjectName": "expo-video-thumbnails",
+    "modules": [
+      {
+        "importPath": "expo.modules.videothumbnails.VideoThumbnailsModule",
+        "className": "VideoThumbnailsModule",
+        "nativeName": "ExpoVideoThumbnails"
+      }
+    ]
+  }
+}

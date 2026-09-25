@@ -83,6 +83,7 @@ queue.
 | `@symbiote-native/asset` | `expo-asset` — full parity including the Expo Go / classic-updates / `expo-updates` code paths (naturally inert in this bare-app repo, real ported code not stubs — see the package's own README). Built primarily as `@symbiote-native/font`'s dependency for the `number`/`Asset`-instance `FontSource` forms. **Known gap (2026-09-25): no canary demo screen in any of the 6 `examples/expo-*` apps** — every other shipped package in this table has one; the ~6-framework navigation wiring (routes/nav-lines/menu/App registration per app) is a separate follow-up, out of scope for a source-parity pass | `symbiote-expo-native-module` |
 | `@symbiote-native/font` | `expo-font` — full parity including `unloadAsync`/`unloadAllAsync` (ported and exported for API parity though they always throw `UnavailabilityError` on native — `ExpoFontLoader` has no unload method on iOS/Android, web-only upstream) and `renderToImageAsync` (iOS + Android, not Android-only). Same **known gap** as `@symbiote-native/asset` above: no canary demo screen yet in any example app | `symbiote-expo-native-module` |
 | `@symbiote-native/image-manipulator` | `expo-image-manipulator` — the current chainable `manipulate(source)`/`ImageManipulatorContext` API plus the deprecated one-shot `manipulateAsync`. `useImageManipulator` not ported (real React hook, `useReleasingSharedObject` — same §11 class as image-picker's dropped hooks). `extent` action not ported (web-only, neither native module registers it) | `symbiote-expo-native-module` |
+| `@symbiote-native/video-thumbnails` | `expo-video-thumbnails` — single `getThumbnailAsync` function, no config plugin, no permissions | `symbiote-expo-native-module` |
 
 **Tier 1 is now fully closed (2026-08-03)** — every Tier 1 row below is shipped except
 `expo-constants` (#9), which stays deliberately skipped (see its own row note). Tier 2 (permission/
@@ -106,7 +107,8 @@ against the stock config shows no diff — not carried over, documented as a man
 `core/` from `expo-modules-core`'s own `createPermissionHook` — see
 `symbiote-expo-native-module` skill §11), `expo-image-manipulator` (#29) shipped 2026-09-25
 (ships no config plugin — `extent` action and `useImageManipulator` hook both dropped, same §11
-class as image-picker), 12 left.
+class as image-picker), `expo-video-thumbnails` (#30) shipped 2026-09-25 (ships no config plugin,
+no permissions — single-function package), 11 left.
 
 ```
 §secure_store_manifest_attrs := {
@@ -165,7 +167,7 @@ from each package's `expo-module.config.json`.
 | ~~27~~ | ~~`expo-document-picker`~~ | M | shipped — see "Already shipped" |
 | ~~28~~ | ~~`expo-image-picker`~~ | M | shipped — see "Already shipped" |
 | ~~29~~ | ~~`expo-image-manipulator`~~ | M | shipped — see "Already shipped" |
-| 30 | `expo-video-thumbnails` | M | apple, android |
+| ~~30~~ | ~~`expo-video-thumbnails`~~ | M | shipped — see "Already shipped" |
 | 31 | `expo-blob` | M | apple, android, web |
 | 32 | `expo-speech` | M | apple, android |
 | ~~33~~ | ~~`expo-audio`~~ | M | shipped — see "Already shipped" |

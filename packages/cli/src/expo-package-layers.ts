@@ -49,6 +49,7 @@ export type IExpoPackageLayerName =
   | 'system-ui'
   | 'task-manager'
   | 'tracking-transparency'
+  | 'video-thumbnails'
   | 'web-browser';
 
 export type IExpoPackageLayer = {
@@ -265,6 +266,11 @@ export const EXPO_PACKAGE_LAYERS: readonly IExpoPackageLayer[] = [
     id: 'tracking-transparency',
     label: 'Tracking transparency',
     symbiotePackage: '@symbiote-native/tracking-transparency',
+  },
+  {
+    id: 'video-thumbnails',
+    label: 'Video thumbnails',
+    symbiotePackage: '@symbiote-native/video-thumbnails',
   },
   {
     id: 'web-browser',

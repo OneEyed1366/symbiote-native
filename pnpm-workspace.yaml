@@ -352,6 +352,10 @@ catalog:
   # peer/runtime line. The `extent` action is web-only (no native impl on either platform) — not
   # ported, see packages/image-manipulator/README.md.
   expo-image-manipulator: 57.0.20
+  # Same exact-pin reasoning: packages/video-thumbnails depends on expo-video-thumbnails ONLY for
+  # its native ios/android folders. Version verified against .vendors/expo at origin/sdk-57
+  # (57.0.2) and npm-published `latest`, same expo-modules-core 57.0.5 peer/runtime line.
+  expo-video-thumbnails: 57.0.2
   # Same exact-pin reasoning, continuing tier-2: packages/task-manager depends on
   # expo-task-manager ONLY for its native ios/android folders (JS hand-ported into our own
   # core). Version verified against .vendors/expo at origin/sdk-57 (57.0.15) and matches the
