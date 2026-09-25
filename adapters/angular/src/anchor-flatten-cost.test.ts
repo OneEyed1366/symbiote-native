@@ -1,14 +1,6 @@
-// Angular's column of the five-adapter anchor census. See adapters/react/src/anchor-flatten-cost.
-// test.tsx for what the shape measures and why; this file mirrors it so the numbers line up.
-//
-// Angular is the reason the census exists. Its compiler binds a component to a host ELEMENT, so a
-// composed component instance cannot exist without a node — anchor-host-registry.ts only stops that
-// node from painting, it cannot remove it.
-//
-// The row used to compose THREE components — itself and two Pressables — for three anchors per row.
-// `<pressable>` is a tag since 2026-09-11 and commits a real painting node, so the row composes ONE
-// component and the census reads one anchor per row. That is the migration's cost showing up in the
-// only currency this file measures.
+// Angular's column of the five-adapter anchor census (see adapters/react's twin for what it
+// measures). Angular's compiler binds a component to a host ELEMENT, so a composed component
+// instance cannot exist without a node; `<pressable>` is a tag, so the row composes ONE component.
 
 import '@angular/compiler';
 import { Component, Input, signal } from '@angular/core';

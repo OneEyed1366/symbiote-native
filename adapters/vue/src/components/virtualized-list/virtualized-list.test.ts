@@ -261,14 +261,9 @@ describe('Vue VirtualizedList virtualization on the engine', () => {
   // why: this is the recommit path, not just the initial mount — a native `topScroll` event has
   // to reach the reducer through Vue's microtask-batched commit and produce a NEW committed tree,
   // proving the adapter re-drives the shared window logic on every scroll, not only once at mount.
-  // why: WHERE a separator sits, and WHAT decides to render it, are both geometry. RN renders
-  // ItemSeparatorComponent INSIDE the cell's own measuring wrapper
-  // (VirtualizedListCellRenderer.js:218-221) and gates it on the last index of the DATA
-  // (VirtualizedList.js:793). As a SIBLING it is an extra flex child, so the chrome between two
-  // cells is gap + separator + gap while a spacer collapsing that region contributes one gap — the
-  // leading spacer lands every cell below it short by (separator + gap). Gated on the WINDOW, a
-  // cell's own height changes as the window slides past it. Both were device-measured 2026-08-19 as
-  // the list jumping mid-scroll; see .claude/rules/list-geometry-feedback-loop.md.
+  // why: WHERE a separator sits, and WHAT decides to render it, are both geometry — as a SIBLING
+  // it's an extra flex child that breaks the leading-spacer math, and gated on the WINDOW instead
+  // of the DATA a cell's height changes as the window slides past it.
   it('renders the separator inside its cell rather than beside it', async () => {
     await mountWithViewport(
       {},
@@ -492,13 +487,6 @@ describe('Vue VirtualizedList sticky header force-mount', () => {
   // scroll view's own paint children, so the behavior synthesizes a wrapper around child N — but a
   // windowed list paints a header, a spacer and a slice, so the positions have to be recomputed
   // every time the window slides, and the reconciler then re-wraps a different child each pass.
-  //
-  // Device-diagnosed 2026-09-18 on examples/vue, sticky path B, and the log measured all three
-  // symptoms: a wrapper's height grew 988 -> 1976 -> 2964, i.e. one WHOLE SECTION swallowed per
-  // slide (988 = a 28pt header plus 32 rows of 30); the wrapped cell's own `onLayout` then reports
-  // y RELATIVE to the wrapper (`cell 136 measured length=28 offset=0`), which poisons the list's
-  // offset table; and `nextHeaderLayoutY` wanders (2004 -> 2962 -> 1044 -> 2032 -> 4880). The
-  // header pins for half a section and then stops, permanently.
   //
   // React and Svelte never had it because their lists name the `sticky-header` TAG on the cell,
   // which pins by DOCUMENT order and survives windowing. Vue and Angular were the only two left on

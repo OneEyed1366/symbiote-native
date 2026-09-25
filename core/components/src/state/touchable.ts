@@ -182,11 +182,9 @@ export function createTouchableFeedbackHandlers(
   };
 }
 
-// ---- RN-audited additions (2026-08-19) --------------------------------------------------------
-//
-// Measured against .vendors/react-native. Everything above predates that audit and is still what
-// the React, Vue, Svelte and Angular adapters call; the names below are the RN-accurate forms and
-// are additive on purpose, so the tree stays green while each adapter migrates.
+// ---- RN-audited additions ----
+// Measured against .vendors/react-native. The names below are the RN-accurate forms, kept
+// additive so the tree stays green while each adapter migrates off the names above.
 
 // RN's Touchable* family OVERRIDES Pressability's own floor with 0 — TouchableOpacity.js:195,
 // TouchableHighlight.js:203 and TouchableWithoutFeedback.js all pass `minPressDuration: 0`. So

@@ -157,10 +157,9 @@ describe('Solid VirtualizedList on the engine', () => {
     // outright addViewAt crash, which is why RN also pins the content view un-flattened
     // (ScrollView.js preserveChildren / collapsable=false).
     //
-    // THE UN-FLATTENING ITSELF is `foldScrollContentProps` in the engine since 2026-09-18 and is
-    // pinned in `core/engine/cpp/tests/js/scroll-content-payload.itest.ts`; this host carries no
-    // copy of the tag rules. What Solid owns is the NESTING, which is the half a flat tree gets
-    // wrong.
+    // THE UN-FLATTENING ITSELF is `foldScrollContentProps` in the engine, pinned in
+    // `scroll-content-payload.itest.ts`; this host carries no copy. What Solid owns is the
+    // NESTING, which is the half a flat tree gets wrong.
     it('commits a nested scroll host holding a single content container', async () => {
       mount(ROOT_TAG, () => (
         <VirtualizedList<IRow>
@@ -326,11 +325,9 @@ describe('Solid VirtualizedList on the engine', () => {
     // why: RN renders ItemSeparatorComponent BETWEEN cells and never after the last one — a trailing
     // separator is the classic off-by-one that shows up as a stray divider above the footer. With
     // the window holding exactly two cells there is exactly one gap.
-    // why: the gate is the last index of the DATA, not of the WINDOW (RN VirtualizedList.js:793,
-    // `const end = getItemCount(data) - 1`). Since the separator lives inside the measuring wrapper,
-    // gating on the window would make a cell's own height change as the window slid past it — seen
-    // on device 2026-08-19 as a run of cells shifting by exactly the divider's 1px. Every rendered
-    // cell here is mid-list, so every one of them carries a separator.
+    // why: the gate is the last index of the DATA, not of the WINDOW (RN VirtualizedList.js:793).
+    // Since the separator lives inside the measuring wrapper, gating on the window would make a
+    // cell's own height change as the window slides past it. Every cell here is mid-list.
     it('gives every cell a separator while none of them is the last item', async () => {
       mount(ROOT_TAG, () => (
         <VirtualizedList<IRow>
@@ -377,14 +374,9 @@ describe('Solid VirtualizedList on the engine', () => {
       );
     });
 
-    // why: WHERE the separator sits is geometry, not decoration. As a sibling of the cell it is an
-    // extra flex child, so the chrome between two cells becomes gap + separator + gap while the
-    // leading spacer collapsing that region contributes only one gap — every cell below it lands
-    // short by (separator + gap) and the content jumps by that much whenever the window's first
-    // index moves. Measured at exactly 17px on device 2026-08-19. RN avoids it structurally by
-    // rendering the separator INSIDE the cell's measuring wrapper
-    // (VirtualizedListCellRenderer.js:218-221), which also folds it into the cell's measured
-    // length. Counting dividers, as the test above does, cannot see any of this.
+    // why: WHERE the separator sits is geometry, not decoration. As a SIBLING it would be an
+    // extra flex child, landing every cell below the leading spacer short. RN avoids this by
+    // rendering it INSIDE the measuring wrapper (VirtualizedListCellRenderer.js:218-221).
     it('renders the separator inside its cell rather than beside it', async () => {
       mount(ROOT_TAG, () => (
         <VirtualizedList<IRow>
@@ -1309,16 +1301,9 @@ describe('Solid VirtualizedList on the engine', () => {
       ).toHaveLength(1);
     });
 
-    // The Android wrap-and-split-style case moved out of this file entirely (2026-09-11): since
-    // VirtualizedList no longer builds its own scroll/content pair, WHICH platform wraps the
-    // RefreshControl is decided by which `<scroll-view>` behavior is registered
-    // (`core/components/src/behaviors/scroll-view/index.{ios,android}.ts`), not by which
-    // `VirtualizedList` factory an app imports — `./index.ios` and `./index.android` now produce
-    // byte-identical output, matching Vue's and Svelte's single, unsplit `VirtualizedList`. Headless
-    // registration is locked to the iOS variant for the whole process
-    // (`core/components/src/behaviors/scroll-view/index.ts` re-exports `index.ios`, same as Metro's
-    // own platform default), so an adapter-level test importing `index.android` here would still
-    // exercise the iOS-registered behavior — it is `wrap-android.test.ts`'s subject, not this file's.
+    // WHICH platform wraps the RefreshControl is decided by which `<scroll-view>` behavior is
+    // registered (`behaviors/scroll-view/index.{ios,android}.ts`), not by which VirtualizedList
+    // factory an app imports — that's `wrap-android.test.ts`'s subject, not this file's.
 
     // why: RN implements sticky headers PURELY IN JS — the native scroll view ignores
     // stickyHeaderIndices entirely, so forwarding the array is a silent no-op that hides a missing
@@ -1358,10 +1343,8 @@ describe('Solid VirtualizedList on the engine', () => {
     // layout, so its pin resets) every time the window slides back — the flickering sticky header
     // this exists to fix. Only the NEAREST one below is kept; earlier sticky indices do not apply.
     // why: the separator lives inside the measuring wrapper, so whatever decides to render it
-    // decides the cell's HEIGHT. The force-mounted sticky cell used to be excluded, which made that
-    // cell's height depend on where the window sat — every window step then shifted everything below
-    // it by the divider's 1px, measured on device 2026-08-19. RN excludes neither the sticky cell
-    // nor anything else window-shaped; the only gate is the data's last index.
+    // decides the cell's HEIGHT. Excluding the sticky cell would make its height depend on the
+    // window, shifting everything below it. RN excludes neither it nor anything window-shaped.
     it('gives the force-mounted sticky cell a separator like any other cell', async () => {
       mount(ROOT_TAG, () => (
         <VirtualizedList<IRow>
@@ -1678,10 +1661,8 @@ describe('Solid VirtualizedList on the engine', () => {
   // be RED-first (the shapes they pin are the natural implementation), so each is proven by
   // MUTATION instead: revert the guard, watch this test fail, restore.
   // why: RN's recordInteraction() ungates waitForInteraction AND runs the viewability pass right
-  // there, so the app hears about its viewable items immediately. The shared reducer used to only
-  // flip the flag, which on a list that fits its viewport and is never scrolled meant the report
-  // never arrived at all — the next windowing change that would have carried it never came.
-  // Aligned to RN 2026-08-18.
+  // there, so the app hears about its viewable items immediately — merely flipping the flag would
+  // leave a list that fits its viewport and is never scrolled with no windowing change to carry it.
   it('reports the ungated viewable items as soon as an interaction is recorded', async () => {
     const onViewableItemsChanged = vi.fn();
     let list: { recordInteraction: () => void } | undefined;
@@ -1896,12 +1877,9 @@ describe('Solid VirtualizedList on the engine', () => {
   });
 
   describe('Negative', () => {
-    // why: RN's scrollToIndex asserts the index is in range and throws, naming the valid range. The
-    // shared reducer used to clamp, which landed the list on the last row and turned a caller bug
-    // into "the wrong row is on screen" with nothing pointing back at the call site. Aligned to RN
-    // 2026-08-18; the reducer's own three invariants are pinned in
-    // core/components/src/state/virtualized-list-reducer.test.ts. This test is the adapter's proof
-    // that the throw survives the handle rather than being swallowed on the way out.
+    // why: RN's scrollToIndex asserts the index is in range and throws, naming the valid range —
+    // clamping instead would turn a caller bug into "the wrong row is on screen" with nothing
+    // pointing back at the call site. This proves the throw survives the handle, unswallowed.
     it('rejects an out-of-range scrollToIndex the way RN does', async () => {
       let list: { scrollToIndex: (p: { index: number }) => void } | undefined;
       mount(ROOT_TAG, () => (

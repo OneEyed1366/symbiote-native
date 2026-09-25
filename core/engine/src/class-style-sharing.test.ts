@@ -1,19 +1,12 @@
 // Two nodes styled the same way should send the host ONE style value, not two identical ones.
-//
-// why: `pushClassStyle` publishes a fresh `[classStyle, explicitStyle]` array per node. That array
-// is what crosses as the `style` prop, and the host turns each entry of the batch's value table into
-// a `folly::dynamic` — so a thousand rows sharing one `StyleSheet.create` object still produced a
-// thousand distinct arrays and a thousand identical conversions. `mutation-buffer.ts` interns by
-// IDENTITY, which is the right rule and could not see them.
-//
-// Measured on `build-release` before this (`raw-fabric-vs-engine.itest.ts`): 12 005 `setProp` ops
-// folded to 9 005 value-table entries, and the 4 000 that refused to fold were exactly the style
-// writes — three shared style objects across a thousand rows, arriving as four thousand arrays.
-//
-// The sharing is keyed on the two parts by identity and held in `WeakMap`s, so a caller that builds
-// a fresh style object per render gets nothing — correctly, since two structurally equal objects are
-// two values to anyone reading them later, and a deep compare would make the cost depend on the size
-// of every style in the app.
+
+// why: pushClassStyle publishes a fresh [classStyle, explicitStyle] array per node, so a thousand
+// rows sharing one StyleSheet.create object still produced a thousand distinct arrays and a
+// thousand identical folly::dynamic conversions — mutation-buffer.ts interns by identity only.
+
+// The sharing is keyed on the two parts by identity, held in WeakMaps, so a caller that builds a
+// fresh style object per render gets nothing — correctly, since two structurally equal objects are
+// two values to anyone reading them later, and a deep compare would cost the size of the style.
 
 import { describe, expect, it } from 'vitest';
 
@@ -67,16 +60,9 @@ describe('the style slot is shared between nodes styled the same way', () => {
     expect(published[1]).toBe(style);
   });
 
-  // ── THE NO-OP RE-RENDER, WHICH IS THE COMMONEST SHAPE THERE IS ─────────────────────────────────
-  //
-  // A component body that builds its style inline hands over a FRESH object every render, equal to
-  // the one already standing. Identity cannot see that, so the write crossed into the host, was
-  // converted to a `folly::dynamic`, and only then compared — and the comparison said "unchanged".
-  // Measured on `build-release` (`no-op-rerender-cost.itest.ts`), 1 000 rows re-rendered with no
-  // change at all: 9.7 ms against 0.3 ms for the same app with the style hoisted, and 5.2 ms of the
-  // 9.7 was that conversion.
-  //
-  // The cheapest place to refuse a write is the earliest place that can see it is a no-op.
+  // The no-op re-render, the commonest shape there is: a component body builds a fresh style
+  // object every render, equal to the one standing. Identity alone can't see that, so without this
+  // the write crossed into the host and converted before being found unchanged.
   it('records nothing when a rebuilt style equals the one standing', () => {
     resetMutationBuffer();
     const node = createElement('RCTView');
@@ -108,10 +94,8 @@ describe('the style slot is shared between nodes styled the same way', () => {
     }
   });
 
-  // why: CONSERVATIVE on anything nested. A style holding an array or an object (a transform list, a
-  // shadow, a nested style array) would need a deep compare to refuse, and a deep compare makes the
-  // guard cost the size of the style — which is the cost it exists to avoid. Those keep crossing,
-  // and the host's own `diffProps` refuses them exactly as it did before.
+  // why: conservative on anything nested — a deep compare would cost the size of the style, so
+  // these keep crossing and the host's own diffProps refuses them exactly as before.
   it('lets a style carrying a nested value through rather than comparing deeply', () => {
     resetMutationBuffer();
     const node = createElement('RCTView');

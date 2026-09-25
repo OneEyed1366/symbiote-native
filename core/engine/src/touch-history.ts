@@ -1,14 +1,9 @@
-// Per-touch position/time tracking, ported from RN's
-// react-native-renderer/.../legacy-events/ResponderTouchHistoryStore.js. PanResponder's
-// multitouch dx/vx math needs each touch's own previous->current delta (RN counts only
-// touches that moved since `_accountsForMovesUpTo`), which a grant-relative centroid of
-// ALL live touches cannot reconstruct. We maintain the bank as touches flow and ATTACH
-// `touchHistory` onto the nativeEvent reaching responder handlers, exactly how
-// ResponderEventPlugin.js sets `*.touchHistory`.
-//
-// events/index.ts consumes only this file's public surface (recordTouchTrack,
-// attachTouchHistory, resetTouchHistory, touchHistory); everything else here is a
-// private implementation detail of the bank.
+// Per-touch position/time tracking, ported from RN's ResponderTouchHistoryStore. PanResponder's
+// multitouch dx/vx math needs each touch's own previous->current delta, which a grant-relative
+// centroid of all live touches can't reconstruct; the bank attaches to responder events.
+
+// events/index.ts consumes only this file's public surface (recordTouchTrack, attachTouchHistory,
+// resetTouchHistory, touchHistory); everything else here is a private implementation detail.
 
 import { isRecord } from './type-guards';
 
@@ -47,10 +42,9 @@ export const touchHistory: ITouchHistory = {
   mostRecentTimeStamp: 0,
 };
 
-// A raw touch as it arrives inside the untyped nativeEvent. RN reads pageX/pageY/
-// identifier/timestamp; we narrow each defensively so a malformed or coordinate-less
-// touch (e.g. the negotiation smoke's `{ target }`-only touches) is skipped, never
-// throwing; recording must not perturb the responder negotiation.
+// A raw touch as it arrives inside the untyped nativeEvent. Each field is narrowed defensively so
+// a malformed or coordinate-less touch is skipped, never thrown — recording must not perturb the
+// responder negotiation.
 interface INormalizedTouch {
   identifier: number;
   pageX: number;

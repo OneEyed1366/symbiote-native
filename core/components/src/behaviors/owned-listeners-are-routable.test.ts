@@ -6,10 +6,8 @@
 // so to the behavior's stash — only for a registered event; a name that misses falls through to
 // `setProp` and sits in `node.props`, where a machine that reads the stash never looks.
 //
-// Found by the gap it left: `pressMove` was the one name of the press machine's eight in neither
-// engine list, so `<pressable @press-move>` highlighted on press (that is `activeStyle`,
-// engine-side) while its dx/dy readout never moved. Device-reported on `examples/vue-sfc`,
-// 2026-09-02.
+// A name missing this audit stays silently dead: `pressMove` once fell through, so
+// `<pressable @press-move>` highlighted on press while its dx/dy readout never moved.
 //
 // DERIVED on both axes — the tags come off `HOST_PRIMITIVES` and the names off each registered
 // behavior — so a primitive or an owned name added later joins this audit by existing. A

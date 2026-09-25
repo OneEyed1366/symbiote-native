@@ -6,12 +6,9 @@
 // compiles to `resolveComponent("text-input")` with its children as a slot the element path never
 // reads, which renders a blank subtree with no error.
 //
-// DERIVED, never enumerated. Until 2026-09-07 this was the prefix test `tag.startsWith('symbiote-')`
-// in ./babel-jsx.cjs — correct while every intrinsic carried that marker, and answering FALSE for
-// every tag since the prefix was dropped (`core/components/src/component-names/shared.ts` says why
-// it went). What hid it is the tag alphabet: `view` / `text` / `image` / `switch` are real SVG
-// element names, so both compilers resolve those four as elements with no configuration at all, and
-// only the hyphenated half degraded.
+// DERIVED, never enumerated — the tag alphabet has no shared marker to test for.
+// `view`/`text`/`image`/`switch` are real SVG element names, so both compilers resolve those four
+// as elements with no configuration at all; only the hyphenated half needs this table.
 //
 // SCOPE, stated because it is smaller than `ISymbioteIntrinsic`. That union also holds
 // `scroll-view`, `modal`, `activity-indicator` and the rest, but it is a TypeScript type and these
@@ -19,16 +16,9 @@
 // runtime-readable table reachable from here, so a hand-written `<scroll-view>` still resolves as a
 // component. Closing that needs a CJS intrinsic table in `core/components`.
 //
-// WHAT THAT GAP COSTS, measured 2026-09-11 rather than reasoned, because the first guess was that
-// the tag simply would not work. It works: `resolveComponent` falls back to the tag STRING, and
-// `normalizeChildren` then unwraps the `withCtx` default slot for an element shapeFlag, so
-// `<scroll-view><text>hi</text></scroll-view>` committed `RCTView > RCTScrollView > RCTText >
-// RCTRawText`. What it costs is a dev-mode `[Vue warn]: Failed to resolve component: scroll-view`
-// on every such element plus the component codegen path (a slot closure per element) instead of
-// `_createElementBlock`. That is a divergence from every other tag, so `ScrollView`,
-// `TouchableOpacity` and `TouchableHighlight` stay COMPONENTS on Vue until their
-// `HOST_PRIMITIVES` entries land — and `intrinsic-elements.ts` already types all three as valid
-// markup off `ISymbioteIntrinsic`, so vue-tsc accepts what the runtime compiler warns about.
+// WHAT THAT GAP COSTS: `resolveComponent` falls back to the tag STRING and still commits the
+// right tree, paying only a dev-mode `[Vue warn]` plus the component codegen path — so
+// `ScrollView`/`TouchableOpacity`/`TouchableHighlight` stay COMPONENTS until they join this table.
 //
 // The tell that the three are still wrapped rather than merely unlisted: `src/register.ts` does
 // NOT call their behaviors, because a registered behavior plus a surviving wrapper is two owners

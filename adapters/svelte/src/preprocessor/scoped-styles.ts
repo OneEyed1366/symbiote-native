@@ -160,13 +160,12 @@ export function scopedStyles(): {
 // ---------------------------------------------------------------------------------------------
 // The <style> block, located WITHOUT parsing it.
 //
-// This is svelte's own tag regex (src/compiler/preprocess/index.js), which is what its official
-// `preprocess()` style hook uses to hand a block's content to a preprocessor unparsed — and the
-// reason `svelte-preprocess` can compile SCSS at all. Reading `parse().css` instead, as this file
-// did until 2026-08-20, validates the block as CSS whatever `lang` says: `<style lang="scss">$pad:
-// 7px;</style>` threw `css_expected_identifier` before the language table above was ever
-// consulted, so only SCSS that is already valid CSS (nesting) survived. A `<!-- -->` comment is an
-// alternative of the pattern purely so a commented-out block is skipped rather than matched.
+// This is svelte's own tag regex (src/compiler/preprocess/index.js): what its official
+// `preprocess()` style hook uses to hand a block's content unparsed, the reason `svelte-preprocess`
+// can compile SCSS at all — `parse().css` would validate it as CSS whatever `lang` says.
+
+// A `<!-- -->` comment is an alternative of the pattern purely so a commented-out block is
+// skipped rather than matched.
 
 const STYLE_TAG_PATTERN =
   /<!--[^]*?-->|<style((?:\s+[^=>'"/\s]+=(?:"[^"]*"|'[^']*'|[^>\s]+)|\s+[^=>'"/\s]+)*\s*)(?:\/>|>([\S\s]*?)<\/style>)/g;

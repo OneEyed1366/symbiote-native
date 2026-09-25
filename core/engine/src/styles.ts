@@ -1,9 +1,6 @@
-// The typed style surface (ViewStyle / TextStyle and friends). Maps onto Yoga layout
-// props and RN's view/text props, which Fabric's C++ reads off the props payload.
-// A correctly-typed subset of RN's StyleSheet surface (see
-// react-native/Libraries/StyleSheet/StyleSheetTypes): the load-bearing layout / box /
-// shadow / transform / text props, not the full surface. Agnostic types, so they
-// live in the engine next to the style processors; every adapter re-exports them.
+// The typed style surface (ViewStyle/TextStyle and friends). Maps onto Yoga layout props and RN's
+// view/text props, which Fabric's C++ reads off the props payload. A correctly-typed subset of
+// RN's StyleSheet surface — agnostic types, so every adapter re-exports them from the engine.
 
 import type { AnimatedNode } from './animated/graph';
 import type { IColorValue } from './platform-color';
@@ -115,10 +112,8 @@ export type IRadialGradientValue = {
   colorStops: ReadonlyArray<IColorStopValue>;
 };
 
-// `background-image` / gradients (StyleSheetTypes BackgroundImageValue:775). Same New-
-// Architecture shape as `boxShadow`/`filter` above: a CSS string or a structured array, JS-
-// parsed before native because `enableNativeCSSParsing()` defaults to `false` — see
-// `core/engine/src/process-background-image`.
+// background-image / gradients. Same shape as boxShadow/filter above: a CSS string or a
+// structured array, JS-parsed before native since enableNativeCSSParsing() defaults to false.
 export type IBackgroundImageValue = ILinearGradientValue | IRadialGradientValue;
 
 // CSS mix-blend-mode keywords (StyleSheetTypes ____BlendMode_Internal:825).
@@ -255,9 +250,8 @@ export interface IViewStyle {
   transformOrigin?:
     [string | number, string | number, string | number] | string;
 
-  // New-Architecture visual props (StyleSheetTypes ____ViewStyle_InternalBase:887).
-  // All three are pass-through style keys: flattenStyle copies the array/object/string
-  // value untouched and fabricProps hoists it, so Fabric's C++ does the parsing: no
+  // New-architecture visual props. All three are pass-through style keys: flattenStyle copies the
+  // array/object/string value untouched and fabricProps hoists it, so Fabric's C++ parses it — no
   // ViewConfig validAttributes entry and no JS-side color processing are needed.
   boxShadow?: IBoxShadowValue[] | string;
   filter?: IFilterFunction[] | string;
@@ -293,10 +287,7 @@ export interface ITextStyle extends IViewStyle {
   // the type is declared here, the COLOR_PROPS wiring is a shared change.
   textDecorationColor?: IColorValue;
   textDecorationStyle?: 'solid' | 'double' | 'dotted' | 'dashed';
-  // The three halves of CSS `text-shadow`, which the CSS compiler has always emitted and
-  // fabric-props.ts has always listed under COLOR_PROPS — the type was the only place they were
-  // missing, so a hand-written `style={{ textShadowRadius: 2 }}` was a type error while the same
-  // thing from a stylesheet went through.
+  // The three halves of CSS text-shadow, listed under COLOR_PROPS in fabric-props.ts.
   textShadowColor?: IColorValue;
   textShadowOffset?: { width: number; height: number };
   textShadowRadius?: number;
@@ -307,21 +298,15 @@ export interface ITextStyle extends IViewStyle {
   includeFontPadding?: boolean;
 }
 
-// A style "slot" exactly as RN callers pass it: a single style object, a (possibly
-// nested) array of them, or a falsy entry that contributes nothing, the idiom
-// `style={[base, cond && override]}`. Mirrors RN's StyleProp<T> (StyleSheetTypes:
-// RecursiveArray + Falsy). The engine's flattenStyle collapses the whole shape to one
-// flat payload at commit (style.ts), so every public `style` prop accepts this, not a
-// bare object. We omit RN's RegisteredStyle brand: our StyleSheet.create is identity
-// (returns the objects, not opaque numeric ids), so there is no id to model.
+// A style "slot" exactly as RN callers pass it: a style object, a (possibly nested) array of
+// them, or a falsy entry contributing nothing (`style={[base, cond && override]}`). Mirrors RN's
+// StyleProp<T>, minus the RegisteredStyle brand — our StyleSheet.create is identity.
 type IStyleFalsy = false | null | undefined | '';
 type IRecursiveArray<T> = ReadonlyArray<T | IRecursiveArray<T>>;
 
-// An animated value may stand in for any LEAF of a style — `{opacity: value}`,
-// `transform: [{translateY: value}]`. It is not a wrapper's private surface: `routeProp`
-// resolves one on any node (animated/host-binding.ts), so a bare tag takes it too, and
-// `Animated.View` is the plain component. Mirrors RN's WithAnimatedValue<T>; recursing rather
-// than widening the leaf types keeps a non-style object from passing as a style.
+// An animated value may stand in for any leaf of a style — {opacity: value},
+// transform: [{translateY: value}]. routeProp resolves one on any node, so a bare tag takes it
+// too. Mirrors RN's WithAnimatedValue<T>; recursing keeps a non-style object from passing as one.
 type IWithAnimated<T> = T extends AnimatedNode
   ? T
   : T extends string | number | boolean | null | undefined
@@ -337,8 +322,7 @@ export type IStyleProp<T> =
   | IStyleFalsy
   | IRecursiveArray<IWithAnimated<T> | IStyleFalsy>;
 
-// The constraint behind StyleSheet.create. Mirrors RN's NamedStyles<T>
-// (StyleSheet.d.ts:26): it both validates each entry as a real style object AND
-// supplies the contextual type that keeps string-literal props (flexDirection: 'row')
-// from widening to `string`: the exact guarantee a bare identity create loses.
+// The constraint behind StyleSheet.create. Mirrors RN's NamedStyles<T>: validates each entry as a
+// real style object AND supplies the contextual type that keeps string-literal props
+// (flexDirection: 'row') from widening to `string` — the guarantee a bare identity create loses.
 export type INamedStyles<T> = { [P in keyof T]: IViewStyle | ITextStyle };

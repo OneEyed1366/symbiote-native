@@ -3,10 +3,8 @@
 // re-writing an UNCHANGED class would still land as a write and mark the node dirty.
 //
 // Costs React / Vue / Svelte nothing — each diffs props before calling the engine — but Solid has
-// no diff: a fine-grained effect re-runs whenever any signal it reads changes. Measured on device
-// 2026-08-23 (examples/solid, once its primitives were tags): selecting one row of 1 000 read
-// WRITES 1001 and a 10.3 ms reconcile window against Fabric's unmoved 0/0/10 — a thousand-node
-// dirty walk for two nodes' worth of change.
+// no diff: a fine-grained effect re-runs whenever any signal it reads changes, so selecting one
+// row of 1 000 writes every row's class and dirties the whole tree for two nodes' worth of change.
 //
 // AGAINST THE REAL DIFFERENTIATOR, not a stand-in — `core/engine/src/node.ts`'s own `setProp`
 // comment settles what to measure: "THE Object.is DEDUPE IS NOT HERE ANY MORE... The guard lives

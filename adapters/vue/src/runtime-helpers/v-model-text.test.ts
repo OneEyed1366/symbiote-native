@@ -1,6 +1,4 @@
-// `v-model` on a `<text-input>`, i.e. on an element. Device-found 2026-08-31 in
-// examples/vue-sfc's canary: the field echoed keystrokes and the greeting beside it never left
-// "Hello, stranger".
+// `v-model` on a `<text-input>`, i.e. on an element.
 //
 // WHY THE SUBJECT IS BUILT WITH `withDirectives` AND NOT WITH `v-model` IN A TEMPLATE. This is
 // exactly what both Vue compilers emit for `v-model` on an element — measured on the real
@@ -136,10 +134,9 @@ describe('v-model on a text-input tag', () => {
     mountModel({ initial: 'start', withDirective: true });
     await tick();
 
-    // `value`, not `text`. The `value -> text` fold moved to `SymbioteFabricProps.cpp` on
-    // 2026-09-18 and this harness's payload comes from the TypeScript builder, which holds no copy
-    // of it — `core/engine/cpp/tests/js/text-input-payload.itest.ts` asserts the fold. What the
-    // directive is responsible for is the value arriving at all, which is what this reads.
+    // `value`, not `text`. The `value -> text` fold is `SymbioteFabricProps.cpp`'s, and this
+    // harness's TypeScript builder holds no copy — `text-input-payload.itest.ts` asserts the fold.
+    // The directive is responsible for the value arriving at all, which is what this reads.
     expect(committedProps()).toMatchObject({ value: 'start' });
   });
 
@@ -204,11 +201,9 @@ describe('v-model on a text-input tag', () => {
   });
 });
 
-// Vue's compiler picks the v-model directive by ELEMENT, and for anything it does not recognise as
-// a DOM input it emits `vModelText` — `<switch>` included. Stringifying the
-// model there is correct upstream (a DOM input's value IS a string) and fatal here: the Switch
-// behavior reads `props.value === true`, so `String(true)` pins the control OFF and no tap moves
-// it. Device-confirmed on `examples/vue-sfc`, both switches on `CanaryScreen`, 2026-09-02.
+// Vue's compiler picks v-model's directive by ELEMENT: anything not recognised as a DOM input
+// gets `vModelText` — `<switch>` included. Stringifying is fatal here: Switch reads
+// `props.value === true`, so `String(true)` pins the control OFF and no tap moves it.
 describe('vModelText on a switch tag', () => {
   const created = (value: unknown): ISymbioteNode => {
     const el = createElement('Switch', false, SWITCH_TAG);

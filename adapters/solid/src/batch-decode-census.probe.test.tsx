@@ -294,11 +294,9 @@ describe('what the native applier decodes per op instead of per thing', () => {
     // batch has distinct things — "if these ever became equal the finding would be gone, and that is
     // exactly what the test should notice". It noticed, for one of the two halves.
     expect(create.stringReads).toBeGreaterThan(create.stringEntries);
-    // CLOSED 2026-09-17, and this line is the guard that it stays closed. `mutation-buffer.ts` now
-    // interns prop VALUES by identity and `node.ts` shares one published `[class, style]` array per
-    // distinct pair, so the far side converts each distinct value once per batch instead of once per
-    // op. Greater-than here again would mean the sharing broke — most likely by something rebuilding
-    // a style object per node, which is invisible to every other test in this repository.
+    // Guards that value-sharing stays closed: `mutation-buffer.ts` interns prop VALUES by identity,
+    // so the far side converts each distinct value once per batch. Greater-than here would mean
+    // the sharing broke — most likely something rebuilding a style object per node.
     expect(create.entries).toBe(create.distinctEntries);
   });
 });

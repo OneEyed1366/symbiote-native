@@ -1,23 +1,11 @@
-// What the React adapter contributes to a `<text>` tag's props — the FORWARDING, as of 2026-09-18.
-//
-// This file was written the day `Text` stopped being a component, because NOTHING in this adapter
-// asserted RN's two Text defaults either way: the suite stayed green with them present and would
-// have stayed green with them gone, the silent shape `.claude/rules/test-harness-false-greens.md` is
-// about. That was a real gap and the file closed it.
-//
-// The rule has since collapsed from six implementations to one. It was the wrapper's
-// (`resolveTextProps`), then the renderer's (`HOST_PRIMITIVES.Text.defaults`), then also Angular's
-// `TextHost`, Vue's and Solid's renderers and the headless payload builder — and it is now
-// `foldTextDefaults` in `SymbioteFabricProps.cpp` alone, keyed on the component so every adapter
-// gets it for emitting the tag. The claims went with it, to
-// `core/engine/cpp/tests/js/committed-payload.itest.ts`, which reads a payload a commit actually
-// sent rather than one a second copy of the rule produced.
-//
-// SO THE UNAUTHORED CASES ARE GONE FROM HERE, and deliberately not replaced with a weaker version of
-// themselves. This harness builds payloads through the TypeScript `fabricProps`, which carries no
-// platform rules, so a `tail` asserted here would be asserting the harness. What remains is the half
-// that is genuinely this adapter's: an authored value reaches the engine unchanged, including the
-// `false` that the whole `!== false` encoding exists for.
+// What the React adapter contributes to a `<text>` tag's props — the FORWARDING.
+
+// RN's two Text defaults are `foldTextDefaults`'s alone now, in `SymbioteFabricProps.cpp`, keyed
+// on the component; asserted in `committed-payload.itest.ts` against a real commit. This harness's
+// `fabricProps` carries no platform rules, so asserting a default here would assert the harness.
+
+// What remains is the half that is genuinely this adapter's: an authored value reaches the engine
+// unchanged, including the `false` that the whole `!== false` encoding exists for.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '@symbiote-native/react';
 import { installRecordingFabric, payloadOf } from '@symbiote-native/test-utils';

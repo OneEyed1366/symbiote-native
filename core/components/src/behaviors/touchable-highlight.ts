@@ -1,33 +1,11 @@
-// TouchableHighlight as an ENGINE-NODE behavior, so it can be an intrinsic tag instead of a
-// framework component (`.claude/rules/host-primitive-tier.md`, tier 2).
-//
-// ONE NODE, THE SAME SIMPLIFICATION EVERY WRAPPER ALREADY SHIPPED. RN's own TouchableHighlight
-// renders a container View (the responder, the underlay backgroundColor, the whole accessibility
-// fold) and CLONES an extra opacity style onto its single child (TouchableHighlight.js:281-320,
-// `_createExtraStyles` + `cloneElement`). This tag folds both onto the ONE node instead, in
-// `foldTouchableHighlightUnderlay` (`SymbioteFabricProps.cpp`) now — see that rule's own header.
-//
-// KNOWN GAP, and it predates both this port and the fix it reverts. Composing `opacity` onto the
-// SAME node as the underlay's `backgroundColor` fades the underlay itself, so `underlayColor:
-// 'black'` paints grey rather than black — every adapter's wrapper shipped this, and the rule's own
-// header above says so on purpose ("The port keeps that, it does not reopen it"). A 2026-09-15 fix
-// (fd39750b) closed it pointwise, in JS, on this one tag; this revert returns to the shared
-// (buggy) behavior every adapter already had, which is correct for THIS merge — a merge that also
-// changes behavior is unattributable.
-//
-// The reason the old header gave for not splitting it — "needs a child to target and a framework
-// component holding an opaque children slot cannot reach one safely" — no longer holds: that was
-// true of JS wrappers, not of the engine. The DESCENDANT seam this needs already exists: a rule
-// keyed on `IOwner.tagName`, the same shape `foldCloneOntoChild` uses to reach a
-// TouchableNativeFeedback child's own `fabricProps()` call and write onto ITS payload — the write
-// `IFirstChild` cannot do, since that seam only reads a child, from the PARENT's own call.
-//
-// TODO: what actually blocks it is one missing field. `IOwner` carries `{ props, tagName,
-// hasPressListener }`; the child would need the owner's `underlayShown` too (currently only on
-// `ISelf`, the node's own state) to decide whether to paint at all. Closing this is a new
-// descendant-keyed rule plus that one field on `IOwner`, not a `foldTouchableHighlightUnderlay`
-// rewrite.
-//
+// TouchableHighlight as an ENGINE-NODE behavior: RN's own version renders a container View plus
+// clones an opacity style onto its child (TouchableHighlight.js:281-320); this tag folds both
+// onto the ONE node instead (`foldTouchableHighlightUnderlay` in `SymbioteFabricProps.cpp`).
+
+// KNOWN GAP: composing `opacity` onto the SAME node as the underlay's `backgroundColor` fades the
+// underlay itself, so `underlayColor: 'black'` paints grey, not black. TODO: needs a
+// descendant-keyed rule plus `underlayShown` added to `IOwner`.
+
 // WHAT IS SHARED AND WHAT IS NEW. The underlay show/hide state machine
 // (createHighlightUnderlayHandlers/createHighlightUnderlayRuntime, `../state/touchable`) is already
 // framework-agnostic — every wrapper already calls it. New here is only WHERE `shown` lives (a
@@ -175,30 +153,16 @@ const refine: IPressConfigRefinement = (node, config) => {
   };
 };
 
-// THE UNDERLAY FOLD LEFT THIS FILE ON 2026-09-18, and with it the last `payloadFold` on this tag —
-// this behavior now costs ZERO trips into JS per commit, down from one on every commit it was dirty
-// in (which for a touchable is FIVE at mount alone, because the opacity settle re-commits it).
-//
-// THE NOTE IT REPLACES SAID THE UNDERLAY WAS "the genuine unportable article" BECAUSE IT IS BUILT
-// FROM LIVE PRESS STATE. Half right, and the half it got wrong is the reusable part: `shown` really
-// does flip mid-gesture and really is JS's, but the RULE was never made of it. Of four inputs, three
-// were already portable — `underlayColor` and `activeOpacity` are ordinary props (ones the engine
-// ALREADY strips), and `_hasPressHandler` is listener EXISTENCE, which has crossed since
-// `OP_SET_OWNED_LISTENER`. The fourth is one bit. "JS holds it" was never the same claim as "only JS
-// can compute it", and this is the third time that distinction has moved a rule.
-//
-// WHAT CROSSES AND WHAT DOES NOT. `setNodeUnderlayShown` sends the bit on a flip — twice a tap. The
-// hold timer, the `press`-then-`pressOut` ordering, the re-arm on a second tap and the
-// `onShowUnderlay` / `onHideUnderlay` callbacks all stay here, where Pressability is, because they
-// run at gesture rate and call into app code. That is the browser's line too: a UA paints `:active`,
-// the page decides what a click means.
-//
-// `focusable` left earlier the same day and carried a bug out with it — it read `props.disabled` off
-// the BAG, which the engine's pressable rule strips, so every DISABLED highlight stayed in the focus
-// order. One rule serves both touchable tags now (`foldPressableProps`), so there is no second copy
-// to drift; pinned in `core/engine/cpp/tests/js/touchable-focusable-payload.itest.ts`.
-//
-// The underlay's own contract: `core/engine/cpp/tests/js/touchable-highlight-underlay.itest.ts`.
+// This behavior binds NO payload fold: `underlayColor`/`activeOpacity` are ordinary props the
+// engine already strips, listener existence crosses via `OP_SET_OWNED_LISTENER`, and the one
+// live bit crosses via `setNodeUnderlayShown` on a flip — twice a tap.
+
+// What stays in JS: the hold timer, press-then-pressOut ordering, the re-arm on a second tap, and
+// the `onShowUnderlay`/`onHideUnderlay` callbacks — they run at gesture rate and call app code.
+
+// `focusable` is `foldPressableProps` now, shared with the other touchable tag so there is no
+// second copy to drift — pinned in `touchable-focusable-payload.itest.ts`. Underlay's own
+// contract: `touchable-highlight-underlay.itest.ts`.
 
 // A listener flip changes no payload by itself, so the commit after it is a no-op and no fold
 // re-runs (`IHostBehavior.onOwnedListenerChange`) — same reason `./touchable-opacity` carries this.

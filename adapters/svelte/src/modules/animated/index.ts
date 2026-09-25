@@ -9,10 +9,10 @@
 // between the value graph and the node's Fabric tag, and both of those were already engine-side.
 //
 // Those three were aliases of the wrappers, and the wrappers are gone — a primitive is a tag now,
-// which is not a value `<Animated.X>` can call. `Animated.ScrollView` left the same way on
-// 2026-09-10: `bindAnimatedEvent` (node.ts, from `setEventListener`) attaches a native-driven event
-// on ANY host node, which was the one job a scroll wrapper still looked like it had. The whole API
-// is `<scroll-view style={{ opacity: v }} p={{ onScroll: Animated.event(…) }}>`.
+// which is not a value `<Animated.X>` can call. `Animated.ScrollView` left the same way:
+// `bindAnimatedEvent` (node.ts) attaches a native-driven event on ANY host node.
+
+// The whole API is `<scroll-view style={{ opacity: v }} p={{ onScroll: Animated.event(…) }}>`.
 //
 // The two below REMAIN because the LIST family is tier 3: a render prop decides their output shape
 // in JS, so there is no tag for `<Animated.X>` to be an alias of.

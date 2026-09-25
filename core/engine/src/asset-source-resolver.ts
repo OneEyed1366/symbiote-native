@@ -1,8 +1,6 @@
-// Generic asset-id resolution seam, the non-Image sibling of image-source-resolver.ts. That file
-// stays image-specific by name and precedent (renderImage, image-loader's statics); this one is
-// for every OTHER package that needs RN's require()'d-asset resolution — audio's `number` source
-// form today, sqlite's `assetSource` option later. Kept as a separate file rather than merged so a
-// non-image consumer never has to import something named "image" to resolve its own assets.
+// Generic asset-id resolution seam, the non-Image sibling of image-source-resolver.ts. Kept as a
+// separate file so a non-image consumer (audio's `number` source, sqlite's `assetSource`) never
+// has to import something named "image" to resolve its own assets.
 
 let sourceResolver: (source: unknown) => unknown = source => source;
 

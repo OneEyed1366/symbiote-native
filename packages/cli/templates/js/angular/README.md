@@ -38,8 +38,8 @@ Not copied, and why:
   (the generated app gets a fresh install).
 
 **The `src/` judgment call**: `examples/angular`'s root has no `App.ts`-equivalent — unlike
-React/Vue's flat `App.tsx` at the app root, Angular's whole source tree (moved 2026-07-14,
-documented in `angular-adapter-build` skill §3a) lives under `src/` specifically to keep
+React/Vue's flat `App.tsx` at the app root, Angular's whole source tree (documented in
+`angular-adapter-build` skill §3a) lives under `src/` specifically to keep
 `ngc --watch`'s recursive chokidar watch (rooted at `angularCompilerOptions.basePath`) away from
 `ios/`/`android/`'s tens of thousands of files as watch-root siblings. That makes the split
 mechanical rather than a judgment call for most of `src/`: everything in it is either (a) the

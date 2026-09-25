@@ -383,13 +383,9 @@ function tileIdsFromScreen(): string[] {
 // `props.style` as the engine's `[classStyle, explicitStyle]` pair, and only `payloadOf` (the
 // engine's own `fabricProps`) flattens that.
 //
-// AN ANCHOR DOES NOT COUNT, and leaving it in the walk is what let this file stay green through a
-// device checkerboard. `routeProp` resolves a class onto the node it was written to, and for a
-// composed component that node is its ANCHOR — which the commit walk skips, so it paints nothing
-// ever. A component frozen after mount therefore has the new colour sitting on its anchor and the
-// old one on the view the user sees, and an oracle that accepts either reports the freeze as a
-// pass. Device-diagnosed 2026-09-20: AnimatedView, FlatList and VirtualizedList stranded on theme
-// A while every assertion here was green.
+// AN ANCHOR DOES NOT COUNT: a composed component's class resolves onto its ANCHOR, which the
+// commit walk skips and never paints — so a component frozen after mount keeps the new colour on
+// its anchor and the old one on screen, and an oracle accepting either reports a freeze as a pass.
 function paintedBackground(handle: ISymbioteNode): unknown {
   if (isAnchor(handle)) return undefined;
   const value = payloadOf(handle).backgroundColor;

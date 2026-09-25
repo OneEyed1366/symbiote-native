@@ -40,7 +40,7 @@ app.
 
 </details>
 
-Targets **Solid 1.9**, deliberately not 2.0 (RC as of 2026-08) — 2.0 moves the package to
+Targets **Solid 1.9**, deliberately not 2.0 (still RC) — 2.0 moves the package to
 `@solidjs/universal`, changes `RendererOptions`, and changes the compiled-output shape. Moving to
 it is a rewrite of `src/renderer.ts`, not a range bump.
 

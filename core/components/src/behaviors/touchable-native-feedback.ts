@@ -49,11 +49,9 @@
 // 3. `style` is NOT cloned, matching RN — its clone list (:342-390) is closed, and a `style` on a
 //    TNF stays on a node that never commits. RN's TNF declares no style prop either.
 //
-// REGISTRATION IS THE HAZARD, not the machine — see `./pressable` for why each adapter entry does a
-// bare `import './register';` that the barrel does not re-export. Registered by ALL FIVE adapters
-// since 2026-09-09, in the same commit that deleted the five wrappers, which is what makes it safe:
-// while a wrapper still built its own Pressable + feedback View, registering would have left every
-// TouchableNativeFeedback with two responders.
+// REGISTRATION IS THE HAZARD, not the machine — see `./pressable` for why each adapter entry does
+// a bare `import './register';`. Registering while a wrapper still built its own Pressable +
+// feedback View would leave every TouchableNativeFeedback with two responders.
 
 import {
   SLOT_DERIVED_ALL,
@@ -97,19 +95,9 @@ const touchableNativeFeedbackDisabled: IDisabledResolver = props =>
 // Read once, like `./button`'s: the platform cannot change under a running app.
 const IS_ANDROID = Platform.OS === 'android';
 
-// WHAT THE OWNER'S WRITES DIRTY, and it is EVERY name rather than a list of thirty.
-//
-// RN's clone list (`TouchableNativeFeedback.js:349-390`) lived here until 2026-09-18 as
-// `CLONED_PROPS` + `DERIVED_FROM` + `ARIA_ALIAS_KEYS`, feeding `slotDerived`. The clone itself is
-// `foldCloneOntoChild` in `SymbioteFabricProps.cpp`, so the list had stopped being the rule and
-// become a MIRROR of `kNativeFeedbackClonedKeys` — two lists that must agree, failing silently (the
-// clone goes stale on the one prop a list forgot) when they drift.
-//
-// `SLOT_DERIVED_ALL` is both the honest spelling and the cheaper one to keep: a `cloneElement` owner
-// re-clones on every render whatever changed, so it never derived its slot from a NAMED set in the
-// first place. The cost is a false dirty on an owner prop the clone does not carry, and for this tag
-// that is nearly empty — its owner is an anchor whose props reach Fabric nowhere else, so every name
-// it holds is either cloned or consumed by the press machine.
+// Dirties EVERY owner prop rather than a named list: `cloneElement` re-clones whatever changed
+// each render, so the C++ fold never worked from a fixed set either. The cost is a false dirty on
+// an uncloned prop — negligible, since this owner's props reach Fabric only via the clone.
 const SLOT_DERIVED: readonly string[] = [SLOT_DERIVED_ALL];
 
 // The two RN clones as EVENTS rather than props (:386-387). Owned, so the app's callback stashes on
@@ -135,12 +123,6 @@ const PRESS_LISTENERS: readonly string[] = [
   'responderTerminationRequest',
 ];
 
-// `asFeedbackBackground` went with the fold, and `backgroundProps` — the slot pick it fed — followed
-// on 2026-09-18 as the orphan it had become. The first narrowed the app's `background` dict on its
-// discriminant; the C++ rule asks only whether the value is an OBJECT and copies it into the slot,
-// because the four factories that produce it (`render-touchable-native-feedback.ts`) are ours and
-// the payload is not a place to re-validate what a typed factory already built.
-
 /**
  * TNF's own Pressability config, applied to whatever node carries the responder.
  *
@@ -165,15 +147,9 @@ export const nativeFeedbackRefinement: IPressConfigRefinement = (
   return IS_ANDROID ? withNativeFeedbackCommands(node, floorless) : floorless;
 };
 
-// `cloneFold` LEFT THIS FILE ON 2026-09-18 — it is `foldCloneOntoChild` in
-// `SymbioteFabricProps.cpp`, and the seam it needed is the first rule keyed on the PARENT'S tag
-// rather than on the node's own (`IOwner`). The child of a TNF is whatever the app wrote, usually a
-// plain `<view>` with no tag at all, so nothing self-keyed could ever have reached it.
-//
-// What it cost to have had here: one JSI round trip per touchable per commit over an eighteen-key
-// bag, and `tag-rule-cost.itest.ts` prices a fold by what it MARSHALS rather than by what it does.
-//
-// Contract: `core/engine/cpp/tests/js/clone-onto-child-payload.itest.ts`.
+// The clone runs in C++ (`foldCloneOntoChild`, `SymbioteFabricProps.cpp`), keyed on the PARENT'S
+// tag rather than the node's own — the child is whatever the app wrote, usually untagged, so
+// nothing self-keyed could ever reach it. Contract: `clone-onto-child-payload.itest.ts`.
 
 // Not RN's own list: RN drops these by never cloning them, and a tag has no clone to omit
 // them from — they would ride into the child's payload as keys no ViewConfig declares. Same strip

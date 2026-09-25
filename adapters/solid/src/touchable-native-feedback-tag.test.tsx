@@ -71,11 +71,9 @@ describe('touchable-native-feedback as a tag', () => {
 
   // why: the count above is satisfied by an unregistered tag too — an anchor commits nothing on its
   // own. This is the arm that fails when the registration is missing.
-  // THE WITNESS CHANGED ON 2026-09-18 and the case did not. It used to be the CLONE, which moved to
-  // `foldCloneOntoChild` in C++ and which this host cannot run — it builds its payloads through the
-  // TypeScript `fabricProps`, carrying no copy of the tag rules. `onLayout` is the same KIND of
-  // claim and is still JS: RN clones it as a LISTENER (`:386`), the behavior's `FORWARDED_LISTENERS`
-  // carries it, and being a Fabric BOOLEAN-GATED event it shows up in the payload as `true`.
+  // The clone is `foldCloneOntoChild` in C++, which this host cannot run — its `fabricProps`
+  // carries no copy of the tag rules. `onLayout` is still JS: RN clones it as a LISTENER (`:386`),
+  // `FORWARDED_LISTENERS` carries it, and being Fabric BOOLEAN-GATED it shows up as `true`.
   it('forwards the owner’s listener onto that one child', async () => {
     await mountTree(() => (
       <view nativeID="root">

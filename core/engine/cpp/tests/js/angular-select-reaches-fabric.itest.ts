@@ -337,8 +337,7 @@ describe('selecting a row through the Angular adapter', () => {
   // door, and the write then surfaced two steps later, on whichever node's style run happened to
   // close the accumulator next.
   //
-  // FIXED 2026-09-21 (`SymbioteRendererFactory.dispose`); this case was pinned to the broken answer
-  // before that and is the reason the fix could be recognised as one.
+  // Fixed by `SymbioteRendererFactory.dispose` publishing the renderer's flush registration.
   it('repaints a component row after a keyed replace', async () => {
     const surface = mount(ROOT_TAG, OneSignalScreen);
     await settle();

@@ -1,4 +1,4 @@
-// The C++ half can say something without crashing — which until 2026-09-18 it could not.
+// The C++ half can say something without crashing.
 //
 // THE GAP THIS CLOSES. The commit path, the payload builder and every tag rule live in C++ now, and
 // the only channel out of that translation unit was `throw jsi::JSError`. So a rule could CRASH or

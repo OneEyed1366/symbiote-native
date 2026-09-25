@@ -16,21 +16,13 @@
 // A row that goes red here names the layer that has not caught up, which is the whole reason to
 // diff payloads rather than assert individual keys.
 //
-// ── THE TWO ARMS HAVE CONVERGED, AND THAT IS NOT FIXABLE HERE (noticed 2026-09-18) ───────────────
-//
-// This file's own paragraph above predicted it: "once `View` is a string, there is no component left
-// to compare against". That day arrived — `adapters/solid/src/components/` holds no `text` or `view`
-// component, only `*-props.ts` — so `payloadOf(WRAPPER_ROOT, () => <text …/>)` and
-// `payloadOf(TAG_ROOT, () => <text …/>)` mount the SAME intrinsic twice. Every remaining case
-// compares a payload with itself and can no longer go red for the reason it was written.
-//
-// It is not a false green of the ordinary kind — the comparison DID its job, before and after the
-// switch, and the record is in the git history. It is a test that has outlived its subject, the same
-// shape as the three `id` cases collapsed on 2026-09-18 ("a loop whose arms have converged reports
-// agreement with itself"). The repair is to collapse each case to a single-arm ABSOLUTE assertion
-// naming the keys the layer now produces — which `tag-folds.test.tsx` already does, and which the
-// Text case below has had done to it. The other seven have not, and are left standing rather than
-// silently weakened in a commit that is about something else.
+// THE TWO ARMS HAVE CONVERGED, AND THAT IS NOT FIXABLE HERE: `components/` holds no `text`/`view`
+// component any more, only `*-props.ts`, so both arms mount the SAME intrinsic — every remaining
+// case compares a payload with itself and cannot go red for the reason it was written.
+
+// Not an ordinary false green: the comparison DID its job before the switch, recorded in git
+// history. The repair is collapsing each case to a single-arm ABSOLUTE assertion naming the keys
+// the layer now produces (`tag-folds.test.tsx` already does this for Text); the rest stay as-is.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -118,14 +110,9 @@ describe('a bare intrinsic commits the wrapper payload', () => {
     expect(keysOf(wrapper.payload)).not.toContain('nativeID');
   });
 
-  // why: RN's two Text defaults left this case on 2026-09-18 — the header's row for them said "the
-  // renderer" and the answer is "the engine" now, keyed on the component and asserted in
-  // `core/engine/cpp/tests/js/committed-payload.itest.ts`. This harness has no copy of that rule, so
-  // asserting the values here would assert the headless builder instead of the device.
-  //
-  // What is left that this adapter decides is the COMPONENT and the authored passthrough, so that is
-  // what it says — absolutely, in the shape `tag-folds.test.tsx` uses, rather than by comparing two
-  // arms. See this describe block's closing note on why the comparison no longer discriminates.
+  // why: RN's two Text defaults are the engine's now, keyed on the component
+  // (`committed-payload.itest.ts`). This harness has no copy, so asserting values here would
+  // assert the headless builder. What's left is the COMPONENT and passthrough, stated absolutely.
   it('Text: commits under the component the engine keys its rule on', async () => {
     const tag = await payloadOf(TAG_ROOT, () => <text numberOfLines={1} />);
 

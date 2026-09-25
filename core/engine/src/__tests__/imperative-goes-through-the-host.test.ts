@@ -2,7 +2,7 @@
 //
 // A JSI handle carries exactly one `NativeState`. Under the native host that state is our `Node`, so
 // `nativeFabricUIManager.measure` — which expects a `ShadowNode` reference — throws `Value state is
-// nullptr` on the first `measure()` an app performs. Device-found 2026-09-08.
+// nullptr` on the first `measure()` an app performs.
 //
 // It could not be found here, and that is the point of this file. The reference applier puts its
 // FAKE FABRIC NODE in `ICommittedRecord.handle` while native puts the PLACEHOLDER, so calling the

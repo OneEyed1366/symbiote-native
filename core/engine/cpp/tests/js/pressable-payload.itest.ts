@@ -201,8 +201,8 @@ describe('what a pressable sends native, resolved by the engine', () => {
   });
 
   // why: RN makes every pressable accessible unless the app opts OUT — Pressable.js:252,
-  // `accessible: accessible !== false`. Nothing in this repo did it until 2026-09-09, so a Pressable
-  // reached a screen reader as a plain view unless the app wrote the prop.
+  // `accessible: accessible !== false`. Without this, a Pressable reaches a screen reader as a
+  // plain view unless the app writes the prop.
   it('is accessible unless the app opts out', () => {
     expect(pressable({}).payload.accessible).toBe(true);
     expect(pressable({ accessible: false }).payload.accessible).toBe(false);
@@ -210,8 +210,8 @@ describe('what a pressable sends native, resolved by the engine', () => {
     expect(pressable({ accessible: true }).payload.accessible).toBe(true);
   });
 
-  // why: Pressable.js:258, the same shape. We computed `focusable` nowhere until 2026-09-09, so a
-  // keyboard, a TV remote or switch control could land on a control it could not press.
+  // why: Pressable.js:258, the same shape. Without this, a keyboard, a TV remote or switch control
+  // could land on a control it could not press.
   it('is focusable unless the app opts out', () => {
     expect(pressable({}).payload.focusable).toBe(true);
     expect(pressable({ focusable: false }).payload.focusable).toBe(false);

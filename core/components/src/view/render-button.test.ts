@@ -9,19 +9,9 @@
 import { describe, expect, it } from 'vitest';
 import { resolveButtonDisabled } from './render-button';
 
-// EVERY PLATFORM-VARYING CASE LEFT THIS FILE ON 2026-09-18, and the file survives for the one fold
-// that does not vary: `resolveButtonDisabled`, which the press MACHINE reads and which is therefore
-// still JS.
-//
-// What went and where. The label's style and the title's uppercase are `foldButtonLabelStyle` and
-// `foldButtonLabel` in `SymbioteFabricProps.cpp`; the inner view's style is inside
-// `foldButtonProps`. All three asserted a JS function that no longer exists, so none could be
-// pointed at anything here.
-//
-// Their iOS half is `core/engine/cpp/tests/js/button-derived-payload.itest.ts`, against the payload
-// a commit actually sent. Their ANDROID half is `core/engine/cpp/tests/js/android-rules.android
-// .itest.ts` — which is new: `#ifdef ANDROID` used to mean "pinned nowhere headless", and the test
-// host now has an arm that compiles those branches (`pnpm run test:android`).
+// The only fold that does not vary by platform: `resolveButtonDisabled`, read by the press
+// MACHINE, so it stays JS. Every platform-varying fold is `SymbioteFabricProps.cpp`'s — iOS
+// asserted in `button-derived-payload.itest.ts`, Android in `android-rules.android.itest.ts`.
 
 describe('Button folds that do not vary by platform', () => {
   // Button.js:337 — an explicit `disabled` wins, and only its ABSENCE lets the accessibility side
@@ -38,7 +28,6 @@ describe('Button folds that do not vary by platform', () => {
     expect(resolveButtonDisabled(false, true, { disabled: true })).toBe(false);
   });
 
-  // `importantForAccessibility` left this file with the function it tested (2026-09-18): the rule is
-  // `foldButtonProps` in the engine now, and the resolver had no caller left but this case. Asserted
-  // against the committed payload in `core/engine/cpp/tests/js/button-payload.itest.ts`.
+  // `importantForAccessibility` is `foldButtonProps` in the engine now, asserted against the
+  // committed payload in `button-payload.itest.ts`.
 });

@@ -314,8 +314,8 @@ function findWantsResponder(
 // WITHOUT THIS A JS RESPONDER LOSES TO ANY SCROLL VIEW ABOVE IT, and it is invisible from JS:
 // `onStartShouldSetResponder` returns true, the native UIScrollView never learns the gesture was
 // claimed, and every subsequent move arrives as `topScroll` instead of `topTouchMove` — so the
-// negotiation never even gets a move to grant on. Device-diagnosed 2026-09-08 on a PanResponder
-// drag box inside the canary's ScrollView: `startShouldSet -> true` followed by
+// negotiation never even gets a move to grant on. Device-diagnosed on a PanResponder drag box
+// inside the canary's ScrollView: `startShouldSet -> true` followed by
 // `topScrollBeginDrag` and twenty `topScroll`, with no grant and no move.
 //
 // `blockNativeResponder` is the taker's own `onResponderGrant` return, exactly as RN reads it.

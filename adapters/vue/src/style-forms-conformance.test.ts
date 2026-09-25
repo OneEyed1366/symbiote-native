@@ -508,12 +508,9 @@ describe('<style scoped> — the compiled token and the registered key are the s
 describe('<style module> — the name map is correct, and the template reaches it', () => {
   it('resolves `:class="$style.card"` named directly in the template', async () => {
     const code = await compileSfc(MODULE_VIA_TEMPLATE_SFC, 'Module.vue');
-    // Vue's template compiler resolves a `$`-prefixed name off the INSTANCE (`_ctx.$style`), which
-    // it reads from `instance.type.__cssModules` — a module-scope `const $style` is invisible to
-    // it. Until 2026-08-20 nothing set `__cssModules`, so this threw `Cannot read properties of
-    // undefined (reading 'card')` at render; the two assertions below used to pin that throw.
-    // compileSfc now hangs the map off the component (compileScript's `genDefaultAs`, the same
-    // thing @vitejs/plugin-vue does), so both routes to the map work.
+    // Vue's template compiler resolves a `$`-prefixed name off the INSTANCE (`_ctx.$style`), read
+    // from `instance.type.__cssModules` — a module-scope `const $style` is invisible to it.
+    // compileSfc hangs the map off the component instead (compileScript's `genDefaultAs`).
     expect(code).toContain('const $style = {');
     expect(code).toContain('_ctx.$style.card');
     expect(code).toContain('__sfc__.__cssModules = { "$style": $style };');

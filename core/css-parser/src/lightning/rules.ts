@@ -12,8 +12,8 @@
 // Class names are emitted AS AUTHORED (`card-title` stays `card-title`, plus whatever the scoping
 // rename appended). No camelCase anywhere in this file: normalization is what the trap was made of.
 //
-// Measured 2026-08-20 and the reason this is ONE pass, not two: with `cssModules` on, the visitor
-// still sees the ORIGINAL class names — lightningcss renames AFTER the visitor walk. So the AST
+// The reason this is ONE pass, not two: with `cssModules` on, the visitor still sees the
+// ORIGINAL class names — lightningcss renames AFTER the visitor walk. So the AST
 // gives authored tokens and `exports` gives their renamed spelling, and the renamed CSS text never
 // has to be parsed a second time (which is exactly what `../metro-css-module/index.ts` had to do,
 // and what mangled a scope tail whose base36 hash began with a letter).
@@ -34,10 +34,9 @@ import { warnOnce } from '../values.ts';
 
 // A conditional at-rule is DROPPED WHOLE, its nested rules with it. There is no media-query engine
 // in React Native, so applying `.responsive` from `@media (min-width: 900px)` would paint it on
-// every phone — worse than not supporting the rule, because it looks supported. The retired text
-// pass dropped these too, but silently: it simply never walked into an at-rule. Measured
-// 2026-08-20: returning `[]` from the at-rule visitor removes it BEFORE the walk descends, so a
-// nested style rule never reaches the collector; without it lightningcss hoists it out.
+// every phone — worse than not supporting the rule, because it looks supported. Returning `[]`
+// from the at-rule visitor removes it BEFORE the walk descends, so a nested style rule never
+// reaches the collector; without it lightningcss hoists it out.
 //
 // `@keyframes` and `@font-face` need no entry here — neither emits a style rule to begin with.
 const CONDITIONAL_AT_RULES = ['media', 'supports', 'container'] as const;

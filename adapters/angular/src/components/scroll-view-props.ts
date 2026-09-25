@@ -1,12 +1,9 @@
 // The `<scroll-view>` / `<horizontal-scroll-view>` tag's prop surface — the axis is the TAG you
 // write, not a `horizontal` binding, because Android resolves a different native class per axis.
 //
-// The wrapper was deleted 2026-09-11 and nothing replaced it in the adapter: the ENGINE owns the
-// whole shape now (`core/components/src/behaviors/scroll-view/`). `buildStructure` builds the
-// content node the children go under, `slotProps` routes `contentContainerStyle` onto it as its
-// `style`, `payloadFold` composes the two base styles, and the sticky machinery pins by DOCUMENT
-// ORDER through the `<sticky-header>` tag — so the Angular projection bridge that used to wrap
-// projected children by index is gone with it, along with its renderer hooks.
+// The ENGINE owns the whole shape (`core/components/src/behaviors/scroll-view/`), no adapter
+// wrapper: `buildStructure` builds the content node, `slotProps` routes `contentContainerStyle`,
+// `payloadFold` composes the base styles, sticky pins by DOCUMENT ORDER via `<sticky-header>`.
 //
 // A `<refresh-control>` is an ordinary FIRST CHILD on both platforms; the behavior re-parents it
 // per platform (iOS a sibling before the content, Android the swipe layout WRAPPING the scroll

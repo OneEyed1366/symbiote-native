@@ -182,21 +182,12 @@ describe('setAppConfigurator', () => {
   });
 });
 
-// Regression for a device-reported redbox (2026-09-11): a throw from a REAL press dispatch
-// reached Hermes's own top-level handler directly, bypassing both `onErrorCaptured` and
-// `app.config.errorHandler` — the reported call stack traced through the actual dispatch chain
-// (pressable.ts's dispatch -> bubble -> runWrapped), which carries no try/catch anywhere: Vue's
-// default `wrapDispatch` is a bare pass-through, so a throw from the app's own listener escaped
-// every framework error boundary and painted a native redbox with no Vue componentStack framing.
-//
-// Fixed in renderer/index.ts: patchProp wraps any `on*`-named function prop with Vue's own
-// `callWithErrorHandling`, captured at `patchProp` time (the one point still holding a live
-// `getCurrentInstance()`), so a thrown listener routes through the same pipeline a throw from
-// render/setup already used.
-//
-// Driven through fabric.fireEvent (topTouchStart/topTouchEnd), never a direct call to the `onPress`
-// prop — a direct call bypasses exactly the dispatch machinery that lost the error, per
-// test-harness-false-greens.md's "a synthetic stand-in for the real input is a different input".
+// A throw from a REAL press dispatch reaches Hermes's own top-level handler directly, bypassing
+// `onErrorCaptured` and `app.config.errorHandler` alike: the native dispatch chain carries no
+// try/catch. `renderer/index.ts`'s `patchProp` wraps any `on*` prop with `callWithErrorHandling`.
+
+// Driven through fabric.fireEvent, never a direct call to `onPress` — a direct call bypasses
+// exactly the dispatch machinery that lost the error.
 describe('Negative — a real press listener throws', () => {
   const DISPATCH_ROOT_TAG = 812;
   const DISPATCH_BOOM = 'listener exploded';

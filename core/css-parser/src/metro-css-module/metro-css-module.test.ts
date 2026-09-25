@@ -197,13 +197,9 @@ describe('compileCssFile — standalone preprocessor files', () => {
   });
 });
 
-// A token appearing ONLY inside a compound selector still has to reach the export map, or the
-// author cannot write the markup the compound rule was authored to match: `styles.loud` would be
-// `undefined` and the element would carry the string "undefined" as a class. Measured 2026-08-19
-// — it was missing, which made every `.a.b` rule in a `.module.css` unusable even after the
-// runtime learned to resolve the key. lightningcss renames per token and exports every class the
-// author actually wrote — the collapsed `badgeLoud` key is ours, not a class in the source, and
-// is no longer exported: the markup spelling is `${styles.badge} ${styles.loud}`.
+// A token appearing ONLY inside a compound selector still has to reach the export map, or
+// `styles.loud` would be `undefined` and the element would carry the string "undefined" as a
+// class. lightningcss exports every class the author actually wrote, never a collapsed key.
 describe('compound-only tokens reach the export map', () => {
   it('exports a token that has no standalone rule', async () => {
     const compiled = await compileCssFile(

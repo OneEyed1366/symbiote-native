@@ -1,25 +1,18 @@
-// Audits every .svelte file for whitespace that reaches a real native node.
-// Costs nothing to run and catches what tsc and the compiler never will:
+// Audits every .svelte file for whitespace that reaches a real native node — costs nothing to run,
+// catches what tsc/the compiler never will:
 //   node scripts/audit-svelte-stray-whitespace.mjs [...roots]
-//
+
 // INSIDE one text node — Svelte trims a text node's leading/trailing whitespace but does not
-// condense whitespace inside it (unlike Vue's compiler), so a sentence wrapped across source
-// lines ships its literal newline + indent into the RCTText: the device renders a line break
-// and a run of spaces mid-sentence.
-//
-// This checks the PIPELINE'S OUTPUT, not the author's source: it runs `collapseTextWhitespace()`
-// first, exactly as svelte.config.js and metro-svelte-transformer.cjs do, and flags only what
-// survives. Checking the source instead would report every sentence wrapped for readability —
-// ~59 of them once the markup was written normally — none of which is a bug, which is how a
-// gate turns into noise. What it still catches is the case that matters: a text node the
-// preprocessor cannot fix, or a build where the preprocessor is not registered at all.
-//
-// BETWEEN siblings — this pass is GONE, deliberately (2026-08-19). It counted whitespace-only
-// text nodes in the compiled from_tree([...]) array, back when each became a ShimText ->
-// RCTRawText -> native shadow node. `dom-shim/text.ts` now maps a whitespace-only text node
-// under a parent that cannot hold raw text to an anchor, so the gap never reaches Fabric and
-// markup is written normally everywhere. A counter reporting thousands of hits none of which
-// is a bug is noise, not hygiene. Mechanism: svelte-adapter-dom-shim skill §16b.
+// condense whitespace inside it, so a sentence wrapped across source lines ships its literal
+// newline+indent into the RCTText: the device renders a line break and mid-sentence spaces.
+
+// Checks the PIPELINE'S OUTPUT (after `collapseTextWhitespace()`, same as svelte.config.js), not
+// the source — checking source would flag every readability-wrapped sentence as a false positive.
+// Catches only what survives: a text node the preprocessor can't fix, or an unregistered build.
+
+// BETWEEN siblings — no longer checked: `dom-shim/text.ts` maps a whitespace-only text node under
+// a parent that can't hold raw text to an anchor, so the gap never reaches Fabric (mechanism:
+// svelte-adapter-dom-shim skill §16b).
 
 import { readFileSync } from 'node:fs';
 import { globSync } from 'node:fs';

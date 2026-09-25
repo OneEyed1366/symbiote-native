@@ -1,10 +1,8 @@
 // Appending to a mounted list must not RE-CREATE the rows already standing.
 //
-// WHY THIS EXISTS. `examples/svelte` regressed against its 2026-09-01 baseline by Create +40 ms,
-// Append +147 and Replace +54, with `WRITES` and the tree byte-identical — the same work, priced
-// higher. Append's share is the readable one: baseline Append was Create + 18 ms and it is now
-// Create + 125, and the only thing separating those two rows is that Append inserts into a list
-// that already holds a thousand rows.
+// WHY THIS EXISTS. `examples/svelte` regressed against its baseline: Create, Append and Replace
+// all got costlier with `WRITES` and the tree byte-identical — the same work, priced higher. The
+// only thing separating Append from Create is that Append inserts into an already-standing list.
 //
 // Two candidate mechanisms were priced headless and neither is large enough to be it: the sibling
 // scan in `OP_INSERT_BEFORE` (`core/engine/bench/sibling-scan.cpp`, 0.8 ms on a device-calibrated

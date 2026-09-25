@@ -21,21 +21,8 @@ export {
 })
 export class ViewHost extends SymbiotePrimitiveHost {}
 
-/**
- * Text is an ORDINARY primitive host as of 2026-09-18, and the two `@Input()`s it used to declare
- * are gone with the code that needed them.
- *
- * They existed for one stated reason: a default can only be applied by code that can SEE whether the
- * caller supplied a value, and a pass-through host binding is invisible to the component — so the
- * defaults had to be applied where the inputs were readable. That argument was sound and it is now
- * answered one layer down. The payload builder reads the AUTHORED bag, so it can tell an absent
- * `ellipsizeMode` from an explicit `clip` without anyone declaring anything; the rule is keyed on the
- * component (`foldTextDefaults`, `SymbioteFabricProps.cpp`) and reaches every `RCTText` however it
- * was spelled.
- *
- * The pass-through is therefore the CORRECT path for both props now, and `text-defaults.test.ts`'s
- * "never overwrites a value the caller supplied" is what proves the authored value still arrives.
- */
+// Text is an ordinary primitive host — no `@Input()`s for defaults; `foldTextDefaults` (C++)
+// reads the authored bag directly, so an absent value never needs declaring here.
 @Component({
   selector: 'text',
   standalone: true,
@@ -99,10 +86,9 @@ export class MultilineTextInputHost extends SymbiotePrimitiveHost {}
 })
 export class SwitchHost extends SymbiotePrimitiveHost {}
 
-// The centering RCTView RN wraps the spinner in (ActivityIndicator.js:112), not the spinner —
-// which is what this tag resolved to until 2026-09-09. The native view moved to
-// `activity-indicator-spinner`, built by the engine's ActivityIndicator behavior, so nothing writes
-// it in a template and it needs no host here.
+// The centering RCTView RN wraps the spinner in (ActivityIndicator.js:112) is
+// `activity-indicator-spinner`, built by the engine's ActivityIndicator behavior — nothing writes
+// it in a template, so it needs no host here.
 @Component({
   selector: 'activity-indicator',
   standalone: true,

@@ -1,8 +1,6 @@
-// Switch as an engine-node behavior. Everything here is asserted on the COMMITTED Fabric payload
-// or on the recorder's `commands` list — the two things a device would actually see — same
-// discipline as `text-input.test.ts`, and for the same reason: every failure this behavior can
-// have (a snap-back that never fires, a fold that leaves an authored alias in the payload) is
-// invisible on `node.props`.
+// Switch as an engine-node behavior. Everything here is asserted on the committed Fabric payload
+// or the recorder's `commands` list — every failure this behavior can have is invisible on
+// `node.props` (same discipline as `text-input.test.ts`).
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   createLiveTree,
@@ -24,13 +22,9 @@ const fabric = installRecordingFabric();
 const live = createLiveTree(fabric);
 let nextRootTag = 8000;
 
-// PRODUCTION SHAPE. An adapter resolves the intrinsic tag through `descriptorFor` and calls
-// `createElement` with the FABRIC view name — `Switch` on iOS, the headless default
-// (`component-names/index.ios.ts`, this file's own base). Building the subject as
-// `createElement(SWITCH_TAG)` would pass the tag AS the Fabric name and make the registry key
-// match by accident, leaving every case below green over a registration that can never fire in an
-// app (`.claude/rules/test-harness-false-greens.md` §11 — the exact trap `text-input.test.ts`
-// already documents for the same reason).
+// PRODUCTION SHAPE: an adapter resolves the tag through `descriptorFor` and calls createElement
+// with the FABRIC view name. Building the subject as createElement(SWITCH_TAG) would pass the
+// tag AS the Fabric name and leave every case below green over a fake registration.
 const SWITCH_VIEW_NAME = 'Switch';
 const TEST_ID = 'subject';
 
@@ -65,10 +59,8 @@ function changeEvent(node: ISymbioteNode, value: boolean): ISymbioteEvent {
   };
 }
 
-// The LIVE tree, by testID — never `fabric.find()`, which searches the creation log and hands back
-// the AUTHORED bag, not the committed payload (`test-harness-false-greens.md`). Reads `.payload`
-// (`fabricProps`'s output): `onTintColor`/`tintColor`/`thumbTintColor` are folds, never props the
-// app wrote.
+// The live tree by testID, never `fabric.find()` (creation log, authored bag). Reads `.payload`:
+// `onTintColor`/`tintColor`/`thumbTintColor` are folds, never props the app wrote.
 function committedPropsOf(testID: string): Record<string, unknown> | undefined {
   return live.findLive(live.appRoot(), node => node.payload.testID === testID)
     ?.payload;
@@ -103,9 +95,7 @@ describe('switch host behavior', () => {
   });
 
   // The reject case: native flips optimistically before JS approves, and a no-op handler never
-  // updates `value` — no commit ever happens on its own, which is why `onChange` must request one
-  // itself (see the module header). Mirrors the React wrapper's own
-  // "snaps native back via a setValue command when a no-op handler rejects the toggle".
+  // updates `value` — no commit happens on its own, which is why `onChange` must request one.
   it('sends the platform snap-back command when a no-op handler rejects the toggle', async () => {
     registerSwitchBehavior();
     const onValueChange = vi.fn(); // deliberately does not touch `value`
@@ -130,10 +120,9 @@ describe('switch host behavior', () => {
     expect(setValue[0]!.args[0]).toBe(false);
   });
 
-  // The accept case, fully synchronous: the app's handler writes `value` back and commits before
-  // `onValueChange` even returns. Whether the check runs synchronously or is deferred, it sees the
-  // correct value here — this alone would NOT catch a regression back to a synchronous check; see
-  // the next case for the one that does.
+  // The accept case, fully synchronous: the app's handler writes `value` back before
+  // `onValueChange` returns. This alone would NOT catch a regression to a synchronous check —
+  // see the next case for the one that does.
   it('issues no snap-back command when the app accepts the toggle synchronously', async () => {
     registerSwitchBehavior();
     const node = makeSwitch();
@@ -153,16 +142,9 @@ describe('switch host behavior', () => {
     expect(committedPropsOf(TEST_ID)).toMatchObject({ value: true });
   });
 
-  // THE CASE THE DEFER EXISTS FOR. Every real adapter's `onValueChange` triggers the APP's own
-  // reactive update, and that update reaching `node.props.value` is itself scheduled — a microtask
-  // in the common case (Promise-based state, Vue/Svelte/Solid's own scheduling; Angular's own
-  // switch component solves the identical problem with `queueMicrotask`, see the module header).
-  // So the app's accept-commit microtask gets enqueued from INSIDE this synchronous listener call —
-  // strictly BEFORE `onChange`'s own `queueMicrotask(evaluateSnapBack)` call, which happens only
-  // after the listener returns. FIFO ordering is what makes the deferred check see the correct,
-  // already-accepted value. Break-tested: reverting `onChange` to call `evaluateSnapBack`
-  // synchronously (instead of deferring it) makes this test fail — a `setValue` command fires on
-  // the stale pre-accept value before the app's own microtask ever runs.
+  // The case the defer exists for: a real adapter's `onValueChange` reacts via its own microtask,
+  // enqueued from inside this synchronous listener call, strictly before `onChange`'s own deferred
+  // `evaluateSnapBack` — FIFO ordering is what lets the check see the accepted value.
   it('issues no snap-back command when the app accepts via its own async reactive update', async () => {
     registerSwitchBehavior();
     const node = makeSwitch();
@@ -171,8 +153,7 @@ describe('switch host behavior', () => {
     const surface = mount(node);
     routeProp(node, 'onValueChange', (event: ISymbioteEvent) => {
       const next = Reflect.get(event, 'value');
-      // The app's own scheduling, enqueued WHILE onChange's synchronous portion is still running —
-      // e.g. a Promise-based store, or any framework whose commit is itself microtask-timed.
+      // The app's own scheduling, enqueued while onChange's synchronous portion is still running.
       queueMicrotask(() => {
         routeProp(node, 'value', next);
         surface.commit();
@@ -187,17 +168,12 @@ describe('switch host behavior', () => {
     expect(committedPropsOf(TEST_ID)).toMatchObject({ value: true });
   });
 
-  // THE TWO FOLD CASES MOVED: `core/engine/cpp/tests/js/switch-payload.itest.ts`. The authored-name
-  // resolution — `trackColor`/`thumbColor`/`ios_backgroundColor` onto the per-platform native names,
-  // and `value === true` — is `foldSwitchProps` in `SymbioteFabricProps.cpp` now, so this harness's
-  // payload (built by the TypeScript `fabricProps`) cannot see it and never will.
-  //
-  // They gained two assertions on the way that this file could not make: `foldsFound === 0`, which
-  // is the reason the rule moved at all, and a behaviorless control proving the renames are the
-  // rule rather than something the engine does for every node.
-  //
-  // Everything below stays, and it is the half that never moved: the snap-back handshake, which
-  // reads app state a microtask after native reports a toggle.
+  // The fold cases (authored-name resolution, `value === true`) moved to
+  // `core/engine/cpp/tests/js/switch-payload.itest.ts`: `foldSwitchProps` in C++ now owns them,
+  // invisible to this harness's TypeScript-built payload.
+
+  // Everything below is the half that never moved: the snap-back handshake, which reads app
+  // state a microtask after native reports a toggle.
 
   it('resolves switch to the native Switch view, on iOS', () => {
     expect(descriptorFor('switch')).toEqual({
@@ -206,10 +182,8 @@ describe('switch host behavior', () => {
     });
   });
 
-  // why: `Switch.js:201-207`'s `handleChange` calls `onChange?.(event)` BEFORE
-  // `onValueChange?.(event.nativeEvent.value)`, always — an app with side effects observable across
-  // both handlers (a shared counter, a log) sees them run in that order on real RN. Ours called
-  // `onValueChange` first.
+  // why: `Switch.js:201-207`'s `handleChange` calls `onChange` before `onValueChange`, always —
+  // an app with side effects observable across both sees that exact order on real RN.
   it('calls onChange before onValueChange, matching vendor order', () => {
     registerSwitchBehavior();
     const node = makeSwitch();
@@ -224,12 +198,8 @@ describe('switch host behavior', () => {
     expect(order).toEqual(['onChange', 'onValueChange']);
   });
 
-  // why: `Switch.js:238-239,288-289` sets `onStartShouldSetResponder={returnsTrue}` and
-  // `onResponderTerminationRequest={returnsFalse}` UNCONDITIONALLY, on BOTH platforms — a switch
-  // always claims the gesture and never yields it, so a parent ScrollView's own responder
-  // negotiation cannot steal a drag-to-toggle mid-gesture. Without this our engine wires no claim
-  // at all, so a Switch nested in a ScrollView could lose the touch to the scroll the moment the
-  // finger moves.
+  // why: `Switch.js:238-239,288-289` sets both responder props unconditionally — a switch always
+  // claims the gesture and never yields it, so a parent ScrollView can't steal a drag mid-toggle.
   it('always claims the responder and never yields it, on both platforms', () => {
     registerSwitchBehavior();
     const node = makeSwitch();

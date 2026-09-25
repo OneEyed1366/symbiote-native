@@ -326,10 +326,8 @@ describe('Angular SymbioteRenderer drives the engine', () => {
   });
 
   // why: Angular's addLViewToLContainer treats a null parent from parentNode/insertBefore as
-  // "defer, a later projection pass places it" (insertBefore's own doc comment) — a real,
-  // previously-fixed 2026-07 device bug (FlatList cells rendering outside their ScrollView) was
-  // this exact null-parent contract getting bypassed. insertBefore must position a node BETWEEN
-  // two existing siblings under the surface, not just append it at the end.
+  // "defer, a later projection pass places it" — bypassing that contract lets FlatList cells render
+  // outside their ScrollView. insertBefore must position a node BETWEEN siblings, not just append.
   it('insertBefore positions a new child before an existing sibling under the surface', async () => {
     const { surface, renderer } = setup();
     const first = renderer.createElement('text');

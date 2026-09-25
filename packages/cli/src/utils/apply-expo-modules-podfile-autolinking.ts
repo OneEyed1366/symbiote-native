@@ -1,13 +1,9 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-// `use_native_modules!` only autolinks React Native's own native modules. Expo modules
-// (ExpoModulesCore/ExpoModulesJSI) are autolinked by a SEPARATE mechanism that the base Podfile
-// template never wires: requiring `expo/scripts/autolinking` and calling `use_expo_modules!`
-// inside the target. Without it, `Expo.podspec`'s `defined?(use_expo_modules!)` check is false,
-// so it never declares its ExpoModulesCore dependency and CocoaPods never sets up that pod's
-// header search path — the build then fails with `'ExpoModulesCore/Platform.h' file not found`
-// / `could not build Objective-C module 'Expo'`, real device failure (2026-09-18).
+// `use_native_modules!` only autolinks React Native's own modules. Expo modules need a SEPARATE
+// mechanism the base Podfile never wires: requiring `expo/scripts/autolinking` and calling
+// `use_expo_modules!`, or CocoaPods never sets up ExpoModulesCore's header search path.
 const AUTOLINKING_REQUIRE =
   'require File.join(File.dirname(`node --print "require.resolve(\'expo/package.json\')"`), "scripts/autolinking")';
 const NATIVE_MODULES_LINE = 'config = use_native_modules!';

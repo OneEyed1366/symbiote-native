@@ -22,8 +22,8 @@ import {
 // and vitest resolves the base file, so importing it would silently test the wrong table.
 //
 // EXHAUSTIVE, and the type is what says so — but nothing enforces it, because every package's
-// tsconfig excludes `*.test.ts` (`.claude/rules/test-harness-false-greens.md` §32). It had drifted
-// five keys behind the union by 2026-09-09 and only an editor reported it. When adding an
+// tsconfig excludes `*.test.ts` (`.claude/rules/test-harness-false-greens.md` §32) — it can drift
+// behind the union with only an editor reporting it. When adding an
 // intrinsic, add it here too; `tsc --build` will not tell you.
 const IOS_NAMES: Record<ISymbioteIntrinsic, string> = {
   view: 'RCTView',

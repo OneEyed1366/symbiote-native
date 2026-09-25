@@ -4,11 +4,11 @@ import { defineConfig } from 'vitest/config';
 import solidPlugin from 'vite-plugin-solid';
 
 // Root unit/integration runner. Tests are co-located with what they exercise. `@symbiote-native/*`
-// packages resolve to raw `src/*.ts` (their package `main`), so they must be inlined for Vitest
-// to transform them. examples/* left the pnpm workspace (2026-07, standalone npm installs) and is
-// out of scope here — run its tests from inside the example app itself. A single `react` copy is
-// enforced by pnpm-workspace.yaml's `overrides` (else "Invalid hook call"), so no Vitest-side
-// dedupe/alias is needed.
+// packages resolve to raw `src/*.ts` (their package `main`), so they must be inlined for Vitest.
+// examples/* is a standalone npm tree outside the pnpm workspace and out of scope here.
+
+// A single `react` copy is enforced by pnpm-workspace.yaml's `overrides` (else "Invalid hook
+// call"), so no Vitest-side dedupe/alias is needed.
 
 const INCLUDE_ALL = [
   'core/**/src/**/*.test.{ts,tsx}',
@@ -57,14 +57,9 @@ const SOLID_TESTS = [
   'packages/**/src/solid/**/*.test.{ts,tsx}',
 ];
 
-// `dev: false` is NOT a production-mode nicety — without it this project loads TWO solid-js builds
-// at once. vite-plugin-solid re-adds the `development` export condition from its own config() hook,
-// so solid-js resolves to dist/dev.js for the plugin's own path while dist/solid.js is resolved
-// elsewhere; a profile of one create showed functions from both files. Signals then live in one
-// runtime and the renderer's prop effects in the other, so THEY NEVER SEE EACH OTHER: measured
-// 2026-08-23, a signal driving a prop on an intrinsic element went clip -> clip -> clip (no update
-// at all), and clip -> head -> tail with this flag. Structural updates (<Show>, <For>) kept working
-// because they run inside the test file's own solid-js, which is why nothing was red.
+// `dev: false` is NOT a production-mode nicety — without it this project loads TWO solid-js
+// builds (dist/dev.js for the plugin's own path, dist/solid.js elsewhere), so signals live in one
+// runtime and the renderer's prop effects in the other and THEY NEVER SEE EACH OTHER.
 //
 // `conditions: ['browser']` picks solid-js's client build over its `node` -> dist/server.js entry,
 // and BOTH resolve and ssr.resolve are needed for the reason the svelte project states below:
@@ -239,11 +234,9 @@ const SHARED = {
 // not the plain `resolve.conditions`. Metro needs the equivalent `conditionNames` fix for a real
 // device build; tracked in the svelte-adapter-dom-shim skill.
 //
-// Scoped to the svelte project on purpose (was global, broke unrelated packages 2026-08-14):
-// `less`/`sass`/`stylus` each declare a `browser` key first in their own exports, so a global
-// browser condition resolves them to browser bundles that fail to load under Node — reordering
-// our conditions array can't fix that, since Node/Vite pick the first matching key in the
-// PACKAGE's own declaration order. So the condition is narrowed to just the tests that need it.
+// Scoped to the svelte project, not global: `less`/`sass`/`stylus` each declare a `browser` key
+// first in their own exports, so a global condition would resolve them to browser bundles that
+// fail under Node — Node/Vite pick the first matching key in the PACKAGE's own declaration order.
 const BROWSER_CONDITIONS = {
   resolve: { conditions: ['browser'] },
   ssr: { resolve: { conditions: ['browser'] } },

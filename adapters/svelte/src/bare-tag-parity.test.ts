@@ -1,29 +1,6 @@
-// What a PUBLIC bare tag would mean on this adapter, measured 2026-09-01 for the primitives-as-tags
-// work. The question was "does a bare tag commit a payload identical to the wrapper's". Here it
-// does not, and the reason is the funnel: our props do not reach the engine as props. A
-// bag-carrying element takes ONE `p={{…}}` object and the shim's `p` setter fans it out; an
-// app-authored `<view class="x" id="y">` has no bag, and Svelte's own codegen sends its
-// attributes three different ways, none of which the shim implements.
-//
-// Measured, four arms, `bag` acting as the live control:
-//
-//   wrapper  <View id testID accessible>            { testID, accessible, nativeID:'ident' }
-//   bag      <view p={{…}}>                IDENTICAL  <- the parity this file asserts
-//   bare     <view id testID accessible>   NOTHING commits; the node mounts empty
-//   bare + style/class                              THROWS: cannot set 'cssText' of undefined
-//
-// SUPERSEDED 2026-09-07 — the two bare rows above are a dated reading, kept because the CODEGEN
-// half of them is still exactly right and is what the fixes had to be aimed at. The shim now
-// implements all four doors (`setAttribute`, `className`, the `set_style` Symbol, and an
-// `addEventListener` that normalises the event name), so a bare tag commits and does not throw;
-// `bare-tag-authored.test.ts` compiles real markup with no preprocessor and pins each one. What is
-// still the compiler's and not ours: a STATIC attribute name is lowercased, and a hyphenated tag
-// stringifies a scalar — both properties of the tag alphabet.
-//
-// Only the wrapper/bag parity is asserted below. The bare-tag readings stay a dated measurement and
-// NOT assertions, on purpose: pinning them would encode today's limitation as a contract, so a
-// later shim that learns `className` / `style` / per-key writes would read as a regression
-// (`.claude/rules/test-harness-false-greens.md` §14).
+// A child written as markup under a tag commits; the same child handed over as a `children` bag
+// key never mounts — `routeProp` treats `children` as an ordinary prop, and a Snippet is not
+// markup there. Bare-tag attribute parity itself is `bare-tag-authored.test.ts`'s.
 import { afterAll, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
 import { rmSync, writeFileSync } from 'node:fs';
@@ -95,12 +72,6 @@ async function arm(
 afterAll(() => {
   rmSync(PROBE_OUT, { force: true });
 });
-
-// The wrapper-vs-bag comparison this file opened with is GONE with the wrappers, and so is
-// `tag-fold-coverage.test.ts`, which replaced it: the spec-driven `defaults` it asserted against
-// were deleted on 2026-09-18 along with `foldHostBag`, because the engine's own component-keyed
-// rules had made every one of them redundant. There is no per-primitive fold left in this adapter to
-// assert absolutely, which is the end state and not a gap.
 
 describe('children under a tag', () => {
   it('mount as markup, which a `children` key in the bag never does', async () => {

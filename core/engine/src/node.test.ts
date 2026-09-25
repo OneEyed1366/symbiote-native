@@ -1,12 +1,6 @@
-// Co-located next to the interface it tests (Information Expert), replacing the private copy
-// scroll-view-commands.ts used to own. Scope: isSymbioteEvent, plus the retained-tree
-// primitives (insertBefore/removeChild/anchors/setText/setEventListener/routeProp
-// classification) that no other co-located suite in this repo exercises directly — most of
-// node.ts's surface is otherwise proven indirectly through commit/incremental/reparenting
-// tests that only ever call appendChild/setProp. createElement/isSymbioteNode/debugNodeId are
-// N/A here: createElement is exercised as setup in every test in this file, isSymbioteNode is
-// covered by accessibility-info.test.ts's handle-narrowing scenarios, and debugNodeId is
-// DEBUG-gated diagnostic instrumentation with no product-facing contract to assert.
+// Scope: isSymbioteEvent, plus the retained-tree primitives (insertBefore/removeChild/anchors/
+// setText/setEventListener/routeProp classification) no other co-located suite exercises directly
+// — most of node.ts's surface is proven indirectly through commit/reparenting tests instead.
 
 import { describe, expect, it } from 'vitest';
 import {
@@ -170,12 +164,9 @@ describe('setText', () => {
 });
 
 describe('setEventListener: the listener map', () => {
-  // why: six events are ALSO gated behind a boolean prop in Fabric's C++, and registering the
-  // listener is what raises it. That half — which flag, whether it reaches the payload, whether
-  // removing the last listener resets it — is proven end-to-end in
-  // __tests__/gated-event-props.test.ts, against the COMMITTED payload rather than node.props,
-  // because the payload is what native reads. What is only observable here is the listener map
-  // itself: it never reaches Fabric, so no commit-level test can see it.
+  // why: six events are also gated behind a boolean prop in Fabric's C++; that half is proven
+  // end-to-end in gated-event-props.test.ts against the committed payload. What's only observable
+  // here is the listener map itself, since it never reaches Fabric.
   it('registers a handler under the event name and drops it on a non-function value', () => {
     const node = createElement('RCTView');
 
@@ -199,10 +190,8 @@ describe('setEventListener: the listener map', () => {
 });
 
 describe('routeProp: event vs plain-prop classification', () => {
-  // why: the flat-bag split (React/Vue/Solid) must tell an event handler from a native
-  // prop that merely looks like one — `onTintColor` is not a ViewConfig event for a plain
-  // view, so it must reach Fabric as a prop, not silently vanish into a listener nobody
-  // fires.
+  // why: the flat-bag split must tell an event handler from a native prop that merely looks like
+  // one — `onTintColor` isn't a ViewConfig event for a plain view, so it reaches Fabric as a prop.
   it('an onX name the component does not declare as an event stays a plain prop', () => {
     const node = createElement('RCTView');
     const handler = (): void => {};
@@ -224,10 +213,8 @@ describe('routeProp: event vs plain-prop classification', () => {
     expect(propOf(node, 'onPress')).toBeUndefined();
   });
 
-  // why: the boundary the `on*` test encodes is "on" followed by an UPPER-CASE letter, and nothing
-  // pinned it. A prop whose name merely begins with the letters o and n — `online`, `onyx`,
-  // `onValueChange` is the real one this repo ships — must reach Fabric as a prop. Written before
-  // the check was rewritten off a regex, so the rewrite had an oracle rather than a reviewer.
+  // why: the `on*` boundary is "on" followed by an upper-case letter — a name merely starting with
+  // the letters o and n (`online`, `onyx`, the real onValueChange) must reach Fabric as a prop.
   it('a name starting with a lower-case letter after "on" is a plain prop', () => {
     const node = createElement('RCTView');
     for (const key of ['online', 'onyx', 'once']) {

@@ -1,7 +1,7 @@
 // A React state update has to reach the screen on every render, while the targeted-replace path is
 // running underneath it.
 //
-// why: device regression 2026-09-17 on `examples/react`, first Release build carrying the re-enabled
+// why: device regression on `examples/react`, first Release build carrying the re-enabled
 // `canReplaceInPlace`. Read the symptoms together and they are ONE symptom — a slider label stuck at
 // 50% while its thumb moves, `dx 0 dy 0` under a live drag, benchmark counters frozen at zero,
 // "native tag —" where a tag should print. None of that is "events are dead"; it is state that

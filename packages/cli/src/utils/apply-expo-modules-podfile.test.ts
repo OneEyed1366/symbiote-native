@@ -36,12 +36,9 @@ describe('applyExpoModulesPodfilePlatform', () => {
     return fs.readFileSync(path.join(root, 'ios', 'Podfile'), 'utf8');
   }
 
-  // why: expo's own podspec (`Expo.podspec`) declares `s.platforms = { :ios => '16.4', ... }` —
-  // real-device bug (2026-09-18), `pod install` on a scaffolded app with --expo-modules fails
-  // with "CocoaPods could not find compatible versions for pod Expo... required a higher minimum
-  // deployment target", because RN's own default (`min_ios_version_supported` = '15.1') is below
-  // it and nothing in the expo-modules layer ever raises it. examples/expo-react/ios/Podfile
-  // already carries the fix — this backports the same one line to a real app's Podfile.
+  // why: expo's own podspec declares `s.platforms = { :ios => '16.4', ... }`, above RN's own
+  // default (`min_ios_version_supported` = '15.1'), so `pod install` fails with "could not find
+  // compatible versions for pod Expo" unless something raises the Podfile's floor.
   it('raises platform :ios to the max of the RN default and 16.4', () => {
     const root = setupApp(BASE_PODFILE);
     applyExpoModulesPodfilePlatform(root);

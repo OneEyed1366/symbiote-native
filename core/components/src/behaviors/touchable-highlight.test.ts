@@ -51,18 +51,9 @@ function listenerOf(node: ISymbioteNode, name: string): IListener {
   return listener;
 }
 
-// THE WITNESS CHANGED ON 2026-09-18 AND THE CLAIM DID NOT. Every case below used to ask whether the
-// underlay was showing by reading `backgroundColor` off the committed payload. That worked while a
-// JS `payloadFold` painted it; the rule is `foldTouchableHighlightUnderlay` in the engine now, and
-// this host builds its payloads through the TypeScript `fabricProps`, which deliberately carries no
-// copy of the tag rules — so the colour is not here to read and never will be.
-//
-// What IS here is the bit the machine flipped, recorded from `OP_SET_UNDERLAY_SHOWN`. That is the
-// better instrument for this file anyway: every case in it is about WHEN the underlay shows — the
-// hold timer, the cancelled gesture, the re-arm — which is the half that stayed in JS. What a
-// showing underlay LOOKS like moved out whole, along with the two style cases that asked, and is
-// asserted against a real committed payload in
-// `core/engine/cpp/tests/js/touchable-highlight-underlay.itest.ts`.
+// Every case here asks whether the underlay is showing via the bit the machine flipped
+// (`OP_SET_UNDERLAY_SHOWN`), not the committed `backgroundColor` — that colour is
+// `foldTouchableHighlightUnderlay` now, asserted in `touchable-highlight-underlay.itest.ts`.
 function isUnderlayShown(node: ISymbioteNode): boolean {
   const hit = fabric.find(authored => authored.handle === node);
   if (hit === undefined) throw new Error('the node never reached the host');
@@ -289,35 +280,13 @@ describe('touchable-highlight host behavior', () => {
     expect(onPress).not.toHaveBeenCalled();
   });
 
-  // THE TWO STYLE CASES LEFT ON 2026-09-18 — "applies a custom underlayColor and activeOpacity" and
-  // "defaults to black at 0.85 opacity when unset". They are the only ones here that asked what a
-  // showing underlay LOOKS like rather than when it shows, and that is `foldTouchableHighlightUnderlay`
-  // in the engine now, reading the same two props the payload builder already strips
-  // (`kTouchableFeedbackKeys`). Their twins are "paints the underlay and dims the child while
-  // pressed" and "falls back to the underlay and opacity RN itself picks", in
-  // `core/engine/cpp/tests/js/touchable-highlight-underlay.itest.ts`, against a real payload.
-  //
-  // They went as a PAIR with the rule rather than being rewritten onto the new witness, because
-  // `underlayShown` cannot tell a crimson underlay from a black one — a bit is the right instrument
-  // for "did the machine flip" and the wrong one for "what colour". Every other case in this file
-  // survived the move, which is the tell that the split was along the real seam.
+  // The two STYLE cases ("custom underlayColor/activeOpacity", "defaults to black at 0.85
+  // opacity") ask what a showing underlay LOOKS like — that's `foldTouchableHighlightUnderlay` now,
+  // asserted in `touchable-highlight-underlay.itest.ts` (`underlayShown` is a bit, not a colour).
 
-  // `focusable` LEFT ON 2026-09-18 — `foldPressableProps` resolves it off the tag now — AND THIS
-  // CASE IS WHY THE MOVE MATTERED, not just where it went.
-  //
-  // It asserted the disabled leg and it PASSED, for weeks, while the real engine shipped the
-  // opposite: a disabled TouchableHighlight committed `focusable: true` and stayed in the focus
-  // order. The fold read `props.disabled` off the bag, and on a device the engine's pressable rule
-  // strips that key BEFORE the fold runs. This harness has no pressable rule — it builds payloads
-  // through the TypeScript `fabricProps`, which deliberately carries no copy — so the key was still
-  // there and the expression resolved correctly HERE and nowhere else.
-  //
-  // So the harness that is right to hold no mirror is also, for the same reason, unable to see a
-  // rule-ORDERING bug. A fold that reads a key an engine rule removes is invisible to every test on
-  // this side; only the committed payload can catch it. It was caught by writing the itest for the
-  // port, on unmodified HEAD, before a line of the port had landed.
-  //
-  // `core/engine/cpp/tests/js/touchable-focusable-payload.itest.ts` carries the case and the rest.
+  // `focusable` is `foldPressableProps` off the tag now. This harness's `fabricProps` never strips
+  // `props.disabled` first the way the device's pressable rule does, so a fold reading it directly
+  // resolves right HERE and wrong on device — `touchable-focusable-payload.itest.ts` catches that.
 
   // `id -> nativeID`, `accessible !== false` and the `disabled -> accessibilityState` merge this
   // file never covered all live in the engine now (`foldIdAlias` / `foldPressableProps`,

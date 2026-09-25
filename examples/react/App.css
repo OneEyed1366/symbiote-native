@@ -1,16 +1,13 @@
 /* Symbiote canary app — static styles, compiled at build time by @symbiote-native/css-parser
-   into the same RN style objects StyleSheet.create used to produce (see the
-   symbiote-sfc-style-compiler skill). Referenced via className, now supported on every
-   component's public prop type. `transform`/`transformOrigin`/`filter`/`box-shadow`/
-   `background-image` ARE supported (raw CSS-text passthrough, 2026-07 — see .gradient-card
-   below) — App.tsx's existing shadow-card/filter-tile/rotated-card demos just predate that
-   and still use inline dynamic style, which is still valid, not a gap. What stays in
-   App.tsx's residualStyles is ONLY what a CSS class truly cannot express:
-   contentContainerStyle (a plain style-object prop, not style/className itself, so it
-   never reaches the class registry), and Pressable's `style` prop when it's a FUNCTION of
-   press state (a CSS class is compiled statically). Plain (unscoped) file: App.tsx is a
-   single component tree, so every class here is effectively global already, no
-   <style scoped> needed. */
+   into the same RN style objects StyleSheet.create used to produce (symbiote-sfc-style-compiler
+   skill), referenced via className. `transform`/`transformOrigin`/`filter`/`box-shadow`/
+   `background-image` ARE supported (raw CSS-text passthrough, see .gradient-card below) — inline
+   dynamic style in App.tsx's shadow-card/filter-tile/rotated-card demos is still valid, not a gap.
+   What stays in App.tsx's residualStyles is ONLY what a CSS class truly cannot express:
+   contentContainerStyle (a plain style-object prop, never reaches the class registry), and
+   Pressable's `style` prop when it's a FUNCTION of press state (a class is compiled statically).
+   Plain (unscoped) file: App.tsx is a single component tree, so every class here is effectively
+   global already, no <style scoped> needed. */
 
 :root {
   /* app-wide surface/text tokens — same values already used ad hoc across this file; named here
@@ -391,11 +388,10 @@
   background-color: #0f1e30;
 }
 
-/* App / CanaryScreen — retokenized onto the shared --ink/--paper/--mist/--chalk palette (2026-07
-   cohesion pass); accent chrome uses --line-primitives, CanaryScreen's own tour-line color (its
-   line-tag is "CN · PRIMITIVES LINE"). Demo colors that ARE the content — the shadow-card glow,
-   the rainbow chip hues, per-feature ActionButton tints in CanaryScreen.tsx/components/* — are
-   deliberately left alone; only chrome that used to duplicate these tokens ad hoc changed. */
+/* App / CanaryScreen chrome uses the shared --ink/--paper/--mist/--chalk palette; accent chrome
+   uses --line-primitives, CanaryScreen's own tour-line color ("CN · PRIMITIVES LINE"). Demo colors
+   that ARE the content — the shadow-card glow, rainbow chip hues, per-feature ActionButton tints —
+   are deliberately left alone. */
 .screen {
   flex: 1;
   background-color: var(--ink);

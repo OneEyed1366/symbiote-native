@@ -1,19 +1,17 @@
 /* Symbiote Angular canary app — static styles, compiled at build time by
    @symbiote-native/css-parser into the same RN style objects StyleSheet.create used to produce
-   (see the symbiote-sfc-style-compiler skill). Referenced via class, resolved at runtime through
-   the shared style registry every adapter's class/className/addClass path shares.
+   (symbiote-sfc-style-compiler skill). Referenced via class, resolved at runtime through the
+   shared style registry every adapter's class/className/addClass path shares.
    `transform`/`transformOrigin`/`filter`/`box-shadow`/`background-image` ARE supported (raw
-   CSS-text passthrough, 2026-07 — see .gradient-card below) — CanaryScreen.ts's existing
-   shadow-card/filter-tile/rotated-card demos just predate that and still use inline dynamic
-   style, which is still valid, not a gap. What stays inline in App.ts/CanaryScreen.ts is ONLY
-   what a CSS class truly cannot express: contentContainerStyle (a plain style-object prop, not
-   style/class itself, so it never reaches the class registry), and Pressable's `style` prop when
-   it's a FUNCTION of press state (a CSS class is compiled statically). Plain (unscoped) file,
-   imported once at the app root (App.ts) — every screen under ./screens/ and every component
-   under ./components/ shares these classes globally, no <style scoped>/CSS-module needed. Ported
-   byte-for-byte from ../react/App.css — every value here stays identical to the React canary's
-   except `--line-primitives` below (Angular's own brand red replaces React's brand blue), per
-   this repo's <adapters_reach_full_feature_parity>/cross-framework color-parity convention. */
+   CSS-text passthrough — see .gradient-card below) — inline dynamic style in CanaryScreen.ts's
+   shadow-card/filter-tile/rotated-card demos is still valid, not a gap. What stays inline in
+   App.ts/CanaryScreen.ts is ONLY what a CSS class truly cannot express: contentContainerStyle
+   (a plain style-object prop, never reaches the class registry), and Pressable's `style` prop when
+   it's a FUNCTION of press state (a class is compiled statically). Plain (unscoped) file, imported
+   once at the app root (App.ts) — every screen and component shares these classes globally, no
+   <style scoped>/CSS-module needed. Ported byte-for-byte from ../react/App.css — every value stays
+   identical except `--line-primitives` (Angular's own brand red replaces React's brand blue), per
+   this repo's cross-framework color-parity convention. */
 
 :root {
   /* app-wide surface/text tokens — same values already used ad hoc across this file; named here
@@ -159,20 +157,16 @@
 }
 
 /* Every demo component's OWN visual detail (pulse-dot, xy-frame, ref-box, color-tile, chip,
-   a11y-card, parity-list, section-header, …) lives ONLY in its dedicated components/*.css file —
-   this file used to carry a duplicate copy of each, from before the per-component split. The
-   style registry (core/engine/src/style-registry) is one flat Map shared across every CSS source
-   in the app, so a same-named class defined here AND in components/*.css silently collides at
-   runtime (no build error) — see the style-registry-collisions rule / symbiote-sfc-style-compiler
-   skill §9. Removed 2026-07-10 after the duplicate `.section`/`.section-label` shadowing this
-   file's own generic versions (missing padding on `.section` specifically) was traced back to
-   this leftover block; the dedicated components/*.css files remain the single source of truth. */
+   a11y-card, parity-list, section-header, …) lives ONLY in its dedicated components/*.css file.
+   The style registry (core/engine/src/style-registry) is one flat Map shared across every CSS
+   source in the app, so a same-named class defined here AND in components/*.css silently collides
+   at runtime (no build error) — see style-registry-collisions / symbiote-sfc-style-compiler skill
+   §9. The dedicated components/*.css files are the single source of truth. */
 
-/* App / CanaryScreen — retokenized onto the shared --ink/--paper/--mist/--chalk palette (2026-07
-   cohesion pass); accent chrome uses --line-primitives, CanaryScreen's own tour-line color (its
-   line-tag is "CN · PRIMITIVES LINE"). Demo colors that ARE the content — the shadow-card glow,
-   the rainbow chip hues, per-feature ActionButton tints in CanaryScreen.tsx/components/* — are
-   deliberately left alone; only chrome that used to duplicate these tokens ad hoc changed. */
+/* App / CanaryScreen chrome uses the shared --ink/--paper/--mist/--chalk palette; accent chrome
+   uses --line-primitives, CanaryScreen's own tour-line color ("CN · PRIMITIVES LINE"). Demo colors
+   that ARE the content — the shadow-card glow, rainbow chip hues, per-feature ActionButton tints —
+   are deliberately left alone. */
 .screen {
   flex: 1;
   background-color: var(--ink);

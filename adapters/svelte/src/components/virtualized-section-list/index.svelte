@@ -63,12 +63,9 @@
       Platform.OS,
     ),
   );
-  // DIAGNOSTIC (2026-08-13, tracking why stickyHeaderIndices comes back undefined on Android
-  // despite the demo passing the bare `stickySectionHeadersEnabled` shorthand): the previous
-  // logging only showed the RESULT (VirtualizedList's own dlog), never the INPUTS this $derived
-  // actually read — isolated verification proved bare-shorthand forwarding through this exact
-  // two-hop generic-component chain works correctly in a standalone repro, so this must show
-  // what differs in the real component tree.
+  // Diagnostic: logs every INPUT this $derived reads, not just VirtualizedList's own result —
+  // `stickyHeaderIndices` can come back undefined on Android with the bare
+  // `stickySectionHeadersEnabled` shorthand, and only the inputs show what differs.
   $effect(() => {
     dlog(
       `VirtualizedSectionList sticky-inputs enabled=${String(props.stickySectionHeadersEnabled)} ` +

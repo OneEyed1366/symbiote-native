@@ -6,17 +6,13 @@
 // which has no engine node of its own, so the shim's `detachFromParent` reaches for
 // `engineRemoveChild` and then `requestCommit()` — a commit provably happens with the node parked.
 //
-// That broke the engine's first design (found 2026-08-23): its sweep read "still absent at the
-// next commit" as proof of death, which holds for Solid's remove-then-reinsert inside one tick and
-// does NOT hold here. Svelte parks across commits, and behind a `<svelte:boundary>` pending
-// snippet it parks until an async result arrives. A torn-down machine on a node that comes back
-// alive is invisible to every headless test and shows up on a device as a primitive that quietly
-// stopped responding.
-//
-// The behaviour is deliberately registered on a DESCENDANT, not on the node being moved. That is
-// the shape Svelte produces — a row wrapper is parked, the machine lives on something inside it —
-// and it is the case an engine-level fix missed on its first pass by marking only nodes that
-// carry a behavior themselves.
+// Parking across commits is NOT death: the engine's sweep once read "still absent at the next
+// commit" as proof of it — true for Solid's remove-then-reinsert inside one tick, false here.
+// Svelte parks across commits, even across an async `<svelte:boundary>` gap.
+
+// The behaviour is deliberately registered on a DESCENDANT, not the node being moved — the shape
+// Svelte produces (a row wrapper parks, the machine lives on something inside it), which an
+// engine-level fix marking only self-carrying nodes missed on its first pass.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { installRecordingFabric } from '@symbiote-native/test-utils';

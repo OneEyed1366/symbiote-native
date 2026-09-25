@@ -88,11 +88,8 @@ describe('focusTextInput', () => {
     expect(commandNames()).toEqual([]);
   });
 
-  // why: RN's TextInputState.focusTextInput's own guard —
-  // `textField.currentProps?.editable !== false` — matching TextInput-test.js's "focus() should
-  // not do anything if the TextInput is not editable" (ported here at the engine level, where the
-  // guard actually lives; the RN test itself exercises an internal-only entry point that isn't the
-  // public ref surface, but the guard IS also what the public `ref.focus()` hits).
+  // why: mirrors RN's TextInputState.focusTextInput guard (`editable !== false`), ported here
+  // since that's where the guard actually lives at the engine level.
   it('does not dispatch when editable is explicitly false', () => {
     const node = mountNode();
     routeProp(node, 'editable', false);

@@ -6,7 +6,7 @@
 // name already on the wire and both halves are reachable from one binary. The rest are not: an
 // `android_ripple` sits on an ordinary `RCTView`, a Button's label commits as `RCTRawText` on both
 // platforms, and a TouchableNativeFeedback's child is a plain view. Those rules are `#ifdef ANDROID`,
-// and until 2026-09-18 the only thing that ran them was a device.
+// so only a device build could run them before this file.
 //
 // What made the arm cheap is a fact about where the rules live rather than a trick: ALL TWELVE
 // `#ifdef ANDROID` sites are in `SymbioteFabricProps.cpp`, which includes `folly/dynamic.h` and our
@@ -359,8 +359,8 @@ describe('the rules that only an Android build compiles', () => {
 
   // why: `snapToAlignment` stops the content node's children collapsing on ANDROID ONLY — RN's gate
   // is `maintainVisibleContentPosition != null || (Platform.OS === 'android' && snapToAlignment !=
-  // null)` (`ScrollView.js:1731-1733`). It was honoured on both platforms here until 2026-09-18, so
-  // this is the arm that pins the half a compile-time branch made unreachable from the other one.
+  // null)` (`ScrollView.js:1731-1733`). This is the arm that pins the half a compile-time
+  // branch made unreachable from the other one.
   // The iOS NEGATIVE is `scroll-content-payload.itest.ts`, "lets a snapping iOS scroller collapse
   // its children" — the two are twins and neither means much alone.
   // why: `pagingEnabled` INVERTS between the platforms, which is the rarest shape in this file — iOS

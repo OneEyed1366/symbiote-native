@@ -1,7 +1,5 @@
-// The `<pressable>` tag's prop surface. The tag is matched by `PressableElement`
-// (`../elements`) and carries the press machine as an engine behavior
-// (`registerPressableBehavior`), so the wrapper that used to run it in Angular was deleted
-// 2026-09-10.
+// The `<pressable>` tag's prop surface. The tag (`PressableElement`) carries the press machine
+// as an engine behavior (`registerPressableBehavior`), no separate wrapper component.
 //
 // The type stays for a component forwarding a bag, for the four `Touchable*` prop types that share
 // this base, and because `IAngularPressableProps` is public API. Mirrors React's IPressableProps

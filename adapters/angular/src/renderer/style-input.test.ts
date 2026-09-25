@@ -1,10 +1,8 @@
 // The two style bindings a tag takes, each reaching the node whole.
 //
-// `[style]` is Angular's styling binding: an OBJECT is decomposed by Angular's own engine into
-// per-key `Renderer2.setStyle` calls, which the renderer merges back into one style. An RN StyleProp
-// ARRAY cannot pass there (`applyStyling` takes each member as a style key and throws - device-
-// diagnosed 2026-09-02 on ImageBackground), so it travels as `[styleProp]`, a plain property the
-// renderer routes to `style`. `bare-intrinsic-tag.test.ts` holds the array-in-`[style]` arm that throws.
+// `[style]` is Angular's styling binding: an OBJECT decomposes into per-key `Renderer2.setStyle`
+// calls, merged back into one style. An RN StyleProp ARRAY throws there (`applyStyling` reads each
+// member as a style key), so it travels as `[styleProp]`, a plain property routed to `style`.
 import '@angular/compiler';
 import { CUSTOM_ELEMENTS_SCHEMA, Component } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';

@@ -1,7 +1,6 @@
-// Co-located with navigation.ts. Scope: the accessors four of five renderer seams need, and
-// specifically the three distinctions that are easy to get wrong and that a seam would only
-// discover on a device — anchors being VISIBLE to traversal, a text CONTAINER not being a
-// writable text node, and a view name that changes under a stable identity.
+// The accessors most renderer seams need, and the three distinctions a seam would only discover
+// on a device: anchors being VISIBLE to traversal, a text CONTAINER not being a writable text
+// node, and a view name that changes under a stable identity.
 
 import { describe, expect, it } from 'vitest';
 import { installRecordingFabric } from '@symbiote-native/test-utils';
@@ -75,25 +74,15 @@ describe('engine host navigation', () => {
     surface.appendChild(second);
 
     expect(nextSiblingOf(first, surface)).toBe(second);
-    // DELIBERATE CHANGE OF CONTRACT, recorded rather than quietly absorbed. This asserted
-    // `undefined` until `nextSiblingOf` became a host call, and its reason was that "a top-level
-    // node has no parent, and the engine will not guess at an ambient surface" — a miss rather than
-    // a guess for an adapter that forgot the argument.
-    //
-    // There is nothing left to guess. The surface is an ordinary node in the host's tree, so the
-    // host resolves the sibling through the node's REAL parent and the answer is right for the
-    // surface the node actually belongs to, not for an assumed one. Keeping the old contract would
-    // mean returning `undefined` where a sibling demonstrably exists, to punish a caller.
-    //
-    // `surface` stays in the signature because three adapters pass it.
+    // The surface is an ordinary node in the host's tree, so nextSiblingOf resolves through the
+    // node's real parent and answers right even with the `surface` arg omitted — it stays in the
+    // signature only because three adapters still pass it.
     expect(nextSiblingOf(first)).toBe(second);
   });
 
   it('separates a text CONTAINER from a writable raw-text node', () => {
-    // Both directions matter. `isTextContainer` answering true for a <Text> and false for the
-    // RCTRawText inside it is what stops a seam writing a string into a container; `isRawTextNode`
-    // answering false for an anchor is what stops it writing into the empty-string placeholder a
-    // runtime leaves to hold a position.
+    // Both directions matter: isTextContainer true/false stops a seam writing a string into a
+    // container; isRawTextNode false for an anchor stops it writing into a position placeholder.
     const container = createElement('RCTText', true);
     const raw = createRawText('hello');
     const anchor = createAnchor();

@@ -10,13 +10,9 @@
   --sl-sidebar-width: 18rem;
 }
 
-/* Bug fix (2026-08): this used to be `:root, :root[data-theme='dark']`, which set
-   these dark-palette values on BARE :root too — that's the same (unscoped)
-   selector Starlight's own light-theme defaults use, so ours always won the
-   cascade (loaded later) regardless of the chosen theme. Result: light theme
-   picked dark bg + light text, unreadable. Scoping strictly to
-   [data-theme='dark'] lets Starlight's own :root light defaults stand until the
-   light block below explicitly overrides them. */
+/* Scoped strictly to [data-theme='dark'], never bare :root: Starlight's own light-theme
+   defaults use that same unscoped selector, so a bare :root here would always win the
+   cascade (loaded later) and pick dark bg + light text regardless of the chosen theme. */
 :root[data-theme='dark'] {
   --sl-color-accent-low: color-mix(in srgb, var(--accent) 22%, var(--core-bg));
   --sl-color-accent: var(--accent);

@@ -13,7 +13,7 @@
 // `<Pressable>`s — components with real bodies, prop folds and, in Pressable's case, a press machine.
 //
 // The device disagrees with this fixture about the tree itself, which is what makes it worth a file
-// rather than a comment: measured 2026-09-21 on iOS 26.5, `examples/bare-rn` calls `createNode`
+// rather than a comment: on device, `examples/bare-rn` calls `createNode`
 // 9 001 times for a thousand rows while our own arm calls it 10 000. Both screens declare ten native
 // views per row. So either RN's components emit one node fewer than the intrinsics this fixture
 // names, or the device screen does — and a headless census of the two rows side by side is the only

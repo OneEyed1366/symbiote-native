@@ -1,7 +1,5 @@
-// reportUncaughtError is the channel an adapter uses when it has caught something its framework
-// would otherwise have surfaced itself. What matters is that it reaches the host EXACTLY once, by
-// the route that host actually has: `global.ErrorUtils` on a native host (LogBox/redbox), plain
-// console.error anywhere else.
+// reportUncaughtError is the channel an adapter uses when it caught something its framework would
+// otherwise have surfaced itself. What matters: it reaches the host EXACTLY once.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { reportUncaughtError } from './report-error';
@@ -10,10 +8,9 @@ const ORIGIN = 'test render';
 
 let consoleError: ReturnType<typeof vi.spyOn>;
 
-// Installed and removed through Reflect/Object.assign rather than `globalThis.ErrorUtils = …`:
-// react-native declares its own global `ErrorUtils` whose type lists only the two globalHandler
-// members, so naming the property directly fights that declaration in any package that pulls RN's
-// types in. The module under test reads it the same indirect way, for the same reason.
+// Installed via Reflect/Object.assign, not `globalThis.ErrorUtils = …`: react-native declares its
+// own global ErrorUtils type, so naming the property directly fights that in any package pulling
+// RN's types in. The module under test reads it the same indirect way.
 function installErrorUtils(reportError: unknown): void {
   Object.assign(globalThis, { ErrorUtils: { reportError } });
 }

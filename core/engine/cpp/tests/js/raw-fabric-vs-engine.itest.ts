@@ -1,6 +1,6 @@
 // What does the SAME tree cost through a zero-cost driver, and what does it cost through ours?
 //
-// why: the device run of 2026-09-17 says every create-shaped row got more expensive after the
+// why: the device run says every create-shaped row got more expensive after the
 // buffer architecture — Create/Replace/Append/Clear up 10-37% on four adapters of five — while
 // every row that touches a handful of nodes got cheaper. The suspicion that follows is "we drive
 // Fabric worse than React does", and it cannot be answered by comparing two adapters: both are ours
@@ -32,7 +32,7 @@
 // `ensureYogaChildrenLookFine` + `ensureYogaChildrenAlignment`, so building an N-child list one
 // append at a time is O(N²) there and O(N) in the build that ships.
 //
-// Measured 2026-09-17, the same file on the two builds:
+// The same file on the two builds:
 //
 //                        build (asserts)   build-release      what it looked like
 //   RAW total                  ~307              ~92

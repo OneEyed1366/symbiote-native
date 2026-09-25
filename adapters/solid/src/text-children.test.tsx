@@ -1,7 +1,6 @@
-// What a <Text>'s children actually become on the way to Fabric. Two of the three claims here were
-// written from a real iOS abort (2026-08-19): the app died inside
-// BaseTextShadowNode::buildAttributedString the moment a screen with `{list().length} tiles` was
-// mounted.
+// What a <Text>'s children actually become on the way to Fabric. Two of the three claims here
+// guard a real iOS abort: a screen rendering `{list().length} tiles` died inside
+// BaseTextShadowNode::buildAttributedString.
 //
 // The trap is that RCTRawText's `text` is parsed natively as a std::string. Anything else fails the
 // conversion, and Fabric does not throw — convertRawProp logs and falls back to the DEFAULT, i.e.

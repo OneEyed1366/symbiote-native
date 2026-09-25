@@ -11,21 +11,9 @@
 // `core/engine/src` reports 93 matches where the real number is 25, so a grep-based guard would
 // either be permanently red or tuned until it caught nothing.
 //
-// The census that motivated it, and where it ended up:
-//
-//   2026-09-05   node.children / node.parent   57 sites across 7 files
-//   2026-09-08   ZERO — the tree left JS entirely, and the two fields left `ISymbioteNode` with it
-//
-// So the count this guards is now nil rather than small, and the guard is one layer of two: a leak
-// is also a type error today. The layers fail differently, which is why both are worth having — a
-// widened interface satisfies `tsc` and reads as an ordinary field addition, and this is what asks
-// whether anything is reading a node's shape at all.
-//
-// THE SENTINEL IS NOT KEYED ON THE COUNT, and that survived the change that made the count zero. It
-// used to require the seam to hold at least four field accesses; a correct deletion then turned it
-// red. **A false-green sentinel must not be keyed on the thing being deleted.** It asks whether the
-// PROGRAM resolved instead — the real question ("did this examine anything?"), which no legitimate
-// deletion can move. Had it stayed keyed on the count, today's tree would have failed it.
+// The count this guards is nil, one layer of two: a leak is also a type error today, but a
+// widened interface satisfies `tsc` and reads as an ordinary field addition. THE SENTINEL IS NOT
+// KEYED ON THE COUNT — it asks whether the PROGRAM resolved instead, which no deletion can move.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -106,10 +94,9 @@ describe('the engine touches node structure only through host-access.ts', () => 
     // examined nothing — the shape this repo has been bitten by often enough to write down
     // (`.claude/rules/test-harness-false-greens.md`).
     //
-    // Asks about the PROGRAM, not about the violations. It used to require the seam to hold at least
-    // four field accesses, which is the count the roadmap is deleting — see the header. The floor of
-    // 60 is deliberately well under the ~110 engine sources: measured 2026-09-07, the real barrel
-    // resolves 103 and a moved one resolves 0, so anything in between is a broken tsconfig.
+    // Asks about the PROGRAM, not about the violations. The floor of 60 is deliberately well
+    // under the ~110 engine sources: the real barrel resolves over 100 and a moved one resolves
+    // 0, so anything in between is a broken tsconfig.
     const engineFiles = program
       .getSourceFiles()
       .map(source => path.relative(REPO_ROOT, source.fileName))

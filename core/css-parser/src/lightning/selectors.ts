@@ -11,7 +11,7 @@
 //   .card[data-x]{…}               -> key `card[dataX]`      a key no element can ever carry
 //   .a.b / .a .b / .a>.b / .a+.b   -> all key `aB`           five selectors, one key, merged
 //
-// (Traps six and seven in `.claude/rules/style-registry-collisions.md`, measured 2026-08-20.)
+// (Traps six and seven in `.claude/rules/style-registry-collisions.md`.)
 //
 // So this module reports what the selector ACTUALLY says and refuses to guess:
 //   - tokens stay AS AUTHORED — `card-title` is `card-title`. Casing is the caller's problem, and
@@ -32,8 +32,7 @@
 // a raw token stream — structurally the same thing `:global(X)` is under that same mode. All three
 // are folded into `deep` here.
 //
-// `:global(X)` arrives in TWO DIFFERENT SHAPES and BOTH are live, so both are handled (measured
-// 2026-08-20, lightningcss 1.32, same CSS through both modes):
+// `:global(X)` arrives in TWO DIFFERENT SHAPES and BOTH are live, so both are handled:
 //
 //   cssModules OFF  {kind:'custom-function', name:'global', arguments:[…raw token stream…]}
 //   cssModules ON   {kind:'global',          selector:[…parsed SelectorComponent[]…]}
@@ -108,10 +107,9 @@ const DROP_EXPLANATION: Record<IDroppedSelector['reason'], string> = {
 // `:active` support is OFF, and the selector machinery below is kept intact so one line turns it
 // back on.
 //
-// WHY. The pressed look has a second, better route that did not exist when `:active` landed: a
-// functional `style={({pressed}) => …}`, which the engine resolves into `style` + `activeStyle`
-// (`routeProp`, 2026-08-23). It reaches the same slot with no pseudo-class machinery and it is what
-// the ecosystem already writes — so the reason `:active` existed is gone.
+// WHY. The pressed look has a second, better route: a functional `style={({pressed}) => …}`,
+// which the engine resolves into `style` + `activeStyle` (`routeProp`). It reaches the same slot
+// with no pseudo-class machinery and it is what the ecosystem already writes.
 //
 // Keeping BOTH live is what argues against it: they occupy different cascade slots (`activeStyle`
 // replaces the authored style, an `:active` class rule replaces the class style), so an adapter has
@@ -480,13 +478,9 @@ function consumeComponent(
       // depends on for every node at once.
       if (component.kind === STATE_PSEUDO_CLASS) {
         builder.specificity[1]++;
-        // ...but NOT through a scope boundary. `:deep(.b:active)` already dropped, because a
-        // custom-function payload is a raw token stream this walk re-parses; `.a >>> .b:active`
-        // did NOT, because `>>>` is a real combinator and the walk reaches the pseudo-class
-        // normally. Two spellings of one relation behaving differently is the bug, and the
-        // decision (2026-08-23) is to refuse BOTH: a deep selector reaches into another
-        // component's internals, and the state token is only meaningful on the node whose press
-        // machine owns it — which is exactly the node a deep rule cannot predict.
+        // ...but NOT through a scope boundary. Both `:deep(.b:active)` and `.a >>> .b:active`
+        // refuse: a deep selector reaches into another component's internals, and the state
+        // token is only meaningful on the node whose press machine owns it.
         if (
           builder.combinators.includes('deep') ||
           builder.pending === 'deep'

@@ -1,22 +1,14 @@
 // VirtualizedList orchestration reducer: the framework-agnostic STATE MACHINE that folds every
-// per-adapter effect skeleton into one place. Before this, each adapter (React useEffect, Vue
-// watch, Angular ngAfterViewChecked) re-wrote the same sequence — recompute the window, gate
-// onEndReached on `last === count - 1`, dedup by content length, run viewability, apply MVCP — in
-// its own reactive dialect, and the predicates in that glue (`last === count - 1`, `first === 0`,
-// the batch-fill catch-up test, the viewability guards) lived THREE times and quietly drifted.
-//
-// Here the whole decision half is one pure `reduceList(state, action, inputs) -> {state, effects}`.
-// The adapter keeps only what is genuinely framework-bound: translate a native event into an
-// ACTION, hold ONE state cell, and EXECUTE the returned EFFECTS with its own primitives (a native
-// scrollTo, a callback/emit, a setTimeout, a re-render). The geometry leaves (buildOffsets /
-// computeWindow / computeMvcpAdjustment / …) still live in ./virtualized-list; this module composes
-// them into the ordered transition every adapter shares.
-//
-// Effect EXECUTION stays per-adapter by design: which framework hook fires the commit, how a
-// native scrollTo is dispatched, how a debounce timer is held — an effect-list DESCRIBES the work,
-// it does not run it. State TRANSITIONS (including the derived window metrics) are owned entirely
-// here, so a windowing / edge / viewability / MVCP bug — and the drift between three copies of it —
-// is fixed once for all adapters.
+// per-adapter effect skeleton into one place, so the same predicates no longer live in three
+// reactive dialects and quietly drift.
+
+// The whole decision half is one pure `reduceList(state, action, inputs) -> {state, effects}`. The
+// adapter keeps only what's genuinely framework-bound: translate a native event into an ACTION,
+// hold ONE state cell, and EXECUTE the returned EFFECTS with its own primitives.
+
+// Effect EXECUTION stays per-adapter by design — an effect list DESCRIBES the work, it doesn't run
+// it. State TRANSITIONS (including derived window metrics) are owned entirely here, so a
+// windowing/edge/viewability/MVCP bug is fixed once for all adapters.
 
 import { dlog } from '@symbiote-native/engine';
 import {
@@ -82,13 +74,9 @@ export interface IListState<ItemT> {
   // Bumped by the ONLY two writers of the two maps above (the 'measure' case). The maps are
   // mutated in place, so their identity can never say "nothing changed" — this counter can.
   measureVersion: number;
-  // buildOffsets walks the WHOLE list and allocates two count-length arrays plus one object per
-  // index, and deriveMetrics runs it on every scroll frame. With getItemLayout the answer is a
-  // pure function of the index and is byte-identical frame to frame, so a fling on a 544-entry
-  // list paid 544 allocations sixty times a second for a value that never moved. Cached on
-  // everything buildOffsets actually reads; a miss recomputes exactly as before. Kept as state
-  // rather than a module-level map so two lists cannot evict each other, and so it dies with the
-  // list.
+  // buildOffsets walks the WHOLE list per call, and deriveMetrics runs it every scroll frame —
+  // with getItemLayout the answer is byte-identical frame to frame, so this caches on everything
+  // buildOffsets reads. State, not a module-level map, so two lists can't evict each other.
   offsetsCache: {
     count: number;
     data: unknown;
@@ -110,10 +98,9 @@ export interface IListState<ItemT> {
   metrics: IListMetrics;
 }
 
-// The config the reducer reads each call (it comes off the adapter's props, so it is passed in
-// rather than stored). The edge/viewability CALLBACKS never reach the reducer — it only needs to
-// know whether a listener is ACTIVE (so it can decide to emit) and the viewability PAIRS (for the
-// classification + minimumViewTime); the adapter fires the actual callbacks from the effect.
+// The config the reducer reads each call, passed in rather than stored. The edge/viewability
+// CALLBACKS never reach the reducer — only whether a listener is ACTIVE and the viewability PAIRS;
+// the adapter fires the actual callbacks from the effect.
 export interface IListReducerInputs<ItemT> {
   data: unknown;
   getItem: (data: unknown, index: number) => ItemT;
@@ -171,10 +158,9 @@ export type IListAction<ItemT> =
     }
   | { kind: 'scroll-to-end'; animated: boolean };
 
-// The work the adapter executes with its own primitives. `scroll-to` rides the native scrollTo (or
-// the pre-mount contentOffset fallback); `fire-*` invoke callbacks/emits; `fire-viewable` carries
-// the debounce `delay` and the `map` to fold back on completion; `schedule-refill` sets the batch
-// timer; `fire-scroll-to-index-failed` reports an unmeasured scroll target.
+// The work the adapter executes with its own primitives: `scroll-to` rides the native scrollTo;
+// `fire-*` invoke callbacks/emits; `fire-viewable` carries the debounce delay and map to fold back
+// on completion; `schedule-refill` sets the batch timer.
 export type IListEffect<ItemT> =
   | { kind: 'scroll-to'; offset: number; animated: boolean }
   | { kind: 'fire-end-reached'; distanceFromEnd: number }
@@ -361,20 +347,13 @@ function keyForOf<ItemT>(
     );
 }
 
-// The after-render pass: every deferred effect, in the order 2 of 3 adapters already ran them
-// (batch-fill -> end -> start -> viewability -> initial-scroll -> MVCP). Each is guarded by its own
-// dedup state (sent*ForContentLength, lastViewable, appliedInitialScroll, firstVisibleKey), so
-// running commit on every render is safe — the guards prevent a redundant fire.
-// Reclassify the rendered cells and, if the viewable set changed, hand the adapter an info payload
-// to fire (after minimumViewTime, if any). lastViewable is folded back only when the fire actually
-// lands (the 'viewable-fired' action), so a debounce superseded mid-flight still diffs against the
-// last COMMITTED set.
-//
+// Reclassify the rendered cells and, if the viewable set changed, hand the adapter an info
+// payload to fire. lastViewable folds back only when the fire actually lands, so a debounce
+// superseded mid-flight still diffs against the last COMMITTED set.
+
 // Extracted from commitList because 'record-interaction' needs the same pass: RN's
-// recordInteraction() ungates waitForInteraction and calls _updateViewableItems immediately
-// (VirtualizedList.js ~288-296). Leaving the pass inline meant a list that fits its viewport and is
-// never scrolled reported nothing at all after the interaction — the next commit that would have
-// carried the report never came.
+// recordInteraction() ungates waitForInteraction immediately, and leaving this inline meant a
+// never-scrolled list reported nothing after the interaction.
 function viewabilityEffects<ItemT>(
   state: IListState<ItemT>,
   inputs: IListReducerInputs<ItemT>,
@@ -547,15 +526,11 @@ function resolveScrollToIndex<ItemT>(
 ): IListReduceResult<ItemT> {
   const m = state.metrics;
 
-  // Range check FIRST, mirroring RN VirtualizedList.js (~165-178) invariant-for-invariant. Three
-  // separate messages rather than one, because an empty list and an index past the end are
-  // different diagnoses. It has to precede the onScrollToIndexFailed branch below, or an
-  // out-of-range index on a list without getItemLayout would be reported as a MEASUREMENT problem
-  // and send the reader to inspect cell layout for what is a caller bug.
-  //
-  // Note this is the one place the range is enforced: offsetForIndex() still CLAMPS, and must, since
-  // scrollToEnd and initialScrollIndex resolve through it with indices that are legitimately at or
-  // past the edge.
+  // Range check FIRST: it must precede the onScrollToIndexFailed branch below, or an out-of-range
+  // index would be reported as a MEASUREMENT problem instead of a caller bug.
+
+  // The one place the range is enforced: offsetForIndex() still CLAMPS, since scrollToEnd and
+  // initialScrollIndex resolve through it with indices legitimately at or past the edge.
   const itemCount = inputs.getItemCount(inputs.data);
   if (action.index < FIRST_INDEX) {
     throw new Error(
@@ -616,10 +591,8 @@ export function reduceList<ItemT>(
   inputs: IListReducerInputs<ItemT>,
 ): IListReduceResult<ItemT> {
   switch (action.kind) {
-    // Scalar transitions never recompute the window — they set the input and ask for a render; the
-    // metrics derive runs exactly ONCE per render, in the 'refresh-metrics' the adapter fires from
-    // its render body. That single-derive-per-render invariant is what advances the throttled
-    // committedWindow one step per frame (deriving here too would advance it twice).
+    // Scalar transitions never recompute the window — metrics derive runs exactly ONCE per
+    // render, in 'refresh-metrics', or committedWindow would advance twice per frame.
     case 'scroll':
       // First scroll is the interaction that ungates waitForInteraction viewability configs.
       state.hasInteracted = true;
@@ -642,10 +615,8 @@ export function reduceList<ItemT>(
       const offsetSettled =
         action.offset === undefined ||
         isSettledLayout(knownOffset, action.offset);
-      // Settled means "the same measurement, re-reported" — an idle onLayout, or the float noise a
-      // relayout leaves behind. Bail WITHOUT storing: keeping the settled value byte-identical is
-      // the half that matters, because the spacer derived from it then stops moving too and the
-      // relayout loop has nothing left to feed on (see LAYOUT_EPSILON).
+      // Settled means the same measurement, re-reported. Bail WITHOUT storing: keeping the value
+      // byte-identical is what stops the spacer moving and starves the relayout loop.
       if (lengthSettled && offsetSettled)
         return { state, effects: [], changed: false };
 
