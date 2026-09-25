@@ -21,6 +21,7 @@ export type IExpoPackageLayerName =
   | 'battery'
   | 'blob'
   | 'brightness'
+  | 'calendar'
   | 'cellular'
   | 'clipboard'
   | 'crypto'
@@ -131,6 +132,11 @@ export const EXPO_PACKAGE_LAYERS: readonly IExpoPackageLayer[] = [
     id: 'brightness',
     label: 'Brightness',
     symbiotePackage: '@symbiote-native/brightness',
+  },
+  {
+    id: 'calendar',
+    label: 'Calendar',
+    symbiotePackage: '@symbiote-native/calendar',
   },
   {
     id: 'cellular',

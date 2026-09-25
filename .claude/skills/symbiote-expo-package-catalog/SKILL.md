@@ -88,6 +88,7 @@ queue.
 | `@symbiote-native/speech` | `expo-speech` - text-to-speech (`speak`, `getAvailableVoicesAsync`, `isSpeakingAsync`, `stop`, `pause`/`resume` iOS-only). Web-only fields dropped (`WebVoice`, DOM-`SpeechSynthesisEvent`-shaped callbacks, `onMark`/`onPause`/`onResume` - package ships no `"web"` platform anyway). Android's `<queries>` TTS_SERVICE entry ships in its own bundled manifest and auto-merges - no `native-link.json` field exists for it | `symbiote-expo-native-module` |
 | `@symbiote-native/screen-capture` | `expo-screen-capture` - prevent/allow screen capture (key-counted, matching upstream), an iOS-only app-switcher privacy blur, and a screenshot listener. `usePreventScreenCapture`/`useScreenshotListener`/`usePermissions` not ported (real React hooks, same §11 class as image-picker's dropped hooks). No config plugin; Android's storage-read permissions for screenshot detection ship in its own bundled manifest and auto-merge | `symbiote-expo-native-module` |
 | `@symbiote-native/auth-session` | `expo-auth-session` - ships no native code at all; hand-ported onto `@symbiote-native/web-browser` (auth tab), `@symbiote-native/crypto` (PKCE), `@symbiote-native/application` (default redirect scheme). No `expo-modules-core` dependency, no `native-link.json` (same shape as `standard-web-crypto`). Dropped: the `expo-constants`/`auth.expo.io` proxy flow and `makeRedirectUri`'s manifest-scheme auto-detection (no app manifest exists here - pass `scheme`/`native` explicitly), and every `use*` hook (real React hooks) | `symbiote-expo-native-module` (no-native variant) |
+| `@symbiote-native/calendar` | `expo-calendar` - the **next** shared-object API only (`ExpoCalendar`/`ExpoCalendarEvent`/`ExpoCalendarAttendee`/`ExpoCalendarReminder` classes, full iOS+Android parity), by explicit product decision - the legacy function-based API (upstream's own default entry point) is deliberately NOT ported. Upstream ships no JS reference for `next` at sdk-57 (native Kotlin/Swift `Class()` registrations only), so the wrapper classes were authored from scratch, using `Object.setPrototypeOf` to upgrade native factory-returned instances (same idiom as `@symbiote-native/blob`'s `slice()`) and the `declare class` + static-assigned-after-class-body pattern from `@symbiote-native/file-system`'s next API. Dropped: `useCalendarPermissions`/`useRemindersPermissions` (real React hooks, §11 class) | `symbiote-expo-native-module` |
 
 **Tier 1 is now fully closed (2026-08-03)** — every Tier 1 row below is shipped except
 `expo-constants` (#9), which stays deliberately skipped (see its own row note). Tier 2 (permission/
@@ -119,7 +120,9 @@ config plugin; Android's TTS_SERVICE `<queries>` entry auto-merges from its own 
 manifest), `expo-screen-capture` (#34) shipped 2026-09-25 (no config plugin; Android's
 screenshot-detection permissions auto-merge from its own bundled manifest), `expo-auth-session`
 (#43) shipped 2026-09-25 (no native code at all - hand-ported onto three already-shipped
-packages instead of a fourth `expo-*` dependency), 7 left.
+packages instead of a fourth `expo-*` dependency), `expo-calendar` (#36) shipped 2026-09-25
+(the modern `next` shared-object API only, full iOS+Android parity - legacy deliberately
+excluded), 6 left.
 
 ```
 §secure_store_manifest_attrs := {
@@ -184,7 +187,7 @@ from each package's `expo-module.config.json`.
 | ~~33~~ | ~~`expo-audio`~~ | M | shipped — see "Already shipped" |
 | ~~34~~ | ~~`expo-screen-capture`~~ | M | shipped - see "Already shipped" |
 | 35 | `expo-contacts` | M | apple, android |
-| 36 | `expo-calendar` | M | apple, android |
+| ~~36~~ | ~~`expo-calendar`~~ | M | shipped - see "Already shipped" |
 | ~~37~~ | ~~`expo-location`~~ | M | shipped — see "Already shipped" |
 | ~~38~~ | ~~`expo-media-library`~~ | M | shipped — see "Already shipped" |
 | ~~39~~ | ~~`expo-notifications`~~ | M | shipped — see "Already shipped" |

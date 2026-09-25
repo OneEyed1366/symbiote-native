@@ -233,5 +233,35 @@
     "package": "@symbiote-native/image-picker",
     "path": "android.manifest.manifest.uses-permission.5",
     "verdict": "RECORD_AUDIO — plugin adds it by default (video recording needs it); already declared in native-link.json android.manifestPermissions"
+  },
+  {
+    "package": "@symbiote-native/calendar",
+    "path": "ios.infoPlist.NSCalendarsUsageDescription",
+    "verdict": "already declared (custom wording) in native-link.json ios.infoPlistKeys"
+  },
+  {
+    "package": "@symbiote-native/calendar",
+    "path": "ios.infoPlist.NSRemindersUsageDescription",
+    "verdict": "already declared (custom wording) in native-link.json ios.infoPlistKeys"
+  },
+  {
+    "package": "@symbiote-native/calendar",
+    "path": "ios.infoPlist.NSRemindersFullAccessUsageDescription",
+    "verdict": "already declared (custom wording) in native-link.json ios.infoPlistKeys"
+  },
+  {
+    "package": "@symbiote-native/calendar",
+    "path": "ios.infoPlist.NSCalendarsFullAccessUsageDescription",
+    "verdict": "already declared (custom wording) in native-link.json ios.infoPlistKeys"
+  },
+  {
+    "package": "@symbiote-native/calendar",
+    "path": "android.manifest.manifest.uses-permission.5",
+    "verdict": "READ_CALENDAR - already declared in native-link.json android.manifestPermissions"
+  },
+  {
+    "package": "@symbiote-native/calendar",
+    "path": "android.manifest.manifest.uses-permission.6",
+    "verdict": "WRITE_CALENDAR - already declared in native-link.json android.manifestPermissions"
   }
 ]

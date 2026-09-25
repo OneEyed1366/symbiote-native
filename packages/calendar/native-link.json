@@ -1,0 +1,30 @@
+{
+  "android": {
+    "gradleProjectName": "expo-calendar",
+    "modules": [
+      {
+        "importPath": "expo.modules.calendar.CalendarModule",
+        "className": "CalendarModule",
+        "nativeName": "ExpoCalendar"
+      },
+      {
+        "importPath": "expo.modules.calendar.next.CalendarNextModule",
+        "className": "CalendarNextModule",
+        "nativeName": "CalendarNext",
+        "internal": true
+      }
+    ],
+    "manifestPermissions": [
+      "android.permission.READ_CALENDAR",
+      "android.permission.WRITE_CALENDAR"
+    ]
+  },
+  "ios": {
+    "infoPlistKeys": {
+      "NSCalendarsUsageDescription": "This app uses your calendars to read and manage events.",
+      "NSRemindersUsageDescription": "This app uses your reminders to read and manage tasks.",
+      "NSRemindersFullAccessUsageDescription": "This app uses your reminders to read and manage tasks.",
+      "NSCalendarsFullAccessUsageDescription": "This app uses your calendars to read and manage events."
+    }
+  }
+}
