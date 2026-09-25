@@ -1182,6 +1182,30 @@ not yet implemented — this section is the map for whoever ports these next.
 }
 ```
 
+## 11. `createPermissionHook` from `expo-modules-core` is a REAL React hook — don't put it in `core/`
+
+```
+§11_permission_hook_leak := {
+  found: "2026-09-25, porting expo-image-picker",
+  claim: "expo-modules-core's createPermissionHook (PermissionsHook.ts) looks framework-agnostic
+          (it's exported from the same package as requireNativeModule) but its body calls
+          useState/useEffect/useCallback from 'react' directly — a real hook, not a wrapper",
+  bug: "3 already-shipped packages (media-library, location, tracking-transparency) re-export
+        their usePermissions from core/, reachable by every adapter including Vue/Svelte/Solid/
+        Angular — same dispatcher-null crash class as <third_party_rn_packages_are_react_only>",
+  fix_this_pass: "@symbiote-native/image-picker does NOT export useCameraPermissions/
+                  useMediaLibraryPermissions from core — only the plain async get/request
+                  functions ship there; calling code wraps its own adapter-local hook/composable",
+  not_fixed: "media-library/location/tracking-transparency still export the hook from core/ —
+              deliberately left alone this pass (out of scope, no user request to touch shipped
+              packages); flagging here so the next package touching any of them fixes it too",
+  rule: "before shipping ANY export whose implementation transitively imports 'react' inside
+         expo-modules-core (grep the resolved package's src/*.ts for `from 'react'`), treat it
+         as adapter-only per <third_party_rn_packages_are_react_only> — never assume 'ships from
+         expo-modules-core' means framework-agnostic",
+}
+```
+
 ## References
 
 - `symbiote-new-package-skeleton` — read FIRST if the package doesn't exist yet at all: resolves

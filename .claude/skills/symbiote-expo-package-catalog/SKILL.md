@@ -70,6 +70,7 @@ queue.
 | `@symbiote-native/mail-composer` | `expo-mail-composer` | `symbiote-expo-native-module` |
 | `@symbiote-native/print` | `expo-print` (no config plugin, no permissions — ships nothing beyond the two native modules) | `symbiote-expo-native-module` |
 | `@symbiote-native/document-picker` | `expo-document-picker` (web-only `base64`/`file`/`output` fields dropped; upstream's config plugin, which sets opt-in iCloud entitlements, is not carried over — no diff against the stock introspection config since it's conditional on `ios.usesIcloudStorage`) | `symbiote-expo-native-module` |
+| `@symbiote-native/image-picker` | `expo-image-picker` (`useCameraPermissions`/`useMediaLibraryPermissions` — real React hooks inside `expo-modules-core`'s `createPermissionHook`, `useState`/`useEffect` under the hood — dropped from `core/`, unlike the 3 earlier packages that re-exported them there; call the plain async permission functions instead. Web-only fields and the config-plugin's own unit test not carried over, same reasoning as document-picker) | `symbiote-expo-native-module` |
 | `@symbiote-native/task-manager` | `expo-task-manager` (no `registerTaskAsync` — upstream has none either; registration is always driven by a consumer module) | `symbiote-expo-native-module` |
 | `@symbiote-native/background-fetch` | `expo-background-fetch` (upstream-deprecated in favor of `expo-background-task`; ported anyway for parity, since Expo still ships both at sdk-57 — see the file-system legacy+modern precedent above) | `symbiote-expo-native-module` |
 | `@symbiote-native/background-task` | `expo-background-task` (`BGTaskScheduler`/`WorkManager`-backed successor to `expo-background-fetch`; both build on `@symbiote-native/task-manager`'s `defineTask`, neither ships one itself) | `symbiote-expo-native-module` |
@@ -99,8 +100,10 @@ shipped 2026-09-25 (canary demo screens pending — see their own rows above), `
 `canOpenURL`), `expo-print` (#26) shipped 2026-09-25 (ships no config plugin at all — the whole
 `native-link.json` is the one Android module entry), `expo-document-picker` (#27) shipped
 2026-09-25 (its config plugin's iCloud entitlements are opt-in/conditional, so introspection
-against the stock config shows no diff — not carried over, documented as a manual app step), 14
-left.
+against the stock config shows no diff — not carried over, documented as a manual app step),
+`expo-image-picker` (#28) shipped 2026-09-25 (first package to catch a React-hook leak into
+`core/` from `expo-modules-core`'s own `createPermissionHook` — see
+`symbiote-expo-native-module` skill §11), 13 left.
 
 ```
 §secure_store_manifest_attrs := {
@@ -157,7 +160,7 @@ from each package's `expo-module.config.json`.
 | ~~25~~ | ~~`expo-mail-composer`~~ | M | shipped — see "Already shipped" |
 | ~~26~~ | ~~`expo-print`~~ | M | shipped — see "Already shipped" |
 | ~~27~~ | ~~`expo-document-picker`~~ | M | shipped — see "Already shipped" |
-| 28 | `expo-image-picker` | M | apple, android |
+| ~~28~~ | ~~`expo-image-picker`~~ | M | shipped — see "Already shipped" |
 | 29 | `expo-image-manipulator` | M | apple, android |
 | 30 | `expo-video-thumbnails` | M | apple, android |
 | 31 | `expo-blob` | M | apple, android, web |

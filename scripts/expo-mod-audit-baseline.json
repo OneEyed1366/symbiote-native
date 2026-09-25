@@ -213,5 +213,25 @@
     "package": "@symbiote-native/mail-composer",
     "path": "ios.infoPlist.LSApplicationQueriesSchemes",
     "verdict": "already declared in native-link.json ios.infoPlistArrayKeys — merges additively with any other package's own LSApplicationQueriesSchemes entries"
+  },
+  {
+    "package": "@symbiote-native/image-picker",
+    "path": "ios.infoPlist.NSPhotoLibraryUsageDescription",
+    "verdict": "already declared in native-link.json ios.infoPlistKeys, reworded for this app instead of upstream's generic default"
+  },
+  {
+    "package": "@symbiote-native/image-picker",
+    "path": "ios.infoPlist.NSCameraUsageDescription",
+    "verdict": "already declared in native-link.json ios.infoPlistKeys, reworded for this app instead of upstream's generic default"
+  },
+  {
+    "package": "@symbiote-native/image-picker",
+    "path": "ios.infoPlist.NSMicrophoneUsageDescription",
+    "verdict": "already declared in native-link.json ios.infoPlistKeys, reworded for this app instead of upstream's generic default"
+  },
+  {
+    "package": "@symbiote-native/image-picker",
+    "path": "android.manifest.manifest.uses-permission.5",
+    "verdict": "RECORD_AUDIO — plugin adds it by default (video recording needs it); already declared in native-link.json android.manifestPermissions"
   }
 ]
