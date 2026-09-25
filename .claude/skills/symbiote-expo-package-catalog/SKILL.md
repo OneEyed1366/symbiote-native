@@ -86,6 +86,8 @@ queue.
 | `@symbiote-native/video-thumbnails` | `expo-video-thumbnails` — single `getThumbnailAsync` function, no config plugin, no permissions | `symbiote-expo-native-module` |
 | `@symbiote-native/blob` | `expo-blob` — a native, JSI-backed W3C `Blob` (constructor, `slice`/`bytes`/`text`/`arrayBuffer`/`stream`/`toString`). First package needing `"DOM"` added to its own `tsconfig.json` lib array (for `ReadableStream`/`BlobPropertyBag`), scoped to this package only. `.stream()` needs an app-supplied `ReadableStream` polyfill — Hermes ships none | `symbiote-expo-native-module` |
 | `@symbiote-native/speech` | `expo-speech` - text-to-speech (`speak`, `getAvailableVoicesAsync`, `isSpeakingAsync`, `stop`, `pause`/`resume` iOS-only). Web-only fields dropped (`WebVoice`, DOM-`SpeechSynthesisEvent`-shaped callbacks, `onMark`/`onPause`/`onResume` - package ships no `"web"` platform anyway). Android's `<queries>` TTS_SERVICE entry ships in its own bundled manifest and auto-merges - no `native-link.json` field exists for it | `symbiote-expo-native-module` |
+| `@symbiote-native/screen-capture` | `expo-screen-capture` - prevent/allow screen capture (key-counted, matching upstream), an iOS-only app-switcher privacy blur, and a screenshot listener. `usePreventScreenCapture`/`useScreenshotListener`/`usePermissions` not ported (real React hooks, same §11 class as image-picker's dropped hooks). No config plugin; Android's storage-read permissions for screenshot detection ship in its own bundled manifest and auto-merge | `symbiote-expo-native-module` |
+| `@symbiote-native/auth-session` | `expo-auth-session` - ships no native code at all; hand-ported onto `@symbiote-native/web-browser` (auth tab), `@symbiote-native/crypto` (PKCE), `@symbiote-native/application` (default redirect scheme). No `expo-modules-core` dependency, no `native-link.json` (same shape as `standard-web-crypto`). Dropped: the `expo-constants`/`auth.expo.io` proxy flow and `makeRedirectUri`'s manifest-scheme auto-detection (no app manifest exists here - pass `scheme`/`native` explicitly), and every `use*` hook (real React hooks) | `symbiote-expo-native-module` (no-native variant) |
 
 **Tier 1 is now fully closed (2026-08-03)** — every Tier 1 row below is shipped except
 `expo-constants` (#9), which stays deliberately skipped (see its own row note). Tier 2 (permission/
@@ -114,7 +116,10 @@ no permissions — single-function package), `expo-blob` (#31) shipped 2026-09-2
 needing `"DOM"` in its own tsconfig `lib` for `ReadableStream`/`BlobPropertyBag`; `.stream()`
 needs an app-supplied polyfill, Hermes ships none), `expo-speech` (#32) shipped 2026-09-25 (no
 config plugin; Android's TTS_SERVICE `<queries>` entry auto-merges from its own bundled
-manifest), 9 left.
+manifest), `expo-screen-capture` (#34) shipped 2026-09-25 (no config plugin; Android's
+screenshot-detection permissions auto-merge from its own bundled manifest), `expo-auth-session`
+(#43) shipped 2026-09-25 (no native code at all - hand-ported onto three already-shipped
+packages instead of a fourth `expo-*` dependency), 7 left.
 
 ```
 §secure_store_manifest_attrs := {
@@ -177,7 +182,7 @@ from each package's `expo-module.config.json`.
 | ~~31~~ | ~~`expo-blob`~~ | M | shipped — see "Already shipped" |
 | ~~32~~ | ~~`expo-speech`~~ | M | shipped - see "Already shipped" |
 | ~~33~~ | ~~`expo-audio`~~ | M | shipped — see "Already shipped" |
-| 34 | `expo-screen-capture` | M | apple, android, web |
+| ~~34~~ | ~~`expo-screen-capture`~~ | M | shipped - see "Already shipped" |
 | 35 | `expo-contacts` | M | apple, android |
 | 36 | `expo-calendar` | M | apple, android |
 | ~~37~~ | ~~`expo-location`~~ | M | shipped — see "Already shipped" |
@@ -186,7 +191,7 @@ from each package's `expo-module.config.json`.
 | ~~40~~ | ~~`expo-task-manager`~~ | M | shipped — see "Already shipped" |
 | ~~41~~ | ~~`expo-background-fetch`~~ | M | shipped — see "Already shipped" |
 | ~~42~~ | ~~`expo-background-task`~~ | M | shipped — see "Already shipped" |
-| 43 | `expo-auth-session` | M | universal (pure-JS OAuth flow over `expo-web-browser`/`Linking`, no native folders) |
+| ~~43~~ | ~~`expo-auth-session`~~ | M | shipped - see "Already shipped" |
 | 44 | `expo-age-range` | M | apple, android |
 | 45 | `expo-app-integrity` | M | apple, android (Play Integrity / DeviceCheck) |
 | 46 | `expo-app-metrics` | M | apple, android |

@@ -15,6 +15,7 @@ export type IExpoPackageLayerName =
   | 'application'
   | 'asset'
   | 'audio'
+  | 'auth-session'
   | 'background-fetch'
   | 'background-task'
   | 'battery'
@@ -100,6 +101,11 @@ export const EXPO_PACKAGE_LAYERS: readonly IExpoPackageLayer[] = [
         ],
       },
     ],
+  },
+  {
+    id: 'auth-session',
+    label: 'Auth session (OAuth2/OIDC)',
+    symbiotePackage: '@symbiote-native/auth-session',
   },
   {
     id: 'background-fetch',
