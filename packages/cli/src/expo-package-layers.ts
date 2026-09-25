@@ -18,6 +18,7 @@ export type IExpoPackageLayerName =
   | 'background-fetch'
   | 'background-task'
   | 'battery'
+  | 'blob'
   | 'brightness'
   | 'cellular'
   | 'clipboard'
@@ -112,6 +113,11 @@ export const EXPO_PACKAGE_LAYERS: readonly IExpoPackageLayer[] = [
     id: 'battery',
     label: 'Battery',
     symbiotePackage: '@symbiote-native/battery',
+  },
+  {
+    id: 'blob',
+    label: 'Blob',
+    symbiotePackage: '@symbiote-native/blob',
   },
   {
     id: 'brightness',
