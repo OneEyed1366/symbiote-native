@@ -1,0 +1,12 @@
+{
+  "android": {
+    "gradleProjectName": "expo-image-manipulator",
+    "modules": [
+      {
+        "importPath": "expo.modules.imagemanipulator.ImageManipulatorModule",
+        "className": "ImageManipulatorModule",
+        "nativeName": "ExpoImageManipulator"
+      }
+    ]
+  }
+}

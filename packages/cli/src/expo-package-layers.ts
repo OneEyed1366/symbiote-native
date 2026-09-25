@@ -27,6 +27,7 @@ export type IExpoPackageLayerName =
   | 'file-system'
   | 'font'
   | 'haptics'
+  | 'image-manipulator'
   | 'image-picker'
   | 'keep-awake'
   | 'local-auth'
@@ -147,6 +148,11 @@ export const EXPO_PACKAGE_LAYERS: readonly IExpoPackageLayer[] = [
     id: 'haptics',
     label: 'Haptics',
     symbiotePackage: '@symbiote-native/haptics',
+  },
+  {
+    id: 'image-manipulator',
+    label: 'Image manipulator',
+    symbiotePackage: '@symbiote-native/image-manipulator',
   },
   {
     id: 'image-picker',

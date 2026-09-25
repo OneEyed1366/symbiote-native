@@ -346,6 +346,12 @@ catalog:
   # (57.0.20) and matches the real npm-published `latest`, same expo-modules-core 57.0.5
   # peer/runtime line.
   expo-image-picker: 57.0.20
+  # Same exact-pin reasoning: packages/image-manipulator depends on expo-image-manipulator ONLY
+  # for its native ios/android folders. Version verified against .vendors/expo at origin/sdk-57
+  # (57.0.20) and matches the real npm-published `latest`, same expo-modules-core 57.0.5
+  # peer/runtime line. The `extent` action is web-only (no native impl on either platform) — not
+  # ported, see packages/image-manipulator/README.md.
+  expo-image-manipulator: 57.0.20
   # Same exact-pin reasoning, continuing tier-2: packages/task-manager depends on
   # expo-task-manager ONLY for its native ios/android folders (JS hand-ported into our own
   # core). Version verified against .vendors/expo at origin/sdk-57 (57.0.15) and matches the
