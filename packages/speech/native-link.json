@@ -1,0 +1,12 @@
+{
+  "android": {
+    "gradleProjectName": "expo-speech",
+    "modules": [
+      {
+        "importPath": "expo.modules.speech.SpeechModule",
+        "className": "SpeechModule",
+        "nativeName": "ExpoSpeech"
+      }
+    ]
+  }
+}

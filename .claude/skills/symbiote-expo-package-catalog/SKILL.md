@@ -85,6 +85,7 @@ queue.
 | `@symbiote-native/image-manipulator` | `expo-image-manipulator` — the current chainable `manipulate(source)`/`ImageManipulatorContext` API plus the deprecated one-shot `manipulateAsync`. `useImageManipulator` not ported (real React hook, `useReleasingSharedObject` — same §11 class as image-picker's dropped hooks). `extent` action not ported (web-only, neither native module registers it) | `symbiote-expo-native-module` |
 | `@symbiote-native/video-thumbnails` | `expo-video-thumbnails` — single `getThumbnailAsync` function, no config plugin, no permissions | `symbiote-expo-native-module` |
 | `@symbiote-native/blob` | `expo-blob` — a native, JSI-backed W3C `Blob` (constructor, `slice`/`bytes`/`text`/`arrayBuffer`/`stream`/`toString`). First package needing `"DOM"` added to its own `tsconfig.json` lib array (for `ReadableStream`/`BlobPropertyBag`), scoped to this package only. `.stream()` needs an app-supplied `ReadableStream` polyfill — Hermes ships none | `symbiote-expo-native-module` |
+| `@symbiote-native/speech` | `expo-speech` - text-to-speech (`speak`, `getAvailableVoicesAsync`, `isSpeakingAsync`, `stop`, `pause`/`resume` iOS-only). Web-only fields dropped (`WebVoice`, DOM-`SpeechSynthesisEvent`-shaped callbacks, `onMark`/`onPause`/`onResume` - package ships no `"web"` platform anyway). Android's `<queries>` TTS_SERVICE entry ships in its own bundled manifest and auto-merges - no `native-link.json` field exists for it | `symbiote-expo-native-module` |
 
 **Tier 1 is now fully closed (2026-08-03)** — every Tier 1 row below is shipped except
 `expo-constants` (#9), which stays deliberately skipped (see its own row note). Tier 2 (permission/
@@ -111,7 +112,9 @@ against the stock config shows no diff — not carried over, documented as a man
 class as image-picker), `expo-video-thumbnails` (#30) shipped 2026-09-25 (ships no config plugin,
 no permissions — single-function package), `expo-blob` (#31) shipped 2026-09-25 (first package
 needing `"DOM"` in its own tsconfig `lib` for `ReadableStream`/`BlobPropertyBag`; `.stream()`
-needs an app-supplied polyfill, Hermes ships none), 10 left.
+needs an app-supplied polyfill, Hermes ships none), `expo-speech` (#32) shipped 2026-09-25 (no
+config plugin; Android's TTS_SERVICE `<queries>` entry auto-merges from its own bundled
+manifest), 9 left.
 
 ```
 §secure_store_manifest_attrs := {
@@ -172,7 +175,7 @@ from each package's `expo-module.config.json`.
 | ~~29~~ | ~~`expo-image-manipulator`~~ | M | shipped — see "Already shipped" |
 | ~~30~~ | ~~`expo-video-thumbnails`~~ | M | shipped — see "Already shipped" |
 | ~~31~~ | ~~`expo-blob`~~ | M | shipped — see "Already shipped" |
-| 32 | `expo-speech` | M | apple, android |
+| ~~32~~ | ~~`expo-speech`~~ | M | shipped - see "Already shipped" |
 | ~~33~~ | ~~`expo-audio`~~ | M | shipped — see "Already shipped" |
 | 34 | `expo-screen-capture` | M | apple, android, web |
 | 35 | `expo-contacts` | M | apple, android |

@@ -228,6 +228,9 @@ catalogs:
     expo-sms:
       specifier: 57.0.1
       version: 57.0.1
+    expo-speech:
+      specifier: 57.0.3
+      version: 57.0.3
     expo-sqlite:
       specifier: 57.0.2
       version: 57.0.2
@@ -2968,6 +2971,73 @@ importers:
       expo-sms:
         specifier: 'catalog:'
         version: 57.0.1(expo@57.0.4)
+      react-native:
+        specifier: '>=0.86'
+        version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
+      vue:
+        specifier: '>=3.5.0'
+        version: 3.5.39(typescript@6.0.3)
+    devDependencies:
+      '@angular/compiler':
+        specifier: 'catalog:'
+        version: 22.0.8
+      '@angular/compiler-cli':
+        specifier: 'catalog:'
+        version: 22.0.8(@angular/compiler@22.0.8)(typescript@6.0.3)
+      '@angular/core':
+        specifier: 'catalog:'
+        version: 22.0.8(@angular/compiler@22.0.8)(rxjs@7.8.2)
+      '@symbiote-native/angular':
+        specifier: workspace:*
+        version: link:../../adapters/angular
+      '@symbiote-native/engine':
+        specifier: workspace:*
+        version: link:../../core/engine
+      '@symbiote-native/react':
+        specifier: workspace:*
+        version: link:../../adapters/react
+      '@symbiote-native/solid':
+        specifier: workspace:*
+        version: link:../../adapters/solid
+      '@symbiote-native/svelte':
+        specifier: workspace:*
+        version: link:../../adapters/svelte
+      '@symbiote-native/test-utils':
+        specifier: workspace:*
+        version: link:../../core/test-utils
+      '@symbiote-native/vue':
+        specifier: workspace:*
+        version: link:../../adapters/vue
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.1.0
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.2.17
+      '@vue/runtime-core':
+        specifier: 'catalog:'
+        version: 3.5.39
+      react:
+        specifier: 19.2.3
+        version: 19.2.3
+      solid-js:
+        specifier: 'catalog:'
+        version: 1.9.14
+      svelte:
+        specifier: 'catalog:'
+        version: 5.56.8(@typescript-eslint/types@8.63.0)
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+
+  packages/speech:
+    dependencies:
+      expo-modules-core:
+        specifier: 'catalog:'
+        version: 57.0.5(react-native@0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3))(react@19.2.3)
+      expo-speech:
+        specifier: 'catalog:'
+        version: 57.0.3(expo@57.0.4)
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
@@ -7143,6 +7213,11 @@ packages:
 
   expo-sms@57.0.1:
     resolution: {integrity: sha512-N5WGAA2Hw0nCGQIE8MAaL74ITwRhJdhtjIKryvExaGBxLXHZMgDD3kGdP4+feTo310kZBsGmXC5EtDqcrizE5Q==}
+    peerDependencies:
+      expo: '*'
+
+  expo-speech@57.0.3:
+    resolution: {integrity: sha512-rcO8izKziksrV4X3qQ5g+prFNTZmLYDEGEVnTvuvpOZDwjzP9nsdoaFymhY+qj9AJfMcpvR7Wshm+zpislyJBg==}
     peerDependencies:
       expo: '*'
 
@@ -14356,6 +14431,10 @@ snapshots:
       - typescript
 
   expo-sms@57.0.1(expo@57.0.4):
+    dependencies:
+      expo: 57.0.4(@babel/core@7.29.7)(@expo/dom-webview@57.0.0)(react-dom@19.2.3(react@19.2.3))(react-native-web@0.21.2(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(react-native@0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3))(react@19.2.3)(typescript@6.0.3)
+
+  expo-speech@57.0.3(expo@57.0.4):
     dependencies:
       expo: 57.0.4(@babel/core@7.29.7)(@expo/dom-webview@57.0.0)(react-dom@19.2.3(react@19.2.3))(react-native-web@0.21.2(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(react-native@0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3))(react@19.2.3)(typescript@6.0.3)
 

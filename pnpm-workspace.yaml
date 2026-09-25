@@ -360,6 +360,10 @@ catalog:
   # ios/android folders. Version verified against .vendors/expo at origin/sdk-57 (57.0.2)
   # and npm-published `latest`, same expo-modules-core 57.0.5 peer/runtime line.
   expo-blob: 57.0.2
+  # Same exact-pin reasoning: packages/speech depends on expo-speech ONLY for its native
+  # ios/android folders. Version verified against .vendors/expo at origin/sdk-57 (57.0.3)
+  # and npm-published `latest`, same expo-modules-core 57.0.5 peer/runtime line.
+  expo-speech: 57.0.3
   # Same exact-pin reasoning, continuing tier-2: packages/task-manager depends on
   # expo-task-manager ONLY for its native ios/android folders (JS hand-ported into our own
   # core). Version verified against .vendors/expo at origin/sdk-57 (57.0.15) and matches the

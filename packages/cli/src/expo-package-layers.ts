@@ -44,6 +44,7 @@ export type IExpoPackageLayerName =
   | 'sensors'
   | 'sharing'
   | 'sms'
+  | 'speech'
   | 'sqlite'
   | 'standard-web-crypto'
   | 'store-review'
@@ -247,6 +248,7 @@ export const EXPO_PACKAGE_LAYERS: readonly IExpoPackageLayer[] = [
     symbiotePackage: '@symbiote-native/sharing',
   },
   { id: 'sms', label: 'SMS', symbiotePackage: '@symbiote-native/sms' },
+  { id: 'speech', label: 'Speech', symbiotePackage: '@symbiote-native/speech' },
   { id: 'sqlite', label: 'SQLite', symbiotePackage: '@symbiote-native/sqlite' },
   {
     id: 'standard-web-crypto',
