@@ -34,6 +34,7 @@ export type IExpoPackageLayerName =
   | 'media-library'
   | 'network'
   | 'notifications'
+  | 'print'
   | 'screen-orientation'
   | 'secure-store'
   | 'sensors'
@@ -194,6 +195,11 @@ export const EXPO_PACKAGE_LAYERS: readonly IExpoPackageLayer[] = [
     id: 'notifications',
     label: 'Notifications',
     symbiotePackage: '@symbiote-native/notifications',
+  },
+  {
+    id: 'print',
+    label: 'Print',
+    symbiotePackage: '@symbiote-native/print',
   },
   {
     id: 'screen-orientation',

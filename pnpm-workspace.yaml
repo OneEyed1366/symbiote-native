@@ -331,6 +331,10 @@ catalog:
   # native ios/android folders. Version verified against .vendors/expo at origin/sdk-57 (57.0.2)
   # and matches the real npm-published `latest`, same expo-modules-core 57.0.5 peer/runtime line.
   expo-mail-composer: 57.0.2
+  # Same exact-pin reasoning: packages/print depends on expo-print ONLY for its native
+  # ios/android folders. Version verified against .vendors/expo at origin/sdk-57 (57.0.2)
+  # and matches the real npm-published `latest`, same expo-modules-core 57.0.5 peer/runtime line.
+  expo-print: 57.0.2
   # Same exact-pin reasoning, continuing tier-2: packages/task-manager depends on
   # expo-task-manager ONLY for its native ios/android folders (JS hand-ported into our own
   # core). Version verified against .vendors/expo at origin/sdk-57 (57.0.15) and matches the
