@@ -1,0 +1,12 @@
+{
+  "android": {
+    "gradleProjectName": "expo-screen-capture",
+    "modules": [
+      {
+        "importPath": "expo.modules.screencapture.ScreenCaptureModule",
+        "className": "ScreenCaptureModule",
+        "nativeName": "ExpoScreenCapture"
+      }
+    ]
+  }
+}

@@ -39,6 +39,7 @@ export type IExpoPackageLayerName =
   | 'network'
   | 'notifications'
   | 'print'
+  | 'screen-capture'
   | 'screen-orientation'
   | 'secure-store'
   | 'sensors'
@@ -226,6 +227,11 @@ export const EXPO_PACKAGE_LAYERS: readonly IExpoPackageLayer[] = [
     id: 'print',
     label: 'Print',
     symbiotePackage: '@symbiote-native/print',
+  },
+  {
+    id: 'screen-capture',
+    label: 'Screen capture',
+    symbiotePackage: '@symbiote-native/screen-capture',
   },
   {
     id: 'screen-orientation',
