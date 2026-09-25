@@ -23,6 +23,7 @@ export type IExpoPackageLayerName =
   | 'clipboard'
   | 'crypto'
   | 'device'
+  | 'document-picker'
   | 'file-system'
   | 'font'
   | 'haptics'
@@ -129,6 +130,11 @@ export const EXPO_PACKAGE_LAYERS: readonly IExpoPackageLayer[] = [
     id: 'device',
     label: 'Device info',
     symbiotePackage: '@symbiote-native/device',
+  },
+  {
+    id: 'document-picker',
+    label: 'Document picker',
+    symbiotePackage: '@symbiote-native/document-picker',
   },
   {
     id: 'file-system',

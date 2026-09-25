@@ -1,0 +1,12 @@
+{
+  "android": {
+    "gradleProjectName": "expo-document-picker",
+    "modules": [
+      {
+        "importPath": "expo.modules.documentpicker.DocumentPickerModule",
+        "className": "DocumentPickerModule",
+        "nativeName": "ExpoDocumentPicker"
+      }
+    ]
+  }
+}

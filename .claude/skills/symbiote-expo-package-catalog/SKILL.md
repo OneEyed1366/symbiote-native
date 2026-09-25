@@ -69,6 +69,7 @@ queue.
 | `@symbiote-native/sms` | `expo-sms` | `symbiote-expo-native-module` |
 | `@symbiote-native/mail-composer` | `expo-mail-composer` | `symbiote-expo-native-module` |
 | `@symbiote-native/print` | `expo-print` (no config plugin, no permissions — ships nothing beyond the two native modules) | `symbiote-expo-native-module` |
+| `@symbiote-native/document-picker` | `expo-document-picker` (web-only `base64`/`file`/`output` fields dropped; upstream's config plugin, which sets opt-in iCloud entitlements, is not carried over — no diff against the stock introspection config since it's conditional on `ios.usesIcloudStorage`) | `symbiote-expo-native-module` |
 | `@symbiote-native/task-manager` | `expo-task-manager` (no `registerTaskAsync` — upstream has none either; registration is always driven by a consumer module) | `symbiote-expo-native-module` |
 | `@symbiote-native/background-fetch` | `expo-background-fetch` (upstream-deprecated in favor of `expo-background-task`; ported anyway for parity, since Expo still ships both at sdk-57 — see the file-system legacy+modern precedent above) | `symbiote-expo-native-module` |
 | `@symbiote-native/background-task` | `expo-background-task` (`BGTaskScheduler`/`WorkManager`-backed successor to `expo-background-fetch`; both build on `@symbiote-native/task-manager`'s `defineTask`, neither ships one itself) | `symbiote-expo-native-module` |
@@ -96,7 +97,10 @@ shipped 2026-09-25 (canary demo screens pending — see their own rows above), `
 (#25) shipped 2026-09-25 (native-link.json needed `ios.infoPlistArrayKeys` for
 `LSApplicationQueriesSchemes` — the 22-scheme list `getClients()` needs to query mail apps via
 `canOpenURL`), `expo-print` (#26) shipped 2026-09-25 (ships no config plugin at all — the whole
-`native-link.json` is the one Android module entry), 15 left.
+`native-link.json` is the one Android module entry), `expo-document-picker` (#27) shipped
+2026-09-25 (its config plugin's iCloud entitlements are opt-in/conditional, so introspection
+against the stock config shows no diff — not carried over, documented as a manual app step), 14
+left.
 
 ```
 §secure_store_manifest_attrs := {
@@ -152,7 +156,7 @@ from each package's `expo-module.config.json`.
 | ~~24~~ | ~~`expo-sms`~~ | M | shipped — see "Already shipped" |
 | ~~25~~ | ~~`expo-mail-composer`~~ | M | shipped — see "Already shipped" |
 | ~~26~~ | ~~`expo-print`~~ | M | shipped — see "Already shipped" |
-| 27 | `expo-document-picker` | M | apple, android |
+| ~~27~~ | ~~`expo-document-picker`~~ | M | shipped — see "Already shipped" |
 | 28 | `expo-image-picker` | M | apple, android |
 | 29 | `expo-image-manipulator` | M | apple, android |
 | 30 | `expo-video-thumbnails` | M | apple, android |
