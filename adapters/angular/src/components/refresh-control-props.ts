@@ -1,8 +1,6 @@
-// The `<refresh-control>` tag's prop surface. The tag is matched by `RefreshControlElement`
-// (`../elements`) and carries the controlled-spinner handshake as an engine behavior
-// (`registerRefreshControlBehavior` — mirror what native last reported, command it back when the
-// app's `refreshing` disagrees, RefreshControl.js:145-166), so the wrapper that ran that in Angular
-// was deleted 2026-09-11.
+// The `<refresh-control>` tag's prop surface. The tag (`RefreshControlElement`) carries the
+// controlled-spinner handshake as an engine behavior (`registerRefreshControlBehavior`: mirror
+// what native last reported, command it back when `refreshing` disagrees), no wrapper component.
 //
 // WHERE it goes is the ScrollView's decision, not this tag's: write it as an ordinary FIRST CHILD
 // on both platforms and the scroll-view behavior re-parents it — iOS a sibling before the content

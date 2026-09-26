@@ -79,11 +79,9 @@ function type(
 
 describe('Solid TextInput on the engine', () => {
   describe('Positive', () => {
-    // why: the `value -> text` FOLD left this file on 2026-09-18, the same way `inputMode` did (see
-    // the note further down) — there is no `value` Fabric prop, RN rides the controlled value as the
-    // private `text`, and that rule is `foldTextInputValue` in `SymbioteFabricProps.cpp` now. This
-    // harness builds payloads through the TypeScript `fabricProps`, which holds no copy of it, so
-    // `text` is asserted in `core/engine/cpp/tests/js/text-input-payload.itest.ts`.
+    // why: there is no `value` Fabric prop — RN rides the controlled value as the private `text`,
+    // folded by `foldTextInputValue` in `SymbioteFabricProps.cpp`. This harness's `fabricProps`
+    // holds no copy, so `text` is asserted in `text-input-payload.itest.ts`.
     //
     // What is this adapter's is the pair below: the authored value reaches the engine, and the
     // MACHINE — the controlled-value handshake, which stays in JS by design — starts its event
@@ -447,12 +445,9 @@ describe('Solid TextInput on the engine', () => {
       await tick();
 
       expect('onValueChange' in committedInput().payload).toBe(false);
-      // `inputMode` used to be asserted here, then `defaultValue` joined it (2026-09-18). Both are
-      // stripped by the ENGINE now — `foldTextInputAliases` and `foldTextInputValue` in
-      // `SymbioteFabricProps.cpp` — which this harness's payload cannot see, so both assertions
-      // moved with their rules to `core/engine/cpp/tests/js/text-input-payload.itest.ts`. The
-      // function is the one that is still this layer's, because dropping it is not a platform rule
-      // about text inputs but a property of building a payload at all.
+      // `inputMode`/`defaultValue` are stripped by the ENGINE (`foldTextInputAliases`/
+      // `foldTextInputValue`, `text-input-payload.itest.ts`). The function is this layer's:
+      // dropping it is not a platform rule but a property of building a payload at all.
     });
 
     // A runtime multiline flip is NOT covered: single- and multiline are different native views,

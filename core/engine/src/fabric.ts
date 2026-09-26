@@ -1,18 +1,14 @@
-// The one seam symbiote drives. `global.nativeFabricUIManager` is the
-// framework-agnostic, JSI-bound mutation API that Fabric exposes; React's
-// renderer is just one client of it. We bind to it directly.
-//
-// The live object is a lazy caching proxy: every property access mints a fresh
-// host function, so we read each method once and cache a plain facade.
+// The one seam symbiote drives. global.nativeFabricUIManager is the framework-agnostic, JSI-bound
+// mutation API Fabric exposes; React's renderer is just one client of it. We bind to it directly.
+// The live object is a lazy caching proxy, so we read each method once and cache a plain facade.
 
 import { dlog } from './debug';
 import { installNativeTreeHost } from './native-tree-host';
 
 export type IRootTag = number;
 
-// Opaque native handles. We never construct these: the slot mints and returns
-// them. The phantom brand fields make the two handle kinds non-interchangeable
-// and stop a raw object being passed where a handle is expected.
+// Opaque native handles. We never construct these: the slot mints and returns them. The phantom
+// brand fields make the two kinds non-interchangeable and stop a raw object being passed as one.
 export interface IFabricNode {
   readonly __fabricNode: unique symbol;
 }
@@ -28,10 +24,9 @@ export type IFabricEventHandler = (
   nativeEvent: Record<string, unknown>,
 ) => void;
 
-// Measurement callbacks, matching Fabric's native signatures (ReactNativeElement's
-// measure family). `measure` reports the on-screen frame plus page offset;
-// `measureInWindow` the window-relative frame; `measureLayout` the frame relative to
-// another node. Libraries (reanimated, gesture-handler, scroll-to) read these.
+// Measurement callbacks, matching Fabric's native signatures. measure reports the on-screen frame
+// plus page offset; measureInWindow the window-relative frame; measureLayout the frame relative to
+// another node.
 export type IMeasureOnSuccess = (
   x: number,
   y: number,
@@ -62,11 +57,9 @@ export interface IFabricSlot {
     instanceHandle: unknown,
   ): IFabricNode;
   cloneNodeWithNewProps(node: IFabricNode, newProps: IFabricProps): IFabricNode;
-  // `children` collapses the N `appendChild` calls that otherwise follow a clone into ONE JSI
-  // crossing. Pass it only when `supportsCloneWithChildren` is true — a host that ignores the
-  // argument would commit a parent with NO children, which paints as a blank screen, not an error.
-  // Our JS keeps `newProps` in the second slot to match every call site; the wrapper below
-  // reorders for the host, whose 3-arg form is (node, children, props).
+  // children collapses the N appendChild calls that otherwise follow a clone into one JSI crossing.
+  // Pass it only when supportsCloneWithChildren is true — a host that ignores the argument would
+  // commit a parent with no children, which paints as a blank screen, not an error.
   cloneNodeWithNewChildren(
     node: IFabricNode,
     children?: readonly IFabricNode[],
@@ -76,12 +69,9 @@ export interface IFabricSlot {
     newProps: IFabricProps,
     children?: readonly IFabricNode[],
   ): IFabricNode;
-  // True when the host's clone bindings declare the child-list parameter (UIManagerBinding.cpp
-  // gives cloneNodeWithNewChildren paramCount 2 / …AndProps paramCount 3, and has its
-  // validateArgumentCount commented out pending the `passChildrenWhenCloningPersistedNodes`
-  // rollout that removes the per-child `appendChild` path entirely). Probed by arity, so a host
-  // predating that change — or a test double that has not been taught the argument — degrades to
-  // the append loop instead of silently dropping every child.
+  // True when the host's clone bindings declare the child-list parameter. Probed by arity, so a
+  // host predating that or a test double not taught the argument degrades to the append loop
+  // instead of silently dropping every child.
   supportsCloneWithChildren: boolean;
   createChildSet(rootTag: IRootTag): IFabricChildSet;
   appendChild(parent: IFabricNode, child: IFabricNode): IFabricNode;
@@ -98,11 +88,8 @@ export interface IFabricSlot {
   // RN's Fabric binding passes the public-instance handle straight here; the C++ side
   // maps the string eventType to the platform's accessibility-event kind.
   sendAccessibilityEvent(node: IFabricNode, eventType: string): void;
-  // Tell the native side that JS has taken (or given up) the gesture, so a native
-  // recogniser — a UIScrollView above the node, above all — stops competing for it.
-  // React's entire contribution to this is `injectGlobalResponderHandler`
-  // (ReactFabric-dev.js:18862): one call as the responder leaves a node and one as it
-  // arrives. Everything below is stock (UIManagerBinding.cpp:255 -> UIManager::setIsJSResponder).
+  // Tell the native side that JS has taken (or given up) the gesture, so a native recogniser (a
+  // UIScrollView above the node, above all) stops competing for it.
   setIsJSResponder(
     node: IFabricNode,
     isResponder: boolean,
@@ -119,15 +106,13 @@ export interface IFabricSlot {
   ): void;
 }
 
-// The JSI global, typed at the trust boundary. RN's InitializeCore installs it
-// on Fabric hosts; it is absent on the legacy (Paper) architecture. Declaring
-// its type here is how host globals are typed (cf. `window` in lib.dom): the
-// single point where we vouch for the native contract, with no per-call cast.
-// Accessed via globalThis to match how RN itself reads it (global.nativeFabricUIManager).
+// The JSI global, typed at the trust boundary. RN's InitializeCore installs it on Fabric hosts; it
+// is absent on the legacy (Paper) architecture. Declaring its type here is the single point where
+// we vouch for the native contract, with no per-call cast.
+
 // The host is NOT shaped exactly like the slot we hand out: its 3-arg clone form takes
 // (node, children, props), ours keeps props second so every call site reads the same with or
-// without the child list. Modelling the difference here keeps the reorder in one place —
-// the wrapper in getSlot() — instead of leaking the quirk into commit.ts.
+// without the child list. Modelling the difference here keeps the reorder in one place.
 interface IFabricHost extends Omit<
   IFabricSlot,
   | 'cloneNodeWithNewChildren'
@@ -150,11 +135,9 @@ interface IFabricHost extends Omit<
   findShadowNodeByTag_DEPRECATED?(tag: number): IFabricNode | null;
 }
 
-/**
- * An accessibility event addressed by a bare native TAG, the way RN's bridgeless
- * `UIManager.sendAccessibilityEvent` does it: resolve the tag to its committed shadow node, then send.
- * An unknown tag is dropped, as RN drops it (with a log rather than a throw).
- */
+// An accessibility event addressed by a bare native tag, the way RN's bridgeless
+// UIManager.sendAccessibilityEvent does it: resolve the tag to its committed shadow node, then
+// send. An unknown tag is dropped, as RN drops it (with a log rather than a throw).
 export function sendAccessibilityEventByTag(
   tag: number,
   eventType: string,
@@ -176,23 +159,13 @@ declare global {
 
 let cached: IFabricSlot | undefined;
 
-// BATCHING IS GONE, and it is worth one paragraph because the idea recurs. `batching-slot.ts`
-// recorded this slot's calls and replayed them once per commit — three ways, the last handing the
-// bytes to `SymbioteApplier` in C++. It existed to remove per-call JSI crossings from a JS walk that
-// worked out the Fabric operations. That walk no longer exists: adapters record their own mutations
-// and the tree host derives everything, so there are no per-call crossings left to batch. Removed
-// 2026-09-08 along with `setBatchedCommits`, the C++ applier and their differential. Root CLAUDE.md
-// keeps the measurement that made it uninteresting even on the old path — Create 256.8 on / 258.5
-// off, i.e. it demonstrably worked and bought nothing.
+// Batching is gone: this slot's calls used to be recorded and replayed once per commit, to remove
+// per-call JSI crossings from a JS walk that worked out the Fabric operations. That walk no longer
+// exists — adapters record their own mutations — so there is nothing left to batch.
 
-/**
- * Test seam: forget the bound slot, so a fixture can install a different host and be believed.
- *
- * `getSlot` caches the facade for the life of the module — the live binding re-mints a host function
- * on every property read, so caching is not an optimisation but the difference between reading each
- * method once and reading it per call. The cache has no invalidation in production because the
- * global is installed once, before anything commits.
- */
+// Test seam: forget the bound slot, so a fixture can install a different host and be believed.
+// getSlot caches the facade for the life of the module — the live binding re-mints a host function
+// on every property read, so caching means reading each method once instead of per call.
 export function resetSlot(): void {
   cached = undefined;
 }
@@ -276,17 +249,13 @@ export function getSlot(): IFabricSlot {
       measureLayout(node, relativeToNode, onFail, onSuccess),
   };
   dlog('slot bound to nativeFabricUIManager');
-  // Resolve our own native module here, once, for its SIDE EFFECT: `RCTTurboModuleManager` runs
-  // `installJSIBindingsWithRuntime:` when it CREATES a module, so without this call the module is
-  // never created, the hook never runs, and `global.__symbioteEngineNative` is absent on a device
-  // carrying a perfectly working binary. A capability that is unreachable until its first consumer
-  // lands is indistinguishable from one that is broken, and the difference costs a build to find out.
-  //
-  // This is the right seam rather than a convenient one, and now for two reasons: binding the Fabric
-  // slot is the moment the engine has established it is on a native host at all, AND it is the last
-  // moment before a commit can happen — the tree host has to be in before `commitSurfaceOps` runs or
-  // the ops it names stay pending. It cannot throw: with no module `installNativeTreeHost()` is a
-  // no-op, which is most places (see `native-engine.ts`'s header).
+  // Resolve our own native module here, once, for its side effect: RCTTurboModuleManager runs
+  // installJSIBindingsWithRuntime: when it creates a module, so without this call the module is
+  // never created and the global bindings stay absent even on a working binary.
+
+  // The right seam, not just a convenient one: binding the Fabric slot is the moment the engine has
+  // established it's on a native host, and the last moment before commitSurfaceOps can run. Cannot
+  // throw: with no module, installNativeTreeHost() is a no-op (see native-engine.ts's header).
   installNativeTreeHost();
   return cached;
 }

@@ -1,10 +1,6 @@
-// Exercises the touch-history store's public surface directly: record a touch, check
-// bank/history state, shift on move/end, reset. Independent of the event-routing layer
-// that consumes it (events.test.ts covers that indirectly). recordTouchTrack/attachTouchHistory
-// never throw — a malformed or coordinate-less touch is silently skipped rather than
-// rejected loudly (see normalizeTouch's own comment: "must not perturb the responder
-// negotiation") — so the "malformed input" scenarios below are grouped as "ignores", not
-// Negative.
+// Exercises the touch-history store's public surface: record a touch, check bank/history state,
+// shift on move/end, reset. recordTouchTrack/attachTouchHistory never throw on a malformed touch,
+// so those scenarios below are grouped as "ignores", not Negative.
 
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -115,10 +111,8 @@ describe('touch-history store', () => {
   });
 
   describe('multi-touch bookkeeping', () => {
-    // why: PanResponder's centroid math needs indexOfSingleActiveTouch to stay -1 while
-    // MORE than one finger is down — the "exactly one touch" gate on both the start and
-    // end paths is the product rule that lets consumers skip the bank scan in the common
-    // one-finger case.
+    // why: PanResponder's centroid math needs this to stay -1 while more than one finger is
+    // down — the "exactly one touch" gate lets consumers skip the bank scan in the common case.
     it('indexOfSingleActiveTouch stays -1 while two touches are simultaneously active', () => {
       recordTouchTrack('start', {
         changedTouches: [

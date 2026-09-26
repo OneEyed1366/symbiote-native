@@ -273,11 +273,9 @@ describe('createTouchableFeedbackHandlers (Positive)', () => {
   });
 });
 
-// ---- the RN-audited additions (2026-08-19) ----------------------------------------------------
-//
-// Everything below covers the API added after measuring the port against RN's own sources. It is
-// what the React/Vue/Svelte/Angular Touchables migrate onto, so the contract is pinned here rather
-// than re-discovered in each adapter.
+// ---- the RN-audited additions ----
+// Covers the API measured against RN's own sources — the contract every adapter's Touchable
+// migrates onto, pinned here rather than re-discovered per adapter.
 
 describe('restingOpacityFromStyle', () => {
   // why: RN's fade settles at the CALLER's opacity, not at 1. Getting this wrong is invisible until

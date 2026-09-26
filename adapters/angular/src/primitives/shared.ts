@@ -287,12 +287,9 @@ export class SymbioteHostPropsDirective {
     return this.elementRef.nativeElement;
   }
 
-  // MEASURED 2026-08-20, headless 1000-row create: writing every key of every bag cost 104 000
-  // engine setProp calls where Solid's identical screen cost 12 000 — and 90 000 of them carried
-  // `undefined`. A composed component's bag is a FIXED-SHAPE literal (Pressable's is ~48 keys,
-  // most of them unset on any given instance), so the first push of a fresh node spends most of
-  // its work deleting keys the node never had. Diffing per key removes exactly that: an unset key
-  // is skipped on mount and still written the moment it changes to or from a real value.
+  // A composed component's bag is a FIXED-SHAPE literal, most keys unset on any given instance, so
+  // writing every key on the first push spends most of its work on keys the node never had.
+  // Diffing per key skips an unset one on mount and writes it only when it gains a real value.
   set symbioteHostProps(props: Record<string, unknown>) {
     const pushed = this.pushed;
     // Only keys the node actually carries, so the vanished-key sweep below walks a handful rather

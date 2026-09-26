@@ -1,4 +1,4 @@
-// Reproduction for the 2026-08-13 Svelte sticky-header crash (effect_update_depth_exceeded):
+// Reproduction for a Svelte sticky-header crash (effect_update_depth_exceeded):
 // device logs showed `native: connect node=X -> view=586` immediately followed by
 // `native: restoreDefaultValues node=X` in an unbounded, rapidly-climbing loop. This test
 // exercises the EXACT pattern the crash traced back to — createAnimatedReconcileRuntime's
@@ -75,7 +75,7 @@ function reconcileCycle(
 }
 
 // No Negative group: reconcileCycle has no guard clause and nothing here is expected to throw —
-// the 2026-08-13 crash was a silent unbounded-growth leak, not a thrown error, so both scenarios
+// the crash was a silent unbounded-growth leak, not a thrown error, so both scenarios
 // below are Positive claims about growth being bounded rather than error-path claims.
 describe('AnimatedProps reconcile-every-render over a shared long-lived interpolation', () => {
   describe('Positive', () => {

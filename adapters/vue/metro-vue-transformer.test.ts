@@ -343,10 +343,9 @@ const label = 'hi'
 </style>
 `;
 
-// Read off a renamed name rather than a dedicated constant: since the scoping moved onto
-// lightningcss (2026-08-20) the scope id exists only inside the names it produced, and reading it
-// from one of those is what keeps these assertions honest — a test that recomputed it would be the
-// second implementation this migration deleted.
+// Read off a renamed name rather than a dedicated constant: the scope id exists only inside the
+// names lightningcss produced, so reading it from one of those keeps these assertions honest —
+// a test that recomputed it would be a second implementation of the same rule.
 function scopeIdOf(code: string): string {
   const match = code.match(/__(data-v-[0-9a-z]+)/);
   if (!match?.[1])

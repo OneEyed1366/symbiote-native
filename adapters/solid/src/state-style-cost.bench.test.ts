@@ -14,10 +14,8 @@
 // that write count is the same on a device.
 //
 // The `split-hoisted` arm is the optimistic BOUND for the split, not a prediction: it shares both
-// objects so the arm allocates nothing. Measured 2026-09-01, babel-preset-solid does NOT hoist —
-// `<pressable style={{opacity:1}} activeStyle={{opacity:0.6}} />` compiles to two inline
-// object literals inside the element factory — so the realistic arm is `split`, and `hoisted` only
-// says what a future hoisting optimisation could buy.
+// objects so the arm allocates nothing. babel-preset-solid does NOT hoist — the two style objects
+// compile to inline literals inside the element factory — so `split` is the realistic arm.
 import { describe, expect, it } from 'vitest';
 import {
   createElement,

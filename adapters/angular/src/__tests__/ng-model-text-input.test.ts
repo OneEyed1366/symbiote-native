@@ -1,26 +1,6 @@
-// `[(ngModel)]` on a `<text-input>` tag — the path `TextInputValueAccessor` exists for, and one
-// that had never run on a device until 2026-09-14.
-//
-// IT COULD NOT HAVE. `examples/angular`'s ApiPlaygroundScreen imported `TextInputElement` by name
-// and not the accessor, so @angular/forms had no `ControlValueAccessor` to select for that element
-// at all; `SYMBIOTE_ELEMENTS` is what brought one into scope (commit 054f85da). So the first
-// device run of this binding is also the first exercise of everything below it.
-//
-// The route is the one no other change-detection test here reaches:
-// `registerOnChange` -> `Renderer2.listen('valueChange')` -> `routeProp('onValueChange')`, with
-// `registerOnTouched` writing an `onBlur` FUNCTION PROP through `Renderer2.setProperty` beside it
-// — which the renderer WRAPS since 2026-09-18, so a blur now runs a synchronous `detectChanges()`
-// from inside the native dispatch.
-//
-// THE DEVICE CRASH OF 2026-09-20 IS THE LAST CASE, and the first four are what it took to find it.
-// Each one adds a slice of ApiPlaygroundScreen — its surrounding bindings, then its effects and
-// queries — and each one stayed GREEN. What finally reproduced is none of those: a child emitting
-// from `ngDoCheck`/`ngAfterContentChecked`/`ngAfterViewChecked` into a parent signal the parent's
-// own template reads. So the crash was never about the text input; the keystroke is only the first
-// thing on that screen that asks for a SYNCHRONOUS flush.
-//
-// The four green arms are kept rather than deleted. They are the record of where the fault is NOT,
-// and they are the only coverage this binding has.
+// `[(ngModel)]` on `<text-input>`, via `TextInputValueAccessor`: `registerOnChange` ->
+// `Renderer2.listen('valueChange')` -> `routeProp`; `registerOnTouched` writes `onBlur` as a
+// function prop, wrapped into a synchronous `detectChanges()` from inside the native dispatch.
 import '@angular/compiler';
 import {
   ChangeDetectorRef,
@@ -367,7 +347,7 @@ describe('[(ngModel)] on a text-input tag', () => {
   // `resolvedPromise.then` instead, so it lands a microtask LATER than the flush and the commit
   // reads the value from before the keystroke.
   //
-  // Device-reported 2026-09-20: the field snapped back to `edit me` after every character.
+  // Without this, the field snaps back to `edit me` after every character.
   it('does not command the pre-keystroke text back', async () => {
     mount(ROOT_TAG, NgModelHost);
     await tick();
@@ -434,8 +414,7 @@ describe('[(ngModel)] on a text-input tag', () => {
   });
 
   // The real gesture, in the real order. `registerOnTouched` writes `onBlur` as a FUNCTION PROP
-  // through `Renderer2.setProperty`, which the renderer now WRAPS — so blur runs a synchronous
-  // `detectChanges()` from inside the native dispatch, which it did not before 2026-09-18.
+  // the renderer wraps, so blur runs a synchronous `detectChanges()` from the native dispatch.
   it('survives focus, several keystrokes and blur in one gesture', async () => {
     mount(ROOT_TAG, NgModelScreen);
     await tick();

@@ -1,4 +1,4 @@
-// §7 of svelte-adapter-dom-shim (DECIDED 2026-08-11): the constructs that compile cleanly and
+// §7 of svelte-adapter-dom-shim: the constructs that compile cleanly and
 // then silently do nothing under the DOM shim. Everything else in the original §4 table is
 // already closed by "app code can't reach it" or "the TS/Svelte compiler already errors on it for
 // free" (see the skill for the full reachability table). This preprocessor is the guard for what

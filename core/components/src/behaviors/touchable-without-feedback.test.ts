@@ -95,15 +95,9 @@ function findCommitted(testID: string): ILiveNode {
   return hit;
 }
 
-/**
- * The committed CHILD, by POSITION rather than by a cloned `testID`.
- *
- * It was `findCommitted(SUBJECT_TEST_ID)` until 2026-09-18, and that stopped working the day the
- * clone moved to `foldCloneOntoChild` in C++: this host builds its payloads through the TypeScript
- * `fabricProps`, which carries no copy of the tag rules, so the id the owner carries no longer
- * arrives. Position is what the tag guarantees anyway — one child in, one node out — and it is what
- * `button-derived-payload.itest.ts` already uses for the same reason.
- */
+// The committed CHILD, by POSITION rather than a cloned `testID` — this host's payloads come
+// from TypeScript `fabricProps`, which carries no copy of the C++ clone rule, so the owner's id
+// never arrives. Position is what the tag guarantees anyway: one child in, one node out.
 function subject(): ILiveNode {
   const child = findCommitted(ROOT_TEST_ID).children[0];
   if (child === undefined) throw new Error('the owner committed no child');
@@ -160,20 +154,9 @@ describe('touchable-without-feedback host behavior', () => {
     expect(countNodes(findCommitted(ROOT_TEST_ID))).toBe(2);
   });
 
-  // WHAT THE CLONE PUTS ON THE CHILD LEFT THIS FILE ON 2026-09-18, and the list is worth naming so
-  // nobody concludes it went untested: RN's passthrough list and the four it computes
-  // (`accessible`, `focusable`, `nativeID`, `accessibilityState`), the aria fold over the owner's
-  // bag, the `id` precedence, and TWF's own when-set split from TNF's unconditional clone. All of
-  // it is `foldCloneOntoChild` in `SymbioteFabricProps.cpp` now, asserted against the committed
-  // payload in `core/engine/cpp/tests/js/clone-onto-child-payload.itest.ts`.
-  //
-  // They could not stay: this host builds its payloads through the TypeScript `fabricProps`, which
-  // deliberately carries no copy of the tag rules — the property that makes it a sound harness for
-  // everything else is exactly what blinds it to a rule that has moved.
-  //
-  // What stays here is what is still JS: the SHAPE (one child in, one node out), adoption, the
-  // press machine, the listener forwarding, and the dirtying that makes a late owner write reach a
-  // child at all.
+  // The clone (passthrough list, computed values, aria fold, `id` precedence, the when-set split
+  // from TNF's unconditional list) is `foldCloneOntoChild` in C++, asserted in
+  // `clone-onto-child-payload.itest.ts` — this host's `fabricProps` carries no copy of it.
 
   // The responder is the CHILD's, and it has to be: `bubble` (events/index.ts) skips anchors for
   // listener lookup and `handOverNativeResponder` has no Fabric handle for an uncommitted node.
@@ -301,10 +284,9 @@ describe('touchable-without-feedback host behavior', () => {
     expect(child.hasCommitHook || owner.childHost === stranger).toBe(true);
   });
 
-  // THE DIRTYING CASES LEFT THIS FILE ON 2026-09-18 — a late owner write, a late listener flip, and
-  // Vue's children-before-props order. The dirtying itself is still JS (`SLOT_DERIVED`,
-  // `onOwnedListenerChange`), but the only way to SEE it is the payload the rule produces, and this
-  // host cannot produce it. They live in `clone-onto-child-payload.itest.ts` with the rule.
+  // Dirtying (late owner write, late listener flip, Vue's children-before-props order) stays JS
+  // (`SLOT_DERIVED`, `onOwnedListenerChange`), but only the payload the C++ rule produces shows
+  // it, which this host can't build — those cases live in `clone-onto-child-payload.itest.ts`.
 
   // :151. A Fabric BOOLEAN-GATED event, so the flag must land on the CHILD — the only node with a
   // native view — and only while the app has one wired.

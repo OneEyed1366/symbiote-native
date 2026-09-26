@@ -1,16 +1,12 @@
 // The buffer's side tables, and the one thing they are FOR: saying a repeated thing once.
-//
-// why: `strings` has been interned since the buffer existed, because a 1 000-row create draws every
-// view name and every prop key from a set of a few dozen. `values` never was — and a style object is
-// the single most repeated thing an app sends. `StyleSheet.create`, a resolved CSS class and a
-// hoisted literal are all one object reused across every row, so a thousand rows push a thousand
-// entries that are the same reference.
-//
-// That costs on the far side, not here. `applyOps` turns each entry into a `folly::dynamic` when the
-// op is applied, so a thousand identical references are a thousand JS -> `folly::dynamic`
-// conversions. Measured 2026-09-17 on `build-release` (`raw-fabric-vs-engine.itest.ts`): 12 005
-// `setProp` ops spent 20-29 ms converting, against a 35 ms `applyOps` and a 92 ms create — the
-// largest single item in the whole path, and most of it the same three style objects over and over.
+
+// why: a style object is the most repeated thing an app sends — StyleSheet.create, a resolved CSS
+// class, a hoisted literal are all one object reused across every row, so a thousand rows push a
+// thousand entries that are the same reference.
+
+// That costs on the far side, not here: applyOps turns each entry into a folly::dynamic when
+// applied, so a thousand identical references become a thousand JS -> folly::dynamic conversions,
+// the largest single item on the path (raw-fabric-vs-engine.itest.ts measures it).
 
 import { beforeEach, describe, expect, it } from 'vitest';
 
@@ -63,10 +59,8 @@ describe('the mutation buffer interns the values it is handed', () => {
     expect(takeBatch().values.length).toBe(1);
   });
 
-  // why: a boolean prop repeats harder than any object — three adapters seed `allowFontScaling: true`
-  // on every text node they create, so a screen of 3 000 of them wrote 3 000 entries for one of two
-  // possible values. It needs no `Map` and raises no equality question: there are exactly two
-  // booleans, so a dedicated slot each is a branch rather than a hash.
+  // why: a boolean prop repeats harder than any object — every text node seeds allowFontScaling.
+  // Needs no Map: there are exactly two booleans, so a dedicated slot each is a branch, not a hash.
   it('gives one entry to each boolean, however often it repeats', () => {
     for (let at = 0; at < 4; at += 1) {
       recordSetProp(handle(), 'allowFontScaling', true);
@@ -79,10 +73,8 @@ describe('the mutation buffer interns the values it is handed', () => {
     expect(batch.values).toContain(false);
   });
 
-  // why: numbers stay un-interned, and this pins that as a decision rather than an oversight. `Map`
-  // keys compare by SameValueZero, which folds `-0` into `0` and `NaN` into itself — a semantics
-  // question not worth opening for a value that converts for about what the lookup costs. Booleans
-  // avoid it entirely because they are matched by a branch, not by a table.
+  // why: numbers stay un-interned, a decision not an oversight. Map keys compare by SameValueZero
+  // (folds -0 into 0, NaN into itself) — a semantics question not worth opening for the savings.
   it('leaves numbers alone', () => {
     recordSetProp(handle(), 'flex', 1);
     recordSetProp(handle(), 'flex', 1);

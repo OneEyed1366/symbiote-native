@@ -1,10 +1,8 @@
 // The prop surfaces of `<touchable-opacity>` and `<touchable-highlight>`, for Angular.
 //
-// No components left to type — the elements ARE the tags, matched by `TouchableOpacityElement` and
-// `TouchableHighlightElement` (`../elements`), and both machines run on the engine node
-// (`registerTouchableOpacityBehavior` / `registerTouchableHighlightBehavior`): the opacity fade is
-// an engine-side style layer over the responder, and the underlay swap is the same `activeStyle`
-// channel a `:active` rule uses. The wrappers that ran those in Angular were deleted 2026-09-11.
+// No components left to type — the elements ARE the tags (`TouchableOpacityElement` /
+// `TouchableHighlightElement`), both running on the engine node: opacity fade is an engine-side
+// style layer over the responder, underlay swap rides the same `activeStyle` a `:active` rule uses.
 //
 // Declared per-adapter over the Angular Pressable INPUT surface, since children arrive through
 // content projection rather than as a field — the split

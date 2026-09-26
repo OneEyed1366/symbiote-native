@@ -4,7 +4,7 @@
 // (`ActivityIndicator.js:112`), routes the app's props across RN's own split, and seeds the native
 // props AndroidProgressBar requires. None of that is a prop rewrite; all of it is structure.
 //
-// WHAT LEFT THIS FILE on 2026-09-18, and it was most of it. The size translation, the two `!== false`
+// WHAT IS NOT IN THIS FILE, which is most of it: the size translation, the two `!== false`
 // defaults, the centering style and the platform colour are `foldActivityIndicatorProps` /
 // `foldActivityIndicatorSpinnerProps` in `SymbioteFabricProps.cpp` now, asserted against the payload
 // the commit actually sent in `core/engine/cpp/tests/js/activity-indicator-payload.itest.ts`. This

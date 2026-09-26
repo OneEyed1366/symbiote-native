@@ -467,13 +467,8 @@ function withImpliedExpoModules(
 }
 
 // Without `hasForce`, an already-added layer is dropped rather than re-applied — re-rendering
-// App/MenuScreen/DetailsScreen would wipe out whatever the developer built on top since `new`
-// (real-world case, 2026-09-18: a blanket `add --navigation --expo-modules --testing
-// --splash-screen --slider` meant to backfill missing layers also re-applied navigation, which
-// was already there). Shared between BOTH resolveAddLayers paths: `buildAddLayerOptions` marks
-// an already-added option `disabled`, but clack's `groupMultiselect` (unlike plain `multiselect`)
-// never actually enforces `disabled` — its render path checks it for styling only, so the option
-// can still be checked and returned. This filter is what actually stops it, not the disabled flag.
+// App/MenuScreen/DetailsScreen would wipe out whatever the developer built since `new`. clack's
+// `groupMultiselect` never enforces `disabled` itself (styling only); this filter does.
 export function dropAlreadyAdded(
   layers: readonly IAddLayerName[],
   alreadyAdded: ReadonlySet<IAddLayerName>,

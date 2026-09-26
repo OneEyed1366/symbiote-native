@@ -105,11 +105,9 @@ export abstract class SymbioteElement implements OnChanges {
   // MATCHES on the callback attributes instead, registering it against the node; `markViewFor` is how
   // the wrapper reaches it. The inputs did not move, so nothing about this file's public surface did.
 
-  // THE `on*` WRAPPER LEFT THIS CLASS on 2026-09-18, for `SymbioteRenderer.setProperty`. Most of
-  // these directives are withheld from runtime matching now (`./runtime-matching`), so a binding
-  // reaches the renderer through `ɵɵproperty` without passing through any directive — a wrapper that
-  // lives here would simply stop running. The renderer is reached by every path, which is the home it
-  // should have had.
+  // No `on*` wrapper here: `SymbioteRenderer.setProperty` handles it. Most directives are withheld
+  // from runtime matching (`./runtime-matching`), so a binding reaches the renderer through
+  // `ɵɵproperty` without passing through any directive — the renderer is reached by every path.
 
   @Input() testID?: IElementProps['testID'];
   @Input() nativeID?: IElementProps['nativeID'];
@@ -255,22 +253,9 @@ abstract class ReadBackElement extends SymbioteElement implements OnDestroy {
     }
   }
 
-  // REPORTED, NOT RETHROWN, and it is Angular's own contract rather than a swallow. Every other
-  // change detection in an app runs inside `ApplicationRef.tick()`, which catches and hands the
-  // error to `ErrorHandler` — `render/index.ts` provides `SymbioteErrorHandler` for exactly that,
-  // after an unprovided token once turned every async tick exception into a hard crash. This flush
-  // is the ONE change detection that runs outside that boundary: the engine calls it from inside a
-  // native event dispatch, where a throw has nowhere to go but `RCTFatal`.
-  //
-  // Device-diagnosed 2026-09-20 on ApiPlaygroundScreen. `PlaygroundLifecycleLogger` emits from
-  // `ngDoCheck`/`ngAfterContentChecked`/`ngAfterViewChecked` and the screen's handler writes a
-  // signal its own template reads, so the view re-dirties itself on every pass and
-  // `detectChangesInViewWhileDirty` throws NG0103 after MAXIMUM_REFRESH_RERUNS. The scheduler's own
-  // ticks were already hitting it and reporting it quietly; the first KEYSTROKE took the same throw
-  // through here and killed the app — `Terminating app due to uncaught exception
-  // 'RCTFatalException: Unhandled JS Exception: Error: NG0103'`, with no redbox because Release has
-  // none. So the app bug is the app's, and a flush that turns a reported error into a fatal one is
-  // ours: a keystroke must not be stricter than a tick.
+  // REPORTED, NOT RETHROWN — Angular's own contract. Every other change detection runs inside
+  // `ApplicationRef.tick()`, caught by `ErrorHandler` (`SymbioteErrorHandler`); this flush instead
+  // runs from a native event dispatch, where an uncaught throw has nowhere to go but `RCTFatal`.
   private flush(): void {
     try {
       this.detector.detectChanges();
@@ -739,7 +724,7 @@ abstract class SymbioteValueAccessor
         // mirrors it, which is the shape rather than a workaround. A later `writeValue` still wins,
         // so an app that transforms or refuses the value keeps doing so, one microtask on.
         //
-        // Device-reported 2026-09-20: every character snapped the field back to its mounted text.
+        // Without this, every character snaps the field back to its mounted text.
         this.setProp('value', value);
         fn(value);
       },
@@ -945,10 +930,9 @@ type IMissingInputs<TProps, TDirective, TIgnored extends PropertyKey = never> =
 const DECLARES_EVERY_PROP: {
   view: IMissingInputs<IElementProps, ViewElement>;
   pressable: IMissingInputs<IAngularPressableProps, PressableElement>;
-  // The two touchables, added when their wrappers were deleted (2026-09-11). They inherit
-  // `PressableElement`, so the rows above would pass whatever these declared — what they pin is the
-  // per-touchable surface (`activeOpacity`, `underlayColor`, the three timing knobs), which used to
-  // be fenced by a source-text assertion over the wrapper's template in `angular-gaps.test.ts`.
+  // The two touchables inherit `PressableElement`, so the rows above would pass whatever these
+  // declared — what they pin is the per-touchable surface (`activeOpacity`, `underlayColor`, the
+  // three timing knobs).
   touchableOpacity: IMissingInputs<
     IAngularTouchableOpacityProps,
     TouchableOpacityElement

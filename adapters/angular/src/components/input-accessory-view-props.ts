@@ -1,7 +1,6 @@
-// The `<input-accessory-view>` tag's prop surface. The tag is matched by
-// `InputAccessoryViewElement` (`../elements`) and commits one `RCTInputAccessoryView`; its whole
-// wrapper was a prop FOLD with no aliasing at all (`registerInputAccessoryViewBehavior`), so it was
-// deleted 2026-09-10 and the behavior applies the same mapping on the tag's own path.
+// The `<input-accessory-view>` tag's prop surface. The tag (`InputAccessoryViewElement`) commits
+// one `RCTInputAccessoryView`; `registerInputAccessoryViewBehavior` folds its props on that path,
+// no separate wrapper component needed.
 //
 // The type stays for a component forwarding a bag, and because `IAngularInputAccessoryViewProps` is
 // public API.

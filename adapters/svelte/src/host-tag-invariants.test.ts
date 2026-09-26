@@ -12,19 +12,9 @@
 // None of these throws — style and spread-attach both fail silently — so `tsc` cannot see them
 // and the invariant needs an enforcer.
 //
-// A FOURTH class lived here until 2026-09-10 and is now CLOSED rather than banned: an individual
-// `on*`-prefixed attribute (`<text-input onValueChange={fn}>`) compiles to `$.event(...)`, which
-// hands the shim Svelte's own wrapped listener (`create_event`'s `target_handler`), never the
-// app's function. `target_handler` always calls with exactly one argument, a real object, and
-// mutates it internally — safe for `onPress`/`onFocus`/responder callbacks, whose sole argument
-// already IS the event, but fatal for the old `onValueChange(text, event)` contract, where a bare
-// string landed in that slot and `handle_event_propagation` threw
-// `Object.defineProperty() called on non-object`. The fix moved `text`/`value` onto the event
-// object as a FIELD (`ITextInputChangeEvent`/`ISwitchChangeEvent`,
-// `core/components/src/state/text-input.ts` / `core/components/src/view/render-switch.ts`), so
-// the sole argument is always a real object again and the individual-attribute form is safe on
-// every current primitive — see `bare-tag-authored.test.ts`'s two positive cases. What survives
-// below is a narrower, durable guard against the same SHAPE recurring on a future primitive.
+// A FOURTH class is CLOSED rather than banned: an individual `on*`-prefixed attribute compiles to
+// `$.event(...)`, handing the shim a wrapped listener that always calls with one real-object
+// argument — safe now that `text`/`value` ride the event as a FIELD (`bare-tag-authored.test.ts`).
 //
 // Spreading onto a COMPONENT stays legal and is used widely (`<Pressable {...rest}>`,
 // `<VirtualizedList {...attachments}>`) — a component's props are plain values that end up in a
@@ -89,10 +79,8 @@ function svelteFilesUnder(directory: string, extension = '.svelte'): string[] {
 }
 
 // The adapter's own components, every package that ships a Svelte entry (navigation, slider, ...),
-// and the canary. `examples/svelte` used to be out of scope on the theory that app code never
-// authors a host tag — false since primitives became public intrinsic tags (2026-09-07): a screen
-// writes `<text-input>`/`<switch>`/`<pressable>` directly, so it is exactly where this hazard was
-// found on device.
+// and the canary — `examples/svelte` is in scope because primitives are public intrinsic tags: a
+// screen writes `<text-input>`/`<switch>`/`<pressable>` directly, exactly where this hazard shows.
 function scannedFiles(): string[] {
   const roots = [
     join(REPO_ROOT, 'adapters', 'svelte', 'src'),

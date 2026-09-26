@@ -33,9 +33,8 @@ const ROOT_TAG = 843;
 const TEST_ID = 'primary-button';
 const TITLE = 'Tap me';
 // RN Button.js's iOS label look, owned by buttonTextStyle in @symbiote-native/components.
-// MARGIN, not padding. This read `padding` until 2026-09-09 and pinned a divergence: RN spells it
-// `margin: 8` (Button.js:409), so the label pushes the button's edges outward instead of insetting
-// itself — a different tap target and, on Android, a different background size.
+// MARGIN, not padding: RN spells it `margin: 8` (Button.js:409), pushing the button's edges
+// outward instead of insetting — a different tap target and, on Android, background size.
 
 const fabric = installRecordingFabric();
 const live = createLiveTree(fabric);
@@ -106,12 +105,9 @@ describe('Solid: `button` as a tag', () => {
       mount(ROOT_TAG, () => <button testID={TEST_ID} title={TITLE} />);
       await tick();
 
-      // The label's STYLE left on 2026-09-18 — `foldButtonLabelStyle` in
-      // `SymbioteFabricProps.cpp`, off the label text's own tag, reading the button through
-      // `IAncestorLookup`. This harness builds its payload through the TypeScript `fabricProps`,
-      // which carries no copy of the tag rules, so the base blue, the size and the margin are
-      // `core/engine/cpp/tests/js/button-derived-payload.itest.ts`'s now. What this adapter
-      // contributes — the title reaching the raw label, and the subtree below — stays.
+      // The label's STYLE is `foldButtonLabelStyle` in C++, off the label's tag via
+      // `IAncestorLookup`. This harness's `fabricProps` carries no copy — base/size/margin are
+      // `button-derived-payload.itest.ts`'s. This adapter contributes the title/subtree only.
       expect(label().children[0].payload.text).toBe(TITLE);
       // RN's FOUR nodes on iOS, in order and by view name — the host (TouchableOpacity's own
       // Animated.View, which the tag IS), the inner view carrying the Material look on Android and
@@ -130,32 +126,17 @@ describe('Solid: `button` as a tag', () => {
       expect(innerView.children[0].children[0].viewName).toBe('RCTRawText');
     });
 
-    // THE TINT AND THE GREYING both left on 2026-09-18 — `color` landing on the LABEL rather than
-    // the touchable, and `disabled` winning over it. Both are `foldButtonLabelStyle`'s, including
-    // the three-way `disabled` resolution it shares with the button's `focusable`, and both are
-    // asserted against the committed payload in
-    // `core/engine/cpp/tests/js/button-derived-payload.itest.ts`.
-    //
-    // They went as a PAIR: the greying case is only meaningful beside the tint it overrides.
+    // `color` on the LABEL and `disabled` winning over it are `foldButtonLabelStyle`'s (including
+    // the three-way `disabled` resolution shared with `focusable`), asserted in
+    // `button-derived-payload.itest.ts`.
 
-    // why: RN's Button pins role=button and the disabled state AFTER the caller's own props, so a
-    // caller cannot accidentally announce it as something else. This is the one place the
-    // single-bag composition matters: with a spread-then-override on the tag, Solid's mergeProps
-    // semantics change which side wins.
-    //
-    // `accessible` and the state MERGE are the two this file used to get wrong, and they now live
-    // where the rule does — `core/engine/cpp/tests/js/pressable-payload.itest.ts`, which asserts
-    // both on the `button` tag against the payload the commit actually sent. They left as a PAIR
-    // with the role rather than one at a time: this harness builds its payload through the
-    // TypeScript `fabricProps`, which holds no copy of the pressable rule, so an assertion left
-    // here would have gone green over a rule it cannot reach.
-    // The role pin and the `touchSoundDisabled` rename LEFT THIS FILE on 2026-09-18, following the
-    // pressable pair above and for the identical reason: both are `foldButtonProps` in the engine
-    // now, and this harness builds its payload through the TypeScript `fabricProps`, which holds no
-    // copy of the tag rules. Asserted on the committed payload in
-    // `core/engine/cpp/tests/js/button-payload.itest.ts`, including the strip of the raw
-    // `touchSoundDisabled` — a key no ViewConfig declares, so Fabric drops it in silence and a
-    // half-done rename looks exactly like a finished one.
+    // why: RN's Button pins role=button and disabled AFTER the caller's own props, so a caller
+    // can't accidentally announce it as something else — the one place single-bag composition
+    // matters, since a spread-then-override changes which side Solid's mergeProps picks.
+
+    // `accessible`/state-merge are `pressable-payload.itest.ts`'s; role/`touchSoundDisabled` are
+    // `foldButtonProps`'s in `button-payload.itest.ts` — including the strip of the raw
+    // `touchSoundDisabled` key, which Fabric would otherwise drop in silence.
 
     // why: the TV-focus props are real Fabric props the touchable does not TYPE — they ride the
     // spread untyped, so nothing but a committed-tree assertion can show they still arrive. `title`

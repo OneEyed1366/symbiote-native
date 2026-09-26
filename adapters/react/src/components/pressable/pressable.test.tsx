@@ -352,12 +352,9 @@ describe('React Pressable on the engine', () => {
   // why: `button` is a TAG, so this is the arm that fails if the registration is dropped — an
   // unregistered `button` commits a bare view and nothing forwards the label.
   //
-  // `accessibilityRole` USED TO BE THE OBSERVABLE HERE and no longer can be: the role joined
-  // `accessible` and `accessibilityState` in the engine on 2026-09-18 (`foldButtonProps`), and this
-  // harness builds its payload through the TypeScript `fabricProps`, which holds no copy of the tag
-  // rules. `accessibilityLabel` is a plain forward and is the right observable now — it proves the
-  // registration is live without asking about a rule this host cannot see.
-  // The role itself: `core/engine/cpp/tests/js/button-payload.itest.ts`.
+  // `accessibilityRole`/`accessible`/`accessibilityState` are `foldButtonProps`'s now, and this
+  // harness's `fabricProps` holds no copy — asserted in `button-payload.itest.ts`.
+  // `accessibilityLabel` is a plain forward, proving the registration is live.
   it('gives button its a11y label through the registration', () => {
     mount(
       ROOT_TAG,
@@ -472,29 +469,9 @@ describe('React Pressable on the engine', () => {
     expect(pressOuts).toBe(1);
   });
 
-  // KNOWN RED — an engine gap, CROSS-ADAPTER, left failing on purpose rather than relaxed. The
-  // wrapper cancelled this from its own unmount effect; the tag's `detach` cancels every timer in
-  // `state.timers`, and on UNMOUNT — and only on unmount — `detach` never runs.
-  //
-  // The gap is ONE file and it is not this adapter's. Measured 2026-09-10 with a control arm that
-  // moves, which is what makes the negative mean anything: the SAME pressable removed from a live
-  // tree by an ordinary conditional render is nominated, swept, detached, and its timer cancelled
-  // (`pressIns` 0, the node gone from the committed tree). Only the unmount path leaks. The reason
-  // is that an unmount does not go through `node.ts`'s `removeChild` at all — React's
-  // `clearContainer`/`removeChildFromContainer` land on `SymbioteSurface.clear()` and
-  // `SymbioteSurface.removeChild()` (`core/engine/src/surface.ts`), which splice `children`
-  // directly and call no `markDetachCandidate`. So `sweepDetachedBehaviors` sees an empty
-  // candidate set, and `disposeRoot` -> `teardownSubtree` then walks a container that final commit
-  // already emptied. `after-commit-lifecycle.test.ts` passes because it calls `disposeRoot`
-  // directly with no framework teardown in front of it (test-harness-false-greens §11).
-  //
-  // An earlier version of this comment said the repair was "placed where no adapter can reach it"
-  // and blamed the ORDER of teardown and dispose. That was reasoning, not measurement, and the
-  // control arm above refutes it: the sweep works fine, it is simply never told.
-  //
-  // The adapter-side workaround — reordering render.ts, or having React's host config nominate —
-  // is deliberately NOT taken: it would be five copies of one engine fix, in the layer this
-  // migration exists to delete.
+  // KNOWN RED — an engine gap, CROSS-ADAPTER: unmount skips `node.ts`'s `removeChild`, so
+  // `markDetachCandidate` never fires and the tag's timers leak. Left failing on purpose — an
+  // adapter-side workaround would be five copies of one engine fix.
   it('cancels a pending unstable_pressDelay timer on unmount', () => {
     let pressIns = 0;
     mount(

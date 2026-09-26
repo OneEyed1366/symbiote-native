@@ -240,9 +240,7 @@ describe('prompts in a non-interactive terminal', () => {
 describe('resolveAddLayers with explicit flags', () => {
   // why: an explicit --navigation on an app that already has navigation must NOT silently
   // re-render its App/MenuScreen/DetailsScreen — that would blow away real customization the
-  // developer made after `new`. Real-world bug (2026-09-18): `add --navigation --expo-modules
-  // --testing --splash-screen --slider` on an app that already had navigation re-applied it
-  // anyway, alongside the genuinely-missing layers.
+  // developer made after `new`.
   it('drops an explicitly-flagged layer that is already added, without --force', async () => {
     await expect(
       resolveAddLayers(
@@ -363,12 +361,11 @@ describe('resolveAddLayers with explicit flags', () => {
   });
 });
 
-// DX (2026-09-18): an already-added layer stays in the multiselect, disabled with why, instead of
-// vanishing — a shrinking menu with no visible reason looked like a bug, not a filter.
-//
-// DX (2026-09-20): grouped under "Core layers" / "Expo packages" (clack's groupMultiselect)
-// instead of one flat 26-option list — the 21 Expo packages alone outnumbered every other layer,
-// so finding "Navigation" meant reading past all of them.
+// An already-added layer stays in the multiselect, disabled with why, instead of vanishing — a
+// shrinking menu with no visible reason looks like a bug, not a filter.
+
+// Grouped under "Core layers" / "Expo packages" (clack's groupMultiselect): the 21 Expo packages
+// alone outnumber every other layer, so a flat list would bury "Navigation" past all of them.
 describe('buildAddLayerOptions', () => {
   function findOption(
     groups: ReturnType<typeof buildAddLayerOptions>,

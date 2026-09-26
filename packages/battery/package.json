@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/battery",
-  "version": "3.0.1",
+  "version": "3.0.2",
   "description": "expo-battery wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, Svelte, Solid, and Angular adapters. Battery level and state (charging/full/unplugged/unknown), low-power-mode detection, plus event listeners for level and state changes.",
   "license": "MIT",
   "repository": {

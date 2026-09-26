@@ -1,11 +1,6 @@
-// JS-side port of RN's processFontVariant (Libraries/StyleSheet/processFontVariant.js).
-// Same root cause family as boxShadow/filter: RN registers `fontVariant` with a JS
-// `process` because enableNativeCSSParsing() defaults to false, so a space-separated CSS
-// string ('small-caps tabular-nums') is split into the array native expects IN JS. An
-// array (the common, already-working form) passes through untouched; this is a no-op
-// for it.
-
-// RN processFontVariant.js:15-28. Array → array; space-separated string → array of variants.
+// JS-side port of RN's processFontVariant: splits a space-separated CSS string
+// ('small-caps tabular-nums') into the array native expects, same root cause as
+// boxShadow/filter. An array (the common, already-working form) passes through as a no-op.
 export function processFontVariant(
   fontVariant: ReadonlyArray<string> | string,
 ): ReadonlyArray<string> {

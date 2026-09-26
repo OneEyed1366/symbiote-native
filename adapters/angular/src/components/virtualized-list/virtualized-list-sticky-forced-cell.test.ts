@@ -197,12 +197,8 @@ describe('VirtualizedList force-mounts the sticky header below the window', () =
   // branch too, or a force-mounted header renders unpinned even though the fix above keeps it
   // merely present.
   //
-  // THE WITNESS CHANGED WITH THE MECHANISM, 2026-09-18. It used to read `forcedDepth ===
-  // windowedDepth + 1`: the list drove `stickyHeaderIndices`, the behavior synthesized a wrapper,
-  // and that extra host node was the only observable difference. The index form is gone (it cannot
-  // survive windowing — see "pins by tag" below), so there is no extra node and the depths are now
-  // EQUAL. The claim is unchanged and is asserted directly instead of through a side effect: both
-  // cells carry the tag, and the forced one is nested no deeper than an ordinary cell.
+  // Asserted directly rather than through a side effect: both cells carry the sticky-header tag,
+  // and the forced one is nested no deeper than an ordinary cell.
   it('gives the forced cell the sticky-header tag, same as an in-window sticky cell', async () => {
     mount(ROOT_TAG, StickyForcedCellHost);
     await tick();
@@ -233,11 +229,9 @@ describe('VirtualizedList force-mounts the sticky header below the window', () =
   // windowed list paints a header, a spacer and a slice, so the positions move every time the
   // window slides and the reconciler re-wraps a different child each pass.
   //
-  // Device-diagnosed 2026-09-18 on examples/angular and examples/vue, sticky path B. The Vue log
-  // measured all three symptoms: a wrapper's height grew 988 -> 1976 -> 2964, one WHOLE SECTION
-  // swallowed per slide; the wrapped cell's own `onLayout` then reported y RELATIVE to the wrapper
-  // (`cell 136 measured length=28 offset=0`), poisoning the list's offset table; and
-  // `nextHeaderLayoutY` wandered. The header pins for half a section and then stops, permanently.
+  // Symptom on sticky path B: the wrapper's height grows, one whole section swallowed per slide;
+  // the wrapped cell's own `onLayout` reports y RELATIVE to the wrapper, poisoning the list's
+  // offset table. The header pins for half a section and then stops, permanently.
   //
   // React and Svelte never had it — their lists name the `sticky-header` TAG on the cell, which
   // pins by DOCUMENT order and survives windowing. Angular and Vue were the only two left on the

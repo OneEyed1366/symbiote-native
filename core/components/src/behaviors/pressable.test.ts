@@ -1,7 +1,6 @@
-// The press machine as an engine-node behavior. Two things here are easy to get wrong in a way
-// that leaves every test green and every button dead on device, so both get their own case:
-// the machine must be built AFTER props exist (not at attach, where node.props is `{}`), and the
-// pressed state must reach the style registry rather than the framework.
+// The press machine as an engine-node behavior. Two things get their own case: the machine must
+// be built AFTER props exist (not at attach, where node.props is `{}`), and the pressed state
+// must reach the style registry rather than the framework.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // Relative rather than by package name: `core/components` does not declare test-utils, and adding
 // a workspace devDependency would need a `pnpm install` across a tree other sessions are working
@@ -53,15 +52,12 @@ function listenerOf(node: ISymbioteNode, name: string): IListener {
   return listener;
 }
 
-// The LIVE tree, never `fabric.find()` — that searches `created`, which keeps every pre-clone node,
-// so a clone-on-write update reads back as its own pre-update self
-// (`.claude/rules/test-harness-false-greens.md`).
-// PRODUCTION SHAPE, and it is the whole reason this helper exists. An adapter resolves the
-// intrinsic tag through `descriptorFor` and calls `createElement` with the FABRIC view name — a
-// pressable arrives as `RCTView`, like every other view. Building the subject as
-// `createElement(PRESSABLE_TAG)` passes the tag as the Fabric name, which makes the registry key
-// match by accident and every test below green while the registration cannot fire in any app.
-// That is exactly what happened; a peer session caught it by probing the installed shape.
+// The live tree, never `fabric.find()` (keeps every pre-clone node, so an update reads back as
+// its own pre-update self).
+
+// PRODUCTION SHAPE: an adapter resolves the tag through descriptorFor and calls createElement
+// with the FABRIC view name — a pressable arrives as `RCTView`. Building the subject as
+// createElement(PRESSABLE_TAG) would leave every case below green over a fake registration.
 function makePressable(): ISymbioteNode {
   return createElement(PRESSABLE_VIEW_NAME, false, PRESSABLE_TAG);
 }
@@ -73,9 +69,8 @@ function classStyleOf(node: ISymbioteNode): unknown {
   return Array.isArray(style) ? style[0] : undefined;
 }
 
-// By testID, never by viewName: the committed tree carries container nodes of the same view name,
-// and a pressable's is `RCTView` like everything else. Reads the PAYLOAD (`fabricProps`'s output),
-// not the authored bag — `opacity`/`focusable` are folds, never props the app wrote.
+// By testID, never by viewName: a pressable's is `RCTView` like every plain view. Reads the
+// payload, not the authored bag — `opacity`/`focusable` are folds, never props the app wrote.
 function committedPropsOf(
   testID: string,
 ): Readonly<Record<string, unknown>> | undefined {
@@ -87,11 +82,9 @@ const TOUCH: ISymbioteEvent = {
   nativeEvent: { pageX: 0, pageY: 0, locationX: 0, locationY: 0 },
 };
 
-// THE ENGINE'S ORDER, and getting it backwards is what made this suite miss a real bug for a day.
-// `core/engine/src/events/index.ts` bubbles PRESS_IN and only THEN calls `negotiateResponder`, so
-// `pressIn` arrives BEFORE `startShouldSetResponder` — every gesture, always. A harness that claims
-// the responder first hands the machine a world it never sees in production, and the press-in half
-// of every gesture can be dropped with all of these green (`.claude/rules/test-harness-false-greens.md` §11).
+// The engine's real order: `core/engine/src/events/index.ts` bubbles PRESS_IN and only THEN
+// negotiates the responder, so `pressIn` arrives BEFORE `startShouldSetResponder`, every gesture.
+// A harness claiming the responder first hides a dropped press-in half behind a green suite.
 function press(node: ISymbioteNode): void {
   listenerOf(node, 'pressIn')(TOUCH);
   listenerOf(node, 'startShouldSetResponder')(TOUCH);
@@ -157,13 +150,9 @@ describe('pressable host behavior', () => {
     expect(classStyleOf(node)).toEqual({ opacity: 0.6 });
   });
 
-  // What `ownedListeners` buys, stated as behaviour rather than as structure. `press`/`pressIn`/
-  // `pressOut` are base ViewConfig events and `startShouldSetResponder` is a responder event on
-  // every node, so `node.listeners` — a single-slot Map — is contested: without the stash the app's
-  // own `onPressIn` overwrites the behavior's dispatcher and the machine is never in the path at
-  // all. Then `disabled` stops working, the retention rectangle stops working, and the press still
-  // "fires", which is why this has to be asserted through a machine RULE and not through a call
-  // count.
+  // `node.listeners` is a single-slot Map: without `ownedListeners` the app's own `onPressIn`
+  // overwrites the behavior's dispatcher and the machine is never in the path — so this must be
+  // asserted through a machine RULE (`disabled`), not a bare call count.
   it('keeps the machine in the path — a disabled pressable calls nobody', () => {
     registerPressableBehavior();
     const onPressIn = vi.fn();
@@ -177,11 +166,9 @@ describe('pressable host behavior', () => {
     expect(onPressIn).not.toHaveBeenCalled();
   });
 
-  // THE OTHER SIDE OF BUTTON'S ASYMMETRY, pinned so nobody "fixes" it. RN's Pressable hands
-  // Pressability the RAW prop (`Pressable.js:266`) — `aria-disabled` reaches only the announced
-  // accessibilityState (`:229`) — so a bare pressable with `aria-disabled` STILL PRESSES. Button
-  // resolves the three spellings in the component and passes the answer down (`Button.js:337`),
-  // which is why the resolver is Button's and not the machine's (`./button`, KNOWN DIVERGENCES 2).
+  // RN's Pressable hands Pressability the raw `disabled` (Pressable.js:266) — `aria-disabled`
+  // reaches only accessibilityState, so a bare pressable with it STILL PRESSES. Button resolves
+  // the spellings itself (`./button`, KNOWN DIVERGENCES 2).
   it('still presses under aria-disabled — only Button resolves that', () => {
     registerPressableBehavior();
     const onPressIn = vi.fn();
@@ -196,14 +183,9 @@ describe('pressable host behavior', () => {
     expect(onPressIn).toHaveBeenCalledTimes(1);
   });
 
-  // Discriminates the same two hypotheses as the `disabled` case above, through the OTHER
-  // observable difference: the machine also drives the pressed style, and a callback sitting
-  // directly in the listener slot cannot. Both must move together.
-  //
-  // This case previously asserted that a `pressIn` with no responder claim before it does NOTHING —
-  // which encoded a real bug as the expected behaviour. The engine bubbles PRESS_IN before it
-  // negotiates the responder, so that sequence is the NORMAL one, and a machine that ignores it
-  // drops the press-in half of every gesture.
+  // Discriminates the same two hypotheses as `disabled` above, through the other observable
+  // difference: the machine also drives the pressed style, which a bare listener callback cannot.
+  // Both must move together, on the engine's real pressIn-before-responder-claim sequence.
   it('moves the app callback and the pressed style together', () => {
     registerRules([
       {
@@ -252,10 +234,8 @@ describe('pressable host behavior', () => {
     ).toHaveBeenCalledTimes(1);
   });
 
-  // Dirtying is not publishing. A press arrives from a native event, outside every renderer
-  // mutation path, so unless the behavior asks for one nothing ever commits — the node holds the
-  // pressed style and the screen keeps the unpressed one. Asserting the node's own style slot
-  // cannot see this: `pushClassStyle` writes that synchronously whether or not a commit follows.
+  // Dirtying is not publishing: a press arrives outside every renderer mutation path, so unless
+  // the behavior asks for a commit, the screen keeps the unpressed style regardless.
   it('commits the pressed style, not just dirties the node', async () => {
     registerRules([
       {
@@ -279,15 +259,8 @@ describe('pressable host behavior', () => {
     });
   });
 
-  // THE FOCUSABLE PAIR MOVED, with its control:
-  // `core/engine/cpp/tests/js/pressable-payload.itest.ts`. Pressable.js:258 is the engine's rule
-  // now (`foldPressableProps`), and this harness commits through the TypeScript `fabricProps`,
-  // which holds no copy of it — so a case left here would read a payload built by the wrong
-  // implementation, which is worse than no case at all.
-  //
-  // What it was pinning is intact there: a disabled, handler-less Pressable STAYS focusable (the
-  // formula has no disabled leg, unlike the Touchable* one), an explicit `false` opts out, and a
-  // tag with no behavior grows neither key.
+  // The focusable pair moved to `core/engine/cpp/tests/js/pressable-payload.itest.ts`:
+  // `foldPressableProps` in C++ owns it now, invisible to this harness's TypeScript payload.
 
   // The other half of keying by tag, and the reason the fix is not "register under the Fabric
   // name": a pressable IS an RCTView, so a Fabric-keyed registry would give the press machine to
@@ -300,10 +273,7 @@ describe('pressable host behavior', () => {
   });
 
   // why: `Pressability.js:479` returns `blockNativeResponder === true` from `onResponderGrant`,
-  // which is what stops a ScrollView above a claimed Pressable from stealing the gesture mid-drag.
-  // Wired through `propOf(source, 'blockNativeResponder')`, the same live-read seam `cancelable`
-  // already uses, so a real mount (not just the unit-level `buildPressableListeners` call) proves
-  // the prop actually reaches the listener the engine dispatches to on grant.
+  // which stops a parent ScrollView from stealing the gesture mid-drag.
   it('answers responderGrant from an authored blockNativeResponder', () => {
     registerPressableBehavior();
     const node = makePressable();
@@ -325,12 +295,8 @@ describe('pressable host behavior', () => {
     expect(listenerOf(node, 'responderGrant')(TOUCH)).toBe(false);
   });
 
-  // why: `TouchableOpacity.js:186`/`TouchableHighlight.js:194`/`TouchableNativeFeedback.js:217` all
-  // derive Pressability's `cancelable` from `rejectResponderTermination` (`cancelable:
-  // !this.props.rejectResponderTermination`) — Pressable itself is the ONLY one of the family with a
-  // `cancelable` prop of its own (`Pressable.js:41`). `rebuild()` read only `cancelable`, so every
-  // Touchable's `rejectResponderTermination` was a completely dead prop: a Touchable asking to keep
-  // its gesture through a parent ScrollView's steal attempt silently kept yielding it.
+  // why: every Touchable derives Pressability's `cancelable` from `rejectResponderTermination`;
+  // Pressable is the only one of the family with its own `cancelable` prop (Pressable.js:41).
   it('derives cancelable from rejectResponderTermination when cancelable is not authored', () => {
     registerPressableBehavior();
     const node = makePressable();

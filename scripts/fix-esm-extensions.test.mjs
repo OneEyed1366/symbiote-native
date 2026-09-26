@@ -122,10 +122,9 @@ test('a bare (non-relative) import is left alone', () => {
   assert.deepEqual(unresolved, []);
 });
 
-// A side-effect import has no `from` and no parenthesis, so it is a third specifier position and
-// was silently left extensionless until 2026-08-23. Real case: `adapters/vue/src/index.ts`'s
-// `import './register';`, which cannot be written as a re-export without going lazy under Metro's
-// inlineRequires. Metro resolves an extensionless specifier; Node ESM does not.
+// A side-effect import has no `from` and no parenthesis — a third specifier position (real case:
+// `adapters/vue/src/index.ts`'s `import './register';`, which can't be a re-export without going
+// lazy under Metro's inlineRequires). Metro resolves an extensionless specifier; Node ESM does not.
 test('a bare side-effect import gets its extension', () => {
   const { code, importsFixed, unresolved } = rewriteEsmSpecifiers(
     `import './register';`,

@@ -194,9 +194,9 @@ describe('a bare intrinsic tag, hand-written', () => {
       `<text testID="probe">hello</text>`,
       NO_ERRORS_SCHEMA,
     );
-    // RN's two Text defaults were asserted here until 2026-09-18 and are the engine's rule now
-    // (`foldTextDefaults`), keyed on exactly this component name — so the name IS the claim, and
-    // `core/engine/cpp/tests/js/committed-payload.itest.ts` is where the values are read.
+    // RN's two Text defaults are the engine's rule (`foldTextDefaults`), keyed on exactly this
+    // component name — so the name IS the claim; the values are read in
+    // `core/engine/cpp/tests/js/committed-payload.itest.ts`.
     expect(node?.viewName).toBe('RCTText');
     expect(node?.payload).toMatchObject({ testID: 'probe' });
     expect(

@@ -39,18 +39,16 @@ const ANDROID_NAMES: Readonly<Record<ISymbioteIntrinsic, string>> = {
   switch: 'AndroidSwitch',
   'activity-indicator': 'RCTView',
   'activity-indicator-spinner': 'AndroidProgressBar',
-  // DELIBERATE DIVERGENCE FROM RN (2026-09-23). RN's `SafeAreaView.js` is a plain View on Android,
-  // with no insets. `RCTSafeAreaView` is registered there too (`ReactSafeAreaViewManager`) and
-  // applies the window insets, so one screen is safe on both platforms.
+  // DELIBERATE DIVERGENCE FROM RN: `SafeAreaView.js` is a plain View on Android, with no insets.
+  // `RCTSafeAreaView` applies the window insets there too (`ReactSafeAreaViewManager`), so one
+  // screen is safe on both platforms.
   'safe-area-view': 'RCTSafeAreaView',
   modal: 'RCTModalHostView',
   'refresh-control': 'AndroidSwipeRefreshLayout',
   'sticky-header': 'RCTView',
-  // `InputAccessoryView.js` on Android does `console.warn(...); return null` — the WHOLE component,
-  // children included, renders NOTHING. A plain `RCTView` container (this file's answer until
-  // 2026-09-20) committed a real, laid-out, potentially visible node plus its whole child subtree —
-  // a real divergence from vendor, not a harmless degrade. `VOID_COMPONENT` matches vendor exactly:
-  // no node, no children, on this platform only.
+  // `InputAccessoryView.js` on Android does `console.warn(...); return null` — the WHOLE
+  // component, children included, renders NOTHING. `VOID_COMPONENT` matches vendor exactly: no
+  // node, no children, on this platform only.
   'input-accessory-view': VOID_COMPONENT,
 };
 

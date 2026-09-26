@@ -17,8 +17,7 @@ function getKey(member) {
 // codegen-view    — has codegen-specs/ or a *.podspec (a native Fabric view wrapper).
 // native-proxy    — has NO src/ directory (the packages/android bare-skeleton shape).
 //
-// Verified against every package in the repo at authoring time (2026-07-29): the
-// intersection of actual fields within each detected tier matches this list exactly.
+// The intersection of actual fields within each detected tier matches this list exactly.
 const TIERS = [
   {
     reason: 'every package',

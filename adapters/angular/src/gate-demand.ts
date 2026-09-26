@@ -18,7 +18,7 @@
 // nothing in this repo could detect and nothing on screen would show. A `viewProviders` entry is
 // not part of the component's binding surface, so an app cannot reach it by accident.
 //
-// WHY `viewProviders` AND NOT `providers` — measured, both arms, 2026-09-02:
+// WHY `viewProviders` AND NOT `providers`:
 //
 //   viewProviders   the wrapper's OWN template sees it, projected content does NOT
 //   providers       both see it

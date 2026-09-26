@@ -147,12 +147,9 @@ function committedPayload(testID: string): Record<string, unknown> {
   return payloadOf(findByTestId(testID).handle);
 }
 
-// TouchableHighlight's underlay is `foldTouchableHighlightUnderlay` in the engine since 2026-09-18,
-// and this host builds payloads through the TypeScript `fabricProps`, which carries no copy of the
-// tag rules — so the colour is not readable here. The BIT is (`OP_SET_UNDERLAY_SHOWN`), and it is
-// the right witness for what these cases actually claim: that VUE's wiring reaches the machine. What
-// the underlay LOOKS like is not Vue's business and is asserted against a real committed payload in
-// `core/engine/cpp/tests/js/touchable-highlight-underlay.itest.ts`.
+// `foldTouchableHighlightUnderlay` in the engine owns the colour; this host's `fabricProps`
+// carries no copy, so only the `OP_SET_UNDERLAY_SHOWN` bit is readable here — the right witness
+// that Vue's wiring reaches the machine. The colour is asserted in the underlay itest.
 function isUnderlayShown(testID: string): boolean {
   return findByTestId(testID).underlayShown;
 }
@@ -577,13 +574,6 @@ describe('Vue TouchableHighlight', () => {
 // wiring and its delayPressIn/delayPressOut scheduler are covered against the COMMITTED tree in
 // `core/components/src/behaviors/touchable-without-feedback.test.ts`.
 
-// `focusable`'s six cases LEFT THIS FILE on 2026-09-18, with the rule: the Touchables' three-leg
-// form (TouchableOpacity.js:336-340) is `foldPressableProps`'s now, keyed off the tag, and this
-// harness builds its payload through the TypeScript `fabricProps`, which holds no copy of the tag
-// rules. They are `core/engine/cpp/tests/js/touchable-focusable-payload.itest.ts`, against the
-// payload a commit actually sent.
-//
-// Nothing about the ADAPTER went with them, which is why they could go rather than being rewritten:
-// what Vue contributes here is routing `onPress` through `setEventListener` so the engine ever
-// learns of it, and every press case above fails outright if it stops doing that — a tag whose
-// handler never reached the stash does not fire.
+// `focusable`'s three-leg form is `foldPressableProps`'s rule now, keyed off the tag; this
+// harness's `fabricProps` holds no copy — asserted in `touchable-focusable-payload.itest.ts`.
+// What Vue contributes is routing `onPress` through `setEventListener` at all.

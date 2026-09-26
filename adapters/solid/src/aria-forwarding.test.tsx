@@ -1,14 +1,6 @@
-// What a Solid tag hands the engine for `role` / `aria-*` — the FORWARDING, as of 2026-09-18.
-//
-// This file used to assert the FOLD: that `aria-label` arrived as `accessibilityLabel` with the raw
-// key gone. That rule is the device's now (`foldAriaProps`, `SymbioteFabricProps.cpp`) and the
-// headless payload builder holds no copy of it, so asserting the folded names here would assert a
-// harness rather than a device. The rule's own eleven cases are in
-// `core/engine/cpp/tests/js/aria-payload.itest.ts`, read off a real committed payload.
-//
-// What is left is genuinely this adapter's and is not a smaller version of the old claim: the engine
-// can only fold what reaches it under the name it expects. A hyphenated attribute is exactly what a
-// compiler can lose in silence.
+// What a Solid tag hands the engine for `role` / `aria-*`: the FORWARDING, not the FOLD
+// (`foldAriaProps`, `aria-payload.itest.ts`). The engine can only fold what reaches it under the
+// name it expects, and a hyphenated attribute is exactly what a compiler can lose in silence.
 //
 // Still read on the COMMITTED payload rather than node.props, because that is what the engine is
 // handed. Shape borrowed from

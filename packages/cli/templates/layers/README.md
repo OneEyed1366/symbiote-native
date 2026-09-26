@@ -4,31 +4,23 @@ Framework-agnostic optional overlays, applied on top of `native/` + `js/<framewo
 `--expo-modules` / `--navigation` / `--testing` / `--splash-screen` / `--slider` / one `--<id>`
 flag per `EXPO_PACKAGE_LAYERS` entry (`src/expo-package-layers.ts`).
 
-`expo-modules` is dependency-only, same regardless of `--framework` (diffing
-`examples/expo-react` against `examples/react`, and checking `packages/navigation`'s
-`peerDependencies`, showed a dependency-only addition with no framework-specific file content and
-no native (`ios/`/`android/`) changes — see `packages/cli/README.md`'s "Design
-decisions" section). It carries ONLY the core autolinking bits — `expo` and
-`@symbiote-native/expo-modules-link` — never a specific Expo-backed package (2026-09-18): it used
-to bundle all 21 `@symbiote-native/<expo-wrapper>` packages unconditionally, so picking any ONE of
-them (or none at all) always installed every other one too. Each wrapper now has its OWN
-`templates/layers/<id>/package.json.fragment.json` (`application`, `battery`, `brightness`,
+`expo-modules` is dependency-only, same regardless of `--framework` (see `packages/cli/README.md`'s
+"Design decisions" section). It carries ONLY the core autolinking bits — `expo` and
+`@symbiote-native/expo-modules-link` — never a specific Expo-backed package. Each wrapper has its
+OWN `templates/layers/<id>/package.json.fragment.json` (`application`, `battery`, `brightness`,
 `cellular`, `clipboard`, `crypto`, `device`, `haptics`, `keep-awake`, `local-auth`,
 `localization`, `network`, `screen-orientation`, `secure-store`, `sensors`, `sharing`, `sms`,
 `standard-web-crypto`, `store-review`, `system-ui`, `tracking-transparency`, `web-browser`) —
 same dependency-only shape as `slider`, registered once in `EXPO_PACKAGE_LAYERS` so cli.ts's
 `--<id>` flag, prompts.ts's multiselect option, and `detect-added-layers.ts`'s marker all derive
 from that ONE table instead of 21 hand-written near-duplicates. `@symbiote-native/expo-modules-
-link` (the "Expo-modules autolinking" feature) is never a SEPARATE explicit tick once one of these
-21 is picked — it doesn't make sense to ask for autolinking twice, so `resolveFeatures` /
+link` is never a SEPARATE explicit tick once one of these 21 is picked — `resolveFeatures` /
 `resolveAddLayers` in `src/prompts.ts` fold `hasExpoModules` to true (or append the `expo-modules`
-layer) automatically. (An earlier pass here also unconditionally added the raw npm `expo-linking`
-package — reverted, 2026-09-18: checking the real installed `expo-battery`/`expo-web-browser`/
-`expo-sharing`/`expo-store-review`/`expo-local-authentication`/`expo`/`expo-modules-autolinking`
-`package.json`s found NONE of them depend on it. Nothing in this codebase's dependency graph
-actually needs it, so it isn't shipped.)
+layer) automatically. The raw npm `expo-linking` package is deliberately NOT added: none of the
+real installed `expo-*` `package.json`s depend on it, so nothing in this codebase's dependency
+graph needs it.
 
-`navigation` is NOT dependency-only (2026-09-15): besides `package.json.fragment.json`
+`navigation` is NOT dependency-only: besides `package.json.fragment.json`
 (`@symbiote-native/navigation`, declaring every adapter as an optional peer itself), it carries an
 `app/<framework>` subtree — a 2-screen `Stack` demo (Menu → Details) that OVERWRITES the base
 `js/<framework>` App file, so `--navigation` demonstrates itself instead of silently doing
@@ -37,7 +29,7 @@ package.json merge (see its own comment) — recursively copying the whole `navi
 would land every framework's `app/` folder on the generated root instead of just the selected
 one.
 
-`splash-screen` (2026-09-17) is the first layer that DOES carry native changes: a `native/`
+`splash-screen` is the first layer that DOES carry native changes: a `native/`
 subtree mirroring `templates/native`'s own layout (`native/android/...`, `native/ios/...`),
 overlaid the same way `renderTemplate` already overlays `navigation`'s `app/<framework>` — no
 `@expo/config-plugins` needed after all, because only 4 files actually require two variants.
@@ -55,7 +47,7 @@ template unconditionally — none of them reference anything from the plugin (th
 draws from our own asset catalog), so leaving them in place when the option is off just means an
 unused-but-harmless launch-screen asset, not a build break.
 
-`testing` (2026-09-17) is also NOT dependency-only: besides the per-framework
+`testing` is also NOT dependency-only: besides the per-framework
 `package.json.fragment.json` (`detox` + `jest` + `ts-jest` + the TypeScript floor, since e2e is a
 separate TS project regardless of `--javascript`), it ships `detox.config.js` at the app root and
 an `e2e/` directory (`jest.config.js`, `tsconfig.json`, `setup.ts`, `smoke.test.ts`). The fragment
@@ -81,10 +73,8 @@ the same line).
 
 Every `@symbiote-native/*` version in every fragment (base and layer) is pinned to `"latest"`,
 not a literal semver range — the monorepo's packages publish independently and a hand-copied
-literal drifts out of sync with peer requirements almost immediately (measured 2026-09-15:
-`templates/js/angular`'s `@symbiote-native/engine` pin was `^0.1.7` against `@symbiote-native/
-navigation@4.0.1`'s `^0.5.0` peer, and `expo-modules`'s `@symbiote-native/application@2.0.0`
-wants `@symbiote-native/angular@^2.0.0` while the angular fragment pinned `^0.6.1` — two separate
-`npm install ERESOLVE` failures from the same root cause). Third-party dependencies (`react`,
+literal drifts out of sync with peer requirements almost immediately, producing `npm install
+ERESOLVE` failures across unrelated fragments that pinned different literals for the same
+package. Third-party dependencies (`react`,
 `react-native`, `vue`, `svelte`, `solid-js`, `@angular/*`, `expo`, …) stay pinned as before —
 only the `@symbiote-native/*` scope moved to `latest`.

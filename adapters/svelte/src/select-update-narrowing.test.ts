@@ -1,17 +1,6 @@
-// Where a benchmark Select does and does not cost this adapter. Device 2026-09-01: wall 14.7 ms
-// against stock's 7.3, reconcile window 1.6 ms, WRITES 2 — so the engine is clean and the ~13 ms
-// sits in pass 1. The obvious suspect was the shim: a bag rebuilt for every row whose `class`
-// expression re-runs, which would be 1 000 `foldHostBag` + `normalizeBagClasses` + diff cycles.
-//
-// Measured here, and it is REFUTED — Svelte narrows at the component-prop boundary:
-//
-//   isSelected expression re-evaluated   1 000   every row reads `selectedId`
-//   row bag rebuilt                          1   only the row that changed
-//   `set p` into the shim                    1
-//
-// So this adapter is touched ONCE per select and the residue is Svelte's own invalidation of
-// 1 000 prop expressions. Headless prices that at ~1.4 ms per 1 000 rows, which does not account
-// for the device's 13 ms — that part is unattributed and needs a device profile, not this file.
+// Where a benchmark Select does and does not cost this adapter: Svelte narrows at the
+// component-prop boundary, so this adapter is touched ONCE per select. The residue is Svelte's
+// own invalidation of per-row prop expressions, not this shim's `foldHostBag`/diff cycle.
 //
 // The row shape is copied from examples/svelte/components/BenchmarkRow.svelte and
 // BenchmarkScreen's `isSelected={row.id === selectedId}`; the counters are threaded through the

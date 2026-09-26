@@ -1,20 +1,12 @@
 // A press on a `<pressable>` must not strand an update to one of its DESCENDANTS.
 //
-// The regression this pins (2026-08-24, fixed in `commitTargeted`): `setNodePressed` dirties the
-// pressed node, so a same-tick prop write on a CHILD bubbles one step, meets the already-dirty
-// pressed node and stops there. The targeted commit then published the pressed node's props and
-// cleared its flags without descending — leaving the child dirty under a CLEAN chain, which
-// `reconcile` skips forever. The screen stopped updating from that node down, permanently, with
-// nothing red anywhere.
-//
-// Why it belongs in the ADAPTER suite and not only in the engine's: the engine's own cases drive
-// the node directly, and this defect needs a framework whose update writes ONLY the child — which
-// is what Svelte's fine-grained reactivity does and what Vue's and Solid's re-render does NOT (they
-// rewrite the prop on the node itself and re-dirty the chain, hiding it by accident). So this is
-// the shape that only a real compiled component on the real shim produces.
-//
-// Read TWO layers. `committed` alone cannot tell a lost commit from a write that never happened,
-// and the engine-node reading is what localised the defect the first time.
+// The regression this pins, fixed in `commitTargeted`: `setNodePressed` dirties the pressed node,
+// so a same-tick child write bubbles one step, meets it already dirty, and stops — the commit
+// publishes the pressed node and clears flags without descending, stranding the child forever.
+
+// Belongs in the ADAPTER suite: it needs a framework whose update writes ONLY the child (Svelte's
+// fine-grained reactivity) — Vue/Solid rewrite the prop on the node itself and hide the bug. Read
+// TWO layers — `committed` alone can't tell a lost commit from a write that never happened.
 import { describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
 import { writeFileSync, rmSync } from 'node:fs';

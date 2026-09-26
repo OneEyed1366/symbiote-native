@@ -96,19 +96,13 @@ describe('React <scroll-view> on the engine', () => {
     // `padding` is a content-container style and must NOT leak onto the scroll view node. That is
     // the SLOT ROUTING, which is this adapter's half and still JS.
     expect(Object.hasOwn(outer!.payload, 'padding')).toBe(false);
-    // The base style (`flexDirection`, `overflow`) used to be asserted here too and is the engine's
-    // rule now — `foldScrollViewProps`, contract in
-    // `core/engine/cpp/tests/js/scroll-view-payload.itest.ts`. This host builds its payload through
-    // the TypeScript `fabricProps`, which carries no copy of the tag rules.
+    // The base style (`flexDirection`, `overflow`) is `foldScrollViewProps`'s rule now, in
+    // `scroll-view-payload.itest.ts`; this host's `fabricProps` holds no copy of the tag rules.
   });
 
-  // The axis flag and `nestedScrollEnabled` LEFT THIS FILE on 2026-09-18 — both are
-  // `foldScrollViewProps` in the engine, asserted on the committed payload in
-  // `core/engine/cpp/tests/js/scroll-view-payload.itest.ts`. They were a pair here for a reason
-  // worth carrying over rather than losing: each case held its own negative control (absent on the
-  // vertical tag; an explicit `false` honoured), and after the port BOTH controls went on passing,
-  // because an absent key and an untouched passthrough are what a harness with no rule produces.
-  // A control only controls beside the thing it controls, so the pairs moved whole.
+  // The axis flag and `nestedScrollEnabled` are `foldScrollViewProps`'s too, asserted in
+  // `scroll-view-payload.itest.ts` — each with its own negative control (absent on the vertical
+  // tag; an explicit `false` honoured), since a control only controls beside what it controls.
 
   // why: onScroll must reach the caller unmodified — RN's ScrollView does no JS-side
   // transformation of the native scroll payload, so re-wrapping or partially copying it here

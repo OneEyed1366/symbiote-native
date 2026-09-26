@@ -5,13 +5,9 @@
 // bag folds. Angular lost both Text defaults AND `id` -> `nativeID` exactly that way: silently, on
 // every app, visible only on a device.
 //
-// BOTH OF THOSE FOLDS HAVE SINCE LEFT THIS ADAPTER, on 2026-09-18, and the file's subject moved with
-// them rather than expiring. Vue used to apply them in the RENDERER (`PROP_ALIASES` and
-// `TEXT_DEFAULTS`), on the argument that the renderer sits under all three paths at once. That
-// argument was right and the engine is a layer lower still: `routeProp` resolves the alias for every
-// adapter and `foldTextDefaults` supplies the defaults off the component name. So what three
-// compilers can still disagree about is not the folding — it is WHICH KEYS AND VALUES each one hands
-// over at all, which is what the cases below pin.
+// Both folds are the ENGINE's now: `routeProp` resolves the alias for every adapter and
+// `foldTextDefaults` supplies the defaults off the component name. What three compilers can
+// still disagree about is WHICH KEYS AND VALUES each hands over, which the cases below pin.
 //
 // WHY THE ORACLE IS THE COMMITTED PAYLOAD, KEY BY KEY. A count agrees for the wrong reasons: two
 // payloads of equal size can differ in which keys they carry, and a whole day was lost to a
@@ -275,10 +271,8 @@ const CASES: readonly IFoldCase[] = [
     expected: [{ nativeID: 'x', testID: 't' }],
   },
   {
-    // RN's two Text defaults used to be the point of this case, and they left the renderer on
-    // 2026-09-18 — the rule is `foldTextDefaults` in `SymbioteFabricProps.cpp`, keyed on the
-    // component, and this harness holds no copy of it. What the case pins now is that NO arm adds a
-    // key of its own, which is the thing three compilers can still disagree about.
+    // RN's two Text defaults are `foldTextDefaults`'s rule now, keyed on the component; this
+    // harness holds no copy. What this case pins is that NO arm adds a key of its own.
     what: 'a bare text lands an empty payload on every path',
     sfc: '<text>hi</text>',
     jsx: '<text>hi</text>',

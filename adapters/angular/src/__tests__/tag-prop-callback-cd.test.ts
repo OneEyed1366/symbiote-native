@@ -1,17 +1,6 @@
-// The TAG twin of `responder-change-detection.test.ts`, which guards the same property on the
-// COMPONENT path. A flat-bag `onX` prop is a plain function the ENGINE calls on event dispatch —
-// Angular is never told. An `(event)` binding is wrapped by Angular's own
-// `wrapListenerIn_markDirtyAndPreventDefault` and therefore notifies; a prop does not, so a plain
-// state mutation inside one dirties nothing and the template stays stale forever.
-//
-// Device-reported 2026-09-11 on `examples/angular`: `<pressable [onPressMove]="onRetentionMove">`
-// read "drag me · dx 0 · dy 0" through the whole gesture, and the real numbers appeared only when
-// an unrelated button was pressed — that button's `(press)` binding ran the tick the drag never
-// asked for. `SymbioteHostPropsDirective.wrapCallback` (primitives/shared.ts) has covered this on
-// the component path since 2026-08; `SymbioteElement` never inherited it.
-//
-// THE ORACLE IS THE RENDERED TEXT, not the component field: the field moves in both arms. What is
-// broken is that nothing re-evaluates the binding reading it.
+// The TAG twin of `responder-change-detection.test.ts`, guarding the same property on the
+// COMPONENT path: a flat-bag `onX` prop is a plain function the engine calls, telling Angular
+// nothing — a state mutation inside it dirties no view. ORACLE: the rendered text, not the field.
 import '@angular/compiler';
 import { Component } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';

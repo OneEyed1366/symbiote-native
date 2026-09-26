@@ -1,7 +1,6 @@
 // The TextInput machine as an engine-node behavior. Everything here is asserted on the COMMITTED
-// Fabric payload or on the recorder's `commands` list — the two things a device would actually
-// see — because every failure this behavior can have (a mirror seeded too late, a count that never
-// reaches the payload, a caret sent to 0 instead of the sentinel) is invisible on `node.props`.
+// Fabric payload or the recorder's `commands` list — every failure this behavior can have is
+// invisible on `node.props`.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 // Relative rather than by package name: `core/components` does not declare test-utils, matching
 // the sibling pressable suite.
@@ -32,12 +31,9 @@ const fabric = installRecordingFabric();
 const live = createLiveTree(fabric);
 let nextRootTag = 7000;
 
-// PRODUCTION SHAPE. An adapter resolves the intrinsic tag through `descriptorFor` and calls
-// `createElement` with the FABRIC view name — the single-line input arrives as
-// `RCTSinglelineTextInputView` (component-names/index.ios.ts, the headless default). Building the
-// subject as `createElement(TEXT_INPUT_TAG)` would pass the tag AS the Fabric name, make the
-// registry key match by accident, and leave every case below green over a registration that can
-// never fire in an app (`.claude/rules/test-harness-false-greens.md` §11).
+// PRODUCTION SHAPE: an adapter resolves the intrinsic tag through descriptorFor and calls
+// createElement with the FABRIC view name. Building the subject as createElement(TEXT_INPUT_TAG)
+// would pass the tag AS the Fabric name and leave every case below green over a fake registration.
 const TEXT_INPUT_VIEW_NAME = 'RCTSinglelineTextInputView';
 const TEST_ID = 'subject';
 
@@ -56,10 +52,8 @@ function mount(node: ISymbioteNode) {
   return surface;
 }
 
-// A commit that changes nothing returns ABOVE the point where the behavior hooks are drained
-// (`commit.ts`, the `!result.changed` early return), so a second beat needs a real prop write to
-// exist at all. Writing the app's `value` is the real beat anyway — it is what the controlled
-// handshake compares against.
+// A commit that changes nothing returns ABOVE the point where behavior hooks are drained, so a
+// second beat needs a real prop write — writing the app's `value` is the real beat anyway.
 function commitValue(
   surface: ReturnType<typeof mount>,
   node: ISymbioteNode,
@@ -85,8 +79,7 @@ function changeEvent(text: string, eventCount: number): ISymbioteEvent {
 
 const EMPTY_EVENT: ISymbioteEvent = { nativeEvent: {} };
 
-// The LIVE tree, by testID — never `fabric.find()`, which searches the creation log and hands back
-// the AUTHORED bag, not the committed payload. Reads `.payload` (`fabricProps`'s output):
+// The live tree by testID, never `fabric.find()` (creation log, authored bag). Reads `.payload`:
 // `mostRecentEventCount` is a fold, never a prop the app wrote.
 function committedPropsOf(testID: string): Record<string, unknown> | undefined {
   return live.findLive(live.appRoot(), node => node.payload.testID === testID)
@@ -113,13 +106,8 @@ afterEach(() => {
 
 describe('text input host behavior', () => {
   // THE CREATE PAYLOAD, and the only assertion in this file that reads the tree before an event.
-  // The wrappers handed the count over on every render, so an input committed
-  // `mostRecentEventCount: 0` at create; the behavior used to write the key only inside the change
-  // handshake, so the tag committed without it until the user typed. Found by three adapters
-  // independently, 2026-09-01.
-  //
-  // Asserted on the committed payload rather than on `node.props`: a mirror the behavior keeps for
-  // itself is exactly what was already correct here, and would pass with the fix reverted.
+  // An input commits `mostRecentEventCount: 0` at create — asserted on the committed payload
+  // rather than `node.props`, which is a mirror the behavior keeps for itself either way.
   it('seeds the acknowledged count into the create payload', () => {
     registerTextInputBehavior();
     const node = makeTextInput();
@@ -131,11 +119,9 @@ describe('text input host behavior', () => {
     });
   });
 
-  // Two independent consequences of ONE cause: the app's own handler still fires (it was parked in
-  // the stash, not evicted by the machine's dispatcher) AND the acknowledged count reaches the
-  // committed payload. A callback sitting directly in the listener slot gives the first and cannot
-  // give the second; a machine that swallowed the app's callback gives the second and not the
-  // first. No single mistake satisfies both.
+  // Two independent consequences of one cause: the app's handler still fires (parked in the stash,
+  // not evicted by the machine's dispatcher) AND the acknowledged count reaches the payload. Either
+  // one alone would mask a wrong wiring the other catches.
   it('runs the machine AND the app callback on one change event', async () => {
     registerTextInputBehavior();
     const onChange = vi.fn();
@@ -153,16 +139,8 @@ describe('text input host behavior', () => {
     });
   });
 
-  // THE WRAPPER-DERIVED CALLBACK, and the reason it is asserted here rather than in an adapter.
-  // `onValueChange(event)` is not a Fabric event — it is a fold the component wrapper did over
-  // the raw `change` payload. A tag has no wrapper, so before this the app's callback
-  // reached `node.props` as a function key, `fabricProps` dropped it, and nothing ever called it:
-  // the field echoed keystrokes natively while every derived value in the app stayed frozen. Found
-  // on device 2026-08-31 in examples/solid's canary ("Hello, stranger" never updated).
-  //
-  // Same class as `value -> text`, and the same repair: below the fork, so all five adapters inherit
-  // it. The alternative — refusing to lower an element carrying the prop — is the transform learning
-  // a fold the runtime can perfectly well do.
+  // `onValueChange(event)` is not a Fabric event — a plain prop key `fabricProps` drops on the
+  // way to native. Asserted here, below the adapter fork, so all five adapters inherit it.
   it('calls the app onValueChange with the folded text on a change', () => {
     registerTextInputBehavior();
     const onValueChange = vi.fn();
@@ -177,10 +155,8 @@ describe('text input host behavior', () => {
     expect(onValueChange.mock.calls[0][0]).toMatchObject({ text: 'ab' });
   });
 
-  // why: `TextInput.js:504-506`'s `_onChange` calls `props.onChange(event)` BEFORE
-  // `props.onChangeText(currentText)`, always — an app with side effects observable across both
-  // (a shared counter, a log) sees that exact order on a real device. Ours used to call the real
-  // `onChange` dead last, after `onChangeText` and after `onValueChange`.
+  // why: `TextInput.js:504-506`'s `_onChange` calls `onChange(event)` before `onChangeText(text)`,
+  // always — an app with side effects observable across both sees that exact order on a device.
   it('calls onChange before onChangeText, matching vendor order', () => {
     registerTextInputBehavior();
     const node = makeTextInput();
@@ -226,9 +202,8 @@ describe('text input host behavior', () => {
     expect(commandsNamed('focus')).toHaveLength(0);
   });
 
-  // The seed's whole reason to exist. `value` was already carried down at createNode, so the first
-  // beat must read it as ALREADY NATIVE, not as a divergence — otherwise every controlled input in
-  // the tree commands a redundant write to native on mount.
+  // `value` was already carried down at createNode, so the first beat must read it as already
+  // native — otherwise every controlled input commands a redundant write on mount.
   it('does not command text down on the first commit of a mount-time value', () => {
     registerTextInputBehavior();
     const node = makeTextInput();
@@ -238,9 +213,8 @@ describe('text input host behavior', () => {
     expect(commandsNamed('setTextAndSelection')).toHaveLength(0);
   });
 
-  // The other half: once the app's value genuinely diverges from the mirror, the command goes out —
-  // and with the caret sentinel, since no `selection` prop was given. 0/0 here would jump the caret
-  // to the front of the field on every controlled write.
+  // Once the app's value diverges from the mirror, the command goes out with the caret sentinel,
+  // since no `selection` prop was given — 0/0 would jump the caret to the front on every write.
   it('commands the diverged value down with the -1/-1 caret sentinel', () => {
     registerTextInputBehavior();
     const node = makeTextInput();
@@ -258,10 +232,8 @@ describe('text input host behavior', () => {
     ]);
   });
 
-  // Two commands now, not one: mounting with `selection` authored fires its OWN caret-only command
-  // (see "moves the caret on mount from selection alone" above), and `commitValue` fires a second
-  // for the text — the selection having already settled at {2,2} on the first, so it does not
-  // diverge again on the second.
+  // Two commands: the authored `selection` fires its own caret-only command at mount, and
+  // `commitValue` fires a second for the text — the caret already settled, so it stays at {2,2}.
   it('sends an explicit selection, defaulting end to start', () => {
     registerTextInputBehavior();
     const node = makeTextInput();
@@ -286,12 +258,9 @@ describe('text input host behavior', () => {
     ]);
   });
 
-  // TextInput.js's `useTextInputStateSynchronization`: `lastNativeSelection` starts at the sentinel
-  // `{start:-1,end:-1}`, distinct from any real selection — so an authored `selection` fires the
-  // command on the very FIRST commit, with no preceding value write and no `commitValue` at all.
-  // This host used to gate the whole first `afterCommit` behind `isMirrorFreshlySeeded`, which
-  // skipped the selection check along with the (correctly skipped) text one — an uncontrolled input
-  // with only a `selection` prop never moved the caret on mount.
+  // `lastNativeSelection` starts at the sentinel `{start:-1,end:-1}`, distinct from any real
+  // selection — so an authored `selection` fires the command on the very first commit, with no
+  // preceding value write.
   it('moves the caret on mount from selection alone, with no value ever written', () => {
     registerTextInputBehavior();
     const node = makeTextInput();
@@ -307,13 +276,9 @@ describe('text input host behavior', () => {
     ]);
   });
 
-  // TextInput.js's `_onSelectionChange` (:522-533) updates `lastNativeSelection` from the REAL
-  // native event too, not only from a controlled write this behavior itself sent — so a caret the
-  // user drags away from a still-unchanged controlled `selection` prop gets snapped straight back on
-  // the very next render (`setLastNativeSelection` schedules one). Without that update our own
-  // mirror stays frozen at whatever we last commanded, so a user-driven move away from a controlled
-  // position was never caught: the mirror and the (unchanged) authored prop kept "agreeing" while
-  // native quietly drifted.
+  // `_onSelectionChange` (TextInput.js:522-533) updates `lastNativeSelection` from the real native
+  // event too, not only from our own commanded write — so a user-dragged caret away from an
+  // unchanged controlled `selection` snaps straight back on the next render.
   it('snaps a controlled selection back after the user drags the caret away', () => {
     registerTextInputBehavior();
     const node = makeTextInput();
@@ -395,19 +360,9 @@ describe('text input host behavior', () => {
     expect(commandsNamed('blur')).toHaveLength(1);
   });
 
-  // THE IMPERATIVE BLUR MUST CLEAR APP-WIDE FOCUS TRACKING SYNCHRONOUSLY, and the raw view command
-  // this used to send does not. It looks equivalent because this behavior's own `blur` LISTENER
-  // also calls `setInputBlurred` — but that listener fires on the NATIVE event, which is the one
-  // thing an imperative blur cannot count on: native sends nothing when the input was already
-  // blurred, or when the command is dropped. `Keyboard.dismiss()` reads `currentlyFocusedInput()`,
-  // so a stale entry aims a blur at a node that no longer holds focus.
-  //
-  // The component path routes through `blurTextInput` for exactly this reason and says so
-  // (`react/src/components/text-input/index.ts`). The two paths must not differ here: an app
-  // calling `.blur()` cannot tell which one it is on.
-  //
-  // No native blur event is fired below — that is the whole point of the case. Firing one would
-  // make it pass against the raw command too.
+  // An imperative blur must clear app-wide focus tracking synchronously: the `blur` LISTENER also
+  // does it, but only fires on a real native event, which never arrives if native was already
+  // blurred. No native event fires below — that's the point of the case.
   it('clears app-wide focus tracking without waiting for a native blur', () => {
     registerTextInputBehavior();
     const node = makeTextInput();
@@ -424,10 +379,7 @@ describe('text input host behavior', () => {
   });
 
   // why: RN's TextInputState.focusTextInput ignores `.focus()` on a field with `editable: false`
-  // (TextInput-test.js's "focus() should not do anything if the TextInput is not editable" — an
-  // earlier verification pass mismarked this N/A, reading `TextInputState.focusInput` [the
-  // unguarded tracker] instead of `focusTextInput` [what `ReactNativeElement.focus()`, i.e. the
-  // real `ref.focus()`, actually calls]).
+  // (TextInput-test.js, "focus() should not do anything if the TextInput is not editable").
   it('ignores an imperative focus while editable is false', () => {
     registerTextInputBehavior();
     const node = makeTextInput();
@@ -527,14 +479,9 @@ describe('text input host behavior', () => {
     expect(plain.listeners?.get('change')).toBeUndefined();
   });
 
-  // why: `TextInput.js`'s own `usePressability(config)` — the same Pressability class every
-  // Touchable uses — wraps the input for exactly one reason: `onPress` calls
-  // `inputRef.current.focus()` when `editable !== false`, so a tap that lands inside the input's
-  // hitSlop but outside the native view's own focus zone (padding, a hitSlop grown past the
-  // rendered box) still focuses it. `onPressIn`/`onPressOut` are forwarded RAW, with no wrapping.
-  // We wired NONE of it — no press listeners at all — so a tap inside an authored `hitSlop` but
-  // outside the native box would silently fail to focus, and `onPress`/`onPressIn`/`onPressOut`
-  // on a TextInput would just be inert props.
+  // why: TextInput.js wraps the input in `usePressability` so `onPress` focuses it when editable
+  // — a tap inside the hitSlop but outside the native focus zone still works. `onPressIn`/
+  // `onPressOut` forward raw, with no wrapping.
   describe('tap-to-focus (TextInput.js usePressability)', () => {
     function press(node: ISymbioteNode): void {
       listenerOf(node, 'pressIn')(EMPTY_EVENT);
@@ -572,10 +519,8 @@ describe('text input host behavior', () => {
       expect(commandsNamed('focus')).toHaveLength(0);
     });
 
-    // No `minPressDuration` override here — unlike the Touchables, which pass 0 to bypass
-    // Pressability's ~130ms deactivation floor, TextInput's own config leaves it unset, so
-    // `onPressOut` waits for the same floor our shared machine defaults to
-    // (`DEFAULT_MIN_PRESS_DURATION_MS`).
+    // Unlike the Touchables (which pass 0), TextInput leaves `minPressDuration` unset, so
+    // `onPressOut` waits for `DEFAULT_MIN_PRESS_DURATION_MS`.
     it('forwards onPressIn and onPressOut raw, with no wrapping', async () => {
       vi.useFakeTimers();
       registerTextInputBehavior();

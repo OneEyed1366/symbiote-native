@@ -1,13 +1,6 @@
-// Image's host behavior, and it carries no runtime at all — no listeners, no timers, no commit
-// hook, and since 2026-09-18 no fold either. What is left is ONE declaration: that this tag's three
-// source props are resolved on the way in.
-//
-// WHERE THE FOLD WENT: `foldImageProps` in `SymbioteFabricProps.cpp`, with
-// `core/engine/cpp/tests/js/image-payload.itest.ts` as its contract. The `srcSet`/`src`/`source`
-// precedence, the W3C header decoration, the `width`/`height` fold into style, `alt` becoming
-// `accessibilityLabel` + `accessible`, `resizeMode`/`tintColor` falling back to style keys, and
-// `loadingIndicatorSource` being plucked down to a bare uri — all of it is a function of the tag,
-// which is what makes it the platform's.
+// Image's host behavior carries no runtime — no listeners, no timers, no fold. `foldImageProps`
+// in C++ resolves the `srcSet`/`src`/`source` precedence, style folds and a11y mapping, asserted
+// in `core/engine/cpp/tests/js/image-payload.itest.ts`.
 //
 // WHY THIS ONE DID NOT MOVE WHOLE, and it is the first that did not. `resolveAssetSource` turns the
 // number `require('./logo.png')` returns into a `{uri, width, height, scale}` by asking METRO'S

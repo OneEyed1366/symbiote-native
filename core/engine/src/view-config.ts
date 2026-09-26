@@ -1,16 +1,10 @@
-// Per-native-component event declarations: symbiote's slimmed ViewConfigRegistry.
-// Mirrors React Native's ViewConfig: each Fabric component declares which event
-// names it can emit. This is native-component knowledge (a Switch fires `change`,
-// a ScrollView fires `scroll`), shared by every adapter, so it lives here, not in
-// any one framework adapter.
-//
-// Flat-bag adapters (React / Vue / Solid) hand props and handlers mixed together
-// and must split them. They consult this registry to tell an event handler
-// (`onChange` -> `change`, a declared event) from a native prop that merely looks
-// like one (`onTintColor` -> `tintColor`, NOT a declared event -> stays a prop and
-// reaches Fabric). Structural adapters (Svelte `addEventListener`, Angular
-// `Renderer2.listen`) deliver events pre-separated and call `setEventListener`
-// directly, bypassing this entirely.
+// Per-native-component event declarations: symbiote's slimmed ViewConfigRegistry. Mirrors RN's
+// ViewConfig — each Fabric component declares which event names it can emit — shared by every
+// adapter, so it lives here rather than in any one framework adapter.
+
+// Flat-bag adapters (React/Vue/Solid) hand props and handlers mixed together and must split them:
+// they consult this registry to tell an event handler (onChange -> change) from a native prop that
+// merely looks like one. Structural adapters (Svelte, Angular) deliver events pre-separated.
 
 import { isRegisteredEvent } from './registry';
 
@@ -24,20 +18,15 @@ const A11Y_EVENTS: readonly string[] = [
   'accessibilityEscape',
 ];
 
-// Events every view can emit, from RN's base ViewConfig. `press`/`pressIn`/`pressOut`/
-// `longPress` are synthesized from the touch stream (see events.ts); `layout` is
-// universal; `focus`/`blur` are RN's bubbling focus events declared on the base View
-// (ViewPropTypes.js FocusEventProps), so any view can emit them; the accessibility
-// events are base too, so they reach every component.
+// Events every view can emit, from RN's base ViewConfig. press/pressIn/pressOut/longPress are
+// synthesized from the touch stream (events.ts); layout is universal; focus/blur are RN's bubbling
+// focus events on the base View, so any view can emit them; the accessibility events are base too.
 const BASE_EVENTS: readonly string[] = [
   'press',
   'pressIn',
   'pressOut',
-  // Synthesized from the touch stream like its four siblings, and omitted here until 2026-09-02.
-  // A name the press machine OWNS but the engine does not route is dead: `routeProp` hands an `on*`
-  // prop to `setEventListener` (and thus to the behavior's stash) only for a registered event, so
-  // `onPressMove` landed in `node.props` where nothing reads it. The wrapper that used to pass the
-  // same callback to the machine directly hid this.
+  // Must be registered like its four siblings: routeProp hands an on* prop to setEventListener
+  // only for a registered event, so an unregistered onPressMove lands in node.props unread.
   'pressMove',
   'longPress',
   'layout',
@@ -46,15 +35,9 @@ const BASE_EVENTS: readonly string[] = [
   ...A11Y_EVENTS,
 ];
 
-// An event set is platform-invariant: a text input emits `change` on iOS and Android
-// alike; only the native component NAME differs (iOS RCTSinglelineTextInputView vs
-// Android AndroidTextInput, iOS Switch vs Android AndroidSwitch). So each primitive's
-// events are declared ONCE and keyed under BOTH platform names below. The table is
-// consulted by the resolved native name (SymbioteNode.component), and only one
-// platform's names ever exist at runtime, so the other platform's keys are inert (no
-// Platform.OS branch), the names simply coexist. Missing the Android keys is what made
-// onValueChange (and Switch/Modal/RefreshControl events) silently dead on Android: the
-// onX prop failed isEventFor, fell to setProp, and no listener was ever registered.
+// An event set is platform-invariant: a text input emits `change` on iOS and Android alike, only
+// the native component name differs. Each primitive's events are declared once and keyed under
+// both platform names — consulted by the resolved name, so only one side is ever live at runtime.
 const TEXT_INPUT_EVENTS: readonly string[] = [
   'change',
   'focus',
@@ -72,11 +55,9 @@ const MODAL_EVENTS: readonly string[] = [
   'orientationChange',
 ];
 
-// A scroll view's events are the same on both axes and both platforms; only the native
-// NAME differs (iOS RCTScrollView for both; Android RCTScrollView vertical vs
-// AndroidHorizontalScrollView horizontal). Declared once, keyed under each name below. The
-// Android horizontal name was missing, so a horizontal FlatList's onScroll never fired and
-// its windowing stalled: same failure mode as the text-input keys.
+// A scroll view's events are the same on both axes and both platforms; only the native name
+// differs (Android RCTScrollView vertical vs AndroidHorizontalScrollView horizontal). Declared
+// once, keyed under each name below — same shape as the text-input keys above.
 const SCROLL_EVENTS: readonly string[] = [
   'scroll',
   'scrollBeginDrag',

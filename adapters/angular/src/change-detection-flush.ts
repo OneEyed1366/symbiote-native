@@ -14,9 +14,8 @@
 //   behaviors/refresh-control.ts  `queueMicrotask` snap-back reads `props.refreshing`
 //
 // Every other adapter's state update lands inside that turn; zoneless Angular cannot, so all three
-// read the PRE-event value and UNDO the user. Device-reported 2026-09-11: `[(value)]` on a
-// `<text-input>` commanded the stale text back after one keystroke, a `[(value)]` `<switch>` snapped
-// straight off again, and pull-to-refresh stopped itself.
+// read the PRE-event value and UNDO the user — a bound text input snaps back after one keystroke,
+// a bound switch snaps off again, pull-to-refresh stops itself.
 //
 // WHY `ChangeDetectorRef.detectChanges()` AND NOT `ApplicationRef.tick()`. Both re-evaluate the
 // binding; only one of them is safe to call from a native event. `tick()` emits `afterTick`
@@ -127,9 +126,8 @@ export function isWrappableCallback(key: string, value: unknown): boolean {
  * An `(event)` binding is wrapped by Angular's own `wrapListenerIn_markDirtyAndPreventDefault` and
  * notifies on its own. A `[onPressMove]="fn"` prop is an `@Input` forwarded to the node, and the
  * ENGINE calls it on event dispatch — Angular is told NOTHING, so a plain field mutation inside it
- * dirties no view and the template reading it stays stale until something unrelated ticks.
- * Device-reported 2026-09-11: a pan readout stuck at `dx 0 · dy 0` for a whole gesture, its real
- * numbers arriving on the next button press.
+ * dirties no view and the template reading it stays stale until something unrelated ticks — a pan
+ * readout stuck at `dx 0 · dy 0` for a whole gesture, real numbers only on the next button press.
  *
  * `markForCheck()` is one of the two notification sources Angular sanctions for an event source
  * outside the framework (the other is writing a signal the template reads, which an ADAPTER cannot
@@ -174,11 +172,9 @@ export function createCallbackWrapper(node: unknown): ICallbackWrapper {
 /**
  * The MARKER half, keyed on the node rather than injected.
  *
- * `markForCheck` needs the view holding the binding, and until 2026-09-18 the only way to have one
- * was for `SymbioteElement` to inject a `ChangeDetectorRef` — on EVERY element, so that its lazy
- * `on*` wrapper could reach one on the few that carry a callback. An injection is ~1-2.4 us per
- * element on JavaScriptCore (`core/engine/cpp/tests/js/angular-directive-cost.itest.ts`), so a
- * thousand-row screen paid for ten thousand `ViewRef`s to serve none.
+ * `markForCheck` needs the view holding the binding. Injecting a `ChangeDetectorRef` on every
+ * element to serve the few with a callback costs a `ViewRef` per element for none of them to use
+ * (`core/engine/cpp/tests/js/angular-directive-cost.itest.ts` counts it) — found lazily instead.
  *
  * Only a composed component's host directive registers here (`primitives/shared.ts`); a TAG's
  * view is found from the node when its callback fires (`markViewFor`), so no element pays an

@@ -1,19 +1,10 @@
 // The press machine as an ENGINE-NODE behavior, so a pressable can be an intrinsic tag instead of
-// a framework component (`.claude/rules/host-primitive-tier.md`, tier 2). Written once; every
-// adapter inherits it by registering, and none re-implements it.
-//
-// The machine itself is unchanged and still shared with the component path — `createPressRuntime`
-// / `createPressHandlers` in `../state/pressable`. What is new is only WHERE its lifecycle lives:
-// on the engine node rather than in a component instance.
-//
-// REGISTRATION IS THE HAZARD, not the machine. Metro enables `inlineRequires` in production only,
-// moving a `require` to the first place its binding is used as a VALUE, and a barrel's
-// `export { X } from './x'` compiles to a lazy getter. A module whose only job is a side effect is
-// never named as a value, so re-exporting it means it NEVER RUNS in a release build — dev perfect,
-// release silently pressless. Each adapter therefore keeps its own `src/register.ts` calling
-// `registerPressableBehavior()`, and its entry does a bare `import './register';` that the barrel
-// does NOT re-export. A bare `import './register';` sitting NEXT TO such a re-export does not work
-// either: Babel merges the two imports of one specifier and the merged dependency stays lazy.
+// a framework component. Written once; every adapter inherits it by registering, none re-implements
+// it. The machine itself is unchanged and still shared with the component path.
+
+// Registration, not the machine, is the hazard: Metro's inlineRequires makes a barrel re-export of
+// a side-effect-only module never run in a release build. Each adapter keeps its own
+// `src/register.ts` calling registerPressableBehavior(), reached only by a bare side-effect import.
 
 import {
   appListenerFor,
@@ -47,33 +38,22 @@ import { buildPressableListeners } from '../view/render-pressable';
 
 export const PRESSABLE_TAG = 'pressable';
 
-/**
- * A last look at the machine's config before its handlers are built, for a tag that IS a pressable
- * plus something — TouchableOpacity, whose fade has to run between the machine and the app's own
- * `onPressIn`.
- *
- * Called from `rebuild`, so once per gesture rather than once per mount: it sees the config the
- * props actually hold by the time a finger lands, and anything it captures is discarded with the
- * gesture. Per-node state that must OUTLIVE a gesture belongs on the caller's own WeakMap.
- */
+// A last look at the machine's config before its handlers are built, for a tag that IS a
+// pressable plus something (TouchableOpacity's fade running between the machine and onPressIn).
+
+// Called from `rebuild`, once per gesture, not per mount — anything it captures is discarded with
+// the gesture; state that must OUTLIVE a gesture belongs on the caller's own WeakMap.
 export type IPressConfigRefinement = (
   node: ISymbioteNode,
   config: IPressMachineConfig,
 ) => IPressMachineConfig;
 
-/**
- * What the machine reads as `disabled`, for a tag whose spelling of it is not the raw prop.
- *
- * There is no resolver by default because RN's Pressable hands Pressability the RAW prop
- * (`Pressable.js:266`) — `aria-disabled` there changes only what is ANNOUNCED. Button is the one
- * primitive that differs: it resolves `disabled ?? aria-disabled ?? accessibilityState.disabled` in
- * the component and passes the ANSWER down as the touchable's own prop (`Button.js:337` -> `:386`),
- * which a single tag has no second node to pass to.
- *
- * Reads the bag and returns the answer; it must never write one back. `resolveButtonDisabled`
- * short-circuits on an authored `disabled`, so a resolved value stored in `node.props.disabled`
- * would answer the NEXT resolution as if the app had written it and the tag could never re-enable.
- */
+// What the machine reads as `disabled`, for a tag whose spelling isn't the raw prop. No resolver
+// by default: RN's Pressable hands Pressability the raw prop. Button differs, resolving
+// disabled/aria-disabled/accessibilityState itself.
+
+// Reads the bag, never writes one back: a resolved value stored in node.props.disabled would
+// answer the NEXT resolution as if the app wrote it, and the tag could never re-enable.
 export type IDisabledResolver = (
   props: Readonly<Record<string, unknown>>,
 ) => boolean | undefined;
@@ -89,12 +69,9 @@ interface IBehaviorState {
   readonly disabledOf: IDisabledResolver | undefined;
   // A tag whose `cancelable` is not the family's rule (TextInput's is platform-split).
   readonly cancelableOf: ICancelableResolver | undefined;
-  // Where the machine READS from, which is not always the node it acts ON. They differ for exactly
-  // one shape: a primitive that renders no view of its own and clones onto its single child
-  // (`./touchable-native-feedback`). There the props and the app's callbacks are on the OWNER, and
-  // the responder — the listeners, the Fabric tag `measure` and the pressed class need — is on the
-  // child, because a node with no committed view receives no events (`events/index.ts` skips
-  // anchors in `bubble`, and `handOverNativeResponder` has no handle to hand native).
+  // Where the machine READS from, not always the node it acts ON: a primitive with no view of its
+  // own that clones onto its single child (touchable-native-feedback) has props on the OWNER but
+  // the responder on the child, since a node with no committed view receives no events.
   readonly source: ISymbioteNode;
   readonly timers: Set<ReturnType<typeof setTimeout>>;
   // Replaced wholesale at each gesture start; see `rebuild`.
@@ -143,10 +120,9 @@ function isPressHandler(value: unknown): value is IPressHandler {
   return typeof value === 'function';
 }
 
-// Narrowed field by field rather than cast: the bag arrives as `unknown` off `propOf`. A local
-// twin of the guard each adapter keeps for its own attrs (Vue's `asAccessibilityState`) — exported
-// to the sibling behaviors that fold the same bag, and deliberately NOT to the shared barrel, which
-// every adapter re-exports wholesale: a narrowing helper is not API anyone should be able to import.
+// Narrowed field by field rather than cast: the bag arrives as `unknown` off propOf. Exported to
+// sibling behaviors folding the same bag, deliberately NOT to the shared barrel — a narrowing
+// helper isn't API anyone should import.
 export function asAccessibilityState(
   value: unknown,
 ): IAccessibilityStateValue | undefined {
@@ -161,40 +137,24 @@ export function asAccessibilityState(
   return state;
 }
 
-// THE PAYLOAD FOLD MOVED TO THE ENGINE — `foldPressableProps` in `SymbioteFabricProps.cpp`, and
-// its contract is `core/engine/cpp/tests/js/pressable-payload.itest.ts`. It is not re-implemented
-// here in any form, which is the point: `disabled` -> `accessibilityState`, `accessible`/`focusable`
-// defaulting on, the Android ripple config, and the nine machine-only keys being kept out of the
-// payload are all functions of the TAG alone. That is user-agent behavior — RN does it for every
-// Pressable in every app — and it belongs beside the tree, like a browser's `<button>`.
-//
-// It cost a trip: a `payloadFold` marshals the whole bag out and the whole bag back, ~17 us per
-// pressable per commit, and a benchmark row carries two.
-//
-// What is still here is the MACHINE, which is where a browser keeps it too: timers, the responder
-// claim, hit-slop retention, and the callbacks into app code.
-//
-// The one thing that did NOT move with it is `hitSlop`, and that is deliberate — it is a real
-// native View prop, so it never was part of the fold.
+// The payload fold moved to the engine (foldPressableProps in SymbioteFabricProps.cpp), not
+// re-implemented here: disabled -> accessibilityState, accessible/focusable defaulting on, the
+// ripple config and the machine-only keys are all functions of the TAG alone, user-agent behavior.
 
-// RN makes every pressable accessible unless the app opts OUT — `Pressable.js:252`
-// (`accessible: accessible !== false`), and the whole Touchable family repeats it verbatim
-// (`TouchableOpacity.js:303`, `TouchableHighlight.js:337`). `!== false` rather than `?? true`, so
-// only a literal `false` opts out and an explicit `undefined` still reads as accessible.
-//
-// Nothing in this repo did it until 2026-09-09, so a Pressable reached a screen reader as a plain
-// view unless the app wrote the prop. Exported so anything composing this tag can say it too.
+// What's still here is the MACHINE: timers, the responder claim, hit-slop retention, callbacks
+// into app code. `hitSlop` did NOT move with the fold — it's a real native View prop.
+
+// RN makes every pressable accessible unless the app opts OUT (`accessible !== false`), and the
+// whole Touchable family repeats it. `!== false` not `?? true`, so only a literal `false` opts out.
 export function accessibleUnlessOptedOut(
   props: Readonly<Record<string, unknown>>,
 ): boolean {
   return props.accessible !== false;
 }
 
-// From the STASH, not from the props. Every name below is in `ownedListeners`, so `routeProp`
-// diverts the app's `onPress` away from `node.listeners` (where it would evict the behavior's own
-// dispatcher) and into the stash — which makes the stash the only place it exists. Reading
-// `propOf` here returns undefined for every callback and every press silently does nothing:
-// the behavior runs, the machine runs, and it calls nobody.
+// From the STASH, not the props: every name below is in ownedListeners, so routeProp diverts the
+// app's onPress away from node.listeners into the stash. Reading propOf here would return
+// undefined for every callback and every press would silently call nobody.
 function callbackAt(
   node: ISymbioteNode,
   event: string,
@@ -214,13 +174,9 @@ function configFor(node: ISymbioteNode): IPressMachineConfig {
     onPressOut: callbackAt(node, 'pressOut'),
     onPressMove: callbackAt(node, 'pressMove'),
     onLongPress: callbackAt(node, 'longPress'),
-    // Pressability.js:471-474 — `normalizeDelay(authored, 10, DEFAULT_LONG_PRESS_DELAY_MS -
-    // delayPressIn)`. The subtraction applies only to the FALLBACK, never to an authored value —
-    // it exists so the long-press threshold, timed from the grant that also arms
-    // `unstable_pressDelay`, lands at a constant 500ms from touch-down by default, not
-    // 500ms + unstable_pressDelay. See `createPressHandlers`'s `handlePressIn` for the other half
-    // (the timer must be ARMED at grant, not after the pressDelay fires, or this compensation
-    // does nothing).
+    // The subtraction applies only to the FALLBACK, never an authored value — it keeps the
+    // long-press threshold at a constant 500ms from touch-down by default, not
+    // 500ms + unstable_pressDelay (see createPressHandlers.handlePressIn for the other half).
     delayLongPress: Math.max(
       10,
       numberOr(
@@ -229,23 +185,17 @@ function configFor(node: ISymbioteNode): IPressMachineConfig {
       ),
     ),
     unstable_pressDelay: unstablePressDelay,
-    // RN's Touchables own the deactivation floor in their OWN machine and hand Pressability
-    // `minPressDuration: 0` (TouchableOpacity.js:195). While they were wrappers they passed it as
-    // an internal input; on the tag there is nowhere else to say it, so the floor has to be a
-    // readable prop or every Touchable holds its fade for the machine's 130 ms default.
+    // RN's Touchables own the deactivation floor in their own machine, handing Pressability
+    // `minPressDuration: 0`. On the tag there's nowhere else to say it, so it's a readable prop.
     minPressDuration: numberOr(
       propOf(node, 'minPressDuration'),
       DEFAULT_MIN_PRESS_DURATION_MS,
     ),
     hitSlop: asRectOffset(propOf(node, 'hitSlop')),
     pressRetentionOffset: asRectOffset(propOf(node, 'pressRetentionOffset')),
-    // Pressable.js's own name is `android_disableSound`; every composed touchable (Highlight,
-    // NativeFeedback, WithoutFeedback, Button) instead forwards vendor's `touchSoundDisabled` to
-    // this same config field (`TouchableHighlight.js:205`, `TouchableWithoutFeedback.js:199`,
-    // `TouchableNativeFeedback.js:228`). `node` here is whichever tag AUTHORS the prop — itself for
-    // a plain pressable/highlight/button, the owner for a clone-onto-child touchable, since
-    // `configFor` is always called with that source — so reading both names off it resolves
-    // correctly for every composition without a per-tag override.
+    // Pressable's own name is `android_disableSound`; every composed touchable instead forwards
+    // `touchSoundDisabled` to this same field. `node` here is whichever tag AUTHORS the prop, so
+    // reading both names resolves correctly for every composition without a per-tag override.
     android_disableSound:
       booleanOr(propOf(node, 'android_disableSound')) ??
       booleanOr(propOf(node, 'touchSoundDisabled')),
@@ -272,12 +222,8 @@ function hotspotAt(nativeEvent: Record<string, unknown>, key: string): number {
   return typeof value === 'number' ? value : 0;
 }
 
-/**
- * The Android ripple's three view commands around the app's callbacks (TNF :230-252,
- * useAndroidRippleForView.js:77-104). The JS responder takes the touch before Android's own
- * pressed handling, so without them the ripple never animates. Hotspot first: it starts under
- * the finger.
- */
+// The Android ripple's three view commands around the app's callbacks. The JS responder takes
+// the touch before Android's own pressed handling, so without them the ripple never animates.
 export function withNativeFeedbackCommands(
   node: ISymbioteNode,
   config: IPressMachineConfig,
@@ -306,13 +252,9 @@ export function withNativeFeedbackCommands(
   };
 }
 
-// Rebuilding at GESTURE START is the whole reason for the dispatcher indirection, and skipping it
-// is a bug that looks like working code. `attach` runs inside `createElement`, before a single
-// prop has been routed — the node holds nothing at all there — so a machine built at attach would
-// capture no `onPress` at all and every press would silently do nothing. `createPressHandlers`
-// destructures its config eagerly, so it cannot be handed a live view either; it has to be re-made
-// once the props exist. A gesture is one interaction, so a handful of closures per press is
-// invisible — unlike doing it per prop write, which is the cost this whole tier exists to remove.
+// Rebuilding at GESTURE START is the whole reason for the dispatcher indirection: `attach` runs
+// inside createElement before a single prop is routed, so a machine built at attach would capture
+// no onPress at all. A gesture is one interaction, so a handful of closures per press is invisible.
 function rebuild(node: ISymbioteNode, state: IBehaviorState): void {
   // `state.source` for everything READ, `node` for the refinement, which acts on the responder
   // (dispatching a view command needs the committed node, not the one holding the props).
@@ -341,13 +283,9 @@ function rebuild(node: ISymbioteNode, state: IBehaviorState): void {
   });
 }
 
-// Pressable is the only member of the family with a `cancelable` prop of its own (`Pressable.js:41`).
-// TouchableOpacity/TouchableHighlight/TouchableNativeFeedback instead expose `rejectResponderTermination`
-// and derive `cancelable: !this.props.rejectResponderTermination` internally
-// (`TouchableOpacity.js:186`, `TouchableHighlight.js:194`, `TouchableNativeFeedback.js:217`) — every
-// composed touchable shares this `rebuild()`, so without this the authored name never reached the
-// machine and every Touchable silently kept the RN native default (yield the responder) regardless of
-// what the app asked for. An explicit `cancelable` still wins, matching Pressable's own precedence.
+// Pressable is the only family member with its own `cancelable` prop; the Touchables instead
+// expose `rejectResponderTermination` and derive cancelable internally. Without this the authored
+// name never reaches the machine. An explicit `cancelable` still wins, matching Pressable's rule.
 function resolveCancelable(source: ISymbioteNode): boolean | undefined {
   const cancelable = propOf(source, 'cancelable');
   if (typeof cancelable === 'boolean') return cancelable;
@@ -355,19 +293,12 @@ function resolveCancelable(source: ISymbioteNode): boolean | undefined {
   return typeof reject === 'boolean' ? !reject : undefined;
 }
 
-// WHICHEVER EVENT OPENS THE GESTURE REBUILDS, and pinning that to one name was a real bug.
-// `onStartShouldSetResponder` looks like the opener and is not: `core/engine/src/events/index.ts`
-// bubbles PRESS_IN and only THEN calls `negotiateResponder`, so `pressIn` arrives FIRST on every
-// gesture. Rebuilding only on the responder claim therefore handed the first `pressIn` an empty
-// listener bag — the press-in half of every press was dropped, the pressed style never reached
-// Fabric, and `onPress` still fired because by then the machine existed. That is exactly the
-// device report: the callback works, the button does not light up.
-//
-// So the trigger is a FLAG, not a name: build if this gesture has not built yet, and clear it when
-// the gesture ends. Order-independent, and it survives the engine reordering its own events.
-//
-// A key `buildPressableListeners` omitted — every one of them when `disabled` is true — resolves to
-// undefined here and the dispatcher returns undefined, which is what an absent listener would do.
+// WHICHEVER EVENT OPENS THE GESTURE REBUILDS: `onStartShouldSetResponder` looks like the opener
+// and isn't, since the engine bubbles PRESS_IN and only then negotiates the responder, so
+// `pressIn` arrives first. Rebuilding only on the responder claim handed it an empty listener bag.
+
+// The trigger is a FLAG, not a name: build if this gesture hasn't built yet, clear on gesture end
+// — order-independent, survives the engine reordering its own events.
 const GESTURE_END_KEYS: ReadonlySet<string> = new Set([
   'onPressOut',
   'onResponderTerminationRequest',
@@ -390,30 +321,16 @@ function dispatch(
   return result;
 }
 
-// Installed straight into the listener slot rather than through `routeProp`: the behavior OWNS
-// these names, and `setEventListener` diverts an owned name into the app stash — routing its own
-// dispatcher through there would stash it and leave the slot empty.
-//
-// The engine event names, not the `onX` prop spellings. `buildPressableListeners` speaks the prop
-// spelling, so the two are mapped here rather than guessed at either end.
-/**
- * Engine event name -> the app-facing callback key its dispatcher routes to.
- *
- * AN ARRAY OF PAIRS RATHER THAN A `Map`, and the reason is measured rather than stylistic.
- * `installListeners` below is the only reader, and it runs once per node that carries a press
- * machine — which is every `<TextInput>` on the screen, not just every `<Pressable>`. A `for…of` over
- * a `Map` builds a fresh two-element array per entry for the destructuring to read back: seven
- * allocations per node, for seven fixed pairs that never change. The tuples here already exist, so
- * the same loop allocates nothing but its iterator.
- *
- * Priced on `-O` Hermes by `text-input-attach-ladder.itest.ts`, one pass over the seven pairs:
- * `Map` 1.04 us, this 0.39, two parallel arrays 0.29. The parallel arrays are cheapest and give up
- * the pairing, which is not worth 0.1 us on a table that a drift would silently unwire.
- *
- * NOT the same list as `createPressBehavior`'s `ownedListeners`, and they must not be merged: that
- * one is every name the machine takes as an INPUT (`pressMove` and `longPress` included), this one
- * is only the names it installs a dispatcher for.
- */
+// Installed straight into the listener slot, not through routeProp: the behavior OWNS these
+// names, and setEventListener diverts an owned name into the app stash — routing the dispatcher
+// through there would stash it and leave the slot empty.
+
+// Engine event name -> the app-facing callback key its dispatcher routes to. An array of pairs
+// rather than a Map: installListeners runs once per node carrying a press machine, and a `for…of`
+// over a Map allocates a fresh pair per entry where these tuples already exist.
+
+// NOT the same list as createPressBehavior's ownedListeners — that's every name the machine takes
+// as an INPUT, this is only the names it installs a dispatcher for.
 const EVENT_KEY_PAIRS: ReadonlyArray<readonly [string, string]> = [
   ['press', 'onPress'],
   ['pressIn', 'onPressIn'],
@@ -439,17 +356,12 @@ function attachWith(
   return node => attach(node, { refine, disabledOf });
 }
 
-/**
- * The machine on `node`, reading its props and the app's callbacks off `options.source` when that
- * is a different node.
- *
- * Exported for a behavior whose responder is not its own node — `./touchable-native-feedback`,
- * whose tag commits nothing and adopts the app's single child as the responder. Every other caller
- * goes through `createPressBehavior`, where source and node are the same.
- *
- * Re-callable on the same node: a second call replaces the state and the dispatchers, which is what
- * a re-arm after `detachPressMachine` needs.
- */
+// The machine on `node`, reading props and callbacks off `options.source` when different.
+// Exported for touchable-native-feedback, whose tag commits nothing and adopts the app's single
+// child as the responder; every other caller goes through createPressBehavior where they're equal.
+
+// Re-callable on the same node: a second call replaces the state and dispatchers, which is what
+// re-arming after detachPressMachine needs.
 export function attachPressMachine(
   node: ISymbioteNode,
   options: {
@@ -478,10 +390,8 @@ function attach(
     // through the style registry's `:active` variant, and never crosses into it.
     setPressed: pressed => {
       setNodePressed(node, pressed);
-      // Dirtying is not publishing. A press arrives from a native event, outside every renderer
-      // mutation path, so nothing schedules a commit — `native-events.ts` requests none, and no
-      // adapter does either. `setNodeHidden`'s React twin never hit this because the reconciler is
-      // already in its commit phase when it calls.
+      // Dirtying is not publishing: a press arrives outside every renderer mutation path, so
+      // nothing else schedules a commit.
       requestCommitFor(node);
     },
     // `measure` needs a committed Fabric tag, which a node has by the time a human can touch it.
@@ -526,10 +436,8 @@ export function detachPressMachine(node: ISymbioteNode): void {
 function detach(node: ISymbioteNode): void {
   const state = states.get(node);
   if (state === undefined) return;
-  // The machine's own teardown, which every wrapper calls from its destroy hook. Not load-bearing
-  // here and no test can make it so: `host.schedule` puts every timer the machine arms into
-  // `state.timers` — the 130ms floor's deferred `pressOut` included — so the loop below already
-  // cancels them. Kept as the contract, and for a timer armed by some future route.
+  // The machine's own teardown. Not load-bearing here: host.schedule puts every timer the machine
+  // arms into state.timers, so the loop below already cancels them — kept as the contract.
   disposePressRuntime(state.runtime);
   for (const id of state.timers) clearTimeout(id);
   state.timers.clear();
@@ -537,15 +445,9 @@ function detach(node: ISymbioteNode): void {
   dlog('pressable behavior detached');
 }
 
-/**
- * The press machine as behavior parts, so a tag that is a pressable PLUS something can compose it
- * instead of re-implementing it.
- *
- * Spread into the caller's own behavior and wrap `attach`/`detach` around these — the touchable
- * family needs a per-node Animated value opened before the machine and closed after it. The
- * WeakMap holding the machine's own state is keyed by node, so one node may hold exactly one of
- * these; a tag composing it therefore must not also register the plain `pressable` behavior.
- */
+// The press machine as behavior parts, so a tag that is a pressable PLUS something can compose
+// it instead of re-implementing it — the touchable family wraps attach/detach for its own
+// per-node Animated value. One node may hold exactly one of these; don't also register `pressable`.
 export function createPressBehavior(
   refine?: IPressConfigRefinement,
   disabledOf?: IDisabledResolver,

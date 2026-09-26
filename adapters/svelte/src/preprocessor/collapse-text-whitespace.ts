@@ -1,11 +1,9 @@
 // svelte-adapter-dom-shim skill §16: Svelte trims only the leading/trailing whitespace of a
 // fragment's own children - never whitespace INSIDE a single Text node, and never a
-// whitespace-only Text node BETWEEN two siblings. Vue's compiler (and every browser) collapses
-// both; Svelte doesn't. Confirmed against the real compiler (2026-08-17): a Text node authored
-// as `Hello world, this is a\n  long sentence.` compiles verbatim into
-// `$.text('Hello world, this is a\n  long sentence.')` - the newline and indent ship into the
-// native text content and render as a forced line break plus stray leading spaces on device.
-// Reproduced live on an iOS simulator before this file existed; fixed with it registered.
+// whitespace-only Text node BETWEEN two siblings. Vue's compiler (and every browser) collapse both.
+
+// A Text node authored as `Hello world, this is a\n  long sentence.` compiles verbatim, so the
+// newline and indent ship into native text as a forced line break plus stray leading spaces.
 //
 // Two hazards:
 //   1. Wrapped sentence - a Text node with real content plus an embedded whitespace run

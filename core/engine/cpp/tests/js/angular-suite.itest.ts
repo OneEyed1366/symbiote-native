@@ -136,13 +136,8 @@ describe('the benchmark screen through the Angular adapter', () => {
       // The root, the container `createSurface` puts under it, and the screen's own wrapper. The
       // per-row component costs an anchor in the adapter's DOM shim, not a committed node.
       chrome: 3,
-      // NO EXEMPTIONS. This arm carried `unappliedSteps: ['select', 'remove']` until 2026-09-21: a
-      // keyed replace made Angular call `destroy()` on the ONE renderer the factory shares across
-      // the surface, that `destroy()` released the renderer's flush registration, and every later
-      // style run then sat in an accumulator until some other node's run closed it — which is why
-      // the selection's single write surfaced two steps later, in `remove`. Fixed by giving the
-      // registration the SURFACE's lifetime (`SymbioteRendererFactory.dispose`), and the write
-      // oracle below is what proves it: this arm now reports the same counts as every other.
+      // NO EXEMPTIONS: the flush registration lives at the SURFACE's lifetime
+      // (`SymbioteRendererFactory.dispose`), so this arm reports the same counts as every other.
       readTelemetry: () => readSurfaceTelemetry(ROOT_TAG),
       apply: async next => {
         screen.state.set(next);

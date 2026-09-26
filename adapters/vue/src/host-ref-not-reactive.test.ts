@@ -1,25 +1,6 @@
-// Regression for a device-reported no-op (2026-09-11): "flash the right chip" — a button whose
-// handler reads a `useTemplateRef()` target and calls `setNativeProps` on it — silently did
-// nothing, with a dev-only "[Vue warn] Set operation on key … failed: target is readonly."
-//
-// Root cause: `useTemplateRef()` (Vue 3.5+) returns `readonly(shallowRef(null))`
-// (runtime-core.cjs.js). Vue's `readonly()` wraps ANY value whose
-// `Object.prototype.toString.call(value) === '[object Object]'` — true of a plain class instance
-// like SymbioteNode, unlike a real DOM Element, which fails that check for free
-// (`[object HTMLDivElement]`) and is therefore never wrapped in real Vue DOM apps. A PLAIN
-// `ref()`/`shallowRef()` bound via `ref="x"` (CanaryScreen's Teleport target, create-portal's
-// tests) never hits this — only `useTemplateRef()`'s deep-readonly wrapper does, so this bug is
-// invisible to every existing ref test in this adapter.
-//
-// Fixed in renderer/index.ts: `createElement` calls `markRaw(node)` before handing it to Vue,
-// which sets a permanent, non-enumerable `__v_skip` flag that exempts the node from ANY future
-// Vue reactivity wrap (reactive/readonly/shallowReactive/shallowReadonly), regardless of which
-// ref API reaches it.
-//
-// Driven through the real compiler (compileSfc) and a real press dispatch, per this repo's own
-// discipline: a hand-built `h(..., {ref: useTemplateRef(...)})` would not prove the SFC's actual
-// codegen reaches the same object, and a direct call to the handler would not prove the press
-// path is what a device exercises.
+// `useTemplateRef()` returns `readonly(shallowRef(null))`, wrapping any value that isn't a real
+// DOM Element — `markRaw(node)` (renderer/index.ts) is the guard. Driven through the real
+// compiler and a real press dispatch, not a hand-built stand-in.
 
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';

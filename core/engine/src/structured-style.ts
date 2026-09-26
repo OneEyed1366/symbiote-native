@@ -1,22 +1,15 @@
 // The ten style keys RN parses in JS before native, and the one place they are resolved.
-//
-// WHY THEY RUN AT WRITE TIME AND NOT AT PAYLOAD-BUILD TIME. On a device the payload is built by
-// `core/engine/cpp/SymbioteFabricProps.cpp`, which does not carry these — they are pure JS. So a
-// `boxShadow: '0 2px 4px #000'` resolved only inside `fabric-props.ts` is resolved only headless,
-// and the device gets the raw CSS string. Fabric's C++ parses a style string ONLY under
-// `enableNativeCSSParsing()`, which defaults to FALSE, so the declaration is dropped in silence:
-// no warning, no wrong value, just a gradient or a shadow that is not there. Resolving on the way
-// IN puts the structured value in `node.props` itself, which is the one thing both payload builders
-// read.
-//
-// This is the same move `configPayloadFold` makes for a third-party view's own processors, one
-// layer down: anything the C++ half cannot do has to happen before the C++ half sees the value.
-//
-// IDENTITY IS PART OF THE CONTRACT. A style object that needs nothing comes back BY IDENTITY, and
-// so does an array whose every entry did. The host's `OP_SET_PROP` skips a same-identity write, and
-// `pushClassStyle` compares what it is about to publish against what it published last — hand
-// either of them a fresh object per write and an unchanged style becomes a write and a dirty node
-// on every render.
+
+// They run at write time, not payload-build time: SymbioteFabricProps.cpp doesn't carry these
+// processors, so resolving only in fabric-props.ts leaves the device its raw CSS string, silently
+// dropped (C++ parses a style string only under enableNativeCSSParsing, default false).
+
+// Same move `configPayloadFold` makes for a third-party view's own processors: anything the C++
+// half can't do has to happen before the C++ half sees the value.
+
+// Identity is part of the contract: an object/array needing no resolution comes back by identity,
+// since OP_SET_PROP skips a same-identity write and pushClassStyle diffs by reference — a fresh
+// object per call would turn an unchanged style into a write and a dirty node every render.
 
 import { processAspectRatio } from './process-aspect-ratio';
 import { processBackgroundImage } from './process-background-image';
@@ -93,10 +86,9 @@ function asFontVariantInput(
   return '';
 }
 
-// transform accepts a CSS string (processTransform parses it) or an array of single-key
-// transform records (the hot animated / sticky-header path). A non-string non-array value is NOT
-// dropped: it may already be processed, so it passes through verbatim rather than being coerced to
-// [] (which would erase a valid transform).
+// transform accepts a CSS string or an array of single-key records (the hot animated /
+// sticky-header path). A non-string non-array value passes through verbatim — it may already be
+// processed, so coercing it to [] would erase a valid transform.
 function processTransformValue(value: unknown): unknown {
   if (typeof value === 'string') return processTransform(value);
   if (Array.isArray(value)) return processTransform(value.filter(isRecord));
@@ -166,15 +158,12 @@ function resolveRecord(
   return answer;
 }
 
-/**
- * A style value with its structured keys resolved — the same value by identity when there was
- * nothing to resolve, which is nearly always.
- *
- * Accepts what a style slot can hold: one object, or a (nested) array of them. An array is not
- * memoized — `pushClassStyle` mints a fresh one on every publish, so a cache keyed on it could
- * never hit; its ENTRIES carry the memo instead, and the original array comes back untouched when
- * none of them moved.
- */
+// A style value with its structured keys resolved — same value by identity when nothing needed
+// resolving, which is nearly always.
+
+// Accepts one object or a (nested) array of them. An array itself isn't memoized (pushClassStyle
+// mints a fresh one per publish, so a cache keyed on it would never hit); its entries carry the
+// memo instead.
 export function resolveStructuredStyle(style: unknown): unknown {
   if (Array.isArray(style)) {
     let out: unknown[] | undefined;

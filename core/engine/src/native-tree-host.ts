@@ -1,13 +1,9 @@
-// The NATIVE tree host — `INativeEngineBindings` presented as an `ITreeHost`.
-//
-// It is the half that makes the buffer mean anything on a device. `tree-host.ts` records ops and
-// then asks a host to turn them into a tree; headlessly `installFabric()` installs the TypeScript
-// applier, and until this file existed a device installed NOTHING — `commitSurfaceOps` returned
-// early, the ops stayed pending forever, and the screen stayed blank with nothing red anywhere.
-//
-// There is no logic here on purpose. Everything the host is asked is something native already
-// answers, so this is a rename and an argument spread; a mapping thin enough to read in one pass is
-// what keeps the two sides auditable against each other.
+// The NATIVE tree host — `INativeEngineBindings` presented as an `ITreeHost`. It is the half that
+// makes the buffer mean anything on a device: `tree-host.ts` records ops and asks a host to turn
+// them into a tree; headlessly, `installFabric()` installs the TS applier instead.
+
+// No logic here on purpose: everything the host is asked is something native already answers, so
+// this stays a rename plus an argument spread, thin enough to audit against native's own side.
 
 import { nativeEngine, type INativeEngineBindings } from './native-engine';
 import {
@@ -17,15 +13,11 @@ import {
   type ITreeHost,
 } from './tree-host';
 
-/**
- * Present one resolved set of bindings as the engine's tree host.
- *
- * `census` is the only member that does not reach native, and it is deliberately not on the ABI: it
- * has exactly ONE engine caller (`censusRetainedTree`), it is diagnostics, and answering it honestly
- * would cost a full native walk of the very tree the design exists to stop walking. The empty census
- * is what `censusRetainedTree` already answers with no host at all, so a probe reading it sees the
- * same zeroes it has always seen off a device.
- */
+// Present one resolved set of bindings as the engine's tree host.
+
+// `census` is the only member that never reaches native — deliberately not on the ABI, since its
+// one caller (censusRetainedTree) is diagnostics and answering honestly costs a full native walk
+// of the tree the design exists to avoid walking. The empty census matches the no-host answer.
 export function nativeTreeHost(bindings: INativeEngineBindings): ITreeHost {
   return {
     // Spread rather than passed as the batch object: JSI reads five arguments cheaper than five
@@ -63,18 +55,13 @@ export function nativeTreeHost(bindings: INativeEngineBindings): ITreeHost {
   };
 }
 
-/**
- * Install it, if this runtime has a native module and nothing has claimed the seam already.
- *
- * PRECEDENCE: an installed host WINS. `installFabric()` is the only other caller of `setTreeHost`,
- * and it puts the TypeScript applier in before any fixture can bind a slot — so a headless run that
- * also happens to carry fake bindings must keep the applier, or the ~5 500 tests written against it
- * would silently start driving a stub. The reverse ordering cannot occur on a device: nothing there
- * installs a host but this.
- *
- * No native module is the ORDINARY answer (`native-engine.ts`'s header lists where), and it stays a
- * quiet one here: the ops simply keep accumulating, exactly as they did before this file existed.
- */
+// Install it, if this runtime has a native module and nothing has claimed the seam already.
+
+// An installed host wins: installFabric() (the only other setTreeHost caller) puts the TS applier
+// in first, so a headless run carrying fake bindings must keep the applier, not the stub.
+
+// No native module is the ordinary answer (see native-engine.ts); ops then simply keep
+// accumulating, undelivered.
 export function installNativeTreeHost(): void {
   const bindings = nativeEngine();
   if (bindings === undefined || treeHost() !== undefined) return;

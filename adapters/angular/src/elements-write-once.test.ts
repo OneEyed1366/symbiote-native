@@ -103,24 +103,9 @@ beforeEach(() => {
 afterEach(() => unmount(ROOT_TAG));
 
 describe('a static attribute on a directive-matched tag', () => {
-  // why: IT REACHED THE ENGINE TWICE UNTIL 2026-09-18, and this case pinned that as characterization
-  // while saying in its own text that "the second one going away" would change the line. It went
-  // away, so the line changed, and the rest of this comment is kept because it is the record of what
-  // the second path WAS.
-  //
-  // Ivy's `setUpAttributes` writes every static attribute unconditionally, and `setInputsFromAttrs`
-  // separately set the directive input the same attribute fed — correct in a browser, where an
-  // attribute and a property are two different things, and a double write here, where they are one
-  // prop. It read `unchanged=3000` on the directive bench arm's create against 0 on the bare one,
-  // about 30% of that arm's prop writes, and the note concluded that neither write could be dropped
-  // from the outside without a props MIRROR in JS.
-  //
-  // WHAT ACTUALLY DROPPED IT was not a mirror and was not aimed at this at all: `./runtime-matching`
-  // withholds the tag directives from Angular's matcher, so no input claims the name and the input
-  // path simply does not exist. A second, unpriced consequence of that change, found by this test.
-  //
-  // The COUNT is still what is watched — a path reappearing changes this line as surely as one
-  // leaving did.
+  // why: `./runtime-matching` withholds tag directives from Angular's matcher, so no input claims
+  // this attribute's name and the input path does not exist — the tag reaches the engine ONCE, by
+  // the attribute path alone. The COUNT is what is watched; a path reappearing changes this line.
   it('reaches the engine once, by the attribute path alone', async () => {
     const restore = watchCallers();
     mount(ROOT_TAG, WriteOnceHost);

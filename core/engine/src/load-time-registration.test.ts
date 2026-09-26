@@ -1,28 +1,10 @@
-// GUARDS A RELEASE-ONLY BUG CLASS THAT NO BEHAVIOURAL TEST CAN SEE.
-//
-// Metro enables `inlineRequires` in production only: it moves a `require()` from the top of a
-// module down to the first place its binding is USED. A barrel's `export { Thing } from './thing'`
-// compiles to a lazy getter, so if nothing ever names `Thing` as a VALUE, `./thing` is never
-// evaluated — and any work its module body does at load time silently never happens. In dev, in
-// vitest, and in `tsc` everything is eager and everything passes. The code is even present in the
-// release bundle; it just never runs.
-//
-// That is exactly how `interpolation-node.ts` shipped broken (2026-08-14): it called
-// `registerInterpolationFactory(...)` at module scope, the only path to it was the animated
-// barrel's re-export, nothing named `AnimatedInterpolation` as a value (adapters only TYPE it),
-// and the first `.interpolate()` on device threw `interpolation factory not registered`, blanking
-// examples/vue-sfc's screen. Adding a bare `import './interpolation-node'` beside the re-export
-// did NOT help either — Babel merges two imports of the same specifier into one lazy dependency.
-//
-// So this test checks the SHAPE, not the behaviour: every module that performs a load-time
-// registration must be reachable by something other than a pure re-export. The two shapes that
-// satisfy it are a bare `import './m';` (as in packages/slider/src/*/index.ts) or an ordinary
-// value import — both give inline-requires a real use site. A module reachable ONLY through
-// `export ... from` fails here.
-//
-// Cheapest correct fix when this fails is usually not to add an import but to DELETE the
-// indirection, which is what the interpolation case ended up doing (AnimatedInterpolation now
-// lives in graph.ts next to the base class it extends).
+// Guards a RELEASE-ONLY bug class no behavioral test can see: Metro's inlineRequires (production
+// only) moves a require() down to a binding's first VALUE use, so a barrel's pure re-export of a
+// load-time-registering module never evaluates it at all — dev/vitest/tsc stay eager and green.
+
+// So this checks the SHAPE, not the behavior: every such module must be reachable by a bare
+// `import './m';` or an ordinary value import, not only `export ... from`. The cheapest fix when
+// this fails is usually deleting the indirection, not adding an import.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -46,17 +28,9 @@ const SCANNED_ROOTS = ['core', 'adapters', 'packages'];
 // registerComposedComponent, registerShimDocumentFactory, setColorProcessor).
 const REGISTRATION_CALLEE = /^(register|set)[A-Z]/;
 
-// `withFileTypes`, and it is a RACE FIX rather than a tidy-up. This walks `adapters/`, and the
-// Svelte suites write a `.smoke-compiled-*.mjs` beside their own source and `rmSync` it in an
-// `afterAll` — dozens of them, by design
-// (`.claude/rules/smoke-compiled-artifact-collisions.md`). A separate `statSync` after `readdirSync`
-// leaves a window where one of those can vanish between the listing and the stat, and `statSync`
-// then throws ENOENT on an entry this function was going to discard for its extension anyway.
-//
-// The symptom is a guard that passes alone and fails in a full parallel run, with no assertion in
-// the message — which reads as flakiness and got dismissed as "a stale build" twice in one session
-// before anyone read the walk. Asking for the type in the SAME syscall closes the window instead of
-// catching the throw, so there is no window to reason about, and it is one syscall cheaper per entry.
+// `withFileTypes`, a RACE FIX not a tidy-up: Svelte suites write and rmSync a
+// `.smoke-compiled-*.mjs` beside their own source, so a separate statSync could ENOENT on an
+// entry this function would discard anyway. One syscall closes the window instead of catching it.
 function collectSourceFiles(dir: string, out: string[]): void {
   for (const dirent of readdirSync(dir, { withFileTypes: true })) {
     const entry = dirent.name;
@@ -69,15 +43,9 @@ function collectSourceFiles(dir: string, out: string[]): void {
       full.endsWith('.ts') &&
       !full.endsWith('.d.ts') &&
       !full.includes('.test.') &&
-      // A bench is excluded for the same reason a test is, and it needs saying because the reason
-      // is not "it is not source": the hazard this audit exists for is Metro's inlineRequires
-      // moving a `require()` down to a binding's first USE, so a module nothing names as a value
-      // never evaluates. Neither a test nor a bench is ever in a bundle, so neither can be reached
-      // by that mechanism at all. `.bench.ts` postdates the filter, which is why it was missing.
+      // Excluded like a test: neither a bench nor an itest is ever in a Metro bundle, so
+      // inlineRequires' lazy-getter hazard can't reach either.
       !full.includes('.bench.') &&
-      // Same reasoning again, for `core/engine/cpp/tests/js/*.itest.ts`: each one is its OWN
-      // esbuild entry point for the C++ test runner (`scripts/run-itests.mjs`), never a module
-      // Metro bundles into an app, so inlineRequires' lazy-getter hazard cannot reach it either.
       !full.includes('.itest.')
     ) {
       out.push(full);
@@ -85,21 +53,13 @@ function collectSourceFiles(dir: string, out: string[]): void {
   }
 }
 
-// THE SECOND WINDOW, and this one cannot be closed the way the first was — only NAMED.
-//
-// `withFileTypes` removed the listing/stat race below by asking one syscall for both answers. There
-// is no such move here: the walk lists a path and this reads it, and nothing makes those atomic. A
-// `.ts` under `adapters/` or `packages/` that vanishes in between throws ENOENT out of a test whose
-// subject is module shape, with no assertion in the message — the exact signature the first race
-// wore, and the reason it was dismissed as a stale build twice in one session.
-//
-// So this does not CATCH the race, it labels it. Swallowing the file would be worse than the throw:
-// a skipped module is a finding that silently stops being reported, and this guard exists for a bug
-// class no behavioural test can see. Rethrowing with the path costs nothing and means the next
-// occurrence arrives already diagnosed instead of being read as flakiness again.
-//
-// Observed once on 2026-09-18 and not reproduced in nine consecutive full runs afterwards, message
-// uncaptured — so whether it IS this window is unproven. That is what the label is for.
+// A second race, unlike the withFileTypes one, can't be closed the same way — only named: the
+// walk lists a path and this reads it, with nothing making those atomic, so a `.ts` that vanishes
+// in between throws ENOENT with no assertion in the message.
+
+// This does not CATCH the race, it labels it: swallowing the file would be worse, since a skipped
+// module is a finding that silently stops being reported. Rethrowing with the path means the next
+// occurrence arrives already diagnosed instead of read as flakiness.
 function parse(file: string): ts.SourceFile {
   let text: string;
   try {
@@ -133,9 +93,8 @@ function resolveSpecifier(
   return undefined;
 }
 
-// A WORKSPACE SUBPATH, through the target package's own `exports` map. Without it a module reached
-// as `@symbiote-native/components/register` looks unreferenced, and the check then reports the one
-// shape it exists to bless — a bare side-effect import — as its failure. Derived from the manifest
+// A workspace subpath, through the target package's own `exports` map: without it a module
+// reached as `@symbiote-native/components/register` looks unreferenced. Derived from the manifest
 // rather than listed, so a new subpath needs no edit here.
 function resolveWorkspaceSubpath(specifier: string): string | undefined {
   const match = /^@symbiote-native\/([^/]+)\/(.+)$/.exec(specifier);
@@ -237,16 +196,13 @@ function analyze(file: string): IModuleFacts {
   return { registrations, bareImports, valueImportedNames, exportedNames };
 }
 
-// No Negative group in the classic throw/reject sense: this static analysis never throws on
-// malformed input, it reports findings via a returned/asserted string. "Negative" here means the
-// shape the detector must FLAG (the 2026-08-14 bug pattern); "Positive" means the shapes that are
-// known-safe and must NOT be flagged, or the false positive itself defeats the whole guard.
+// No classic throw/reject Negative group: this static analysis reports findings via a returned
+// string. "Negative" means the shape the detector must FLAG; "Positive" means known-safe shapes
+// that must NOT be flagged, or the false positive defeats the whole guard.
 describe('load-time registrations survive an inline-requires production bundle', () => {
   describe('detector correctness on synthetic fixtures', () => {
-    // A fresh scratch directory per test proves the detector's verdict from its own scan, not
-    // from residual state — collectSourceFiles/analyze operate on real files on disk by design
-    // (they parse actual module graphs), so a temp fixture tree is the only way to drive them
-    // without touching real source.
+    // A fresh scratch directory per test: collectSourceFiles/analyze operate on real files on
+    // disk by design, so a temp fixture tree is the only way to drive them without real source.
     let scratchDir: string;
 
     beforeEach(() => {
@@ -287,11 +243,8 @@ describe('load-time registrations survive an inline-requires production bundle',
         .map(([file]) => relative(scratchDir, file));
     }
 
-    // why: this is the literal 2026-08-14 shape — registerFactory() at module scope, the only
-    // path to the module is a barrel `export { Thing } from './thing'`, and nothing ever names
-    // Thing as a value. Without this fixture, the real-repo test above passing proves nothing: it
-    // would pass identically whether the detector works or is silently broken, since the repo
-    // currently has zero violations either way.
+    // why: the literal bug shape — a barrel re-export as the only path, nothing naming the export
+    // as a value. Without this fixture the real-repo test below proves nothing either way.
     it('flags a registration reachable only through a barrel re-export', () => {
       writeModule(
         'thing.ts',
@@ -358,13 +311,9 @@ describe('load-time registrations survive an inline-requires production bundle',
     //
     // 1. Something bare-imports it (`import './m';`) — no binding, nothing to defer.
     const bareImported = new Set<string>();
-    // 2. Something names one of its exports as a VALUE. Walking a barrel getter to read that name
-    //    materializes the require, so the body runs at first access. This is deliberately matched
-    //    on the NAME rather than a resolved path: adapters reach engine internals through the
-    //    package specifier (`from '@symbiote-native/engine'`), which no relative resolver can
-    //    follow. The trade-off is that an identically-named export in an unrelated package would
-    //    mask a real finding — acceptable for a guard whose job is catching the shape, and the
-    //    reason this is a heuristic rather than a proof.
+    // 2. Something names one of its exports as a VALUE, materializing the require. Matched on the
+    //    NAME, not a resolved path (adapters reach internals via package specifier) — a heuristic,
+    //    so an identically-named export elsewhere could mask a real finding.
     const namedAsValue = new Set<string>();
     for (const { bareImports, valueImportedNames } of facts.values()) {
       for (const target of bareImports) bareImported.add(target);

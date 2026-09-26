@@ -29,7 +29,7 @@ import { join } from 'node:path';
 const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url));
 const SCANNED_ROOTS = ['core', 'adapters', 'packages'];
 
-// Measured 2026-09-15. Two files are gated and excluded from it by being gated, not by being named.
+// The two gated files are excluded from this count by being gated, not by being named.
 const BUDGET = 347;
 
 // `withFileTypes`, and it is a RACE FIX rather than a tidy-up — the same one

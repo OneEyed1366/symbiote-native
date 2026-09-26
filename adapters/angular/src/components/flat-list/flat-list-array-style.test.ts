@@ -118,11 +118,9 @@ describe('FlatList array-composed item style', () => {
     await new Promise<void>(resolve => setTimeout(resolve, 0));
     await new Promise<void>(resolve => setTimeout(resolve, 0));
 
-    // Settle on a real condition FIRST, then observe — and both halves in wall time, not ticks.
-    // Measured 2026-09-02: the list commits its batch once more 30-60 ticks in, so a tick-counted
-    // settle declared quiet before it on an idle machine and caught it under a loaded full-suite
-    // run, reading as free-running change detection. If CD genuinely free-ran, waitForQuiet never
-    // settles and throws — the failure this test is here to catch.
+    // Settle on a real condition FIRST, then observe — both halves in wall time, not ticks: a
+    // tick-counted settle can declare quiet before a late extra batch commits, reading as
+    // free-running CD. If CD genuinely free-runs, waitForQuiet never settles and throws.
     const settled = await waitForQuiet(
       () => fabric.commits,
       'flat-list window commits',

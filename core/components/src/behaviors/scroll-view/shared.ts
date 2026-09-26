@@ -1,86 +1,32 @@
-// ScrollView's host behavior, the platform-invariant half — and the pilot for four of the engine's
-// composed-primitive seams: `buildStructure` + `childHost`, `slotProps`, `slotDerived`, and
-// `claimedChildren`.
-//
-// THE PLATFORM HALF IS THE REFRESHCONTROL, and only that. `index.ios` claims it `beside` the
-// content view; `index.android` claims it as a `wrap`, because an Android ScrollView holds exactly
-// one child. Everything else here is shared, including the tags, the folds and the content-size
-// synthesis.
-//
-// WHAT IS WIRED. Structure, the style compositions, `decelerationRate` resolution,
-// `collapsableChildren`, the synthesized `onContentSizeChange`, the RefreshControl on both
-// platforms — and, since the sticky half landed, the raised `scrollEventThrottle`, the scroll
-// value that drives the pins, the owner layout an inverted pin needs, and the per-commit walk that
-// turns `stickyHeaderIndices` into those same headers. The sticky machinery itself lives in
-// `./sticky`, because a `<StickyHeader>` is a CHILD and the three props above are functions of
-// whether one registered.
-//
-// TODO(rn-parity): `keyboardShouldPersistTaps` is a type-only prop everywhere — no capture-phase
-// responder negotiation exists to eat a tap-elsewhere and dismiss the keyboard
-// (`ScrollView.js:1360-1590`). Needs a `TextInputState.isTextInput`-equivalent, capture-phase
-// `startShouldSetResponder`/`responderTerminationRequest` wiring on this tag (the same seam
-// `Switch`/`Pressable` already use), and an `_isAnimating()`/momentum signal from the scroll
-// machine. Full scope and the reusable infra already in place: audit skill, "Found, NOT fixed:
-// ScrollView's keyboardShouldPersistTaps".
-//
-// TODO(rn-parity): `stickyHeaderHiddenOnScroll` is completely absent — no prop surface, no state,
-// no adapter wiring (`grep -rn "stickyHeaderHiddenOnScroll\|hiddenOnScroll"` returns zero hits).
-// Vendor composes an `Animated.diffClamp` over the scroll delta and adds it to the ordinary sticky
-// translateY (`ScrollViewStickyHeader.js:39,84-103`). Needs a new running clamped-offset state
-// ADDED to `STICKY_TRANSLATE_PROP` (our sticky pin is a discrete debounced number, not a live
-// `Animated` composition), and the fix touches `reduceSticky`
-// (`state/sticky-header-reducer.ts`) — the shared decision function every adapter's own sticky
-// component plus Angular's projection controller also run — not just this file. Audit skill,
-// "Found, NOT fixed: ScrollView's stickyHeaderHiddenOnScroll".
-//
-// WHAT A COMPOSED PRIMITIVE COSTS TODAY. Every adapter's ScrollView wrapper builds the same two
-// nodes: `selectScrollIntrinsics` picks a scroll intrinsic and a content intrinsic, and the
-// wrapper's body nests `<content>{children}</content>` inside `<scroll>`. That body is a framework
-// component instance per ScrollView — a Vue instance, a Solid props Proxy, Svelte anchors, an
-// Angular LView — which is precisely the currency a tag exists to delete. `foldPayload` gives a tag
-// its wrapper's PROP MAPPING; nothing gave it the wrapper's COMPOSITION, so a composed primitive
-// could not become a tag at all no matter what its props did. This is that half.
-//
-// WHY THE TAG CARRIES THE AXIS. `buildStructure` runs at `createElement`, before a single prop is
-// routed, so it cannot read `horizontal`. It does not need to: horizontal scroll is already a
-// SEPARATE intrinsic (`horizontal-scroll-view` — a different native ViewManager on
-// Android, not RCTScrollView with a flag), so the decision the behavior needs is in the tag it was
-// looked up by. One behavior per tag, each knowing its own content intrinsic. That is the same
-// shape `intrinsicWhen` gives TextInput's `multiline`, arrived at from the other side.
-//
-// REGISTERED BY SVELTE SINCE 2026-09-07 (`adapters/svelte/src/register.ts`), and by no other
-// adapter — this paragraph read "NOT REGISTERED BY ANY ADAPTER" for three days after that stopped
-// being true. The hazard still holds for the four that have not registered: `scroll-view` is the
-// tag their WRAPPERS emit, and a wrapper builds its own content node from `selectScrollIntrinsics`,
-// as does `VirtualizedList`. Registering while either stands silently gives those trees a SECOND
-// content node: `RCTScrollView > RCTScrollContentView > RCTScrollContentView`. So the precondition
-// per adapter is that nothing else builds the content node.
-//
-// A SECOND TAG WAS NOT THE ANSWER, and this reverses what this header said until 2026-09-07: a
-// second spelling only keeps two owners apart while two paths exist, and it buys a rename across
-// every call site now plus another when one path dies. The decision was that the ENGINE becomes the
-// single owner of the content node. That cut LANDED 2026-09-11: nothing else builds a content node
-// any more, and all five adapters register this behavior through
-// `@symbiote-native/components/register`.
-//
-// STYLE, on both nodes, and the precedence is the part that is easy to get silently wrong. The
-// wrapper composes exactly two arrays, and this reproduces both:
-//
-//   owner    [scrollViewBaseStyle, style]                  base UNDER the app's, so an explicit
-//                                                          flexDirection still wins
-//   slot     [contentContainerStyle, {flexDirection:'row'}] row OVER the app's, on horizontal only
-//
-// Which is why the two halves use different seams rather than one. `contentContainerStyle` is
-// written by the app on the OWNER and belongs to the slot, so it travels through `slotProps` — a
-// pure RENAME (`contentContainerStyle` -> the slot's `style`) that goes through the slot's own
-// `routeProp` and inherits style merging, class merging and the already-published guard. The
-// CONSTANT half is a `payloadFold`, because a fold is where precedence can be expressed: the
-// owner's puts the base first, the slot's puts the row direction last. A redirect that also tried
-// to compose would have to pick one order for both.
-//
-// The slot's fold is assigned to the node inside `buildStructure`, not declared on the behavior:
-// `IHostBehavior.foldPayload` is the OWNER's, wired by `attachHostBehavior`, and a behavior that
-// builds a node owns what that node carries.
+// ScrollView's host behavior, platform-invariant half — pilot for `buildStructure` + `childHost`,
+// `slotProps`, `slotDerived`, `claimedChildren`. Only the RefreshControl claim differs by platform
+// (`index.ios` beside the content view, `index.android` wraps it); everything else is shared.
+
+// TODO(rn-parity): `keyboardShouldPersistTaps` is type-only — no capture-phase responder
+// negotiation eats a tap-elsewhere to dismiss the keyboard (`ScrollView.js:1360-1590`). Needs
+// `TextInputState.isTextInput`-equivalent wiring on this tag; see audit skill.
+
+// TODO(rn-parity): `stickyHeaderHiddenOnScroll` is entirely absent (no prop, no state, no
+// wiring). Vendor composes `Animated.diffClamp` over the scroll delta onto the sticky translateY
+// (`ScrollViewStickyHeader.js:39,84-103`); our sticky pin is a discrete number, not live Animated.
+
+// A composed primitive could not become a tag from props alone: `foldPayload` gives a tag its
+// wrapper's PROP MAPPING, but every adapter's ScrollView wrapper also built the same two nodes as
+// a framework component instance — this file gives the tag the wrapper's COMPOSITION too.
+
+// `buildStructure` runs at `createElement`, before any prop routes, so it can't read `horizontal`
+// — it doesn't need to: the axis is a SEPARATE intrinsic (`horizontal-scroll-view`, a different
+// native ViewManager on Android), so one behavior per tag already knows its own content intrinsic.
+
+// The ENGINE is the single owner of the content node: an adapter wrapper building one for the
+// same tag would double-commit it if registered while the wrapper still stands.
+
+// STYLE precedence differs by node: owner is [base, style] (base UNDER the app's), slot is
+// [contentContainerStyle, rowStyle] (row OVER the app's, horizontal only).
+
+// `contentContainerStyle` travels through `slotProps` as a pure RENAME onto the slot's `style`;
+// the row-direction CONSTANT is a `payloadFold` instead, assigned to the slot node inside
+// `buildStructure` since `IHostBehavior.foldPayload` is only ever the OWNER's.
 import {
   appendChild,
   appListenerFor,
@@ -134,61 +80,21 @@ const SLOT_DERIVED = [
   'removeClippedSubviews',
 ];
 
-// A `<RefreshControl>` written among the app's children is claimed, and WHAT the owner does with
-// it is the one thing that genuinely differs per platform — see the platform files. Resolved
-// through `descriptorFor`, so this is `PullToRefreshView` on iOS and `AndroidSwipeRefreshLayout`
-// on Android without either name appearing here.
+// A `<RefreshControl>` written among the app's children is claimed; WHAT the owner does with it
+// is the one thing that genuinely differs per platform — see the platform files.
 export const REFRESH_CONTROL = descriptorFor('refresh-control').component;
 
-// The OWNER's fold: the per-axis base style UNDER the app's (so an explicit `flexDirection` still
-// wins), `decelerationRate` resolved from RN's two words to the platform's friction constant, and
-// the two props a tag has no wrapper to write for it. The resolution has to happen here because
-// 'normal'/'fast' reach Fabric as strings it cannot read.
-//
-// `horizontal` is a real C++ prop (`BaseScrollViewProps.h:56`) and the separate ViewManager is
-// ANDROID's — on iOS both tags resolve to RCTScrollView, so the PROP is what turns the axis there
-// and a bare `<horizontal-scroll-view>` would otherwise scroll vertically. Written from the tag
-// rather than read off props, which is the same source `buildStructure` picked the content
-// intrinsic from; an app that also writes `horizontal` on the vertical tag is contradicting the
-// element it chose, and the tag wins.
-//
-// `nestedScrollEnabled` defaults ON only on the Android RefreshControl WRAP path, as RN does
-// (`ScrollView.js:1862`); elsewhere only the authored value is sent.
-// THE OWNER'S FOLD IS GONE (2026-09-18) — `foldScrollViewProps` in `SymbioteFabricProps.cpp`. Every
-// input it had was the node's own bag plus the AXIS, and the axis is the tag (`scroll-view` vs
-// `horizontal-scroll-view`), so it was a tag rule by every criterion: the base style composition,
-// `nestedScrollEnabled`, the `horizontal` strip, the asymmetric bounce pair, the two ViewConfig-less
-// strips, and `decelerationRate`. Contract:
-// `core/engine/cpp/tests/js/scroll-view-payload.itest.ts`.
-//
-// IT WAS BLOCKED ON A MISSING LOG, not on anything about the rule. An app writing `horizontal` on
-// the vertical tag has it IGNORED, and this fold `dlog`'d where to write it instead — while
-// `core/engine/cpp` had no logging facility at all, only `throw jsi::JSError`. Moving the rule as
-// written would have deleted a diagnostic, which `<keep_logs_gate_behind_DEBUG>` forbids. So
-// `SymbioteDebug.h` was built first and this is its first caller
-// (`core/engine/cpp/tests/js/native-debug-log.itest.ts`).
-//
-// `decelerationRate`'s two constants went with it and are `#ifdef ANDROID` there: on iOS BOTH tags
-// resolve to `RCTScrollView`, so a component name cannot tell iOS-vertical from Android-vertical the
-// way `foldSwitchProps` can. That leaves the Android half outside headless reach — the same gap
-// already recorded for `android_ripple`, and the only part of this rule a test here cannot see.
+// foldScrollViewProps in C++ owns the OWNER's fold: the per-axis base style UNDER the app's,
+// decelerationRate resolved from RN's two words to a platform friction constant, and the
+// horizontal strip and bounce pair — all tag rules, since strings reach Fabric unreadable.
 
-// THE SLOT'S FOLD IS GONE (2026-09-18) — `foldScrollContentProps` in `SymbioteFabricProps.cpp`.
-// Its two halves came from different places and the second is why it took until now:
-//
-//   rowStyle             a CONSTANT, horizontal only, composed OVER the app's contentContainerStyle
-//                        — a function of the content node's OWN tag, portable from the start
-//   collapsableChildren  DERIVED from `maintainVisibleContentPosition` / `snapToAlignment`, which
-//                        stay on the OWNER
-//
-// "A per-node rule cannot reach another node" is what this file used to say, and it was a fact about
-// the JS FOLD rather than about the engine: the tree lives in C++, so a node knows its parent and
-// `fabricProps` now takes `ownerProps` from it. Contract:
-// `core/engine/cpp/tests/js/scroll-content-payload.itest.ts`.
+// `horizontal` is a real C++ prop and the separate ViewManager is ANDROID's — on iOS both tags
+// resolve to RCTScrollView, so the prop is what turns the axis there. Written from the TAG, not
+// read off props; an app also writing `horizontal` on the vertical tag loses to the tag.
 
-// `rowStyle` USED TO BE A PARAMETER HERE and is not one any more: the content node's row direction
-// is decided in the engine from that node's OWN tag (`horizontal-scroll-content`), so this builder
-// no longer needs to know the axis to build it.
+// foldScrollContentProps in C++ owns the slot's fold: rowStyle (horizontal-only constant) and
+// collapsableChildren, derived from the OWNER's maintainVisibleContentPosition/snapToAlignment.
+
 function buildContent(contentIntrinsic: ISymbioteIntrinsic) {
   return (node: ISymbioteNode): ISymbioteNode => {
     const descriptor = descriptorFor(contentIntrinsic);
@@ -197,15 +103,11 @@ function buildContent(contentIntrinsic: ISymbioteIntrinsic) {
       descriptor.isText,
       contentIntrinsic,
     );
-    // `collapsable: false` WAS SEEDED HERE AND IS NOT ANY MORE (2026-09-18). It is unconditional on
-    // every content node in both axes (`ScrollView.js:1747`), which makes it a constant of the TAG
-    // rather than of this builder — `foldScrollContentProps` writes it, and the contract is
-    // `scroll-content-payload.itest.ts` ("from the rule and not a seed", which asserts the authored
-    // prop is ABSENT because that is the only thing distinguishing the two routes).
-    // Lands directly on the owner, because `node.childHost` is still undefined here: the engine
-    // assigns it from what this returns. That ordering is why `buildStructure` RETURNS the slot
-    // instead of setting the field itself — a behavior that set it first would redirect its own
-    // structure into the slot it was building.
+    // `collapsable: false` is a TAG constant now (`foldScrollContentProps`, `ScrollView.js:1747`),
+    // not seeded here — `scroll-content-payload.itest.ts` asserts the authored prop stays ABSENT.
+
+    // Lands on the owner: `node.childHost` is undefined here, so `buildStructure` RETURNS the
+    // slot instead of setting the field itself.
     appendChild(node, content);
     return content;
   };
@@ -216,14 +118,11 @@ function buildContent(contentIntrinsic: ISymbioteIntrinsic) {
 // exists only for the ScrollViews an app wired a handler to.
 const lastContentSize = new WeakMap<ISymbioteNode, IContentSize>();
 
-// RN synthesizes onContentSizeChange from the CONTENT view's own onLayout — there is no native
-// content-size event (ScrollView.js:1675 `contentSizeChangeProps`). The wrapper wired that by
-// rendering an `onLayout` onto its inner node; a tag has no inner node of its own, so the behavior
-// installs it on the slot it built.
-//
-// The app's callback takes `(width, height)`, not an event, which is why `contentSizeChange` is an
-// OWNED listener: `setEventListener` wraps an ordinary listener as `(event) => handler(event)` and
-// would call a two-number handler with one event. Owned names are stashed raw instead.
+// RN synthesizes onContentSizeChange from the CONTENT view's own onLayout — there's no native
+// content-size event. A tag has no inner node of its own, so the behavior installs it on the slot.
+
+// The app's callback takes `(width, height)`, not an event, so `contentSizeChange` is an OWNED
+// listener: setEventListener would wrap it as `(event) => handler(event)` and call it wrong.
 function contentSizeListener(owner: ISymbioteNode) {
   return (event: ISymbioteEvent): void => {
     const handler = appListenerFor(owner, 'contentSizeChange');
@@ -244,16 +143,11 @@ function contentSizeListener(owner: ISymbioteNode) {
   };
 }
 
-// RN installs the content `onLayout` only when the app passed `onContentSizeChange`, and so does
-// every wrapper — `onLayout` is a gated event, so wiring it unconditionally would put `onLayout:
-// true` in the payload of every ScrollView's content node and buy a native event nobody reads. A
-// change to the committed surface in EITHER direction is a bug, so the wiring has to follow the
-// prop.
-//
-// It follows the LISTENER rather than a commit, which is what `onOwnedListenerChange` is for: a
-// listener flip changes no payload by itself, so the commit after it is a no-op and a post-commit
-// hook would never fire. Measured on exactly this — the wire worked (mount commits for other
-// reasons) and the UNWIRE silently did not.
+// RN installs the content `onLayout` only when the app passed `onContentSizeChange`: `onLayout`
+// is gated, so wiring it unconditionally would put `onLayout: true` in every ScrollView's payload.
+
+// Follows the LISTENER rather than a commit, since a listener flip changes no payload by itself —
+// the commit after it is a no-op and a post-commit hook would never fire.
 function syncContentSizeWiring(owner: ISymbioteNode, wired: boolean): void {
   const slot = owner.childHost;
   if (slot === undefined) return;
@@ -277,23 +171,14 @@ function syncOwnedListener(
   else if (name === 'layout') syncOwnerLayout(owner);
 }
 
-// The platform half, and as of 2026-09-18 it is a CLAIM MODE and a dirty list — nothing else. iOS
-// takes the RefreshControl `beside` the content view; Android takes it as a `wrap`, and the style
-// split that inversion needs is `foldScrollViewProps`/`foldRefreshWrapperProps` in the engine now.
-//
-// This interface carried an `onWrapChange` factory over the axis until then, purely to hand each
-// behavior's base style to the two folds it installed. Both folds are gone, so the factory had no
-// implementor and `scrollBehavior` no longer needs a `base` at all.
+// The platform half is a CLAIM MODE and a dirty list — nothing else. iOS takes the RefreshControl
+// `beside` the content view; Android takes it as a `wrap`; the style split that inversion needs is
+// `foldScrollViewProps`/`foldRefreshWrapperProps` in the engine.
 export interface IScrollPlatform {
   claimMode: IClaimMode;
-  // Owner props this platform's WRAPPER fold reads, added to the slot's own. Android's needs
-  // `style`, because the layout half of the scroll view's style is what the wrapper paints — and it
-  // is load-bearing for the ENGINE's rule now rather than for a JS fold: `foldRefreshWrapperProps`
-  // derives from a node that is not its own, so it re-reads only on a commit that marks it.
-  //
-  // It dirties the content node as well as the wrapper — the engine marks both from one list — so a
-  // ScrollView style write on Android re-clones a content node whose payload did not change. A
-  // style write is not a per-frame event, and a second list to avoid one clone is not worth a field.
+  // Owner props this platform's WRAPPER fold reads, added to the slot's own. Android needs
+  // `style`, since foldRefreshWrapperProps derives from a node that isn't its own and only
+  // re-reads on a commit that marks it — dirtying the content node too costs one avoidable clone.
   slotDerived?: readonly string[];
 }
 
@@ -303,11 +188,9 @@ function scrollBehavior(
   platform: IScrollPlatform,
 ): IHostBehavior {
   return {
-    // `scroll` and `layout` are owned for the collision reason rather than because the behavior
-    // consumes them: RN's ScrollView installs `_handleScroll` and `_handleLayout` on the native
-    // view unconditionally and calls the app's own handler from inside them, and `node.listeners`
-    // is single-slot — so a behavior that installed either without owning it would silently evict
-    // the app's.
+    // `scroll` and `layout` are owned for the collision reason, not because the behavior consumes
+    // them: node.listeners is single-slot, so installing either without owning it would silently
+    // evict the app's own handler.
     ownedListeners: [
       'contentSizeChange',
       'scroll',
@@ -318,10 +201,8 @@ function scrollBehavior(
     slotDerived: [...SLOT_DERIVED, ...(platform.slotDerived ?? [])],
     claimedChildren: { [REFRESH_CONTROL]: platform.claimMode },
     buildStructure: buildContent(contentIntrinsic),
-    // The scroll dispatcher is installed here and never conditionally: it is what drives the
-    // sticky AnimatedValue, and a header can register long after this node was created. It costs a
-    // forward per scroll event on a ScrollView with no sticky child, which is what RN pays too.
-    // Nothing else is taken — no timer, and the two conditional listeners are wired on a flip.
+    // The scroll dispatcher is installed unconditionally: it drives the sticky AnimatedValue, and
+    // a header can register long after this node was created.
     attach(node) {
       markScrollOwner(node);
       setBehaviorListener(node, 'scroll', event =>
@@ -330,10 +211,8 @@ function scrollBehavior(
       installResponderPredicates(node);
     },
     onOwnedListenerChange: syncOwnedListener,
-    // The one beat at which the app's children are all present — `stickyHeaderIndices` addresses
-    // them positionally, and no hook reports a children CHANGE. Costs a Set iteration per commit
-    // over the ScrollViews alone, and `reconcileStickyIndices` returns on a WeakSet miss for any
-    // that never used the prop.
+    // The one beat where the app's children are all present — no hook reports a children CHANGE,
+    // and reconcileStickyIndices returns on a WeakSet miss for any that never used the prop.
     afterCommit: reconcileStickyIndices,
     detach(node) {
       lastContentSize.delete(node);
@@ -357,13 +236,9 @@ export function registerScrollViewBehaviors(platform: IScrollPlatform): void {
       platform,
     ),
   );
-  // REGISTRATIONS WITH NO RUNTIME, and they are what hand the content tags to the host. A tag
-  // crosses only through `recordSetTag`, which `attachHostBehavior` emits, so a tag with no behavior
-  // registered carries an EMPTY `tagName` in C++ and no rule can fire for it. These two nodes are
-  // built by `buildStructure` and named by no app, which is exactly the shape that trap has.
-  //
-  // Same reasoning as `activity-indicator-spinner`'s stub: a registration is how this codebase says
-  // a tag HAS platform semantics, which is the claim being made.
+  // REGISTRATIONS WITH NO RUNTIME, what hand the content tags to the host: a tag with no behavior
+  // registered carries an EMPTY tagName in C++ and no rule can fire for it. A registration is how
+  // this codebase says a tag HAS platform semantics.
   for (const contentTag of ['scroll-content', 'horizontal-scroll-content'])
     registerHostBehavior(contentTag, { attach() {}, detach() {} });
   // With the scroll views, never on its own: a sticky header is meaningless without an owner to

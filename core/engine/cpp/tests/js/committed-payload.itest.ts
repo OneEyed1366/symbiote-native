@@ -8,8 +8,8 @@
 // exactly the component whose fold resolves `inputMode` into `keyboardType`.
 //
 // RN's own complete read is `Props::rawProps` behind `RN_SERIALIZABLE_STATE`, and that flag pulls
-// `fbjni/fbjni.h` into `State`'s virtual interface: it does not compile on a host build, tried
-// 2026-09-15 and recorded in this directory's `CMakeLists.txt`.
+// `fbjni/fbjni.h` into `State`'s virtual interface: it does not compile on a host build (see this
+// directory's `CMakeLists.txt`).
 //
 // `committedPayloadOf` needs no flag and adds no bookkeeping. `SymbioteTree` already retains the
 // payload per node as the next commit's diff baseline (`Node::committedProps`), so the read is a
@@ -83,11 +83,9 @@ describe('reading back the payload a commit sent', () => {
     expect(payload.readOnly).toBe(undefined);
   });
 
-  // why: the component-keyed rule that HAD two TypeScript twins, which is the drift this read
-  // closes. `applyTextDefaults` in `fabric-props.ts` and `resolveTextProps` in
-  // `core/components/src/text-props.ts` were both deleted on 2026-09-18 and the four cases below are
-  // where their claims went. Neither could ever have caught the device rule: one is a vitest over the
-  // headless builder, the other a unit test of a function the commit path does not call.
+  // why: two now-deleted TypeScript twins (`applyTextDefaults` in `fabric-props.ts`,
+  // `resolveTextProps` in `core/components/src/text-props.ts`) could never have caught the device
+  // rule breaking. The four cases below are where their claims went.
   it('shows a text node the platform defaults no adapter writes', () => {
     const text = commit('RCTText', 'text', {});
 
@@ -184,8 +182,7 @@ describe('reading back the payload a commit sent', () => {
   });
 
   // why: a NULL is not a value the author chose either, and getting that wrong is device-only and
-  // silent — `<text ellipsizeMode={null}>` committed null until Solid's renderer was corrected for
-  // it in 2026-08, its second revision of a rule it should never have held. Travelled here from
+  // silent — `<text ellipsizeMode={null}>` must not commit null. Travelled here from
   // `adapters/solid/src/tag-folds.test.tsx`, which could only ever see that adapter's own copy.
   it('treats a null the same as an absent value', () => {
     const nulled = commit('RCTText', 'text', {

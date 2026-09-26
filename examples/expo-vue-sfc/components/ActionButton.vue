@@ -1,13 +1,6 @@
-<!--
-  Drop-in replacement for RN's stock <Button> (same title/onPress/color/testID surface) — a bare
-  Button renders as unstyled tinted text on iOS, visually indistinguishable from a body Text line,
-  which was the single biggest source of "looks messy" across the demo app (2026-07 cohesion
-  pass). One consistent bordered pill, tinted in the caller's own `color` exactly like Button
-  already took, so every screen's per-feature color-coding is preserved — only the chrome becomes
-  consistent. Vue SFC twin of .examples/react/components/ActionButton.tsx: `onPress` stays a
-  plain callback PROP (not a Vue `@press` emit) to mirror React's exact title/onPress/color/testID
-  surface byte-for-byte across every screen that uses it.
--->
+<!-- Drop-in for RN's stock <Button>: a bare Button renders as unstyled tinted text on iOS, so a
+  bordered pill tinted by `color` replaces it. `onPress` stays a plain callback PROP (not a Vue
+  `@press` emit) to mirror React's ActionButton.tsx surface exactly. -->
 <script setup lang="ts">
 import type { IPressState } from '@symbiote-native/components';
 

@@ -1,21 +1,7 @@
 /** @jsxRuntime automatic */
-// WHERE a separator sits, and WHAT decides to render it, are both geometry — not decoration.
-//
-// RN renders ItemSeparatorComponent INSIDE the cell's own measuring wrapper
-// (VirtualizedListCellRenderer.js:218-221) and gates it on the last index of the DATA
-// (VirtualizedList.js:793, `const end = getItemCount(data) - 1`). Every adapter here had it as a
-// SIBLING of the wrapper, gated on the WINDOW's last index. Both were device-measured on
-// 2026-08-19 as the list jumping mid-scroll:
-//
-//   * as a sibling it is an extra flex child, so the chrome between two cells is gap + separator +
-//     gap while a spacer collapsing that region contributes only one gap — the leading spacer lands
-//     every cell below it short by (separator + gap), 17px with a 1px divider under a 16px gap;
-//   * gated on the window, a cell's own measured height changes as the window slides past it, so
-//     everything below shifts by the divider's 1px on each window step.
-//
-// Counting separators cannot see either one: the pre-fix code passed a count-based test. These
-// assertions are structural on purpose — they ask which node CONTAINS the divider.
-// Full incident: .claude/rules/list-geometry-feedback-loop.md.
+// WHERE a separator sits, and WHAT decides to render it, are both geometry — as a SIBLING it's an
+// extra flex child that breaks the leading-spacer math, and gated on the WINDOW instead of the
+// DATA a cell's height changes as it slides past. These assertions ask which node CONTAINS it.
 
 import { createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';

@@ -1,23 +1,20 @@
-// @symbiote-native/engine: the retained shadow-tree + clone-on-write commit engine.
-// Every framework adapter drives this tiny mutation API; all Fabric-specific
-// logic (tag allocation, view-name resolution, clone-on-write, event
-// normalization) lives behind it, in one place.
+// @symbiote-native/engine: the retained shadow-tree + clone-on-write commit engine. Every framework
+// adapter drives this tiny mutation API; all Fabric-specific logic (tag allocation, view-name
+// resolution, clone-on-write, event normalization) lives behind it, in one place.
 
 export {
   createElement,
   createRawText,
   createAnchor,
-  // The component name of a node the commit walk skips and whose children flatten into its parent.
-  // Exported so a PRIMITIVE that renders no view of its own can be born with it — RN's
-  // TouchableNativeFeedback clones onto its single child and commits nothing
-  // (TouchableNativeFeedback.js:339) — rather than being converted after the fact.
+  // The component name of a node the commit walk skips and whose children flatten into its
+  // parent. Exported so a primitive rendering no view of its own (TouchableNativeFeedback) can be
+  // born with it directly, rather than converted after the fact.
   ANCHOR_COMPONENT,
   isAnchor,
   createVoid,
-  // The component name of a node whose ENTIRE subtree the commit walk drops — unlike
-  // `ANCHOR_COMPONENT`, which hoists its children up in its place, a void node contributes neither
-  // itself nor them. For a primitive whose whole component renders nothing on this platform —
-  // `input-accessory-view` on Android, `InputAccessoryView.js`'s `return null`.
+  // The component name of a node whose entire subtree the commit walk drops — unlike
+  // ANCHOR_COMPONENT, which hoists children in its place, a void node contributes neither itself
+  // nor them. For a primitive whose whole component renders nothing on this platform.
   VOID_COMPONENT,
   appendChild,
   insertBefore,
@@ -27,11 +24,9 @@ export {
   routeProp,
   censusRetainedTree,
   getExplicitStyle,
-  // Exported for the ONE adapter that has to build style objects rather than receive them: Angular's
-  // `ɵɵstyleMap` hands over keys, so its renderer allocates a fresh object per node and needs to
-  // recognise one it has already published. A second copy of this comparator in the adapter is the
-  // mirror shape this codebase deletes on sight — and its deliberate conservatism (a nested value
-  // reports "not the same") is exactly right for that use too.
+  // Exported for the one adapter that has to build style objects rather than receive them:
+  // Angular's ɵɵstyleMap hands over keys, so its renderer allocates a fresh object per node and
+  // needs to recognise one it has already published.
   isSameShallowStyle,
   getPublishedStyle,
   setNodeHidden,
@@ -137,28 +132,22 @@ export type { ISurfaceTelemetry } from './tree-host';
 // `installNativeTreeHost` is not on any app path: `getSlot()` already calls it, and it is here so a
 // bring-up probe can install one explicitly against a hand-built set of bindings.
 export { nativeTreeHost, installNativeTreeHost } from './native-tree-host';
-// `ITreeHost` is exported to be READ, not implemented outside this repo: it is the engine's own
-// seam, and the hosts that satisfy it ship here (`native-tree-host.ts`, test-utils' recording host).
-// It is versioned as internal — a new required member lands in a MINOR, so anything implementing it
-// by hand breaks on a minor bump. Implement it only if you are prepared to track that.
+// ITreeHost is exported to be READ, not implemented outside this repo: it's the engine's own seam,
+// and the hosts that satisfy it ship here. Versioned as internal — a new required member lands in
+// a MINOR, so anything implementing it by hand breaks on a minor bump.
 export type {
   ITreeHost,
   ITreeCensus,
   ICommittedRecord,
   ICommitProfile,
 } from './tree-host';
-// The OPCODES and the recorder are deliberately NOT here. They are the wire contract between this
-// package and whatever implements the tree, so their audience is a HOST author — the C++ and the
-// TypeScript applier — not an app. They live on the `@symbiote-native/engine/mutation-buffer`
-// subpath, for the same reason `state-style` does: a name on this barrel is public API on all five
-// adapters at once, with no edit to any of them
-// (`.claude/rules/adapter-parity-audit.md`, "A build-tool-facing symbol belongs on a SUBPATH").
-// "A commit just reached completeRoot." The one seam that means the same thing under every
-// adapter: React commits synchronously inside its own commit phase, while Vue / Svelte / Angular
-// schedule completeRoot on a microtask, so each framework's own after-render hook fires at a
-// DIFFERENT point relative to the native commit. Anything timing or comparing the commit path
-// across adapters has to hang off this, not off a per-framework lifecycle hook, or it measures a
-// different quantity in each one under the same name.
+// The opcodes and the recorder are deliberately NOT here: they're the wire contract between this
+// package and whatever implements the tree, audience a host author, not an app. They live on the
+// mutation-buffer subpath instead, since a name on this barrel is public API on all five adapters.
+
+// "A commit just reached completeRoot" — the one seam that means the same thing under every
+// adapter: React commits synchronously, Vue/Svelte/Angular schedule it on a microtask, so each
+// framework's after-render hook fires at a different point relative to the native commit.
 export { registerPostCommit, unregisterPostCommit } from './post-commit';
 // The aria/role -> accessibility* fold. Lives here rather than in a component wrapper because a tag
 // has none: `fabricProps` runs it on the way to the payload, so every path gets it.
@@ -238,10 +227,9 @@ export type {
   IPlatformOSType,
   IPlatformSelectSpec,
 } from './platform';
-// The per-platform constants types come from their own files, not the host-selected
-// `./platform`: on an Android Metro build `./platform` IS platform.android.ts, which
-// has no PlatformConstantsIOS. These are type-only (erased at runtime), so naming the
-// explicit file pulls no cross-platform runtime code.
+// The per-platform constants types come from their own files, not the host-selected ./platform:
+// on an Android Metro build ./platform IS platform.android.ts, which has no PlatformConstantsIOS.
+// Type-only (erased at runtime), so naming the explicit file pulls no cross-platform runtime code.
 export type { IPlatformConstantsIOS } from './platform/index.ios';
 export type { IPlatformConstantsAndroid } from './platform/index.android';
 export { dlog, isDebug } from './debug';
@@ -361,9 +349,8 @@ export type {
 } from './fabric';
 
 // Imperative runtime modules: framework-agnostic native-bridge consumers (no visual, no
-// lifecycle), moved here from @symbiote-native/react so every adapter re-exports the SAME module.
-// The native module a JS API talks to is chosen per platform and can only be confirmed on a
-// real device or simulator, not headless (a headless fake resolves any module name).
+// lifecycle), so every adapter re-exports the same module. The native module a JS API talks to is
+// chosen per platform and can only be confirmed on a real device or simulator, not headless.
 export { Alert } from './alert';
 export type {
   IAlertType,
@@ -523,9 +510,7 @@ export {
 // composed primitive assigns a fold to its own slot (`behaviors/scroll-view.ts`), and the owner's
 // `foldPayload` field cannot type that.
 export type { IClaimMode, IHostBehavior, IPayloadFold } from './host-behavior';
-// `markPropsDirty` is a behavior's only way to say "the fold reads state I just changed". Every
-// other dirtying route goes through a prop write, and a behavior whose payload is DERIVED — the
-// sticky header's debounced translateY lives in its own runtime, not in the node's props — has no
-// prop to write. Pair it with `requestCommitFor` (exported off `./imperative` above): dirtying is
-// not publishing.
+// markPropsDirty is a behavior's only way to say "the fold reads state I just changed" — every
+// other dirtying route goes through a prop write, and a derived-payload behavior has no prop to
+// write. Pair it with requestCommitFor: dirtying is not publishing.
 export { setBehaviorListener, markPropsDirty } from './node';

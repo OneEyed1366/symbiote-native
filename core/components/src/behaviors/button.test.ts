@@ -149,22 +149,11 @@ describe('button host behavior', () => {
 
     const { text, label } = subtreeOf(TEST_ID);
     expect(label?.payload.text).toBe('Save');
-    // RN's two Text defaults are what this line REPLACED, later the same day, and the comment below
-    // is why: it stated the criterion, and these two keys changed sides.
-    //
-    // The component name is the WITNESS that survives, and it is the better one — the engine's rule
-    // is keyed on exactly this, so asserting it says "whatever `buildStructure` built will be
-    // defaulted" without restating what the defaulting does.
+    // The component name is the witness: asserting `RCTText` says "whatever `buildStructure`
+    // built gets defaulted" without restating the defaulting rule itself.
     expect(text.viewName).toBe('RCTText');
-    // `styles.text` LEFT ON 2026-09-18 — the label's whole style is `foldButtonLabelStyle` in
-    // `SymbioteFabricProps.cpp`, and this host builds its payload through the TypeScript
-    // `fabricProps`, which carries no copy of the tag rules. Pinned against the committed payload in
-    // `core/engine/cpp/tests/js/button-derived-payload.itest.ts`.
-    //
-    // The Text DEFAULTS used to stay, on the stated grounds that they were written as real props by
-    // `buildStructure` at build time and so were this side's and observable here. That was true, and
-    // then the seed was deleted — they are a payload RULE now, exactly like the style, and they left
-    // through the same door. The criterion held; only the answer moved.
+    // The label's whole style is `foldButtonLabelStyle` in C++ now; this host's `fabricProps`
+    // carries no copy — pinned in `core/engine/cpp/tests/js/button-derived-payload.itest.ts`.
   });
 
   it('keeps title and color off the payload and pins the button role', async () => {
@@ -178,21 +167,13 @@ describe('button host behavior', () => {
     await settle();
 
     const { host } = subtreeOf(TEST_ID);
-    // `title` is redirected by `SLOT_PROPS` before it can land here, which is a REDIRECT and stays
-    // observable from this host. Its neighbour `color` is a strip and is not: that, the role, the
-    // `touchSoundDisabled` rename and the `importantForAccessibility` promotion are all
-    // `foldButtonProps` in the engine now, and this host builds its payload through the TypeScript
-    // `fabricProps`, which carries no copy of the tag rules. All four are asserted against the
-    // committed payload in `core/engine/cpp/tests/js/button-payload.itest.ts`.
-    //
-    // They moved as a GROUP with the two strips rather than one at a time. An absence assertion left
-    // on a harness that can no longer produce the key passes forever for the wrong reason — the
-    // false green the text-input port was caught by.
+    // `title` redirects via `SLOT_PROPS`, observable here; `color`, role, `touchSoundDisabled`
+    // rename and `importantForAccessibility` are `foldButtonProps` in C++ now — asserted in
+    // `core/engine/cpp/tests/js/button-payload.itest.ts`.
     expect(host.payload.title).toBeUndefined();
-    // The tint went with the style on 2026-09-18. On iOS `color` tints the LABEL, never the button
-    // (Button.js:318-324), and that half is now `foldButtonLabelStyle` reading the button through
-    // `IAncestorLookup` — pinned in `button-derived-payload.itest.ts`, where the tinted and untinted
-    // labels are compared on the committed payload.
+    // On iOS `color` tints the LABEL, never the button (Button.js:318-324) — now
+    // `foldButtonLabelStyle` reading the button through `IAncestorLookup`, pinned in
+    // `button-derived-payload.itest.ts`.
   });
 
   it('greys the label from aria-disabled and merges accessibilityState', async () => {
@@ -207,17 +188,9 @@ describe('button host behavior', () => {
     await settle();
 
     const { host } = subtreeOf(TEST_ID);
-    // BOTH HALVES OF THIS CASE HAVE NOW LEFT, and the second one proves the first's reasoning.
-    //
-    // The GREY that `aria-disabled` causes went first — `foldButtonLabelStyle`, asserted in
-    // `button-derived-payload.itest.ts`. What stayed was the accessibilityState MERGE, on the
-    // grounds that it was "this side's". It was not: the comment beside it said outright that
-    // nothing in `button.ts` does it and that the engine's aria fold and the press fold COMPOSE to
-    // it — two rules, both since ported, neither visible here. It moved to
-    // `button-payload.itest.ts` on 2026-09-18.
-    //
-    // What a behaviour test can still say about this input is that the app's own props arrive on the
-    // node the rules will read, which is the precondition for either of them running at all.
+    // The GREY from `aria-disabled` is `foldButtonLabelStyle` (`button-derived-payload.itest.ts`);
+    // the accessibilityState MERGE is the engine's aria fold + press fold composing
+    // (`button-payload.itest.ts`). This test only proves the props arrive on the node those read.
     expect(host.payload.accessibilityState).toEqual({ busy: true });
     expect(host.payload['aria-disabled']).toBe(true);
   });
@@ -273,15 +246,9 @@ describe('button host behavior', () => {
   // its constant `{}`, which is the exact mirror of Android, where it tints the view and leaves the
   // label white. A projection that only ever re-folded the slot the engine marks would pass one of
   // the two and fail the other.
-  // The RE-TINT case left on 2026-09-18 and MOVED rather than being deleted, because its subject is
-  // not fold content: it pins that a `color` written on the BUTTON after the first commit reaches the
-  // derived label at all (`addDerivedNode` extending `slotDerived`'s mark past the slot). That
-  // invariant is unchanged by the port and is now asserted where the rule runs —
-  // `core/engine/cpp/tests/js/button-derived-payload.itest.ts`, against the committed payload.
-  //
-  // It could not stay: the tint it checks is `foldButtonLabelStyle`'s, and this harness builds its
-  // payload through the TypeScript `fabricProps`, which holds no copy of the tag rules. A case that
-  // cannot produce the value it asserts is not a weaker test, it is a red one.
+  // The RE-TINT case pins that a `color` written on the BUTTON after the first commit reaches the
+  // derived label (`addDerivedNode` extending `slotDerived`'s mark past the slot) — asserted in
+  // `button-derived-payload.itest.ts`, since this harness's `fabricProps` has no copy of the fold.
 
   it('runs the composed press machine', async () => {
     vi.useFakeTimers();
@@ -383,18 +350,9 @@ describe('button host behavior', () => {
     expect(typeof host.payload.opacity).toBe('number');
   });
 
-  // `focusable` LEFT ON 2026-09-18, and it took the whole owner fold with it off Android — this tag
-  // now binds no `payloadFold` at all on iOS.
-  //
-  // It is `foldButtonProps` in `SymbioteFabricProps.cpp`, and this harness builds its payload
-  // through the TypeScript `fabricProps`, which deliberately carries no copy of the tag rules. The
-  // three-legged form and its `props.disabled ?? aria-disabled ?? accessibilityState.disabled`
-  // precedence are the `whether a button is a focus stop` block in
-  // `core/engine/cpp/tests/js/button-payload.itest.ts`, including the late-wiring flip this case
-  // used to pin.
-  //
-  // What kept it in JS was the middle leg, `onPress !== undefined`: an owned name, stashed here and
-  // never a prop. The EXISTENCE crosses now as one bit while the callback does not.
+  // `focusable` is `foldButtonProps` in C++ now, three-legged precedence and all — this tag binds
+  // no `payloadFold` at all on iOS. Asserted in `button-payload.itest.ts`. What stays in JS is
+  // `onPress !== undefined`: its EXISTENCE crosses as one bit, the callback does not.
 
   // Button.js:337 resolves `props.disabled ?? aria-disabled ?? accessibilityState.disabled` and
   // passes the ANSWER down to the touchable, so on a Button — unlike a bare Pressable — either
@@ -501,17 +459,9 @@ describe('button host behavior', () => {
     expect(committedByTestId(TEST_ID).payload.opacity).toBe(resting);
   });
 
-  // why: a Button's name must reach its OWNER, and `id` beats a `nativeID` written beside it.
-  //
-  // This case used to be about COMPOSITION — two layers folding the same pair, asked over two arms
-  // to prove they composed idempotently, and it is what decided `HOST_PRIMITIVES.Button.aliases`.
-  // Both layers are gone: the spec's `aliases` was deleted on 2026-09-18 and the rename is
-  // `routeProp`'s, so there is one layer and nothing left for a second arm to disagree with. The
-  // loop survives because the case below still drives several props through `routeProp`.
-  //
-  // The arm that made the old entry NECESSARY was on Android, where the touchable is the bare press
-  // machine and folded nothing — see `button-android.test.ts`. iOS passed either way, which is
-  // exactly why declining the entry looked free.
+  // why: a Button's name must reach its OWNER, and `id` beats a `nativeID` written beside it —
+  // the rename is `routeProp`'s alone now (see `button-android.test.ts` for the Android arm
+  // that makes it necessary; iOS passes either way).
   it('folds `id` to `nativeID`, with id winning', async () => {
     for (const props of [{ id: 'from-id', nativeID: 'losing-value' }]) {
       vi.useFakeTimers();

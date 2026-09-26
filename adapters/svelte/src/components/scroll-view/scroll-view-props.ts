@@ -4,10 +4,9 @@
 // adapters/vue/src/components/scroll-view/shared.ts) with Svelte's own idioms: `class` (not
 // `className`), `children` as a Snippet.
 //
-// `stickyHeaderIndices` works here since the wrapper was deleted (2026-09-10) — deleting it is what
-// turned the feature on. It was unhonored while a component saw only an opaque `Snippet`, with no
-// "child at index N" to pull out of a render function; the behavior walks the COMMITTED children
-// instead (`behaviors/scroll-view/sticky-indices.test.ts`), which needs no Snippet at all.
+// `stickyHeaderIndices` works because the behavior walks the COMMITTED children
+// (`behaviors/scroll-view/sticky-indices.test.ts`) rather than pulling "child at index N" out of
+// an opaque `Snippet`, which no render function could ever do.
 //
 // The `sticky-header` TAG is the other spelling and still the better one for markup you control: it
 // pins by document order, so no index has to stay in step with the children.

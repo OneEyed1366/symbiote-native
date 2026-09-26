@@ -23,7 +23,7 @@
 //
 // WHAT THE RULE NEEDS, all of which already crosses:
 //
-//   the owner's props        `ownerProps`, since 2026-09-18 — the scroll content rule's seam
+//   the owner's props        `ownerProps` — the scroll content rule's seam
 //   the owner's aria fold    the engine folds aria at `fabricProps` already
 //   `focusable`              `usesTouchableFocusableRule`, ported with the touchables
 //   the press listener BIT   `OP_SET_OWNED_LISTENER`, and it is the OWNER'S bit, read off the parent
@@ -262,10 +262,8 @@ describe('what the owner clones onto its child', () => {
     expect(committedPayloadOf(child)?.accessibilityLabel).toBe('After');
   });
 
-  // why: THE WILDCARD IS LIVE, asked with a key no clone list names. `slotDerived` held thirty names
-  // until 2026-09-18 and they had become a mirror of the C++ rule's own arrays; it is
-  // `SLOT_DERIVED_ALL` now, which is what a `cloneElement` owner actually means — it re-clones on
-  // every render, whatever changed.
+  // why: THE WILDCARD IS LIVE, asked with a key no clone list names. `SLOT_DERIVED_ALL` is what a
+  // `cloneElement` owner actually means — it re-clones on every render, whatever changed.
   //
   // `hitSlop` is the probe rather than `accessibilityLabel`, and that is the whole point: a NAMED
   // list makes every key its own question, and the one it forgets fails silently. Break-tested by

@@ -140,8 +140,7 @@ describe('runtime state-style resolution', () => {
     // why: the MIXED sequence, and the one neither half of the flag covered on its own. A callback
     // sets the flag; a later explicit `activeStyle` replaces slot 1 but said nothing about the
     // flag, so a plain `style` arriving third read a flag that was no longer true of the slot's
-    // contents and cleared a variant the engine never derived. Found by the Solid session against
-    // the flag's own contract, 2026-09-01.
+    // contents and cleared a variant the engine never derived, against the flag's own contract.
     //
     // An author writes one or the other, so a callback and an explicit `activeStyle` do not reach
     // one node from the same source. A flat-bag adapter routing a `p={{…}}` bag key by key can

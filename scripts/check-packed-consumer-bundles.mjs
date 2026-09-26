@@ -28,11 +28,8 @@ export const KNOWN_FRAMEWORKS = ['react', 'vue', 'svelte', 'angular', 'solid'];
 export const PLATFORMS = ['ios', 'android'];
 
 // Keyed by ARM, which is not the same thing as a framework: one adapter can have more than one
-// canary, and `vue` has two. The key names the disposable directory and is what
-// SYMBIOTE_CONSUMER_FRAMEWORKS selects on; the FRAMEWORK an arm belongs to is derived from its
-// `adapter` (see `ownFrameworkOf`), because that is the only one of the two the foreign-file check
-// may use. Keying the whole table on the framework is why `examples/vue-tsx` was in no CI list at
-// all until 2026-09-10 — see scripts/lib/canary-examples.mjs.
+// canary, and `vue` has two. The key names the disposable directory; the FRAMEWORK an arm belongs
+// to is derived from its `adapter` (see `ownFrameworkOf`) — the one the foreign-file check may use.
 export const FRAMEWORK_EXAMPLES = {
   react: {
     dir: 'examples/react',
@@ -101,20 +98,13 @@ function run(command, args, options = {}) {
   }
 }
 
-// npm's cacache fans out internally: one `npm install` fetches/hashes many packages in parallel
-// inside a single process, and its tmp-then-rename cache writes race each other on that
-// same-process concurrency, not only across processes. Per-framework cache isolation
-// (`frameworkNpmCache` below) kills the cross-framework race this script used to have; it can't
-// kill this one, since it's entirely inside one `npm install`. Observed 2026-09-13: ENOTEMPTY on
-// `_cacache/content-v2/**` even with isolated caches. Upstream npm/cacache bug, not fixable here -
-// retry with a wiped cache, the documented workaround for this failure shape.
-//
+// npm's cacache fans out internally: one `npm install` fetches many packages in parallel inside a
+// single process, so tmp-then-rename cache writes race even WITHIN one process — per-framework
+// cache isolation (`frameworkNpmCache`) can't fix that. ENOTEMPTY is an upstream npm/cacache bug.
+
 // `--legacy-peer-deps`: navigation/slider/splash-screen each list all five adapters as peers, so
-// an example installing just one still makes npm auto-resolve the other four off the registry.
-// That 5-way peer graph triggers arborist's own backtracking crash (`Cannot read properties of
-// null (reading 'edgesOut')`, npm/cli#4828 - non-deterministic, hit react only on 2026-09-14).
-// This check only needs the tarball to install and bundle, not real peer enforcement, so skipping
-// peer resolution removes the trigger instead of hoping a retry dodges it.
+// installing just one makes npm auto-resolve the other four, and that 5-way graph can trigger
+// arborist's own backtracking crash (npm/cli#4828) — skip resolution rather than risk it.
 async function installWithCacheRetry(cwd, env, cacheDir, attempts = 3) {
   for (let attempt = 1; attempt <= attempts; attempt++) {
     try {
@@ -177,13 +167,9 @@ async function runAsync(command, args, options = {}) {
   }
 }
 
-// Each framework's npm install needs its OWN cache directory — see the ENOTEMPTY comment on
-// installWithCacheRetry, npm's cacache isn't safe for two installs writing the same cache root
-// concurrently. Without a cacheRoot (local dev, or CI runs that don't opt in) the cache lives
-// inside the disposable matrix dir and dies with it every run. CI passes SYMBIOTE_NPM_CACHE_ROOT
-// pointed at an actions/cache-restored path so the registry downloads survive across runs instead
-// of every framework re-fetching the whole RN toolchain from npm on every job (measured 2026-09-14:
-// install dominates each framework's 300s+ wall time).
+// Each framework's npm install needs its OWN cache directory — npm's cacache isn't safe for two
+// installs writing the same cache root concurrently (see the ENOTEMPTY comment above). Without a
+// cacheRoot the cache dies with the disposable matrix dir; CI passes SYMBIOTE_NPM_CACHE_ROOT.
 export function npmCacheDirFor(exampleRoot, framework, cacheRoot) {
   if (cacheRoot) return join(cacheRoot, framework);
   return join(exampleRoot, '.npm-cache');
@@ -298,8 +284,7 @@ function copyTrackedExample(exampleDir, destination) {
 }
 
 // Each `pnpm pack` writes its own uniquely-named tarball into the shared packDirectory, so nothing
-// here is mutable shared state - safe to run concurrently. Measured 2026-09-14: 13 packages,
-// 21.4s sequential -> 7.6s in parallel on an 8-core machine (three of these - navigation, slider,
+// here is mutable shared state - safe to run concurrently (three packages - navigation, slider,
 // splash-screen - run a full Angular AOT compile as a prepack side effect and dominate either way).
 async function packPackages(names, packDirectory) {
   const entries = new Map(

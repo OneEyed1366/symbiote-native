@@ -19,13 +19,12 @@
 // RUN ON `build-release` (`pnpm run bench:itest`).
 //
 // AND RUN THE ARMS ONE AT A TIME when the numbers are meant to be compared. `pnpm run bench:itest`
-// fills `availableParallelism()` slots, so seven suites contend: measured 2026-09-18, the same
-// sitting read stock 107.4 / ng-elements 264.9 in one parallel run and stock 88.6 / ng-elements
-// 234.5 sequentially. The RATIO survives that and the absolute numbers do not, so a figure quoted
+// fills `availableParallelism()` slots, so seven suites contend, inflating every arm's absolute
+// reading. The RATIO survives that and the absolute numbers do not, so a figure quoted
 // off a parallel run is not on the same ruler as one quoted off a sequential one.
 //
-// ONE RULER, sequential, one process per arm, `build-release`, 2026-09-18 — AFTER `mount()` began
-// turning Angular's dev mode off in a release bundle (`render/index.ts`, `settleAngularDevMode`):
+// ONE RULER, sequential, one process per arm, `build-release`, AFTER `mount()` began turning
+// Angular's dev mode off in a release bundle (`render/index.ts`, `settleAngularDevMode`):
 //
 //              stock  react    vue  solid svelte  angular  ng-elements
 //   create      88.6  103.6  138.1   94.7  104.7    147.9        234.5

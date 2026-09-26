@@ -1,12 +1,6 @@
-// Drop-in replacement for RN's stock <Button> (same title/onPress/color/testID surface) -
-// a bare Button renders as unstyled tinted text on iOS, visually indistinguishable from a body
-// Text line, which was the single biggest source of "looks messy" across the demo app (2026-07
-// cohesion pass). One consistent bordered pill, tinted in the caller's own `color` exactly like
-// Button already took, so each screen's own line color is preserved - only the chrome becomes
-// consistent.
-//
-// NOTHING here destructures `props` - a Solid component body runs ONCE, so a destructure would
-// freeze the button at its mount-time config.
+// Drop-in for RN's stock <Button>: a bare Button renders as unstyled tinted text on iOS, so a
+// bordered pill tinted by `color` replaces it. NOTHING here destructures `props` - a Solid
+// component body runs ONCE, so a destructure would freeze the button at its mount-time config.
 
 interface IActionButtonProps {
   title: string;

@@ -8,9 +8,6 @@
 // proxy breaks, and the failure reads as a product bug — a press that produced no event, change
 // detection that never stopped — rather than as the harness giving up early.
 //
-// Measured 2026-08-19: three tests across two adapters failed only inside a loaded `vitest run`
-// and passed in isolation, every one of them on a fixed tick count.
-//
 // Use `waitUntil` when a condition names what you are waiting for, and `waitForQuiet` when the
 // thing to wait for is the ABSENCE of further work. Do not raise a tick count to fix a flake —
 // that trades a fast failure for a slow one and keeps the race.
@@ -19,10 +16,8 @@ const TICK_MS = 0;
 const DEFAULT_TIMEOUT_MS = 2_000;
 
 // A tick count cannot express "no work arrived", only "the queue drained N times" — and how much
-// wall time that spans is a property of the machine. Measured 2026-09-02 on the FlatList window:
-// exactly one deferred commit lands 30-60 ticks after a 3-tick settle, so an idle machine declared
-// quiet before the list's own batch and a loaded one caught it. The producer is RN's VirtualizedList
-// batching period (50ms), the longest deferred one in this repo; quiet has to outlast it.
+// wall time that spans is a property of the machine. The longest deferred producer in this repo
+// is RN's VirtualizedList batching period (50ms); quiet has to outlast it.
 const DEFAULT_QUIET_MS = 75;
 
 // Read off the host rather than imported, the same reason the engine's animations/raf.ts does:

@@ -1,17 +1,10 @@
-<!--
-  <KeepAlive> + onActivated/onDeactivated + <component :is> — no shipped screen has exercised any
-  of these against a real Fabric tree before now (.docs/framework-api-surface/vue.md), so this
-  demo IS the first real test, per the 2026-08-17 decision recorded there. KeepAlive's cache key is
-  the resolved component's own identity, not props — three genuinely distinct component objects
-  (TabA/TabB/TabC below) are switched by `:is`, not one component reused with different props, or
-  KeepAlive would collapse them into a single cached slot.
+<!-- KeepAlive's cache key is the resolved component's own identity, not props — three genuinely
+  distinct component objects (TabA/TabB/TabC) are switched by `:is`, not one component reused with
+  different props, or KeepAlive would collapse them into a single cached slot. -->
 
-  Each tab counts how many times IT ITSELF activates. With the cache ON, switching away and back
-  leaves the count untouched (the instance was kept alive, just detached); with the cache OFF
-  (plain `<component :is>`, no <KeepAlive> wrapper) the same switch destroys and recreates the
-  tab, so its count resets to 0 every time — the toggle below makes that contrast visible instead
-  of asserted.
--->
+<!-- Each tab counts how many times IT ITSELF activates. Cache ON: switching away and back leaves
+  the count untouched (kept alive, detached). Cache OFF (plain `<component :is>`): the switch
+  destroys and recreates the tab, resetting its count — the toggle makes that contrast visible. -->
 <script setup lang="ts">
 import { ref, defineComponent, onActivated, onDeactivated, h } from 'vue';
 import ActionButton from '../ActionButton.vue';
