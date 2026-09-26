@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/system-ui",
-  "version": "3.0.1",
+  "version": "3.0.2",
   "description": "expo-system-ui wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, Svelte, Solid, and Angular adapters. Sets and reads the root view's background color.",
   "keywords": [
     "react-native",

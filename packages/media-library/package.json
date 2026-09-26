@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/media-library",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "expo-media-library wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, Svelte, Solid, and Angular adapters. Matches upstream's own layout: the modern shared-object Query/Asset/Album API at the package root, and the legacy function-based API at the ./legacy subpath. Reads, saves and organizes the device's photo/video library (assets, albums, permissions, library-change events).",
   "license": "MIT",
   "repository": {
