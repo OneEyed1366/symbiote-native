@@ -114,10 +114,8 @@ jsi::Value probeUIManager(
 void installBindings(jsi::Runtime &runtime) {
   auto bindings = jsi::Object(runtime);
 
-  // THE SWITCH, pushed down from the same two places `debug.ts` reads. Done at install so a host
-  // that sets `__SYMBIOTE_DEBUG__` in its bootstrap (every example's `index.js` does) gets the C++
-  // half armed without calling anything; `setDebugEnabled` below is what a LATER toggle uses, since
-  // this read happens exactly once.
+  // Armed at install so a host's bootstrap-time __SYMBIOTE_DEBUG__/DEBUG=1 takes effect with no
+  // explicit call - this read happens once. `setDebugEnabled` below is for a LATER toggle.
   const auto flag = runtime.global().getProperty(runtime, "__SYMBIOTE_DEBUG__");
   const char *const env = std::getenv("DEBUG");
   setDebugEnabled(
@@ -131,8 +129,10 @@ void installBindings(jsi::Runtime &runtime) {
           runtime,
           jsi::PropNameID::forAscii(runtime, "setDebugEnabled"),
           1,
-          [](jsi::Runtime & /*rt*/, const jsi::Value & /*thisVal*/, const jsi::Value *args, size_t count)
-              -> jsi::Value {
+          [](jsi::Runtime & /*rt*/,
+             const jsi::Value & /*thisVal*/,
+             const jsi::Value *args,
+             size_t count) -> jsi::Value {
             if (count > 0 && args[0].isBool()) setDebugEnabled(args[0].getBool());
             return jsi::Value::undefined();
           }));
@@ -147,8 +147,10 @@ void installBindings(jsi::Runtime &runtime) {
           runtime,
           jsi::PropNameID::forAscii(runtime, "takeDebugLog"),
           0,
-          [](jsi::Runtime &rt, const jsi::Value & /*thisVal*/, const jsi::Value * /*args*/, size_t /*count*/)
-              -> jsi::Value {
+          [](jsi::Runtime &rt,
+             const jsi::Value & /*thisVal*/,
+             const jsi::Value * /*args*/,
+             size_t /*count*/) -> jsi::Value {
             const std::vector<std::string> lines = takeDebugLog();
             auto out = jsi::Array(rt, lines.size());
             for (size_t at = 0; at < lines.size(); at += 1)
@@ -168,15 +170,13 @@ void installBindings(jsi::Runtime &runtime) {
       jsi::Function::createFromHostFunction(
           runtime, jsi::PropNameID::forAscii(runtime, "probeUIManager"), 0, probeUIManager));
 
-  // One tree per runtime, and it holds NOTHING — a node's owner is the JS placeholder object,
-  // through `NativeState`. So this instance exists only to give the methods a `this` to hang off,
-  // and a per-call one would work identically. It is shared because an earlier version DID hold a
-  // table, and keeping the shape makes the diff that removed it readable.
+  // Holds nothing - a node's owner is the JS placeholder object via NativeState; this only gives
+  // the methods a `this` to hang off, so a per-call instance would work identically.
   auto tree = std::make_shared<Tree>();
 
-  // Installed by name rather than through a switch so a JS caller's mistake is `undefined is not a
-  // function` at the call site, instead of a runtime string comparison failing somewhere inside C++.
-  // `isBindings` in `native-engine.ts` checks these names one by one for the same reason.
+  // Installed by name, not a switch, so a JS caller's mistake reads `undefined is not a function`
+  // at the call site rather than a string comparison failing inside C++. `isBindings` in
+  // native-engine.ts checks these same names for the same reason.
   const auto install = [&](const char *name,
                            unsigned int arity,
                            jsi::Value (Tree::*method)(jsi::Runtime &, const jsi::Value *, size_t)) {
@@ -197,9 +197,9 @@ void installBindings(jsi::Runtime &runtime) {
   // The one member on a commit path.
   install("applyOps", 5, &Tree::applyOps);
 
-  // The reads — value and structural — and the imperative six. All of them take the same placeholder
-  // object `applyOps` attached the node to, and none is on a commit path: they run at gesture or
-  // lifecycle rate. `census` is deliberately absent; see `native-tree-host.ts`.
+  // The reads (value and structural) plus the imperative six, all keyed off the same placeholder
+  // `applyOps` attached to the node; none sit on a commit path, they run at gesture/lifecycle rate.
+  // `census` is deliberately absent - see native-tree-host.ts.
   install("getProp", 2, &Tree::getProp);
   install("getProps", 1, &Tree::getProps);
   install("markPropsDirty", 1, &Tree::markPropsDirty);
@@ -223,6 +223,7 @@ void installBindings(jsi::Runtime &runtime) {
   install("measure", 2, &Tree::measure);
   install("measureInWindow", 2, &Tree::measureInWindow);
   install("measureLayout", 4, &Tree::measureLayout);
+  install("getBoundingClientRect", 2, &Tree::getBoundingClientRect);
   install("setIsJSResponder", 3, &Tree::setIsJSResponder);
 
   // Diagnostic, read on demand rather than per op. See `Tree::readSurfaceTelemetry`.

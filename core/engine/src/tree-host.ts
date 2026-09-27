@@ -168,6 +168,20 @@ export type ITreeHost = {
     isResponder: boolean,
     blockNativeResponder: boolean,
   ) => void;
+
+  // Synchronous, unlike the six above. Optional so a native binary predating it still passes
+  // `isBindings`; `undefined` means "not built with this yet", not "no layout".
+  getBoundingClientRect?: (
+    handle: object,
+    includeTransform: boolean,
+  ) => IDomRect | undefined;
+};
+
+export type IDomRect = {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
 };
 
 let host: ITreeHost | undefined;

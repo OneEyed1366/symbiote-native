@@ -113,9 +113,11 @@ export {
   measure,
   measureInWindow,
   measureLayout,
+  getBoundingClientRect,
   disposeRoot,
   requestCommitFor,
 } from './imperative';
+export type { IDomRect } from './tree-host';
 // The tree host: the seam a runtime installs to answer about the tree JS does not hold. `setTreeHost`
 // is what `installFabric()` (@symbiote-native/test-utils) calls with the TypeScript applier.
 export {

@@ -239,6 +239,12 @@ class Tree {
       facebook::jsi::Runtime &runtime,
       const facebook::jsi::Value *arguments,
       size_t count);
+  // Synchronous, unlike the four above - no callback. Throws where SYMBIOTE_HAS_DOM_MEASURE is
+  // undetected, same as they do; JS callers must catch it (see imperative.ts).
+  facebook::jsi::Value getBoundingClientRect(
+      facebook::jsi::Runtime &runtime,
+      const facebook::jsi::Value *arguments,
+      size_t count);
   facebook::jsi::Value setIsJSResponder(
       facebook::jsi::Runtime &runtime,
       const facebook::jsi::Value *arguments,

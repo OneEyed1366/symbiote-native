@@ -2408,6 +2408,10 @@ jsi::Value Tree::measureLayout(jsi::Runtime &runtime, const jsi::Value *, size_t
   throw jsi::JSError(runtime, "symbiote engine: measureLayout is not built on this platform");
 }
 
+jsi::Value Tree::getBoundingClientRect(jsi::Runtime &runtime, const jsi::Value *, size_t) {
+  throw jsi::JSError(runtime, "symbiote engine: getBoundingClientRect is not built on this platform");
+}
+
 #else
 
 jsi::Value Tree::measure(jsi::Runtime &runtime, const jsi::Value *arguments, size_t count) {
@@ -2469,6 +2473,37 @@ jsi::Value Tree::measureInWindow(
        jsi::Value{runtime, rect.width},
        jsi::Value{runtime, rect.height}});
   return jsi::Value::undefined();
+}
+
+// No callback, unlike its siblings above - the JS caller (imperative.ts) expects a direct return.
+// `undefined` (no revision yet) reads the same as an uncommitted node to that caller.
+jsi::Value Tree::getBoundingClientRect(
+    jsi::Runtime &runtime,
+    const jsi::Value *arguments,
+    size_t count) {
+  if (count < 2) {
+    throw jsi::JSError(
+        runtime, "symbiote engine: expected getBoundingClientRect(handle, includeTransform)");
+  }
+  const auto node = nodeFrom(runtime, arguments[0].asObject(runtime), "getBoundingClientRect");
+  const bool includeTransform = arguments[1].getBool();
+
+  auto revision = node->committed == nullptr
+      ? nullptr
+      : uiManagerFor(runtime, "getBoundingClientRect")
+            .getShadowTreeRevisionProvider()
+            ->getCurrentRevision(node->committed->getSurfaceId());
+  if (revision == nullptr) {
+    return jsi::Value::undefined();
+  }
+
+  auto rect = react::dom::getBoundingClientRect(revision, *node->committed, includeTransform);
+  auto result = jsi::Object(runtime);
+  result.setProperty(runtime, "x", jsi::Value(rect.x));
+  result.setProperty(runtime, "y", jsi::Value(rect.y));
+  result.setProperty(runtime, "width", jsi::Value(rect.width));
+  result.setProperty(runtime, "height", jsi::Value(rect.height));
+  return result;
 }
 
 jsi::Value Tree::measureLayout(

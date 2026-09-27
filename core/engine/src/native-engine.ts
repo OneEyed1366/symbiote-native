@@ -130,6 +130,11 @@ export type INativeEngineBindings = {
     isResponder: boolean,
     blockNativeResponder: boolean,
   ) => void;
+  // Synchronous, matching nativeFabricUIManager's own shape. Optional: an older binary predates it.
+  getBoundingClientRect?: (
+    handle: object,
+    includeTransform: boolean,
+  ) => { x: number; y: number; width: number; height: number } | undefined;
   // RN's own commit telemetry for any surface, including one this host never drove. Optional: read
   // with ?., so a pod predating it degrades instead of throwing. Treat an absent member as "no
   // answer", never as zeroes — a zero reads as "React's commit measures no text".
@@ -196,36 +201,37 @@ declare global {
   var __symbioteEngineNative: unknown;
 }
 
+// A member missing from this list resolves fine at bring-up and throws at the first call site
+// instead. `getBoundingClientRect` stays out on purpose: it is optional on the type.
+const REQUIRED_METHOD_NAMES: readonly (keyof INativeEngineBindings)[] = [
+  'allocInt32Array',
+  'probeUIManager',
+  'applyOps',
+  'getProp',
+  'getProps',
+  'markPropsDirty',
+  'getViewName',
+  'parentOf',
+  'childrenOf',
+  'firstChildOf',
+  'nextSiblingOf',
+  'parentsOf',
+  'subtreesOf',
+  'teardownSubtreesOf',
+  'ancestorsOf',
+  'committedRecordOf',
+  'dispatchCommand',
+  'sendAccessibilityEvent',
+  'measure',
+  'measureInWindow',
+  'measureLayout',
+  'setIsJSResponder',
+];
+
 function isBindings(value: unknown): value is INativeEngineBindings {
   if (!isRecord(value)) return false;
   if (typeof value.version !== 'number') return false;
-  if (typeof value.allocInt32Array !== 'function') return false;
-  if (typeof value.probeUIManager !== 'function') return false;
-  if (typeof value.applyOps !== 'function') return false;
-  // The tree reads, checked one by one: a member added to the type without a line here resolves
-  // fine at bring-up and throws at the first call site — a gesture or a measure() — one language
-  // and several seconds away from the install that caused it.
-  if (typeof value.getProp !== 'function') return false;
-  if (typeof value.getProps !== 'function') return false;
-  if (typeof value.markPropsDirty !== 'function') return false;
-  if (typeof value.getViewName !== 'function') return false;
-  if (typeof value.parentOf !== 'function') return false;
-  if (typeof value.childrenOf !== 'function') return false;
-  if (typeof value.firstChildOf !== 'function') return false;
-  if (typeof value.nextSiblingOf !== 'function') return false;
-  if (typeof value.parentsOf !== 'function') return false;
-  if (typeof value.subtreesOf !== 'function') return false;
-  if (typeof value.teardownSubtreesOf !== 'function') return false;
-  if (typeof value.ancestorsOf !== 'function') return false;
-  if (typeof value.committedRecordOf !== 'function') return false;
-  // The imperative six, checked by name: a pod with applyOps but not these is an older binary,
-  // and accepting it means measure() reaches a missing method at gesture time, not bring-up.
-  if (typeof value.dispatchCommand !== 'function') return false;
-  if (typeof value.sendAccessibilityEvent !== 'function') return false;
-  if (typeof value.measure !== 'function') return false;
-  if (typeof value.measureInWindow !== 'function') return false;
-  if (typeof value.measureLayout !== 'function') return false;
-  return typeof value.setIsJSResponder === 'function';
+  return REQUIRED_METHOD_NAMES.every(name => typeof value[name] === 'function');
 }
 
 // SUPPORTED_NATIVE_VERSION guards a memory layout, not a member list: the shape guard above
