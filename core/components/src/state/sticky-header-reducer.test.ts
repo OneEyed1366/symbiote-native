@@ -144,12 +144,9 @@ describe('reduceSticky layout — rebuild-interpolation ranges', () => {
       first.effects.some(effect => effect.kind === 'rebuild-interpolation'),
     ).toBe(true);
 
-    // A parent re-render can re-dispatch 'inputs-changed' off a freshly-recomputed
-    // nextHeaderLayoutY (e.g. VirtualizedList re-deriving it from its cross-talk Map on every
-    // reactive pass) even when the VALUE is identical — this must NOT rebuild again, or a
-    // native-driven header would reconnect on every unrelated parent update (device-confirmed
-    // 2026-08-13: this was a second, independent source of the effect_update_depth_exceeded loop
-    // the 'layout' guard alone didn't cover).
+    // A parent re-render can re-dispatch 'inputs-changed' off a freshly-recomputed value even
+    // when it's identical — this must NOT rebuild again, or a native-driven header would
+    // reconnect on every unrelated parent update.
     const redundant = reduceSticky(
       first.state,
       { kind: 'inputs-changed' },
@@ -159,14 +156,9 @@ describe('reduceSticky layout — rebuild-interpolation ranges', () => {
     expect(redundant.changed).toBe(false);
   });
 
-  // REGRESSION (2026-08-14). The redundant-ranges guard above compares freshly derived ranges
-  // against the ones already in state — and the INITIAL state holds the identity ranges, which is
-  // exactly what an unmeasured header derives. So the guard, as first written, swallowed the very
-  // FIRST dispatch: Angular's ScrollViewStickyHeader sends `inputs-changed` from ngOnInit before
-  // any layout has happened, got `changed: false` with no effects, never ran change detection, and
-  // never committed its wrapper at all — `scroll-view-projection.test.ts` went red looking for a
-  // `collapsable: false` node that was never created. "Derives the same values as the initial
-  // placeholder" is not the same as "has already been emitted", and only the latter may skip.
+  // The redundant-ranges guard compares derived ranges against state — and the INITIAL state
+  // holds the same identity ranges an unmeasured header derives. Only "already emitted" may skip
+  // a rebuild, or the FIRST dispatch (Angular's ngOnInit, before any layout) never commits.
   it('DOES emit the first rebuild even though an unmeasured header derives the identity ranges', () => {
     const initial = createInitialStickyState();
     const first = reduceSticky(
@@ -237,9 +229,8 @@ describe('reduceSticky layout — redundant-geometry guard', () => {
     ).toBe(true);
 
     // Yoga legitimately re-fires onLayout with identical geometry (relayout passes, sibling
-    // changes, a native-driven prop commit) — a redundant rebuild here is what let a native-driven
-    // AnimatedView commit provoke another relayout, an unbounded same-tick ping-pong that crashed
-    // with Svelte's effect_update_depth_exceeded (device-confirmed 2026-08-13).
+    // changes, a native-driven prop commit) — a redundant rebuild here can provoke another
+    // relayout, an unbounded same-tick ping-pong.
     const redundant = reduceSticky(
       first.state,
       { kind: 'layout', y: 100, height: 40 },

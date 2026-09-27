@@ -162,16 +162,12 @@ describe('Svelte: `button` as a tag', () => {
 
     const [view] = host.children;
     const [text] = view.children;
-    // The label's STYLE left on 2026-09-18 — `foldButtonLabelStyle` in `SymbioteFabricProps.cpp`,
-    // reached off the label text's own tag and reading the button through `IAncestorLookup`. This
-    // harness builds its payload through the TypeScript `fabricProps`, which carries no copy of the
-    // tag rules, so the base blue and the margin are `core/engine/cpp/tests/js/
-    // button-derived-payload.itest.ts`'s now. The SUBTREE SHAPE, which is what this adapter
-    // contributes, is what stays.
-    //
-    // RN's two Text DEFAULTS left the same way on 2026-09-18, for the same reason one layer along:
-    // five copies of the rule collapsed into the engine's `foldTextDefaults`, so this harness no
-    // longer applies them. `button-derived-payload.itest.ts` reads them off the label's real payload.
+    // The label's STYLE is `foldButtonLabelStyle` in `SymbioteFabricProps.cpp`, reached off the
+    // label text's own tag via `IAncestorLookup`. This harness's `fabricProps` carries no copy —
+    // base blue/margin are `button-derived-payload.itest.ts`'s. The SUBTREE SHAPE is what stays.
+
+    // RN's two Text DEFAULTS are the engine's `foldTextDefaults` now, so this harness no longer
+    // applies them — `button-derived-payload.itest.ts` reads them off the label's real payload.
     expect(text.children[0].payload.text).toBe('Save');
 
     unmount(root);
@@ -184,12 +180,9 @@ describe('Svelte: `button` as a tag', () => {
   // The a11y half went to `core/engine/cpp/tests/js/pressable-payload.itest.ts`: Button composes
   // the pressable rule, that rule is the engine's now, and this harness's payload is built by the
   // TypeScript `fabricProps`, which holds no copy of it.
-  // THE GREYING CASE LEFT ON 2026-09-18. `disabled` greys the label and wins over an explicit
-  // `color` (RN pushes the disabled colour after the tint), and that whole expression is
-  // `foldButtonLabelStyle` in `SymbioteFabricProps.cpp` now — including the three-way `disabled`
-  // resolution it shares with the button's `focusable`. It is asserted against the committed payload
-  // in `core/engine/cpp/tests/js/button-derived-payload.itest.ts`, with the aria-disabled arm beside
-  // it.
+  // THE GREYING CASE: `disabled` greys the label and wins over an explicit `color` — that whole
+  // expression, including the three-way `disabled` resolution shared with `focusable`, is
+  // `foldButtonLabelStyle` in C++ now. Asserted in `button-derived-payload.itest.ts`.
   //
   // Nothing about THIS adapter went with it: its part is driving the tag so the subtree exists at
   // all, which the case above holds.

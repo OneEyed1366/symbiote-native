@@ -99,10 +99,9 @@ function listenerOf(node: ISymbioteNode, name: string): IListener {
 // the FIRST case's tree for every case after it — green on case one and quietly wrong after.
 let currentRoot: ISymbioteNode | undefined;
 
-// BY POSITION, not by the `testID` the owner clones onto the child. It was the cloned id until
-// 2026-09-18, when the clone moved to `foldCloneOntoChild` in C++ and this host — which builds its
-// payloads through the TypeScript `fabricProps`, carrying no copy of the tag rules — stopped seeing
-// it. The tag guarantees the position anyway: one child in, one node out.
+// BY POSITION, not the `testID` the owner clones onto the child — this host's payloads come from
+// TypeScript `fabricProps`, which carries no copy of the C++ clone rule. The tag guarantees
+// position anyway: one child in, one node out.
 function subject(): ILiveNode {
   if (currentRoot === undefined) throw new Error('nothing was mounted');
   const root = live.findLive(
@@ -135,21 +134,9 @@ describe('touchable-native-feedback host behavior on Android', () => {
     expect(subject().children).toHaveLength(0);
   });
 
-  // THE TWO BACKGROUND CASES LEFT THIS FILE ON 2026-09-18 AND HAVE NO NEW HOME — a coverage LOSS,
-  // recorded rather than papered over. `foldCloneOntoChild`'s background half is `#ifdef ANDROID` in
-  // `SymbioteFabricProps.cpp`, so it is not compiled into the test host at all, and mocking
-  // `Platform.OS` no longer reaches it: what that mock steered was a JS function that no longer
-  // exists.
-  //
-  // What went: the default `selectableItemBackground` landing in `nativeBackgroundAndroid`, an
-  // explicit `background` dict being honoured, `useForeground` picking the other slot, and neither
-  // `background` nor `useForeground` reaching Fabric raw.
-  //
-  // It is the same hole `android_ripple`, `underlineColorAndroid` and `decelerationRate` already
-  // carry, and it is a PROPERTY of porting a platform-split rule: a compile-time branch is only
-  // testable in a build that compiles it. Closing it means an Android arm of the test host, not a
-  // mock. The half that IS reachable — that neither slot is written off Android — is asserted in
-  // `core/engine/cpp/tests/js/clone-onto-child-payload.itest.ts`.
+  // THE TWO BACKGROUND CASES HAVE NO HOME HERE: `foldCloneOntoChild`'s Android half is `#ifdef
+  // ANDROID` in `SymbioteFabricProps.cpp`, unreachable by mocking `Platform.OS`. The reachable
+  // half (neither slot writes off Android) lives in `clone-onto-child-payload.itest.ts`.
 
   // :230-252. Without these the drawable is installed and never animates: the JS responder consumes
   // the touch, so Android's own pressed-state handling never fires and the child looks dead while

@@ -289,6 +289,24 @@ describe('negative — guards and unavailable native methods', () => {
         await expect(getItemAsync(key)).resolves.toBe('stored');
       },
     );
+
+    // Ported from expo-secure-store's SecureStore-test.native.ts ("checks for invalid keys") —
+    // upstream's key param is typed `string`, but a caller without type checking can still pass
+    // any of these; `typeof key !== 'string'` in ensureValidKey is what catches them.
+    it.each([
+      [null, 'null'],
+      [true, 'a boolean'],
+      [{}, 'an object'],
+      [() => {}, 'a function'],
+    ])('getItemAsync rejects (%s) as a key', async key => {
+      // @ts-expect-error -- the guard exists precisely for callers without type checking
+      await expect(getItemAsync(key)).rejects.toThrow(
+        /Invalid key provided to SecureStore/,
+      );
+      expect(
+        FAKE_NATIVE_SECURE_STORE.getValueWithKeyAsync,
+      ).not.toHaveBeenCalled();
+    });
   });
 
   // why: values reach setItem(Async) from JS callers that TypeScript can't police — the runtime
@@ -297,6 +315,21 @@ describe('negative — guards and unavailable native methods', () => {
     it('setItemAsync rejects a non-string value', async () => {
       // @ts-expect-error -- the guard exists precisely for callers without type checking
       await expect(setItemAsync('token', { a: 1 })).rejects.toThrow(
+        /Values must be strings; consider JSON-encoding/,
+      );
+      expect(
+        FAKE_NATIVE_SECURE_STORE.setValueWithKeyAsync,
+      ).not.toHaveBeenCalled();
+    });
+
+    // Ported from expo-secure-store's SecureStore-test.native.ts ("checks for invalid values").
+    it.each([
+      [null, 'null'],
+      [true, 'a boolean'],
+      [() => {}, 'a function'],
+    ])('setItemAsync rejects (%s) as a value', async value => {
+      // @ts-expect-error -- the guard exists precisely for callers without type checking
+      await expect(setItemAsync('token', value)).rejects.toThrow(
         /Values must be strings; consider JSON-encoding/,
       );
       expect(

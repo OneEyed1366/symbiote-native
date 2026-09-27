@@ -1,0 +1,225 @@
+---
+title: Media library
+description: expo-media-library wrapped for every SymbioteNative adapter — the modern Query/Asset/Album shared-object API, plus the full legacy function-based surface at /legacy.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+`@symbiote-native/media-library` wraps
+[`expo-media-library`](https://github.com/expo/expo/tree/main/packages/expo-media-library) for
+every SymbioteNative adapter. Both of upstream's surfaces are ported: the default export is the
+modern `Query`/`Asset`/`Album` API built on JSI shared objects; the legacy function-based API lives
+at the `/legacy` subpath. Reads, saves, and organizes the device's photo/video library — assets,
+albums, permissions (including the granular Android 13+ and limited-access iOS/Android 14+
+pickers), and library-change events.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | ✅ live |
+| Android     | ✅ live |
+
+| Framework adapter | Support |
+| ------------------ | ------- |
+| React              | ✅ live |
+| Vue                | ✅ live |
+| Angular            | ✅ live |
+| Svelte             | ✅ live |
+| Solid              | ✅ live |
+
+## Installation
+
+```sh
+npm install @symbiote-native/media-library
+```
+
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --media-library` (or
+`add --media-library` in an existing app) installs and wires this for you — see
+[`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
+
+`expo-media-library` and `expo-modules-core` come along as regular dependencies, pinned to exact
+versions — never install them yourself, and never add the `expo` meta-package to your project.
+
+<Aside type="danger" title="Native setup is required before first use">
+  Follow [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first. Two iOS
+  `Info.plist` usage-description keys
+  (`NSPhotoLibraryUsageDescription`/`NSPhotoLibraryAddUsageDescription`) are
+  wired automatically with generic default text. Android's
+  `requestLegacyExternalStorage="true"` attribute is also wired
+  automatically — required for scoped-storage compatibility on Android 10+.
+</Aside>
+
+<Aside type="caution" title="Android runtime permissions are not auto-wired">
+  Add whichever of these your app needs to its own `AndroidManifest.xml`:
+  `READ_EXTERNAL_STORAGE`, `WRITE_EXTERNAL_STORAGE`,
+  `READ_MEDIA_VISUAL_USER_SELECTED`, `READ_MEDIA_IMAGES`, `READ_MEDIA_VIDEO`,
+  `READ_MEDIA_AUDIO`, and — only if reading GPS out of an asset's EXIF data —
+  `ACCESS_MEDIA_LOCATION`. `READ_MEDIA_IMAGES`/`READ_MEDIA_VIDEO`/
+  `READ_MEDIA_AUDIO` are the granular Android 13+ permissions — pass the
+  matching subset as `requestPermissionsAsync(false, [...])`'s second
+  argument; omitting one here means Android silently refuses that grant
+  regardless of what the app asks for at runtime.
+</Aside>
+
+## Usage
+
+```ts
+import { Query, Asset, Album, AssetField, requestPermissionsAsync } from '@symbiote-native/media-library';
+
+const { granted } = await requestPermissionsAsync(false, ['photo']);
+if (granted) {
+  const asset = await Asset.create(photoUri);
+  const album = await Album.create('My Album', [asset]);
+
+  const recentPhotos = await new Query()
+    .eq(AssetField.MEDIA_TYPE, 'image' as never)
+    .orderBy(AssetField.CREATION_TIME)
+    .limit(20)
+    .exe();
+}
+```
+
+Identical import surface on every adapter — `@symbiote-native/media-library/react`, `/vue`,
+`/svelte`, `/solid`, `/angular` all re-export the same classes.
+
+## API
+
+### `Query`
+
+Builder pattern — every filter/sort method returns the same instance for chaining.
+
+```ts
+new Query()
+.eq(field, value) / .within(field, value[]) / .gt(field, value) / .gte(field, value) /
+.lt(field, value) / .lte(field, value)                              // AssetField-keyed filters
+.limit(n) / .offset(n)
+.orderBy(sortDescriptor | AssetField)
+.album(album: Album)
+.exe(): Promise<Asset[]>
+.exeForMetadata(): Promise<AssetMetadata[]>                          // lightweight fields only
+```
+
+### `Asset`
+
+```ts
+new Asset(id: string)
+static create(filePath, album?): Promise<Asset>
+static delete(assets: Asset[]): Promise<void>
+
+.id
+.getCreationTime() / .getModificationTime(): Promise<number | null>
+.getDuration(): Promise<number | null>                              // audio/video only
+.getFilename() / .getUri(): Promise<string>
+.getWidth() / .getHeight(): Promise<number>
+.getMediaType(): Promise<MediaType>
+.getShape(): Promise<Shape | null>
+.getInfo(): Promise<AssetInfo>
+.getAlbums(): Promise<Album[]>
+.getLocation(): Promise<Location | null>                            // android needs ACCESS_MEDIA_LOCATION
+.getExif(): Promise<Record<string, unknown>>
+.getFavorite(): Promise<boolean> / .setFavorite(isFavorite): Promise<void>
+.delete(): Promise<void>
+.getMediaSubtypes(): Promise<MediaSubtype[]>                        // ios only
+.getLivePhotoVideoUri(): Promise<string | null>                     // ios only
+.getIsInCloud(): Promise<boolean>                                   // ios only
+.getOrientation(): Promise<number | null>                           // ios only
+```
+
+### `Album`
+
+```ts
+new Album(id: string)
+static create(name, assetsRefs, moveAssets?): Promise<Album>
+static delete(albums: Album[], deleteAssets?): Promise<void>
+static get(title): Promise<Album | null>
+static getAll(): Promise<Album[]>
+
+.id
+.getAssets(): Promise<Asset[]>
+.getTitle(): Promise<string>
+.add(assets: Asset | Asset[]): Promise<void>
+.removeAssets(assets: Asset[]): Promise<void>                       // ios only
+.delete(): Promise<void>
+```
+
+### Permissions and change events
+
+```ts
+requestPermissionsAsync(writeOnly?, granularPermissions?) /
+getPermissionsAsync(writeOnly?, granularPermissions?): Promise<PermissionResponse>
+usePermissions(options?)
+presentPermissionsPicker(mediaTypes?): Promise<void>                // android 14+ / ios
+addListener(listener) / removeAllListeners(): void
+```
+
+Plus the `AssetField`, `MediaType`, `MediaSubtype` runtime enums and the full `I*` type surface.
+
+### Errors
+
+Every native exception surfaces as an ordinary thrown `Error` or rejected `Promise` — no custom
+error-class hierarchy.
+
+| Trigger | When |
+| ------- | ---- |
+| Calling an `Asset`/`Album` method on an ID that no longer exists on the device | Native exception — "could not be found" |
+| `Asset.getMediaSubtypes()`/`.getLivePhotoVideoUri()`/`.getIsInCloud()`/`.getOrientation()` on Android | `UnavailabilityError` — thrown synchronously, iOS only |
+| `Album.removeAssets()` on Android | Native exception — an Android asset belongs to one album; delete it or add it to another instead |
+| `getLocation()` on Android without `ACCESS_MEDIA_LOCATION` | Rejects — needs that runtime permission |
+
+## Legacy API (`/legacy`)
+
+Upstream's original function-based surface — plain async functions over `expo-modules-core`
+instead of JSI shared objects.
+
+```ts
+import { requestPermissionsAsync, createAssetAsync, getAssetsAsync, addListener } from '@symbiote-native/media-library/legacy';
+
+const { granted } = await requestPermissionsAsync(false, ['photo']);
+if (granted) {
+  const asset = await createAssetAsync(photoUri);
+  const page = await getAssetsAsync({ first: 20, mediaType: 'photo' });
+
+  const subscription = addListener(event => {
+    console.log('library changed', event.hasIncrementalChanges);
+  });
+  // later: subscription.remove();
+}
+```
+
+### Legacy API reference
+
+```ts
+isAvailableAsync(): Promise<boolean>
+requestPermissionsAsync(writeOnly?, granularPermissions?) / getPermissionsAsync(writeOnly?, granularPermissions?): Promise<IMediaLibraryPermissionResponse>
+usePermissions(options?)
+presentPermissionsPickerAsync(mediaTypes?): Promise<void>                                   // android 14+ / ios
+createAssetAsync(localUri, album?): Promise<IMediaLibraryAsset>
+saveToLibraryAsync(localUri): Promise<void>
+addAssetsToAlbumAsync(assets, album, copy?): Promise<boolean>
+removeAssetsFromAlbumAsync(assets, album): Promise<boolean>
+deleteAssetsAsync(assets): Promise<boolean>
+getAssetInfoAsync(asset, options?): Promise<IMediaLibraryAssetInfo>
+getAssetContentUriAsync(asset): Promise<string>                                             // android
+getAlbumsAsync(options?) / getAlbumAsync(title): Promise<IMediaLibraryAlbum[] | IMediaLibraryAlbum>
+createAlbumAsync(albumName, asset?, copyAsset?, initialAssetLocalUri?): Promise<IMediaLibraryAlbum>
+deleteAlbumsAsync(albums, deleteAssets?): Promise<boolean>
+getAssetsAsync(options?): Promise<IMediaLibraryPagedInfo<IMediaLibraryAsset>>
+addListener(listener) / removeAllListeners(): void
+getMomentsAsync(): Promise<IMediaLibraryAlbum[]>                                            // ios
+migrateAlbumIfNeededAsync(album) / albumNeedsMigrationAsync(album): Promise<void | boolean>  // android R+
+setAssetFavoriteAsync(asset, isFavorite): Promise<boolean>                                  // ios
+MediaType, SortBy                                                                           // runtime constants
+```
+
+Plus the full `IMediaLibrary*` type surface.
+
+### Legacy notes
+
+- **`sortBy`'s single-tuple form must be double-nested.** `getAssetsAsync({ sortBy: [['creationTime', true]] })`
+  sorts by one key ascending; the unnested `sortBy: ['creationTime', true]` reads as two
+  independent (and here, invalid) sort keys. An upstream quirk, ported verbatim.
+- **`getAssetContentUriAsync` is Android-only** — a plain `content://` URI, still useful alongside
+  the modern `Asset`/`Query` API above.
+- **`getMomentsAsync` and `setAssetFavoriteAsync` are iOS-only**; `getAssetContentUriAsync`,
+  `migrateAlbumIfNeededAsync`, and `albumNeedsMigrationAsync` are Android-only or Android-R+-only.
+  Each throws (or, for the migration pair, resolves a safe default) on the wrong platform.

@@ -20,6 +20,8 @@ let sentIntent: { action: string; extras?: unknown } | undefined;
 let deviceHub: IDeviceHub | undefined;
 
 const INITIAL_URL = 'https://start-from-native';
+// The `nullthrows` package's message, which RN's Linking.js surfaces for a missing module.
+const NULLTHROWS = 'Got unexpected null or undefined';
 
 function isPresent<T>(value: unknown): value is T {
   return value !== null && value !== undefined;
@@ -174,29 +176,13 @@ describe('Linking (iOS build -> LinkingManager)', () => {
       ({ Linking: iosLinking } = await import('./index.ios'));
     });
 
-    // why: an app calling openURL before/without LinkingManager linked must get an
-    // informative rejection, not a hang or a generic native crash.
-    it('openURL rejects with an "unavailable" error', async () => {
-      await expect(iosLinking.openURL('https://x')).rejects.toThrow(
-        /unavailable/,
-      );
-    });
-
-    it('canOpenURL rejects with an "unavailable" error', async () => {
-      await expect(iosLinking.canOpenURL('https://x')).rejects.toThrow(
-        /unavailable/,
-      );
-    });
-
-    it('openSettings rejects with an "unavailable" error', async () => {
-      await expect(iosLinking.openSettings()).rejects.toThrow(/unavailable/);
-    });
-
-    // why: getInitialURL alone degrades to null instead of rejecting (RN parity --
-    // "no deep link launched this app" and "can't tell" are the same observable
-    // outcome to a caller), so an app can call it unconditionally at startup.
-    it('getInitialURL resolves null instead of rejecting', async () => {
-      await expect(iosLinking.getInitialURL()).resolves.toBeNull();
+    // why: RN calls `nullthrows(NativeLinkingManager).X()` (Linking.js), which throws
+    // SYNCHRONOUSLY — no promise is returned at all when the module is missing.
+    it('openURL, canOpenURL, openSettings and getInitialURL throw synchronously', () => {
+      expect(() => iosLinking.openURL('https://x')).toThrow(NULLTHROWS);
+      expect(() => iosLinking.canOpenURL('https://x')).toThrow(NULLTHROWS);
+      expect(() => iosLinking.openSettings()).toThrow(NULLTHROWS);
+      expect(() => iosLinking.getInitialURL()).toThrow(NULLTHROWS);
     });
   });
 });
@@ -227,13 +213,14 @@ describe('Linking (Android build -> IntentAndroid)', () => {
       ({ Linking: androidLinking } = await import('./index.android'));
     });
 
-    // why: unlike iOS (which always rejects 'Unsupported'), Android's sendIntent
-    // genuinely depends on IntentAndroid -- without it, the rejection must name
-    // the real cause (module unavailable), not silently no-op a launched intent.
-    it('sendIntent rejects with an "unavailable" error', async () => {
-      await expect(
+    // why: RN calls `nullthrows(NativeIntentAndroid).X()` (Linking.js) on Android — a missing
+    // IntentAndroid throws synchronously from every method, sendIntent and getInitialURL included.
+    it('every method throws synchronously', () => {
+      expect(() =>
         androidLinking.sendIntent('android.intent.action.VIEW'),
-      ).rejects.toThrow(/unavailable/);
+      ).toThrow(NULLTHROWS);
+      expect(() => androidLinking.openURL('https://x')).toThrow(NULLTHROWS);
+      expect(() => androidLinking.getInitialURL()).toThrow(NULLTHROWS);
     });
   });
 });

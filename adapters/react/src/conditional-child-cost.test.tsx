@@ -1,22 +1,6 @@
-// What a FALSE conditional child costs React, in both currencies.
-//
-// WHY IT MATTERS AND WHY A FABRIC COUNT CANNOT ANSWER IT. The benchmark's row-shape arm
-// (`examples/*/screens/BenchmarkScreen`) adds one TextInput per row under a condition, and its
-// acceptance criterion is that the CONTROL arm — `plain` — stays byte-identical to what it
-// committed before the arm existed. Stated in Fabric counters that criterion is satisfied by a
-// framework whose false branch still retains a node: an anchor never reaches the slot, so
-// `createNode` and `appendChild` do not move while the retained tree grows by one per row.
-//
-// Measured on the other adapters 2026-08-31, this is not hypothetical:
-//
-//   svelte  a false {#if}          +1 anchor per row   renderable unmoved
-//   vue     v-if false             +1 retained         createNode unmoved
-//   vue     a JSX ternary -> null  +1 retained         same cost, same blindness
-//
-// React's canary and the stock baseline both write the JSX ternary, so this is the arm every other
-// column is read against and a contaminated control is the worst failure available. `createAnchor`
-// (core/engine/src/node.ts) is the only producer of an anchor node and no file in this adapter
-// calls it — but "the grep says zero" is an inference, and the two arms below are a measurement.
+// What a FALSE conditional child costs React. A Fabric count alone cannot answer it: a framework
+// whose false branch still retains a node satisfies "byte-identical commit" while the retained
+// tree grows by one per row, since an anchor never reaches the slot (`createAnchor`, node.ts).
 import { describe, expect, it, afterEach, beforeEach } from 'vitest';
 import { parentOf, type ISymbioteNode } from '@symbiote-native/engine';
 import {

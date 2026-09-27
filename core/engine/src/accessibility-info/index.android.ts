@@ -13,6 +13,7 @@ import {
   type IEventSubscription,
 } from '../native-events';
 import { dlog } from '../debug';
+import { sendAccessibilityEventByTag } from '../fabric';
 import {
   isBoolean,
   routeSendAccessibilityEvent,
@@ -44,6 +45,8 @@ const ACCESSIBILITY_MODULE = 'AccessibilityInfo';
 const ANDROID_DEVICE_EVENT: Partial<
   Record<IAccessibilityChangeEventName, string>
 > = {
+  // RN's deprecated alias (AccessibilityInfo.js EventNames).
+  change: 'touchExplorationDidChange',
   screenReaderChanged: 'touchExplorationDidChange',
   reduceMotionChanged: 'reduceMotionDidChange',
   highTextContrastChanged: 'highTextContrastDidChange',
@@ -91,24 +94,25 @@ function getEmitter() {
   return deviceEventModule.getEmitter();
 }
 
-// Run a single-callback Android getter as a Promise. Resolves false when the module is
-// unlinked OR the optional method is absent on this host; mirrors RN's "missing query ->
-// false" contract for the cross-platform getters. The dlog records the miss.
+const MODULE_UNAVAILABLE = 'NativeAccessibilityInfoAndroid is not available';
+
+// Run a single-callback Android getter as a Promise, REJECTING when it cannot run, as RN does
+// (AccessibilityInfo.js): a required getter names the module, an optional one names itself.
 function queryState(
   pick: (
     module: INativeAccessibilityInfoAndroid,
   ) => ((s: IStateCallback) => void) | undefined,
   label: string,
+  isOptional = false,
 ): Promise<boolean> {
   const module = getModule();
-  if (module === null) {
-    dlog(`AccessibilityInfo(android).${label} -> no module (false)`);
-    return Promise.resolve(false);
-  }
-  const getter = pick(module);
-  if (getter === undefined) {
-    dlog(`AccessibilityInfo(android).${label} -> method absent (false)`);
-    return Promise.resolve(false);
+  const getter = module === null ? undefined : pick(module);
+  if (module === null || getter === undefined) {
+    const message = isOptional
+      ? `NativeAccessibilityInfoAndroid.${label} is not available`
+      : MODULE_UNAVAILABLE;
+    dlog(`AccessibilityInfo(android).${label} -> rejected: ${message}`);
+    return Promise.reject(new Error(message));
   }
   return new Promise(resolve => {
     getter.call(module, enabled => resolve(enabled));
@@ -134,11 +138,15 @@ class AccessibilityInfoAndroid implements IAccessibilityInfoStatic {
   }
 
   isGrayscaleEnabled(): Promise<boolean> {
-    return queryState(m => m.isGrayscaleEnabled, 'isGrayscaleEnabled');
+    return queryState(m => m.isGrayscaleEnabled, 'isGrayscaleEnabled', true);
   }
 
   isInvertColorsEnabled(): Promise<boolean> {
-    return queryState(m => m.isInvertColorsEnabled, 'isInvertColorsEnabled');
+    return queryState(
+      m => m.isInvertColorsEnabled,
+      'isInvertColorsEnabled',
+      true,
+    );
   }
 
   // iOS-only query; resolve false (RN parity).
@@ -150,6 +158,7 @@ class AccessibilityInfoAndroid implements IAccessibilityInfoStatic {
     return queryState(
       m => m.isHighTextContrastEnabled,
       'isHighTextContrastEnabled',
+      true,
     );
   }
 
@@ -167,6 +176,7 @@ class AccessibilityInfoAndroid implements IAccessibilityInfoStatic {
     return queryState(
       m => m.isAccessibilityServiceEnabled,
       'isAccessibilityServiceEnabled',
+      true,
     );
   }
 
@@ -195,10 +205,10 @@ class AccessibilityInfoAndroid implements IAccessibilityInfoStatic {
   // bare reactTag can't be resolved back to its SymbioteNode (the mirror is node-keyed), so
   // this best-effort path is a logged no-op. Callers should use sendAccessibilityEvent(node,
   // 'focus') with a host ref, which routes a real node through the slot.
+  // RN: legacySendAccessibilityEvent(tag, 'focus') -> bridgeless UIManager resolves the tag.
   setAccessibilityFocus(reactTag: number): void {
-    dlog(
-      `AccessibilityInfo(android).setAccessibilityFocus(${reactTag}) -> tag-only, no node to route (no-op)`,
-    );
+    dlog(`AccessibilityInfo(android).setAccessibilityFocus(${reactTag})`);
+    sendAccessibilityEventByTag(reactTag, 'focus');
   }
 
   // Recommended UI-change timeout for this user. Resolves the original when the module or

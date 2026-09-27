@@ -1,8 +1,6 @@
-// The `<safe-area-view>` tag's prop surface. The tag is matched by `SafeAreaViewElement`
-// (`../elements`) and commits a single `SafeAreaView` native view whose host insets its children to
-// the safe area; there is no JS-side translation to do, so the wrapper that used to fold
-// aria/role and forward a host bag was deleted 2026-09-10 — the engine's own aria fold and the
-// renderer's `id` -> `nativeID` alias cover both, on every path.
+// The `<safe-area-view>` tag's prop surface. The tag (`SafeAreaViewElement`) commits a single
+// `SafeAreaView` native view that insets its children; no wrapper component needed, since the
+// engine's own aria fold and the renderer's `id` -> `nativeID` alias already cover both.
 //
 // The type stays for a component forwarding a bag, and because `IAngularSafeAreaViewProps` is
 // public API. Mirrors React's ISafeAreaViewProps minus children, which Angular takes via

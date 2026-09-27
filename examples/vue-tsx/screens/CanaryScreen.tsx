@@ -573,25 +573,36 @@ const PlatformColorDemo = defineComponent({
           {/* backgroundColor stays dynamic (PlatformColor is a runtime-resolved opaque color object) */}
           <view
             class="color-tile"
-            style={{ backgroundColor: PlatformColor('systemBlue') }}
+            style={{
+              backgroundColor: PlatformColor(
+                'systemBlue',
+                '@android:color/holo_blue_dark',
+              ),
+            }}
           >
             <text class="tile-label">systemBlue</text>
           </view>
-          {/* backgroundColor / borderColor stay dynamic (DynamicColorIOS / PlatformColor) */}
-          <view
-            class="color-tile-bordered"
-            style={{
-              backgroundColor: DynamicColorIOS({
-                light: '#dcf3e8',
-                dark: '#2c3e50',
-              }),
-              borderColor: PlatformColor('separator'),
-            }}
-          >
-            <text class="bold-label" style={{ color: PlatformColor('label') }}>
-              dynamic
-            </text>
-          </view>
+          {/* backgroundColor / borderColor stay dynamic (DynamicColorIOS / PlatformColor).
+              DynamicColorIOS throws off iOS, as in RN. */}
+          {Platform.OS === 'ios' && (
+            <view
+              class="color-tile-bordered"
+              style={{
+                backgroundColor: DynamicColorIOS({
+                  light: '#dcf3e8',
+                  dark: '#2c3e50',
+                }),
+                borderColor: PlatformColor('separator'),
+              }}
+            >
+              <text
+                class="bold-label"
+                style={{ color: PlatformColor('label') }}
+              >
+                dynamic
+              </text>
+            </view>
+          )}
         </view>
       </view>
     );
@@ -924,6 +935,7 @@ const ParityDemo = defineComponent({
         <text class="section-label">FlatList · animated scrollToOffset</text>
         <FlatList
           ref={listRef}
+          nestedScrollEnabled
           data={parityRows}
           // ItemT is INFERRED from `data` — keyExtractor's item is typed {id,n} with no annotation
           // (the generic defineComponent pattern). onViewableItemsChanged proves the SAME ItemT
@@ -986,6 +998,7 @@ const ParityDemo = defineComponent({
         </text>
         <SectionList
           testID="sticky-section-list"
+          nestedScrollEnabled
           sections={paritySections}
           keyExtractor={(item: { id: string; label: string }) => item.id}
           stickySectionHeadersEnabled={true}
@@ -1533,6 +1546,7 @@ export const CanaryScreen = defineComponent({
             data={mvcpItems.value}
             keyExtractor={(item: { id: string; label: string }) => item.id}
             maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+            nestedScrollEnabled
             class="box-list160"
           >
             {/* The cell is the #item scoped slot — Vue's idiom (no renderItem prop). */}
@@ -1586,6 +1600,7 @@ export const CanaryScreen = defineComponent({
           </Animated.View>
           <Animated.ScrollView
             class="box-list160"
+            nestedScrollEnabled
             scrollEventThrottle={16}
             onScroll={onParityScroll}
           >
@@ -1617,10 +1632,9 @@ export const CanaryScreen = defineComponent({
             tap Freeze, then immediately drag the box — bar should still move
           </text>
 
-          {/* Modern style props reaching Fabric's C++ parser. Each is an A/B so the effect
-            is unmistakable on the dark theme. Kept as a dynamic style object here — the CSS
-            class form works equally well now (raw passthrough, 2026-07), see .gradient-card
-            below, this is just legacy demo wiring, not a remaining gap. */}
+          {/* Modern style props reaching Fabric's C++ parser. Each is an A/B so the effect is
+            unmistakable on the dark theme. Kept as a dynamic style object, legacy demo wiring —
+            the CSS class form works equally well too (see .gradient-card). */}
           {/* boxShadow: a BLUE glow (a black shadow is invisible on the near-black bg).
             PASS: a soft blue halo bleeds out around the panel. */}
           <view class="shadow-card" style={shadowCardExtra}>

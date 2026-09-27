@@ -12,6 +12,7 @@ import requireNativeLinkPackaged from './eslint-rules/require-native-link-packag
 import excludeTestsFromPublishedFiles from './eslint-rules/exclude-tests-from-published-files.js';
 import validNativeLinkManifest from './eslint-rules/valid-native-link-manifest.js';
 import coLocateModuleFiles from './eslint-rules/co-locate-module-files.js';
+import requireCliPackageCoverage from './eslint-rules/require-cli-package-coverage.js';
 
 // Flat config for the symbiote LIBRARY code only (core / adapters / packages).
 // The RN example apps own their formatting + lint via the @react-native eslint
@@ -112,7 +113,9 @@ export default defineConfig(
   // ── package.json hygiene: every publishable package (core/adapters/packages) needs a
   // README next to it, and the field set matching its detected tier (full-library /
   // codegen-view / native-proxy — see eslint-rules/require-package-fields.js). apps/* is
-  // excluded on purpose: apps/docs-site is a private Astro app, not an npm package. ──
+  // excluded on purpose: apps/docs-site is a private Astro app, not an npm package.
+  // require-cli-package-coverage only fires on packages/cli/package.json (it self-guards) —
+  // it checks that every OTHER packages/* dir is scaffoldable by the CLI. ──
   {
     files: ['{core,adapters,packages}/*/package.json'],
     language: 'json/json',
@@ -124,6 +127,7 @@ export default defineConfig(
           'require-package-fields': requirePackageFields,
           'require-native-link-packaged': requireNativeLinkPackaged,
           'exclude-tests-from-published-files': excludeTestsFromPublishedFiles,
+          'require-cli-package-coverage': requireCliPackageCoverage,
         },
       },
     },
@@ -132,6 +136,7 @@ export default defineConfig(
       'local/require-package-fields': 'error',
       'local/require-native-link-packaged': 'error',
       'local/exclude-tests-from-published-files': 'error',
+      'local/require-cli-package-coverage': 'error',
     },
   },
 

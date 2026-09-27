@@ -314,8 +314,8 @@ function findWantsResponder(
 // WITHOUT THIS A JS RESPONDER LOSES TO ANY SCROLL VIEW ABOVE IT, and it is invisible from JS:
 // `onStartShouldSetResponder` returns true, the native UIScrollView never learns the gesture was
 // claimed, and every subsequent move arrives as `topScroll` instead of `topTouchMove` — so the
-// negotiation never even gets a move to grant on. Device-diagnosed 2026-09-08 on a PanResponder
-// drag box inside the canary's ScrollView: `startShouldSet -> true` followed by
+// negotiation never even gets a move to grant on. Device-diagnosed on a PanResponder drag box
+// inside the canary's ScrollView: `startShouldSet -> true` followed by
 // `topScrollBeginDrag` and twenty `topScroll`, with no grant and no move.
 //
 // `blockNativeResponder` is the taker's own `onResponderGrant` return, exactly as RN reads it.
@@ -467,8 +467,15 @@ export function installEventHandler(): void {
       if (topLevelType === TOUCH_START) {
         // The ternary is gone with the gate: `isSymbioteNode(instanceHandle)` was re-asked here
         // three lines after the early return above already proved it.
-        if (isDebug())
+        if (isDebug()) {
           dlog(`event ${TOUCH_START} on ${instanceHandle.component}`);
+          // A responder surviving into a one-touch start lost its end/cancel. If it is an ancestor
+          // of the target, this whole tap goes to it and the release finally clears it.
+          if (currentResponder !== undefined)
+            dlog(
+              `touchStart while ${currentResponder.component} still holds the responder`,
+            );
+        }
         // Update the touch bank, then attach it so responder handlers (PanResponder)
         // read each touch's own previous->current delta; RN records before dispatch.
         recordTouchTrack('start', nativeEvent);
@@ -606,6 +613,10 @@ export function installEventHandler(): void {
       }
 
       if (topLevelType === TOUCH_CANCEL) {
+        // Android: a ScrollView whose scroller has not finished (fling tail, spring-back) intercepts
+        // the next down natively, and the tap reaches JS as start + cancel with no press.
+        if (isDebug())
+          dlog(`event ${TOUCH_CANCEL} on ${instanceHandle.component}`);
         recordTouchTrack('end', nativeEvent);
         attachTouchHistory(nativeEvent);
         // A cancel is scoped to the finger(s) removed from `touches`, just like an end. An unrelated

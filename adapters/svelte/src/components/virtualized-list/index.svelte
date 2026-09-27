@@ -12,8 +12,7 @@
   //
   // This file authors the raw `scroll-view` intrinsic directly, and needs to: it walks an indexable
   // `plan.cells` list rather than taking an opaque children Snippet, so it can mark sticky cells
-  // itself. (There is no ScrollView component to render instead — it was deleted 2026-09-10 and an
-  // app writes the tag too.)
+  // itself. (There is no ScrollView component to render instead — an app writes the tag too.)
   //
   // It does NOT author the CONTENT node. `registerScrollViewBehavior()` puts a `buildStructure` on
   // the scroll tags, and exactly one thing may build `RCTScrollContentView` — emitting one here as
@@ -109,6 +108,10 @@
 
   // The one folded state cell — the Svelte twin of Vue's plain listState / React's stateRef.
   const listState: IListState<ItemT> = createInitialListState<ItemT>();
+  // Plain Map by design, like listState above: separatorVersion (below) is the manual
+  // invalidation signal a read tracks — a SvelteMap would double-track and still miss nothing,
+  // but adds reactive overhead this hot path doesn't need.
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity
   const separatorOverrides = new Map<number, Partial<ISeparatorProps<ItemT>>>();
   let viewableTimer: ReturnType<typeof setTimeout> | null = null;
   let batchTimer: ReturnType<typeof setTimeout> | null = null;
@@ -154,6 +157,8 @@
       scrollEventThrottle: props.scrollEventThrottle,
       keyboardShouldPersistTaps: props.keyboardShouldPersistTaps,
       keyboardDismissMode: props.keyboardDismissMode,
+      removeClippedSubviews: props.removeClippedSubviews,
+      nestedScrollEnabled: props.nestedScrollEnabled,
       style: props.style,
       contentContainerStyle: props.contentContainerStyle,
       class: props.class,
@@ -437,11 +442,12 @@
     };
   });
 
+  // VirtualizedList.js: `[inversionStyle, style]` — the app's style can override the flip.
   const resolvedStyle = $derived(
     narrowed.inverted
       ? [
-          narrowed.style,
           narrowed.horizontal ? INVERTED_X_STYLE : INVERTED_Y_STYLE,
+          narrowed.style,
         ]
       : narrowed.style,
   );
@@ -482,6 +488,13 @@
     }
     if (narrowed.keyboardDismissMode !== undefined)
       bag.keyboardDismissMode = narrowed.keyboardDismissMode;
+    // RN's VirtualizedList spreads its props onto the ScrollView, this one included.
+    if (narrowed.removeClippedSubviews !== undefined)
+      bag.removeClippedSubviews = narrowed.removeClippedSubviews;
+    if (narrowed.nestedScrollEnabled !== undefined)
+      bag.nestedScrollEnabled = narrowed.nestedScrollEnabled;
+    // VirtualizedList.js:1111 — Android moves the scrollbar back after the `scale: -1` flip.
+    if (narrowed.inverted === true) bag.isInvertedVirtualizedList = true;
     // `stickyHeaderIndices` is deliberately NOT forwarded. The behavior honours it by numbering the
     // owner's own PAINT children, and this list's indices are into the DATA stream — a windowed
     // list paints a spacer, a header and a slice, so index 3 of the data is almost never paint

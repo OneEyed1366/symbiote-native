@@ -40,16 +40,25 @@ const PROPS_ARG_INDEX: Partial<Record<ICountedMethod, number>> = {
   cloneNodeWithNewChildrenAndProps: 1,
 };
 
+// `createNode(tag, viewName, rootTag, props, handle)` names the view second. The per-name tally is
+// the only instrument that tells two arms apart once their TOTALS disagree: a row that is ten views
+// by construction and nine createNode calls by measurement names the missing view here and nowhere
+// else. A total alone says the arms differ; this says which node.
+const VIEW_NAME_ARG_INDEX = 1;
+
 export type IFabricCallProfile = {
   calls: Record<string, number>;
   /** Total own enumerable keys across every props payload sent, by method. */
   propKeys: Record<string, number>;
+  /** createNode calls broken down by the view name asked for. */
+  createsByView: Record<string, number>;
   totalCalls: number;
   totalPropKeys: number;
 };
 
 const calls: Record<string, number> = {};
 const propKeys: Record<string, number> = {};
+const createsByView: Record<string, number> = {};
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -71,9 +80,15 @@ export function readFabricCallProfile(): IFabricCallProfile {
     calls[method] = 0;
     propKeys[method] = 0;
   }
+  const createsByViewSnapshot: Record<string, number> = {};
+  for (const viewName of Object.keys(createsByView)) {
+    createsByViewSnapshot[viewName] = createsByView[viewName] ?? 0;
+    delete createsByView[viewName];
+  }
   return {
     calls: callsSnapshot,
     propKeys: propKeysSnapshot,
+    createsByView: createsByViewSnapshot,
     totalCalls,
     totalPropKeys,
   };
@@ -84,6 +99,12 @@ function counting(original: unknown, method: ICountedMethod): unknown {
   const propsIndex = PROPS_ARG_INDEX[method];
   const wrapped = (...args: unknown[]): unknown => {
     calls[method] = (calls[method] ?? 0) + 1;
+    if (method === 'createNode') {
+      const viewName = args[VIEW_NAME_ARG_INDEX];
+      if (typeof viewName === 'string') {
+        createsByView[viewName] = (createsByView[viewName] ?? 0) + 1;
+      }
+    }
     if (propsIndex !== undefined) {
       const payload = args[propsIndex];
       if (isRecord(payload)) {

@@ -102,12 +102,9 @@ function target(): ILiveNode {
   return committed(node => node.payload.testID === TARGET);
 }
 
-// TouchableHighlight's underlay is `foldTouchableHighlightUnderlay` in the engine since 2026-09-18,
-// and this host builds payloads through the TypeScript `fabricProps`, which carries no copy of the
-// tag rules — so the painted colour is not readable here. The BIT is (`OP_SET_UNDERLAY_SHOWN`), and
-// it is what these cases actually claim: that SOLID's renderer reaches the machine. What a showing
-// underlay looks like is asserted on a real payload in
-// `core/engine/cpp/tests/js/touchable-highlight-underlay.itest.ts`.
+// TouchableHighlight's underlay is `foldTouchableHighlightUnderlay` in the engine, and this
+// host's `fabricProps` carries no copy — the painted colour is not readable here. The BIT
+// (`OP_SET_UNDERLAY_SHOWN`) is what these cases claim: that SOLID's renderer reaches the machine.
 //
 // Located by TAG rather than by testID: a `<touchable-highlight>` commits as a plain `RCTView`, so
 // the tag is the only exact locator.

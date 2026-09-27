@@ -162,11 +162,9 @@ describe('addLayersToApp', () => {
     expect(result.appliedLayers).toEqual(['navigation', 'slider']);
   });
 
-  // splash-screen is the one layer that touches 4 native files plus the App source on top of the
-  // dependency — all via the idempotent apply-splash-screen-* splices, never a whole-file overlay
-  // (see their own comments for why: a real app's native files may already be customized). The
-  // App-source hide() splice is a real bug fix (2026-09-18): without it, the native splash screen
-  // never hides itself and a real `add`-extended app freezes on it forever.
+  // splash-screen touches 4 native files plus the App source, all via idempotent
+  // apply-splash-screen-* splices, never a whole-file overlay. Without the App-source hide()
+  // splice, the native splash screen never hides and the app freezes on it.
   it('wires splash-screen: dependency + all 4 native splices + the App hide() call', async () => {
     const root = scaffold();
     const result = await addLayersToApp({

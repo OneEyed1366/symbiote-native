@@ -103,6 +103,13 @@ describe('Vue Modal on the engine', () => {
       expect(payloadOf(containerHandle()).backgroundColor).toBe('white');
     });
 
+    // why: Modal.js `defaultProps.visible = true` — a `<Modal>` without `visible` shows.
+    it('shows a modal written without visible, as RN defaults it', async () => {
+      mountModal({});
+      await tick();
+      expect(modalNode().props.visible).toBe(true);
+    });
+
     it('commits no modal node when visible is false', async () => {
       // why: shouldRenderModal must gate the FIRST mount too, not just a later visible->hidden
       // transition — an initially-invisible modal must never pay for a host node it never shows.
@@ -124,6 +131,44 @@ describe('Vue Modal on the engine', () => {
       await tick();
       fabric.fireEvent(modalNode().instanceHandle, 'topRequestClose', {});
       expect(closed).toBe(true);
+    });
+
+    // why: Modal.js (iOS) drops the keep-alive ONLY in its onDismiss handler — the node stays
+    // mounted through the native exit animation, then unmounts, then the app hears `dismiss`.
+    it('holds the modal on iOS until the native dismiss, then unmounts and emits dismiss', async () => {
+      const visible = ref(true);
+      let dismissed = 0;
+      mount(
+        ROOT_TAG,
+        defineComponent({
+          setup: () => () =>
+            h(
+              Modal,
+              {
+                visible: visible.value,
+                onDismiss: () => (dismissed += 1),
+              },
+              () => h('view'),
+            ),
+        }),
+      );
+      await tick();
+      const host = modalNode().instanceHandle;
+
+      visible.value = false;
+      await tick();
+      await tick();
+      expect(
+        live.findLive(live.appRoot(), n => n.viewName === 'ModalHostView'),
+      ).toBeDefined();
+
+      fabric.fireEvent(host, 'topDismiss', {});
+      await tick();
+      await tick();
+      expect(
+        live.findLive(live.appRoot(), n => n.viewName === 'ModalHostView'),
+      ).toBeUndefined();
+      expect(dismissed).toBe(1);
     });
 
     it('routes topShow to the show emit', async () => {
@@ -202,10 +247,9 @@ describe('Vue Modal on the engine', () => {
     });
 
     it('fires the dismiss emit only on the native topDismiss event, not on the hide transition', async () => {
-      // why: the keep-alive frame (state.isRendered staying true for one extra render on
-      // visible->hidden) must NOT be mistaken for the native "finished dismissing" signal — dismiss
-      // is a real animation-completion event from Fabric, not something JS can infer from its own
-      // state transition, or an app relying on onDismiss to release resources would do so too early.
+      // why: the hide transition must NOT be mistaken for the native "finished dismissing" signal —
+      // dismiss is a real animation-completion event from Fabric, or an app relying on onDismiss to
+      // release resources would do so too early.
       let dismissCount = 0;
       const visible = ref(true);
       mount(
@@ -226,18 +270,13 @@ describe('Vue Modal on the engine', () => {
       await tick();
       expect(dismissCount).toBe(0);
 
-      // Drive the native close: topRequestClose -> visible flips false. No dismiss emit fires from
-      // JS on this transition alone — the keep-alive's one extra render has already resolved by
-      // the next tick (the post-flush watch and the render it triggers both land inside it), so
-      // the node found below is the recorded one, not necessarily still in the live tree.
+      // Drive the native close: topRequestClose -> visible flips false. The node is held (iOS
+      // keep-alive) and no dismiss emit fires from JS on this transition.
       fabric.fireEvent(modalNode().instanceHandle, 'topRequestClose', {});
       await tick();
       expect(dismissCount).toBe(0);
 
-      // The native exit animation completes -> Fabric emits topDismiss on the recorded host node
-      // -> dismiss fires exactly once. The keep-alive frame is one render wide, so by now the node
-      // may already have left the LIVE tree; `fireEvent` targets the instanceHandle regardless of
-      // residency, same as a real device event racing the JS unmount would.
+      // The native exit animation completes -> Fabric emits topDismiss -> dismiss fires once.
       fabric.fireEvent(modalNode().instanceHandle, 'topDismiss', {});
       await tick();
       expect(dismissCount).toBe(1);

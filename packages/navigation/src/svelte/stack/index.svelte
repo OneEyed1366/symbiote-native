@@ -132,6 +132,9 @@
 
   // One emitter per route.key, created lazily the first time a route is rendered and pruned once
   // it is popped off the stack (the broadcast effect below).
+  // Plain Map: a get/set/delete identity cache never read by the reactive graph, not rendered
+  // state — SvelteMap's tracking would be pure overhead here.
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity
   const emitters = new Map<string, INavigationEmitter>();
   function emitterFor(routeKey: string): INavigationEmitter {
     let emitter = emitters.get(routeKey);

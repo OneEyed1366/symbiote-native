@@ -24,8 +24,11 @@ import './App.css';
 `@symbiote-native/css-parser` compiles the rule at build time; `className="card"`
 resolves it back at render time through a runtime class registry shared by
 every adapter. Plain CSS, CSS Modules, plus optional SCSS/Sass, Less, and
-Stylus preprocessing (`<style lang="scss">`, `.module.scss`, …) — no
-pseudo-classes, no media queries, nothing that needs a DOM to match.
+Stylus preprocessing (`<style lang="scss">`, `.module.scss`, …) — no media
+queries and no pseudo-classes, save `:active`, which survives because a press
+is the one state the engine tracks itself ([Styling
+guide](/docs/learn/styling/#what-is-not-css)). `:hover` and `:focus` have
+nothing to match and are dropped.
 
 ## Vue and Svelte also get an inline `<style>` block
 

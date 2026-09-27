@@ -62,17 +62,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-// RN's TWO TEXT DEFAULTS LEFT THIS RENDERER ENTIRELY ON 2026-09-18, in two steps a fortnight apart.
-// The SEED went first, to the payload builder — writing them as props cost a crossing every time an
-// app authored the same value (6 000 per 1 000-row create, `writesOfUnchanged`). What stayed was a
-// resolver for the clear-back path: a write of `undefined` looked up the default instead of clearing.
-//
-// That is gone too, and for the reason the seed was: `applyTextDefaults` (and its C++ twin) runs on
-// EVERY commit of every `RCTText`, so a cleared key is absent for exactly as long as it takes the
-// payload builder to supply the default again. The resolver was answering a question nothing asks.
-//
-// `PROP_ALIASES` (`id` -> `nativeID`) left this renderer on 2026-09-18 — `routeProp` resolves it
-// for every adapter now, so every path that can set a prop still reaches it.
+// RN's two TEXT DEFAULTS and `PROP_ALIASES` (`id` -> `nativeID`) are NOT resolved here: text
+// defaults run once per commit in `applyTextDefaults` (C++ twin included), and `routeProp` resolves
+// aliases for every adapter — every path that can set a prop still reaches both.
 // Angular's two-way sugar `[(value)]` compiles to a `(valueChange)` binding; the engine knows the
 // same fold as the function prop `onValueChange`. See `listen()`. The two names live in a leaf
 // module so `elements.ts`'s ControlValueAccessor can name them without importing this cyclic file.
@@ -81,8 +73,22 @@ import {
   createCallbackWrapper,
   flushViewFor,
   isWrappableCallback,
+  markReadBackNode,
   type ICallbackWrapper,
 } from '../change-detection-flush';
+
+// The tags whose behavior reads the app's answer back inside the event's own turn - the three
+// behaviors `../change-detection-flush` names, plus the multiline spelling of the input. Marked at
+// creation so a flush finds their view lazily instead of a directive instance per element.
+const READ_BACK_TAGS: ReadonlySet<string> = new Set([
+  'text-input',
+  'text-input-multiline',
+  'switch',
+  'refresh-control',
+]);
+
+// The property binding an RN StyleProp travels as; see `SymbioteElement.style`.
+const STYLE_PROP_BINDING = 'styleProp';
 
 // The app callbacks an engine behavior READS BACK inside the same microtask turn, as an Angular
 // `(event)` binding — `valueChange` is handled in `listen` on its own, since it also needs the field
@@ -253,6 +259,13 @@ export class SymbioteRenderer implements Renderer2 {
   // free of a second guard.
   private pendingStyleNode: ISymbioteNode | undefined;
   private pendingStyle: Record<string, unknown> = {};
+  // A node with no standing style is matched against a published style key by key, as Angular hands
+  // the keys over, and builds nothing while they match. Rows sharing a style then skip the
+  // accumulator and the shallow compare's two key arrays (~320 B a `view` on create). The first
+  // mismatch materializes the accumulator from the keys matched so far.
+  private matchCandidate: Record<string, unknown> | undefined;
+  private matchCandidateSize = 0;
+  private readonly matchedKeys: string[] = [];
   private pendingClassNode: ISymbioteNode | undefined;
   private readonly releaseBeforeFlush: () => void;
 
@@ -303,10 +316,20 @@ export class SymbioteRenderer implements Renderer2 {
   private flushStyling(): void {
     const styled = this.pendingStyleNode;
     if (styled !== undefined) {
-      const style = this.pendingStyle;
       this.pendingStyleNode = undefined;
-      this.pendingStyle = {};
-      routeProp(styled, 'style', this.canonicalStyle(style));
+      const candidate = this.matchCandidate;
+      if (
+        candidate !== undefined &&
+        this.matchedKeys.length === this.matchCandidateSize
+      ) {
+        this.matchCandidate = undefined;
+        routeProp(styled, 'style', candidate);
+      } else {
+        this.materializeMatch();
+        const style = this.pendingStyle;
+        this.pendingStyle = {};
+        routeProp(styled, 'style', this.canonicalStyle(style));
+      }
     }
     const classed = this.pendingClassNode;
     if (classed !== undefined) {
@@ -362,6 +385,8 @@ export class SymbioteRenderer implements Renderer2 {
    * this simply stops sharing — it never stops being correct.
    */
   private readonly publishedStyles: Record<string, unknown>[] = [];
+  // Key count of each entry above, index for index: how a key-by-key match knows it is complete.
+  private readonly publishedSizes: number[] = [];
 
   /** A published object equal to this one, or this one — which then becomes the published copy. */
   private canonicalStyle(
@@ -373,24 +398,82 @@ export class SymbioteRenderer implements Renderer2 {
       if (at > 0) {
         this.publishedStyles.splice(at, 1);
         this.publishedStyles.unshift(known);
+        this.publishedSizes.unshift(this.publishedSizes.splice(at, 1)[0]);
       }
       return known;
     }
     this.publishedStyles.unshift(style);
-    if (this.publishedStyles.length > STYLE_CACHE) this.publishedStyles.pop();
+    this.publishedSizes.unshift(Object.keys(style).length);
+    if (this.publishedStyles.length > STYLE_CACHE) {
+      this.publishedStyles.pop();
+      this.publishedSizes.pop();
+    }
     return style;
+  }
+
+  /** Open this node's style run (closing any other); a no-op when it is already the open one. */
+  private openRun(el: ISymbioteNode): void {
+    if (this.pendingStyleNode === el) return;
+    this.flushStyling();
+    this.pendingStyleNode = el;
+    // Seeded from what is STANDING, because Angular sends only the keys that changed — an update
+    // that moves one key must not drop the rest.
+    const current = getExplicitStyle(el);
+    if (isRecord(current)) {
+      this.pendingStyle = { ...current };
+      return;
+    }
+    this.isChoosingCandidate = true;
+    this.matchedKeys.length = 0;
+  }
+
+  // The FIRST key picks the candidate: a row alternates styles (row, cell, cell, input), so the
+  // front entry is usually the neighbour's.
+  private isChoosingCandidate = false;
+
+  private chooseCandidate(key: string, value: unknown): void {
+    this.isChoosingCandidate = false;
+    if (value === undefined) return;
+    for (let at = 0; at < this.publishedStyles.length; at += 1) {
+      const known = this.publishedStyles[at];
+      if (!Object.is(known[key], value)) continue;
+      this.matchCandidate = known;
+      this.matchCandidateSize = this.publishedSizes[at] ?? 0;
+      return;
+    }
+  }
+
+  /** Stop matching: write the keys matched so far into the accumulator the run goes on with. */
+  private materializeMatch(): void {
+    this.isChoosingCandidate = false;
+    const candidate = this.matchCandidate;
+    if (candidate === undefined) return;
+    this.matchCandidate = undefined;
+    for (const key of this.matchedKeys) this.pendingStyle[key] = candidate[key];
   }
 
   /** The accumulator for this node's style run, opening one (and closing any other) if needed. */
   private openStyleRun(el: ISymbioteNode): Record<string, unknown> {
-    if (this.pendingStyleNode === el) return this.pendingStyle;
-    this.flushStyling();
-    // Seeded from what is STANDING, because Angular sends only the keys that changed — an update
-    // that moves one key must not drop the rest.
-    const current = getExplicitStyle(el);
-    this.pendingStyle = isRecord(current) ? { ...current } : {};
-    this.pendingStyleNode = el;
+    this.openRun(el);
+    this.materializeMatch();
     return this.pendingStyle;
+  }
+
+  private writeStyle(el: ISymbioteNode, key: string, value: unknown): void {
+    this.openRun(el);
+    if (this.isChoosingCandidate) this.chooseCandidate(key, value);
+    const candidate = this.matchCandidate;
+    if (
+      candidate !== undefined &&
+      value !== undefined &&
+      Object.is(candidate[key], value) &&
+      !this.matchedKeys.includes(key)
+    ) {
+      this.matchedKeys.push(key);
+      return;
+    }
+    this.materializeMatch();
+    this.pendingStyle[key] = value;
   }
 
   createElement(name: string): IHostNode {
@@ -442,6 +525,7 @@ export class SymbioteRenderer implements Renderer2 {
     if (isDebug()) {
       dlog(`angular createElement ${name} -> ${descriptor.component}`);
     }
+    if (READ_BACK_TAGS.has(engineName)) markReadBackNode(node);
     return toPublicInstance(node);
   }
 
@@ -544,19 +628,9 @@ export class SymbioteRenderer implements Renderer2 {
     this.surface.requestCommit();
   }
 
-  // FlatList/VirtualizedList cells are content projected into a component host (our
-  // ANCHOR_HOST_COMPONENTS, e.g. ScrollView) — Angular's own addLViewToLContainer
-  // (.vendors/angular node_manipulation.ts/container.ts) treats a null parent here as "defer —
-  // the child component's own <ng-content>/ɵɵprojection will place this once its structure
-  // resolves" (e.g. ScrollView's `@if(isHorizontal)` branch). Renderer2's contract types this
-  // return as nullable for exactly that reason; returning `this.surface` as a non-null fallback
-  // defeated that defer check and caused premature top-level insertion (2026-07: FlatList cells
-  // rendered outside their ScrollView).
-  //
-  // Safe only because appendChild/insertBefore above now also treat a null parent as "skip, wait
-  // for projection" — a second Angular call site (`insertAnchorNode`, hit whenever a directive
-  // does `inject(ViewContainerRef)`, e.g. VListOutletDirective) forwards this null straight into
-  // insertBefore without checking it; without that guard it crashed on-device.
+  // FlatList/VirtualizedList cells project into a component host (ANCHOR_HOST_COMPONENTS, e.g.
+  // ScrollView); Angular defers insertion on a null parent until projection resolves, so a
+  // non-null fallback here breaks that. appendChild/insertBefore/insertAnchorNode skip null too.
   parentNode(node: IHostNode): IHostElement | null {
     return parentOf(node) ?? null;
   }
@@ -653,7 +727,7 @@ export class SymbioteRenderer implements Renderer2 {
     if (isSurface(el)) return;
     countAngular('rendererWrites');
     noteAngularStyleWrite(style);
-    this.openStyleRun(el)[style] = value;
+    this.writeStyle(el, style, value);
     this.surface.requestCommit();
   }
 
@@ -709,7 +783,11 @@ export class SymbioteRenderer implements Renderer2 {
       }
     }
     this.flushStyling();
-    routeProp(el, name, this.wrapCallback(el, name, value));
+    // `[styleProp]` IS `style`, carried as a plain property so an RN array or press-state callback
+    // reaches the engine whole instead of Angular's styling engine. Binding it beside `[style]` on one
+    // element makes the later write win - they are one prop.
+    const propName = name === STYLE_PROP_BINDING ? 'style' : name;
+    routeProp(el, propName, this.wrapCallback(el, propName, value));
     this.surface.requestCommit();
   }
 

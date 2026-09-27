@@ -1,9 +1,6 @@
-// Portal — the Svelte adapter's same-surface portal: the twin of React's `createPortal`
-// (adapters/react/src/create-portal/index.ts), Solid's `<Portal mount={…}>`
-// (adapters/solid/src/create-portal/index.tsx) and Angular's PortalDirective/PortalOutletDirective
-// pair. This adapter shipped `createTunnel` and no portal in any spelling until 2026-08-20; the
-// two do NOT overlap (see the table at the bottom of this header), so the tunnel was never a
-// substitute.
+// Portal — the Svelte adapter's same-surface portal: the twin of React's `createPortal`, Solid's
+// `<Portal mount={…}>` and Angular's PortalDirective/PortalOutletDirective pair. Does NOT overlap
+// with `createTunnel` (table at the bottom of this header) — the tunnel is not a substitute.
 //
 // WHY IT IS A COMPONENT (`<Portal mount={…}>`) AND NOT A CALL (`createPortal(content, target)`).
 // NOT for Solid's reason. Solid had to avoid the call form because Solid evaluates JSX eagerly at

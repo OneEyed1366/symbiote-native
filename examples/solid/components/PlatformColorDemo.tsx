@@ -6,6 +6,7 @@
 
 import {
   DynamicColorIOS,
+  Platform,
   PlatformColor,
   createColorScheme,
 } from '@symbiote-native/solid';
@@ -26,27 +27,35 @@ export function PlatformColorDemo() {
       <view class="row">
         <view
           class="color-tile"
-          style={{ backgroundColor: PlatformColor('systemBlue') }}
+          style={{
+            backgroundColor: PlatformColor(
+              'systemBlue',
+              '@android:color/holo_blue_dark',
+            ),
+          }}
         >
           <text class="color-tile-label">systemBlue</text>
         </view>
-        <view
-          class="color-tile-bordered"
-          style={{
-            backgroundColor: DynamicColorIOS({
-              light: '#dbeafe',
-              dark: '#16305a',
-            }),
-            borderColor: PlatformColor('separator'),
-          }}
-        >
-          <text
-            class="color-tile-label"
-            style={{ color: PlatformColor('label') }}
+        {/* DynamicColorIOS throws off iOS, as in RN */}
+        {Platform.OS === 'ios' && (
+          <view
+            class="color-tile-bordered"
+            style={{
+              backgroundColor: DynamicColorIOS({
+                light: '#dbeafe',
+                dark: '#16305a',
+              }),
+              borderColor: PlatformColor('separator'),
+            }}
           >
-            dynamic
-          </text>
-        </view>
+            <text
+              class="color-tile-label"
+              style={{ color: PlatformColor('label') }}
+            >
+              dynamic
+            </text>
+          </view>
+        )}
       </view>
     </view>
   );

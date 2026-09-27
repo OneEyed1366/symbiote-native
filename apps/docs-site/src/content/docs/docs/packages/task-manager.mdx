@@ -1,0 +1,136 @@
+---
+title: Task manager
+description: expo-task-manager wrapped for every SymbioteNative adapter — the low-level primitive background location, geofencing, background fetch/task, and push notifications register tasks through.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+`@symbiote-native/task-manager` wraps
+[`expo-task-manager`](https://github.com/expo/expo/tree/main/packages/expo-task-manager) so every
+SymbioteNative adapter can define and inspect background tasks. It does not itself schedule
+anything — it defines tasks, tracks which are registered, dispatches native's task-execute event
+to the matching executor, and acks completion. Starting a task running (periodic scheduling,
+geofence triggers, push delivery) is each consumer package's own job:
+[`@symbiote-native/location`](/docs/packages/location/),
+[`@symbiote-native/background-fetch`](/docs/packages/background-fetch/),
+[`@symbiote-native/background-task`](/docs/packages/background-task/), and
+[`@symbiote-native/notifications`](/docs/packages/notifications/) all register through it.
+
+Every export is a plain function or a one-time module-load side effect — no hook/composable/
+service to wrap, so every adapter's entry point is a plain re-export of the same core.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | ✅ live |
+| Android     | ✅ live |
+
+| Framework adapter | Support |
+| ------------------ | ------- |
+| React              | ✅ live |
+| Vue                | ✅ live |
+| Angular            | ✅ live |
+| Svelte             | ✅ live |
+| Solid              | ✅ live |
+
+## Installation
+
+```sh
+npm install @symbiote-native/task-manager
+```
+
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --task-manager` (or
+`add --task-manager` in an existing app) installs and wires this for you — see
+[`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
+
+`expo-task-manager`, `unimodules-app-loader`, and `expo-modules-core` come along as regular
+dependencies, pinned to exact versions — never install them yourself, and never add the `expo`
+meta-package to your project.
+
+<Aside type="danger" title="Native setup is required before first use">
+  Follow [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first; it
+  covers this package and every future `expo-modules-core` package with zero
+  further native changes. Android's headless-boot loader
+  (`RNHeadlessAppLoader`) and iOS's `TaskManagerAppDelegateSubscriber` are
+  both discovered automatically by autolinking the moment this package is
+  installed. One iOS `Info.plist` key is wired automatically:
+  `UIBackgroundModes: fetch` — the baseline mode any registered task's
+  background delivery relies on, independent of which consumer package
+  actually registers a task.
+</Aside>
+
+## Usage
+
+`defineTask` must run at the top of the JS bundle, outside any component — the app can be
+launched headlessly to run a background task, with no views mounted, so a task defined inside a
+component lifecycle method would never register on that launch.
+
+```ts
+// index.ts, alongside AppRegistry.registerComponent — identical on every adapter
+import { defineTask } from '@symbiote-native/task-manager';
+
+const SYNC_TASK = 'background-sync';
+
+defineTask(SYNC_TASK, async ({ data, error }) => {
+  if (error) {
+    console.error('background-sync failed:', error);
+    return;
+  }
+  await runSync(data);
+});
+```
+
+A consumer package registers the task with native through its own native module —
+[`location`](/docs/packages/location/)'s `startLocationUpdatesAsync`/`startGeofencingAsync`,
+[`background-fetch`](/docs/packages/background-fetch/)'s `registerTaskAsync`,
+[`background-task`](/docs/packages/background-task/)'s `registerTaskAsync`, or
+[`notifications`](/docs/packages/notifications/)'s `registerTaskAsync`. Once registered, inspect
+it from here:
+
+```ts
+import {
+  getRegisteredTasksAsync,
+  isTaskRegisteredAsync,
+  unregisterTaskAsync,
+} from '@symbiote-native/task-manager';
+
+const isRunning = await isTaskRegisteredAsync(SYNC_TASK);
+const tasks = await getRegisteredTasksAsync();
+await unregisterTaskAsync(SYNC_TASK); // stop receiving updates for this task
+```
+
+Identical import surface on every adapter — `@symbiote-native/task-manager/react`, `/vue`,
+`/svelte`, `/solid`, `/angular` all re-export the same functions.
+
+## API
+
+```ts
+defineTask<TData>(taskName: string, taskExecutor: ITaskManagerTaskExecutor<TData>): void
+isTaskDefined(taskName: string): boolean
+isTaskRegisteredAsync(taskName: string): Promise<boolean>
+getTaskOptionsAsync<TOptions>(taskName: string): Promise<TOptions>
+getRegisteredTasksAsync<TOptions>(): Promise<ITaskManagerTask<TOptions>[]>
+unregisterTaskAsync(taskName: string): Promise<void>
+unregisterAllTasksAsync(): Promise<void>
+isAvailableAsync(): Promise<boolean>
+```
+
+There is no free `registerTaskAsync` here — registration is always driven by the consumer package
+that needs the task, never by task-manager itself.
+
+## Notes
+
+<Aside type="tip" title="isAvailableAsync resolves false rather than throwing">
+  Every other guarded function throws an `UnavailabilityError` when the
+  native method is missing. `isAvailableAsync` resolves `false` instead — "can
+  this API be used at all" has to answer even where the rest of the surface
+  can't.
+</Aside>
+
+- **A defined task that native fires but nobody registered still gets acked and unregistered.**
+  If `defineTask` for a given name was renamed or deleted from the bundle after the task was
+  registered, the dangling native registration is cleaned up automatically instead of leaking a
+  wakelock forever.
+- **A task executor that throws still acks native.** The failure is logged, but the completion ack
+  always fires, so a bug in one task's executor can't leave the OS believing the task never
+  completed.

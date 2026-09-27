@@ -263,24 +263,13 @@ describe('touchable-opacity host behavior', () => {
     expect(getExplicitStyle(node)).toBe(authored);
   });
 
-  // `id -> nativeID` and `accessible !== false` USED TO BE ASSERTED HERE and are not any more, which
-  // is a move rather than a loss: both are the engine's rules now (`foldIdAlias` /
-  // `foldPressableProps`, `SymbioteFabricProps.cpp`) and this host builds its payloads through the
-  // TypeScript `fabricProps`, which deliberately carries no copy of them. An assertion left here
-  // would fail for the right reason today and, once someone "fixed" it by mirroring the rule in JS,
-  // pass forever for the wrong one. Contract: `core/engine/cpp/tests/js/touchable-payload.itest.ts`.
+  // `id -> nativeID` / `accessible !== false` are the engine's rules now (`foldIdAlias` /
+  // `foldPressableProps`, `SymbioteFabricProps.cpp`); this host's `fabricProps` carries no copy, so
+  // an assertion here would pass for the wrong reason. Contract: `touchable-payload.itest.ts`.
 
-  // `focusable` LEFT ON 2026-09-18 and it was the LAST thing in this tag's fold, so the tag now
-  // costs zero trips into JS. Same reason as the two rules above: it is `foldPressableProps`'s, and
-  // this host carries no copy of the tag rules.
-  //
-  // It held out longer because its middle leg is `onPress !== undefined` — an OWNED name, stashed
-  // in JS and never a prop. The comment that used to sit here said a props-only fold "cannot answer
-  // this", and that was two claims in one: the callback's IDENTITY genuinely cannot cross, its
-  // EXISTENCE is one bit and now does (`OP_SET_OWNED_LISTENER`).
-  //
-  // Contract, including the late-wiring and cleared-handler cases this used to carry:
-  // `core/engine/cpp/tests/js/touchable-focusable-payload.itest.ts`.
+  // `focusable` is `foldPressableProps` too, costing zero trips into JS. Its middle leg —
+  // `onPress !== undefined` — is an OWNED name crossing as one bit (`OP_SET_OWNED_LISTENER`); the
+  // callback's identity never crosses. Contract: `touchable-focusable-payload.itest.ts`.
 
   // TouchableOpacity.js:186-189 resolves `disabled ?? aria-disabled ?? accessibilityState.disabled`
   // for its OWN Pressability config — the same three-way answer Button resolves, wired here for the

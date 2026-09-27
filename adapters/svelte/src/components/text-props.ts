@@ -3,7 +3,6 @@
 import type { Snippet } from 'svelte';
 import type {
   ISymbioteEvent,
-  IClassNameValue,
   IStyleProp,
   ITextStyle,
 } from '@symbiote-native/engine';

@@ -8,7 +8,7 @@
 // is core's job and is exhaustively covered by core/keep-awake.test.ts; re-asserting it here
 // would just duplicate that coverage under a different mount path.
 
-import { createElement, type ReactElement } from 'react';
+import { createElement, Fragment, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount } from '@symbiote-native/react';
 import { installRecordingFabric } from '@symbiote-native/test-utils';
@@ -125,6 +125,28 @@ describe('useKeepAwake', () => {
       await vi.waitFor(() =>
         expect(addListener).toHaveBeenCalledWith('custom-tag', listener),
       );
+    });
+
+    // why: ported from upstream's `calls in different components default to using unique tags` —
+    // two simultaneously-mounted callers that both omit `tag` must not clobber each other's lock,
+    // since deactivating one would otherwise release the other's too.
+    it('gives two components with no explicit tag two different default tags', async () => {
+      mount(
+        ROOT_TAG,
+        createElement(
+          Fragment,
+          null,
+          createElement(Probe),
+          createElement(Probe),
+        ),
+      );
+
+      await vi.waitFor(() =>
+        expect(activateKeepAwakeAsync).toHaveBeenCalledTimes(2),
+      );
+      const [firstTag] = activateKeepAwakeAsync.mock.calls[0];
+      const [secondTag] = activateKeepAwakeAsync.mock.calls[1];
+      expect(firstTag).not.toEqual(secondTag);
     });
   });
 

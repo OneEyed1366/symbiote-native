@@ -42,12 +42,10 @@ export interface IAlertStatic {
 // The default positive label RN uses when a button carries no text.
 export const DEFAULT_POSITIVE_TEXT = 'OK';
 
-// Normalize the `buttons` arg into a consistent list: undefined/empty becomes a single
-// default "OK" button, exactly as RN does before handing the list to native. Both
-// platform files start from this so the no-buttons case behaves identically.
-export function normalizeButtons(buttons?: IAlertButtons): IAlertButtons {
-  if (buttons === undefined || buttons.length === 0) {
-    return [{ text: DEFAULT_POSITIVE_TEXT }];
-  }
-  return buttons;
+// Android's `buttons ? buttons : [{text: 'OK'}]` (Alert.js): only an ABSENT list gets the default
+// OK. An explicit empty array is a dialog with no buttons.
+export function normalizeButtons(
+  buttons?: IAlertButtons | null,
+): IAlertButtons {
+  return buttons ?? [{ text: DEFAULT_POSITIVE_TEXT }];
 }

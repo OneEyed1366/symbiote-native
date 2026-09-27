@@ -164,27 +164,63 @@ describe('what a text input sends native, resolved by the engine', () => {
     );
   });
 
-  // why: RN resolves BOTH native props from the one W3C token (TextInput.js:938) — Android reads
-  // `autoComplete`, iOS reads `textContentType`, and each is inert on the other platform. A token
-  // with no Android equivalent falls back to itself; one with no iOS equivalent leaves
-  // `textContentType` unset.
-  it('resolves the one autoComplete token into both native props', () => {
+  // why: TextInput.js:938-954 — iOS (this build) derives `textContentType` from the W3C token and
+  // sends NO `autoComplete` (`Platform.OS === 'android' ? … : undefined`); the Android half is in
+  // `android-rules.android.itest.ts`. A token with no iOS entry leaves `textContentType` unset.
+  it('resolves the autoComplete token into textContentType and sends no autoComplete', () => {
     const email = single({ autoComplete: 'email' }).payload;
-    expect(email.autoComplete).toBe('email');
+    expect(email.autoComplete).toBe(undefined);
     expect(email.textContentType).toBe('emailAddress');
 
     const street = single({ autoComplete: 'street-address' }).payload;
-    expect(street.autoComplete).toBe('street-address');
     expect(street.textContentType).toBe('fullStreetAddress');
 
     const nickname = single({ autoComplete: 'nickname' }).payload;
-    // No Android entry, so the raw token rides through; iOS has one.
-    expect(nickname.autoComplete).toBe('nickname');
     expect(nickname.textContentType).toBe('nickname');
 
     const unknown = single({ autoComplete: 'not-a-token' }).payload;
-    expect(unknown.autoComplete).toBe('not-a-token');
+    expect(unknown.autoComplete).toBe(undefined);
     expect(unknown.textContentType).toBe(undefined);
+  });
+
+  // why: TextInput.js:919-937 — the W3C spelling WINS over the native one when both are authored.
+  it('lets the web alias beat the native prop', () => {
+    expect(
+      single({ inputMode: 'numeric', keyboardType: 'default' }).payload
+        .keyboardType,
+    ).toBe('number-pad');
+    expect(
+      single({ enterKeyHint: 'search', returnKeyType: 'done' }).payload
+        .returnKeyType,
+    ).toBe('search');
+    expect(single({ readOnly: true, editable: true }).payload.editable).toBe(
+      false,
+    );
+    expect(
+      single({ inputMode: 'none', showSoftInputOnFocus: true }).payload
+        .showSoftInputOnFocus,
+    ).toBe(false);
+  });
+
+  // why: TextInput.js:708,711 (both platforms) — `rows` wins as numberOfLines; `tabIndex` decides
+  // `focusable` as `!tabIndex`, else `focusable !== false`, always sent.
+  it('maps rows and tabIndex, and always sends focusable', () => {
+    const rows = multi({ rows: 3, numberOfLines: 1 }).payload;
+    expect(rows.numberOfLines).toBe(3);
+    expect(rows.rows).toBe(undefined);
+    expect(single({}).payload.focusable).toBe(true);
+    expect(single({ focusable: false }).payload.focusable).toBe(false);
+    expect(single({ tabIndex: -1 }).payload.focusable).toBe(false);
+    expect(single({ tabIndex: 0 }).payload.focusable).toBe(true);
+    expect(single({ tabIndex: 0 }).payload.tabIndex).toBe(undefined);
+  });
+
+  // why: TextInput.js:904 — `allowFontScaling = true` by default.
+  it('defaults allowFontScaling on', () => {
+    expect(single({}).payload.allowFontScaling).toBe(true);
+    expect(single({ allowFontScaling: false }).payload.allowFontScaling).toBe(
+      false,
+    );
   });
 
   // why: an authored `textContentType` wins over the one derived from `autoComplete`.
@@ -267,8 +303,8 @@ describe('what a text input sends native, resolved by the engine', () => {
   });
 
   // why: RN HAS NO `value` FABRIC PROP — the controlled value rides as the private `text`. The four
-  // cases below pinned only the TypeScript twin of this rule until 2026-09-18, in a vitest that
-  // builds payloads through `fabric-props.ts` and therefore cannot see the C++ copy at all. The
+  // cases below pin only the TypeScript twin of this rule, in a vitest that builds payloads
+  // through `fabric-props.ts` and therefore cannot see the C++ copy at all. The
   // device rule could have broken with every one of them green. Same shape as the disabled
   // `touchable-highlight` that committed `focusable: true` for as long as it did.
   it('folds an uncontrolled defaultValue the same way', () => {

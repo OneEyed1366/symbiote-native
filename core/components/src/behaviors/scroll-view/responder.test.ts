@@ -10,6 +10,7 @@ import {
   createSurface,
   currentlyFocusedInput,
   Keyboard,
+  Platform,
   routeProp,
   setInputBlurred,
   setInputFocused,
@@ -321,5 +322,90 @@ describe('an app-supplied handler still fires (composition, not eviction)', () =
     )({ nativeEvent: {} } as ISymbioteEvent);
 
     expect(calls).toEqual(['begin', 'grant', 'release', 'end']);
+  });
+});
+
+describe('Android-only branches', () => {
+  const originalOs = Platform.OS;
+  const originalVersion = Platform.Version;
+
+  function setPlatform(os: string, version: unknown): void {
+    Object.defineProperty(Platform, 'OS', { value: os, configurable: true });
+    Object.defineProperty(Platform, 'Version', {
+      value: version,
+      configurable: true,
+    });
+  }
+
+  afterEach(() => setPlatform(originalOs, originalVersion));
+
+  function focusInput(): ISymbioteNode {
+    const input = makeTextInput();
+    mount(input);
+    setInputFocused(input);
+    focusedInput = input;
+    return input;
+  }
+
+  // why: ScrollView.js:1287-1292 — Android's native scroller has no keyboardDismissMode, so
+  // `on-drag` is JS dismissing the keyboard at drag start, before the app's own onScrollBeginDrag.
+  it('dismisses the keyboard at drag start for on-drag, then calls the app', () => {
+    setPlatform('android', 33);
+    const owner = makeScrollView();
+    mount(owner);
+    routeProp(owner, 'keyboardDismissMode', 'on-drag');
+    const seen: Array<ISymbioteNode | null> = [];
+    routeProp(owner, 'onScrollBeginDrag', () =>
+      seen.push(currentlyFocusedInput()),
+    );
+    focusInput();
+
+    listenerOf(owner, 'scrollBeginDrag')({ nativeEvent: {} });
+
+    expect(seen).toEqual([null]);
+  });
+
+  // why: iOS handles keyboardDismissMode natively; JS must not dismiss there.
+  it('leaves the keyboard alone on iOS', () => {
+    setPlatform('ios', '18.0');
+    const owner = makeScrollView();
+    mount(owner);
+    routeProp(owner, 'keyboardDismissMode', 'on-drag');
+    const input = focusInput();
+
+    listenerOf(owner, 'scrollBeginDrag')({ nativeEvent: {} });
+
+    expect(currentlyFocusedInput()).toBe(input);
+  });
+
+  // why: ScrollView.js:1558-1561 — before API 30 keyboard events are unreliable, so a focused
+  // input alone makes the keyboard dismissible even with no metrics.
+  it('claims a tap with no keyboard metrics below API 30', () => {
+    setPlatform('android', 29);
+    const owner = makeScrollView();
+    mount(owner);
+    focusInput();
+
+    expect(
+      listenerOf(
+        owner,
+        'startShouldSetResponderCapture',
+      )(eventWithTarget(makePlainView())),
+    ).toBe(true);
+  });
+
+  // why: from API 30 the metrics are trusted, so no metrics means no keyboard.
+  it('does not claim with no keyboard metrics from API 30', () => {
+    setPlatform('android', 30);
+    const owner = makeScrollView();
+    mount(owner);
+    focusInput();
+
+    expect(
+      listenerOf(
+        owner,
+        'startShouldSetResponderCapture',
+      )(eventWithTarget(makePlainView())),
+    ).toBe(false);
   });
 });

@@ -1,5 +1,52 @@
 # @symbiote-native/react
 
+## 3.0.4
+
+### Patch Changes
+
+- [`99fdbbb`](https://github.com/OneEyed1366/symbiote-native/commit/99fdbbb54b72d5d06cfd95fbf0d82f2d9fe17a6a) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Force a clean republish of every publishable package. `engine@1.3.0`/`components@3.1.1` proved a
+  missing changeset on a producer package can leave its published tarball silently behind its own
+  source (see the `symbiote-release-publishing` skill's changeset-skips-callee gap) with no CI
+  signal. A blanket patch here is the cheap way to rule out the same gap sitting anywhere else:
+  every package rebuilds and republishes from current HEAD, and `updateInternalDependencies: patch`
+  bumps every internal `workspace:*`/`workspace:^` pin along with it.
+- Updated dependencies [[`99fdbbb`](https://github.com/OneEyed1366/symbiote-native/commit/99fdbbb54b72d5d06cfd95fbf0d82f2d9fe17a6a)]:
+  - @symbiote-native/components@3.1.2
+  - @symbiote-native/css-parser@0.5.2
+
+## 3.0.3
+
+### Patch Changes
+
+- [#86](https://github.com/OneEyed1366/symbiote-native/pull/86) [`aa17531`](https://github.com/OneEyed1366/symbiote-native/commit/aa175314db0f79474b9ac87bee3e30c4e87a72c4) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - README: the zero-config entry example was missing `import '@symbiote-native/react'` — the bare side-effect import that registers host behaviors (Pressable/Switch/Image); `/bootstrap` alone doesn't reach it, and Metro's production `inlineRequires` drops it silently without the bare import. Also corrects the Node requirement (react-native 0.86's own `package.json#engines` needs `>=22.13`, not `>=22.11`) and leads Install with `npx @symbiote-native/cli new`.
+
+- Updated dependencies [[`aa17531`](https://github.com/OneEyed1366/symbiote-native/commit/aa175314db0f79474b9ac87bee3e30c4e87a72c4), [`aa17531`](https://github.com/OneEyed1366/symbiote-native/commit/aa175314db0f79474b9ac87bee3e30c4e87a72c4)]:
+  - @symbiote-native/components@3.1.1
+  - @symbiote-native/css-parser@0.5.1
+
+## 3.0.2
+
+### Patch Changes
+
+- [`1e8cd62`](https://github.com/OneEyed1366/symbiote-native/commit/1e8cd62387caded852fbb8e14c04b3195fc2c516) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Ship the Android parity release. Engine 1.2.0 and adapters 3.0.1 were already taken on npm, so the previous release skipped these packages.
+
+- Updated dependencies []:
+  - @symbiote-native/components@3.1.0
+
+## 3.0.1
+
+### Patch Changes
+
+- [`26775bc`](https://github.com/OneEyed1366/symbiote-native/commit/26775bce65788f9074dcb10460f8cf683be5ed70) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - - Every adapter keeps an iOS Modal mounted until native dismiss, then calls `onDismiss`.
+  - Every adapter sends `isInvertedVirtualizedList` for inverted lists.
+  - Svelte and Angular lists forward `removeClippedSubviews` and `nestedScrollEnabled` to their ScrollView. React, Vue and Solid list prop types now declare `nestedScrollEnabled`.
+  - A bare boolean attribute (`<view accessible>`, `nested-scroll-enabled`) now reaches native as `true` in Vue templates and on Svelte tags. Before, it arrived as `""`, which Android rejects.
+
+- [#83](https://github.com/OneEyed1366/symbiote-native/pull/83) [`564870f`](https://github.com/OneEyed1366/symbiote-native/commit/564870ffabb61b3b778fcf18600b1c5f40d62ac2) Thanks [@github-actions](https://github.com/apps/github-actions)! - Walk props bags with `Object.keys` instead of `Object.entries` on the per-node paths. `entries` allocates the outer array and a two-element array per key before the loop starts; `keys` allocates one array of strings, and the value is a property read the adapter is about to make anyway. Measured on `-O` Hermes over a four-key bag: 0.42 us against 0.23, so ~0.19 us per node - about 1.9 ms of a thousand-row create. No behaviour change; `applyUpdate`'s sibling loop already used `Object.keys`.
+
+- Updated dependencies [[`fba54ee`](https://github.com/OneEyed1366/symbiote-native/commit/fba54ee2d39a3b2ea12bb11a846b32658e3f8902), [`d4f46e7`](https://github.com/OneEyed1366/symbiote-native/commit/d4f46e7ca1601aa469b5c8c5ab97f8a8217c968f), [`3de549b`](https://github.com/OneEyed1366/symbiote-native/commit/3de549b2ab9785c845a1f3acd5626d85d2b9b9e4)]:
+  - @symbiote-native/components@3.1.0
+
 ## 3.0.0
 
 ### Major Changes

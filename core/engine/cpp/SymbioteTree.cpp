@@ -18,9 +18,10 @@
 #include <react/renderer/uimanager/primitives.h>
 
 // `react/renderer/dom/` is NOT among the header folders ReactAndroid copies into its prefab
-// (`ReactAndroid/build.gradle.kts` lists uimanager, mounting, core, … and no dom), so including it
-// unconditionally breaks the Android build of this same file. iOS compiles against the full
-// ReactCommon tree and has it.
+// (`ReactAndroid/build.gradle.kts` lists uimanager, mounting, core, … and no dom), though
+// libreactnative.so exports the functions. `android/CMakeLists.txt` copies `DOM.h` from the app's
+// react-native onto the include path; without it this falls back to the throwing stubs. iOS compiles
+// against the full ReactCommon tree and has it.
 //
 // Detected rather than branched on `__ANDROID__`, because the fact is about the TOOLCHAIN'S HEADERS,
 // not about the platform — and it self-heals the day upstream exports the folder. The three
@@ -73,6 +74,13 @@ constexpr int32_t kOpCreateVoid = 13;
 // The owned listener names any platform rule reads, one bit each — see `Node::pressListeners`.
 // `press` is deliberately bit 0 so the `focusable` question is the cheapest of the two.
 constexpr uint8_t kPressListenerPress = 1u << 0;
+// The four press names; `hasAnyPressListener` asks about these and nothing else.
+constexpr uint8_t kPressListenerMask = 0x0f;
+// ScrollView's `sendMomentumEvents` (`ScrollView.js:1801-1804`) asks about either of these two.
+constexpr uint8_t kMomentumListenerMask = (1u << 4) | (1u << 5);
+// Text's pressability (`Text.js:145-163`): onPress / onLongPress, plus onStartShouldSetResponder.
+constexpr uint8_t kTextPressMask = kPressListenerPress | (1u << 3);
+constexpr uint8_t kStartShouldSetResponder = 1u << 6;
 
 /** 0 for a name the host has no rule for, which is nearly all of them. */
 uint8_t pressListenerBit(const std::string &name) {
@@ -80,6 +88,9 @@ uint8_t pressListenerBit(const std::string &name) {
   if (name == "pressIn") return 1u << 1;
   if (name == "pressOut") return 1u << 2;
   if (name == "longPress") return 1u << 3;
+  if (name == "momentumScrollBegin") return 1u << 4;
+  if (name == "momentumScrollEnd") return 1u << 5;
+  if (name == "startShouldSetResponder") return kStartShouldSetResponder;
   return 0;
 }
 
@@ -327,7 +338,27 @@ struct Node : jsi::NativeState {
   //
   // The reference applier has no such window (a JS child's `parent` reference keeps the parent
   // alive), so nothing headless can reach this and there is no test to write for it.
+  /**
+   * How many nodes this process is holding, right now.
+   *
+   * The one reading nothing else can produce. Ownership here is JS-anchored — `children` is strong,
+   * `parent` is raw, and a node lives while a parent holds it or while JS names it through
+   * `NativeState` — so "JS gave its half back" IMPLIES the C++ half went with it. That is an
+   * inference from the ownership model, and the shape it would miss is the one
+   * software-mansion/react-native-reanimated#10527 describes: a container keyed by surface that
+   * nothing empties, holding a root alive after the surface is gone. We have no such container; this
+   * counter is what turns "we have no such container" from a reading of the code into a reading of
+   * the process.
+   *
+   * Not atomic, and deliberately: a commit walk is single-threaded, and the counter exists for a
+   * test rather than for a report anything acts on.
+   */
+  static inline int64_t live = 0;
+
+  Node() { live += 1; }
+
   ~Node() {
+    live -= 1;
     for (const NodePtr &child : children) {
       // A HOLE, from a detach nothing has read past yet. The destructor is the one reader that does
       // not compact first: compaction renumbers, and renumbering a vector whose owner is being
@@ -396,62 +427,25 @@ void holdHandle(jsi::Runtime &runtime, Node &node) {
 }
 
 /**
- * The UIManager, resolved ONCE per runtime.
+ * The UIManager for this runtime.
  *
- * `UIManagerBinding::getBinding` reads a global off the runtime, and `applyOps` is entered once per
- * DRAIN — which a framework navigating between mutations makes once per MUTATION rather than once
- * per commit. Solid's `cleanChildren` does exactly that: 2 000 entries to clear a thousand rows.
+ * NOT cached, and the failed attempt is worth recording: keying a cache on `&runtime` treats an
+ * ADDRESS as a lifetime, and an allocator reuses addresses. `symbiote_tree_tests` builds and tears
+ * down a JSCRuntime per case, so the second one can land where the first was and inherit a dangling
+ * binding — a crash, not a wrong number. The same mistake with three interned `PropNameID`s aborted
+ * that suite outright (`~JSCRuntime`: "destroyed with a dangling API string").
  *
- * Keyed on the runtime POINTER rather than cached outright, so a second runtime (a reload) resolves
- * its own binding instead of inheriting a dangling one. Everything else in this file is already
- * single-runtime by construction — `walkCost_` below is file scope — but a stale UIManager is a
- * crash where a stale counter is a wrong number.
+ * It bought nothing anyway: both caches together moved an empty drain 4.46 -> 4.38 us, against the
+ * 4.38 -> 1.54 that dropping the checked JSI casts gave.
  */
-jsi::Runtime *uiManagerCachedFor_ = nullptr;
-react::UIManager *cachedUiManager_ = nullptr;
-
 react::UIManager &uiManagerFor(jsi::Runtime &runtime, const char *what) {
-  if (uiManagerCachedFor_ == &runtime && cachedUiManager_ != nullptr) {
-    return *cachedUiManager_;
-  }
   auto binding = react::UIManagerBinding::getBinding(runtime);
   if (binding == nullptr) {
     throw jsi::JSError(
         runtime,
         std::string(what) + ": nativeFabricUIManager is not installed on this runtime");
   }
-  cachedUiManager_ = &binding->getUIManager();
-  uiManagerCachedFor_ = &runtime;
-  return *cachedUiManager_;
-}
-
-/**
- * `buffer` / `byteOffset` / `length`, interned once per runtime.
- *
- * `Object::getProperty(runtime, const char *)` builds a `PropNameID` from UTF-8 on every call, and
- * `int32ArrayData` below makes three of them per `applyOps`. Measured on an EMPTY batch, the whole
- * prologue costs 4.4-5.1 us against a 0.13 us bare host call
- * (`small-batch-crossing-cost.itest.ts`) — a JSI property read is the dominant term in it, not the
- * call.
- */
-struct ITypedArrayNames {
-  jsi::PropNameID buffer;
-  jsi::PropNameID byteOffset;
-  jsi::PropNameID length;
-};
-
-jsi::Runtime *namesCachedFor_ = nullptr;
-std::optional<ITypedArrayNames> typedArrayNames_;
-
-const ITypedArrayNames &typedArrayNames(jsi::Runtime &runtime) {
-  if (namesCachedFor_ != &runtime || !typedArrayNames_.has_value()) {
-    typedArrayNames_.emplace(ITypedArrayNames{
-        jsi::PropNameID::forAscii(runtime, "buffer"),
-        jsi::PropNameID::forAscii(runtime, "byteOffset"),
-        jsi::PropNameID::forAscii(runtime, "length")});
-    namesCachedFor_ = &runtime;
-  }
-  return *typedArrayNames_;
+  return binding->getUIManager();
 }
 
 /**
@@ -460,13 +454,16 @@ const ITypedArrayNames &typedArrayNames(jsi::Runtime &runtime) {
  * `ArrayBuffer::data` hands back the backing store, so the commands never become JS values — which
  * is the entire reason the format is flat. `byteOffset` is read rather than assumed: a typed array
  * need not start at the head of its buffer.
+ *
+ * The three names are built from UTF-8 on every call and that stands: interning them in a
+ * file-scope cache is what aborted `symbiote_tree_tests`, because a `PropNameID` outliving its
+ * runtime is a dangling API string. See `uiManagerFor` above for the general form and the price.
  */
 const int32_t *int32ArrayData(jsi::Runtime &runtime, const jsi::Value &value, size_t &lengthOut) {
-  const auto &names = typedArrayNames(runtime);
   auto typedArray = value.asObject(runtime);
-  auto buffer = typedArray.getProperty(runtime, names.buffer).asObject(runtime).getArrayBuffer(runtime);
-  auto byteOffset = static_cast<size_t>(typedArray.getProperty(runtime, names.byteOffset).asNumber());
-  lengthOut = static_cast<size_t>(typedArray.getProperty(runtime, names.length).asNumber());
+  auto buffer = typedArray.getProperty(runtime, "buffer").asObject(runtime).getArrayBuffer(runtime);
+  auto byteOffset = static_cast<size_t>(typedArray.getProperty(runtime, "byteOffset").asNumber());
+  lengthOut = static_cast<size_t>(typedArray.getProperty(runtime, "length").asNumber());
   return reinterpret_cast<const int32_t *>(buffer.data(runtime) + byteOffset);
 }
 
@@ -1069,15 +1066,18 @@ IOwner ownerOf(const Node &node) {
       node.parent->tagName.c_str(),
       (node.parent->pressListeners & kPressListenerPress) != 0,
       node.parent->underlayShown,
-      node.parent->pressListeners != 0};
+      (node.parent->pressListeners & kPressListenerMask) != 0};
 }
 
 /** The node's own non-prop bits, unpacked from the mask the ops maintain. See `ISelf`. */
 ISelf selfOf(const Node &node) {
   return ISelf{
       (node.pressListeners & kPressListenerPress) != 0,
-      node.pressListeners != 0,
-      node.underlayShown};
+      (node.pressListeners & kPressListenerMask) != 0,
+      node.underlayShown,
+      (node.pressListeners & kMomentumListenerMask) != 0,
+      (node.pressListeners & kTextPressMask) != 0,
+      (node.pressListeners & kStartShouldSetResponder) != 0};
 }
 
 /**
@@ -2612,6 +2612,10 @@ jsi::Value Tree::readSurfaceTelemetry(
   result.setProperty(
       runtime, "valueConversions", jsi::Value(static_cast<double>(walkCost_.valueConversions)));
   result.setProperty(runtime, "applyMs", millis(walkCost_.applyNs));
+  // NOT DRAINED ON READ, unlike every counter around it: this is a level rather than a total, and a
+  // level that zeroed itself when read would answer about nothing. `retention-after-clear.itest.ts`
+  // reads it across cycles.
+  result.setProperty(runtime, "liveNodes", jsi::Value(static_cast<double>(Node::live)));
   result.setProperty(runtime, "stringDecodeMs", millis(walkCost_.stringDecodeNs));
   result.setProperty(runtime, "structureMs", millis(walkCost_.structureNs));
   result.setProperty(runtime, "holdHandleMs", millis(walkCost_.holdHandleNs));

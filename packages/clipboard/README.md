@@ -11,13 +11,27 @@ mount/unmount lifecycle (`useClipboard`).
 
 ## Install
 
+**New app:**
+
+```bash
+npx @symbiote-native/cli new my-app --clipboard
+```
+
+**Existing SymbioteNative app:**
+
+```bash
+npx @symbiote-native/cli add --clipboard
+```
+
+Either way: installs `@symbiote-native/clipboard` and wires the native autolinking automatically —
+see [`@symbiote-native/cli`](../cli).
+
+<details>
+<summary>Manual install (no CLI — installing and wiring native autolinking by hand)</summary>
+
 ```bash
 npm install @symbiote-native/clipboard
 ```
-
-Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --clipboard` (or
-`add --clipboard` in an existing app) installs and wires this for you — see
-[`@symbiote-native/cli`](../cli).
 
 Depends on `expo-clipboard` and `expo-modules-core` directly (regular dependencies, pinned to an
 exact version — never a caret range, since this package's `core/` is hand-ported against one
@@ -25,7 +39,7 @@ specific native API shape and a newer resolve could silently drift the two apart
 `expo-clipboard` yourself, and never add the `expo` meta-package to this project — it bundles its
 own Metro/Babel pipeline that conflicts with this project's own.
 
-## Required one-time step: native autolinking wiring
+### Required one-time step: native autolinking wiring
 
 Unlike a plain RN native module, `expo-clipboard`'s native code is discovered by
 `expo-modules-autolinking`, not RN's own `react-native.config.cjs` mechanism — this needs wiring
@@ -42,6 +56,8 @@ package (`@symbiote-native/sensors`, `@symbiote-native/local-auth`) with zero fu
 Full mechanics live in the `symbiote-expo-native-module` skill. Clipboard itself needs no
 `Info.plist`/`AndroidManifest.xml` permission entry on either platform — reading/writing the
 clipboard requires no platform permission string.
+
+</details>
 
 ## Shape
 

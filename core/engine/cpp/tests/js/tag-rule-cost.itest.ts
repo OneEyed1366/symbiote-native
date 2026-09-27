@@ -410,11 +410,19 @@ registerHostBehavior('scroll-view-in-js', {
         },
         props.style,
       ],
-      nestedScrollEnabled: props.nestedScrollEnabled ?? true,
     };
     delete out.horizontal;
     if (props.alwaysBounceVertical === undefined)
       out.alwaysBounceVertical = true;
+    // ScrollView.js:1797-1808. The fixture wires no momentum listener.
+    out.sendMomentumEvents = false;
+    if (
+      Array.isArray(props.stickyHeaderIndices) &&
+      props.stickyHeaderIndices.length > 0
+    )
+      out.scrollEventThrottle = 1;
+    out.snapToStart = props.snapToStart !== false;
+    out.snapToEnd = props.snapToEnd !== false;
     delete out.stickyHeaderIndices;
     delete out.invertStickyHeaders;
     if (props.decelerationRate === 'normal') out.decelerationRate = 0.998;

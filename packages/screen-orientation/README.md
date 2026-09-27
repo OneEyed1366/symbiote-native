@@ -14,13 +14,27 @@ depended on directly and never the `expo` meta-package, why the upstream JS is h
 
 ## Install
 
+**New app:**
+
+```bash
+npx @symbiote-native/cli new my-app --screen-orientation
+```
+
+**Existing SymbioteNative app:**
+
+```bash
+npx @symbiote-native/cli add --screen-orientation
+```
+
+Either way: installs `@symbiote-native/screen-orientation` and wires the native autolinking
+automatically — see [`@symbiote-native/cli`](../cli).
+
+<details>
+<summary>Manual install (no CLI — installing and wiring native autolinking by hand)</summary>
+
 ```bash
 npm install @symbiote-native/screen-orientation
 ```
-
-Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --screen-orientation`
-(or `add --screen-orientation` in an existing app) installs and wires this for you — see
-[`@symbiote-native/cli`](../cli).
 
 Depends on `expo-screen-orientation` and `expo-modules-core` directly (regular dependencies,
 pinned to exact versions — never a caret range, since this package's `core/` is hand-ported against
@@ -50,6 +64,8 @@ implementation: `examples/expo-react/ios/Podfile` and
 
 No platform permission string is needed for screen-orientation's surface — locking and reading the
 current orientation read/write system state with no runtime permission prompt on either platform.
+
+</details>
 
 ## Shape
 

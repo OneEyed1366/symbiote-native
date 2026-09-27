@@ -11,6 +11,7 @@ import {
   findNodeHandle,
   type IHostInstance,
 } from '@symbiote-native/angular';
+import { ActionButton } from './ActionButton';
 
 // Static look lives in RefApiDemo.css, compiled at build time by @symbiote-native/css-parser.
 import './RefApiDemo.css';
@@ -25,7 +26,7 @@ import './RefApiDemo.css';
 @Component({
   selector: 'RefApiDemo',
   standalone: true,
-  imports: [SYMBIOTE_ELEMENTS],
+  imports: [SYMBIOTE_ELEMENTS, ActionButton],
   template: `
     <view class="section-nested">
       <text class="section-label"
@@ -41,20 +42,20 @@ import './RefApiDemo.css';
       }}</text>
       <view class="row">
         <view class="flex-1">
-          <button
+          <ActionButton
             testID="measure-btn"
             title="Measure"
             (press)="onMeasure()"
             color="#dd0031"
-          ></button>
+          ></ActionButton>
         </view>
         <view class="flex-1">
-          <button
+          <ActionButton
             testID="flash-btn"
             title="Flash (setNativeProps)"
             (press)="onFlash()"
             color="#f6ad55"
-          ></button>
+          ></ActionButton>
         </view>
       </view>
     </view>

@@ -13,13 +13,27 @@ project never depends on) — every sensor's logic is hand-ported into this pack
 
 ## Install
 
+**New app:**
+
+```bash
+npx @symbiote-native/cli new my-app --sensors
+```
+
+**Existing SymbioteNative app:**
+
+```bash
+npx @symbiote-native/cli add --sensors
+```
+
+Either way: installs `@symbiote-native/sensors` and wires the native autolinking automatically — see
+[`@symbiote-native/cli`](../cli).
+
+<details>
+<summary>Manual install (no CLI — installing and wiring native autolinking by hand)</summary>
+
 ```bash
 npm install @symbiote-native/sensors
 ```
-
-Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --sensors` (or
-`add --sensors` in an existing app) installs and wires this for you — see
-[`@symbiote-native/cli`](../cli).
 
 Depends on `expo-sensors` and `expo-modules-core` directly (regular dependencies, pinned to exact
 versions — never a caret range, since this package's `core/` is hand-ported against one specific
@@ -48,6 +62,8 @@ and `examples/expo-react/android/app/src/main/java/com/canaryexpo/MainApplicatio
 Permissions ship with the native module itself — nothing to reimplement, just the platform
 permission string each sensor needs (e.g. DeviceMotion/Pedometer need `NSMotionUsageDescription`
 on iOS).
+
+</details>
 
 ## Shape
 

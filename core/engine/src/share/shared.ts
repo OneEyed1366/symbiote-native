@@ -8,6 +8,10 @@
 // share.ts re-exports the iOS build for web/headless. There is no runtime `Platform.OS`
 // read: the filename is the selector.
 
+import { invariant } from '../invariant';
+
+export { invariant };
+
 // RN's IShareContent: a url OR a message is required (title always optional).
 export type IShareContent =
   | { title?: string; url: string; message?: string }
@@ -32,8 +36,10 @@ export const DISMISSED_ACTION = 'dismissedAction';
 
 // RN's IShareAction: the resolved shape. The action literals must agree with the
 // constants above.
+// RN's own result type (`{action: string, activityType: ?string}`): the native action string
+// passes through unnarrowed, so compare it against `sharedAction` / `dismissedAction`.
 export interface IShareAction {
-  action: typeof SHARED_ACTION | typeof DISMISSED_ACTION;
+  action: string;
   activityType?: string | null;
 }
 
@@ -56,14 +62,21 @@ export const shareActions: {
   dismissedAction: DISMISSED_ACTION,
 };
 
-// RN's invariant: return an Error (caller rejects rather than throws) so a bad call
-// can't unmount the tree on device. Shared because the rule is identical per platform.
-export function validateContent(content: IShareContent): Error | null {
-  if (typeof content !== 'object' || content === null) {
-    return new Error('Content to share must be a valid object');
-  }
-  if (typeof content.url !== 'string' && typeof content.message !== 'string') {
-    return new Error('At least one of URL or message is required');
-  }
-  return null;
+// Share.js's three shared invariants, checked before any promise exists on both platforms.
+export function assertShareArgs(
+  content: IShareContent,
+  options: IShareOptions,
+): void {
+  invariant(
+    typeof content === 'object' && content !== null,
+    'Content to share must be a valid object',
+  );
+  invariant(
+    typeof content.url === 'string' || typeof content.message === 'string',
+    'At least one of URL or message is required',
+  );
+  invariant(
+    typeof options === 'object' && options !== null,
+    'Options must be a valid object',
+  );
 }

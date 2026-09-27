@@ -193,17 +193,9 @@ describe('DescriptorOutlet', () => {
     // This test's subject is `createdCount` — that `sameElement`'s (type, key) match means PATCH and
     // not replace, so no new Fabric node comes out of a prop rewrite. That has never changed.
     //
-    // The COMMIT half of it has, twice. It first claimed a rebuilt-but-identical descriptor never
-    // forces a redundant commit, which was a `tree-applier.ts` artifact — the JS applier dedupes by
-    // comparing the final committed shape, a step nothing in production performs. It was then
-    // corrected to "genuinely re-commits every time", with the reasoning that object-identity dedup
-    // only catches the SAME reference handed back twice. Both sentences were about the ENGINE, and
-    // the second was accurate when it was written.
-    //
-    // As of 2026-09-17 the engine refuses this write in JS: `routeProp`'s style branch compares a
-    // rebuilt style against the standing one key for key (`isSameShallowStyle`) and returns without
-    // recording anything. So the cost this test was documenting is gone, and the assertion follows
-    // it rather than the other way round — nothing about DescriptorOutlet moved.
+    // The engine refuses this write in JS: `routeProp`'s style branch compares a rebuilt style
+    // against the standing one key for key (`isSameShallowStyle`) and returns without recording
+    // anything — nothing about DescriptorOutlet itself does the deduping.
     it('does not commit at all when a prop object is rebuilt with identical content', async () => {
       mountHost(DescriptorOutletHost);
       await flushAngular();

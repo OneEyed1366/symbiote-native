@@ -156,28 +156,24 @@ describe('button host behavior on Android', () => {
 
     const { host, label } = subtreeOf(TEST_ID);
     expect(countNodes(host)).toBe(3);
-    // The label still carries the app's title — WHERE it lands is this case's subject, and that is
-    // the hop `subtreeOf` proves. The UPPERCASING left on 2026-09-18: it is `foldButtonLabel` in
-    // `SymbioteFabricProps.cpp`, behind `#ifdef ANDROID`, and this suite runs against neither an
-    // Android build nor the C++ payload builder — it mocks `Platform.OS`, which the rule no longer
-    // reads. Asserting 'SAVE' here would now be asserting a mock of nothing.
-    //
-    // NOT REPLACED, and that is the honest state: the identity branch is pinned in
-    // `core/engine/cpp/tests/js/button-derived-payload.itest.ts`, the Android branch is pinned
-    // NOWHERE, exactly like `android_ripple` and `decelerationRate`'s constants. A compile-time
-    // branch needs a build that compiles it.
-    expect(label?.payload.text).toBe('Save');
+    // The label carries the app's title, uppercased: Android's `title.toUpperCase()` is applied in
+    // JS at the slot redirect (`slotValueFor`), which is what this mocked `Platform.OS` steers.
+    expect(label?.payload.text).toBe('SAVE');
     expect(node.childHost).toBeDefined();
   });
 
-  // THE MATERIAL LOOK LEFT THIS FILE ON 2026-09-18 AND HAS A BETTER HOME, which is the first time in
-  // this migration that sentence has been true of an Android branch. The style, the selectable
-  // background, the `color` override, the disabled greying and the late re-tint are asserted against
-  // the COMMITTED PAYLOAD in `core/engine/cpp/tests/js/android-rules.android.itest.ts`, run by
-  // `pnpm run test:android` against a build that actually compiles `#ifdef ANDROID`.
-  //
-  // What this file could offer was always weaker: it mocks `Platform.OS`, and what that steers is
-  // the JS half. A rule in `SymbioteFabricProps.cpp` never reads it.
+  // why: Button.js:352-353 — Android renders `title.toUpperCase()`, JavaScript's full-Unicode
+  // uppercase, so a Cyrillic or German title uppercases too (ß -> SS).
+  it('uppercases the title with full Unicode, as JS toUpperCase does', async () => {
+    mountButton({ title: 'Сохранить straße' });
+    await settle();
+
+    expect(subtreeOf(TEST_ID).label?.payload.text).toBe('СОХРАНИТЬ STRASSE');
+  });
+
+  // The Material look (style, selectable background, `color` override, disabled greying, re-tint)
+  // is asserted against the committed payload in `android-rules.android.itest.ts`, not here — this
+  // file only mocks `Platform.OS`, which a C++ rule never reads.
 
   // TouchableNativeFeedback.js:230-252. Without these the drawable is installed and never animates:
   // the JS responder consumes the touch, so Android's own pressed-state handling never fires and
@@ -220,31 +216,13 @@ describe('button host behavior on Android', () => {
     await settle();
   });
 
-  // `focusable` LEFT ON 2026-09-18 — `foldButtonProps` in `SymbioteFabricProps.cpp` — and this
-  // harness carries no copy of the tag rules. The pair is the `whether a button is a focus stop`
-  // block in `core/engine/cpp/tests/js/button-payload.itest.ts`.
-  //
-  // THE OWNER'S FOLD SURVIVES ON THIS PLATFORM AND ONLY THIS ONE, which is the part worth keeping
-  // here rather than only in the iOS twin: Android still needs the view style and the ripple
-  // background, so `buildStructure` binds a fold behind `IS_ANDROID`. Off Android it binds none at
-  // all. The cases below are what hold that half.
+  // `focusable` is `foldButtonProps` in C++ now; this harness carries no copy — see
+  // `button-payload.itest.ts`. The owner's fold still binds behind `IS_ANDROID` here (view style
+  // + ripple background); off Android it binds none.
 
-  // why: THE arm that made `HOST_PRIMITIVES.Button.aliases` necessary rather than inherited.
-  //
-  // Button's touchable is swapped by platform (Button.js:281-284), and only ONE of the two arms
-  // renames `id` itself: `touchable-opacity`'s own `foldPayload` does, the bare press machine this
-  // platform composes does not (`Pressable`'s spec entry does it for that tag instead). Measured
-  // with no entry, on the committed payload:
-  //
-  //   iOS      nativeID: 'from-id'   id: absent      the touchable-opacity fold
-  //   Android  nativeID: undefined   id: 'from-id'   a key no ViewConfig declares -> dropped
-  //
-  // So the alias is what makes the two platforms agree, and the iOS twin of this test passes with
-  // NO entry at all — which is exactly why declining the entry looked free.
-  //
-  // The bag is RAW now, where it used to be pre-folded by `foldHostBag`: the rename moved to
-  // `routeProp` on 2026-09-18, which `mountButton` crosses, so the pre-fold would be asking the
-  // same question one step earlier.
+  // why: Button's touchable swaps by platform (Button.js:281-284) — only touchable-opacity's own
+  // fold renames `id`, so without an alias here Android's bare press machine leaves `id`
+  // unrenamed and Fabric drops it as an undeclared key.
   it('folds `id` to `nativeID`, which no layer on this platform does for it', async () => {
     mountButton({ id: 'from-id', nativeID: 'losing' });
     await settle();

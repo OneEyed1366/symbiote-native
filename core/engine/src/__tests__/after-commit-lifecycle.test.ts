@@ -39,7 +39,7 @@ import {
   type ISymbioteNode,
 } from '../index';
 
-const fabric = installRecordingFabric();
+installRecordingFabric();
 let nextRootTag = 7900;
 
 // A tag whose Fabric name is an ordinary view, which is what every adapter passes — building the

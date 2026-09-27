@@ -12,19 +12,33 @@ Solid entry points are plain re-exports of the same `core`.
 
 ## Install
 
+**New app:**
+
+```bash
+npx @symbiote-native/cli new my-app --system-ui
+```
+
+**Existing SymbioteNative app:**
+
+```bash
+npx @symbiote-native/cli add --system-ui
+```
+
+Either way: installs `@symbiote-native/system-ui` and wires the native autolinking automatically —
+see [`@symbiote-native/cli`](../cli).
+
+<details>
+<summary>Manual install (no CLI — installing and wiring native autolinking by hand)</summary>
+
 ```bash
 npm install @symbiote-native/system-ui
 ```
-
-Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --system-ui` (or
-`add --system-ui` in an existing app) installs and wires this for you — see
-[`@symbiote-native/cli`](../cli).
 
 `expo-system-ui` and `expo-modules-core` come along as regular dependencies, pinned to exact
 versions — never install either yourself, and never add the `expo` meta-package to your project
 (it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
 
-## Required one-time step: native autolinking wiring
+### Required one-time step: native autolinking wiring
 
 Unlike a plain RN native module, `expo-system-ui`'s native code is discovered by
 `expo-modules-autolinking`, not RN's own `react-native.config.cjs` mechanism — this needs wiring
@@ -44,6 +58,8 @@ implementation: `examples/expo-react/ios/Podfile` and
 
 `expo-system-ui` needs no runtime permission on either platform — it only sets/reads a stored
 background color, nothing gated by a permission prompt.
+
+</details>
 
 ## Shape
 

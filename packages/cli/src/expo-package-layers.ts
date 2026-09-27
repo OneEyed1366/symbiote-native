@@ -1,3 +1,5 @@
+import type { ISymbioteExpoLinkOptionalBundle } from '@symbiote-native/expo-modules-link';
+
 // The individually-selectable @symbiote-native/* packages that are thin wrappers over an Expo
 // module (expo-modules-core + one expo-<x> package — see each package's own package.json). Every
 // one of them is a dependency-only layer, same shape as `slider` (templates/layers/<id>/
@@ -11,25 +13,34 @@
 // already handles any id in here with no per-package code.
 export type IExpoPackageLayerName =
   | 'application'
+  | 'audio'
+  | 'background-fetch'
+  | 'background-task'
   | 'battery'
   | 'brightness'
   | 'cellular'
   | 'clipboard'
   | 'crypto'
   | 'device'
+  | 'file-system'
   | 'haptics'
   | 'keep-awake'
   | 'local-auth'
   | 'localization'
+  | 'location'
+  | 'media-library'
   | 'network'
+  | 'notifications'
   | 'screen-orientation'
   | 'secure-store'
   | 'sensors'
   | 'sharing'
   | 'sms'
+  | 'sqlite'
   | 'standard-web-crypto'
   | 'store-review'
   | 'system-ui'
+  | 'task-manager'
   | 'tracking-transparency'
   | 'web-browser';
 
@@ -37,6 +48,14 @@ export type IExpoPackageLayer = {
   readonly id: IExpoPackageLayerName;
   readonly label: string;
   readonly symbiotePackage: string;
+  // Mirrors the wrapped package's own native-link.json `android.optionalManifestBundles` —
+  // policy-sensitive permissions/services the developer opts into, never applied automatically.
+  // Duplicated here (not read from node_modules) because `add`/`new` offer to grant it BEFORE the
+  // package is even installed — `applyBundle` only needs the bundle data and the app's own
+  // AndroidManifest.xml, neither of which requires node_modules to exist yet. Cross-checked
+  // byte-for-byte against the real file in expo-package-layers.test.ts, so this can't silently
+  // drift once a package's own bundle changes.
+  readonly optionalManifestBundles?: readonly ISymbioteExpoLinkOptionalBundle[];
 };
 
 export const EXPO_PACKAGE_LAYERS: readonly IExpoPackageLayer[] = [
@@ -44,6 +63,41 @@ export const EXPO_PACKAGE_LAYERS: readonly IExpoPackageLayer[] = [
     id: 'application',
     label: 'Application info',
     symbiotePackage: '@symbiote-native/application',
+  },
+  {
+    id: 'audio',
+    label: 'Audio',
+    symbiotePackage: '@symbiote-native/audio',
+    optionalManifestBundles: [
+      {
+        id: 'recording',
+        label: 'Background audio recording',
+        warning:
+          'Requesting FOREGROUND_SERVICE_MICROPHONE triggers Play Console policy review — Google requires a clear, prominent in-app disclosure and justification before you can publish.',
+        nextSteps:
+          'Pass `allowsBackgroundRecording: true` to setAudioModeAsync so recording keeps running with the app backgrounded.',
+        manifestPermissions: [
+          'android.permission.FOREGROUND_SERVICE_MICROPHONE',
+          'android.permission.POST_NOTIFICATIONS',
+        ],
+        manifestServices: [
+          {
+            name: 'expo.modules.audio.service.AudioRecordingService',
+            foregroundServiceType: 'microphone',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'background-fetch',
+    label: 'Background fetch',
+    symbiotePackage: '@symbiote-native/background-fetch',
+  },
+  {
+    id: 'background-task',
+    label: 'Background task',
+    symbiotePackage: '@symbiote-native/background-task',
   },
   {
     id: 'battery',
@@ -72,6 +126,11 @@ export const EXPO_PACKAGE_LAYERS: readonly IExpoPackageLayer[] = [
     symbiotePackage: '@symbiote-native/device',
   },
   {
+    id: 'file-system',
+    label: 'File system',
+    symbiotePackage: '@symbiote-native/file-system',
+  },
+  {
     id: 'haptics',
     label: 'Haptics',
     symbiotePackage: '@symbiote-native/haptics',
@@ -92,9 +151,39 @@ export const EXPO_PACKAGE_LAYERS: readonly IExpoPackageLayer[] = [
     symbiotePackage: '@symbiote-native/localization',
   },
   {
+    id: 'location',
+    label: 'Location',
+    symbiotePackage: '@symbiote-native/location',
+    optionalManifestBundles: [
+      {
+        id: 'background',
+        label: 'Background location tracking',
+        warning:
+          'Requesting ACCESS_BACKGROUND_LOCATION and the location foreground-service permissions triggers Play Console policy review — Google requires a clear, prominent in-app disclosure and justification before you can publish.',
+        nextSteps:
+          "Pass a `foregroundService` option to `startLocationUpdatesAsync` (notification title/body) so the OS keeps tracking alive outside the app. expo-location's own LocationTaskService is already declared in its AndroidManifest.xml and merges automatically — this only adds the permissions it needs.",
+        manifestPermissions: [
+          'android.permission.ACCESS_BACKGROUND_LOCATION',
+          'android.permission.FOREGROUND_SERVICE',
+          'android.permission.FOREGROUND_SERVICE_LOCATION',
+        ],
+      },
+    ],
+  },
+  {
+    id: 'media-library',
+    label: 'Media library',
+    symbiotePackage: '@symbiote-native/media-library',
+  },
+  {
     id: 'network',
     label: 'Network info',
     symbiotePackage: '@symbiote-native/network',
+  },
+  {
+    id: 'notifications',
+    label: 'Notifications',
+    symbiotePackage: '@symbiote-native/notifications',
   },
   {
     id: 'screen-orientation',
@@ -117,6 +206,7 @@ export const EXPO_PACKAGE_LAYERS: readonly IExpoPackageLayer[] = [
     symbiotePackage: '@symbiote-native/sharing',
   },
   { id: 'sms', label: 'SMS', symbiotePackage: '@symbiote-native/sms' },
+  { id: 'sqlite', label: 'SQLite', symbiotePackage: '@symbiote-native/sqlite' },
   {
     id: 'standard-web-crypto',
     label: 'Web Crypto polyfill',
@@ -131,6 +221,11 @@ export const EXPO_PACKAGE_LAYERS: readonly IExpoPackageLayer[] = [
     id: 'system-ui',
     label: 'System UI',
     symbiotePackage: '@symbiote-native/system-ui',
+  },
+  {
+    id: 'task-manager',
+    label: 'Task manager',
+    symbiotePackage: '@symbiote-native/task-manager',
   },
   {
     id: 'tracking-transparency',
@@ -152,4 +247,17 @@ export function isExpoPackageLayerName(
   value: string,
 ): value is IExpoPackageLayerName {
   return EXPO_PACKAGE_LAYER_IDS.has(value);
+}
+
+// `new`/`add`'s post-install hint: of the packages just installed, which ones have something to
+// `grant` — so the developer hears about it right there instead of having to already know the
+// command exists.
+export function expoPackagesWithOptionalManifestBundles(
+  selected: ReadonlySet<IExpoPackageLayerName> | Iterable<string>,
+): IExpoPackageLayer[] {
+  const ids = selected instanceof Set ? selected : new Set(selected);
+  return EXPO_PACKAGE_LAYERS.filter(
+    layer =>
+      (layer.optionalManifestBundles?.length ?? 0) > 0 && ids.has(layer.id),
+  );
 }

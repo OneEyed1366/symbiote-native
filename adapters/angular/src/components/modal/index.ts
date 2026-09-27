@@ -2,10 +2,8 @@
 // through the same childSet as the rest of the tree (no second JS surface). The style math (the
 // backdrop override, the container/host styles, the presentationStyle default), the visible gate,
 // and the iOS keep-alive reducer all live framework-agnostic in @symbiote-native/components and are shared
-// verbatim with React/Vue; here Angular supplies only the lifecycle: the keep-alive state + a
-// POST-render transition (ngOnChanges queues the reducer on a microtask so it runs AFTER the render
-// that used the OLD state, the Angular twin of React's useEffect / Vue's post-flush watch — one
-// keep-alive frame survives the visible→hidden transition), reusing renderModal's resolved props.
+// verbatim with React/Vue; here Angular supplies only the lifecycle: the keep-alive state, armed on
+// show (ngOnChanges) and dropped by the native dismiss on iOS, reusing renderModal's resolved props.
 // The user children nest UNDER the container View via <ng-content>.
 
 import {
@@ -27,7 +25,9 @@ import {
 } from '@angular/core';
 import {
   createInitialModalState,
+  isModalVisible,
   modalReducer,
+  modalVisibilityAction,
   renderModal,
   resolveAccessibilityProps,
   shouldRenderModal,
@@ -42,6 +42,7 @@ import {
 import {
   dlog,
   isSymbioteEvent,
+  Platform,
   type IStyleProp,
   type ISymbioteEvent,
   type IViewStyle,
@@ -112,7 +113,7 @@ export type IAngularModalInputs = Omit<
       <modal
         [symbioteHostProps]="hostProps()"
         (show)="show.emit()"
-        (dismiss)="dismiss.emit()"
+        (dismiss)="handleDismiss()"
         (requestClose)="requestClose.emit()"
         (orientationChange)="emit(orientationChange, $event)"
       >
@@ -180,8 +181,8 @@ export class Modal implements IAngularModalInputs, OnInit, OnChanges, DoCheck {
   @Input('aria-valuenow') ariaValueNow?: number;
   @Input('aria-valuetext') ariaValueText?: string;
 
-  // The iOS keep-alive (state/modal.ts): on visible→hidden the node renders one more frame
-  // (isRendered still true) before unmounting, so the native onDismiss can arrive.
+  // The iOS keep-alive (state/modal.ts): after visible→hidden the node stays until the native
+  // onDismiss (`handleDismiss`) drops it.
   private state: IModalState = createInitialModalState(false);
 
   private readonly changeDetector = inject(ChangeDetectorRef);
@@ -192,7 +193,7 @@ export class Modal implements IAngularModalInputs, OnInit, OnChanges, DoCheck {
   private readonly elementRef = inject(ElementRef);
 
   ngOnInit(): void {
-    this.state = createInitialModalState(this.visible === true);
+    this.state = createInitialModalState(isModalVisible(this.visible));
   }
 
   // Bridges the non-reactive @Input fields `hostProps` reads into the reactive graph, so it can
@@ -212,20 +213,25 @@ export class Modal implements IAngularModalInputs, OnInit, OnChanges, DoCheck {
     const visibleChange = changes.visible;
     // First change is reflected by the ngOnInit seed; only later toggles drive the keep-alive.
     if (visibleChange === undefined || visibleChange.firstChange) return;
-    const isVisible = this.visible === true;
-    // Queue on a microtask so the reducer runs AFTER this CD pass renders with the OLD state —
-    // the keep-alive frame. A synchronous dispatch here would unmount in the same pass.
+    // Arms the iOS keep-alive on show; a hide is left to the native dismiss (state/modal.ts).
+    const action = modalVisibilityAction(isModalVisible(this.visible));
+    if (action === undefined) return;
     queueMicrotask(() => {
-      this.state = modalReducer(
-        this.state,
-        isVisible ? { type: 'show' } : { type: 'hide' },
-      );
+      this.state = modalReducer(this.state, action);
       this.changeDetector.markForCheck();
     });
   }
 
+  // Modal.js: onDismiss is iOS-only — it drops the keep-alive, then tells the app.
+  handleDismiss(): void {
+    if (Platform.OS !== 'ios') return;
+    this.state = modalReducer(this.state, { type: 'hide' });
+    this.changeDetector.markForCheck();
+    this.dismiss.emit();
+  }
+
   get shouldRender(): boolean {
-    const render = shouldRenderModal(this.visible === true, this.state);
+    const render = shouldRenderModal(isModalVisible(this.visible), this.state);
     if (!render) dlog('Modal hidden -> no node committed');
     return render;
   }

@@ -8,12 +8,9 @@ import {
   DEFAULT_UNDERLAY_COLOR,
 } from '../state/touchable';
 
-// RN-audited form (2026-08-19). It replaces a `highlightPressedStyle(pressed, style, …)` helper
-// that folded BOTH halves onto ONE node — the bug this shape exists to prevent.
-// RN keeps them apart (TouchableHighlight.js _createExtraStyles + render): `underlay` — the
-// backgroundColor — goes on the container, `child` — the lowered opacity — is cloned onto the
-// CHILD. Put the opacity on the container instead and it fades the very underlay it is supposed to
-// reveal: `underlayColor: 'black'` paints grey, not black.
+// RN keeps the two halves apart (`TouchableHighlight.js`): `underlay` (backgroundColor) goes on
+// the container, `child` (lowered opacity) clones onto the CHILD. Swapping them fades the very
+// underlay it should reveal — `underlayColor: 'black'` paints grey, not black.
 //
 // So this returns the two styles SEPARATELY and takes no position on where they land. React can
 // keep using cloneElement; an adapter with no element-cloning decides for itself (and records what

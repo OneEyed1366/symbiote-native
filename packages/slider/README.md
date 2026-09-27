@@ -11,13 +11,28 @@ own primitives.
 
 ## Install
 
+**New app:**
+
+```bash
+npx @symbiote-native/cli new my-app --slider
+```
+
+**Existing SymbioteNative app:**
+
+```bash
+npx @symbiote-native/cli add --slider
+```
+
+Either way: installs and wires this for you — see [`@symbiote-native/cli`](../cli).
+
+<details>
+<summary>Manual install</summary>
+
 ```bash
 npm install @symbiote-native/slider
 ```
 
-Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --slider` (or
-`add --slider` in an existing app) installs and wires this for you — see
-[`@symbiote-native/cli`](../cli).
+</details>
 
 Only this package — never `@react-native-community/slider` directly, see
 [Packaging](#packaging--one-dependency-not-two) below for why.

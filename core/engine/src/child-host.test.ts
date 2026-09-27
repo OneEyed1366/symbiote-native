@@ -1,13 +1,9 @@
-// `IHostBehavior.buildStructure` + `ISymbioteNode.childHost` — the seam that lets a COMPOSED
-// primitive be a host element. `foldPayload` gives a tag its wrapper's prop mapping;
-// this gives it the wrapper's internal subtree, which is what a ScrollView (scroll view wrapping a
-// content view) or an ImageBackground needs and what nothing before this could express.
-//
-// The assertions worth their lines are the ones that are green either way if you only test the
-// happy append: `removeChild` through the owner (an un-redirected remove is a SILENT no-op — the
-// splice misses, the child stays committed, and the framework believes it is gone), and the
-// park/unpark case (rebuilding on re-attach duplicates the structure and swaps the slot's identity
-// out from under app children that still point at the old one).
+// `IHostBehavior.buildStructure` + `ISymbioteNode.childHost` — the seam letting a COMPOSED
+// primitive be a host element (a ScrollView wrapping a content view, an ImageBackground).
+
+// The assertions worth their lines aren't the happy append: `removeChild` through the owner (an
+// un-redirected remove is a silent no-op) and park/unpark (rebuilding on re-attach can swap the
+// slot's identity from under a still-pointing child).
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   createLiveTree,

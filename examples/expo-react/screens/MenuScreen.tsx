@@ -96,6 +96,21 @@ const MENU_ITEMS: readonly IMenuItem[] = [
     hint: '@symbiote-native/localization — locales and calendars, both reactive to device settings changes',
   },
   {
+    label: 'Location',
+    route: ROUTE_NAME.Location,
+    hint: '@symbiote-native/location — foreground/background position, geocoding, motion activity',
+  },
+  {
+    label: 'Media Library',
+    route: ROUTE_NAME.MediaLibrary,
+    hint: '@symbiote-native/media-library — photo/video library: permissions, albums, assets, change events',
+  },
+  {
+    label: 'File System',
+    route: ROUTE_NAME.FileSystem,
+    hint: '@symbiote-native/file-system — legacy read/write/copy/move/delete plus the modern File/Directory/Paths API',
+  },
+  {
     label: 'Tracking Transparency',
     route: ROUTE_NAME.TrackingTransparency,
     hint: '@symbiote-native/tracking-transparency — iOS App Tracking Transparency prompt + advertising ID',
@@ -119,6 +134,26 @@ const MENU_ITEMS: readonly IMenuItem[] = [
     label: 'SMS',
     route: ROUTE_NAME.Sms,
     hint: '@symbiote-native/sms — opens the system SMS composer prefilled with recipients and a message',
+  },
+  {
+    label: 'Audio',
+    route: ROUTE_NAME.Audio,
+    hint: '@symbiote-native/audio — remote-URL playback, recording, and the audio-session mode toggle',
+  },
+  {
+    label: 'Notifications',
+    route: ROUTE_NAME.Notifications,
+    hint: '@symbiote-native/notifications — permissions, scheduling, presentation, badges, Android channels',
+  },
+  {
+    label: 'Background Tasks',
+    route: ROUTE_NAME.BackgroundTasks,
+    hint: '@symbiote-native/task-manager + background-fetch + background-task — task registration and periodic/OS-scheduled background work',
+  },
+  {
+    label: 'SQLite',
+    route: ROUTE_NAME.Sqlite,
+    hint: '@symbiote-native/sqlite — Provider-scoped database, tagged-template SQL, transactions, and a SQLite-backed key-value store',
   },
 ];
 

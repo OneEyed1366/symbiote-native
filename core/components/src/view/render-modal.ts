@@ -141,11 +141,12 @@ export function renderModal(
       // supportedOrientations/allowSwipeDismissal, Android hardwareAccelerated/
       // statusBarTranslucent/navigationBarTranslucent.
       supportedOrientations: view.supportedOrientations,
-      hardwareAccelerated: view.hardwareAccelerated,
+      // Modal.js `defaultProps = {hardwareAccelerated: false, visible: true}`.
+      hardwareAccelerated: view.hardwareAccelerated ?? false,
       statusBarTranslucent: view.statusBarTranslucent,
       navigationBarTranslucent: view.navigationBarTranslucent,
       allowSwipeDismissal: view.allowSwipeDismissal,
-      visible: view.visible,
+      visible: view.visible ?? true,
     },
     [container],
   );

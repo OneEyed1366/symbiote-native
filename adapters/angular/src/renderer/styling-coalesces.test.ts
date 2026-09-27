@@ -379,3 +379,65 @@ describe('a styling binding', () => {
     expect(payload.right).toBe(3);
   });
 });
+
+// Rows whose styles SHARE A PREFIX with one already published, in the order Angular walks them. A
+// renderer that recognises a published style key by key must not stop at the prefix. Angular hands
+// the keys over SORTED, so `diverges` sits right after `base`: same keys, the last value differs.
+@Component({
+  selector: 'prefix-cost-host',
+  standalone: true,
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
+  template: `
+    <view testID="base" [style]="base"></view>
+    <view testID="diverges" [style]="diverges"></view>
+    <view testID="subset" [style]="subset"></view>
+    <view testID="superset" [style]="superset"></view>
+  `,
+})
+class PrefixHost {
+  readonly base = { height: 44, paddingLeft: 10, flexDirection: 'row' };
+  readonly subset = { height: 44, paddingLeft: 10 };
+  readonly diverges = { height: 44, paddingLeft: 99, flexDirection: 'row' };
+  readonly superset = {
+    height: 44,
+    paddingLeft: 10,
+    flexDirection: 'row',
+    marginTop: 5,
+  };
+}
+
+function payloadOf(testID: string): Record<string, unknown> {
+  const hit = live.findLive(
+    live.appRoot(),
+    node => node.payload.testID === testID,
+  );
+  if (hit === undefined) throw new Error(`no committed node "${testID}"`);
+  return hit.payload;
+}
+
+describe('a style that shares a prefix with one already published', () => {
+  beforeEach(async () => {
+    mount(ROOT_TAG, PrefixHost);
+    await tick();
+  });
+
+  // why: fewer keys is a different style - the published one would paint a key the row never asked for.
+  it('keeps a shorter style its own', () => {
+    expect(payloadOf('subset').flexDirection).toBe(undefined);
+    expect(payloadOf('subset').paddingLeft).toBe(10);
+  });
+
+  // why: a match on the first keys says nothing about the rest.
+  it('carries the value that diverged and every key before it', () => {
+    const payload = payloadOf('diverges');
+    expect(payload.paddingLeft).toBe(99);
+    expect(payload.height).toBe(44);
+    expect(payload.flexDirection).toBe('row');
+  });
+
+  // why: more keys is a different style - the published one would drop the extra key.
+  it('keeps a longer style whole', () => {
+    expect(payloadOf('superset').marginTop).toBe(5);
+    expect(payloadOf('superset').flexDirection).toBe('row');
+  });
+});

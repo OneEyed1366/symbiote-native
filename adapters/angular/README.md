@@ -1,7 +1,7 @@
 # @symbiote-native/angular
 
 The **Angular adapter** for [SymbioteNative](../../README.md) — render real native iOS/Android views
-from Angular, on the _same_ untouched core as React and Vue, with React Native's own renderer
+from Angular, on the _same_ untouched core as React, Vue, Svelte, and Solid, with React Native's own renderer
 never in the path. It is a `Renderer2`/`RendererFactory2` whose calls map onto the engine's
 four-call mutation API; `@symbiote-native/engine` does the clone-on-write commit into Fabric.
 
@@ -22,20 +22,97 @@ already-validated engine with zero changes to it.
 ## Install
 
 ```bash
-npm install @symbiote-native/angular react-native @angular/core
+npx @symbiote-native/cli new my-app --framework angular
 ```
 
-`react-native` and `@angular/core` (**>=20**, for stable zoneless change detection) stay your app's
-own top-level dependencies. `npx @symbiote-native/cli new` wires the AOT pipeline (`ngc --watch`
-alongside Metro — see [Run it](#run-it)) and the Metro config for a new app; wiring them into an
-existing one still follows [`examples/angular`](../../examples/angular) rather than a generator.
+One command, nothing to wire by hand: this adapter needs the most build wiring of the five (the
+AOT pipeline, `ngc --watch` alongside Metro, the static-block Babel plugin below) — the generator
+sets up all of it, plus `@symbiote-native/angular`/`react-native`/`@angular/core`/`@angular/forms`
+as your app's own dependencies.
+
+<details>
+<summary>Manual install (no generator — an existing app, or you want to wire it yourself)</summary>
+
+```bash
+npm install @symbiote-native/angular react-native @angular/core @angular/forms
+```
+
+`react-native`, `@angular/core`, and `@angular/forms` (all **>=20**, for stable zoneless change
+detection) stay your app's own top-level dependencies. `@angular/forms` is a real peer, not
+boilerplate — `text-input`'s `NG_VALUE_ACCESSOR` registration (for `ngModel`/`formControl*`
+binding) imports `ControlValueAccessor` from it. Follow [`examples/angular`](../../examples/angular)
+for the AOT pipeline (`ngc --watch` alongside Metro — see [Run it](#run-it)) and the Metro config;
+there is no wiring script for an existing app.
+
+</details>
 
 ---
 
 ## Use it
 
-The native entry reaches the _same_ `registerRunnable` seam as React and Vue — only the adapter
-changes. It hands the surface's `rootTag` to `mount` from `@symbiote-native/angular`, which drives the
+The app is ordinary standalone Angular. The native primitives are lowercase intrinsic tags, same as
+every other adapter — Angular still needs them declared in the component's `imports:` array (an
+Angular "element directive" is what makes `ngtsc` accept the tag with typed props), so
+`SYMBIOTE_ELEMENTS` from `@symbiote-native/angular` covers the whole primitive surface in one import.
+Styling is a CSS class against a plain `.css` file — the convention every example app here
+follows. A tap→increment counter:
+
+```ts
+import { Component, signal } from '@angular/core';
+import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
+import './App.css';
+
+@Component({
+  selector: 'app-root',
+  standalone: true,
+  imports: [SYMBIOTE_ELEMENTS],
+  template: `
+    <safe-area-view class="screen">
+      <text>Taps: {{ count() }}</text>
+      <pressable (press)="count.set(count() + 1)">
+        <text>Tap me</text>
+      </pressable>
+    </safe-area-view>
+  `,
+})
+export class AppComponent {
+  count = signal(0);
+}
+```
+
+```css
+/* App.css */
+.screen {
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+```
+
+<details>
+<summary>Native entry point (index.js) — already scaffolded by <code>npx @symbiote-native/cli new --framework angular</code></summary>
+
+The zero-config entry mirrors real Angular's own `bootstrapApplication(RootComponent, config)`
+idiom and wires the same RN-backed host seams the other adapters' entries do — this is what
+[`examples/angular`](../../examples/angular) actually uses:
+
+```js
+// index.js
+
+// Registers host behaviors (Image, Pressable, Switch, ...) that /bootstrap alone doesn't
+// reach; deleting this breaks them silently (Metro's production inlineRequires makes a
+// side-effect-only barrel import go lazy, see register.ts).
+import '@symbiote-native/angular';
+import { bootstrapApplication } from '@symbiote-native/angular/bootstrap';
+import { AppComponent } from './App';
+import { name as appName } from './app.json';
+
+bootstrapApplication(AppComponent, { appName });
+```
+
+For anything the defaults don't cover, drive the lower-level seam directly — the same
+`registerRunnable` seam React and Vue use, with `mount` from `@symbiote-native/angular` driving the
 engine through Angular's `Renderer2`:
 
 ```js
@@ -52,33 +129,7 @@ RNAppRegistry.registerRunnable(appName, ({ rootTag }) => {
 });
 ```
 
-The app is ordinary standalone Angular. The native primitives are lowercase intrinsic tags, same as
-every other adapter — Angular still needs them declared in the component's `imports:` array (an
-Angular "element directive" is what makes `ngtsc` accept the tag with typed props), so
-`SYMBIOTE_ELEMENTS` from `@symbiote-native/angular` covers the whole primitive surface in one import.
-A tap→increment counter:
-
-```ts
-import { Component, signal } from '@angular/core';
-import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
-
-@Component({
-  selector: 'app-root',
-  standalone: true,
-  imports: [SYMBIOTE_ELEMENTS],
-  template: `
-    <view [style]="{ padding: 24 }">
-      <text>Taps: {{ count() }}</text>
-      <pressable (press)="count.set(count() + 1)">
-        <text>Tap me</text>
-      </pressable>
-    </view>
-  `,
-})
-export class AppComponent {
-  count = signal(0);
-}
-```
+</details>
 
 The full canary is [`examples/angular`](../../examples/angular) — a stock RN 0.86 app whose
 [`App.ts`](../../examples/angular/src/App.ts) exercises the same surface as the React and Vue
@@ -89,8 +140,8 @@ reference canaries, standalone components, zoneless change detection.
 ## Parity — and the one gap
 
 Angular reaches the same 21+ primitives, runtime modules, `Animated` on both drivers, gestures,
-accessibility, and the `VirtualizedList` family as React and Vue, verified on-device on iOS and
-Android. That parity is **structural, not
+accessibility, and the `VirtualizedList` family as React, Vue, Svelte, and Solid, verified
+on-device on iOS and Android. That parity is **structural, not
 hand-copied**: the component logic (state machines + render functions) is written **once** in
 `@symbiote-native/components`, and Angular supplies only its lifecycle (`Renderer2` + zoneless change
 detection + the descriptor→`createElement` bridge).
@@ -122,13 +173,23 @@ Angular also requires **zoneless change detection** (`provideZonelessChangeDetec
 `@angular/core >=20`) — zone.js fights Hermes, and versions before 20 don't offer a stable
 zoneless API. This is the version floor for the whole adapter, not a suggestion.
 
+`babel.config.js` needs `@babel/plugin-transform-class-static-block`, listed **first**, before
+`@symbiote-native/angular`'s own `babel-register-composed` and linker plugins. `ngc` emits static
+blocks (`tsconfig.angular.base.json`'s `useDefineForClassFields: false` at ES2022 lowers a static
+property initializer to one), and RN's preset doesn't enable that transform — the class-features
+plugin then refuses the class outright. This only surfaces in a **Release** build (where that
+transform actually runs) and is invisible to every headless check, so a hand-wired app missing it
+builds and tests clean right up until the first release build. `npx @symbiote-native/cli new
+--framework angular` already includes it; wiring Angular into an existing app by hand needs it
+copied from [`examples/angular`](../../examples/angular)'s own `babel.config.js`.
+
 ---
 
 ## Run it
 
 [`examples/angular`](../../examples/angular) is a stock React Native 0.86 app. Requires Node ≥
-22.13 and the [RN environment setup](https://reactnative.dev/docs/set-up-your-environment) (Xcode,
-CocoaPods):
+22.13 (react-native 0.86's own `package.json#engines`) and the [RN environment
+setup](https://reactnative.dev/docs/set-up-your-environment) (Xcode, CocoaPods):
 
 ```bash
 cd examples/angular

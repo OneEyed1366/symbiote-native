@@ -1,0 +1,12 @@
+{
+  "android": {
+    "gradleProjectName": "expo-sqlite",
+    "modules": [
+      {
+        "importPath": "expo.modules.sqlite.SQLiteModule",
+        "className": "SQLiteModule",
+        "nativeName": "ExpoSQLite"
+      }
+    ]
+  }
+}

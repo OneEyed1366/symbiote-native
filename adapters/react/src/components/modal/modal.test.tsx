@@ -83,6 +83,17 @@ describe('React Modal on the engine', () => {
       expect(modalNode().payload.visible).toBe(true);
     });
 
+    // why: Modal.js `defaultProps.visible = true` — a `<Modal>` without `visible` shows.
+    it('shows a modal written without visible, as RN defaults it', () => {
+      mount(
+        ROOT_TAG,
+        <Modal>
+          <view />
+        </Modal>,
+      );
+      expect(modalNode().payload.visible).toBe(true);
+    });
+
     // why: shouldRenderModal's boolean result is core-tested directly; this proves the React
     // FC's `if (!shouldRenderModal(...)) return null` line actually removes the node from a
     // real commit rather than rendering an empty/placeholder host.
@@ -115,6 +126,38 @@ describe('React Modal on the engine', () => {
       fabric.fireEvent(modalNode().instanceHandle, 'topRequestClose', {});
       // Still mounted and eventable: the keep-alive frame, not yet torn down.
       expect(() => modalNode()).not.toThrow();
+    });
+
+    // why: Modal.js (iOS) drops the keep-alive ONLY in its onDismiss handler — the node stays
+    // mounted through the whole native exit animation, then unmounts, then the app hears it.
+    it('holds the modal on iOS until the native dismiss, then unmounts and calls onDismiss', async () => {
+      let dismissed = 0;
+      function HoldCase(): ReactElement {
+        const [visible, setVisible] = useState(true);
+        return (
+          <Modal
+            visible={visible}
+            onRequestClose={() => setVisible(false)}
+            onDismiss={() => {
+              dismissed += 1;
+            }}
+          >
+            <view />
+          </Modal>
+        );
+      }
+      mount(ROOT_TAG, <HoldCase />);
+      const host = modalNode().instanceHandle;
+      fabric.fireEvent(host, 'topRequestClose', {});
+      await new Promise(resolve => setTimeout(resolve, 0));
+      expect(() => modalNode()).not.toThrow();
+
+      fabric.fireEvent(host, 'topDismiss', {});
+      await new Promise(resolve => setTimeout(resolve, 0));
+      expect(
+        live.findLive(live.appRoot(), n => n.viewName === 'ModalHostView'),
+      ).toBeUndefined();
+      expect(dismissed).toBe(1);
     });
   });
 

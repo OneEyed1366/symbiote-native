@@ -10,19 +10,33 @@ and Solid entry points are plain re-exports of the same `core`.
 
 ## Install
 
+**New app:**
+
+```bash
+npx @symbiote-native/cli new my-app --store-review
+```
+
+**Existing SymbioteNative app:**
+
+```bash
+npx @symbiote-native/cli add --store-review
+```
+
+Either way: installs `@symbiote-native/store-review` and wires the native autolinking
+automatically — see [`@symbiote-native/cli`](../cli).
+
+<details>
+<summary>Manual install (no CLI — installing and wiring native autolinking by hand)</summary>
+
 ```bash
 npm install @symbiote-native/store-review
 ```
-
-Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --store-review` (or
-`add --store-review` in an existing app) installs and wires this for you — see
-[`@symbiote-native/cli`](../cli).
 
 `expo-store-review` and `expo-modules-core` come along as regular dependencies, pinned to exact
 versions — never install either yourself, and never add the `expo` meta-package to your project
 (it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
 
-## Required one-time step: native autolinking wiring
+### Required one-time step: native autolinking wiring
 
 Unlike a plain RN native module, `expo-store-review`'s native code is discovered by
 `expo-modules-autolinking`, not RN's own `react-native.config.cjs` mechanism — this needs wiring
@@ -41,6 +55,8 @@ implementation: `examples/expo-react/ios/Podfile` and
 `examples/expo-react/android/app/src/main/java/com/canaryexpo/MainApplication.kt`.
 
 `expo-store-review` needs no runtime permission on either platform.
+
+</details>
 
 ## Shape
 

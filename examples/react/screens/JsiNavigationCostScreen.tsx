@@ -285,25 +285,13 @@ export function JsiNavigationCostScreen() {
         WARMUPS,
       );
 
-      // ONE EDGE, one returned handle — this is the per-query constant, and the one to read against
-      // a design that answers getFirstChild/getNextSibling from native.
-      //
-      // Measured on THIS parent, not on one of its children, and the reason is a type trap in RN's
-      // own spec that crashed this screen on its first device run (2026-09-07, "Exception in
-      // HostFunction: Value is not a ShadowNode reference"):
-      //
-      //   getChildNodes(nativeNodeReference) -> ReadonlyArray<InstanceHandle>
-      //   getParentNode(nativeNodeReference) -> ?InstanceHandle
-      //
-      // Both TAKE a NativeNodeReference and RETURN InstanceHandles — different types. So the output
-      // of one is not an input to the other, and `getChildNodes(reference)[0]` is an InstanceHandle
-      // the native side rejects. There is no conversion available from JS; a child's reference comes
-      // from that child's OWN host instance.
-      //
-      // Using the parent's own reference costs nothing here: these parents are mounted inside the
-      // screen's ScrollView, so the lookup walks a real edge and returns a real handle. The original
-      // comment's worry — that a lookup from the ROOT answers null and prices nothing — applies to
-      // the surface root, which this is not.
+      // ONE EDGE, one returned handle — the per-query constant, read against getFirstChild/
+      // getNextSibling. Measured on THIS parent, not a child: RN types both calls
+      // NativeNodeReference -> InstanceHandle, so one's output can't feed the other as input.
+
+      // Using the parent's own reference costs nothing: these parents mount inside the screen's
+      // ScrollView, so the lookup walks a real edge — unlike a lookup from the surface ROOT, which
+      // answers null and prices nothing.
       const parentNode = timeBatch(
         () => dom.getParentNode(reference),
         SAMPLES,

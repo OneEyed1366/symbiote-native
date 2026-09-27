@@ -4,11 +4,7 @@
 // declared per-adapter from scratch, mirroring React's and Vue's own local declarations, per
 // CLAUDE.md's <prop_types_split_agnostic_vs_per_adapter>.
 import type { Snippet } from 'svelte';
-import type {
-  IClassNameValue,
-  IStyleProp,
-  IViewStyle,
-} from '@symbiote-native/engine';
+import type { IStyleProp, IViewStyle } from '@symbiote-native/engine';
 import type {
   IAccessibilityProps,
   IAriaProps,

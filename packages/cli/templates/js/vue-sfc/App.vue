@@ -67,11 +67,11 @@ const count = ref(0);
 }
 
 .brand-logo-react {
-  aspect-ratio: 1.0977;
+  width: 70px;
 }
 
 .brand-logo-vue {
-  aspect-ratio: 1.1542;
+  width: 74px;
 }
 
 .plus-icon {

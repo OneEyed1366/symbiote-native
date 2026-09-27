@@ -279,6 +279,15 @@ describe('Alert (Android build -> DialogManagerAndroid)', () => {
       expect(capturedConfig?.buttonNeutral).toBeUndefined();
     });
 
+    // why: RN defaults to OK only when `buttons` is ABSENT (`buttons ? buttons.slice(0, 3) :
+    // [{text: 'OK'}]`, Alert.js); an explicit empty array shows a dialog with no buttons.
+    it('an explicit empty buttons array shows no buttons', () => {
+      androidAlert.alert('t', 'm', []);
+      expect(capturedConfig?.buttonPositive).toBeUndefined();
+      expect(capturedConfig?.buttonNegative).toBeUndefined();
+      expect(capturedConfig?.buttonNeutral).toBeUndefined();
+    });
+
     // why: the 'dismissed' action (back-button / outside-tap on a cancelable dialog) is a
     // DIFFERENT native action than 'buttonClicked' — it must fire options.onDismiss, not any
     // button's onPress.

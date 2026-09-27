@@ -1,10 +1,6 @@
-// A BARE tag must commit what the `p={{…}}` bag commits.
-//
-// Until 2026-09-07 it committed NOTHING: `setAttribute` wrote an inert Map and no key ever reached
-// `routeProp`, so `<view testID="x">` mounted an empty node with nothing red — only the bag was
-// routed.
-//
-// The parity row is the point of the file; the rest exist so a failure says WHICH half broke.
+// A BARE tag (`<view testID="x">`) must commit what the `p={{…}}` bag commits — `setAttribute`
+// must reach `routeProp`, not just write an inert Map. The parity row is the point of the file;
+// the rest exist so a failure says WHICH half broke.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   createLiveTree,
@@ -126,6 +122,28 @@ describe('a bare intrinsic tag', () => {
     const props = committedPropsOf('bare');
     expect(props.nativeID).toBe('ident');
     expect(props.id).toBeUndefined();
+  });
+
+  // why: `<view accessible>` on a tag with no hyphen rides the static template as `accessible=""`.
+  // A boolean prop has no "" value, so it is the HTML shorthand for true — and Android's
+  // ViewManager threw `String cannot be cast to Boolean` on the "" (device-seen, AccessibilityDemo).
+  it('reads a bare boolean attribute as true', async () => {
+    const element = new ShimElement('view');
+    element.setAttribute('testID', 'bare');
+    element.setAttribute('accessible', '');
+    await mount(element);
+
+    expect(committedPropsOf('bare').accessible).toBe(true);
+  });
+
+  // why: a string prop's "" is a real value, not the shorthand.
+  it('keeps an empty string on a string prop', async () => {
+    const element = new ShimElement('view');
+    element.setAttribute('testID', 'bare');
+    element.setAttribute('accessibilityLabel', '');
+    await mount(element);
+
+    expect(committedPropsOf('bare').accessibilityLabel).toBe('');
   });
 });
 

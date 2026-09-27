@@ -287,7 +287,7 @@ describe('what a pressed touchable-highlight sends native', () => {
   });
 
   // why: `testOnly_pressed` is RN's documented way to snapshot a pressed control
-  // (`TouchableHighlight.js:61, 189`), and we supported it NOWHERE until 2026-09-18 — a real
+  // (`TouchableHighlight.js:61, 189`), previously supported NOWHERE — a real
   // `<adapters_reach_full_feature_parity>` gap, found while reading the vendor for the underlay port
   // and deliberately left to its own commit so the port stayed a pure move.
   //

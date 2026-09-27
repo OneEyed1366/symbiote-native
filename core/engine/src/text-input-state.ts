@@ -1,7 +1,5 @@
-// Mirrors RN's TextInput/TextInputState: the single currently-focused input, tracked
-// JS-side because native exposes no focus getter. TextInput reports focus/blur here so
-// Keyboard.dismiss can blur whatever holds focus without a ref, exactly how RN's
-// dismissKeyboard() works (blurTextInput(currentlyFocusedInput())).
+// Mirrors RN's TextInput/TextInputState: the single currently-focused input, tracked JS-side since
+// native exposes no focus getter. Lets Keyboard.dismiss blur whatever holds focus without a ref.
 
 import { dispatchViewCommand, propOf } from './imperative';
 import { dlog } from './debug';
@@ -24,10 +22,8 @@ export function setInputBlurred(node: ISymbioteNode): void {
   if (currentlyFocused === node) currentlyFocused = null;
 }
 
-// Imperative blur: drive the native `blur` view command and drop the tracked focus.
-// Used by TextInput.blur() and Keyboard.dismiss(). A no-op if this node isn't the
-// currently-focused one — mirrors RN's TextInputState.blurTextInput, which guards the
-// same way so blurring an already-unfocused input never reaches native.
+// Imperative blur: drives the native `blur` command and drops tracked focus. A no-op if this
+// node isn't the currently-focused one, mirroring RN's TextInputState.blurTextInput guard.
 export function blurTextInput(node: ISymbioteNode | null): void {
   if (node === null || currentlyFocused !== node) return;
   dlog('TextInputState.blurTextInput -> blur command');

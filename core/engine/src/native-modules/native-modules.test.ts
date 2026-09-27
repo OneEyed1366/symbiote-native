@@ -15,15 +15,12 @@ interface IDeviceHub {
   emit: (eventType: string, ...args: unknown[]) => void;
 }
 
-let deviceHub: IDeviceHub | undefined;
-
 beforeEach(() => {
-  deviceHub = undefined;
   globalThis.RN$registerCallableModule = (
     name: string,
     factory: () => IDeviceHub,
   ): void => {
-    if (name === 'RCTDeviceEventEmitter') deviceHub = factory();
+    if (name === 'RCTDeviceEventEmitter') factory();
   };
 });
 

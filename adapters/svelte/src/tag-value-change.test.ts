@@ -1,20 +1,10 @@
-// `onValueChange` must reach the app from a bare `text-input` TAG. There is no wrapper left, so
-// this is not a second path — it is the only one.
-//
-// It is not a Fabric event; it is a fold over the raw `change` payload the wrapper used to perform
-// in its own lifecycle. Before the engine grew that fold, a tag simply never called it: the field
-// echoed keystrokes (native owns its own text) while every value the app derived from it stayed
-// frozen. Device-found 2026-08-31 in examples/solid's canary, and reproduced by examples/svelte's
-// own `Hello, ${name}` greeting.
-//
-// The repair lives in `core/components/src/behaviors/text-input.ts` (`callValueChange`), so all five
-// adapters inherit it. This file is the Svelte-side proof that it actually arrives here, because the
-// route to `node.props` is per-adapter: Svelte is a flat-bag adapter, so the prop travels through
-// `routeProp`, whose `/^on[A-Z]/` branch diverts a handler to `setEventListener` — but only for an
-// event the ViewConfig DECLARES. `valueChange` is not one, so it falls through to `setProp` and
-// lands in `node.props`. That is a property of the engine's routing, not of this adapter, and it is
-// exactly the kind of cross-layer assumption `.claude/rules/verify-the-deciding-side.md` says to
-// measure rather than read.
+// `onValueChange` must reach the app from a bare `text-input` TAG — the only path, no wrapper left.
+// It is not a Fabric event; the fold lives in `core/components/src/behaviors/text-input.ts`
+// (`callValueChange`), inherited by all five adapters.
+
+// This file is the Svelte-side proof it actually arrives: Svelte is a flat-bag adapter, so the
+// prop travels through `routeProp`'s `/^on[A-Z]/` branch — which diverts to `setEventListener`
+// only for a ViewConfig-declared event. `valueChange` isn't one, so it falls through to `setProp`.
 import { afterAll, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
 import { rmSync, writeFileSync } from 'node:fs';

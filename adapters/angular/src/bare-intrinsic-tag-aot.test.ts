@@ -208,12 +208,9 @@ export class L { value = 'x'; }
     note: 'One symbol covers every primitive, and it stays one symbol as the set grows.',
   },
 
-  // why: THE chosen route (2026-09-07), and the one thing an app writes ONCE instead of per
-  // component. A component DECLARED in an NgModule inherits that module's whole import scope, so a
-  // single `imports: [SymbioteElementsModule]` in the app's module gives every component in it the
-  // element directives — no `imports` line, no `schemas` line, anywhere else. This is what
-  // NativeScript-Angular does, minus their `NO_ERRORS_SCHEMA`, which they need because they have no
-  // directives to match.
+  // why: THE chosen route — the one thing an app writes ONCE instead of per component. A component
+  // DECLARED in an NgModule inherits that module's whole import scope, so one
+  // `imports: [SymbioteElementsModule]` covers every component in it, no per-component schema.
   //
   // The cost is stated by the case itself: `standalone: false` on every component that wants it.
   // Angular still supports that in v20 — this case is what proves it rather than assuming it.

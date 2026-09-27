@@ -1,0 +1,88 @@
+{
+  "android": {
+    "gradleProjectName": "expo-notifications",
+    "modules": [
+      {
+        "importPath": "expo.modules.notifications.badge.BadgeModule",
+        "className": "BadgeModule",
+        "nativeName": "ExpoBadgeModule"
+      },
+      {
+        "importPath": "expo.modules.notifications.notifications.background.ExpoBackgroundNotificationTasksModule",
+        "className": "ExpoBackgroundNotificationTasksModule",
+        "nativeName": "ExpoBackgroundNotificationTasksModule"
+      },
+      {
+        "importPath": "expo.modules.notifications.notifications.categories.ExpoNotificationCategoriesModule",
+        "className": "ExpoNotificationCategoriesModule",
+        "nativeName": "ExpoNotificationCategoriesModule"
+      },
+      {
+        "importPath": "expo.modules.notifications.notifications.channels.NotificationChannelGroupManagerModule",
+        "className": "NotificationChannelGroupManagerModule",
+        "nativeName": "ExpoNotificationChannelGroupManager"
+      },
+      {
+        "importPath": "expo.modules.notifications.notifications.channels.NotificationChannelManagerModule",
+        "className": "NotificationChannelManagerModule",
+        "nativeName": "ExpoNotificationChannelManager"
+      },
+      {
+        "importPath": "expo.modules.notifications.notifications.emitting.NotificationsEmitter",
+        "className": "NotificationsEmitter",
+        "nativeName": "ExpoNotificationsEmitter"
+      },
+      {
+        "importPath": "expo.modules.notifications.notifications.handling.NotificationsHandler",
+        "className": "NotificationsHandler",
+        "nativeName": "ExpoNotificationsHandlerModule"
+      },
+      {
+        "importPath": "expo.modules.notifications.permissions.NotificationPermissionsModule",
+        "className": "NotificationPermissionsModule",
+        "nativeName": "ExpoNotificationPermissionsModule"
+      },
+      {
+        "importPath": "expo.modules.notifications.notifications.presentation.ExpoNotificationPresentationModule",
+        "className": "ExpoNotificationPresentationModule",
+        "nativeName": "ExpoNotificationPresenter"
+      },
+      {
+        "importPath": "expo.modules.notifications.notifications.scheduling.NotificationScheduler",
+        "className": "NotificationScheduler",
+        "nativeName": "ExpoNotificationScheduler"
+      },
+      {
+        "importPath": "expo.modules.notifications.serverregistration.ServerRegistrationModule",
+        "className": "ServerRegistrationModule",
+        "nativeName": "NotificationsServerRegistrationModule"
+      },
+      {
+        "importPath": "expo.modules.notifications.tokens.PushTokenModule",
+        "className": "PushTokenModule",
+        "nativeName": "ExpoPushTokenManager"
+      },
+      {
+        "importPath": "expo.modules.notifications.topics.TopicSubscriptionModule",
+        "className": "TopicSubscriptionModule",
+        "nativeName": "ExpoTopicSubscriptionModule"
+      },
+      {
+        "importPath": "expo.modules.notifications.notifications.channels.AndroidXNotificationsChannelsProvider",
+        "className": "AndroidXNotificationsChannelsProvider",
+        "nativeName": "NotificationsChannelsProvider",
+        "internal": true
+      }
+    ]
+  },
+  "reviewedNonIntrospectableMods": [
+    {
+      "mod": "android.dangerous",
+      "note": "withNotificationIcons/withNotificationSounds (expo-notifications' withNotificationsAndroid.js) run unconditionally with icon:null, sounds:[] by default — icon:null only unlinks a previously-written notification icon PNG if one exists (existsSync-gated), and an empty sounds array copies zero files. No-op for every consumer: this repo never sets a custom notification icon/color/sounds anywhere."
+    },
+    {
+      "mod": "ios.xcodeproj",
+      "note": "withNotificationSounds' iOS half (withNotificationsIOS.js) copies each entry of `sounds` (default []) into the Xcode project via setNotificationSounds — an empty array loops zero times, so it's a no-op with our defaults. Note it also has a hard `if (!projectName) throw` path, but that's unreachable here since this mod is stripped from every introspected run before executing at all (xcodeproj is not isIntrospective)."
+    }
+  ]
+}

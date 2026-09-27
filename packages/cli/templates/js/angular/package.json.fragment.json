@@ -22,7 +22,7 @@
     "dev": "symbiote-angular-dev --reset-cache",
     "start": "symbiote-angular-dev",
     "android": "ngc -p tsconfig.angular.json && react-native run-android",
-    "ios": "ngc -p tsconfig.angular.json && react-native run-ios",
+    "ios": "ngc -p tsconfig.angular.json && cd ios && pod install && cd .. && react-native run-ios",
     "pretypecheck": "css-dts .",
     "typecheck": "ngc -p tsconfig.angular.json --noEmit"
   }

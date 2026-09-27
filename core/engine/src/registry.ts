@@ -1,23 +1,14 @@
-// Runtime metadata for native Fabric views, DERIVED BY DEFAULT. Any RN library
-// already ships its own ViewConfig: codegen registers it into RN's
-// ReactNativeViewConfigRegistry the moment the library's native-component module is
-// imported. That config carries everything the shared engine can't infer: which
-// events the view emits (bubblingEventTypes / directEventTypes) and how to process
-// its props (validAttributes[*].process, e.g. processColor). So we DON'T transcribe
-// any of it, and we don't mark anything "third-party": there is no
-// per-package registration to maintain. The engine reads the config for ANY
-// component on first use. Install a community view library, render it, done.
-//
-// shared must stay react-native-free (the headless harness runs in plain Node), so
-// the ViewConfig lookup is INJECTED, exactly like the color processor: the adapter
-// wires `setNativeViewConfigSource(ReactNativeViewConfigRegistry.get)` on a real
-// host, where that one source covers BOTH RN core and every library.
-//
-// The ONLY explicit list is OUR OWN built-in primitives (BUILTIN_COMPONENTS): a
-// finite set we own, which keep their hand-tuned tables (view-config events, commit
-// COLOR_PROPS) and are never read from the source, so they can't drift. Everything
-// NOT in that set derives. The list never grows with the community; it grows only
-// when we add a core primitive of our own.
+// Runtime metadata for native Fabric views, derived by default. Any RN library ships its own
+// ViewConfig via codegen, carrying everything the shared engine can't infer — which events a view
+// emits, how to process its props. Nothing is transcribed; read from the config on first use.
+
+// shared must stay react-native-free (the headless harness runs in plain Node), so the ViewConfig
+// lookup is injected, exactly like the color processor: the adapter wires
+// setNativeViewConfigSource(ReactNativeViewConfigRegistry.get) on a real host.
+
+// The only explicit list is our own built-in primitives (BUILTIN_COMPONENTS): a finite set we own,
+// which keep their hand-tuned tables and are never read from the source, so they can't drift. It
+// grows only when we add a core primitive of our own, never for a community package.
 
 import { isRecord } from './type-guards';
 // Type-only, so this does not close an import cycle at runtime: `host-behavior` owns the fold
@@ -26,10 +17,8 @@ import type { IPayloadFold } from './host-behavior';
 
 export type IPropProcessor = (value: unknown) => unknown;
 
-// A native event the component emits. `raw` is the Fabric topLevelType
-// (`topRNCSliderSlidingComplete`); `listener` is the name our nodes register the
-// handler under, from the `onX`-prop split (`onRNCSliderSlidingComplete` ->
-// `rNCSliderSlidingComplete`). `direct: true` marks a non-bubbling event.
+// A native event the component emits. raw is the Fabric topLevelType; listener is what our nodes
+// register the handler under, from the onX-prop split. direct: true marks a non-bubbling event.
 export interface INativeEventBinding {
   raw: string;
   listener: string;
@@ -77,10 +66,7 @@ const EMPTY: IResolved = {
   processors: new Map(),
 };
 
-// OUR own primitives: the finite set shared hand-tunes (view-config events,
-// commit COLOR_PROPS). The source is never consulted for these, so they can't
-// drift. Everything else derives. This list grows only when WE add a core
-// primitive, never for a community package.
+// Our own primitives — see the module header for why the source is never consulted for these.
 const BUILTIN_COMPONENTS = new Set([
   'RCTView',
   'RCTText',
@@ -233,39 +219,22 @@ export function registeredProcessor(
   return resolve(component).processors.get(key);
 }
 
-/**
- * A component's ViewConfig processors, as a payload fold — or undefined when it has none.
- *
- * WHY A FOLD AND NOT A LOOKUP AT PAYLOAD-BUILD TIME. The payload is built in C++ on a device
- * (`core/engine/cpp/SymbioteFabricProps.cpp`) and only in JS headless, and this registry cannot
- * cross that boundary: it is populated lazily from an INJECTED `ReactNativeViewConfigRegistry`
- * lookup, holding JS closures. `payloadFold` is the one seam that already runs in JS on both paths
- * — the C++ probes it once per node and calls back — so putting the processors there is what makes
- * a third-party view behave the same on a device as it does in a test.
- *
- * The alternative was a list of prop NAMES in C++, and that is what this replaces. It cost a day:
- * `@symbiote-native/slider` declares `minimumTrackTintColor` / `maximumTrackTintColor` in its own
- * ViewConfig, neither name was in the C++ list, both reached Fabric as CSS strings, and iOS answers
- * a string colour with `clearColor()`. The slider dragged and reported values correctly with no
- * track drawn at all. Any list of names is a list somebody has to extend for a component we have
- * never seen — which would have meant editing C++ to add a native view, and that is exactly the
- * coupling `<native_core_is_untouched>` exists to prevent.
- *
- * Resolved ONCE per component and cached, because `createElement` asks per node. A built-in
- * short-circuits inside `resolve` before any of this.
- */
-/**
- * The prop names a component's OWN ViewConfig claims a processor for — i.e. exactly the keys
- * `configPayloadFold` has already converted by the time the payload builder's own passes run.
- *
- * It exists so "a colour is converted exactly once" can be a stated rule rather than a lucky one.
- * The overlap is real: `thumbTintColor` is claimed by @symbiote-native/slider's config AND by the
- * engine's built-in COLOR_PROPS, and for a while nothing broke only because a processed colour came
- * back as a NUMBER and the engine skipped numbers. That guard died when a numeric colour became
- * processable in its own right — an author writing `color: 0xff0000ff` means rrggbbaa and owes the
- * same rotation a string owes — and the second conversion then turned an already-correct int into
- * a different colour.
- */
+// A component's ViewConfig processors, as a payload fold — or undefined when it has none. Not a
+// lookup at payload-build time: the payload is built in C++ on a device and this registry can't
+// cross that boundary (it's populated lazily from an injected JS-closure-holding lookup).
+
+// payloadFold is the one seam that already runs in JS on both paths, so putting the processors
+// there is what makes a third-party view behave the same on device as in a test. The alternative,
+// a list of prop names hardcoded in C++, needs editing native code for every new component we see.
+
+// Resolved once per component and cached, since createElement asks per node. A built-in
+// short-circuits inside resolve before any of this.
+
+// The prop names a component's own ViewConfig claims a processor for — exactly the keys
+// configPayloadFold has already converted by the time the payload builder's own passes run.
+
+// Exists so "a colour is converted exactly once" is a stated rule, not a lucky one: an overlap
+// between a third-party config and the engine's own COLOR_PROPS would otherwise double-convert.
 export function configProcessedKeys(
   component: string,
 ): ReadonlySet<string> | undefined {

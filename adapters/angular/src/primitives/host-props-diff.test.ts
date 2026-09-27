@@ -1,15 +1,6 @@
-// `SymbioteHostPropsDirective` pushes a whole flat bag, and a composed component's bag is a
-// FIXED-SHAPE literal: Pressable's carries ~48 keys, of which any one instance sets a handful.
-// Writing every key of every bag therefore spent most of its work deleting keys the node never
-// had — measured 2026-08-20 on a headless 1000-row create of the benchmark row: 104 000 engine
-// setProp calls, 90 000 of them carrying `undefined`, against 12 000 for the identical screen in
-// Solid, with byte-identical Fabric output on both sides.
-//
-// This file pins the three halves of the diff that replaced it: an unset key costs nothing on
-// mount, a key that CHANGES to `undefined` still clears the prop, and a key that VANISHES from
-// the bag clears it too (`resolveAccessibilityProps` really does return two different key sets).
-// The observable is the renderer, one level below the directive, so it proves what the engine was
-// handed rather than what a private field holds.
+// This file pins the diff `SymbioteHostPropsDirective` uses over a composed component's flat,
+// mostly-unset bag: an unset key costs nothing on mount, a key CHANGING to `undefined` still
+// clears the prop, and one VANISHING from the bag clears it too — proven at the renderer.
 
 import '@angular/compiler';
 import { Component, signal } from '@angular/core';

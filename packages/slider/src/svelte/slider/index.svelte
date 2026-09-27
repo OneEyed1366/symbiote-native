@@ -236,6 +236,9 @@
       mountedDefaultCount !== children.length
     ) {
       for (const child of hostShimDefault.children.slice())
+        // hostShimDefault is a `view` intrinsic bound via bind:this; patch-globals.ts routes it
+        // to ShimElement, not real DOM, so there's no Svelte-tracked tree for this to desync from
+        // eslint-disable-next-line svelte/no-dom-manipulating
         hostShimDefault.removeChild(child);
       mountedDefault = mountDescriptorChildren(hostShimDefault, children);
       mountedDefaultCount = children.length;

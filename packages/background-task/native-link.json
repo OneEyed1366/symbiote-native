@@ -1,0 +1,20 @@
+{
+  "android": {
+    "gradleProjectName": "expo-background-task",
+    "modules": [
+      {
+        "importPath": "expo.modules.backgroundtask.BackgroundTaskModule",
+        "className": "BackgroundTaskModule",
+        "nativeName": "ExpoBackgroundTask"
+      }
+    ]
+  },
+  "ios": {
+    "infoPlistArrayKeys": {
+      "UIBackgroundModes": ["processing"],
+      "BGTaskSchedulerPermittedIdentifiers": [
+        "com.expo.modules.backgroundtask.processing"
+      ]
+    }
+  }
+}

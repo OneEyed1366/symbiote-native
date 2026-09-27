@@ -232,15 +232,18 @@ describe('Modal (real compiled index.svelte)', () => {
       // Drive the native close exactly like React's DismissCase: topRequestClose -> the parent's
       // own $state flips visible=false, which flows back down through the SAME onRequestClose bag
       // entry the passthrough props wired onto the host node.
-      fabric.fireEvent(
-        committedModalNode().instanceHandle,
-        'topRequestClose',
-        {},
-      );
+      const host = committedModalNode().instanceHandle;
+      fabric.fireEvent(host, 'topRequestClose', {});
       await settle();
 
-      // The keep-alive reducer must have actually transitioned (not gotten stuck): the node is
-      // fully gone from the CURRENTLY COMMITTED tree.
+      // Modal.js (iOS): held through the native exit animation…
+      expect(
+        findInCommittedTree(n => n.viewName === 'ModalHostView'),
+      ).toBeDefined();
+
+      // …and dropped only by the native dismiss.
+      fabric.fireEvent(host, 'topDismiss', {});
+      await settle();
       expect(
         findInCommittedTree(n => n.viewName === 'ModalHostView'),
       ).toBeUndefined();
@@ -276,6 +279,14 @@ describe('Modal (real compiled index.svelte)', () => {
     // why: `shouldRender` gates the `{#if}` around the host tag entirely — a modal that starts
     // hidden must never commit a node at all (not commit-then-immediately-remove), matching
     // `createInitialModalState`'s seed-from-initial-visibility contract.
+    // why: Modal.js `defaultProps.visible = true` — a `<Modal>` without `visible` shows.
+    it('shows a modal mounted without visible, as RN defaults it', async () => {
+      mount(ROOT_TAG, await loadModal(), {});
+      await settle();
+
+      expect(committedModalNode().payload.visible).toBe(true);
+    });
+
     it('commits no modal node when visible starts false', async () => {
       const Hidden = await loadHidden();
       mount(ROOT_TAG, Hidden);

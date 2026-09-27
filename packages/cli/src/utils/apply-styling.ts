@@ -50,37 +50,6 @@ const SKIPPED_DIR_NAMES: ReadonlySet<string> = new Set([
   'node_modules',
 ]);
 
-const APP_COMPONENT_FILENAMES: ReadonlySet<string> = new Set([
-  'App.tsx',
-  'App.jsx',
-  'App.ts',
-  'App.vue',
-  'App.svelte',
-]);
-
-// The trivial flat rule below is identical across every framework's App.module.css, so it's
-// written here once instead of duplicated across 12 template files.
-const STARTER_CSS_CONTENT = `.container {
-  flex: 1;
-  align-items: center;
-  justify-content: center;
-}
-`;
-
-function findAppComponentDir(dir: string): string | undefined {
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const entryPath = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      if (SKIPPED_DIR_NAMES.has(entry.name)) continue;
-      const found = findAppComponentDir(entryPath);
-      if (found !== undefined) return found;
-      continue;
-    }
-    if (APP_COMPONENT_FILENAMES.has(entry.name)) return dir;
-  }
-  return undefined;
-}
-
 function findAppCssFile(dir: string): string | undefined {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     if (entry.isDirectory()) {
@@ -161,20 +130,10 @@ export function applyStyling(
         { hasTypescript },
       );
     }
-    // The base layer's default App.css is now orphaned — 'stylesheet' needs no external file at
-    // all, and 'css-modules' ships its own App.module.css below.
+    // The base layer's default App.css is now orphaned: 'stylesheet' needs no external file, and
+    // 'css-modules' ships its own App.module.css via the renderTemplate call above.
     const orphanedCss = findAppCssFile(root);
     if (orphanedCss !== undefined) fs.rmSync(orphanedCss, { force: true });
-
-    if (styling === 'css-modules') {
-      const appDir = findAppComponentDir(root);
-      if (appDir !== undefined) {
-        fs.writeFileSync(
-          path.join(appDir, 'App.module.css'),
-          STARTER_CSS_CONTENT,
-        );
-      }
-    }
     return;
   }
 

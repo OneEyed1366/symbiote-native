@@ -132,6 +132,7 @@ const parityRowHeightStyle = { height: PARITY_ROW_H };
     <text class="section-label"> FlatList · animated scrollToOffset </text>
     <FlatList
       ref="listRef"
+      nested-scroll-enabled
       :data="parityRows"
       :key-extractor="keyExtractor"
       :get-item-layout="getItemLayout"
@@ -168,6 +169,7 @@ const parityRowHeightStyle = { height: PARITY_ROW_H };
     </text>
     <SectionList
       testID="sticky-section-list"
+      nested-scroll-enabled
       :sections="paritySections"
       :key-extractor="sectionKeyExtractor"
       :sticky-section-headers-enabled="true"

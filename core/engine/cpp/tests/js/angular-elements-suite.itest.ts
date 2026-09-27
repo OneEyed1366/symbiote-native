@@ -19,13 +19,12 @@
 // RUN ON `build-release` (`pnpm run bench:itest`).
 //
 // AND RUN THE ARMS ONE AT A TIME when the numbers are meant to be compared. `pnpm run bench:itest`
-// fills `availableParallelism()` slots, so seven suites contend: measured 2026-09-18, the same
-// sitting read stock 107.4 / ng-elements 264.9 in one parallel run and stock 88.6 / ng-elements
-// 234.5 sequentially. The RATIO survives that and the absolute numbers do not, so a figure quoted
+// fills `availableParallelism()` slots, so seven suites contend, inflating every arm's absolute
+// reading. The RATIO survives that and the absolute numbers do not, so a figure quoted
 // off a parallel run is not on the same ruler as one quoted off a sequential one.
 //
-// ONE RULER, sequential, one process per arm, `build-release`, 2026-09-18 — AFTER `mount()` began
-// turning Angular's dev mode off in a release bundle (`render/index.ts`, `settleAngularDevMode`):
+// ONE RULER, sequential, one process per arm, `build-release`, AFTER `mount()` began turning
+// Angular's dev mode off in a release bundle (`render/index.ts`, `settleAngularDevMode`):
 //
 //              stock  react    vue  solid svelte  angular  ng-elements
 //   create      88.6  103.6  138.1   94.7  104.7    147.9        234.5
@@ -45,7 +44,7 @@
 // AND THE DIRECTIVE IS DEARER WHILE WRITING LESS, which is the fact that decides what to do about
 // it. `setAngularProfileDetail` on the create step of each arm, same tree, same ten-node row:
 //
-//   this arm    style=4000            ellipsizeMode=6000  testID=1000  value=1000  #text=2000
+//   this arm    style=4000            ellipsizeMode=6000  value=1000  #text=2000
 //   bare arm    style.height=2000 style.flex=2000 style.flexDirection=1000
 //               style.paddingLeft=1000 style.width=1000   ellipsizeMode=3000 …
 //
@@ -117,7 +116,6 @@ Component({
   template: `
     <view
       [style]="isSelected ? selectedRowStyle : rowStyle"
-      [testID]="'row-' + row.id"
     >
       <text ellipsizeMode="tail">{{ row.id }}</text>
       <view [style]="cellStyle"

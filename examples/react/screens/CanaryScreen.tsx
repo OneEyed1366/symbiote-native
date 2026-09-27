@@ -539,6 +539,7 @@ export function CanaryScreen() {
           scroll-driven header demo below. */}
         <text className="section-label">MVCP · prepend without jump</text>
         <FlatList
+          nestedScrollEnabled
           data={mvcpItems}
           keyExtractor={item => item.id}
           maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
@@ -600,6 +601,7 @@ export function CanaryScreen() {
         </Animated.View>
         {/* box-list160 is shared with the MVCP FlatList above. */}
         <scroll-view
+          nestedScrollEnabled
           className="box-list160"
           scrollEventThrottle={16}
           onScroll={Animated.event(
@@ -635,12 +637,9 @@ export function CanaryScreen() {
           tap Freeze, then immediately drag the box — bar should still move
         </text>
 
-        {/* Modern style props reaching Fabric's C++ parser. Each is an A/B so the effect
-          is unmistakable on the dark theme. Kept as inline dynamic style here (not CSS)
-          only because these particular demos predate @symbiote-native/css-parser's `raw`
-          passthrough for transform/box-shadow/filter/transform-origin (2026-07) — the CSS
-          property itself now works identically (see .gradient-card below, which IS
-          authored via CSS) — this is just legacy demo wiring, not a remaining gap. */}
+        {/* Modern style props reaching Fabric's C++ parser. Each is an A/B so the effect is
+          unmistakable on the dark theme. Kept as inline dynamic style, legacy demo wiring — the
+          CSS property works identically too (see .gradient-card, authored via CSS). */}
         {/* boxShadow: a BLUE glow (a black shadow is invisible on the near-black bg).
           PASS: a soft blue halo bleeds out around the panel. */}
         <view

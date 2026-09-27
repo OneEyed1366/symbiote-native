@@ -107,6 +107,21 @@ describe('getRandomBytesAsync', () => {
       await expect(getRandomBytesAsync(0)).resolves.toHaveLength(0);
       await expect(getRandomBytesAsync(1024)).resolves.toHaveLength(1024);
     });
+
+    it('resolves a Uint8Array and calls the native method with that exact array', async () => {
+      const result = await getRandomBytesAsync(0);
+
+      expect(result).toBeInstanceOf(Uint8Array);
+      expect(FAKE_NATIVE_CRYPTO.getRandomValues).toHaveBeenCalledWith(result);
+    });
+
+    it('returns an array with the desired, non-boundary number of bytes', async () => {
+      await expect(getRandomBytesAsync(3)).resolves.toHaveLength(3);
+    });
+
+    it('floors a fractional byteCount', async () => {
+      await expect(getRandomBytesAsync(512.5)).resolves.toHaveLength(512);
+    });
   });
 
   describe('Negative', () => {
@@ -116,6 +131,25 @@ describe('getRandomBytesAsync', () => {
 
     it('rejects a byteCount above 1024', async () => {
       await expect(getRandomBytesAsync(1025)).rejects.toThrow(TypeError);
+    });
+
+    it('rejects NaN', async () => {
+      await expect(getRandomBytesAsync(NaN)).rejects.toThrow(TypeError);
+    });
+
+    it('rejects a non-number byteCount', async () => {
+      // @ts-expect-error -- exercising the runtime guard against a caller ignoring the types
+      await expect(getRandomBytesAsync('16')).rejects.toThrow(TypeError);
+    });
+
+    it('rejects a null byteCount', async () => {
+      // @ts-expect-error -- exercising the runtime guard against a caller ignoring the types
+      await expect(getRandomBytesAsync(null)).rejects.toThrow(TypeError);
+    });
+
+    it('rejects an object byteCount', async () => {
+      // @ts-expect-error -- exercising the runtime guard against a caller ignoring the types
+      await expect(getRandomBytesAsync({})).rejects.toThrow(TypeError);
     });
 
     it('throws an UnavailabilityError-shaped error when the native method is absent', async () => {
@@ -229,11 +263,39 @@ describe('digestStringAsync', () => {
       expect(FAKE_NATIVE_CRYPTO.digestStringAsync).not.toHaveBeenCalled();
     });
 
+    // why: sweeps every non-string primitive shape an algorithm could arrive as (upstream's own
+    // Crypto-test.ts asserts the identical set) — a closed-enum guard must reject all of them, not
+    // just the one bad-string case above.
+    it.each<[string, unknown]>([
+      ['null', null],
+      ['a number', 2],
+      ['a boolean', true],
+      ['undefined', undefined],
+      ['an object', {}],
+    ])('rejects %s as an algorithm', async (_label, value) => {
+      // @ts-expect-error -- exercising the runtime guard against an invalid algorithm value
+      await expect(digestStringAsync(value, 'hello')).rejects.toThrow(
+        TypeError,
+      );
+    });
+
     it('rejects non-string data', async () => {
       // @ts-expect-error -- exercising the runtime guard against non-string data
       await expect(
         digestStringAsync(CryptoDigestAlgorithm.SHA256, 12345),
       ).rejects.toThrow('Invalid data provided');
+    });
+
+    it.each<[string, unknown]>([
+      ['null', null],
+      ['a boolean', true],
+      ['undefined', undefined],
+      ['an object', {}],
+    ])('rejects %s as data', async (_label, value) => {
+      await expect(
+        // @ts-expect-error -- exercising the runtime guard against non-string data
+        digestStringAsync(CryptoDigestAlgorithm.SHA256, value),
+      ).rejects.toThrow(TypeError);
     });
 
     it('rejects an invalid encoding', async () => {
@@ -243,6 +305,22 @@ describe('digestStringAsync', () => {
           encoding: 'not-an-encoding',
         }),
       ).rejects.toThrow('Invalid encoding provided');
+    });
+
+    it.each<[string, unknown]>([
+      ['null', null],
+      ['an empty string', ''],
+      ['a number', 2],
+      ['a boolean', true],
+      ['undefined', undefined],
+      ['an object', {}],
+    ])('rejects %s as an encoding', async (_label, value) => {
+      await expect(
+        digestStringAsync(CryptoDigestAlgorithm.SHA256, 'hello', {
+          // @ts-expect-error -- exercising the runtime guard against an invalid encoding value
+          encoding: value,
+        }),
+      ).rejects.toThrow(TypeError);
     });
 
     it('throws an UnavailabilityError-shaped error when the native method is absent', async () => {

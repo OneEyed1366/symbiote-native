@@ -4,10 +4,9 @@
 // working tree is on disk. It fails only after `pnpm pack`, in a consuming app, as a
 // MODULE_NOT_FOUND thrown from inside Babel before the first module is transformed.
 //
-// Measured 2026-08-23: adapters/solid/babel-preset.cjs gained `require('./babel-lower-host-
-// primitives.cjs')` and `files` was not updated. Every test stayed green, the package packed
-// without a warning, and the missing plugin surfaced as a device measurement that silently read as
-// "the optimization does nothing" — the tarball simply had no plugin in it.
+// A new `require()` in an already-listed `.cjs` is the trap: every test stays green, the package
+// packs with no warning, and the missing dependency surfaces on-device as "silently does nothing"
+// — the tarball simply had no plugin in it.
 //
 // Models `files` the way npm does for this one shape: an entry is either a filename or a directory
 // prefix, and package.json / README / LICENSE ship unconditionally. Follows requires transitively,

@@ -1,26 +1,71 @@
 import { Screen, Stack, useStackNavigation } from '@symbiote-native/navigation/vue';
+import { ref } from 'vue';
 import styles from './App.module.css';
 
-function MenuScreen() {
-  const navigation = useStackNavigation();
+const MenuScreen = {
+  setup() {
+    const navigation = useStackNavigation();
+    const count = ref(0);
 
-  return (
-    <view class={styles.container}>
-      <text>Welcome to SymbioteNative!</text>
-      <pressable onPress={() => navigation.push('Details')}>
-        <text>Go to Details</text>
-      </pressable>
-    </view>
-  );
-}
+    return () => (
+      <safe-area-view class={styles['screen']}>
+        <view class={styles['brand-row']}>
+          <image
+            class={`${styles['brand-logo']} ${styles['brand-logo-react']}`}
+            resizeMode="contain"
+            source={require('./assets/react-native-logo.png')}
+          />
+          <image
+            class={styles['plus-icon']}
+            resizeMode="contain"
+            source={require('./assets/plus-icon.png')}
+          />
+          <image
+            class={`${styles['brand-logo']} ${styles['brand-logo-vue']}`}
+            resizeMode="contain"
+            source={require('./assets/vue-logo.png')}
+          />
+        </view>
+        <text class={styles['title']}>Welcome to SymbioteNative!</text>
+        <text class={styles['subtitle']}>Framework-agnostic React Native, driven by Vue.</text>
 
-function DetailsScreen() {
-  return (
-    <view class={styles.container}>
-      <text>Details screen</text>
-    </view>
-  );
-}
+        <view class={styles['counter-card']}>
+          <text class={styles['counter-label']}>TAPS</text>
+          <text class={styles['counter-value']}>{count.value}</text>
+        </view>
+
+        <view class={styles['button-row']}>
+          <pressable class={styles['button-primary']} onPress={() => count.value++}>
+            <text class={styles['button-primary-text']}>Tap me</text>
+          </pressable>
+          <pressable class={styles['button-secondary']} onPress={() => navigation.value.push('Details')}>
+            <text class={styles['button-secondary-text']}>Go to Details</text>
+          </pressable>
+        </view>
+      </safe-area-view>
+    );
+  },
+};
+
+const DetailsScreen = {
+  setup() {
+    const navigation = useStackNavigation();
+
+    return () => (
+      <safe-area-view class={styles['screen']}>
+        <view class={styles['details-card']}>
+          <text class={styles['details-title']}>You made it!</text>
+          <text class={styles['details-body']}>
+            This screen was pushed by the Stack navigator — proof navigation actually works.
+          </text>
+        </view>
+        <pressable class={styles['button-secondary']} onPress={() => navigation.value.pop()}>
+          <text class={styles['button-secondary-text']}>Go back</text>
+        </pressable>
+      </safe-area-view>
+    );
+  },
+};
 
 export default {
   setup() {

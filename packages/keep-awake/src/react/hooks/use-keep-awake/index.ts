@@ -38,5 +38,10 @@ export function useKeepAwake(tag?: string, options?: KeepAwakeOptions): void {
         deactivateKeepAwake(tagOrDefault);
       }
     };
+    // options is read only at effect-setup/teardown time, matching upstream expo-keep-awake's own
+    // useKeepAwake exactly (same [tagOrDefault]-only deps) — the effect is keyed on the tag, not on
+    // options identity, so a caller passing a fresh inline options object each render doesn't tear
+    // down and reattach the listener every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tagOrDefault]);
 }

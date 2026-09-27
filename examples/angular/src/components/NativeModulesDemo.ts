@@ -11,6 +11,7 @@ import {
   SYMBIOTE_ELEMENTS,
   Settings,
 } from '@symbiote-native/angular';
+import { ActionButton } from './ActionButton';
 // Static look lives in NativeModulesDemo.css — compiled at build time by
 // @symbiote-native/css-parser and resolved at runtime through the shared style registry.
 import './NativeModulesDemo.css';
@@ -27,7 +28,7 @@ const TAP_KEY = 'symbiote.tapCount';
 @Component({
   selector: 'NativeModulesDemo',
   standalone: true,
-  imports: [SYMBIOTE_ELEMENTS],
+  imports: [SYMBIOTE_ELEMENTS, ActionButton],
   template: `
     <view class="section-nested">
       <text class="section-label"
@@ -39,24 +40,24 @@ const TAP_KEY = 'symbiote.tapCount';
           ' · swap L/R: ' +
           (rtl.doLeftAndRightSwapInRTL ? 'yes' : 'no')
       }}</text>
-      <button
+      <ActionButton
         testID="force-rtl-btn"
         [title]="
           rtl.isRTL ? 'Force LTR (needs reload)' : 'Force RTL (needs reload)'
         "
         (press)="onForceRtl()"
         color="#dd0031"
-      ></button>
+      ></ActionButton>
 
       <text testID="persist-count" class="info-text">{{
         'persisted taps: ' + persisted + ' · survives relaunch'
       }}</text>
-      <button
+      <ActionButton
         testID="persist-btn"
         title="Persist a tap"
         (press)="persistTap()"
         color="#dd0031"
-      ></button>
+      ></ActionButton>
 
       <view class="row-align-center">
         <image [source]="{ uri: LOGO_URI }" class="logo-thumb"></image>
@@ -67,12 +68,12 @@ const TAP_KEY = 'symbiote.tapCount';
       <text testID="cache-state" class="info-text">{{
         'prefetch cache: ' + cacheState
       }}</text>
-      <button
+      <ActionButton
         testID="prefetch-btn"
         title="Prefetch logo"
         (press)="prefetchLogo()"
         color="#dd0031"
-      ></button>
+      ></ActionButton>
     </view>
   `,
 })

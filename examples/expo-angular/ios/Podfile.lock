@@ -71,7 +71,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - ExpoModulesJSI (57.0.5):
+  - ExpoModulesJSI (57.0.7):
     - React-Core
     - ReactCommon
   - ExpoModulesWorklets (57.0.5):
@@ -114,6 +114,9 @@ PODS:
     - ExpoModulesCore
   - ExpoSystemUI (57.0.2):
     - ExpoModulesCore
+  - ExpoTaskManager (57.0.15):
+    - ExpoModulesCore
+    - UMAppLoader
   - ExpoTrackingTransparency (57.0.1):
     - ExpoModulesCore
   - ExpoWebBrowser (57.0.2):
@@ -1942,7 +1945,7 @@ PODS:
     - React-utils (= 0.86.0)
     - ReactNativeDependencies
   - ReactNativeDependencies (0.86.0)
-  - symbiote-navigation (2.2.0):
+  - symbiote-navigation (3.0.0):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -1964,9 +1967,9 @@ PODS:
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
-    - symbiote-navigation/common (= 2.2.0)
+    - symbiote-navigation/common (= 3.0.0)
     - Yoga
-  - symbiote-navigation/common (2.2.0):
+  - symbiote-navigation/common (3.0.0):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -1989,7 +1992,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - symbiote-splash-screen (3.2.0):
+  - symbiote-splash-screen (4.0.0):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -2011,6 +2014,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
+  - UMAppLoader (57.0.1)
   - Yoga (0.0.0)
 
 DEPENDENCIES:
@@ -2037,6 +2041,7 @@ DEPENDENCIES:
   - "ExpoSMS (from `../node_modules/@symbiote-native/sms/node_modules/expo-sms/ios`)"
   - "ExpoStoreReview (from `../node_modules/@symbiote-native/store-review/node_modules/expo-store-review/ios`)"
   - "ExpoSystemUI (from `../node_modules/@symbiote-native/system-ui/node_modules/expo-system-ui/ios`)"
+  - "ExpoTaskManager (from `../node_modules/@symbiote-native/task-manager/node_modules/expo-task-manager/ios`)"
   - "ExpoTrackingTransparency (from `../node_modules/@symbiote-native/tracking-transparency/node_modules/expo-tracking-transparency/ios`)"
   - "ExpoWebBrowser (from `../node_modules/@symbiote-native/web-browser/node_modules/expo-web-browser/ios`)"
   - FBLazyVector (from `../node_modules/react-native/Libraries/FBLazyVector`)
@@ -2116,6 +2121,7 @@ DEPENDENCIES:
   - ReactNativeDependencies (from `../node_modules/react-native/third-party-podspecs/ReactNativeDependencies.podspec`)
   - "symbiote-navigation (from `../node_modules/@symbiote-native/navigation`)"
   - "symbiote-splash-screen (from `../node_modules/@symbiote-native/splash-screen`)"
+  - UMAppLoader (from `../node_modules/unimodules-app-loader/ios`)
   - Yoga (from `../node_modules/react-native/ReactCommon/yoga`)
 
 EXTERNAL SOURCES:
@@ -2165,6 +2171,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/@symbiote-native/store-review/node_modules/expo-store-review/ios"
   ExpoSystemUI:
     :path: "../node_modules/@symbiote-native/system-ui/node_modules/expo-system-ui/ios"
+  ExpoTaskManager:
+    :path: "../node_modules/@symbiote-native/task-manager/node_modules/expo-task-manager/ios"
   ExpoTrackingTransparency:
     :path: "../node_modules/@symbiote-native/tracking-transparency/node_modules/expo-tracking-transparency/ios"
   ExpoWebBrowser:
@@ -2322,6 +2330,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/@symbiote-native/navigation"
   symbiote-splash-screen:
     :path: "../node_modules/@symbiote-native/splash-screen"
+  UMAppLoader:
+    :path: "../node_modules/unimodules-app-loader/ios"
   Yoga:
     :path: "../node_modules/react-native/ReactCommon/yoga"
 
@@ -2339,7 +2349,7 @@ SPEC CHECKSUMS:
   ExpoLocalAuthentication: 96989637e567a10cdeabe61e5c6026d30c0dc53f
   ExpoLocalization: 659243b03b3a3e9589793cee2f728a899e181329
   ExpoModulesCore: 9df645bbfcfe4fec54e6597aee756f7820ac8e0e
-  ExpoModulesJSI: ea64813990c7650f3a2d469f176a54c3c7b2c66a
+  ExpoModulesJSI: 52f43ddb01b1db76ccfcff4c4df4fed39e31ba7d
   ExpoModulesWorklets: 18419b65da3b14a8df484baccec7dd6dad15387a
   ExpoNetwork: 973d523fe9b1f99223dd945fed9ad1226ae64920
   ExpoScreenOrientation: 17fd81b2bdb7615b4b540335673aaf98a358281f
@@ -2349,10 +2359,11 @@ SPEC CHECKSUMS:
   ExpoSMS: ac35f6c85b72ee5b18a7c6bb06550fbd4a683775
   ExpoStoreReview: 2a0f6b8e04112aea2f6e3e1cb84109d78f4d041f
   ExpoSystemUI: ff3142b323ae7b4d11dc0b1dc4acfa30d92be7dc
+  ExpoTaskManager: 4cbfc5d2ffb59b6d35023bd062bdf80f39534253
   ExpoTrackingTransparency: 43401b22cf6aed3a4a35e0c24d0b320905acc477
   ExpoWebBrowser: 9b98d939d5f1c5dd8f523f0a0683056fb1204434
   FBLazyVector: b3e7ad108f0d882e30445c5527d774e3fd432f3d
-  hermes-engine: f9df247afd45296b2357dde5a3d3d0d3c3c1160e
+  hermes-engine: d4eb676d7bc1cf9e8578ad44e0b4c59c5c0192ab
   RCTDeprecation: 2a74a2c57675e64419bd89078efde81f7c1de90b
   RCTRequired: 30451112e6fef4e6f31b4e7eee0845156e35e4b0
   RCTSwiftUI: 5aaf0b07e747ba749dc6acc94d8bd41eea4b570f
@@ -2425,8 +2436,9 @@ SPEC CHECKSUMS:
   ReactCodegen: afe0d436ee089d7bea6418429d8312b1d23a6801
   ReactCommon: d5c1bb4427bf51c443de5926aac332c89ddd9363
   ReactNativeDependencies: fa0a54b3f5319ae0e3b9aff32bfee7a424b88e66
-  symbiote-navigation: 1dcb17db615052fdc90b12d5dc29f3fc681f3543
-  symbiote-splash-screen: 029fcc03b4f4ac8332a5ab47664286feb9aab35f
+  symbiote-navigation: 902e540b70e1c6b0ab1345a0f55f050f2e34424a
+  symbiote-splash-screen: 082b03d52ce7abc1d965eb356d808eae3cccba66
+  UMAppLoader: 173cb90a3039aa9c1b84bace4487e1907a4a5a39
   Yoga: fe50ab299e578f397fef753cf309c6703a4db29b
 
 PODFILE CHECKSUM: 8ca2aaf6aed00e243bb8ba82747472aca424ac86

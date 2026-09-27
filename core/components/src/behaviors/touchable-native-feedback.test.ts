@@ -89,14 +89,8 @@ function findCommitted(testID: string): ILiveNode {
   return hit;
 }
 
-/**
- * The committed CHILD, by POSITION rather than by the `testID` the owner clones onto it.
- *
- * It was `findCommitted(SUBJECT_TEST_ID)` until 2026-09-18, and that stopped working the day the
- * clone moved to `foldCloneOntoChild` in C++: this host builds its payloads through the TypeScript
- * `fabricProps`, which carries no copy of the tag rules. Position is what the tag guarantees anyway
- * — one child in, one node out.
- */
+// The committed CHILD, by POSITION rather than the `testID` the owner clones onto it — this
+// host's payloads come from TypeScript `fabricProps`, which carries no copy of the C++ clone rule.
 function subject(): ILiveNode {
   const child = findCommitted(ROOT_TEST_ID).children[0];
   if (child === undefined) throw new Error('the owner committed no child');
@@ -150,16 +144,9 @@ describe('touchable-native-feedback host behavior', () => {
     expect(owner.childHost).toBe(child);
   });
 
-  // WHAT THE CLONE PUTS ON THE CHILD LEFT THIS FILE ON 2026-09-18 — RN's unconditional prop list,
-  // the four computed values (`accessible`, `focusable`, `nativeID`, `accessibilityState`), the aria
-  // fold over the owner's bag and the `id` precedence. All of it is `foldCloneOntoChild` in
-  // `SymbioteFabricProps.cpp`, asserted against the committed payload in
-  // `core/engine/cpp/tests/js/clone-onto-child-payload.itest.ts`.
-  //
-  // They could not stay: this host builds its payloads through the TypeScript `fabricProps`, which
-  // deliberately carries no copy of the tag rules — the property that makes it sound for everything
-  // else is what blinds it here. What stays is what is still JS: the SHAPE, adoption, the press
-  // machine, the view commands and the listener forwarding.
+  // The clone (prop list, computed values, aria fold, `id` precedence) is `foldCloneOntoChild` in
+  // `SymbioteFabricProps.cpp`, asserted in `clone-onto-child-payload.itest.ts` — this host's
+  // `fabricProps` carries no copy, so what stays testable is the SHAPE, adoption, and listeners.
 
   // The responder is the CHILD's, and it has to be: `bubble` (events/index.ts) skips anchors for
   // listener lookup and `handOverNativeResponder` has no Fabric handle for an uncommitted node, so
@@ -224,10 +211,9 @@ describe('touchable-native-feedback host behavior', () => {
     expect(onPressOut).toHaveBeenCalledTimes(1);
   });
 
-  // THE DIRTYING CASES LEFT THIS FILE ON 2026-09-18 — a late owner write, a late listener flip, and
-  // Vue's children-before-props order. The dirtying is still JS (`SLOT_DERIVED`,
-  // `onOwnedListenerChange`), but the only way to SEE it is the payload the rule produces, which
-  // this host cannot build. They live in `clone-onto-child-payload.itest.ts` with the rule.
+  // Dirtying (late owner write, late listener flip, Vue's children-before-props order) stays JS
+  // (`SLOT_DERIVED`, `onOwnedListenerChange`), but only the payload the C++ rule produces shows
+  // it, which this host can't build — those cases live in `clone-onto-child-payload.itest.ts`.
 
   // :386-387. Both are Fabric BOOLEAN-GATED events, so the flag must land on the CHILD — the only
   // node with a native view — and only while the app has one wired.

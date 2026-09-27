@@ -1,6 +1,6 @@
 // Unit-tests withSymbioteAngularMetroConfig's resolveRequest against fake Metro contexts — no
-// real ngc/Metro build involved. Real-device bug (2026-09-18): a component under buildRoot doing
-// `require('./assets/logo.png')` 404'd because the redirect only matched style extensions.
+// real ngc/Metro build involved. Guards `require('./assets/logo.png')` under buildRoot, which
+// 404'd when the redirect matched only style extensions.
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { withSymbioteAngularMetroConfig } from './metro-config.cjs';

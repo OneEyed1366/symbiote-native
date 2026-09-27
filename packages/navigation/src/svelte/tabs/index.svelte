@@ -123,6 +123,9 @@
   // mirrors Stack's own `emitters` map. This decouples emitter IDENTITY (stable, looked up by
   // key, read below when a route's NavigationScope is built) from emit TIMING (must wait until
   // the focused screen has actually mounted and subscribed).
+  // Plain Map: a get/set/delete identity cache never read by the reactive graph, not rendered
+  // state — SvelteMap's tracking would be pure overhead here.
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity
   const emitters = new Map<string, INavigationEmitter>();
   function emitterFor(routeKey: string): INavigationEmitter {
     let emitter = emitters.get(routeKey);

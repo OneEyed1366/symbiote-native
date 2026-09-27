@@ -29,6 +29,13 @@ export const NAV_LINE = {
   Sharing: 'sharing',
   WebBrowser: 'web-browser',
   Sms: 'sms',
+  Location: 'location',
+  MediaLibrary: 'media-library',
+  FileSystem: 'file-system',
+  Audio: 'audio',
+  Notifications: 'notifications',
+  BackgroundTasks: 'background-tasks',
+  Sqlite: 'sqlite',
 } as const;
 
 export type INavLine = (typeof NAV_LINE)[keyof typeof NAV_LINE];
@@ -77,6 +84,29 @@ export const LINE_COLOR: Record<INavLine, string> = {
   [NAV_LINE.WebBrowser]: '#0369a1',
   // Olive — @symbiote-native/sms.
   [NAV_LINE.Sms]: '#65a30d',
+  // Royal blue — @symbiote-native/location. A map-pin blue distinct from Cellular's brighter
+  // blue and WebBrowser's sky-toned blue.
+  [NAV_LINE.Location]: '#1d4ed8',
+  // Deep pink/magenta — @symbiote-native/media-library. Distinct from Application's pink (#ec4899)
+  // and Sharing's fuchsia (#d946ef).
+  [NAV_LINE.MediaLibrary]: '#db2777',
+  // Rust/terracotta — @symbiote-native/file-system. Distinct from StandardWebCrypto's orange
+  // (#f97316) and SecureStore's bronze (#a16207).
+  [NAV_LINE.FileSystem]: '#9a3412',
+  // Meadow green — @symbiote-native/audio. Fresh spring-green, distinct from Battery's green
+  // (#22c55e), StoreReview's lime (#84cc16) and Sms's olive (#65a30d).
+  [NAV_LINE.Audio]: '#34b02a',
+  // Orchid magenta — @symbiote-native/notifications. Distinct from Sharing's fuchsia (#d946ef)
+  // and MediaLibrary's deep pink (#db2777).
+  [NAV_LINE.Notifications]: '#dd3cc4',
+  // Periwinkle blue-violet — @symbiote-native/task-manager + background-fetch + background-task.
+  // Distinct from Crypto's indigo (#6366f1), Location's royal blue (#1d4ed8) and Cellular's blue
+  // (#3b82f6).
+  [NAV_LINE.BackgroundTasks]: '#495adf',
+  // Chartreuse — @symbiote-native/sqlite. The widest hue gap left in this palette (~17° from
+  // Brightness' gold and StoreReview's lime, the two nearest neighbors), measured rather than
+  // eyeballed against every line color above.
+  [NAV_LINE.Sqlite]: '#bbc91d',
 };
 
 export type INavLineInfo = {
@@ -195,4 +225,39 @@ export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
     label: 'WEB BROWSER LINE',
   },
   [ROUTE_NAME.Sms]: { line: NAV_LINE.Sms, code: 'SM', label: 'SMS LINE' },
+  [ROUTE_NAME.Location]: {
+    line: NAV_LINE.Location,
+    code: 'LC',
+    label: 'LOCATION LINE',
+  },
+  [ROUTE_NAME.MediaLibrary]: {
+    line: NAV_LINE.MediaLibrary,
+    code: 'ML',
+    label: 'MEDIA LIBRARY LINE',
+  },
+  [ROUTE_NAME.FileSystem]: {
+    line: NAV_LINE.FileSystem,
+    code: 'FS',
+    label: 'FILE SYSTEM LINE',
+  },
+  [ROUTE_NAME.Audio]: {
+    line: NAV_LINE.Audio,
+    code: 'AU',
+    label: 'AUDIO LINE',
+  },
+  [ROUTE_NAME.Notifications]: {
+    line: NAV_LINE.Notifications,
+    code: 'NT',
+    label: 'NOTIFICATIONS LINE',
+  },
+  [ROUTE_NAME.BackgroundTasks]: {
+    line: NAV_LINE.BackgroundTasks,
+    code: 'BG',
+    label: 'BACKGROUND TASKS LINE',
+  },
+  [ROUTE_NAME.Sqlite]: {
+    line: NAV_LINE.Sqlite,
+    code: 'SQ',
+    label: 'SQLITE LINE',
+  },
 };

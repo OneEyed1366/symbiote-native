@@ -108,28 +108,17 @@ describe('a bare tag commits what a wrapper used to', () => {
       // what a real device commits it as (`RootView`), nor its creation-time name (`RCTView`), but
       // it is the live tree's honest answer and incidental to what this case is actually pinning.
       '#surface{flex,pointerEvents}',
-      // No `accessible`/`focusable`: RN's two Pressable defaults are the engine's rule now
-      // (`foldPressableProps`), and this harness's payload comes from the TypeScript
-      // `fabricProps`, which holds no copy of it —
-      // `core/engine/cpp/tests/js/pressable-payload.itest.ts` has them.
-      //
-      // The case is unharmed: what it pins is that a tag reaches its BEHAVIOR and lands in the
-      // right tree SHAPE, and the shape is the half a single-node check cannot see.
+      // No `accessible`/`focusable`: `foldPressableProps` is the engine's rule now, and this
+      // harness's `fabricProps` holds no copy — `pressable-payload.itest.ts` asserts them. What's
+      // pinned here is that a tag reaches its BEHAVIOR and lands in the right tree SHAPE.
       'RCTView{accessibilityLabel,testID}',
     ]);
   });
 
   it('text: the tag adds nothing of the adapter’s own', async () => {
-    // RN's two Text defaults left on 2026-09-18, the same way and for the same reason as the
-    // Pressable pair one case up: the rule is `foldTextDefaults` in `SymbioteFabricProps.cpp` now,
-    // and this harness's payload comes from the TypeScript `fabricProps`, which holds no copy of it.
-    // `core/engine/cpp/tests/js/committed-payload.itest.ts` has them.
-    //
-    // An EMPTY payload is the real assertion here rather than a leftover: this renderer once held
-    // three successive mechanisms for these two keys (a wrapper fold, a create-time seed, a
-    // patch-time substitution), each invisible to the others, and the seed in particular put both
-    // keys on every text node in the app. So "a text carrying no props commits no props" is exactly
-    // the regression that history makes worth pinning.
+    // `foldTextDefaults` in `SymbioteFabricProps.cpp` owns RN's two Text defaults now; this
+    // harness's `fabricProps` holds no copy — `committed-payload.itest.ts` asserts them. An EMPTY
+    // payload is the real assertion: a text carrying no props must commit no props.
     const tag = await commit('text', {}, 'hi');
 
     expect(tag).toEqual({});

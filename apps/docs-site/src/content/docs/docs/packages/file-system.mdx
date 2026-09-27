@@ -1,0 +1,221 @@
+---
+title: File system
+description: expo-file-system wrapped for every SymbioteNative adapter — the modern File/Directory/Paths shared-object API, plus the full legacy function-based surface at /legacy.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+`@symbiote-native/file-system` wraps
+[`expo-file-system`](https://github.com/expo/expo/tree/main/packages/expo-file-system) for every
+SymbioteNative adapter. Both of upstream's surfaces are ported: the default export is the modern
+`File`/`Directory`/`Paths` API built on JSI shared objects; the legacy function-based API (read/
+write/copy/move/delete, directory listing, disk-space queries, resumable download/upload, Android
+Storage Access Framework) lives at the `/legacy` subpath.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | ✅ live |
+| Android     | ✅ live |
+
+| Framework adapter | Support |
+| ------------------ | ------- |
+| React              | ✅ live |
+| Vue                | ✅ live |
+| Angular            | ✅ live |
+| Svelte             | ✅ live |
+| Solid              | ✅ live |
+
+## Installation
+
+```sh
+npm install @symbiote-native/file-system
+```
+
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --file-system` (or
+`add --file-system` in an existing app) installs and wires this for you — see
+[`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
+
+`expo-file-system` and `expo-modules-core` come along as regular dependencies, pinned to exact
+versions — never install them yourself, and never add the `expo` meta-package to your project.
+
+<Aside type="danger" title="Native setup is required before first use">
+  Follow [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first. No
+  `Info.plist` keys or Android manifest attributes are wired — upstream's own
+  config plugin only sets two opt-in `Info.plist` keys
+  (`LSSupportsOpeningDocumentsInPlace`, `UIFileSharingEnabled`) an app adds
+  itself if it wants its Documents directory exposed to the Files app.
+</Aside>
+
+<Aside type="caution" title="Android runtime permissions are not auto-wired">
+  Add whichever of these your app needs to its own `AndroidManifest.xml`:
+  `INTERNET`, and — only for reading/writing outside the app's own sandboxed
+  directories — `READ_EXTERNAL_STORAGE`/`WRITE_EXTERNAL_STORAGE`.
+  `Paths.document`/`Paths.cache` operations and the Storage Access Framework
+  (which prompts the user to pick a directory) both work without any of
+  these on modern Android.
+</Aside>
+
+## Usage
+
+```ts
+import { File, Directory, Paths } from '@symbiote-native/file-system';
+
+const file = new File(Paths.document, 'notes.txt');
+file.write('hello world');
+const contents = file.text();
+
+const dir = new Directory(Paths.document, 'photos');
+dir.create();
+const entries = dir.list();
+
+const downloaded = await File.downloadFileAsync('https://example.com/big-file.zip', Paths.cache, {
+  onProgress: ({ bytesWritten, totalBytes }) => console.log(bytesWritten / totalBytes),
+});
+```
+
+Identical import surface on every adapter — `@symbiote-native/file-system/react`, `/vue`,
+`/svelte`, `/solid`, `/angular` all re-export the same classes.
+
+## API
+
+### `File`
+
+```ts
+new File(...uris: (string | File | Directory)[])
+static downloadFileAsync(url, destination, options?): Promise<File>
+static pickFileAsync(options?): Promise<IPickSingleFileResult | IPickMultipleFilesResult>
+static createDownloadTask(url, destination, options?): DownloadTask
+
+.uri / .exists / .size / .md5 / .type / .lastModified / .creationTime / .parentDirectory /
+.extension / .name
+.write(contents, options?) / .text() / .bytes() / .base64()          // + Sync variants
+.create(options?) / .delete() / .copy(dest) / .move(dest)            // + Sync variants
+.open(mode) -> IFileSystemHandle
+.readableStream() / .writableStream() / .stream() / .arrayBuffer() / .json() / .formData()
+.slice(start?, end?, contentType?): Blob
+.upload(url, options?): Promise<IFileSystemUploadResult>
+.createUploadTask(url, options?): UploadTask
+.watch(callback, options?): IFileSystemWatchSubscription
+```
+
+### `Directory`
+
+```ts
+new Directory(...uris: (string | File | Directory)[])
+static pickDirectoryAsync(initialUri?): Promise<Directory>
+
+.uri / .exists / .size / .parentDirectory / .name
+.create(options?) / .delete() / .copy(dest) / .move(dest)
+.list(): (File | Directory)[]
+.createFile(name, options?): File
+.createDirectory(name, options?): Directory
+.watch(callback, options?): IFileSystemWatchSubscription
+```
+
+### `Paths`
+
+```ts
+Paths.cache / Paths.document / Paths.bundle: Directory
+Paths.appleSharedContainers: Record<string, Directory>              // ios only
+Paths.totalDiskSpace / Paths.availableDiskSpace: number
+Paths.info(...uris): IPathInfo
+Paths.join / .relative / .isAbsolute / .normalize / .dirname / .basename / .extname / .parse
+```
+
+### `UploadTask` / `DownloadTask`
+
+State machines over a network transfer, both cancellable via `AbortSignal`:
+
+```ts
+new UploadTask(file, url, options?)
+.uploadAsync(): Promise<IFileSystemUploadResult>
+.state: IFileSystemUploadTaskState                                  // idle/active/completed/cancelled/error
+
+new DownloadTask(url, destination, options?)
+.downloadAsync(): Promise<File>
+.pause() / .resume()
+.savable(): IFileSystemDownloadPauseState                            // resume after app restart
+static fromSavable(savable): DownloadTask
+.state: IFileSystemDownloadTaskState                                 // + paused
+```
+
+### Errors
+
+Every native exception surfaces as an ordinary thrown `Error` or rejected `Promise` — no custom
+error-class hierarchy.
+
+| Trigger | When |
+| ------- | ---- |
+| Constructing a `File`/`Directory` with an invalid/empty path | Throws synchronously in the constructor |
+| Reading/writing through a stale or already-closed handle | `IFileSystemHandle` methods throw |
+| `pickFileAsync`/`pickDirectoryAsync` cancelled by the user | Rejects `AbortError`, or resolves `{ canceled: true }` |
+| `upload()`/`createUploadTask()`/`createDownloadTask()` aborted via `options.signal` | Rejects `AbortError` |
+| `.copy()`/`.move()` onto an existing destination without `overwrite: true` | Native exception — destination already exists |
+| Any operation on a path outside the app sandbox without permission | Native exception — permission/sandbox violation |
+
+## Legacy API (`/legacy`)
+
+Upstream's original function-based surface — plain async functions over `expo-modules-core`
+instead of JSI shared objects, behind a **separate** native module registration inside the same
+`expo-file-system` dependency, so nothing extra to install.
+
+```ts
+import {
+  documentDirectory,
+  writeAsStringAsync,
+  readAsStringAsync,
+  downloadAsync,
+  createDownloadResumable,
+} from '@symbiote-native/file-system/legacy';
+
+const fileUri = `${documentDirectory}notes.txt`;
+await writeAsStringAsync(fileUri, 'hello world');
+const contents = await readAsStringAsync(fileUri);
+
+const resumable = createDownloadResumable(
+  'https://example.com/big-file.zip',
+  `${documentDirectory}big-file.zip`,
+  undefined,
+  ({ totalBytesWritten, totalBytesExpectedToWrite }) => {
+    console.log(totalBytesWritten / totalBytesExpectedToWrite);
+  },
+);
+await resumable.downloadAsync();
+```
+
+### Legacy API reference
+
+```ts
+documentDirectory / cacheDirectory / bundleDirectory: string | null       // trailing-slash-normalized
+getInfoAsync(fileUri, options?): Promise<IFileSystemFileInfo>
+readAsStringAsync(fileUri, options?): Promise<string>
+writeAsStringAsync(fileUri, contents, options?): Promise<void>
+getContentUriAsync(fileUri): Promise<string>                              // android; echoes input on ios
+deleteAsync(fileUri, options?): Promise<void>
+moveAsync(options) / copyAsync(options): Promise<void>                    // { from, to }
+makeDirectoryAsync(fileUri, options?): Promise<void>
+readDirectoryAsync(fileUri): Promise<string[]>
+getFreeDiskStorageAsync() / getTotalDiskCapacityAsync(): Promise<number>  // bytes
+downloadAsync(uri, fileUri, options?): Promise<IFileSystemDownloadResult>
+uploadAsync(url, fileUri, options?): Promise<IFileSystemUploadResult>
+createDownloadResumable(uri, fileUri, options?, callback?, resumeData?): DownloadResumable
+createUploadTask(url, fileUri, options?, callback?): UploadTask
+StorageAccessFramework.{ getUriForDirectoryInRoot, requestDirectoryPermissionsAsync,
+  readDirectoryAsync, makeDirectoryAsync, createFileAsync,
+  writeAsStringAsync, readAsStringAsync, deleteAsync, moveAsync, copyAsync }  // android
+FileSystemSessionType, FileSystemUploadType, FileSystemEncodingType        // runtime enums
+```
+
+`DownloadResumable` carries `cancelAsync`/`pauseAsync`/`resumeAsync`/`savable()`; `UploadTask`
+carries `cancelAsync`/`uploadAsync`. Both report progress through the `callback` passed at
+construction.
+
+### Legacy notes
+
+- **`StorageAccessFramework` is Android-only** — every function throws `UnavailabilityError` on
+  iOS; use the ordinary `document`/`cacheDirectory` functions there instead.
+- **`getContentUriAsync` is Android-only** — on iOS it resolves to the input `fileUri` unchanged
+  rather than throwing.
+- **Progress callbacks fire only while a task is in flight** — the native event listener is added
+  for the duration of the call and removed the moment the promise settles.

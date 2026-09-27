@@ -7,7 +7,7 @@
 // below is Positive (a rule applies) or a documented divergence (a rule deliberately does not
 // apply, and returns `{}` rather than erroring).
 //
-// Sources (read 2026-08-14):
+// Sources:
 //   Vue, https://vuejs.org/api/sfc-css-features.html — `.example { }` + `<div class="example">`
 //     compiles to `.example[data-v-f3f3eg9] { }` + `<div class="example" data-v-f3f3eg9>`. The
 //     element KEEPS its original class and GAINS an attribute; the selector gains the attribute
@@ -421,12 +421,9 @@ describe('a partial :global() reaches the markup it was written for', () => {
   });
 });
 
-// Compound resolution must not depend on WHICH scoping mechanism produced the names. Measured
-// 2026-08-19: it did — every compound rule authored in a `.module.css` (or a Vue `<style module>`)
-// was silently dead, because the scope split ran on the LAST `__` and the module form carries its
-// own. Vue `<style scoped>` and Svelte `<style>` were unaffected and passed the rest of this file,
-// which is why it went unseen. Parameterized so a fourth mechanism cannot be added with coverage
-// for only three.
+// Compound resolution must not depend on WHICH scoping mechanism produced the names — a compound
+// rule authored in a `.module.css` (or Vue `<style module>`) went silently dead when the scope
+// split ran on the LAST `__` and the module form carried its own. Parameterized against a fourth.
 describe('compound rules resolve under EVERY scoping mechanism', () => {
   const MECHANISMS: ReadonlyArray<readonly [string, string]> = [
     ['Vue <style scoped>', VUE_SCOPE],

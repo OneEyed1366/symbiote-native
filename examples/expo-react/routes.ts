@@ -21,11 +21,18 @@ export const ROUTE_NAME = {
   KeepAwake: 'KeepAwake',
   ScreenOrientation: 'ScreenOrientation',
   Localization: 'Localization',
+  Location: 'Location',
+  MediaLibrary: 'MediaLibrary',
+  FileSystem: 'FileSystem',
   TrackingTransparency: 'TrackingTransparency',
   SecureStore: 'SecureStore',
   Sharing: 'Sharing',
   WebBrowser: 'WebBrowser',
   Sms: 'Sms',
+  Audio: 'Audio',
+  Notifications: 'Notifications',
+  BackgroundTasks: 'BackgroundTasks',
+  Sqlite: 'Sqlite',
 } as const;
 
 export type IRouteName = (typeof ROUTE_NAME)[keyof typeof ROUTE_NAME];

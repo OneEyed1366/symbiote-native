@@ -1,22 +1,20 @@
-// Does a declared `style` @Input actually take the `[style]` binding away from Angular's styling
-// engine — in a REAL build, not just in the JIT compiler vitest happens to run?
+// Does a press-state STYLE CALLBACK reach the engine in a REAL build, not just in the JIT compiler
+// vitest happens to run?
 //
-// `element-props.ts` refused to declare the input for four months on the grounds that this "is
-// provable solely by executing a linked AOT artifact". Correct, and the reason is sharper than it
-// sounds: the emitted TEXT says nothing here. `ɵɵstyleMap` is what the linker emits for EVERY
-// `[style]`, claimed or not — measured, both arms below contain it — and the choice is made inside
-// it at runtime, by `checkStylingMap` consulting `hasStylingInputShadow(tNode)` and redirecting to
-// the directive's input before `toStylingKeyValueArray` is ever reached. Reading the instruction
-// name is reading half the machine (`test-harness-false-greens.md` §21a).
+// `[style]` cannot carry one: it is Angular's styling binding, `ɵɵstyleMap` in the linked output,
+// and the styling engine dies on a function. Nothing claims `[style]` at run time (a claim is a
+// directive instance per element), so the callback travels as `[styleProp]`, a plain property the
+// renderer routes to `style`. ngtsc rejects a function in `[style]` on a tag: the declared input is
+// typed as the object/string that engine can hold.
 //
 // So this compiles through ngtsc partial mode + `@angular/compiler-cli/linker/babel`, writes the
 // linked output as a plain `.mjs` — pure `ɵɵdefineComponent`, no decorators, the shape Metro hands
 // Hermes — imports it, and MOUNTS it on the real engine.
 //
 // The unmatched arm is the positive control and it is what makes the matched one mean anything: the
-// same binding with no directive in scope must reach the styling engine and DIE there, with
-// Angular's own "Unsupported styling type: function". Without it, a clean matched arm is equally
-// produced by a harness that compiled nothing.
+// same callback through `[style]` must reach the styling engine and DIE there, with Angular's own
+// "Unsupported styling type: function". Without it, a clean matched arm is equally produced by a
+// harness that compiled nothing.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createRequire } from 'node:module';
 import {
@@ -85,7 +83,7 @@ import { SYMBIOTE_ELEMENTS } from '../src';
   selector: 'style-matched',
   standalone: true,
   imports: [SYMBIOTE_ELEMENTS],
-  template: \`<pressable testID="probe" [style]="buttonStyle"></pressable>\`,
+  template: \`<pressable testID="probe" [styleProp]="buttonStyle"></pressable>\`,
 })
 export class StyleMatched { buttonStyle = ${STYLE_EXPR}; }
 `,
@@ -222,7 +220,7 @@ afterAll(() => {
   rmSync(FIXTURE_DIR, { recursive: true, force: true });
 });
 
-describe('a declared style input claims [style] in a linked AOT artifact', () => {
+describe('a press-state style callback in a linked AOT artifact', () => {
   it('control: with no directive in scope the styling engine rejects a functional style', async () => {
     const Unmatched = await loadLinked('unmatched');
     expect(() => mount(ROOT_TAG, Unmatched)).toThrow(

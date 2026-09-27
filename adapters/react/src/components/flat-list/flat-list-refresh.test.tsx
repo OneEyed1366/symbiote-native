@@ -30,14 +30,16 @@ const DATA: IRow[] = Array.from({ length: ITEM_COUNT }, (_unused, index) => ({
   label: `row-${index}`,
 }));
 
-let refreshCalls = 0;
+// TODO: nothing in this file fires the native event that would call onRefresh, so this never
+// gets asserted on — either add that scenario or drop the counter.
+let _refreshCalls = 0;
 
 function RefreshApp(): ReactElement {
   return createElement(FlatList<IRow>, {
     data: DATA,
     refreshing: true,
     onRefresh: () => {
-      refreshCalls += 1;
+      _refreshCalls += 1;
     },
     progressViewOffset: 12,
     keyExtractor: (item: IRow) => `r-${item.id}`,
@@ -69,7 +71,7 @@ const fabric = installRecordingFabric();
 const live = createLiveTree(fabric);
 beforeEach(() => {
   fabric.reset();
-  refreshCalls = 0;
+  _refreshCalls = 0;
 });
 afterEach(() => unmount(ROOT_TAG));
 

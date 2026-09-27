@@ -5,12 +5,9 @@ type IActionButtonProps = {
   testID?: string;
 };
 
-// Drop-in replacement for RN's stock <Button> (same title/onPress/color/testID surface) —
-// a bare Button renders as unstyled tinted text on iOS, visually indistinguishable from a body
-// Text line, which was the single biggest source of "looks messy" across the demo app (2026-07
-// cohesion pass). One consistent bordered pill, tinted in the caller's own `color` exactly like
-// Button already took, so every screen's per-feature color-coding (e.g. AnimatedDemo's JS-vs-
-// native pairing) is preserved — only the chrome becomes consistent.
+// Drop-in replacement for RN's stock <Button> (same title/onPress/color/testID surface) — a bare
+// Button renders as unstyled tinted text on iOS, indistinguishable from body text. One consistent
+// bordered pill, tinted by the caller's own `color`, keeps each screen's color-coding intact.
 export function ActionButton({
   title,
   onPress,

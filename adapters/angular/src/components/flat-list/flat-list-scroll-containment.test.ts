@@ -24,15 +24,9 @@ const chips: IChip[] = Array.from({ length: 24 }, (_unused, index) => ({
   n: index,
 }));
 
-// Mirrors examples/angular/App.ts's "FlatList · 24 chips" demo end to end: a horizontal FlatList
-// with getItemLayout. Regression coverage for a bug fixed 2026-07: cell content used to land
-// OUTSIDE the ScrollView's content view entirely — as top-level siblings
-// of the committed RCTScrollView node, instead of children of its RCTScrollContentView — which is
-// why the device screenshot showed full-width vertically-stacked chips instead of a small
-// horizontal row. Root cause was `<ng-content>` declared once per `@if`/`@else` branch in
-// scroll-view/index.ios.ts (a documented Angular limitation, angular/angular#53310); fixed by
-// collapsing to a single unconditional host tag since iOS never needed axis-specific tags to begin
-// with (`horizontal` already flows as a plain prop). This test pins the CORRECT tree shape.
+// Mirrors examples/angular/App.ts's "FlatList · 24 chips" demo: a horizontal FlatList with
+// getItemLayout. Pins the CORRECT tree shape — cell content as children of RCTScrollContentView,
+// not RCTScrollView siblings, a trap from `<ng-content>` per `@if`/`@else` (angular/angular#53310).
 @Component({
   selector: 'symbiote-chip-container-host',
   standalone: true,

@@ -151,9 +151,8 @@ describe('what a switch sends native, resolved by the engine', () => {
 
   // why: `Switch.js:255` and `:293` — `accessibilityRole={props.accessibilityRole ?? 'switch'}`, on
   // BOTH platforms. Without it a screen reader announces the control as a plain view, with nothing
-  // visual to notice: the same silent class of gap `accessible`/`focusable` were on Pressable until
-  // 2026-09-09. Found by reading `Switch.js` to port the rule; fixed in its own commit AFTER the
-  // port, so the move and the correction each have their own before and after.
+  // visual to notice: the same silent class of gap `accessible`/`focusable` were on Pressable.
+  // Found by reading `Switch.js` to port the rule.
   it('announces itself as a switch, unless the app says otherwise', () => {
     expect(commit({ value: true }).payload.accessibilityRole).toBe('switch');
     expect(commitAndroid({ value: true }).payload.accessibilityRole).toBe(
@@ -260,6 +259,31 @@ describe('what a switch sends native, resolved by the engine', () => {
     expect(payload.trackColorForFalse).toBe(0xff_76_75_77);
     // `Switch.js:248` — the active track follows the value.
     expect(payload.trackTintColor).toBe(0xff_81_b0_ff);
+  });
+
+  // why: RN passes trackColor/thumbColor/ios_backgroundColor through as ANY ColorValue
+  // (Switch.js:187-188,245-278), so a PlatformColor must reach native as the opaque object.
+  it('carries PlatformColor track and thumb colours on both platforms', () => {
+    const off = { resource_paths: ['@android:color/black'] };
+    const on = { resource_paths: ['@android:color/white'] };
+    const thumb = { resource_paths: ['?android:attr/colorAccent'] };
+    const android = commitAndroid({
+      value: true,
+      trackColor: { false: off, true: on },
+      thumbColor: thumb,
+    }).payload;
+    expect(android.trackColorForFalse).toEqual(off);
+    expect(android.trackColorForTrue).toEqual(on);
+    expect(android.trackTintColor).toEqual(on);
+    expect(android.thumbTintColor).toEqual(thumb);
+
+    const semanticOn = { semantic: ['systemGreen'] };
+    const semanticOff = { semantic: ['systemGray'] };
+    const ios = commit({
+      trackColor: { false: semanticOff, true: semanticOn },
+    }).payload;
+    expect(ios.onTintColor).toEqual(semanticOn);
+    expect(ios.tintColor).toEqual(semanticOff);
   });
 
   // why: THE CONTROL. Every absence assertion above would be satisfied by a payload with no rule at

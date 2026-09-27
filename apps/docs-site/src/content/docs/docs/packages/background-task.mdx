@@ -1,0 +1,124 @@
+---
+title: Background task
+description: expo-background-task wrapped for every SymbioteNative adapter — BGTaskScheduler/WorkManager-backed background execution registered through @symbiote-native/task-manager.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+`@symbiote-native/background-task` wraps
+[`expo-background-task`](https://github.com/expo/expo/tree/main/packages/expo-background-task) so
+every SymbioteNative adapter can register a task that runs in the background on the OS's own
+schedule — `BGTaskScheduler` on iOS, `WorkManager` on Android. It is the modern replacement for
+[`@symbiote-native/background-fetch`](/docs/packages/background-fetch/). It does not define what
+the task does — define it first with
+[`@symbiote-native/task-manager`](/docs/packages/task-manager/)'s `defineTask`, then register it
+here.
+
+Every export is a plain function or a one-time module-load side effect — no hook/composable/
+service to wrap, so every adapter's entry point is a plain re-export of the same core.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | ✅ live |
+| Android     | ✅ live |
+
+| Framework adapter | Support |
+| ------------------ | ------- |
+| React              | ✅ live |
+| Vue                | ✅ live |
+| Angular            | ✅ live |
+| Svelte             | ✅ live |
+| Solid              | ✅ live |
+
+## Installation
+
+```sh
+npm install @symbiote-native/background-task @symbiote-native/task-manager
+```
+
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --background-task`
+(or `add --background-task` in an existing app) installs and wires this for you — see
+[`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
+
+`expo-background-task` and `expo-modules-core` come along as regular dependencies, pinned to exact
+versions — never install them yourself, and never add the `expo` meta-package to your project.
+
+<Aside type="danger" title="Native setup is required before first use">
+  Follow [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first. iOS
+  additionally needs `UIBackgroundModes: processing` and
+  `BGTaskSchedulerPermittedIdentifiers` in `Info.plist`, both wired
+  automatically by the same postinstall step. Android needs no manual step.
+</Aside>
+
+<Aside type="caution" title="The iOS Simulator has no BGTaskScheduler support">
+  Apple's own limitation — physical device only. `getStatusAsync` reads
+  `Restricted` on a simulator and `registerTaskAsync` is a no-op there
+  regardless of `Info.plist`. Test registration on a real device.
+</Aside>
+
+## Usage
+
+```ts
+// index.ts, alongside AppRegistry.registerComponent — identical on every adapter
+import { defineTask } from '@symbiote-native/task-manager';
+import { registerTaskAsync, BackgroundTaskResult } from '@symbiote-native/background-task';
+
+const SYNC_TASK = 'background-sync';
+
+defineTask(SYNC_TASK, async () => {
+  try {
+    await runSync();
+    return BackgroundTaskResult.Success;
+  } catch (error) {
+    console.error('background-sync failed:', error);
+    return BackgroundTaskResult.Failed;
+  }
+});
+
+// Somewhere after the task is defined (a settings screen, app bootstrap, …):
+await registerTaskAsync(SYNC_TASK, { minimumInterval: 15 });
+```
+
+```ts
+import {
+  getStatusAsync,
+  unregisterTaskAsync,
+  addExpirationListener,
+} from '@symbiote-native/background-task';
+
+const status = await getStatusAsync();
+
+// iOS only — the system can interrupt a running background task before it finishes.
+const subscription = addExpirationListener(() => {
+  console.warn('background-sync was interrupted before it finished');
+});
+subscription.remove();
+
+await unregisterTaskAsync(SYNC_TASK); // stop receiving executions of it
+```
+
+Identical import surface on every adapter — `@symbiote-native/background-task/react`, `/vue`,
+`/svelte`, `/solid`, `/angular` all re-export the same functions.
+
+## API
+
+```ts
+getStatusAsync(): Promise<BackgroundTaskStatus>
+registerTaskAsync(taskName: string, options?: IBackgroundTaskOptions): Promise<void>
+unregisterTaskAsync(taskName: string): Promise<void>
+triggerTaskWorkerForTestingAsync(): Promise<boolean>
+addExpirationListener(listener: () => void): { remove: () => void }
+```
+
+Plus `BackgroundTaskStatus`, `BackgroundTaskResult`, and `IBackgroundTaskOptions`.
+
+## Notes
+
+- **`registerTaskAsync` requires the task to already be defined** — it throws if the task named
+  isn't defined yet with `@symbiote-native/task-manager`'s `defineTask`.
+- **`registerTaskAsync` is a no-op, twice over.** It skips silently (one-time console warning)
+  when the status reads `Restricted`, and it skips again, quietly, when the task is already
+  registered.
+- **`triggerTaskWorkerForTestingAsync` only runs in a dev build** — it always resolves `false` in
+  production.

@@ -271,24 +271,9 @@ export function createTouchableOpacityBehavior(
   };
 }
 
-// THIS TAG NOW COSTS ZERO TRIPS INTO JS (2026-09-18). `focusable` was the last thing here, and it
-// held out because its middle leg — `onPress !== undefined` (TouchableOpacity.js:338) — is an OWNED
-// name that lives in the stash and never becomes a prop, so a props-only rule could not see it.
-//
-// What moved was not the closure but ONE BIT. `setEventListener` already knew the flip (it computes
-// `wasWired !== isHandler` to fire `onOwnedListenerChange`); it now also records
-// `OP_SET_OWNED_LISTENER`, and `foldPressableProps` resolves the whole three-leg expression off the
-// node. The callback itself never left JS and never will — that is the split a browser draws too,
-// where the UA knows which elements carry a click handler and the handler's body stays the page's.
-//
-// So "a rule cannot read an owned listener" was two claims wearing one sentence, and only the one
-// about the FUNCTION was true. Contract:
-// `core/engine/cpp/tests/js/touchable-focusable-payload.itest.ts`.
-//
-// `./button` keeps its own fold and its own resolution, deliberately: it resolves `disabled` three
-// ways through the projection its derived children share, and it folds an Android view style and
-// ripple regardless — so moving only its `focusable` would duplicate that precedence and buy back
-// no crossing.
+// `focusable`'s three-leg check (disabled, aria-disabled/accessibilityState, `onPress !==
+// undefined`) is `foldPressableProps` in C++, reading `OP_SET_OWNED_LISTENER` for the last leg.
+// Contract: `touchable-focusable-payload.itest.ts`. `./button` keeps its own copy regardless.
 
 // STILL NEEDED, and for a reason the wire did not remove: `markDirty` on the host marks the node
 // whose payload must be rebuilt, but the COMMIT still has to be asked for. A listener flip changes

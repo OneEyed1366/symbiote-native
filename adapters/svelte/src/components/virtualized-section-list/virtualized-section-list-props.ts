@@ -4,7 +4,6 @@
 // @symbiote-native/components — only the render-callback fields below are hand-declared here.
 import type { Snippet } from 'svelte';
 import type {
-  IClassNameValue,
   IStyleProp,
   ISymbioteEvent,
   IViewStyle,
@@ -85,6 +84,8 @@ export interface IVirtualizedSectionListProps<ItemT>
   scrollEventThrottle?: number;
   keyboardShouldPersistTaps?: boolean | 'always' | 'never' | 'handled';
   keyboardDismissMode?: 'none' | 'on-drag' | 'interactive';
+  removeClippedSubviews?: boolean;
+  nestedScrollEnabled?: boolean;
   style?: IStyleProp<IViewStyle>;
   contentContainerStyle?: IStyleProp<IViewStyle>;
   class?: ISvelteClassValue;

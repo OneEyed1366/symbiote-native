@@ -1,0 +1,47 @@
+{
+  "android": {
+    "gradleProjectName": "expo-audio",
+    "modules": [
+      {
+        "importPath": "expo.modules.audio.AudioModule",
+        "className": "AudioModule",
+        "nativeName": "ExpoAudio"
+      }
+    ],
+    "manifestPermissions": [
+      "android.permission.FOREGROUND_SERVICE",
+      "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+    ],
+    "manifestServices": [
+      {
+        "name": "expo.modules.audio.service.AudioControlsService",
+        "foregroundServiceType": "mediaPlayback",
+        "intentFilterActions": ["androidx.media3.session.MediaSessionService"]
+      }
+    ],
+    "optionalManifestBundles": [
+      {
+        "id": "recording",
+        "label": "Background audio recording",
+        "warning": "Requesting FOREGROUND_SERVICE_MICROPHONE triggers Play Console policy review — Google requires a clear, prominent in-app disclosure and justification before you can publish.",
+        "nextSteps": "Pass `allowsBackgroundRecording: true` to setAudioModeAsync so recording keeps running with the app backgrounded.",
+        "manifestPermissions": [
+          "android.permission.FOREGROUND_SERVICE_MICROPHONE",
+          "android.permission.POST_NOTIFICATIONS"
+        ],
+        "manifestServices": [
+          {
+            "name": "expo.modules.audio.service.AudioRecordingService",
+            "foregroundServiceType": "microphone"
+          }
+        ]
+      }
+    ]
+  },
+  "ios": {
+    "infoPlistKeys": {
+      "NSMicrophoneUsageDescription": "This app uses the microphone to record audio."
+    },
+    "infoPlistArrayKeys": { "UIBackgroundModes": ["audio"] }
+  }
+}

@@ -191,6 +191,8 @@ export interface IVirtualizedListProps<ItemT>
   scrollEventThrottle?: number;
   keyboardShouldPersistTaps?: boolean | 'always' | 'never' | 'handled';
   keyboardDismissMode?: 'none' | 'on-drag' | 'interactive';
+  removeClippedSubviews?: boolean;
+  nestedScrollEnabled?: boolean;
   style?: IStyleProp<IViewStyle>;
   contentContainerStyle?: IStyleProp<IViewStyle>;
   // Forwarded onto the inner ScrollView like `style` — resolves through the shared style
@@ -385,7 +387,7 @@ export function VirtualizedList<ItemT>(
       );
       setCommandedOffset(target);
     },
-    [],
+    [scrollHandle],
   );
 
   // dispatch and runEffects are mutually recursive (a schedule-refill / fire-viewable effect
@@ -750,21 +752,13 @@ export function VirtualizedList<ItemT>(
         index: planCell.index,
         separators: makeSeparators(planCell.index),
       });
-      // RN renders the separator INSIDE the cell's own measuring wrapper
-      // (VirtualizedListCellRenderer.js:218-221), and that placement is load-bearing rather than
-      // cosmetic. As a SIBLING it is an extra flex child, so the chrome between two cells becomes
-      // gap + separator + gap while a spacer collapsing that region replaces it with one gap — the
-      // leading spacer then lands every cell below it short by (separator + gap), and the content
-      // visibly jumps by that amount each time the window's first index moves. Measured at exactly
-      // 17px on device 2026-08-19 (a 1px divider under a 16px container gap); see
-      // .claude/rules/list-geometry-feedback-loop.md. Inside the wrapper it is part of the cell's
-      // measured length instead, and every cell stays exactly one child.
+      // The separator lives INSIDE the cell's own measuring wrapper, not as a sibling: a sibling
+      // is an extra flex child, so a leading-spacer collapse would land every cell below it short
+      // by (separator + gap). See .claude/rules/list-geometry-feedback-loop.md.
       const separator =
-        // RN gates the separator on the last index of the DATA, not of the WINDOW
-        // (VirtualizedList.js:793 `const end = getItemCount(data) - 1`), and now that the separator
-        // lives INSIDE the measuring wrapper that distinction is load-bearing: gating on the window
-        // would make a cell's own measured height change as the window slides past it. Device-measured
-        // 2026-08-19 as a run of cells all shifting by exactly the divider's 1px.
+        // Gated on the last index of the DATA, not the WINDOW: since the separator lives inside
+        // the measuring wrapper, gating on the window would make a cell's own measured height
+        // change as the window slides past it.
         planCell.index < count - 1
           ? renderSeparatorElement(
               ItemSeparatorComponent,
@@ -822,12 +816,14 @@ export function VirtualizedList<ItemT>(
   const resolvedContentContainerStyle: IStyleProp<IViewStyle> = horizontal
     ? [contentContainerStyle, { width: total }]
     : contentContainerStyle;
+  // VirtualizedList.js: `[inversionStyle, style]` — the app's style can override the flip.
   const resolvedStyle: IStyleProp<IViewStyle> | undefined = inverted
-    ? [style, horizontal ? INVERTED_X_STYLE : INVERTED_Y_STYLE]
+    ? [horizontal ? INVERTED_X_STYLE : INVERTED_Y_STYLE, style]
     : style;
 
   const scrollProps: IScrollViewProps & {
     onLayout: (event: ISymbioteEvent) => void;
+    isInvertedVirtualizedList?: boolean;
   } = {
     // The list's accessibility surface rides down onto the ScrollView. Spread first so the
     // explicit windowing props below always win.
@@ -841,6 +837,8 @@ export function VirtualizedList<ItemT>(
   // scrolls the two axes with different native ViewManagers. The behavior's own fold deletes the
   // prop and rewrites it from the tag, so passing it would be at best redundant and at worst a
   // contradiction it has to warn about.
+  // VirtualizedList.js:1111 — Android moves the scrollbar back after the `scale: -1` flip.
+  if (inverted) scrollProps.isInvertedVirtualizedList = true;
   if (onScrollBeginDrag !== undefined)
     scrollProps.onScrollBeginDrag = onScrollBeginDrag;
   if (onScrollEndDrag !== undefined)

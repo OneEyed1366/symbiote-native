@@ -14,7 +14,9 @@
 import { defineComponent, h, ref, watch } from '@vue/runtime-core';
 import {
   createInitialModalState,
+  isModalVisible,
   modalReducer,
+  modalVisibilityAction,
   renderModal,
   resolveAccessibilityProps,
   shouldRenderModal,
@@ -27,6 +29,7 @@ import {
 } from '@symbiote-native/components';
 import {
   dlog,
+  Platform,
   type IClassNameValue,
   type IStyleProp,
   type ISymbioteEvent,
@@ -153,26 +156,30 @@ function forwardAttrs(attrs: Record<string, unknown>): IForwardBag {
 export const Modal = defineComponent<IModalProps, IModalEmits>(
   (_props, { attrs: rawAttrs, slots, emit }) => {
     const state = ref<IModalState>(
-      createInitialModalState(rawAttrs.visible === true),
+      createInitialModalState(isModalVisible(rawAttrs.visible)),
     );
 
-    // POST-flush so the transition fires AFTER the render that used the OLD state: on visible→hidden
-    // the node renders once more (state.isRendered still true → the keep-alive frame), then this
-    // drops it and the next render unmounts. flush:'pre' would unmount immediately, killing the
-    // keep-alive. The reducer is identity-stable, so a no-op transition triggers no extra render.
+    // Arms the iOS keep-alive on show; a hide is left to the native dismiss (state/modal.ts). The
+    // reducer is identity-stable, so a no-op transition triggers no extra render.
     watch(
-      () => rawAttrs.visible === true,
+      () => isModalVisible(rawAttrs.visible),
       isVisible => {
-        state.value = modalReducer(
-          state.value,
-          isVisible ? { type: 'show' } : { type: 'hide' },
-        );
+        const action = modalVisibilityAction(isVisible);
+        if (action !== undefined)
+          state.value = modalReducer(state.value, action);
       },
       { flush: 'post' },
     );
 
+    // Modal.js: onDismiss is iOS-only — it drops the keep-alive, then tells the app.
+    const handleDismiss = (): void => {
+      if (Platform.OS !== 'ios') return;
+      state.value = modalReducer(state.value, { type: 'hide' });
+      emit('dismiss');
+    };
+
     return () => {
-      const isVisible = rawAttrs.visible === true;
+      const isVisible = isModalVisible(rawAttrs.visible);
       if (!shouldRenderModal(isVisible, state.value)) {
         dlog('Modal hidden -> no node committed');
         return null;
@@ -207,7 +214,7 @@ export const Modal = defineComponent<IModalProps, IModalEmits>(
           ...root.props,
           key: root.key,
           onShow: (): void => emit('show'),
-          onDismiss: (): void => emit('dismiss'),
+          onDismiss: handleDismiss,
           onRequestClose: (): void => emit('requestClose'),
           onOrientationChange: (event: ISymbioteEvent): void =>
             emit('orientationChange', event),

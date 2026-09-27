@@ -115,9 +115,6 @@ const VIEWPORT = 600;
 // never mounts, never measures, and `nextHeaderLayoutY` stays legitimately undefined in EVERY
 // adapter — which would make the comparison vacuous rather than differential.
 const STICKY_INDICES = [0, 3, 6];
-// Scrolls index 0's origin well past the top while keeping index 10 ahead of the window — the
-// exact geometry where a pinned header must know its collision point.
-const SCROLL_Y = 550;
 const REACT_ROOT_TAG = 77_201;
 const SVELTE_ROOT_TAG = 77_202;
 

@@ -108,14 +108,9 @@ const CASES: Record<string, ICase> = {
     source: fixture('T', `<view [testID]="42"></view>`),
     expect: 'not assignable',
   },
-  // THE HYPHENATED SPELLING IS THE SAME TAG, and until 2026-09-18 it was not. The renderer has always
-  // mapped `symbiote-view` onto `view` (`PRIMITIVE_SELECTOR_ALIAS`), so both commit the identical
-  // node — but the directive's selector was the bare `view` alone, so the hyphenated form matched
-  // NOTHING. An app that imports `SYMBIOTE_ELEMENTS` and writes it got the schema route instead: no
-  // type check, no declared inputs, none of the directive's behaviour, and no diagnostic saying so.
-  //
-  // `[testID]="42"` is the same wrong value as the case above. If the two spellings are one tag it
-  // is caught twice; if they are not, this one compiles clean and the trap is open.
+  // THE HYPHENATED SPELLING IS THE SAME TAG: the renderer maps `symbiote-view` onto `view`
+  // (`PRIMITIVE_SELECTOR_ALIAS`), so both commit the identical node — the directive must match both
+  // spellings, or the hyphenated form silently falls back to the schema route with no diagnostic.
   T2_hyphenated_spelling_is_the_same_tag: {
     source: fixture('T2', `<symbiote-view [testID]="42"></symbiote-view>`),
     expect: 'not assignable',

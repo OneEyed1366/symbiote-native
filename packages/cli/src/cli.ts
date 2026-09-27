@@ -44,6 +44,13 @@ export type IParsedCommand =
       readonly expoPackages: ReadonlySet<IExpoPackageLayerName>;
       readonly hasForce: boolean;
       readonly packageManager: IPackageManager | undefined;
+    }
+  | {
+      readonly kind: 'grant';
+      // Free-form, not one of IExpoPackageLayerName/IAddLayerName: which packages can even
+      // offer a bundle is discovered from the app's own node_modules at runGrant time, not
+      // known to the parser (see grant.ts's discoverOptionalBundles).
+      readonly layer: string | undefined;
     };
 
 // Typed as ReadonlySet<string>, not ReadonlySet<IFramework>, so the membership check below
@@ -171,8 +178,18 @@ export function parseArgv(argv: readonly string[]): IParsedCommand {
   if (command === '--version' || command === '-v') {
     return { kind: 'version' };
   }
+  if (command === 'grant') {
+    const [layer, ...extra] = rest;
+    if (extra.length > 0) {
+      throw new CliUsageError(
+        `"grant" takes at most one layer — got "${layer}" and "${extra[0]}".`,
+      );
+    }
+    return { kind: 'grant', layer };
+  }
+
   if (command !== 'new' && command !== 'add') {
-    throw usageErrorFor('command', command, ['new', 'add']);
+    throw usageErrorFor('command', command, ['new', 'add', 'grant']);
   }
 
   let appName: string | undefined;

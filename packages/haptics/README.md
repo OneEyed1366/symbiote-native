@@ -10,13 +10,27 @@ Vue, Svelte, Solid, Angular — not just React.
 
 ## Install
 
+**New app:**
+
+```bash
+npx @symbiote-native/cli new my-app --haptics
+```
+
+**Existing SymbioteNative app:**
+
+```bash
+npx @symbiote-native/cli add --haptics
+```
+
+Either way: installs `@symbiote-native/haptics` and wires the native autolinking automatically —
+see [`@symbiote-native/cli`](../cli).
+
+<details>
+<summary>Manual install (no CLI — installing and wiring native autolinking by hand)</summary>
+
 ```bash
 npm install @symbiote-native/haptics
 ```
-
-Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --haptics` (or
-`add --haptics` in an existing app) installs and wires this for you — see
-[`@symbiote-native/cli`](../cli).
 
 `expo-haptics` and `expo-modules-core` come along as regular, exact-pinned dependencies — never
 install either yourself, and never add the `expo` meta-package (it bundles its own Metro/Babel
@@ -43,6 +57,8 @@ implementation: `examples/expo-react/ios/Podfile` and
 
 No permission or `Info.plist`/`AndroidManifest.xml` entry is needed on either platform — haptic
 feedback requires none.
+
+</details>
 
 ## Shape
 

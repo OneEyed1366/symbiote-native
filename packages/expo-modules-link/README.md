@@ -146,6 +146,18 @@ That makes overriding a description free:
 When your wording and the package's default disagree, the run prints a one-line notice naming
 both. It keeps your file as-is - the point is that drift is visible, not that it's corrected.
 
+## iOS Info.plist array keys
+
+`UIBackgroundModes`, `BGTaskSchedulerPermittedIdentifiers` - anything Info.plist expects as an
+`<array>` rather than a `<string>` - is a different shape from a permission string and can't reuse
+`infoPlistKeys`. A package declares it under `ios.infoPlistArrayKeys` instead:
+`{ "UIBackgroundModes": ["audio"] }`. Several packages can want the SAME key (`task-manager`,
+`background-fetch`, `location`, and `audio` all touch `UIBackgroundModes`) - every package's items
+merge into one array instead of one package's write clobbering another's, and an item already
+present (packaged or hand-added) is never duplicated or reordered. A key the app doesn't have yet
+gets a whole new `<key>` + `<array>` block in the outer `<dict>`; a key it already has only gets
+the missing items appended, same additive/no-generated-region policy as `infoPlistKeys` above.
+
 ## Android manifest attributes
 
 `android.manifestApplicationAttributes` is additive-only for the same reason Info.plist is, plus

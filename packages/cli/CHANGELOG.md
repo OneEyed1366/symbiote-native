@@ -1,5 +1,60 @@
 # @symbiote-native/cli
 
+## 0.2.1
+
+### Patch Changes
+
+- [`99fdbbb`](https://github.com/OneEyed1366/symbiote-native/commit/99fdbbb54b72d5d06cfd95fbf0d82f2d9fe17a6a) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Force a clean republish of every publishable package. `engine@1.3.0`/`components@3.1.1` proved a
+  missing changeset on a producer package can leave its published tarball silently behind its own
+  source (see the `symbiote-release-publishing` skill's changeset-skips-callee gap) with no CI
+  signal. A blanket patch here is the cheap way to rule out the same gap sitting anywhere else:
+  every package rebuilds and republishes from current HEAD, and `updateInternalDependencies: patch`
+  bumps every internal `workspace:*`/`workspace:^` pin along with it.
+
+## 0.2.0
+
+### Minor Changes
+
+- [#86](https://github.com/OneEyed1366/symbiote-native/pull/86) [`aa17531`](https://github.com/OneEyed1366/symbiote-native/commit/aa175314db0f79474b9ac87bee3e30c4e87a72c4) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Add `--audio`, `--background-fetch`, `--background-task`, `--file-system`, `--location`, `--media-library`, `--notifications`, `--sqlite`, and `--task-manager` layer flags to `new`/`add`, covering every currently-shipped `@symbiote-native/*` Expo-backed package.
+
+- [#86](https://github.com/OneEyed1366/symbiote-native/pull/86) [`aa17531`](https://github.com/OneEyed1366/symbiote-native/commit/aa175314db0f79474b9ac87bee3e30c4e87a72c4) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - `new` now offers to `git init` the scaffolded app and prints the manual command if declined or if the target is already a git repo. Never commits on the developer's behalf — only the repository itself.
+
+- [#86](https://github.com/OneEyed1366/symbiote-native/pull/86) [`aa17531`](https://github.com/OneEyed1366/symbiote-native/commit/aa175314db0f79474b9ac87bee3e30c4e87a72c4) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Add `npx @symbiote-native/cli grant <id>` for opting into a package's policy-sensitive Android permission bundle (currently `audio`'s background recording and `location`'s background tracking) after declining the interactive prompt or running `new`/`add` non-interactively. Idempotent — safe to run again on an already-granted bundle.
+
+### Patch Changes
+
+- [#86](https://github.com/OneEyed1366/symbiote-native/pull/86) [`aa17531`](https://github.com/OneEyed1366/symbiote-native/commit/aa175314db0f79474b9ac87bee3e30c4e87a72c4) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - README: fixed a dead anchor link and a false premise — it pointed at the root README's "Try It In Your Own App" section, which no longer exists (the root Install section already leads with this package, so there's no manual-process gap left to close). Also drops a stale hardcoded layer/framework count in favor of pointing at `templates/layers` directly, so the claim can't go stale as layers are added.
+
+- [#86](https://github.com/OneEyed1366/symbiote-native/pull/86) [`aa17531`](https://github.com/OneEyed1366/symbiote-native/commit/aa175314db0f79474b9ac87bee3e30c4e87a72c4) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Scaffolded `ios`/`ios:release` scripts now run `pod install` before `react-native run-ios`, matching `run-android`'s implicit reinstall-everything behavior — a scaffolded app's first `ios` run no longer needs a separate manual `pod install`.
+
+## 0.1.2
+
+### Patch Changes
+
+- [`7c15933`](https://github.com/OneEyed1366/symbiote-native/commit/7c15933f329fbeca9c643f366f7161fd23a9896e) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - The Angular templates pass style arrays through `[styleProp]`.
+
+## 0.1.1
+
+### Patch Changes
+
+- [`7080650`](https://github.com/OneEyed1366/symbiote-native/commit/7080650e86d9baf157155e7fabdd6b695a49d7e6) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Every scaffold shipped a stray `bootsplash-logo/` folder at its root, holding all four other frameworks' boot-splash logo assets on top of its own.
+
+  `templates/native/bootsplash-logo/<framework>` lived inside `native/`, which `generate.ts` copies wholesale into every app before the framework-specific overlay runs. Moved to `templates/bootsplash-logo/<framework>`, alongside `native/` rather than inside it.
+
+- [`2f22bd4`](https://github.com/OneEyed1366/symbiote-native/commit/2f22bd47856f8acb40b963e261a30dffa656a44a) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - `--styling css-modules`/`stylesheet` scaffolds now render the same branded screen as the default `css` one, instead of a bare "Taps: N" stub.
+
+  The two modes had drifted onto a hand-written skeleton `App.module.css` that overwrote whatever the real per-framework template shipped.
+
+- [`c47b318`](https://github.com/OneEyed1366/symbiote-native/commit/c47b318d3c800d7a4fb7639d85b30d0f920b6b5d) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - `--navigation` scaffolds' Menu/Details screens in `css-modules`/`stylesheet` now match the branded `css` scaffold (logo, header options, details screen), instead of a bare "Welcome to SymbioteNative!" stub.
+
+  Also fixes vue-tsx's `--navigation` Menu/Details screens calling `navigation.push()`/`.pop()` on an unwrapped `ComputedRef` in those two styling modes - the same class of bug already fixed for the base App.
+
+- [`e5c9c1e`](https://github.com/OneEyed1366/symbiote-native/commit/e5c9c1eaa7b174439bb9e7d7ac76b329fa8b5b5c) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Every scaffold committed dead: `require()`'d images never resolved, and any host behavior beyond a plain press (Switch, TextInput, ScrollView, ...) silently did nothing.
+
+  `index.js` only imported each adapter's `/bootstrap` and `/jsx-runtime` subpaths. Neither reaches `import './register'`, which lives solely in the adapter's main barrel and registers the engine's host behaviors - so a fresh scaffold never ran it. Fixed by adding a bare `import '@symbiote-native/<adapter>';` to every framework's `index.js`.
+
+- [`a018a2d`](https://github.com/OneEyed1366/symbiote-native/commit/a018a2df797272848f8974058cf4da97bcce2fbd) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Every scaffold's `.brand-logo`/`.brand-logo-*` rule now sizes with an explicit pixel `width` instead of `aspect-ratio`, across every framework, every styling option (base, css-modules, stylesheet) and both the base app and navigation layers.
+
 ## 0.1.0
 
 ### Minor Changes

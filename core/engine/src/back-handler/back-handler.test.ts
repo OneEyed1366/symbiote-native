@@ -187,23 +187,11 @@ describe('BackHandler', () => {
       subSecond.remove();
     });
 
-    // why: removeEventListener is the legacy unsubscribe path kept for RN parity --
-    // it must remove the handler from the same chain the modern subscription.remove() uses.
-    it('removeEventListener (legacy path) also removes the handler from the chain', async () => {
+    // why: RN 0.86's BackHandler exposes only exitApp + addEventListener (BackHandler.android.js,
+    // BackHandler.d.ts) — unsubscribing is the subscription's remove(). No legacy method.
+    it('exposes no removeEventListener, as RN does', async () => {
       await loadBackHandler();
-      let received = false;
-      const handler = (): boolean => {
-        received = true;
-        return true;
-      };
-      BackHandler.addEventListener('hardwareBackPress', handler);
-      BackHandler.removeEventListener('hardwareBackPress', handler);
-
-      const exitsBefore = exitAppCount;
-      emitBack();
-
-      expect(received).toBe(false);
-      expect(exitAppCount).toBe(exitsBefore + 1);
+      expect('removeEventListener' in BackHandler).toBe(false);
     });
 
     // why: 'backPress' is documented as RN's legacy alias for 'hardwareBackPress' --
@@ -239,6 +227,39 @@ describe('BackHandler', () => {
       await loadBackHandler();
       expect(() => BackHandler.exitApp()).not.toThrow();
       expect(exitAppCount).toBe(0);
+    });
+  });
+
+  describe('host installation', () => {
+    // why: Android emits `hardwareBackPress` and exits ONLY when JS answers with
+    // invokeDefaultBackPressHandler (DeviceEventManagerModule.kt:40,55). RN subscribes when
+    // BackHandler.android.js loads; an app that never registers a handler must still exit.
+    it('exits on back with no app handler once the host installed it', async () => {
+      const { installBackHandler } = await import('./index');
+      installBackHandler();
+      emitBack();
+      expect(exitAppCount).toBe(1);
+    });
+
+    // why: RN hands every handler a HardwareBackPressEvent (type `hardwareBackPress`) whose
+    // timeStamp is the native one when native sent it (BackHandler.android.js).
+    it('hands the handler a hardwareBackPress event carrying the native timestamp', async () => {
+      await loadBackHandler();
+      let event: unknown;
+      const sub = BackHandler.addEventListener(
+        'hardwareBackPress',
+        received => {
+          event = received;
+          return true;
+        },
+      );
+      if (deviceHub === undefined) throw new Error('no device hub');
+      deviceHub.emit('hardwareBackPress', { timeStamp: 1234 });
+      expect(event).toMatchObject({
+        type: 'hardwareBackPress',
+        timeStamp: 1234,
+      });
+      sub.remove();
     });
   });
 });

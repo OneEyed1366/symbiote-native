@@ -84,6 +84,7 @@
   <text class="section-label">FlatList · animated scrollToOffset</text>
   <FlatList
     bind:this={listRef}
+    nestedScrollEnabled
     data={parityRows}
     keyExtractor={item => item.id}
     getItemLayout={(_data, index) => ({
@@ -124,6 +125,7 @@
   </text>
   <SectionList
     testID="sticky-section-list"
+    nestedScrollEnabled
     sections={paritySections}
     keyExtractor={item => item.id}
     stickySectionHeadersEnabled

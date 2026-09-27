@@ -27,12 +27,9 @@
 // resolving a template reference variable, so `strictTemplates` rejects anything else at compile
 // time and there is nothing left to guard at runtime.
 //
-// THE MARKER GOES ON AN `<ng-container>` INSIDE THE TARGET, never on the target element. A
-// ViewContainerRef anchors AT its host and `createEmbeddedView` inserts after that anchor, so
-// `<view portalOutlet>` delivers a SIBLING where React's `createPortal(node, host)` and Vue's
-// `<Teleport to>` deliver a child. Device-reported 2026-09-02: a card portaled into an absolutely
-// positioned overlay laid out in the scroll flow, since the overlay cannot centre a node that is
-// not in it.
+// THE MARKER GOES ON AN `<ng-container>` INSIDE THE TARGET, never on the target element:
+// ViewContainerRef anchors AT its host, so `<view portalOutlet>` delivers a SIBLING where React's
+// `createPortal` and Vue's `<Teleport to>` deliver a child — breaks centering inside an overlay.
 
 import {
   Directive,

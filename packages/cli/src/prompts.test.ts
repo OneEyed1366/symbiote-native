@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { CliUsageError } from './errors.js';
 import { EXPO_PACKAGE_LAYERS } from './expo-package-layers.js';
+import type { IDiscoveredBundle } from './grant-bundles.js';
 import {
   buildAddLayerOptions,
   dropAlreadyAdded,
@@ -10,6 +11,8 @@ import {
   resolveBundleId,
   resolveFeatures,
   resolveFramework,
+  resolveGitInit,
+  resolveGrantSelection,
   resolveOverwrite,
   resolvePackageManager,
   resolveStyling,
@@ -166,6 +169,12 @@ describe('prompts in a non-interactive terminal', () => {
     await expect(resolveAddOverwrite(true, 'Overwrite?')).resolves.toBe(true);
   });
 
+  // Piped/CI `new` can't pop a confirm prompt — same safe-by-default shape as resolveAddOverwrite:
+  // resolve false (skip git init) rather than hang or silently init a repo nobody asked for.
+  it('resolveGitInit skips (resolves false) with no prompt, non-interactively', async () => {
+    await expect(resolveGitInit()).resolves.toBe(false);
+  });
+
   // No layer flags and no interactive terminal to ask in — same fail-fast shape as
   // resolveFramework/resolveAppName above, but only when there's actually something left to add.
   it('resolveAddLayers with no flags and remaining layers fails fast, non-interactively', async () => {
@@ -181,6 +190,26 @@ describe('prompts in a non-interactive terminal', () => {
         new Set(),
       ),
     ).rejects.toThrow(CliUsageError);
+  });
+
+  // why: granting a bundle means requesting a permission that triggers Play Console policy
+  // review — that decision can't be made up by a non-interactive default the way, say,
+  // resolveStyling's "css" fallback can. No terminal to ask in must fail fast, not guess.
+  it('resolveGrantSelection fails fast — a policy-sensitive bundle needs an interactive choice', async () => {
+    const candidates: IDiscoveredBundle[] = [
+      {
+        packageName: '@symbiote-native/location',
+        bundle: {
+          id: 'background',
+          label: 'Background location tracking',
+          warning: 'w',
+          nextSteps: 'n',
+        },
+      },
+    ];
+    await expect(resolveGrantSelection(candidates)).rejects.toThrow(
+      CliUsageError,
+    );
   });
 
   it('resolveAddLayers with no flags and nothing left to add resolves to an empty list, no prompt', async () => {
@@ -211,9 +240,7 @@ describe('prompts in a non-interactive terminal', () => {
 describe('resolveAddLayers with explicit flags', () => {
   // why: an explicit --navigation on an app that already has navigation must NOT silently
   // re-render its App/MenuScreen/DetailsScreen — that would blow away real customization the
-  // developer made after `new`. Real-world bug (2026-09-18): `add --navigation --expo-modules
-  // --testing --splash-screen --slider` on an app that already had navigation re-applied it
-  // anyway, alongside the genuinely-missing layers.
+  // developer made after `new`.
   it('drops an explicitly-flagged layer that is already added, without --force', async () => {
     await expect(
       resolveAddLayers(
@@ -334,12 +361,11 @@ describe('resolveAddLayers with explicit flags', () => {
   });
 });
 
-// DX (2026-09-18): an already-added layer stays in the multiselect, disabled with why, instead of
-// vanishing — a shrinking menu with no visible reason looked like a bug, not a filter.
-//
-// DX (2026-09-20): grouped under "Core layers" / "Expo packages" (clack's groupMultiselect)
-// instead of one flat 26-option list — the 21 Expo packages alone outnumbered every other layer,
-// so finding "Navigation" meant reading past all of them.
+// An already-added layer stays in the multiselect, disabled with why, instead of vanishing — a
+// shrinking menu with no visible reason looks like a bug, not a filter.
+
+// Grouped under "Core layers" / "Expo packages" (clack's groupMultiselect): the 21 Expo packages
+// alone outnumber every other layer, so a flat list would bury "Navigation" past all of them.
 describe('buildAddLayerOptions', () => {
   function findOption(
     groups: ReturnType<typeof buildAddLayerOptions>,

@@ -5,6 +5,8 @@
  * AppRegistry, then registers the root component — same entry point the other canaries use.
  */
 
+// Registers host behaviors (Image, Pressable, Switch, ...) that /bootstrap alone doesn't reach; deleting this breaks them silently.
+import '@symbiote-native/angular';
 import { bootstrapApplication } from '@symbiote-native/angular/bootstrap';
 import { AppComponent } from './build/angular/src/App';
 import { name as appName } from './app.json';

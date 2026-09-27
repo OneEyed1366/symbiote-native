@@ -18,7 +18,13 @@
 // — ten native views and the same strings — because the quantity under test is how many distinct
 // text-measure cache keys the tree produces.
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import {
   Pressable,
   ScrollView,
@@ -242,7 +248,9 @@ export default function StockBenchmarkScreen({
         <Pressable
           style={styles.button}
           onPress={() =>
-            run('select', () => setSelected(previous => (previous === 2 ? 3 : 2)))
+            run('select', () =>
+              setSelected(previous => (previous === 2 ? 3 : 2)),
+            )
           }
         >
           <Text style={styles.buttonText}>Select row</Text>

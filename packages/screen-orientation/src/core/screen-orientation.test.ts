@@ -103,6 +103,41 @@ describe('Positive (delegates to the native module without error)', () => {
       ).toHaveBeenCalledWith([Orientation.PORTRAIT_UP]);
     });
 
+    // why: ported from upstream's ScreenOrientation-test.android.ts — a caller that spreads
+    // options for several platforms into one call must still only forward the property that
+    // matches the CURRENT platform, ignoring iOS/unknown properties rather than erroring on them
+    it('uses only the Android property on Android, ignoring iOS and unknown properties', async () => {
+      fakePlatform.OS = 'android';
+
+      await lockPlatformAsync({
+        screenOrientationConstantAndroid: 1,
+        screenOrientationArrayIOS: [],
+        // @ts-expect-error -- simulating an unrelated property a caller shouldn't pass
+        bad: "shouldn't be here",
+      });
+
+      expect(
+        FAKE_NATIVE_SCREEN_ORIENTATION.lockPlatformAsync,
+      ).toHaveBeenCalledWith(1);
+    });
+
+    // why: ported from upstream's ScreenOrientation-test.ios.ts — same precedence contract as the
+    // Android case above, mirrored for iOS
+    it('uses only the iOS property on iOS, ignoring Android and unknown properties', async () => {
+      fakePlatform.OS = 'ios';
+
+      await lockPlatformAsync({
+        screenOrientationConstantAndroid: 1,
+        screenOrientationArrayIOS: [],
+        // @ts-expect-error -- simulating an unrelated property a caller shouldn't pass
+        bad: "shouldn't be here",
+      });
+
+      expect(
+        FAKE_NATIVE_SCREEN_ORIENTATION.lockPlatformAsync,
+      ).toHaveBeenCalledWith([]);
+    });
+
     it('forwards the web orientation lock on web', async () => {
       fakePlatform.OS = 'web';
 
@@ -338,10 +373,17 @@ describe('Positive (delegates to the native module without error)', () => {
 
 describe('Negative (native method absent / invalid input must throw, not silently no-op)', () => {
   describe('lockAsync', () => {
-    it('throws a TypeError on an invalid lock value', async () => {
-      // @ts-expect-error -- simulating a caller passing a bogus lock value
-      await expect(lockAsync(999)).rejects.toThrow('Invalid Orientation Lock');
-    });
+    // why: ported from upstream's ScreenOrientation-test.native.ts — 999 covers an out-of-range
+    // number, NaN and a plain string cover the other two shapes a caller could pass from JS
+    it.each([999, NaN, 'test'])(
+      'throws a TypeError on an invalid lock value (%s)',
+      async bogus => {
+        await expect(
+          // @ts-expect-error -- simulating a caller passing a bogus lock value
+          lockAsync(bogus),
+        ).rejects.toThrow('Invalid Orientation Lock');
+      },
+    );
 
     it('throws UnavailabilityError when the native method is absent', async () => {
       const { lockAsync: native } = FAKE_NATIVE_SCREEN_ORIENTATION;
@@ -383,6 +425,23 @@ describe('Negative (native method absent / invalid input must throw, not silentl
 
       await expect(lockPlatformAsync({})).rejects.toThrow(
         'cannot be called with undefined option properties',
+      );
+    });
+
+    // why: ported from upstream's ScreenOrientation-test.android.ts — unlike the falsy-trap cases
+    // above (0/NaN, which never reach the isNaN check because the guard itself is falsy), a
+    // non-empty non-numeric string IS truthy, so this is the one input that actually reaches and
+    // fires the isNaN-specific message
+    it('throws the isNaN-specific TypeError for a non-numeric string Android constant', async () => {
+      fakePlatform.OS = 'android';
+
+      await expect(
+        lockPlatformAsync({
+          // @ts-expect-error -- simulating a caller passing a non-numeric value from plain JS
+          screenOrientationConstantAndroid: 'test',
+        }),
+      ).rejects.toThrow(
+        'screenOrientationConstantAndroid cannot be called with test',
       );
     });
 
@@ -431,12 +490,17 @@ describe('Negative (native method absent / invalid input must throw, not silentl
   });
 
   describe('supportsOrientationLockAsync', () => {
-    it('throws a TypeError on an invalid lock value', async () => {
-      // @ts-expect-error -- simulating a caller passing a bogus lock value
-      await expect(supportsOrientationLockAsync(999)).rejects.toThrow(
-        'Invalid Orientation Lock',
-      );
-    });
+    // why: ported from upstream's ScreenOrientation-test.native.ts — same three invalid-input
+    // shapes as lockAsync's own invalid-value case above
+    it.each([999, NaN, 'test'])(
+      'throws a TypeError on an invalid lock value (%s)',
+      async bogus => {
+        await expect(
+          // @ts-expect-error -- simulating a caller passing a bogus lock value
+          supportsOrientationLockAsync(bogus),
+        ).rejects.toThrow('Invalid Orientation Lock');
+      },
+    );
 
     it('throws UnavailabilityError when the native method is absent', async () => {
       const { supportsOrientationLockAsync: native } =
@@ -453,19 +517,29 @@ describe('Negative (native method absent / invalid input must throw, not silentl
   });
 
   describe('addOrientationChangeListener', () => {
-    it('throws a TypeError when the listener is not a function', () => {
-      // @ts-expect-error -- simulating a caller passing a non-function listener
-      expect(() => addOrientationChangeListener('not-a-function')).toThrow();
-    });
+    // why: ported from upstream's ScreenOrientation-test.native.ts — NaN alongside the existing
+    // string case, both failing the `typeof listener !== 'function'` guard
+    it.each(['not-a-function', NaN])(
+      'throws a TypeError when the listener is not a function (%s)',
+      bogus => {
+        // @ts-expect-error -- simulating a caller passing a non-function listener
+        expect(() => addOrientationChangeListener(bogus)).toThrow();
+      },
+    );
   });
 
   describe('removeOrientationChangeListener', () => {
-    it('throws a TypeError when passed an invalid subscription', () => {
-      // @ts-expect-error -- simulating a caller passing a bogus subscription
-      expect(() => removeOrientationChangeListener(null)).toThrow(
-        'Must pass in a valid subscription',
-      );
-    });
+    // why: null was already covered here; NaN/'test'/{} ported from upstream's
+    // ScreenOrientation-test.native.ts — all fail the `!subscription || !subscription.remove` guard
+    it.each([null, NaN, 'test', {}])(
+      'throws a TypeError when passed an invalid subscription (%s)',
+      bogus => {
+        // @ts-expect-error -- simulating a caller passing a bogus subscription
+        expect(() => removeOrientationChangeListener(bogus)).toThrow(
+          'Must pass in a valid subscription',
+        );
+      },
+    );
   });
 });
 

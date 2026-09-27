@@ -4,11 +4,9 @@
 // All Fabric clone-on-write lives in the engine, shared cross-adapter. App code names only
 // @symbiote-native/svelte.
 //
-// Full component parity with React/Vue/Angular landed 2026-08-11 (svelte-adapter-dom-shim
-// skill §15): every `core/components` render function has a fixed tree shape, so no
-// `descriptorToSvelte` bridge was ever needed — each component below is hand-authored Svelte
-// markup mirroring its render-*.ts, reusing only the pure state/render logic. See skill §17/§18
-// for the one open async-exception repro and the honest cross-cutting gap list.
+// Full component parity with React/Vue/Angular (svelte-adapter-dom-shim skill §15): every
+// `core/components` render function has a fixed tree shape, so no `descriptorToSvelte` bridge is
+// needed — each component below is hand-authored Svelte markup mirroring its render-*.ts.
 
 // Bare side-effect import, deliberately NOT a re-export and deliberately not beside one of the
 // same specifier: it registers the press behavior with the engine's host-behavior registry. Any
@@ -123,9 +121,8 @@ export type {
 } from '@symbiote-native/components';
 
 // Pure, framework-agnostic runtime modules — same re-export every other adapter does per
-// CLAUDE.md's <runtime_modules_layering>. PanResponder was missing here (present on
-// React/Vue's own barrels) until 2026-08-12 — a pure engine re-export, no framework glue, so
-// adding it is a one-line parity fix, not new adapter work.
+// CLAUDE.md's <runtime_modules_layering>. A pure engine re-export with no framework glue, so
+// adding one is a one-line parity fix, not new adapter work.
 export {
   Platform,
   StyleSheet,

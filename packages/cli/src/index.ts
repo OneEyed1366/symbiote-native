@@ -2,6 +2,7 @@
 import pc from 'picocolors';
 import { parseArgv } from './cli.js';
 import { runAdd } from './commands/add.js';
+import { runGrant } from './commands/grant.js';
 import { runNew } from './commands/new.js';
 import { CliUsageError, NotSymbioteAppError } from './errors.js';
 import { EXPO_PACKAGE_LAYERS } from './expo-package-layers.js';
@@ -26,6 +27,10 @@ Usage:
   npx @symbiote-native/cli add [--navigation] [--expo-modules] [--testing] [--splash-screen] [--slider]
                       [--<expo-package> ...] [--force] [--pm npm|pnpm|yarn]
                       (run inside an existing @symbiote-native/* app)
+  npx @symbiote-native/cli grant [layer]
+                      interactively opt into policy-sensitive Android permissions/services
+                      (e.g. background location, audio recording) an installed package offers;
+                      [layer] narrows to one package's short name, e.g. "grant location"
 
   npx @symbiote-native/cli --version   print the CLI version
   npx @symbiote-native/cli --help      print this message
@@ -44,6 +49,9 @@ async function main(): Promise<void> {
       return;
     case 'add':
       await runAdd(parsed);
+      return;
+    case 'grant':
+      await runGrant(parsed);
       return;
     case 'help':
       printHelp();

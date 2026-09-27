@@ -1,15 +1,9 @@
 // Sticky headers — the Solid lifecycle half of the JS layer RN implements in ScrollView.js /
 // ScrollViewStickyHeader.js.
 //
-// PRIVATE TO VIRTUALIZED-LIST since 2026-09-11. It used to live under `../scroll-view` and back
-// that component's `stickyHeaderIndices` too; the tag `<scroll-view>` now honors that prop through
-// the engine's own `sticky-header` intrinsic (`core/components/src/behaviors/scroll-view/sticky.ts`)
-// with no adapter code at all — see that primitive's props header. VirtualizedList still needs its
-// OWN implementation because it hand-builds its scroll host (`shared.tsx`'s own header explains
-// why) rather than emitting the tag, so it wraps a flagged CELL itself instead of leaning on the
-// engine's per-child walk. `wrapStickyHeaders`/`IStickyWrapInputs` — the generic child-array wrapper
-// ScrollView used and this file never called — were dropped with the move; `virtualized-list/
-// shared.tsx` wraps the cell it already owns directly.
+// PRIVATE TO VIRTUALIZED-LIST: `<scroll-view>` honors `stickyHeaderIndices` via the engine's own
+// `sticky-header` intrinsic with no adapter code. VirtualizedList still needs its OWN
+// implementation because it hand-builds its scroll host, so `shared.tsx` wraps the cell directly.
 //
 // RN does stickiness PURELY IN JS: ScrollView wraps each flagged child in a ScrollViewStickyHeader
 // fed by ONE scroll AnimatedValue, and the native scroll view ignores `stickyHeaderIndices`

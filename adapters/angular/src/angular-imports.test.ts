@@ -7,7 +7,7 @@
 import '@angular/compiler';
 import { ElementRef, Injector, runInInjectionContext } from '@angular/core';
 import { describe, expect, it } from 'vitest';
-import { Image, Text, View } from './components';
+import { Text, View } from './components';
 import {
   VirtualizedList,
   VListItemDirective,

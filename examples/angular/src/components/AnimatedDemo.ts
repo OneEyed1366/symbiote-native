@@ -15,6 +15,7 @@ import {
   AnimatedView,
   SYMBIOTE_ELEMENTS,
 } from '@symbiote-native/angular';
+import { ActionButton } from './ActionButton';
 // Static look lives in AnimatedDemo.css — compiled at build time by @symbiote-native/css-parser.
 import './AnimatedDemo.css';
 
@@ -26,7 +27,7 @@ const FREEZE_MS = 1500;
 @Component({
   selector: 'AnimatedDemo',
   standalone: true,
-  imports: [SYMBIOTE_ELEMENTS, AnimatedView],
+  imports: [SYMBIOTE_ELEMENTS, AnimatedView, ActionButton],
   template: `
     <view class="section-nested">
       <text class="section-label">Animated · JS vs native driver</text>
@@ -49,12 +50,12 @@ const FREEZE_MS = 1500;
           [style]="{ transform: [{ translateX: jsX }] }"
         ></AnimatedView>
       </view>
-      <button
+      <ActionButton
         testID="slide-js-btn"
         title="Slide (JS driver)"
         (press)="slideJsDriver()"
         color="#dd0031"
-      ></button>
+      ></ActionButton>
 
       <view class="slide-track">
         <AnimatedView
@@ -63,19 +64,19 @@ const FREEZE_MS = 1500;
           [style]="{ transform: [{ translateX: nativeX }] }"
         ></AnimatedView>
       </view>
-      <button
+      <ActionButton
         testID="slide-native-btn"
         title="Slide (native driver)"
         (press)="slideNativeDriver()"
         color="#68d391"
-      ></button>
+      ></ActionButton>
 
-      <button
+      <ActionButton
         testID="freeze-js-btn"
         title="Freeze JS 1.5s"
         (press)="freezeJs()"
         color="#fc8181"
-      ></button>
+      ></ActionButton>
     </view>
   `,
 })

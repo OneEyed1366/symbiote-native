@@ -10,13 +10,27 @@ no hook/composable/service to wrap — every adapter's entry point is a plain re
 
 ## Install
 
+**New app:**
+
+```bash
+npx @symbiote-native/cli new my-app --crypto
+```
+
+**Existing SymbioteNative app:**
+
+```bash
+npx @symbiote-native/cli add --crypto
+```
+
+Either way: installs `@symbiote-native/crypto` and wires the native autolinking automatically — see
+[`@symbiote-native/cli`](../cli).
+
+<details>
+<summary>Manual install (no CLI — installing and wiring native autolinking by hand)</summary>
+
 ```bash
 npm install @symbiote-native/crypto
 ```
-
-Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --crypto` (or
-`add --crypto` in an existing app) installs and wires this for you — see
-[`@symbiote-native/cli`](../cli).
 
 `expo-crypto` and `expo-modules-core` come along as regular dependencies, pinned to exact
 versions — never install either yourself, and never add the `expo` meta-package to your project
@@ -42,6 +56,8 @@ implementation: `examples/expo-react/ios/Podfile` and
 
 No platform permission strings are needed for this package — random-byte generation and
 digest hashing touch no protected device capability.
+
+</details>
 
 ## Shape
 

@@ -13,7 +13,7 @@
 //                         ViewManager on Android, so the axis is the tag; a prop contradicting it
 //                         is dropped with a dlog. Typed here for parity, and for an app porting
 //                         from RN.
-//   nestedScrollEnabled   defaults to `true` in the behavior, on both platforms.
+//   nestedScrollEnabled   defaults to `true` only under an Android RefreshControl, as in RN.
 import type {
   IClassNameValue,
   ISymbioteEvent,

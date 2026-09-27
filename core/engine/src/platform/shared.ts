@@ -85,3 +85,16 @@ export function createConstantsResolver<TConstants>(
     return cached;
   };
 }
+
+// Metro's `__DEV__` global: `true` in a dev bundle, `false` in release. Read off globalThis so a
+// host that never defines it (headless tooling) counts as release, like any unset flag.
+export function isDevBuild(): boolean {
+  return Reflect.get(globalThis, '__DEV__') === true;
+}
+
+// RN's `isTesting`: the native flag in a dev build only (`if (__DEV__) … return false`).
+export function gatedIsTesting(
+  constants: { isTesting?: boolean } | undefined,
+): boolean {
+  return isDevBuild() && (constants?.isTesting ?? false);
+}

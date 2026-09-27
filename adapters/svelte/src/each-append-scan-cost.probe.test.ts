@@ -1,27 +1,6 @@
-// F-82 (`.docs/tree-inefficiency-findings.md`) ruled the native commit+layout pipeline out as
-// the cause of the still-open Append regression (device Create +40 ms, Append +147, Replace +54
-// against the 2026-09-01 baseline, tree and WRITES byte-identical — F-44's "still open" section):
-// at the real benchmark scale, commit+layout together cost ~15 ms against a 107-147 ms gap. That
-// redirected the search to the one layer no itest can see — Svelte's own compiled `{#each}`
-// reconciler, running before a single op reaches the engine.
-//
-// F-83 found a real one: `ShimNode.insertOne` (dom-shim/shim-node.ts) resolved an `insertBefore`
-// ref with `this.children.indexOf(ref)`, a LINEAR scan of the shim's own child array — the exact
-// shape F-80 already exonerated for the engine's `OP_INSERT_BEFORE` (`std::find` over `siblings`,
-// too small to matter). Svelte's own reconciler was doing the identical scan a second time, one
-// layer up: BenchmarkScreen's real `{#each rows as row (row.id)}` is a KEYED block, and a new
-// tail item — whether appended OR built for the first time — is inserted via `newRow.before(ref)`
-// — `parent.insertBefore(newRow, ref)` — where `ref` is the block's own closing boundary anchor,
-// sitting a small constant distance from the true end of `children` (one extra trailing anchor
-// from the component's own root fragment, in the measured shape). Confirmed on real compiled
-// output: appending 1 000 rows onto 1 000 standing cost 1 502 500 `indexOf` comparisons — one
-// O(n) scan per row, O(n²) aggregate — and the per-call average tracked `standing` almost exactly
-// at two widths apart by 20x (302.5 @ standing=200, 4 102.5 @ standing=4 000). The INITIAL build
-// pays the identical mechanism (every row is two MORE ref-based inserts, not push), so this is not
-// only an Append cost — it is a candidate for F-44's Create and Replace regressions too. Fixed by
-// `indexNearEnd`: a bounded backward scan finds a ref that close to the end in O(1), falling back
-// to the full scan (still correct, unchanged) only when it isn't. This file is now the regression
-// guard for that fix, for both mount and append, not just the probe that found it.
+// `ShimNode.insertOne` (dom-shim/shim-node.ts) resolved an `insertBefore` ref via
+// `this.children.indexOf(ref)` — a LINEAR scan, O(n) per insert and O(n²) aggregate on Svelte's
+// keyed `{#each}` reconciler. Fixed by `indexNearEnd`, a bounded backward scan; guarded here.
 import { afterEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';

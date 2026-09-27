@@ -1,6 +1,5 @@
 // TouchableOpacity over REAL compiled `.svelte` output — the Svelte twin of
-// adapters/solid/src/components/touchable/touchable.test.tsx's TouchableOpacity group, written
-// for the 2026-08-19 RN audit migration.
+// adapters/solid/src/components/touchable/touchable.test.tsx's TouchableOpacity group.
 //
 // SCOPE. The press-scheduling machine (computePressOutWait, createTouchableFeedback*) is
 // unit-tested in core/components/src/state/touchable.test.ts, and the press lifecycle underneath

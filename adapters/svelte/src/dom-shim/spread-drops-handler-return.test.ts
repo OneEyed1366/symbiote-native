@@ -15,10 +15,6 @@
 // (`core/engine/src/events/index.ts`). A handler whose answer is swallowed reads as "does not
 // want it", so a spread element asks for every gesture and is never heard.
 //
-// Device-diagnosed 2026-09-08 on the canary's PanResponder drag box: `PanResponder
-// startShouldSet -> true` immediately followed by `responder start: nobody wants it (path=11)` —
-// the listener ran, and its answer did not survive the trip.
-//
 // The three arms are the point: two of them PASS, and without them "spread returns undefined"
 // could equally be the harness failing to read a return at all.
 import { rmSync, writeFileSync } from 'node:fs';

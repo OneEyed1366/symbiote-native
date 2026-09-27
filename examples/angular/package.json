@@ -5,8 +5,8 @@
   "scripts": {
     "android": "pnpm ng:build && react-native run-android",
     "android:release": "pnpm ng:build && react-native run-android --mode Release",
-    "ios": "pnpm ng:build && react-native run-ios",
-    "ios:release": "pnpm ng:build && react-native run-ios --mode Release",
+    "ios": "pnpm ng:build && cd ios && pod install && cd .. && react-native run-ios",
+    "ios:release": "pnpm ng:build && cd ios && pod install && cd .. && react-native run-ios --mode Release",
     "lint": "eslint .",
     "dev": "symbiote-angular-dev --reset-cache",
     "start": "symbiote-angular-dev",

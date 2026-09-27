@@ -1,5 +1,40 @@
 # @symbiote-native/slider
 
+## 8.0.4
+
+### Patch Changes
+
+- [`99fdbbb`](https://github.com/OneEyed1366/symbiote-native/commit/99fdbbb54b72d5d06cfd95fbf0d82f2d9fe17a6a) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Force a clean republish of every publishable package. `engine@1.3.0`/`components@3.1.1` proved a
+  missing changeset on a producer package can leave its published tarball silently behind its own
+  source (see the `symbiote-release-publishing` skill's changeset-skips-callee gap) with no CI
+  signal. A blanket patch here is the cheap way to rule out the same gap sitting anywhere else:
+  every package rebuilds and republishes from current HEAD, and `updateInternalDependencies: patch`
+  bumps every internal `workspace:*`/`workspace:^` pin along with it.
+- Updated dependencies [[`99fdbbb`](https://github.com/OneEyed1366/symbiote-native/commit/99fdbbb54b72d5d06cfd95fbf0d82f2d9fe17a6a)]:
+  - @symbiote-native/components@3.1.2
+
+## 8.0.3
+
+### Patch Changes
+
+- [#86](https://github.com/OneEyed1366/symbiote-native/pull/86) [`aa17531`](https://github.com/OneEyed1366/symbiote-native/commit/aa175314db0f79474b9ac87bee3e30c4e87a72c4) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - README: Install now leads with `npx @symbiote-native/cli new`/`add` (split into separate "New app"/"Existing app" blocks to avoid an accidental double copy-paste), with the manual `npm install` + native-wiring steps collapsed into a `<details>` block for anyone not using the CLI. Every `--flag` was verified against `expo-package-layers.ts`, and each package's native-wiring claims (Info.plist keys, manifest permissions/services) were cross-checked against its own `native-link.json`.
+
+- Updated dependencies [[`aa17531`](https://github.com/OneEyed1366/symbiote-native/commit/aa175314db0f79474b9ac87bee3e30c4e87a72c4)]:
+  - @symbiote-native/components@3.1.1
+
+## 8.0.2
+
+### Patch Changes
+
+- [#85](https://github.com/OneEyed1366/symbiote-native/pull/85) [`0468bca`](https://github.com/OneEyed1366/symbiote-native/commit/0468bca22da67f9f3f58b2020a5403380cd2c634) Thanks [@github-actions](https://github.com/apps/github-actions)! - Depend on `@symbiote-native/components` 3.1.0. The versions published earlier pinned 3.0.1.
+
+## 8.0.1
+
+### Patch Changes
+
+- Updated dependencies [[`fba54ee`](https://github.com/OneEyed1366/symbiote-native/commit/fba54ee2d39a3b2ea12bb11a846b32658e3f8902), [`d4f46e7`](https://github.com/OneEyed1366/symbiote-native/commit/d4f46e7ca1601aa469b5c8c5ab97f8a8217c968f), [`3de549b`](https://github.com/OneEyed1366/symbiote-native/commit/3de549b2ab9785c845a1f3acd5626d85d2b9b9e4)]:
+  - @symbiote-native/components@3.1.0
+
 ## 8.0.0
 
 ### Patch Changes

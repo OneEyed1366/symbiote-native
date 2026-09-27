@@ -6,6 +6,8 @@
  * Same entry shape as every other canary, going through the shared AppRegistry seam.
  */
 
+// Registers host behaviors (Image, Pressable, Switch, ...) that /bootstrap alone doesn't reach; deleting this breaks them silently.
+import '@symbiote-native/solid';
 import { createApp } from '@symbiote-native/solid/bootstrap';
 import App from './App';
 import { name as appName } from './app.json';

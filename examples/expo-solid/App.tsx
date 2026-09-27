@@ -34,6 +34,13 @@ import { SecureStoreScreen } from './screens/SecureStoreScreen';
 import { SharingScreen } from './screens/SharingScreen';
 import { WebBrowserScreen } from './screens/WebBrowserScreen';
 import { SmsScreen } from './screens/SmsScreen';
+import { LocationScreen } from './screens/LocationScreen';
+import { MediaLibraryScreen } from './screens/MediaLibraryScreen';
+import { FileSystemScreen } from './screens/FileSystemScreen';
+import { AudioScreen } from './screens/AudioScreen';
+import { NotificationsScreen } from './screens/NotificationsScreen';
+import { BackgroundTasksScreen } from './screens/BackgroundTasksScreen';
+import { SqliteScreen } from './screens/SqliteScreen';
 import { ROUTE_NAME } from './routes';
 import { LINE_COLOR } from './navigation-lines';
 import { hide } from '@symbiote-native/splash-screen/solid';
@@ -335,6 +342,97 @@ function App() {
           title: 'SMS',
           headerShown: true,
           headerTintColor: LINE_COLOR.sms,
+          headerTranslucent: true,
+          headerTitleColor: '#ffffff',
+          headerStyle: { backgroundColor: '#0b1622' },
+          headerUserInterfaceStyle: 'dark',
+        }}
+      />
+      <Stack.Screen
+        name={ROUTE_NAME.Location}
+        component={LocationScreen}
+        options={{
+          title: 'Location',
+          headerShown: true,
+          headerTintColor: LINE_COLOR.location,
+          headerTranslucent: true,
+          headerTitleColor: '#ffffff',
+          headerStyle: { backgroundColor: '#0b1622' },
+          headerUserInterfaceStyle: 'dark',
+        }}
+      />
+      <Stack.Screen
+        name={ROUTE_NAME.MediaLibrary}
+        component={MediaLibraryScreen}
+        options={{
+          title: 'Media Library',
+          headerShown: true,
+          headerTintColor: LINE_COLOR['media-library'],
+          headerTranslucent: true,
+          headerTitleColor: '#ffffff',
+          headerStyle: { backgroundColor: '#0b1622' },
+          headerUserInterfaceStyle: 'dark',
+        }}
+      />
+      <Stack.Screen
+        name={ROUTE_NAME.FileSystem}
+        component={FileSystemScreen}
+        options={{
+          title: 'File System',
+          headerShown: true,
+          headerTintColor: LINE_COLOR['file-system'],
+          headerTranslucent: true,
+          headerTitleColor: '#ffffff',
+          headerStyle: { backgroundColor: '#0b1622' },
+          headerUserInterfaceStyle: 'dark',
+        }}
+      />
+      <Stack.Screen
+        name={ROUTE_NAME.Audio}
+        component={AudioScreen}
+        options={{
+          title: 'Audio',
+          headerShown: true,
+          headerTintColor: LINE_COLOR.audio,
+          headerTranslucent: true,
+          headerTitleColor: '#ffffff',
+          headerStyle: { backgroundColor: '#0b1622' },
+          headerUserInterfaceStyle: 'dark',
+        }}
+      />
+      <Stack.Screen
+        name={ROUTE_NAME.Notifications}
+        component={NotificationsScreen}
+        options={{
+          title: 'Notifications',
+          headerShown: true,
+          headerTintColor: LINE_COLOR.notifications,
+          headerTranslucent: true,
+          headerTitleColor: '#ffffff',
+          headerStyle: { backgroundColor: '#0b1622' },
+          headerUserInterfaceStyle: 'dark',
+        }}
+      />
+      <Stack.Screen
+        name={ROUTE_NAME.BackgroundTasks}
+        component={BackgroundTasksScreen}
+        options={{
+          title: 'Background Tasks',
+          headerShown: true,
+          headerTintColor: LINE_COLOR['background-tasks'],
+          headerTranslucent: true,
+          headerTitleColor: '#ffffff',
+          headerStyle: { backgroundColor: '#0b1622' },
+          headerUserInterfaceStyle: 'dark',
+        }}
+      />
+      <Stack.Screen
+        name={ROUTE_NAME.Sqlite}
+        component={SqliteScreen}
+        options={{
+          title: 'SQLite',
+          headerShown: true,
+          headerTintColor: LINE_COLOR.sqlite,
           headerTranslucent: true,
           headerTitleColor: '#ffffff',
           headerStyle: { backgroundColor: '#0b1622' },

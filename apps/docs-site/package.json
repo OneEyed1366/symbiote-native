@@ -11,7 +11,8 @@
   },
   "dependencies": {
     "@astrojs/starlight": "catalog:",
-    "astro": "catalog:"
+    "astro": "catalog:",
+    "starlight-llms-txt": "catalog:"
   },
   "devDependencies": {
     "@astrojs/check": "catalog:",

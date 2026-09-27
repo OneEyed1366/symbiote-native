@@ -129,8 +129,6 @@ class BenchmarkRow {
   }
 }
 
-let mounted: List | undefined;
-
 @Component({
   selector: 'work-ledger-list',
   standalone: true,
@@ -153,11 +151,6 @@ class List {
   readonly suffix = signal('');
   readonly partialSuffix = signal('');
 
-  constructor() {
-    // eslint-disable-next-line @typescript-eslint/no-this-alias
-    mounted = this;
-  }
-
   suffixFor(row: IRow): string {
     return (
       this.suffix() +
@@ -166,16 +159,10 @@ class List {
   }
 }
 
-function drive(): List {
-  if (mounted === undefined) throw new Error('list was never mounted');
-  return mounted;
-}
-
 beforeEach(() => {
   fabric.reset();
   clearGlobalStyles();
   registerRules(benchmarkRowRules());
-  mounted = undefined;
 });
 
 describe('the work an angular commit asks for, against the work it needs', () => {

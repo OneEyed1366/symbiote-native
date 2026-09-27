@@ -292,4 +292,31 @@ describe('parseArgv', () => {
     if (parsed.kind !== 'new') throw new Error('expected "new"');
     expect(parsed.expoPackages).toEqual(new Set(['battery', 'sensors']));
   });
+
+  // why: `grant` with no argument offers every policy-sensitive bundle across every installed
+  // package — the layer isn't known until runGrant scans node_modules, so parseArgv can't (and
+  // shouldn't) validate it against a fixed list the way --framework/--styling do.
+  it('parses "grant" with no layer', () => {
+    expect(parseArgv(['grant'])).toEqual({ kind: 'grant', layer: undefined });
+  });
+
+  it('parses "grant <layer>" as a free-form filter, not a fixed enum', () => {
+    expect(parseArgv(['grant', 'location'])).toEqual({
+      kind: 'grant',
+      layer: 'location',
+    });
+    expect(parseArgv(['grant', 'not-a-real-package'])).toEqual({
+      kind: 'grant',
+      layer: 'not-a-real-package',
+    });
+  });
+
+  it('rejects a second positional argument to "grant"', () => {
+    expect(() => parseArgv(['grant', 'location', 'extra'])).toThrow(
+      CliUsageError,
+    );
+    expect(() => parseArgv(['grant', 'location', 'extra'])).toThrow(
+      /"grant" takes at most one layer/,
+    );
+  });
 });

@@ -297,9 +297,61 @@ add_test(NAME symbiote_tree_tests COMMAND symbiote_tree_tests)
 # Same engine, driven from JS instead of from C++, so the adapter and engine test suites can stop
 # committing into a TypeScript stand-in. React Native's own host harness has this shape too: a
 # bundler produces one file and a native binary evaluates it (`private/react-native-fantom`).
+# ── Which JavaScript engine hosts it ─────────────────────────────────────────────────────────────
+# HERMES IS THE DEFAULT, because it is the engine a device runs. `-DSYMBIOTE_JS_ENGINE=jsc` builds
+# the same target against JavaScriptCore instead.
+#
+# WHY IT IS POSSIBLE AT ALL, since this comment used to say Hermes "would need its source fetched and
+# built": it does not. The `hermes-engine` pod unpacks a universal macOS `hermesvm.framework` beside
+# the iOS ones, and the `jsi.h` it was built against is BYTE-IDENTICAL to ReactCommon's — checked,
+# not assumed, because a JSI ABI mismatch would not crash, it would return wrong numbers.
+# `hermes-probe/` is the standalone proof.
+#
+# WHY IT IS THE DEFAULT: JavaScriptCore has a JIT and Hermes does not, and that difference is not a
+# scale factor — it inverts conclusions. The engine costs LESS than a bare Fabric driver under the
+# JIT and nearly twice as much without it, and the whole premise the buffer rests on (many small JSI
+# crossings are dear, one big one is not) is substantially a JavaScriptCore artefact. A ruler that
+# reverses the sign of the headline is not a convenience, so the default is the device's engine and
+# JavaScriptCore is the arm you ask for deliberately. The measurement skill's §18c holds the numbers.
+#
+# The framework is a `pod install` ARTEFACT, not a tracked dependency, so the path is a cache
+# variable with a search as its default and the configure FAILS LOUDLY rather than silently falling
+# back to JavaScriptCore — an arm that quietly measured the wrong engine is the worst outcome here.
+set(SYMBIOTE_JS_ENGINE "hermes" CACHE STRING "Which JSI runtime hosts the tester: hermes or jsc")
+set(SYMBIOTE_HERMES_DESTROOT "" CACHE PATH "hermes-engine pod destroot; searched when empty")
+
+if(SYMBIOTE_JS_ENGINE STREQUAL "hermes")
+  if(SYMBIOTE_HERMES_DESTROOT STREQUAL "")
+    # A built example first, because that is the one a developer already has and the one whose
+    # configuration their app actually runs. `.hermes/destroot` is the fetched fallback
+    # (`node scripts/fetch-hermes.mjs`) — the same Maven tarball CocoaPods unpacks, for a checkout
+    # with no Pods tree at all. CI has no Pods tree.
+    file(GLOB _hermes_destroots
+      ${CMAKE_CURRENT_SOURCE_DIR}/../../../../examples/*/ios/Pods/hermes-engine/destroot)
+    list(APPEND _hermes_destroots ${CMAKE_CURRENT_SOURCE_DIR}/../../../../.hermes/destroot)
+    foreach(_candidate ${_hermes_destroots})
+      if(EXISTS ${_candidate}/Library/Frameworks/macosx/hermesvm.framework)
+        set(SYMBIOTE_HERMES_DESTROOT ${_candidate})
+        break()
+      endif()
+    endforeach()
+  endif()
+  if(SYMBIOTE_HERMES_DESTROOT STREQUAL "")
+    message(FATAL_ERROR
+      "SYMBIOTE_JS_ENGINE=hermes but no hermes-engine destroot was found. Either run "
+      "`node scripts/fetch-hermes.mjs`, or `pod install` in any example "
+      "(examples/<app>/ios/Pods/hermes-engine/destroot), or pass "
+      "-DSYMBIOTE_HERMES_DESTROOT=<path> to point at one explicitly.")
+  endif()
+  message(STATUS "Hermes destroot: ${SYMBIOTE_HERMES_DESTROOT}")
+  set(SYMBIOTE_RUNTIME_SOURCES "")
+else()
+  set(SYMBIOTE_RUNTIME_SOURCES ${REACT_COMMON_DIR}/jsc/JSCRuntime.cpp)
+endif()
+
 add_executable(symbiote_tester
   symbiote-tester.cpp
-  ${REACT_COMMON_DIR}/jsc/JSCRuntime.cpp
+  ${SYMBIOTE_RUNTIME_SOURCES}
   ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteTree.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteDebug.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteFabricProps.cpp
@@ -308,6 +360,12 @@ target_include_directories(symbiote_tester PRIVATE
   ${REACT_COMMON_DIR} ${REACT_COMMON_DIR}/jsi ${REACT_COMMON_DIR}/jsc
   ${CMAKE_CURRENT_SOURCE_DIR}/..)
 target_compile_options(symbiote_tester PRIVATE -fexceptions -frtti -Wall)
+if(SYMBIOTE_JS_ENGINE STREQUAL "hermes")
+  target_compile_definitions(symbiote_tester PRIVATE SYMBIOTE_USE_HERMES)
+  # The pod's own headers, LAST: `jsi.h` is identical in both trees, and Hermes's `hermes/hermes.h`
+  # lives only here.
+  target_include_directories(symbiote_tester PRIVATE ${SYMBIOTE_HERMES_DESTROOT}/include)
+endif()
 
 # ── The ANDROID arm ──────────────────────────────────────────────────────────────────────────────
 # `-DSYMBIOTE_PLATFORM_ANDROID=ON` compiles the rule file's Android branches instead of its default
@@ -332,7 +390,18 @@ if(SYMBIOTE_PLATFORM_ANDROID)
     ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteFabricProps.cpp
     PROPERTIES COMPILE_DEFINITIONS ANDROID)
 endif()
-target_link_libraries(symbiote_tester PRIVATE
-  folly_runtime
-  ${REACT_TARGETS}
-  "-framework JavaScriptCore")
+if(SYMBIOTE_JS_ENGINE STREQUAL "hermes")
+  # An `rpath` into the pod, because the framework is a dylib that stays where CocoaPods put it:
+  # copying it into the build tree would make the binary outlive the artefact it was measured with.
+  target_link_libraries(symbiote_tester PRIVATE
+    folly_runtime
+    ${REACT_TARGETS}
+    "-F${SYMBIOTE_HERMES_DESTROOT}/Library/Frameworks/macosx"
+    "-framework hermesvm"
+    "-Wl,-rpath,${SYMBIOTE_HERMES_DESTROOT}/Library/Frameworks/macosx")
+else()
+  target_link_libraries(symbiote_tester PRIVATE
+    folly_runtime
+    ${REACT_TARGETS}
+    "-framework JavaScriptCore")
+endif()

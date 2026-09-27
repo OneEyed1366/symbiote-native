@@ -77,30 +77,6 @@ interface INativeKeyboardObserver extends IEventEmitterModule {
 // isVisible() / metrics() reads need no native round-trip.
 let currentlyShowing: IKeyboardEvent | null = null;
 
-// Every live subscription this module handed out, grouped by event type, so
-// removeAllListeners(eventType) can tear them all down. The shared NativeEventEmitter
-// exposes only per-listener remove(), so Keyboard tracks the set itself (mirrors RN's
-// _emitter.removeAllListeners, which we cannot reach through the shared emitter).
-const subscriptions = new Map<IKeyboardEventName, Set<IEventSubscription>>();
-
-function trackSubscription(
-  eventType: IKeyboardEventName,
-  subscription: IEventSubscription,
-): IEventSubscription {
-  let set = subscriptions.get(eventType);
-  if (set === undefined) {
-    set = new Set();
-    subscriptions.set(eventType, set);
-  }
-  set.add(subscription);
-  return {
-    remove(): void {
-      subscription.remove();
-      set.delete(subscription);
-    },
-  };
-}
-
 // Lazily resolved so importing this module has no native side effect: a headless
 // run without a fake __turboModuleProxy still loads it; resolution happens on the
 // first addListener. Null when the module isn't linked.
@@ -122,6 +98,8 @@ const deviceEventModule = createDeviceEventModule<INativeKeyboardObserver>({
   },
 });
 
+// RN builds KeyboardImpl, and with it the didShow/didHide tracking, the first time Keyboard is
+// touched. Every method goes through here so the tracking starts at that same moment.
 function getEmitter() {
   return deviceEventModule.getEmitter();
 }
@@ -132,41 +110,36 @@ export const Keyboard = {
     listener: INativeEventListener,
   ): IEventSubscription {
     dlog(`Keyboard.addListener -> ${eventType}`);
-    return trackSubscription(
-      eventType,
-      getEmitter().addListener(eventType, listener),
-    );
+    return getEmitter().addListener(eventType, listener);
   },
 
-  // Tear down every listener this module added for one event type. The self-subscription
-  // that feeds the cache is untracked, so it survives (RN parity: removeAllListeners only
-  // clears caller subscriptions). No-op when nobody's listening for that event.
+  // RN's `_emitter.removeAllListeners(eventType)`: every listener of the event on the device bus,
+  // Keyboard's own show/hide tracking included — a later show is then no longer cached.
   removeAllListeners(eventType: IKeyboardEventName): void {
     dlog(`Keyboard.removeAllListeners -> ${eventType}`);
-    const set = subscriptions.get(eventType);
-    if (set === undefined) return;
-    for (const subscription of set) subscription.remove();
-    set.clear();
+    getEmitter().removeAllListeners(eventType);
   },
 
   // Whether the keyboard is last known to be visible. Reads the cached show event.
   isVisible(): boolean {
+    getEmitter();
     return currentlyShowing !== null;
   },
 
   // The soft-keyboard frame if visible (the cached event's endCoordinates), else
   // undefined. RN's metrics().
   metrics(): IKeyboardMetrics | undefined {
+    getEmitter();
     return currentlyShowing?.endCoordinates;
   },
 
   // Syncs an accessory view's layout with the keyboard transition: configure the next
   // commit to animate over the keyboard's own duration/easing. RN's
-  // scheduleLayoutAnimation (Keyboard.js:193). Skipped when duration is absent or 0,
-  // since a zero-length animation is a no-op.
+  // scheduleLayoutAnimation (Keyboard.js:193): only when `duration != null && duration !== 0`.
   scheduleLayoutAnimation(event: IKeyboardEvent): void {
+    getEmitter();
     const { duration, easing } = event;
-    if (duration === 0) return;
+    if (duration == null || duration === 0) return;
     dlog(
       `Keyboard.scheduleLayoutAnimation -> duration ${duration}, easing ${easing}`,
     );

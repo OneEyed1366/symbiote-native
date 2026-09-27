@@ -30,14 +30,12 @@ templates/
                                    # layers/navigation/app/<fw> — render-template.ts copies a
                                    # source directory recursively with no exclusion, so nesting an
                                    # override folder inside a tree that's already copied wholesale
-                                   # ships it into every generated app regardless of --styling
-                                   # (a real bug, fixed 2026-09-17 — see ../README.md).
+                                   # ships it into every generated app regardless of --styling.
 ```
 
 Every `js/<framework>` also ships a base `App.<ext>` (a "Welcome to SymbioteNative!" + tap
 counter, no navigation) — the one thing that actually makes a scaffolded app RUN instead of
-crashing on `import App from './App'` resolving to nothing (fixed 2026-09-15, see git history —
-the copy/merge mechanism landed before this file did).
+crashing on `import App from './App'` resolving to nothing.
 
 **Every App file is TWO independently-maintained variants, never one derived from the other.**
 react/vue-tsx/solid: `App.tsx` + `App.jsx`, picked by filename (`render-template.ts`'s
@@ -45,8 +43,8 @@ react/vue-tsx/solid: `App.tsx` + `App.jsx`, picked by filename (`render-template
 language is an internal `<script lang="ts">` attribute, so both variants would collide on the same
 extension (`App.vue`/`App.svelte`) — instead the TypeScript half is a `App.typescript.vue` /
 `App.typescript.svelte` sibling that renders to the plain name only when TypeScript is on (same
-`.typescript.` infix mechanism as `package.json.fragment.typescript.json`, generalized
-2026-09-15). Angular has no JS half at all (AOT requires TypeScript). The two variants read
+`.typescript.` infix mechanism as `package.json.fragment.typescript.json`). Angular has no JS
+half at all (AOT requires TypeScript). The two variants read
 identically today because neither has a REAL type annotation yet worth diverging on — a
 copy-with-renamed-extension looked equivalent for the same reason and was rejected: the moment
 one side gains an actual type, that copy would silently ship broken syntax into the other mode.
@@ -72,9 +70,8 @@ workspace names, Android package directory + `namespace`/`applicationId`, `app.j
 Podfile target — see `src/utils/apply-app-identity.ts`; case-sensitive, so it never touches an
 unrelated lowercase "canary" in prose/comments). Every framework ships a working base App and,
 with `--navigation`, a 2-screen Stack demo — verified end-to-end against real installs, including
-a real `ngc` AOT build for Angular both with and without `--navigation` (2026-09-15; that pass
-also caught and fixed two stale `@symbiote-native/*` version pins that broke `npm install` under
-ERESOLVE — every such pin is now `"latest"`, see `templates/layers/README.md`). Verified against 5
+a real `ngc` AOT build for Angular both with and without `--navigation`. Every
+`@symbiote-native/*` version pin is `"latest"` (see `templates/layers/README.md`). Verified against 5
 combinations (react+expo+navigation, vue-sfc+navigation, solid, svelte+expo, angular) — see
 `../README.md`'s "Design decisions" section.
 

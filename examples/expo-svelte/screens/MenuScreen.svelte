@@ -137,6 +137,41 @@
       route: ROUTE_NAME.Sms,
       hint: '@symbiote-native/sms — opens the system SMS composer prefilled with recipients and a message',
     },
+    {
+      label: 'Location',
+      route: ROUTE_NAME.Location,
+      hint: '@symbiote-native/location — foreground/background position, geocoding, motion activity',
+    },
+    {
+      label: 'Media Library',
+      route: ROUTE_NAME.MediaLibrary,
+      hint: '@symbiote-native/media-library — photo/video library: permissions, albums, assets, change events',
+    },
+    {
+      label: 'File System',
+      route: ROUTE_NAME.FileSystem,
+      hint: '@symbiote-native/file-system — legacy function API and the modern File/Directory/Paths class API',
+    },
+    {
+      label: 'Audio',
+      route: ROUTE_NAME.Audio,
+      hint: '@symbiote-native/audio — playback, recording, and audio-session mode over a remote source',
+    },
+    {
+      label: 'Notifications',
+      route: ROUTE_NAME.Notifications,
+      hint: '@symbiote-native/notifications — permissions, scheduling, presentation, badges, Android channels, and listeners',
+    },
+    {
+      label: 'Background Tasks',
+      route: ROUTE_NAME.BackgroundTasks,
+      hint: '@symbiote-native/task-manager + background-fetch + background-task — define and register a background task',
+    },
+    {
+      label: 'SQLite',
+      route: ROUTE_NAME.Sqlite,
+      hint: '@symbiote-native/sqlite — SQLiteProvider/useSQLiteContext, CRUD, transactions, and a SQLite-backed key/value store',
+    },
   ];
 </script>
 

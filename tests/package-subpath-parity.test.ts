@@ -1,6 +1,5 @@
-// A companion package is reachable from an adapter only through a per-framework subpath in its own
-// package.json `exports`, and nothing enforced that the five agreed: on 2026-08-21 twelve of the
-// twenty-five declared ./react ./vue ./svelte ./angular and no ./solid.
+// A companion package is reachable from an adapter only through a per-framework subpath in its
+// own package.json `exports`, and nothing enforced that the five agree.
 //
 // No other guard sees this. adapter-barrel-parity.test.ts reads ADAPTER barrels, the tsc audit in
 // .claude/rules/adapter-parity-audit.md resolves adapters/*/src/index.ts, and tsc never checks a

@@ -60,10 +60,9 @@ describe('Solid scroll-view / horizontal-scroll-view tags', () => {
     expect(scroll.children).toHaveLength(1);
     const content = scroll.children[0];
     expect(content?.viewName).toBe(CONTENT_VIEW);
-    // `collapsable: false` is `foldScrollContentProps` in the engine since 2026-09-18, and this host
-    // builds payloads through the TypeScript `fabricProps`, which carries no copy of the tag rules —
-    // pinned in `core/engine/cpp/tests/js/scroll-content-payload.itest.ts`. What Solid owns is the
-    // SHAPE either side of it: a content node here, and the app's child under it.
+    // `collapsable: false` is `foldScrollContentProps` in the engine, and this host's `fabricProps`
+    // carries no copy — pinned in `scroll-content-payload.itest.ts`. What Solid owns is the SHAPE
+    // either side of it: a content node here, and the app's child under it.
     expect(content?.children[0]?.payload.testID).toBe('child');
   });
 

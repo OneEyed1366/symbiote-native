@@ -1,14 +1,10 @@
-// Pressable, the logic half (framework-agnostic, zero render, zero framework imports). The
-// press lifecycle RN's Pressability runs in JS (pressIn/pressOut/press synthesis, the
-// long-press timer, unstable_pressDelay deferral, and the pressRetentionOffset drift test)
-// lives here as a pure state machine over a mutable runtime plus an adapter-supplied host. The
-// adapter owns only the lifecycle wiring: React holds the runtime in a ref and flips `pressed`
-// via setState; Vue holds it in setup scope and flips a ref. Both call the SAME handlers.
-//
-// Framework-specific, stays in the adapter: the `pressed` state cell (it drives a
-// re-render, so each framework owns its reactive primitive) and the raw frame-measure (the host
-// node plus its measure call). The rest (the timers, the geometry, the suppression flags,
-// the decision of when each callback fires) is here, shared by every adapter.
+// Pressable, the logic half (framework-agnostic, zero render). The press lifecycle RN's
+// Pressability runs in JS lives here as a pure state machine over a mutable runtime plus an
+// adapter-supplied host. Both React and Vue call the SAME handlers, differing only in lifecycle.
+
+// Framework-specific, stays in the adapter: the `pressed` state cell (drives a re-render, so each
+// framework owns its reactive primitive) and the raw frame-measure. The rest — timers, geometry,
+// suppression flags, when each callback fires — is here, shared by every adapter.
 
 import {
   dlog,
@@ -18,12 +14,9 @@ import {
 } from '@symbiote-native/engine';
 
 export const DEFAULT_DELAY_LONG_PRESS_MS = 500;
-// Pressability.js's DEFAULT_LONG_PRESS_DEACTIVATION_DISTANCE. A SEPARATE, smaller radius than
-// `pressRetentionOffset`/`hitSlop`: any move past it cancels a pending long press even while the
-// finger is still well inside the retention rect — real presses jitter a few px, long-press must
-// not fire mid-scroll. Vendor exposes it only as a rare static override
-// (`Pressability.setLongPressDeactivationDistance`, used by e.g. gesture libraries), never as a
-// per-component prop, so it stays a plain constant here rather than a config field.
+// A SEPARATE, smaller radius than pressRetentionOffset/hitSlop: any move past it cancels a
+// pending long press even while the finger is still well inside the retention rect — real presses
+// jitter a few px, long-press must not fire mid-scroll.
 export const LONG_PRESS_DEACTIVATION_DISTANCE = 10;
 // Pressability's default active-visual floor for a plain Pressable. Touchable* overrides this to 0.
 export const DEFAULT_MIN_PRESS_DURATION_MS = 130;
@@ -153,13 +146,8 @@ export function computeRegion(
   };
 }
 
-// `rippleProps` STOOD HERE and is now the engine's — `applyAndroidRipple` in
-// `SymbioteFabricProps.cpp`, under the same `#ifdef ANDROID` its `Platform.OS` check was. Deleted
-// rather than kept exported: nothing called it any more, and an uncalled twin of a rule that lives
-// somewhere else is a copy kept alive by its own test.
-//
-// `IRippleBackground` above stays — it describes the shape the engine emits, which every adapter
-// still re-exports as a public type.
+// IRippleBackground above describes the shape the engine emits (applyAndroidRipple in
+// SymbioteFabricProps.cpp); every adapter still re-exports it as a public type.
 
 // ---- the press state machine ------------------------------------------------------------------
 
@@ -171,10 +159,9 @@ export interface IPressRuntime {
   pressDelayCancel: (() => void) | undefined;
   pressOutCancel: (() => void) | undefined;
   pressOrigin: { x: number; y: number } | undefined;
-  // Where the finger was when the press last ACTIVATED (Pressability.js's `_touchActivatePosition`,
-  // set in `_activate`) — distinct from `pressOrigin`, which is the raw touch-down point. A drift
-  // re-activation moves this, so the long-press jitter check below is always measured from the
-  // most recent activation, not from the original touch-down.
+  // Where the finger was when the press last ACTIVATED, distinct from pressOrigin (the raw
+  // touch-down point). A drift re-activation moves this, so the jitter check is always measured
+  // from the most recent activation.
   activatePosition: { x: number; y: number } | undefined;
   driftedOut: boolean;
   region: IResponderRegion | undefined;
@@ -275,11 +262,8 @@ export interface IPressMachineConfig {
   android_disableSound?: boolean;
 }
 
-// TODO(rn-parity, low priority): `Pressable.js` also has `onHoverIn`/`onHoverOut`,
-// `delayHoverIn`/`delayHoverOut`, driven by `onMouseEnter`/`onMouseLeave` — no equivalent exists in
-// `IPressMachineConfig` or anywhere in this file. Deliberately not implemented: hover requires a
-// pointer/mouse device, which neither iOS nor Android touch delivers — same class as the TV
-// (`Platform.isTV`) focus/blur gap already recorded for the Touchables.
+// No onHoverIn/onHoverOut: hover requires a pointer/mouse device, which neither iOS nor Android
+// touch delivers — same class as the TV focus/blur gap already recorded for the Touchables.
 
 export interface IPressHandlers {
   handlePressIn: IPressHandler;
@@ -289,10 +273,8 @@ export interface IPressHandlers {
 }
 
 // Measure the responder's on-screen frame and cache it as the retention region for the life of
-// the press (RN measures on responder grant, _measureResponderRegion). When measure is
-// unavailable (no node yet, an uncommitted node, or a host slot without a measure method,
-// headless) the region stays undefined and the move test falls back to the radius bound. The
-// try/catch guards that last case: a slot lacking measure throws rather than no-opping.
+// the press. When measure is unavailable the region stays undefined and the move test falls back
+// to the radius bound; the try/catch guards a slot lacking measure throwing rather than no-opping.
 function measureRegion(
   runtime: IPressRuntime,
   measureFn: ((callback: IFrameCallback) => void) | undefined,
@@ -344,18 +326,10 @@ export function createPressHandlers(
 
   // True iff the touch still belongs to the active press: against the measured rect when we have
   // one (the RN-faithful path), else the symmetric radius fallback.
-  //
-  // TODO(rn-parity): `Pressability.js`'s `onResponderMove` (:489-493) returns right after the
-  // app's `onPressMove`, before any drift/long-press-jitter check, whenever the region is not yet
-  // measured — vendor treats "no measurement yet" as "do nothing until one arrives." The radius
-  // fallback below diverges: it judges drift/jitter on synthetic geometry instead of waiting.
-  // Confirmed unreachable on a real device (`Tree::measure` in `SymbioteTree.cpp` is a synchronous
-  // JSI call, so the region is always populated before `handleResponderMove` can fire), so the
-  // fallback only ever fires in this codebase's own test harness, which wires
-  // `getMeasureFn: () => undefined` everywhere (`state/pressable.test.ts:84` and every touchable
-  // test built on it). A real fix needs a synchronous mock-measure harness under 11+ existing
-  // drift/retention/long-press call sites across `pressable.test.ts`, `touchable-opacity.test.ts`
-  // and `render-pressable.test.ts`, not a one-line guard — see the audit skill for the finding.
+
+  // Known divergence: vendor does nothing until the region is measured, this judges drift/jitter
+  // on synthetic geometry instead. Unreachable on a real device (measure is a synchronous JSI
+  // call), so the fallback only ever fires in this codebase's own test harness.
   function isWithinRetention(point: { x: number; y: number }): boolean {
     const region = runtime.region;
     if (region !== undefined) {
@@ -380,12 +354,8 @@ export function createPressHandlers(
     cancelRuntimeTimer(runtime, 'pressOutCancel');
   }
 
-  // Pressability.js arms this ONCE, at RESPONDER_GRANT, and a drift out/back-in never re-arms it
-  // (`onResponderMove` only ever CANCELS via `_cancelLongPressDelayTimeout`, permanently, for the
-  // rest of the gesture). Splitting it out of `activate()` is what makes that possible: `activate`
-  // itself runs again on every drift-back-in, and used to re-arm a fresh full-duration timer each
-  // time, which is wrong on two counts — it can resurrect a long press the finger already
-  // disqualified, and if it never left, it's simply the same timer restarted for no reason.
+  // Arms ONCE, at grant; a drift out/back-in never re-arms it, only cancels. Split out of
+  // activate(), which runs again on drift-back-in and would resurrect a disqualified long press.
   function armLongPress(event: ISymbioteEvent): void {
     if (!onLongPress) return;
     runtime.longPressCancel = host.schedule(() => {
@@ -464,10 +434,8 @@ export function createPressHandlers(
       runtime.pressOrigin = readPoint(event);
       runtime.driftedOut = false;
       measureRegion(runtime, host.getMeasureFn());
-      // Armed at GRANT, unconditionally — before the `unstable_pressDelay` branch below, which only
-      // defers the PRESSED VISUAL. `delayLongPress` already has `unstable_pressDelay` baked out of
-      // its default (`configFor`), so adding it back here is what keeps the long-press threshold at
-      // a constant time-from-touch-down regardless of how long the visual is deferred.
+      // Armed at GRANT, unconditionally — the unstable_pressDelay branch below only defers the
+      // PRESSED VISUAL, keeping the long-press threshold constant from touch-down.
       armLongPress(event);
       if (unstable_pressDelay > 0) {
         dlog(`Pressable pressIn deferred ${unstable_pressDelay}ms`);

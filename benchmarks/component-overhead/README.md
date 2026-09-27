@@ -60,7 +60,7 @@ Solid, Svelte and Angular. All three need a build step: a component only exists 
 and un-compiled Solid is not Solid. Angular would additionally need a caveat that JIT is not what an
 AOT app ships.
 
-## First numbers, measured 2026-09-01 (Chrome, V8, this machine)
+## First numbers (Chrome, V8, this machine)
 
 ```
 React 18.3.1   under ~1-2 us   ranges OVERLAP at 7000 instances — an upper bound, not zero

@@ -1,7 +1,8 @@
 // The prop surface of `<safe-area-view>`, for React.
 //
 // No component left to type — the element IS the tag. There was never any JS-side translation
-// here: RN renders the native RCTSafeAreaView and the host does the inset math, so the wrapper's
+// here: the native SafeAreaView does the inset math (on Android too, a deliberate divergence from
+// RN's plain View there — see component-names/index.android.ts), so the wrapper's
 // whole body was a passthrough plus the aria fold (now `fabricProps`) and `id -> nativeID` (now
 // `foldHostBag`, driven by HOST_PRIMITIVES). This stays exported because an app that wraps the tag
 // in its own component types the bag it forwards against something.

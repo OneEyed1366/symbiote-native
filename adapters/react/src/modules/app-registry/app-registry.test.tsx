@@ -10,7 +10,6 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   AppRegistry,
   setHostRegistrar,
-  mount,
   unmount,
   type IAppParameters,
   type IRunnable,

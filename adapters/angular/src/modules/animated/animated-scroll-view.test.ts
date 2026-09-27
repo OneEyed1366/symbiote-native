@@ -95,9 +95,8 @@ describe('AnimatedScrollView', () => {
 
     const contentNode = fabric.find(n => n.handle === scrollChildren[0]);
     expect(contentNode?.viewName).toBe('RCTScrollContentView');
-    // `collapsable: false` joined `nestedScrollEnabled` in `foldScrollContentProps` on 2026-09-18 —
-    // it was a build-time `setProp` until then, so it was visible in the authored props this line
-    // read. Same note as above: what this case is about is the wrap below.
+    // `collapsable: false` is `foldScrollContentProps` in the engine, not a build-time setProp —
+    // same note as above: what this case is about is the wrap below.
 
     const contentChildren = contentNode ? childrenOf(contentNode.handle) : [];
     expect(
@@ -116,11 +115,9 @@ describe('AnimatedScrollView', () => {
   // over sibling views instead of scrolling clipped (Android's native ViewGroup clips regardless
   // of the style prop, which is why this was invisible there). See
   // core/components/src/view/render-scroll-view.ts's SCROLL_VIEW_BASE_VERTICAL comment.
-  // The base style itself is `foldScrollViewProps` in the engine since 2026-09-18, asserted on the
-  // committed payload in `core/engine/cpp/tests/js/scroll-view-payload.itest.ts`; this host builds
-  // its payload through the TypeScript `fabricProps`, which carries no copy of the tag rules. What
-  // an Animated ScrollView still owes THIS file is that the animated wrapper reaches a real
-  // `RCTScrollView` at all — lose that and the base style has nothing to land on.
+  // The base style itself is `foldScrollViewProps` in the engine, asserted on the committed payload
+  // (`scroll-view-payload.itest.ts`). What Animated ScrollView still owes THIS file is that the
+  // wrapper reaches a real `RCTScrollView` at all — lose that and the style has nowhere to land.
   it('commits a real RCTScrollView from the animated wrapper', async () => {
     mount(ROOT_TAG, AnimatedScrollViewApp);
     await tick();

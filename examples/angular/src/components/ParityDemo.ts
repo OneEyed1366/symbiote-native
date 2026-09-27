@@ -12,6 +12,7 @@ import {
   type IHostInstance,
   type ISection,
 } from '@symbiote-native/angular';
+import { ActionButton } from './ActionButton';
 // static look compiled at build time by @symbiote-native/css-parser
 import './ParityDemo.css';
 
@@ -65,6 +66,7 @@ const paritySections: ISection<ISectionEntry>[] = [
   standalone: true,
   imports: [
     SYMBIOTE_ELEMENTS,
+    ActionButton,
     FlatList,
     SectionList,
     VListItemDirective,
@@ -97,17 +99,18 @@ const paritySections: ISection<ISectionEntry>[] = [
         class="focus-input"
       ></text-input>
       <text testID="dismiss-msg" class="note-text">{{ dismissMsg }}</text>
-      <button
+      <ActionButton
         testID="hide-keyboard-btn"
         title="Hide keyboard"
         (press)="hideKeyboard()"
         color="#dd0031"
-      ></button>
+      ></ActionButton>
 
       <!-- animated VirtualizedList scroll: smooth vs instant -->
       <text class="section-label">FlatList · animated scrollToOffset</text>
       <FlatList
         testID="parity-flat-list"
+        [nestedScrollEnabled]="true"
         [data]="parityRows"
         [keyExtractor]="parityKeyExtractor"
         [getItemLayout]="parityItemLayout"
@@ -121,20 +124,20 @@ const paritySections: ISection<ISectionEntry>[] = [
       </FlatList>
       <view class="row">
         <view class="flex-1">
-          <button
+          <ActionButton
             testID="scroll-down-animated-btn"
             title="Scroll ▼ animated"
             (press)="scrollDown()"
             color="#dd0031"
-          ></button>
+          ></ActionButton>
         </view>
         <view class="flex-1">
-          <button
+          <ActionButton
             testID="scroll-top-btn"
             title="Top · instant"
             (press)="scrollTop()"
             color="#dd0031"
-          ></button>
+          ></ActionButton>
         </view>
       </view>
 
@@ -144,6 +147,7 @@ const paritySections: ISection<ISectionEntry>[] = [
       >
       <SectionList
         testID="sticky-section-list"
+        [nestedScrollEnabled]="true"
         [sections]="paritySections"
         [keyExtractor]="sectionKeyExtractor"
         [stickySectionHeadersEnabled]="true"
@@ -160,12 +164,12 @@ const paritySections: ISection<ISectionEntry>[] = [
       </SectionList>
 
       <!-- a11y focus: node-based sendAccessibilityEvent routes through the Fabric slot on both platforms -->
-      <button
+      <ActionButton
         testID="focus-title-btn"
         title="Focus the panel title (a11y)"
         (press)="focusTitle()"
         color="#dd0031"
-      ></button>
+      ></ActionButton>
     </view>
   `,
 })

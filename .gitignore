@@ -5,6 +5,14 @@ build-ngc/
 build-release/
 # and the ANDROID twin — same sources, `#ifdef ANDROID` compiled in (`pnpm run test:android`)
 build-android/
+# and the JavaScriptCore twin — the second ruler, kept because a JIT inverts conclusions rather than
+# scaling them (`pnpm run bench:itest:jsc`). Hermes is what the other three build.
+build-release-jsc/
+build-hermes/
+build-os/
+# the hermes-engine destroot `scripts/fetch-hermes.mjs` unpacks — the same Maven tarball CocoaPods
+# fetches, for a checkout with no Pods tree (CI). Never tracked: it is a 27 MB binary artefact.
+.hermes/
 dist/
 *.tsbuildinfo
 

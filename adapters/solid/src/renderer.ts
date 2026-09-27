@@ -98,17 +98,12 @@ export function replaceText(textNode: IHostNode, value: string): void {
   requestCommit();
 }
 
-// solid-js/universal hands createTextNode/replaceText the JSX child value UNCONVERTED, not a
-// stringified one: normalizeIncomingArray() pushes `createTextNode(item)` straight from the
-// children array, so `<Text>{list().length} tiles</Text>` arrives here as the NUMBER 3. On the DOM
-// that is invisible — document.createTextNode coerces — which is why upstream never had to, and why
-// React's and Vue's adapters (whose frameworks stringify first) never saw it either. Here the value
-// lands on RCTRawText's `text`, which Fabric parses as a std::string: a number fails the
-// conversion, convertRawProp logs and falls back to the DEFAULT empty string, and an empty first
-// fragment then ABORTS the app inside BaseTextShadowNode::buildAttributedString — a native SIGABRT
-// with nothing in the JS stack to point at. Diagnosed on the iOS simulator 2026-08-19. The
-// parameter is typed `string` by RendererOptions, so the guard reads as redundant; it is not, and
-// `unknown` is what makes that honest rather than a cast.
+// solid-js/universal hands createTextNode/replaceText the JSX child value UNCONVERTED —
+// `<Text>{list().length} tiles</Text>` arrives here as the NUMBER 3. RCTRawText's `text` parses
+// as a std::string: a number falls back to empty, aborting inside buildAttributedString.
+
+// Typed `unknown` rather than `string` (which RendererOptions declares) so the runtime guard
+// below isn't erased as dead code.
 function asText(value: unknown): string {
   return typeof value === 'string' ? value : String(value);
 }
@@ -139,21 +134,12 @@ export function removeNode(parent: IHostNode, node: IHostNode): void {
   requestCommit();
 }
 
-// RN's two Text defaults left this renderer on 2026-09-18, and the per-key FOLD went with them. It
-// was the last and subtlest of the three shapes this file tried: a create-time SEED (gone a month
-// earlier, 6 000 wasted crossings per 1 000-row create), then a substitute-on-`undefined`, then a
-// fold per key — because `?? 'tail'` has to catch a null too, and substituting only on `undefined`
-// meant `<text ellipsizeMode={null}>` committed null, device-only and silent.
-//
-// All three were answering a question the layer below now answers for everyone: the rule reads the
-// AUTHORED bag at payload time (`foldTextDefaults`, `SymbioteFabricProps.cpp`), where a null, an
-// explicit `undefined` and an absent prop are all simply "not a value the author chose". The
-// null case that cost this file two revisions is `ellipsize->isNull()` there, in one place, for
-// every adapter.
+// RN's two Text defaults are answered below the adapter now: the rule reads the AUTHORED bag at
+// payload time (`foldTextDefaults`, `SymbioteFabricProps.cpp`), where a null, an explicit
+// `undefined` and an absent prop are all "not a value the author chose" — one rule, every adapter.
 
-// The `id` -> `nativeID` fold and its `aliasedNodes` WeakSet left this file on 2026-09-18. The
-// memory was the right shape and the wrong LAYER: `routeProp` carries it now, so all five adapters
-// resolve the precedence identically instead of three of them doing it three ways.
+// The `id` -> `nativeID` fold lives in `routeProp` now, so all five adapters resolve the
+// precedence identically instead of each doing it their own way.
 
 // `multiline` selects between TWO Fabric views, so the TAG decides and no prop write moves a node
 // between them. An author writing `<text-input multiline>` instead of `<text-input-multiline>` gets

@@ -1,9 +1,31 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+type IFakeMagnetometerMeasurement = {
+  x: number;
+  y: number;
+  z: number;
+  timestamp: number;
+};
+
+// A real listener store, not a stub — lets a test simulate the native side emitting an event
+// (upstream's own MockNativeSensorModule extends NativeModule and does this via a real
+// EventEmitter; ours is a plain fake, so it needs to be reachable to emit through it).
+const nativeListeners = new Set<
+  (measurement: IFakeMagnetometerMeasurement) => void
+>();
+
 const FAKE_NATIVE_MAGNETOMETER = {
-  addListener: vi.fn(() => ({ remove: vi.fn() })),
-  listenerCount: vi.fn(() => 0),
-  removeAllListeners: vi.fn(),
+  addListener: vi.fn(
+    (
+      _eventName: string,
+      listener: (measurement: IFakeMagnetometerMeasurement) => void,
+    ) => {
+      nativeListeners.add(listener);
+      return { remove: () => nativeListeners.delete(listener) };
+    },
+  ),
+  listenerCount: vi.fn(() => nativeListeners.size),
+  removeAllListeners: vi.fn(() => nativeListeners.clear()),
   setUpdateInterval: vi.fn(),
 };
 
@@ -61,6 +83,19 @@ describe('Magnetometer', () => {
         'magnetometerDidUpdate',
         listener,
       );
+    });
+
+    it('delivers a native-emitted measurement to the app listener unchanged', () => {
+      // why: DeviceSensor.addListener is a bare pass-through with no transform in between — a
+      // measurement the native side emits must reach the app listener byte-for-byte, the same
+      // guarantee upstream's own `notifies listeners` test pins via a real EventEmitter.emit().
+      const listener = vi.fn();
+      Magnetometer.addListener(listener);
+      const measurement = { x: 0.2, y: 0.1, z: 0.3, timestamp: 123456 };
+
+      for (const nativeListener of nativeListeners) nativeListener(measurement);
+
+      expect(listener).toHaveBeenCalledWith(measurement);
     });
   });
 });

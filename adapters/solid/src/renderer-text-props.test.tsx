@@ -1,13 +1,6 @@
-// What the Solid renderer contributes to a `<text>` tag's props — which, as of 2026-09-18, is the
-// FORWARDING and not the defaulting.
-//
-// This file used to test RN's two Text defaults, through three successive shapes in the renderer: a
-// create-time seed, a substitute-on-`undefined`, and finally a fold per key (because `?? 'tail'` has
-// to catch a null too). All three are gone. The rule reads the authored bag at payload time
-// (`foldTextDefaults`, `SymbioteFabricProps.cpp`) where a null, an explicit `undefined` and an absent
-// prop are alike, so no adapter needs to know about it — and `core/engine/cpp/tests/js/
-// committed-payload.itest.ts` carries every claim this file used to make, read off a real payload
-// instead of off the headless builder's copy of the rule.
+// What the Solid renderer contributes to a `<text>` tag's props: the FORWARDING, not the
+// defaulting — that's `foldTextDefaults` in `SymbioteFabricProps.cpp`, where null/undefined/absent
+// are alike, so no adapter needs to know about it (`committed-payload.itest.ts`).
 //
 // WHAT COULD NOT MOVE, and is the whole reason this file still exists: the CLEAR. A default arriving
 // is the engine's business, but whether a Solid signal going back to `undefined` reaches the engine
@@ -86,11 +79,9 @@ describe('what the Solid renderer sends a text tag', () => {
     await tick();
     expect(committedTextProps()?.ellipsizeMode).toBe('clip');
 
-    // Not redundant with the line below — it is the harness canary. Prop-level reactivity on an
-    // intrinsic was DEAD in this repo's vitest solid project until 2026-08-23 (two solid-js builds
-    // loaded at once, so signals and the renderer's effects lived in different runtimes; see
-    // vitest.config.ts's SOLID_TRANSFORM). With it dead, the clear assertion below passes for the
-    // wrong reason: nothing updates, so nothing clears. This step fails first and says so.
+    // Not redundant with the line below — the harness canary. If prop-level reactivity on an
+    // intrinsic ever goes dead (two solid-js builds loaded at once; see
+    // vitest.config.ts's SOLID_TRANSFORM), the clear below passes for the wrong reason.
     setMode('head');
     await tick();
     expect(committedTextProps()?.ellipsizeMode, 'defined -> defined').toBe(

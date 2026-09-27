@@ -63,18 +63,9 @@ import {
 
 export const TOUCHABLE_WITHOUT_FEEDBACK_TAG = 'touchable-without-feedback';
 
-// WHAT THE OWNER'S WRITES DIRTY, and it is EVERY name rather than a list of thirty.
-//
-// RN's two clone lists (`TouchableWithoutFeedback.js:130-153` when-set, `:253-276` always) lived
-// here until 2026-09-18, feeding `slotDerived` alongside the six computed names and the three
-// scheduler ones. The clone is `foldCloneOntoChild` in `SymbioteFabricProps.cpp` now, which turned
-// the list from the RULE into a MIRROR of `kWithoutFeedbackWhenSetKeys` +
-// `kWithoutFeedbackAlwaysKeys` — two lists that must agree, failing silently when they drift.
-//
-// See `touchable-native-feedback.ts` for the same note and what the wildcard costs. The three
-// scheduler names (`delayPressIn`, `delayPressOut`, `minPressDuration`) were the one entry here that
-// was NEVER about the clone — they configure the press machine, which reads them live at gesture
-// start — and a wildcard covers them for free where a list had to remember them.
+// Dirties EVERY owner prop rather than a list: the clone is `foldCloneOntoChild` in C++ now, so a
+// wildcard covers it for free. The three scheduler names (`delayPressIn`, `delayPressOut`,
+// `minPressDuration`) were never about the clone — they configure the press machine, read live.
 const SLOT_DERIVED: readonly string[] = [SLOT_DERIVED_ALL];
 
 // :148-153. Owned, so the app's callback stashes on the owner and a trampoline on the child reads it
@@ -114,18 +105,9 @@ function numberOr(value: unknown, fallback: number): number {
   return typeof value === 'number' ? value : fallback;
 }
 
-// `cloneFold` LEFT THIS FILE ON 2026-09-18 — `foldCloneOntoChild` in `SymbioteFabricProps.cpp`,
-// reached through the first rule keyed on the PARENT'S tag (`IOwner`). TWF's two lists are NOT
-// TNF's: the passthrough half is copied only when SET (`:281`), and the C++ rule keeps that split
-// rather than collapsing the two into one.
-//
-// One quirk of upstream's that IS reproduced, and it is NOT free: `:280-284`'s passthrough loop
-// re-assigns a set `nativeID` over the `id` it just resolved, so an explicit `nativeID` wins here
-// where TNF's `id` does. `routeProp` settles the two names into one value before any rule runs, so
-// getting this right needed the collapse itself to know which of the two components it is running
-// for — `node.nativeIdWinsOverId`, set only by this behavior's registration, flips it.
-//
-// Contract: `core/engine/cpp/tests/js/clone-onto-child-payload.itest.ts`.
+// The clone is `foldCloneOntoChild` in C++, keyed on the PARENT'S tag; TWF's passthrough half
+// copies only when SET, unlike TNF's unconditional list. One upstream quirk it reproduces:
+// `nativeID` wins over `id` here (`node.nativeIdWinsOverId`, `clone-onto-child-payload.itest.ts`).
 
 /**
  * `delayPressIn` / `delayPressOut` (:186-188) plus RN's unconditional `minPressDuration: 0` (:190).

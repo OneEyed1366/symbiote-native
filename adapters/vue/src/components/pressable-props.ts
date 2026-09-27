@@ -31,9 +31,7 @@ export type {
 } from '@symbiote-native/components';
 
 // Mirrors React's IPressableProps minus `children` (Vue takes it on its own channel — a template
-// slot) plus `ref`, which every other Vue prop type here carries. Measured 2026-09-13: this was
-// missing every event handler below (`onPress` included) until then — invisible while `pressable`
-// fell through to the untyped host bag, and a real gap the moment it was cross-typed for real
+// slot) plus `ref`, which every other Vue prop type here carries
 // (`<adapters_reach_full_feature_parity>` — full parity with React's own IPressableProps).
 export interface IPressableProps extends IAccessibilityProps, IAriaProps {
   onPress?: IPressHandler;

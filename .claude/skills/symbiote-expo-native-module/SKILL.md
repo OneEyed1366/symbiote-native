@@ -219,6 +219,36 @@ reproduced directly in `examples/react/ios/Podfile` rather than worked around.
           'expo-file-system','expo-font','expo-keep-awake','@expo/dom-webview',
           '@expo/log-box']) — extend for every future unmarked-optional expo peer",
   },
+  stale_exclude_after_real_port: {
+    bug: "this exclude list is a name-based blocklist with no idea WHY a name was added — once
+          @symbiote-native/<pkg> starts wrapping that same package for real,
+          `expo-file-system` in the list silently blocks its OWN native module too, not just
+          the unwanted `expo`-meta-package copy",
+    symptom: "JS/npm side looks completely correct (native-link.json right,
+              `expo-modules-autolinking resolve --json` finds the podspec + module classes
+              fine, package.json deps right) — the ONLY tell is `Podfile.lock` has no entry
+              for the pod, and Pods/Target Support Files/Pods-<App>/ExpoModulesProvider.swift
+              has no `import Expo<Pkg>` / no module class in getModuleClasses(). requireNativeModule
+              throws 'Cannot find native module' even after a real, fresh pod install — this is
+              NOT the stale-DerivedData/stale-Pods failure mode (§4c), a real reinstall doesn't
+              fix it, because the Ruby-side exclude filter runs AFTER JS resolve and drops the
+              entry every single time regardless of cache state",
+    fix: "the moment a package on this exclude list gets its own @symbiote-native/<pkg> wrapper,
+          remove that name from ALL SIX examples/expo-*/ios/Podfile exclude lists AND the
+          mirrored ALL SIX examples/expo-*/android/settings.gradle expoAutolinking.exclude
+          lists (both hand-maintained, not generated, and NOT kept in sync with each other
+          automatically despite settings.gradle's own comment saying they share one cause —
+          grep -rn \"'expo-file-system'\" examples/expo-*/ios/Podfile examples/expo-*/android/
+          settings.gradle to find every copy on both platforms) in the SAME change that ships
+          the wrapper — never as a follow-up, and never assume fixing one platform's copy
+          fixed the other's",
+    found: "2026-09-11, expo-file-system's next-surface (FileSystemModule) — the exclude entry
+            predated @symbiote-native/file-system by weeks and was never revisited. iOS was
+            fixed that day; Android's settings.gradle mirror was missed and stayed broken
+            until 2026-09-23, when it surfaced as a real `run-android` Gradle failure
+            (\"Project with path ':expo-file-system' could not be found in project ':app'\")
+            — proof the two-file fix instruction above wasn't explicit enough the first time.",
+  },
   deployment_target_trap: {
     bug: "ExpoSensors.podspec pins s.platforms={:ios=>'16.4'}, above RN's
           min_ios_version_supported (15.1); CocoaPods checks pod-vs-target compat against the
@@ -897,6 +927,251 @@ one-time, whole-Xcode-project operation, not a per-package one, so it was never 
 5. Demo screen in `examples/react`, confirm on simulator/device (final word per ADR-0012 —
    real device, not headless).
 6. Wire the same hooks/composables/services into `examples/vue-*` and `examples/angular`.
+
+## 10. Batch survey 2026-09-03 — audio/notifications/location/file-system/sqlite/task-manager
+
+Six packages researched against `.vendors/expo` origin/sdk-57 before any port started, to find
+where this skill's recipe (plain `requireNativeModule` + EventEmitter) stops applying. Findings,
+not yet implemented — this section is the map for whoever ports these next.
+
+```
+§10a_shape_split := {
+  fits_this_skill_as_written:  [expo-location (foreground only)],
+  SharedObject_JSI_class:      [expo-audio (AudioPlayer/AudioRecorder/AudioPlaylist/AudioStream),
+                                 expo-file-system NEW api (File/Directory extend
+                                 ExpoFileSystem.FileSystemFile — legacy API still fits this skill
+                                 as-is, exported from a separate `/legacy` subpath),
+                                 expo-sqlite (NativeDatabase/NativeStatement/NativeSession)],
+  extra_native_SDK_dependency: [expo-notifications — real firebase-messaging AAR + ShortcutBadger
+                                 on Android, breaks §1's "expo-modules-core only" assumption],
+  headless_JS_relaunch:        [expo-task-manager, expo-background-task — native tears down and
+                                 re-executes the WHOLE JS bundle from cold with no UI mounted;
+                                 category has NO precedent anywhere in this repo],
+  hard_dependency_on_task_manager: [expo-location background/geofencing, expo-notifications
+                                     background delivery, expo-background-task],
+  skip: "expo-background-fetch — upstream-deprecated in favor of expo-background-task, do not
+         port unless explicitly requested",
+}
+
+§10b_SharedObject_is_a_new_pattern_this_skill_does_not_cover_SOLVED_2026_09_07 := {
+  gap: "§3 of this skill ('port the JS class verbatim') assumes a plain JS class wrapping
+        requireNativeModule free functions — a SharedObject/SharedRef instance is a JSI-backed
+        native object with its own retained lifetime, created via `new Module.SomeClass(...)`
+        and released via a lifecycle hook (`useReleasingSharedObject` upstream)",
+  superseded: "the ORIGINAL note here (2026-09-03) said grep for `extends SharedObject` returned
+              zero hits and recommended file-system's NEW api as the isolating first port. Neither
+              happened — `@symbiote-native/audio` shipped 2026-09-07 and is the first REAL
+              `extends SharedObject<Events>` port in this repo (`grep -rn 'extends SharedObject'
+              packages/*/src` — 4 hits, all in packages/audio/src/core/native-module.ts). Read
+              packages/audio/src/core/{native-module,audio-player,audio-recorder}.ts as the
+              worked template before porting expo-sqlite or reaching for expo-file-system's
+              `/next` subpath, which uses a DIFFERENT, weaker pattern (see below) — do not assume
+              the two are the same shape.",
+  solved_pattern: "the native module exposes the SharedObject subclass itself as a CLASS PROPERTY
+              (`readonly AudioPlayer: typeof AudioPlayer` on the requireNativeModule<...>() result,
+              same shape upstream's own `AudioModule.types.ts` declares) — not a bare
+              requireNativeModule call returning an instance factory. So there is nothing to
+              reimplement: `export class AudioPlayer extends expoAudio.AudioPlayer { ... }`
+              subclasses the REAL native class, overriding only the handful of methods upstream
+              itself shims onto the prototype at module load (source resolution on `replace()`,
+              an Android arg-count fix on `setPlaybackRate()`, per-platform option processing on
+              `prepareToRecordAsync()`). A class with no JS-side logic to add at all (AudioPlaylist,
+              AudioStream) is just re-exported: `export const AudioPlaylist =
+              expoAudio.AudioPlaylist;` plus `export type AudioPlaylist =
+              InstanceType<typeof AudioPlaylist>;` for the type. `SharedObject<Events>` itself is a
+              REAL runtime + type export of `expo-modules-core` (confirmed: `export { SharedObject }
+              from './SharedObject';` in its `index.ts`) — never reimplemented, only used as the
+              `extends` target in a `declare class` describing each native class's own surface.",
+  lifecycle_wrapper_still_open: "the React/Vue/Angular hook/composable/service wrapping
+              create-on-mount + release-on-unmount (upstream's `useReleasingSharedObject`) was
+              NOT built for audio — out of scope for that port, same status as task-manager's
+              `defineTask` having no consumer wired in yet. Framework-agnostic factories
+              (`createAudioPlayer`/`createAudioPlaylist`/`createAudioStream`) exist in core; each
+              adapter's own lifecycle wrapper is a separate, still-open task.",
+  testing_pattern_solved_too: "§6's 'inject a fake native-module object' recipe DOES extend to a
+              SharedObject subclass, once the fake is a real ES class with PROTOTYPE methods
+              (never vi.fn() instance fields) — `super.replace(...)` / `super.setPlaybackRate(...)`
+              resolve through the prototype chain only if the fake's methods live on
+              `FakeClass.prototype`, not on `this`. See
+              packages/audio/src/core/audio-classes.test.ts's header comment for the worked
+              example and why an instance-field fake silently breaks every `super.*()` call in the
+              subclass under test.",
+  file_system_next_is_a_different_weaker_pattern: "packages/media-library/src/next/native-module.ts
+              and packages/file-system/src/next/native-module.ts predate this port and do NOT use
+              `SharedObject` — their native classes (`NativeMediaLibraryAsset`, etc.) are plain
+              `declare class`es with no `extends` at all, exposed as class properties the same way,
+              but with no JSI-backed retained-object base. Structurally similar (subclass a class
+              property off the native module) but not proof of the SharedObject/Events pattern —
+              don't cite one as precedent for the other without checking which shape a given
+              upstream package actually uses.",
+}
+
+§10c_expo_sqlite_compiles_vendored_C_not_just_autolinks := {
+  fact: "expo-sqlite ships its own SQLite amalgamation (vendor/sqlite3/{sqlite3.c,sqlite3.h}, plus
+         an alternate SQLCipher tree) and COMPILES it per-platform (iOS podspec copies+compiles
+         via s.vendor_sqlite_src!, Android CMakeLists.txt builds it into libexpo-sqlite.so via
+         NDK) — does not link the OS's system libsqlite3.tbd at all",
+  does_not_violate_native_core_is_untouched: "we still don't fork/copy anything OURSELVES — the
+              wrapped package's own build scripts do the compiling from the real
+              (pnpm-realpath-resolved) directory, same mechanism as §2's autolinking transparency
+              — but it is the first port whose native build step compiles a large third-party C
+              tree rather than linking a prebuilt/OS framework, worth flagging so a future build
+              troubleshooting session doesn't mistake a slow/heavy pod-install for something
+              broken",
+}
+
+§10d_expo_notifications_needs_firebase_a_real_exception_to_expo_modules_core_only := {
+  fact: "android/build.gradle depends directly on com.google.firebase:firebase-messaging:25.0.1 —
+         push requires an actual google-services.json / Firebase project, not just autolinking",
+  hard_dependency: "registerTaskAsync explicitly requires expo-task-manager (iOS
+                    BackgroundModule.swift throws if TaskManager isn't linked); Android's
+                    FirebaseMessagingDelegate starts a headless React instance on background FCM
+                    receipt via runTaskManagerTasks",
+  first_real_appdelegate_subscriber_use: "NotificationsAppDelegateSubscriber.swift implements
+              didRegisterForRemoteNotificationsWithDeviceToken as an ExpoAppDelegateSubscriber —
+              sensors registered subscribers that were wired but never exercised (zero of them);
+              this is the first package where that plumbing is load-bearing, worth a real device
+              test of the subscriber-forwarding path specifically, not just 'it compiles'",
+  sequencing: "port AFTER task-manager exists — do not attempt notifications' background delivery
+               before task-manager's headless-relaunch question (§10e) is resolved",
+}
+
+§10e_headless_relaunch_question_RESOLVED_2026_09_03_this_repo_already_has_the_primitive := {
+  superseded: "the paragraph below this one is the ORIGINAL 2026-09-03 open question, kept for
+               the record — it was resolved the same day by finding PR #64 (merged) + PR #65
+               (open) on this repo's own GitHub, not by reading examples/react's entry point",
+  what_exists: "core/engine/src/app-registry/index.ts already models headless-task registration
+                as a DISTINCT channel from surface mounting — registerRunnable(appKey, run) for
+                a Fabric surface vs registerCancellableHeadlessTask(taskKey, taskProvider,
+                taskCancelProvider)/startHeadlessTask(taskId, taskKey, data) for headless work.
+                Both mirror through the SAME injected IHostRegistrar into RN's native
+                AppRegistry (PR #64, 'fix(engine): bridge headless tasks to native AppRegistry',
+                MERGED). So: no, the entry point does NOT unconditionally mount a surface for a
+                headless invocation — headless tasks were already a first-class, adapter-agnostic
+                concept before this Expo-package survey started, exposed identically from
+                @symbiote-native/{react,vue,svelte,solid,angular}'s own AppRegistry re-export",
+  real_precedent: "PR #65 ('feat(android): add foreground-service lifecycle', OPEN/unmerged as
+                   of 2026-09-03, depends on #64) ships @symbiote-native/foreground-service —
+                   ANDROID ONLY. Shape: app calls AppRegistry.registerCancellableHeadlessTask
+                   (the cross-adapter primitive above) to register a task, then
+                   startForegroundServiceAsync({taskKey, types:['microphone'|'mediaPlayback'],
+                   notification, taskTimeoutMs}) tells a native Kotlin Service
+                   (SymbioteForegroundService.kt + ForegroundServiceRuntime.kt +
+                   SymbioteForegroundServiceModule.kt) to run as a real Android foreground
+                   service, delivering into that same registered task via
+                   startHeadlessTask, with native handling ownership/cancellation/redelivery/
+                   stale-intent/timeout/competing-start races (SessionRegistries.kt) and a
+                   persistent notification with a native stop action. Package is a plain
+                   requireNativeModule-shaped module (getEnforcingNativeModule +
+                   NativeEventEmitter) — fits THIS skill's ordinary recipe once the task is
+                   already registered through the engine-level primitive",
+  caveats: "PR body is explicit: 'Actual Android OS behavior still needs a device/emulator
+            canary for cold-process delivery, foreground-to-background continuation,
+            notification-action stopping, permission/background-start rejection, and service
+            redelivery. Issue #58 should remain open until that is verified.' Treat as a real,
+            working-on-paper reference SHAPE, not a proven implementation — the user who
+            surfaced this PR called it 'сырой' (raw) themselves. Android-only: no iOS
+            BGTaskScheduler-equivalent counterpart exists yet in this repo for ANY headless
+            background trigger — that half is still greenfield work.",
+  consequence_for_this_survey_CORRECTED_same_day: "the ORIGINAL note here said don't port
+                                expo-task-manager's JS, build a sibling to foreground-service
+                                instead — that was overcautious, based on an UNVERIFIED worry
+                                that Android's headless boot (`unimodules-app-loader`'s
+                                HeadlessAppLoader) is Expo-Go/expo-updates-specific. Checked: it
+                                is not. `expo-modules-core/android/.../adapters/react/apploader/
+                                RNHeadlessAppLoader.kt` is the generic implementation and needs
+                                only `(context.applicationContext as
+                                ReactApplication).reactHost` — an ordinary bare-RN host, nothing
+                                Expo-specific. `AppLoaderProvider.kt` resolves it via a plain
+                                AndroidManifest `<meta-data android:name=\"org.unimodules.core.
+                                AppLoader#...\" android:value=\"...RNHeadlessAppLoader\"/>`
+                                lookup — a declarative entry, autolinkable the normal way.
+                                `apps/expo-go/.../InternalHeadlessAppLoader.kt` is a SEPARATE,
+                                Expo-Go-only implementation — don't confuse the two when reading
+                                expo-task-manager's Android source.",
+  verdict: "PORT expo-task-manager the standard way (this skill's §1-§9 recipe — native folder
+            autolinks unmodified, JS hand-ported into core/, same shape as every other package in
+            this survey). Do not reimplement scheduling/task-consumer-registry/boot-persistence
+            from scratch — expo-task-manager's native machinery (WorkManager JobService,
+            TaskBroadcastReceiver for BOOT_COMPLETED, BGTaskScheduler registration on iOS,
+            notifyTaskFinishedAsync completion contract, pluggable TaskConsumerInterface for
+            location/geofencing/notifications) is mature and worth reusing wholesale, not
+            redone. The one real wiring decision: point the ported TaskManager's headless
+            DELIVERY at this repo's own core/engine AppRegistry.registerCancellableHeadlessTask/
+            startHeadlessTask channel (§10e above) rather than raw RN AppRegistry, so a task
+            registered from any adapter (not just React) survives the same bootstrap-ordering
+            race PR #64 already fixed for surface runnables. That is a wiring detail inside the
+            port, not a reason to avoid the port.",
+  new_gap_to_close_RETRACTED_2026_09_03_no_gap_exists: "the note originally here claimed
+                     expo-modules-link needed a new <meta-data>-element shape for
+                     AppLoaderProvider's lookup. Checked while actually porting
+                     expo-task-manager (@symbiote-native/task-manager, shipped 2026-09-03): the
+                     <meta-data android:name=\"org.unimodules.core.
+                     AppLoader#react-native-headless\" .../> entry AppLoaderProvider.kt reads
+                     ships inside expo-modules-core's OWN android/src/main/AndroidManifest.xml
+                     — not something an app or a wrapper package's manifest needs to declare —
+                     and auto-merges via Gradle's standard manifest merger the moment
+                     expo-modules-core is a real dependency (already true for every package this
+                     skill covers). No expo-modules-link change was needed; the package shipped
+                     with only native-link.json's existing `android.modules` shape (§9), same as
+                     every other module-only wrapper. Lesson: verify a 'gap' by reading the
+                     dependency's OWN shipped manifest before scoping work to close it — see
+                     `.claude/rules/verify-the-deciding-side.md`.",
+}
+
+§10e_ORIGINAL_open_question_2026_09_03_superseded_above := {
+  mechanism: "TaskManager.defineTask(name, fn) just populates a module-level Map — pure JS, no
+              native call. Android: TaskService.java uses RN's own
+              com.facebook.react.jstasks.HeadlessJsTaskContext — same HeadlessJsTaskService
+              machinery RN apps use for background JS execution, confirmed by import. iOS:
+              TaskManagerAppDelegateSubscriber.swift hooks didFinishLaunchingWithOptions +
+              performFetchWithCompletionHandler, drives EXTaskService.runTasks on a
+              relaunched/existing JS runtime. Both: re-execute the WHOLE JS bundle from a cold
+              start with NO UI mounted — defineTask calls must re-run at module scope on every
+              such relaunch since state doesn't survive engine teardown",
+  open_question_AS_ASKED: "does this project's JS entry point unconditionally attempt to mount
+                a Fabric surface, conflicting with a headless relaunch? Answered above: no —
+                headless tasks were already a separate registered channel, not a surface.",
+}
+
+§10f_recommended_port_order := {
+  order: [
+    "1. expo-location (foreground only: getCurrentPositionAsync/watchPositionAsync/foreground
+        permissions/geocoding) — fits this skill exactly as written, same shape as the sensors
+        pilot, zero new architecture",
+    "2. read PR #64 (merged, core/engine/src/app-registry) and PR #65 (open,
+        packages/foreground-service) in full before writing any background/task-manager code —
+        §10e's precedent, do not re-derive the headless-task primitive from scratch or from
+        expo-task-manager's shape",
+    "3. SHIPPED 2026-09-03 as @symbiote-native/task-manager — defineTask/isTaskDefined/
+        isTaskRegisteredAsync/getTaskOptionsAsync/getRegisteredTasksAsync/unregisterTaskAsync/
+        unregisterAllTasksAsync/isAvailableAsync ported into core/, native folder autolinks
+        unmodified via native-link.json's ordinary `android.modules` shape (the <meta-data>
+        gap this item used to name did not exist — see §10e's retraction note). registerTaskAsync
+        does NOT exist upstream — registration is always driven by a consumer module (e.g. a
+        future expo-location background API), not by task-manager itself. Headless delivery
+        still routes through the wrapped package's own native TaskService/
+        TaskManagerAppDelegateSubscriber (RN's HeadlessJsTaskContext / BGTaskScheduler) rather
+        than core/engine's AppRegistry.registerCancellableHeadlessTask — that wiring is deferred
+        to whichever consumer package (step 4/6/7) is the first to need adapter-agnostic
+        headless delivery, not done speculatively here",
+    "4. expo-location background/geofencing — layers onto the location package from step 1 and
+        the scheduler primitive from step 3",
+    "5. expo-file-system NEW api — first SharedObject port, smallest surface among the three
+        candidates, produces the lifecycle-wrapper template for the next two",
+    "6. expo-audio — reuses the SharedObject template from step 5, adds background-playback
+        native services (Android foreground services — check whether PR #65's
+        foreground-service package itself is reusable here before writing a second Android
+        foreground-service implementation, iOS UIBackgroundModes:audio)",
+    "7. expo-notifications — heaviest (Firebase native SDK + hard task-manager dependency +
+        first load-bearing AppDelegate subscriber), do last",
+    "8. expo-sqlite — independent of the rest, portable any time after step 5's SharedObject
+        pattern lands; heaviest native BUILD (vendored C compile) but not architecturally coupled
+        to anything else in this list",
+  ],
+  skip: "expo-background-fetch (deprecated upstream, superseded by expo-background-task)",
+}
+```
 
 ## References
 

@@ -1,22 +1,10 @@
-// Which intrinsics carry a STRICT prop type, and which still accept anything.
-//
-// SECOND PREMISE SHIFT (2026-09-14, first one dated 2026-09-11 below): `jsx-runtime.ts` no longer
-// hand-rolls `Omit<Record<ISymbioteIntrinsic, IHostProps>, 'view' | 'text'>` plus two explicit
-// fields. It now calls the same `ICrossTypedIntrinsics` generic Vue/Svelte/Solid already use, fed
-// an `ICrossedPrimitiveProps` interface that lists every crossed tag directly — 18 of them now
-// (pressable, button, image, scroll-view, switch, text-input, ... ), not just view/text. The
-// extraction below reads that interface's own keys instead of an Omit clause that no longer exists.
-//
-// Original premise (2026-09-11): this used to derive "is this primitive a tag yet" from
-// `export const View = 'view'` in `components.ts` — a capitalized alias whose value was the tag
-// string. Every alias was deleted that day: an app writes `<view>` / `<text>` directly, so that
-// oracle went to zero and nothing was a component any more.
-//
+// Which intrinsics carry a STRICT prop type, and which still accept anything. `jsx-runtime.ts`
+// calls the same `ICrossTypedIntrinsics` generic Vue/Svelte/Solid use, fed an
+// `ICrossedPrimitiveProps` interface listing every crossed tag; extracted below by its own keys.
+
 // Read as source rather than checked by the compiler on purpose: NO test file in this repo is
-// type-checked (every package's tsconfig excludes `**/*.test.ts`, and vitest strips types without
-// checking them), so a type-level assertion written here would be decoration. See
-// `.claude/rules/test-harness-false-greens.md`, "A type-level oracle inside a test file does not
-// run".
+// type-checked (every package's tsconfig excludes `**/*.test.ts`), so a type-level assertion
+// written here would be decoration. See `.claude/rules/test-harness-false-greens.md`.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';

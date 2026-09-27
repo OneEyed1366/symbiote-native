@@ -1,20 +1,12 @@
 // Wipes every tsc-emitted build/ tree and its .tsbuildinfo, so a build starts from nothing.
-//
-// WHY this exists: `tsc --build` emits outputs but never REMOVES the output of a source that was
-// deleted. The file simply stays, and `files: ["build"]` then ships it forever. Measured
-// 2026-08-19: 12 packages still carried build/{react,vue,svelte}/index.js months after the commit
-// that deleted those source barrels, and adapters/solid shipped a deleted component plus two
-// forgotten probe files inside a `pnpm pack` tarball.
-//
-// It cannot reach npm through CI — build/ is gitignored and the release runs on a clean checkout —
-// but it DOES reach a local `pnpm pack`, which is the everyday loop for examples/* (see CLAUDE.md's
-// <examples_vs_dot_examples>). So a locally packed tarball silently differed from a released one:
-// the exact class of "works on my machine" this repo pays most for.
-//
-// DELETING build/ ALONE IS NOT ENOUGH, and the failure is silent in the worst direction: tsc reads
-// .tsbuildinfo, concludes every project is up to date, and emits NOTHING — leaving an empty build/
-// that looks like a successful build. Both go, together. Same shape as the examples' stale-install
-// trap, where removing node_modules/@symbiote-native/<pkg> without the lockfile also short-circuits.
+
+// `tsc --build` emits outputs but never REMOVES the output of a deleted source — the file stays,
+// and `files: ["build"]` ships it forever. Invisible through CI (build/ is gitignored, the release
+// runs on a clean checkout) but reaches a local `pnpm pack`, the everyday examples/* loop.
+
+// DELETING build/ ALONE IS NOT ENOUGH: tsc reads .tsbuildinfo, concludes the project is up to date,
+// and emits NOTHING — an empty build/ that looks like a successful one. Both go together, the same
+// shape as removing node_modules/@symbiote-native/<pkg> without the lockfile also short-circuiting.
 
 import { readdirSync, rmSync, existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';

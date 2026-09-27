@@ -36,11 +36,18 @@
   --line-keep-awake: #0ea5e9;
   --line-screen-orientation: #f43f5e;
   --line-localization: #10b981;
+  --line-location: #1d4ed8;
+  --line-media-library: #db2777;
+  --line-file-system: #134e4a;
   --line-tracking-transparency: #78716c;
   --line-secure-store: #a16207;
   --line-sharing: #d946ef;
   --line-web-browser: #0369a1;
   --line-sms: #65a30d;
+  --line-audio: #3fc123;
+  --line-notifications: #e236c8;
+  --line-background-tasks: #8a78e2;
+  --line-sqlite: #a6af1d;
 }
 
 .info-text {
@@ -194,6 +201,15 @@
 .line-tag-localization {
   background-color: var(--line-localization);
 }
+.line-tag-location {
+  background-color: var(--line-location);
+}
+.line-tag-media-library {
+  background-color: var(--line-media-library);
+}
+.line-tag-file-system {
+  background-color: var(--line-file-system);
+}
 .line-tag-tracking-transparency {
   background-color: var(--line-tracking-transparency);
 }
@@ -208,6 +224,18 @@
 }
 .line-tag-sms {
   background-color: var(--line-sms);
+}
+.line-tag-audio {
+  background-color: var(--line-audio);
+}
+.line-tag-notifications {
+  background-color: var(--line-notifications);
+}
+.line-tag-background-tasks {
+  background-color: var(--line-background-tasks);
+}
+.line-tag-sqlite {
+  background-color: var(--line-sqlite);
 }
 .line-tag-text {
   color: var(--ink);
@@ -292,6 +320,18 @@
   border-left-width: 3px;
   border-left-color: var(--line-localization);
 }
+.menu-row-location {
+  border-left-width: 3px;
+  border-left-color: var(--line-location);
+}
+.menu-row-media-library {
+  border-left-width: 3px;
+  border-left-color: var(--line-media-library);
+}
+.menu-row-file-system {
+  border-left-width: 3px;
+  border-left-color: var(--line-file-system);
+}
 .menu-row-tracking-transparency {
   border-left-width: 3px;
   border-left-color: var(--line-tracking-transparency);
@@ -311,6 +351,22 @@
 .menu-row-sms {
   border-left-width: 3px;
   border-left-color: var(--line-sms);
+}
+.menu-row-audio {
+  border-left-width: 3px;
+  border-left-color: var(--line-audio);
+}
+.menu-row-notifications {
+  border-left-width: 3px;
+  border-left-color: var(--line-notifications);
+}
+.menu-row-background-tasks {
+  border-left-width: 3px;
+  border-left-color: var(--line-background-tasks);
+}
+.menu-row-sqlite {
+  border-left-width: 3px;
+  border-left-color: var(--line-sqlite);
 }
 
 .menu-badge {
@@ -371,6 +427,15 @@
 .menu-badge-localization {
   background-color: var(--line-localization);
 }
+.menu-badge-location {
+  background-color: var(--line-location);
+}
+.menu-badge-media-library {
+  background-color: var(--line-media-library);
+}
+.menu-badge-file-system {
+  background-color: var(--line-file-system);
+}
 .menu-badge-tracking-transparency {
   background-color: var(--line-tracking-transparency);
 }
@@ -385,6 +450,18 @@
 }
 .menu-badge-sms {
   background-color: var(--line-sms);
+}
+.menu-badge-audio {
+  background-color: var(--line-audio);
+}
+.menu-badge-notifications {
+  background-color: var(--line-notifications);
+}
+.menu-badge-background-tasks {
+  background-color: var(--line-background-tasks);
+}
+.menu-badge-sqlite {
+  background-color: var(--line-sqlite);
 }
 .menu-badge-text {
   color: var(--ink);
@@ -456,6 +533,15 @@
 .menu-row-hint-localization {
   color: var(--line-localization);
 }
+.menu-row-hint-location {
+  color: var(--line-location);
+}
+.menu-row-hint-media-library {
+  color: var(--line-media-library);
+}
+.menu-row-hint-file-system {
+  color: var(--line-file-system);
+}
 .menu-row-hint-tracking-transparency {
   color: var(--line-tracking-transparency);
 }
@@ -470,6 +556,18 @@
 }
 .menu-row-hint-sms {
   color: var(--line-sms);
+}
+.menu-row-hint-audio {
+  color: var(--line-audio);
+}
+.menu-row-hint-notifications {
+  color: var(--line-notifications);
+}
+.menu-row-hint-background-tasks {
+  color: var(--line-background-tasks);
+}
+.menu-row-hint-sqlite {
+  color: var(--line-sqlite);
 }
 
 /* SensorsScreen — one card per @symbiote-native/sensors hook, each rendering its own
@@ -612,6 +710,15 @@
   color: var(--ink);
   font-size: 13px;
   font-weight: bold;
+}
+
+/* LocationScreen's permissions card pairs a status badge with a Request button per row — no
+   other auth-card-shaped screen needs a second control alongside the badge, so this one shape is
+   new; everything else on the screen reuses .auth-card/.auth-status-badge/.auth-result as-is. */
+.location-permission-actions {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
 }
 
 /* Shared card/badge/row vocabulary for HapticsScreen, ClipboardScreen, and BatteryScreen — same

@@ -2,6 +2,7 @@ import { Component, inject } from '@angular/core';
 import {
   ColorSchemeService,
   DynamicColorIOS,
+  Platform,
   PlatformColor,
   SYMBIOTE_ELEMENTS,
 } from '@symbiote-native/angular';
@@ -25,18 +26,20 @@ import './PlatformColorDemo.css';
         >
           <text class="tile-label">systemBlue</text>
         </view>
-        <view
-          testID="dynamic-color-tile"
-          class="color-tile-bordered"
-          [style]="{
-            backgroundColor: dynamicBackground,
-            borderColor: separatorColor,
-          }"
-        >
-          <text class="bold-label" [style]="{ color: labelColor }"
-            >dynamic</text
+        @if (isIos) {
+          <view
+            testID="dynamic-color-tile"
+            class="color-tile-bordered"
+            [style]="{
+              backgroundColor: dynamicBackground,
+              borderColor: separatorColor,
+            }"
           >
-        </view>
+            <text class="bold-label" [style]="{ color: labelColor }"
+              >dynamic</text
+            >
+          </view>
+        }
       </view>
     </view>
   `,
@@ -44,11 +47,15 @@ import './PlatformColorDemo.css';
 export class PlatformColorDemo {
   private readonly colorScheme = inject(ColorSchemeService).colorScheme;
 
-  readonly systemBlue = PlatformColor('systemBlue');
-  readonly dynamicBackground = DynamicColorIOS({
-    light: '#dbeafe',
-    dark: '#13243a',
-  });
+  readonly systemBlue = PlatformColor(
+    'systemBlue',
+    '@android:color/holo_blue_dark',
+  );
+  // DynamicColorIOS throws off iOS, as in RN.
+  readonly isIos = Platform.OS === 'ios';
+  readonly dynamicBackground = this.isIos
+    ? DynamicColorIOS({ light: '#dbeafe', dark: '#13243a' })
+    : undefined;
   readonly separatorColor = PlatformColor('separator');
   readonly labelColor = PlatformColor('label');
 

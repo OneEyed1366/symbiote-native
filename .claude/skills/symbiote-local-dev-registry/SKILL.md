@@ -1,6 +1,6 @@
 ---
 name: symbiote-local-dev-registry
-description: "Use when getting a local `core/*`, `adapters/*` or `packages/*` build into an `examples/*` app — the everyday loop before a simulator build or a device measurement. Covers the LOCAL VERDACCIO registry that replaced the `pnpm pack` + `file:` tarball dance as of 2026-09-01: `pnpm run registry:setup|sync|publish|on|off|refresh|status`, the container and its tracked config under `scripts/verdaccio/`, and the gitignored `examples/<app>/.npmrc` that points a scope at it. Read BEFORE editing `scripts/local-registry.mjs`, `scripts/verdaccio/**`, `scripts/trust-publishers.mjs`, `.npmrc.example`, or any `examples/*/package.json` dependency on `@symbiote-native/*`; and before diagnosing an example that runs code older than the repo. Holds why a tracked pointer at localhost is forbidden (npm has NO registry fallback — an unreachable configured registry is an install FAILURE, not a fall-through to npmjs), what the registry does NOT fix (npm's lockfile still short-circuits: same version + new bytes + plain `npm install` = `up to date` and stale code), why a real npm `canary` dist-tag was tried and reverted, and why every npm call in `trust-publishers.mjs` pins `--registry` explicitly. Trigger on: 'example runs old code', 'get my engine change into the example', 'file: tarball', '.tarballs', 'verdaccio', 'local registry', 'registry:sync', 'npm install serves stale', 'up to date but my change is missing'."
+description: "Use when getting a local `core/*`, `adapters/*` or `packages/*` build into an `examples/*` app — the everyday loop before a simulator build or a device measurement. Covers the LOCAL VERDACCIO registry that replaced the `pnpm pack` + `file:` tarball dance as of 2026-09-01: `pnpm run registry:setup|sync|publish|on|off|refresh|status`, the container and its tracked config under `scripts/verdaccio/`, and the gitignored `examples/<app>/.npmrc` that points a scope at it. Read BEFORE editing `scripts/local-registry.mjs`, `scripts/verdaccio/**`, `scripts/trust-publishers.mjs`, `.npmrc.example`, or any `examples/*/package.json` dependency on `@symbiote-native/*`; and before diagnosing an example that runs code older than the repo. Holds why a tracked pointer at localhost is forbidden (npm has NO registry fallback — an unreachable configured registry is an install FAILURE, not a fall-through to npmjs), what the registry does NOT fix (npm's lockfile still short-circuits: same version + new bytes + plain `npm install` = `up to date` and stale code), why a real npm `canary` dist-tag was tried and reverted, and why every npm call in `trust-publishers.mjs` pins `--registry` explicitly. ALSO holds the four iOS build failures that follow any reinstall and read as anything but an install problem: the deleted `.rn-bootsplash/` pod sandbox, the LINKER error naming `facebook::react::Sealable`/`getDebugProps` (a stale prebuilt `React.xcframework` flavor, with a two-command probe and the red-herring `ld: warning` lines), `examples/expo-*/node_modules` at 2.2GB from ~25 nested `expo` copies, and `EINTEGRITY` on a retry after a failed install. Trigger on: 'example runs old code', 'get my engine change into the example', 'file: tarball', '.tarballs', 'verdaccio', 'local registry', 'registry:sync', 'npm install serves stale', 'up to date but my change is missing', 'pod install', 'Build input file cannot be found', 'RNBootSplash.mm', 'Undefined symbols for architecture arm64', 'React.xcframework', 'RCT_USE_PREBUILT_RNCORE', 'node_modules is huge', 'EINTEGRITY'."
 ---
 
 # The local dev registry
@@ -351,3 +351,86 @@ Order matters — the cheap checks first, and the version number is never one of
 
 The failure mode this order exists for: a run that reports success while the example measures last
 week's code. It does not fail, it lies — and a perf number taken on it is worse than no number.
+
+## The iOS build failures that follow a reinstall
+
+All four survive the switch from tarballs to the registry, because `registry:refresh` replaces the
+package FOLDER exactly as `npm install` did. None of them reads as an install problem.
+
+### `pod install` is not optional after a reinstall
+
+`@symbiote-native/splash-screen`'s podspec vendors react-native-bootsplash's native sources into a
+`.rn-bootsplash/` folder next to itself, at **podspec evaluation** time — during `pod install`, not
+on package install. Replacing the package folder deletes that folder, and the next `xcodebuild`
+fails with `Build input file cannot be found: .../.rn-bootsplash/ios/RNBootSplash.mm`, buried under
+hundreds of lines of clang argument dumps that make it look like a broken toolchain. It is a stale
+pod sandbox; `pod install` regenerates it. (That podspec's own comment says why the copy exists.)
+
+### A LINKER error naming React's own C++ internals — a stale prebuilt DOWNLOAD
+
+```
+ld: warning: Could not find or use auto-linked framework 'React_RCTAppDelegate': not found
+Undefined symbols for architecture arm64:
+  "facebook::react::Sealable::Sealable()", "facebook::react::ShadowNode::getDebugName() const",
+  "…::BaseViewProps::getDebugProps() const", …
+  referenced from: RNSSafeAreaViewShadowNode.o, RNSScreenStackHeaderConfigShadowNode.o
+```
+
+**The `ld: warning` lines are a RED HERRING** — those modules live inside the single merged
+`React.framework` and the same warnings appear in a build that links fine. **Read the
+`referenced from:` object names**; they name the third-party Fabric library that is actually
+unsatisfied (here `RNS*` = react-native-screens, pulled in by `@symbiote-native/navigation`).
+
+RN 0.86 links a PREBUILT `React.xcframework`, downloaded per configuration
+(`reactnative-core-0.86.0-debug.tar.gz` ~94MB / `-release.tar.gz` ~30MB). The `getDebug*` /
+`DebugStringConvertible` / `Sealable` surface exists only in the DEBUG flavor, so a Debug app linked
+against the release-flavor framework fails exactly this way. CocoaPods reuses a stale extracted
+`Pods/React-Core-prebuilt/` rather than re-extracting, because the pod's source URL did not change.
+
+Diagnose in one command — size and symbols are unambiguous:
+
+```bash
+B=ios/Pods/React-Core-prebuilt/React.xcframework/ios-arm64_x86_64-simulator/React.framework/React
+stat -f %z "$B"; nm -gU "$B" | grep -c getDebugProps     # release: ~24MB / 0   debug: ~137MB / 80
+```
+
+Fix: `rm -rf ios/Pods/React-Core-prebuilt ios/Pods/ReactNativeCore-artifacts` then `pod install`,
+and re-run the probe to confirm the debug flavor landed BEFORE spending another build. Do **not**
+reach for `RCT_USE_PREBUILT_RNCORE=0` first — that costs a 30-minute from-source build to work
+around a stale download.
+
+**But first check there is anything to fix at all: the probe reading "debug" is the normal resting
+state.** The podspec's `source` is hardcoded to the `-debug` tarball, so a fresh `pod install` always
+leaves the debug flavor extracted, whatever you intend to build. RN then swaps it per build —
+`React-Core-prebuilt` carries a `before_compile` phase, `[RNCore] Replace React Native Core for the
+right configuration`, reading `DEBUG=1` out of `GCC_PREPROCESSOR_DEFINITIONS` and running
+`react-native/scripts/replace-rncore-version.js`. Both tarballs sit side by side in
+`Pods/ReactNativeCore-artifacts/`, so the swap is local — no network. Verified on `examples/react`:
+probe before a Release build 131MB/80 symbols, after 24MB/0. **"Pods holds debug while I build
+Release" is NOT the bug**, and clearing pods over it wastes a build. The failure above is
+specifically a stale or missing download, and its signature is the LINKER error, not a probe result.
+
+### `examples/expo-*/node_modules` at 2.2-2.3GB each
+
+89MB × ~25 duplicated `expo` copies, one per `@symbiote-native/*` Expo wrapper. None of the six
+`expo-*` examples declares `expo` itself — every wrapper reaches it transitively via
+`expo-sensors`/`expo-battery`/etc. With no root-level request anchoring a version, npm's arborist
+nests a separate `expo` copy inside every wrapper's own `node_modules`, even though all ~25 resolve
+to the SAME version. (`expo-modules-core`, depended on identically, hoists fine — the difference is
+specifically that nothing requests `expo` from the root, not a generic dedup failure.)
+
+Fix, which is also the CORRECT shape — a real `create-expo-app` project always declares `expo`
+directly: add `"expo": "<pinned SDK version>"` to the example's `package.json`, then
+`rm -f package-lock.json && rm -rf node_modules && npm install`. Verified across all six:
+2.2-2.3GB -> 600-660MB each, zero nested copies, no peer conflicts. If the pinned `expo` and the
+catalog's `expo-modules-core`/`expo-sensors` versions ever drift apart, that is a real SDK
+compatibility bug (modules ship in lockstep with one SDK release) — fix the skew, not the symptom.
+
+### `EINTEGRITY` on a retry after a FAILED install — delete the lockfile, not `node_modules`
+
+A run that fails partway can still write a partial `package-lock.json` recording the OLD hash. The
+next `npm install` then errors `EINTEGRITY … wanted <old> but got <new>` even after
+`rm -rf node_modules` and even after `npm cache clean --force` — because the stale hash lives in the
+project's own lockfile, not in npm's cache. `rm -f package-lock.json` before retrying. Same failure
+shape as the lockfile short-circuit above (stale integrity vs changed bytes), just triggered by a
+failed install instead of a re-publish.

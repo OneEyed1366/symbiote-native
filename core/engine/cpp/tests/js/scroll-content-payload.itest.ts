@@ -19,8 +19,8 @@
 //                         `horizontal-scroll-content` or `scroll-content`, so this half needs no
 //                         owner at all and would have been portable at any point
 //   collapsable           a CONSTANT too, and unconditional on both axes (`ScrollView.js:1747`). It
-//                         was a build-time `setProp` in `buildStructure` until 2026-09-18 and is
-//                         the rule's now — see "from the rule and not a seed" for why that case has
+//                         is the rule's now, not a build-time `setProp` in `buildStructure` — see
+//                         "from the rule and not a seed" for why that case has
 //                         to assert an ABSENT authored prop to mean anything
 //   collapsableChildren   DERIVED from the OWNER's `maintainVisibleContentPosition`, or its
 //                         `snapToAlignment` on ANDROID ONLY (`:1731-1733`) — the half that needed
@@ -180,6 +180,19 @@ describe('what a scroll content node sends native', () => {
     expect(payload.testID).toBe(undefined);
     expect(payload.decelerationRate).toBe(undefined);
     expect(payload.snapToAlignment).toBe(undefined);
+  });
+
+  // why: ScrollView.js:1740-1745 — the content view carries the scroller's removeClippedSubviews
+  // (sticky headers only change that on Android); unset stays unset.
+  it('carries the owner removeClippedSubviews down, sticky headers or not, off Android', () => {
+    expect(
+      vertical({ removeClippedSubviews: true }).payload.removeClippedSubviews,
+    ).toBe(true);
+    expect(
+      vertical({ removeClippedSubviews: true, stickyHeaderIndices: [0] })
+        .payload.removeClippedSubviews,
+    ).toBe(true);
+    expect(vertical({}).payload.removeClippedSubviews).toBe(undefined);
   });
 
   // why: `collapsable={false}` is UNCONDITIONAL on RN's content view (`ScrollView.js:1747`) — Yoga may

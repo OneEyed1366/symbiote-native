@@ -23,8 +23,11 @@ let deviceHub: IDeviceHub | undefined;
 // Whether the fake __turboModuleProxy resolves an AppState module at all --
 // toggled per test to exercise the "module not linked" branch.
 let moduleLinked = true;
+// The success callback the fake getCurrentAppState was handed, so a test answers it.
+let pendingCurrentState: ((data: { app_state: string }) => void) | undefined;
 
 beforeEach(async () => {
+  pendingCurrentState = undefined;
   appStateAdded = 0;
   appStateRemoved = 0;
   deviceHub = undefined;
@@ -39,6 +42,11 @@ beforeEach(async () => {
     },
     removeListeners: (count: number): void => {
       appStateRemoved += count;
+    },
+    getCurrentAppState: (
+      onSuccess: (data: { app_state: string }) => void,
+    ): void => {
+      pendingCurrentState = onSuccess;
     },
   };
 
@@ -154,17 +162,16 @@ describe('AppState', () => {
       expect(received).toBeUndefined();
     });
 
-    // why: isStateChangePayload guards against a malformed native payload (missing
-    // `app_state`) -- the handler must not fire on garbage rather than call it with
-    // `undefined` and let bad data silently propagate to app code.
-    it('ignores a malformed payload missing app_state', async () => {
+    // why: RN hands the listener `appStateData.app_state` with no shape check (AppState.js), so
+    // a payload without it reaches the app as `undefined` rather than being swallowed.
+    it('passes app_state through as-is, undefined when the payload lacks it', async () => {
       await loadAppState();
-      let calls = 0;
-      AppState.addEventListener('change', () => {
-        calls += 1;
+      const received: unknown[] = [];
+      AppState.addEventListener('change', state => {
+        received.push(state);
       });
       deviceHub?.emit('appStateDidChange', { unrelated: true });
-      expect(calls).toBe(0);
+      expect(received).toEqual([undefined]);
     });
   });
 
@@ -209,6 +216,58 @@ describe('AppState', () => {
       expect(calls).toBe(0);
       deviceHub?.emit('appStateFocusChange', false);
       expect(calls).toBe(1);
+    });
+
+    // why: RN tests truthiness (`type === 'focus' && hasFocus`, `!hasFocus`), not `=== true`.
+    it('reads hasFocus by truthiness, as RN does', async () => {
+      await loadAppState();
+      const seen: string[] = [];
+      AppState.addEventListener('focus', () => seen.push('focus'));
+      AppState.addEventListener('blur', () => seen.push('blur'));
+      deviceHub?.emit('appStateFocusChange', 1);
+      deviceHub?.emit('appStateFocusChange', 0);
+      expect(seen).toEqual(['focus', 'blur']);
+    });
+  });
+
+  describe('RN parity — Negative', () => {
+    // why: RN throws rather than handing back a dead subscription (AppState.js).
+    it('addEventListener throws when the native module is not linked', async () => {
+      moduleLinked = false;
+      await loadAppState();
+      expect(() => AppState.addEventListener('change', () => {})).toThrow(
+        'Cannot use AppState when `isAvailable` is false.',
+      );
+    });
+
+    it('addEventListener throws for an unknown event', async () => {
+      await loadAppState();
+      const unknownEvent: 'change' = JSON.parse('"nonsense"');
+      expect(() => AppState.addEventListener(unknownEvent, () => {})).toThrow(
+        'Trying to subscribe to unknown event: nonsense',
+      );
+    });
+  });
+
+  describe('RN parity — getCurrentAppState correction', () => {
+    // why: RN asks native for the live state at construction; when it differs from the
+    // initial constant and no event beat it, currentState is corrected AND the change is
+    // re-emitted so listeners see it (AppState.js constructor).
+    it('corrects currentState and notifies listeners when native reports a different state', async () => {
+      await loadAppState();
+      const received: unknown[] = [];
+      AppState.addEventListener('change', state => received.push(state));
+      pendingCurrentState?.({ app_state: 'background' });
+      expect(AppState.currentState).toBe('background');
+      expect(received).toEqual(['background']);
+    });
+
+    it('ignores the answer when an appStateDidChange arrived first', async () => {
+      await loadAppState();
+      expect(AppState.currentState).toBe('active');
+      deviceHub?.emit('appStateDidChange', { app_state: 'inactive' });
+      pendingCurrentState?.({ app_state: 'background' });
+      expect(AppState.currentState).toBe('inactive');
     });
   });
 });

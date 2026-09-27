@@ -8,17 +8,17 @@
   // and Vue's arm uses `shallowRef` for the identical reason. Measured with the deep spelling first:
   // every mutation step carried a flat ~20 ms of proxying (select 30.1, swap 21.9, remove 25.6
   // against the engine's own 0.8 walk / 3.3 apply).
-  let state = $state.raw({ rows: [], selectedId: undefined });
+  let localState = $state.raw({ rows: [], selectedId: undefined });
 
   // Registered from the component body so the fixture can drive the state the component owns. See
   // `svelte-suite-bridge.ts` for why there is no handle to write through instead.
   registerSetBenchState(next => {
-    state = next;
+    localState = next;
   });
 </script>
 
 <view style={{ flex: 1 }}>
-  {#each state.rows as row (row.id)}
-    <Row {row} isSelected={row.id === state.selectedId} />
+  {#each localState.rows as row (row.id)}
+    <Row {row} isSelected={row.id === localState.selectedId} />
   {/each}
 </view>

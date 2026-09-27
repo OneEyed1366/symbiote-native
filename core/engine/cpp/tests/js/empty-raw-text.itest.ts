@@ -5,8 +5,8 @@
 // a raw-text child becomes a fragment, EXCEPT that AttributedString::appendFragment silently drops
 // a fragment whose string is empty — while the walk has already recorded "the previous child was
 // raw text". The next raw-text sibling therefore takes the merge branch and calls `fragments.back()`
-// on a vector that is still empty, which aborts the process (SIGABRT inside std::vector::back,
-// diagnosed on the iOS simulator 2026-08-19). React Native's own renderer has the same hole, so this
+// on a vector that is still empty, which aborts the process (SIGABRT inside std::vector::back).
+// React Native's own renderer has the same hole, so this
 // cannot be pinned on one adapter; it belongs at the single seam where the retained tree becomes
 // Fabric's child set.
 //

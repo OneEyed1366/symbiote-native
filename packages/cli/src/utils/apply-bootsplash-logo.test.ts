@@ -19,7 +19,6 @@ describe('applyBootsplashLogo', () => {
     tmpDirs.push(templatesRoot);
     const vueLogoPath = path.join(
       templatesRoot,
-      'native',
       'bootsplash-logo',
       'vue',
       'android',

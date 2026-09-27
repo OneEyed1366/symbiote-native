@@ -320,8 +320,12 @@ const DrawerImpl = forwardRef<IDrawerNavigatorHandle, IDrawerProps>(
     ).current;
 
     const animated = isDrawerAnimated(options);
+    // Narrow on purpose: resolveDrawerGeometry only ever reads these 3 fields off options (see
+    // drawer-options/index.ts's resolveDrawerWidth/Type/Position) — depending on the whole
+    // `options` object would recompute on every unrelated options field, defeating the memo.
     const geometry = useMemo(
       () => resolveDrawerGeometry(options),
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       [options.drawerType, options.drawerPosition, options.drawerWidth],
     );
 
@@ -371,8 +375,11 @@ const DrawerImpl = forwardRef<IDrawerNavigatorHandle, IDrawerProps>(
     // route object, so a jumpTo-with-no-params re-focus of the ALREADY-focused route (a no-op in
     // drawerRouterReducer) and any future params merge don't spuriously re-fire focus/blur.
     const focusedRouteKey = focusedRoute?.key;
+    // focusedRouteKey is a pure invalidation signal — createNavigationEmitter() takes no
+    // arguments, the key only forces a fresh emitter per focus change (see comment above).
     const routeEmitter = useMemo(
       () => createNavigationEmitter(),
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       [focusedRouteKey],
     );
 

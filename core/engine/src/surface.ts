@@ -1,15 +1,12 @@
 // A surface is one mounted root: it owns the rootTag handed down by the native Fabric host and the
 // top-level nodes under it. Adapters mutate it and ask it to commit.
-//
-// A SURFACE IS ONE ORDINARY NODE, and that is the whole implementation rather than a trick. It holds
-// a real handle, its child ops are the ordinary append / insertBefore / removeChild, and `OP_COMMIT`
-// names that one handle — so the host needs no `rootTag -> node` map, which is what keeps it
-// stateless.
-//
-// The node is RN's AppContainer (`createSurfaceRoot` in `node.ts` — `flex: 1`, `box-none`), so what
-// reaches the root child set is one view with the app under it. An ANCHOR in the same position
-// hoists its children instead, and the host takes both through the same call, so nothing here is a
-// special case.
+
+// A surface is one ordinary node, and that is the whole implementation rather than a trick. It
+// holds a real handle, its child ops are the ordinary append/insertBefore/removeChild, and
+// OP_COMMIT names that one handle — so the host needs no rootTag -> node map, keeping it stateless.
+
+// The node is RN's AppContainer (createSurfaceRoot in node.ts), so what reaches the root child set
+// is one view with the app under it — the host takes it through the same call as any other node.
 
 import type { IRootTag } from './fabric';
 import { dlog } from './debug';
@@ -57,17 +54,11 @@ export class SymbioteSurface {
     this.node = createSurfaceRoot();
   }
 
-  /**
-   * Every OTHER live surface, so one commit names every root — see `commitSurfaceOps`.
-   *
-   * Static because it reads a sibling instance's private handle, which only a member of this class
-   * may do. One surface — the universal case — allocates nothing.
-   *
-   * `self` may already be OUT of the registry: a teardown unregisters and then commits, and that
-   * commit is the one carrying the removals. So the fast path cannot be a size check — with one
-   * live surface left, `size === 1` means either "only me" or "only the other one", and taking the
-   * shortcut on the second reading is how a surface loses the very batch that empties it.
-   */
+  // Every other live surface, so one commit names every root — see commitSurfaceOps. Static
+  // because it reads a sibling instance's private handle, which only a member of this class may do.
+
+  // self may already be out of the registry: a teardown unregisters and then commits, carrying the
+  // removals — so the fast path can't be a size check, since size===1 could mean either surface.
   private static others(
     self: SymbioteSurface,
   ): readonly (readonly [IRootTag, ISymbioteNode])[] {
@@ -80,13 +71,8 @@ export class SymbioteSurface {
     return out ?? NO_CO_COMMITTERS;
   }
 
-  /**
-   * The top-level nodes, asked of the host.
-   *
-   * A getter rather than an array this class maintains: a second copy of a child list is the thing
-   * this design removes, and `nextSiblingOf` (host-access.ts) needs the same answer the host gives
-   * for a parented node.
-   */
+  // The top-level nodes, asked of the host. A getter rather than an array this class maintains: a
+  // second copy of a child list is the thing this design removes.
   get children(): readonly ISymbioteNode[] {
     return childrenOf(this.node);
   }
@@ -99,10 +85,8 @@ export class SymbioteSurface {
     insertBefore(this.node, child, beforeChild);
   }
 
-  // Nomination for teardown rides on `node.ts`'s `removeChild`, and only NOMINATES for the reason
-  // stated there: a framework may spell a move as remove-then-reinsert, so the commit sweep
-  // decides. The surface is one ordinary node, so it is not a second removal path that could miss
-  // the sweep and leave a behavior — its timers included — outliving the surface.
+  // Nomination for teardown rides on node.ts's removeChild, and only nominates: a framework may
+  // spell a move as remove-then-reinsert, so the commit sweep decides.
   removeChild(child: ISymbioteNode): void {
     removeChild(this.node, child);
   }
@@ -111,41 +95,28 @@ export class SymbioteSurface {
     for (const child of this.children) removeChild(this.node, child);
   }
 
-  /**
-   * Release every host behavior still standing under this surface, at unmount.
-   *
-   * The sweep above cannot answer this: it only sees nodes a `removeChild` NOMINATED, and an
-   * unmount removes nothing — the adapter drops the whole surface. Without it every node keeps its
-   * `afterCommit` registration and its timers, and a restarted surface's commits drain the dead
-   * one's hooks forever.
-   */
+  // Release every host behavior still standing under this surface, at unmount. The sweep above
+  // can't answer this: it only sees nodes removeChild nominated, and an unmount removes nothing —
+  // the adapter drops the whole surface.
   teardown(): void {
-    // The nominations first: an adapter that empties the surface and disposes it without a commit
-    // in between (React's `clearContainer`) never reaches the commit sweep, and the walk below
-    // cannot see those nodes either — they already left the tree.
+    // The nominations first: an adapter that empties and disposes the surface without a commit in
+    // between never reaches the commit sweep, and the walk below can't see those nodes either.
     sweepDetachedBehaviors(this.children, detachAnimatedProps);
     teardownSubtree(this.node, detachAnimatedProps);
   }
 
   // Synchronous commit: used by React's resetAfterCommit, which already batches per logical update.
   commit(): void {
-    // A SUPERSEDED surface still flushes its ops and still names every other root — its teardown is
-    // what carries the removals — but it must not complete a root another surface now owns. Fast
-    // Refresh and the focus lifecycle re-mount the same rootTag, so the old surface's teardown
-    // commit lands AFTER the new one's mount commit and would hand Fabric the emptied tree.
-    // An UNREGISTERED surface is not superseded — nobody took the root, so its final emptied tree
-    // is still the truth for it. Only a live OTHER owner suppresses the op.
-    // The teardown half of the behavior lifecycle. It runs AFTER the ops are applied — it decides
-    // what really left by asking the host for a parent, and the host does not know about a removal
-    // it has not been handed — but BEFORE the root is completed, so a behavior's parting writes
-    // (ScrollView taking its forced `scrollEventThrottle` back) ride this commit instead of owing
-    // another one. `flushOps` is that split: apply, do not publish.
-    //
-    // `removeChild` only NOMINATES — a framework spells a move as remove-then-reinsert, so tearing
-    // down at the call would kill a machine that comes back in the same batch.
+    // A superseded surface still flushes its ops and names every other root (its teardown carries
+    // the removals), but must not complete a root another surface now owns — Fast Refresh and the
+    // focus lifecycle can re-mount the same rootTag while an old teardown commit is still pending.
+
+    // The behavior-teardown half runs after ops are applied (asking the host for a parent needs the
+    // removal already handed over) but before the root completes, so a behavior's parting writes
+    // ride this commit instead of owing another one. flushOps is that split: apply, don't publish.
     flushOps();
-    // GUARDED AT THE CALL SITE, not inside the sweep — `this.children` is a host read that builds
-    // the whole top-level list, and it would run on every commit for a sweep that had nothing to do.
+    // Guarded at the call site, not inside the sweep — this.children is a host read that builds the
+    // whole top-level list, and it would run on every commit for a sweep with nothing to do.
     if (hasDetachCandidates()) {
       sweepDetachedBehaviors(this.children, detachAnimatedProps);
     }
@@ -156,23 +127,15 @@ export class SymbioteSurface {
       this.node,
       SymbioteSurface.others(this),
     );
-    // Fresh Fabric handles are now assigned, so the three things that could not run before one
-    // existed all drain here — this is the moment the old `commitChildren` drained them too.
-    //
-    // `notifyCommitted` releases the imperative waiters (`whenCommitted`); `runPostCommitHooks` the
-    // consumers that needed a committed TAG and ran too early, which is the Animated native driver
-    // binding a props node under an async-batched commit; `runDeferredAttaches` the half of a host
-    // behavior whose setup needs a tag (a view command, an event attach). The predicate is passed in
-    // rather than imported by `host-behavior.ts`, keeping that dependency one-directional — a cycle
-    // there is a live hazard under Metro's `inlineRequires`.
+    // Fresh Fabric handles are now assigned, so the three things that couldn't run before one
+    // existed all drain here: notifyCommitted releases the imperative waiters, runPostCommitHooks
+    // the consumers that needed a committed tag, runDeferredAttaches the same for a host behavior.
     notifyCommitted();
     runPostCommitHooks();
     runDeferredAttaches(isNodeCommitted);
-    // After the setup half, never before it: a node carrying both hooks has `attachAfterCommit`
-    // seed the mirrors `afterCommit` then compares against. Unlike the two above it asks only
-    // "props were published", so it is NOT gated on the commit having made native calls — a fold
-    // that strips a prop makes its own commit byte-identical, and the hook that must react to the
-    // flip would be the one the flip cannot wake.
+    // After the setup half, never before: a node carrying both hooks has attachAfterCommit seed the
+    // mirrors afterCommit then compares against. Unlike the two above, this asks only "props were
+    // published", so it isn't gated on the commit having made native calls.
     runCommittedHooks(isNodeCommitted);
   }
 
@@ -188,9 +151,8 @@ export class SymbioteSurface {
   }
 }
 
-// Every live surface, so the microtask flush in `imperative.ts` can commit the one a queued write
-// named. Registered from here rather than imported there: a surface owns its own commit, and
-// reaching into it from the imperative half would put back the cycle that split exists to remove.
+// Every live surface, so the microtask flush in imperative.ts can commit the one a queued write
+// named. Registered from here rather than imported there, keeping that dependency one-directional.
 const surfaces = new Map<IRootTag, SymbioteSurface>();
 
 registerSurfaceCommit(

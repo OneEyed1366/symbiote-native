@@ -130,25 +130,10 @@ describe('the RefreshControl becomes the scroll view s parent', () => {
   });
 });
 
-// THE WHOLE STYLE-SPLIT DESCRIBE LEFT THIS FILE ON 2026-09-18, three cases, as a GROUP — and the
-// group is the point rather than the count. The split is `splitScrollViewStyle` /
-// `foldRefreshWrapperProps` in `SymbioteFabricProps.cpp` now, and this host builds its payloads
-// through the TypeScript `fabricProps`, which deliberately carries no copy of the tag rules. Two of
-// the three went red on the move, which is honest. The third — "stops splitting the style when the
-// wrap goes away" — went on PASSING, and for the wrong reason: with no rule in this host there is no
-// split to stop, so an unwrapped owner carries its whole style whatever the engine does. A case whose
-// subject is a fold cannot stay behind beside the twins that failed; it would be green forever and
-// mean nothing. Same shape ActivityIndicator's "OMITS colour entirely" case had.
-//
-// Their new home is `core/engine/cpp/tests/js/scroll-view-wrap-payload.itest.ts`, against the payload
-// a commit actually sent, with a `foldsFound === 0` assertion beside them that this host could never
-// have made. `nestedScrollEnabled` and `decelerationRate` had already gone the same way, and their
-// note is worth keeping: both used to be restated in the WRAPPED copy of the owner's fold, because
-// the wrap swapped that fold out and anything the ordinary one did had to be repeated —
-// `decelerationRate` once was NOT repeated, and reached Fabric as the string 'fast' on every Android
-// ScrollView carrying a RefreshControl. A rule that runs off the TAG cannot be swapped out, so that
-// class of bug is unrepresentable now.
-//
-// What stays HERE is what this host is authoritative for and the itest is not: the TOPOLOGY. Who
-// ends up whose parent, that the owner keeps its identity across a wrap, that removing the
-// RefreshControl puts it back. That is `ISymbioteNode.wrapper`'s contract and it is JS's.
+// The style split (`splitScrollViewStyle`/`foldRefreshWrapperProps`) is a C++ fold now
+// (`scroll-view-wrap-payload.itest.ts`); this host's `fabricProps` has no copy. A tag rule can't
+// be swapped out the way a wrapped fold copy once was, so a repeat-on-wrap bug class is gone.
+
+// What stays HERE is the TOPOLOGY: who ends up whose parent, that the owner keeps its identity
+// across a wrap, that removing the RefreshControl puts it back — `ISymbioteNode.wrapper`'s
+// contract, and it is JS's.

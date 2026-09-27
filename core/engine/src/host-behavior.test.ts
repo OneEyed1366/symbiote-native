@@ -1,8 +1,6 @@
-// The seam that lets a tier-2 primitive's machine live on the engine node instead of inside a
-// framework component (`.claude/rules/host-primitive-tier.md`). What makes it worth a file of its
-// own is the teardown half: `removeChild` looks like the destroy signal and is not, because a
-// framework may spell a MOVE as remove-then-reinsert. The reorder case below is the whole point —
-// it is green either way if you only assert "removeChild tears down".
+// The seam letting a tier-2 primitive's machine live on the engine node instead of a framework
+// component. Worth its own file for the teardown half: `removeChild` looks like the destroy
+// signal and isn't, since a framework may spell a MOVE as remove-then-reinsert.
 import { afterEach, describe, expect, it } from 'vitest';
 import { installRecordingFabric } from '@symbiote-native/test-utils';
 import {
@@ -88,11 +86,9 @@ describe('teardown', () => {
     expect(log.detached).toEqual([pressable]);
   });
 
-  // THE CASE THE COMMIT SWEEP EXISTS FOR. `solid-js/universal`'s replaceNode (universal.cjs:186)
-  // is insertNode + removeNode, and reconcileArrays calls it at :157 for a node that IS in the new
-  // array and is needed at a later index. Torn down at removeChild, that node returns to the tree
-  // alive and machine-less: long-press stops working after certain reorders, device-only, nothing
-  // red. Asserting on removeChild instead of on the commit passes here for the wrong reason.
+  // The case the commit sweep exists for: solid-js/universal's replaceNode is insertNode +
+  // removeNode for a node still needed at a later index. Torn down at removeChild, that node
+  // returns alive and machine-less — long-press silently stops working after certain reorders.
   it('does NOT tear down a node removed and reinserted in the same tick', () => {
     const log = trackBehavior(PRESSABLE);
     const { surface, root } = mount();
@@ -146,14 +142,9 @@ describe('teardown', () => {
     expect(log.detached).toEqual([inner, outer]);
   });
 
-  // Svelte parks LIVE nodes offscreen across commits — `detachFromParent`
-  // (adapters/svelte/src/dom-shim/shim-node.ts) moves a node into a DocumentFragment with no
-  // engine node, so it calls engineRemoveChild AND requestCommit while fully intending to bring it
-  // back: a parked {#if} branch, each.js's destroy_effects, and boundary.js's move_effect while a
-  // pending snippet shows, which returns only when async work resolves. So "still absent at the
-  // next commit" is not proof of death either. The machine RESTARTS rather than survives — a
-  // parked subtree is offscreen, nobody is mid-gesture in it, and teardown stays unconditional so
-  // there is no leak mode.
+  // Svelte parks LIVE nodes offscreen across commits (a parked {#if} branch, an async snippet),
+  // fully intending to bring them back — so "still absent at the next commit" isn't proof of
+  // death. The machine RESTARTS rather than survives; teardown stays unconditional, no leak mode.
   it('re-attaches a node the sweep tore down but the framework put back', () => {
     const log = trackBehavior(PRESSABLE);
     const { surface, root } = mount();
@@ -176,14 +167,11 @@ describe('teardown', () => {
     expect(log.attached.filter(node => node === parked)).toHaveLength(2);
   });
 
-  // why: the framework may bring back an INTERIOR node of a subtree it removed, not the root it
-  // named — Svelte's `{#if}` returns a branch from a fragment the engine never saw, so the node
-  // that reappears is the one it parked and not the one whose removal nominated the sweep. Whether
-  // a node re-arms therefore cannot depend on its being the root the sweep was handed.
-  //
-  // It is a GUARD on what the sweep's walk is allowed to narrow to: any node with a behavior
-  // ANYWHERE beneath it must carry the mark that makes its insert walk. The whole-subtree mark
-  // satisfies that trivially; a narrower one has to keep satisfying it.
+  // why: the framework may bring back an INTERIOR node of a removed subtree, not the root it
+  // named — so whether a node re-arms cannot depend on being the root the sweep was handed.
+
+  // A guard on what the sweep's walk may narrow to: any node with a behavior anywhere beneath it
+  // must carry the mark that makes its insert walk.
   it('re-arms a behavior under an interior node the framework brings back alone', () => {
     const log = trackBehavior(PRESSABLE);
     const { surface, root } = mount();
@@ -224,11 +212,9 @@ describe('teardown', () => {
   });
 });
 
-// The half `attach` cannot do. A behavior whose setup needs a committed Fabric tag — a view command
-// for `autoFocus`, a native Animated binding, an event attach — cannot run at `attach`, because
-// that fires inside `createElement` with the node holding its component and nothing else. React
-// would hide this: it commits synchronously, so such code works there by accident and no-ops
-// silently on Vue, Solid and Angular, which commit a tick later.
+// The half `attach` cannot do: setup needing a committed Fabric tag can't run at `attach`, which
+// fires inside createElement with the node holding only its component. React hides this by
+// committing synchronously; Vue/Solid/Angular commit a tick later and would no-op silently.
 describe('attachAfterCommit', () => {
   interface IDeferredLog extends ILog {
     afterCommit: ISymbioteNode[];
@@ -261,11 +247,9 @@ describe('attachAfterCommit', () => {
     expect(log.afterCommit).toEqual([pressable]);
   });
 
-  // The later commits must be REAL ones. Written first with three bare `surface.commit()` calls,
-  // this passed against a drain that never removed anything from its pending set — because commits
-  // two and three changed nothing, and `commitContainer` returns on `!result.changed` ABOVE the
-  // drain, so no second drain ever happened (`engine-mutations-must-mark-dirty.md`, "a no-op commit
-  // fires NO post-commit hook"). A test of "runs once" that never runs the drain twice is vacuous.
+  // The later commits must be REAL ones: a no-op commit fires no post-commit hook at all
+  // (commitContainer returns above the drain), so bare surface.commit() calls would make "runs
+  // once" vacuous — it would pass even if the drain never ran twice.
   it('runs once, not once per later commit', () => {
     const log = trackDeferred(PRESSABLE);
     const { surface, root } = mount();
@@ -323,10 +307,9 @@ describe('attachAfterCommit', () => {
   });
 });
 
-// The RECURRING beat, for a behavior whose contract is driven by a PROP rather than by an event.
-// A controlled TextInput is the case: RN commands the text back down when the app's `value`
-// diverges from what native last reported, and in a component the render is what re-runs that
-// comparison. A tag has no render, so the commit is the only equivalent.
+// The RECURRING beat, for a behavior driven by a PROP rather than an event: a controlled
+// TextInput's render re-runs the value comparison in a component, and a tag has no render, so the
+// commit is the only equivalent.
 describe('afterCommit', () => {
   interface IRecurringLog extends ILog {
     order: string[];
@@ -404,10 +387,9 @@ describe('afterCommit', () => {
 });
 
 describe('onOwnedListenerChange', () => {
-  // The gap it fills: a behavior can owe PAYLOAD work to a listener's mere presence (ScrollView
-  // gates the content view's `onLayout` on `onContentSizeChange`), and a listener flip changes no
-  // payload by itself — so the commit after it is a no-op and `commitContainer` returns above
-  // `runPostCommitHooks`. `afterCommit` is exactly the hook that cannot see this.
+  // The gap it fills: a behavior can owe payload work to a listener's mere presence, and a
+  // listener flip changes no payload by itself — so the commit after it is a no-op and
+  // afterCommit is exactly the hook that can't see this.
   interface IFlipLog extends ILog {
     flips: Array<{ name: string; wired: boolean }>;
   }
@@ -434,10 +416,9 @@ describe('onOwnedListenerChange', () => {
     setEventListener(node, 'load', () => {});
     expect(log.flips).toEqual([{ name: 'load', wired: true }]);
 
-    // A FRESH CLOSURE for the same name, which is what a framework hands over on nearly every
-    // render. Notifying here would put a per-render callback on a per-mount seam, and a behavior
-    // acting on it would re-dirty its subtree every render — the reason `node.listeners` does not
-    // mark dirty at all.
+    // A fresh closure for the same name, what a framework hands over nearly every render.
+    // Notifying here would put a per-render callback on a per-mount seam, re-dirtying the subtree
+    // every render — why node.listeners doesn't mark dirty at all.
     setEventListener(node, 'load', () => {});
     setEventListener(node, 'load', () => {});
     expect(log.flips).toHaveLength(1);

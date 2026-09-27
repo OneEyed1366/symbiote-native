@@ -13,9 +13,9 @@ export type { ITextProps } from './text-props';
 
 export type { IActivityIndicatorProps } from './activity-indicator-props';
 
-// The `<image>` tag's prop surface. The `Image` STATICS moved to `modules/image` (2026-09-10) — an
-// imperative API with no view, which living here made read as a component. Same split as
-// `scroll-view`: the prop type stays with the tag, the runtime does not.
+// The `<image>` tag's prop surface. The `Image` STATICS live in `modules/image` — an imperative
+// API with no view, which living here made read as a component. Same split as `scroll-view`: the
+// prop type stays with the tag, the runtime does not.
 export type { IImageProps } from './image/image-props';
 
 // `ImageBackground` is a TAG — `<image-background>` — and there is nothing to import in its place.
@@ -45,9 +45,8 @@ export type { IModalProps } from './modal/modal-props';
 export type { ISafeAreaViewProps } from './safe-area-view-props';
 
 // `RefreshControl` is a TAG — `<refresh-control>` — carrying its own engine behavior
-// (`registerRefreshControlBehavior`). Its wrapper was a pure passthrough (the accessibility fold
-// it called already runs in `fabricProps` on every path) with zero consumers left in this repo
-// once ScrollView's own `<RefreshControl>` usage moved to the tag; deleted 2026-09-10.
+// (`registerRefreshControlBehavior`). No wrapper: the accessibility fold it would call already
+// runs in `fabricProps` on every path.
 export type { IRefreshControlProps } from './refresh-control-props';
 
 export type { IPressableProps } from './pressable/pressable-props';
@@ -80,11 +79,9 @@ export type { ITouchableNativeFeedbackProps } from './touchable-native-feedback/
 // the prop type stays, for a component forwarding a bag.
 export type { IButtonProps } from './button-props';
 
-// `ScrollView` is a TAG — `<scroll-view>` / `<horizontal-scroll-view>`, the axis picked by which
-// one you write. The wrapper was deleted 2026-09-10: both reasons its header gave had expired (the
-// engine binds an AnimatedNode and a native `Animated.event` on any host node, and the scroll
-// commands live on `ISymbioteNode`'s prototype, which `IHostInstance` IS). The imperative surface
-// comes from `hostInstance(bind:this)`.
+// `ScrollView` is a TAG — `<scroll-view>` / `<horizontal-scroll-view>`, axis picked by which one
+// you write. No wrapper: the engine binds an AnimatedNode on any host node, and scroll commands
+// live on `ISymbioteNode`'s prototype; the imperative surface is `hostInstance(bind:this)`.
 export type { IScrollViewProps } from './scroll-view/scroll-view-props';
 export type { IScrollViewHandle } from '@symbiote-native/components';
 

@@ -43,7 +43,7 @@ const Row = {
       'view',
       {
         style: this.isSelected ? SELECTED_ROW_STYLE : ROW_STYLE,
-        testID: `row-${this.row.id}`,
+        // No id prop — the row is kept concrete by `ROW_STYLE`'s background, as on the device screen.
       },
       [
         label(String(this.row.id)),
@@ -84,6 +84,10 @@ describe('the benchmark screen through the Vue adapter', () => {
       name: 'vue',
       // The root, the container `createSurface` puts under it, and the screen's own wrapper.
       chrome: 3,
+      // The third leg of the mutation comparison — see the React arm. React's reconciler is in
+      // mutation mode and Vue's is a different one entirely, so an arm that agrees with React here
+      // places the extra work in the engine rather than in either reconciler.
+      countsMutations: true,
       readTelemetry: () => readSurfaceTelemetry(ROOT_TAG),
       apply: async next => {
         state.value = next;

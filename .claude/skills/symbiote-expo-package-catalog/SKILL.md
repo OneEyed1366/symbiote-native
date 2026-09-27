@@ -1,6 +1,6 @@
 ---
 name: symbiote-expo-package-catalog
-description: "Symbiote Expo-package migration catalog — read BEFORE starting work on porting ANY package from .vendors/expo/packages into @symbiote-native/*, and before answering 'what Expo packages are left to migrate' or 'what should we port next'. Holds the full audited inventory of .vendors/expo/packages (116 dirs), the scope filter that separates real migration candidates from CLI/EAS/router/internal-interface noise, the explicit backlog of anomalous packages (sqlite/maps/ui/widgets), and a single complexity+demand-ranked priority queue covering all ~59 remaining candidates. Also documents two 'already covered by RN's own native module, not by Expo' exclusions (expo-linking, expo-status-bar) found by cross-checking core/engine/src and adapters/react/src/modules before assuming an Expo package is net-new work. Trigger on 'migrate Expo package', 'what's the local-auth/sensors precedent for X', 'port expo-<name>', 'Expo package roadmap', or any question about which .vendors/expo package to wrap next."
+description: "Symbiote Expo-package migration catalog — read BEFORE starting work on porting ANY package from .vendors/expo/packages into @symbiote-native/*, and before answering 'what Expo packages are left to migrate' or 'what should we port next'. Holds the full audited inventory of .vendors/expo/packages (116 dirs), the scope filter that separates real migration candidates from CLI/EAS/router/internal-interface noise, the explicit backlog of anomalous packages (maps/ui/widgets), and a single complexity+demand-ranked priority queue covering all ~59 remaining candidates. Also documents two 'already covered by RN's own native module, not by Expo' exclusions (expo-linking, expo-status-bar) found by cross-checking core/engine/src and adapters/react/src/modules before assuming an Expo package is net-new work. Trigger on 'migrate Expo package', 'what's the local-auth/sensors precedent for X', 'port expo-<name>', 'Expo package roadmap', or any question about which .vendors/expo package to wrap next."
 ---
 
 # Symbiote Expo-package migration catalog
@@ -32,7 +32,6 @@ closed (2026-08-03) — see "Already shipped" for the real state; from Tier 2 on
 
 | Package | Why it doesn't fit the normal recipe |
 |---|---|
-| `expo-sqlite` | Embeds a whole SQLite engine — own scope, own risk profile, not a thin device-API wrapper |
 | `expo-maps` | Depends on Google Maps SDK / Apple Maps + API keys — external service dependency, not just native code |
 | `expo-ui` | Bridges SwiftUI/Jetpack Compose directly — a **different rendering paradigm** than this project's Yoga+Fabric path (`<layout_is_yoga>`); wrapping it doesn't fit the Descriptor/engine model at all |
 | `expo-widgets` | Ships native **app-extension** targets (iOS Widget Extension, Android App Widget) — not a JS-reachable runtime module, needs its own native-target scaffolding story |
@@ -68,11 +67,27 @@ queue.
 | `@symbiote-native/sharing` | `expo-sharing` (OUTGOING share only — `shareAsync`/`isAvailableAsync`. The incoming half (`useIncomingShare`, `getSharedPayloads`, …) is deliberately NOT ported: it needs an iOS Share Extension target, which upstream's config plugin builds as a second Xcode target with entitlements + an App Group — the same app-extension category as `expo-widgets` in the backlog above) | `symbiote-expo-native-module` |
 | `@symbiote-native/web-browser` | `expo-web-browser` (minus the opt-in `experimentalLauncherActivity` config plugin, and minus the web-only `maybeCompleteAuthSession`) | `symbiote-expo-native-module` |
 | `@symbiote-native/sms` | `expo-sms` | `symbiote-expo-native-module` |
+| `@symbiote-native/task-manager` | `expo-task-manager` (no `registerTaskAsync` — upstream has none either; registration is always driven by a consumer module) | `symbiote-expo-native-module` |
+| `@symbiote-native/background-fetch` | `expo-background-fetch` (upstream-deprecated in favor of `expo-background-task`; ported anyway for parity, since Expo still ships both at sdk-57 — see the file-system legacy+modern precedent above) | `symbiote-expo-native-module` |
+| `@symbiote-native/background-task` | `expo-background-task` (`BGTaskScheduler`/`WorkManager`-backed successor to `expo-background-fetch`; both build on `@symbiote-native/task-manager`'s `defineTask`, neither ships one itself) | `symbiote-expo-native-module` |
+| `@symbiote-native/location` | `expo-location` (geofencing wired, deliberately not demoed in the canary screens — see the module's own README) | `symbiote-expo-native-module` |
+| `@symbiote-native/media-library` | `expo-media-library` — both surfaces, matching upstream's own layout: the shared-object `Query`/`Asset`/`Album` API (default entry) and the legacy function-based API (`/legacy` subpath, added 2026-09-07) | `symbiote-expo-native-module` |
+| `@symbiote-native/file-system` | `expo-file-system` — both surfaces, matching upstream's own layout: the shared-object `File`/`Directory`/`Paths` API (default entry) and the legacy function-based API (`/legacy` subpath, added 2026-09-07) | `symbiote-expo-native-module` |
+| `@symbiote-native/audio` | `expo-audio` — the shared-object `AudioPlayer`/`AudioRecorder`/`AudioPlaylist`/`AudioStream` classes plus the module-level audio-session/permission/preload functions. React hooks (`useAudioPlayer`, `useAudioRecorder`, …) not ported (framework-specific); neither is the `number`/`Asset`-instance form of `AudioSource` or the `downloadFirst` option (both need `expo-asset`, out of scope — see the package's own README) | `symbiote-expo-native-module` |
+| `@symbiote-native/sqlite` | `expo-sqlite` — `Database`/`Statement`/`Session` (transactions, changesets), a Bun-style SQL tagged-template helper, and a SQLite-backed key-value store (own `/kv-store` subpath). Plain-constructor native classes (`new ExpoSQLite.NativeDatabase(...)`), not `SharedObject`s — simpler than `@symbiote-native/audio`'s port. Full parity: a `<SQLiteProvider>`/`useSQLiteContext` equivalent on every adapter (`./react` `./vue` `./svelte` `./solid`, plus Angular's own `SqliteService`/`provideSqliteDatabase` DI shape on `./angular`). `assetSource`/`importAssetDatabaseAsync` (needs `expo-asset`), the `expo-sqlite/plugin` config plugin (libSQL/`sqlite-vec` bundling), React's `useSuspense` on the other four adapters, and DevTools-browser wiring are out of scope — see the package's own README | `symbiote-expo-native-module` |
+| `@symbiote-native/notifications` | `expo-notifications` — permissions, device/Expo push tokens, scheduling, presentation, badges, Android channels/channel groups, categories, and the `@symbiote-native/task-manager`-backed background-task hook (13 native modules, more than any package this project has wrapped before). No auto push-token server-resync daemon (upstream's `DevicePushTokenAutoRegistration.fx.ts` background retry loop), no `expo-constants`/`expo-application` defaults for `projectId`/`applicationId` (pass explicitly — see the package's own README), no `useLastNotificationResponse` hook (whole surface is adapter-agnostic by design). First package needing real per-app native config beyond the linker's fixed-value contract — Firebase/`google-services.json`, the notification-icon/color meta-data, and the `aps-environment` entitlement are all documented as manual one-time app steps, not generated | `symbiote-expo-native-module` |
 
 **Tier 1 is now fully closed (2026-08-03)** — every Tier 1 row below is shipped except
 `expo-constants` (#9), which stays deliberately skipped (see its own row note). Tier 2 (permission/
 async, 31 packages) is under way: `expo-secure-store` (#18), `expo-sharing` (#19),
-`expo-web-browser` (#23) and `expo-sms` (#24) all shipped 2026-08-05, 27 left.
+`expo-web-browser` (#23) and `expo-sms` (#24) all shipped 2026-08-05, `expo-task-manager` (#40)
+shipped 2026-09-03, `expo-location` (#37) shipped 2026-09-03, `expo-media-library` (#38) shipped
+2026-09-03, `expo-file-system` (#20) shipped 2026-09-03, `expo-background-fetch` (#41) and
+`expo-background-task` (#42) both shipped 2026-09-07 (built on `expo-task-manager`'s
+`@symbiote-native/task-manager`, per that package's own README "other background-work packages
+register tasks through" note), `expo-audio` (#33) shipped 2026-09-07, `expo-notifications` (#39)
+shipped 2026-09-07 (13 native modules, first package needing real per-app native config beyond the
+linker's fixed-value contract — see its own README), 19 left.
 
 ```
 §secure_store_manifest_attrs := {
@@ -121,7 +136,7 @@ from each package's `expo-module.config.json`.
 |---|---|---|---|
 | ~~18~~ | ~~`expo-secure-store`~~ | M | shipped — see "Already shipped" |
 | ~~19~~ | ~~`expo-sharing`~~ | M | shipped — see "Already shipped" |
-| 20 | `expo-file-system` | M | apple, android |
+| ~~20~~ | ~~`expo-file-system`~~ | M | shipped — see "Already shipped" |
 | 21 | `expo-font` | M | apple, android, web |
 | 22 | `expo-asset` | M | apple, android, web |
 | ~~23~~ | ~~`expo-web-browser`~~ | M | shipped — see "Already shipped" |
@@ -134,16 +149,16 @@ from each package's `expo-module.config.json`.
 | 30 | `expo-video-thumbnails` | M | apple, android |
 | 31 | `expo-blob` | M | apple, android, web |
 | 32 | `expo-speech` | M | apple, android |
-| 33 | `expo-audio` | M | apple, android |
+| ~~33~~ | ~~`expo-audio`~~ | M | shipped — see "Already shipped" |
 | 34 | `expo-screen-capture` | M | apple, android, web |
 | 35 | `expo-contacts` | M | apple, android |
 | 36 | `expo-calendar` | M | apple, android |
-| 37 | `expo-location` | M | apple, android |
-| 38 | `expo-media-library` | M | apple, android |
-| 39 | `expo-notifications` | M | apple, android |
-| 40 | `expo-task-manager` | M | apple, android |
-| 41 | `expo-background-fetch` | M | apple, android |
-| 42 | `expo-background-task` | M | apple, android |
+| ~~37~~ | ~~`expo-location`~~ | M | shipped — see "Already shipped" |
+| ~~38~~ | ~~`expo-media-library`~~ | M | shipped — see "Already shipped" |
+| ~~39~~ | ~~`expo-notifications`~~ | M | shipped — see "Already shipped" |
+| ~~40~~ | ~~`expo-task-manager`~~ | M | shipped — see "Already shipped" |
+| ~~41~~ | ~~`expo-background-fetch`~~ | M | shipped — see "Already shipped" |
+| ~~42~~ | ~~`expo-background-task`~~ | M | shipped — see "Already shipped" |
 | 43 | `expo-auth-session` | M | universal (pure-JS OAuth flow over `expo-web-browser`/`Linking`, no native folders) |
 | 44 | `expo-age-range` | M | apple, android |
 | 45 | `expo-app-integrity` | M | apple, android (Play Integrity / DeviceCheck) |

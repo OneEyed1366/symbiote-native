@@ -20,10 +20,9 @@ export function resolveDisabledAccessibilityState(
     : accessibilityState;
 }
 
-// RN computes `focusable` in all five touchables and we computed it nowhere until 2026-09-09, so a
-// DISABLED control stayed focusable — a keyboard, a TV remote or switch control could land on
-// something that cannot be pressed. There are TWO formulas, split by primitive and not by platform;
-// do not collapse them.
+// RN computes `focusable` in all five touchables; without it a DISABLED control stays focusable —
+// a keyboard, TV remote or switch control could land on something that cannot be pressed. There
+// are TWO formulas, split by primitive and not by platform; do not collapse them.
 //
 // Pressable defaults it ON (Pressable.js:258). `!== false`, not `?? true`: only a literal `false`
 // opts out, the same shape `accessible` uses one file over.

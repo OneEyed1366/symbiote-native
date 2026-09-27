@@ -1,6 +1,6 @@
 // What does the SAME tree cost through a zero-cost driver, and what does it cost through ours?
 //
-// why: the device run of 2026-09-17 says every create-shaped row got more expensive after the
+// why: the device run says every create-shaped row got more expensive after the
 // buffer architecture — Create/Replace/Append/Clear up 10-37% on four adapters of five — while
 // every row that touches a handful of nodes got cheaper. The suspicion that follows is "we drive
 // Fabric worse than React does", and it cannot be answered by comparing two adapters: both are ours
@@ -32,7 +32,7 @@
 // `ensureYogaChildrenLookFine` + `ensureYogaChildrenAlignment`, so building an N-child list one
 // append at a time is O(N²) there and O(N) in the build that ships.
 //
-// Measured 2026-09-17, the same file on the two builds:
+// The same file on the two builds:
 //
 //                        build (asserts)   build-release      what it looked like
 //   RAW total                  ~307              ~92
@@ -80,7 +80,6 @@ import {
 
 const ROOT_TAG = 1;
 const ROWS = 1_000;
-const NODES_PER_ROW = 10;
 
 // Hoisted exactly as a payload reaches Fabric: React Native flattens `style` into the top-level
 // props object before it crosses JSI (`ReactNativeAttributePayload.addNestedProperty`), and so does
@@ -130,7 +129,30 @@ function fabric(): IFabricBinding {
       throw new Error(`nativeFabricUIManager.${name} is not a function`);
     }
   }
-  return binding as IFabricBinding;
+  // RESOLVED ONCE, INTO AN ORDINARY OBJECT, and this line is load-bearing rather than tidy.
+  // `nativeFabricUIManager` is a `jsi::HostObject`, so a property read on it is not a lookup — it
+  // runs `UIManagerBinding::get`, which allocates a `std::string` from the name, walks a compare
+  // chain and RETURNS A FRESH `jsi::Function` (`UIManagerBinding.cpp:184`). Reaching the methods
+  // through the binding on every call charged this arm 20 003 of those on a thousand-row create —
+  // 0.13 us each on Hermes, ~2.7 ms, priced by `host-object-resolution-cost.itest.ts`. React's own
+  // renderer pays it TWICE per method, ever: `ReactFiberConfigFabric.js:45-60` destructures the whole
+  // surface at module scope. An arm that skipped that was not measuring stock's protocol, it was
+  // measuring stock's protocol plus a tax stock does not pay.
+  const surface = binding as IFabricBinding;
+  const {
+    createNode,
+    appendChild,
+    createChildSet,
+    appendChildToSet,
+    completeRoot,
+  } = surface;
+  return {
+    createNode,
+    appendChild,
+    createChildSet,
+    appendChildToSet,
+    completeRoot,
+  };
 }
 
 /**

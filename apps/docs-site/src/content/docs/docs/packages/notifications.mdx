@@ -1,0 +1,193 @@
+---
+title: Notifications
+description: expo-notifications wrapped for every SymbioteNative adapter — permissions, push tokens, scheduling, presentation, badges, Android channels, and background delivery.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+`@symbiote-native/notifications` wraps
+[`expo-notifications`](https://github.com/expo/expo/tree/main/packages/expo-notifications) —
+permissions, device/Expo push tokens, scheduling, presentation, badges, Android channels, iOS/
+Android categories, and the background notification task hook — for every SymbioteNative adapter.
+
+Every export is a plain async function or a module-level listener registration — no hook/
+composable/service to wrap, so every adapter's entry point is a plain re-export of the same core.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | ✅ live |
+| Android     | ✅ live |
+
+| Framework adapter | Support |
+| ------------------ | ------- |
+| React              | ✅ live |
+| Vue                | ✅ live |
+| Angular            | ✅ live |
+| Svelte             | ✅ live |
+| Solid              | ✅ live |
+
+## Installation
+
+```sh
+npm install @symbiote-native/notifications
+```
+
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --notifications` (or
+`add --notifications` in an existing app) installs and wires this for you — see
+[`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
+
+`expo-notifications` and `expo-modules-core` come along as regular, pinned dependencies — never
+install either yourself, and never add the `expo` meta-package to your project.
+
+<Aside type="danger" title="Native setup is required before first use">
+  Follow [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first — it
+  wires this package's 13 native modules with zero further native changes.
+  None of the following steps are covered by that linker; read them before
+  shipping push.
+</Aside>
+
+### Local notifications need nothing further
+
+Permissions, scheduling, presentation, badges, channels, and categories all work with zero extra
+app-level native config beyond the linker step above.
+
+### Push notifications need real, app-specific native configuration
+
+| Platform | What you must add yourself | Why |
+| -------- | --------------------------- | --- |
+| Android | A real Firebase project + `google-services.json`, plus the Google Services Gradle plugin | Push delivery is FCM, not a generic APNs-style relay |
+| Android | A 96×96 all-white PNG at `res/drawable-*dpi/notification_icon.png`, plus two `<meta-data>` entries on `<application>` (`com.google.firebase.messaging.default_notification_icon`, `expo.modules.notifications.default_notification_icon`), both `@drawable/notification_icon` | The status-bar icon Android draws for a notification with no custom small icon |
+| Android | Optionally, `android:color` via `@color/notification_icon_color` and the matching `default_notification_color` meta-data entries | Tint applied to the small icon above |
+| Android | Optionally, `com.google.firebase.messaging.default_notification_channel_id` meta-data | Which channel an FCM-delivered notification lands in when the payload names none |
+| Android | Copy any custom sound file into `res/raw/` | `INotificationContentInput.sound` on iOS; Android channels carry their own `sound` field — see `setNotificationChannelAsync` |
+| iOS | The **Push Notifications** capability + `aps-environment` entitlement (`development`/`production`) in Xcode | `getDevicePushTokenAsync`/`getExpoPushTokenAsync` need APNs registration, which needs this entitlement — omitting it fails registration silently |
+| iOS | Add any custom sound file as a bundle resource in Xcode | Same as Android's `res/raw/` step |
+| iOS | Optionally, `UIBackgroundModes` including `remote-notification` in `Info.plist` | Lets a background/silent push wake the app to run a registered task |
+| Both | [`@symbiote-native/task-manager`](/docs/packages/task-manager/) installed, with a task `defineTask`'d at module scope before `registerTaskAsync` runs | `registerTaskAsync`/`unregisterTaskAsync` here need it linked to work at all |
+
+## Usage
+
+```ts
+import * as Notifications from '@symbiote-native/notifications';
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: false,
+    shouldSetBadge: false,
+  }),
+});
+
+const { granted } = await Notifications.requestPermissionsAsync();
+if (granted) {
+  const identifier = await Notifications.scheduleNotificationAsync({
+    content: { title: "Time's up!", body: 'Change sides!' },
+    trigger: { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: 60 },
+  });
+
+  const subscription = Notifications.addNotificationReceivedListener(notification => {
+    console.log(notification.request.content.title);
+  });
+  // later: subscription.remove();
+
+  await Notifications.cancelScheduledNotificationAsync(identifier);
+}
+```
+
+Identical import surface on every adapter — `@symbiote-native/notifications/react`, `/vue`,
+`/svelte`, `/solid`, `/angular` all re-export the same functions.
+
+## API
+
+```ts
+// permissions
+getPermissionsAsync(): Promise<INotificationPermissionsStatus>
+requestPermissionsAsync(permissions?: INotificationPermissionsRequest): Promise<INotificationPermissionsStatus>
+
+// tokens
+addPushTokenListener(listener: IPushTokenListener): EventSubscription
+getDevicePushTokenAsync(): Promise<IDevicePushToken>
+getExpoPushTokenAsync(options?: IExpoPushTokenOptions): Promise<IExpoPushToken>
+setAutoServerRegistrationEnabledAsync(enabled: boolean): Promise<void>
+unregisterForNotificationsAsync(): Promise<void>
+subscribeToTopicAsync(topic: string): Promise<null>          // android
+unsubscribeFromTopicAsync(topic: string): Promise<null>      // android
+
+// presentation
+getPresentedNotificationsAsync(): Promise<INotification[]>
+dismissNotificationAsync(notificationIdentifier: string): Promise<void>
+dismissAllNotificationsAsync(): Promise<void>
+
+// badge
+getBadgeCountAsync(): Promise<number>
+setBadgeCountAsync(badgeCount: number): Promise<boolean>
+
+// scheduling
+scheduleNotificationAsync(request: INotificationRequestInput): Promise<string>
+getAllScheduledNotificationsAsync(): Promise<INotificationRequest[]>
+cancelScheduledNotificationAsync(identifier: string): Promise<void>
+cancelAllScheduledNotificationsAsync(): Promise<void>
+getNextTriggerDateAsync(trigger: ISchedulableNotificationTriggerInput): Promise<number | null>
+
+// categories
+getNotificationCategoriesAsync(): Promise<INotificationCategory[]>
+setNotificationCategoryAsync(identifier, actions, options?): Promise<INotificationCategory>
+deleteNotificationCategoryAsync(identifier: string): Promise<boolean>
+
+// channels — android only (no-op returning []/null/void elsewhere)
+getNotificationChannelsAsync(): Promise<INotificationChannel[]>
+getNotificationChannelAsync(channelId: string): Promise<INotificationChannel | null>
+setNotificationChannelAsync(channelId, channel): Promise<INotificationChannel | null>
+deleteNotificationChannelAsync(channelId: string): Promise<void>
+getNotificationChannelGroupsAsync(): Promise<INotificationChannelGroup[]>
+getNotificationChannelGroupAsync(groupId: string): Promise<INotificationChannelGroup | null>
+setNotificationChannelGroupAsync(groupId, group): Promise<INotificationChannelGroup | null>
+deleteNotificationChannelGroupAsync(groupId: string): Promise<void>
+
+// handler / emitter
+setNotificationHandler(handler: INotificationHandler | null): void
+addNotificationReceivedListener(listener): EventSubscription
+addNotificationsDroppedListener(listener): EventSubscription    // android
+addNotificationResponseReceivedListener(listener): EventSubscription
+getLastNotificationResponse(): INotificationResponse | null
+clearLastNotificationResponse(): void
+addNotificationResponseClearedListener(listener): EventSubscription
+DEFAULT_ACTION_IDENTIFIER: string
+
+// background task — needs @symbiote-native/task-manager, see native setup above
+registerTaskAsync(taskName: string): Promise<null>
+unregisterTaskAsync(taskName: string): Promise<null>
+```
+
+Plus the enums `IosAlertStyle`, `IosAllowsPreviews`, `IosAuthorizationStatus`,
+`AndroidNotificationVisibility`, `AndroidAudioContentType`, `AndroidImportance`,
+`AndroidAudioUsage`, `AndroidNotificationPriority`, `SchedulableTriggerInputTypes`,
+`BackgroundNotificationTaskResult`, `PermissionStatus`, and the full content/trigger/payload type
+surface.
+
+## What's not ported
+
+- **No automatic push-token server-resync daemon.** `setAutoServerRegistrationEnabledAsync` is
+  here (used internally by `getExpoPushTokenAsync`), but not a permanent background retry loop —
+  call `getExpoPushTokenAsync()` again from your own `addPushTokenListener` callback for the same
+  effect.
+- **No `projectId`/`applicationId` auto-fill.** Pass both explicitly to `getExpoPushTokenAsync` —
+  [`@symbiote-native/application`](/docs/packages/application/)'s `applicationId` export covers
+  the second one.
+- **No `useLastNotificationResponse` hook.** Read the last response with
+  `getLastNotificationResponse()` and subscribe to changes with
+  `addNotificationResponseClearedListener`/`addNotificationResponseReceivedListener` directly.
+
+## Notes
+
+<Aside type="caution" title="setNotificationHandler must respond within 3 seconds">
+  A slow `handleNotification` implementation causes native to discard the
+  notification and call `handleError` with a `NotificationTimeoutError`
+  instead.
+</Aside>
+
+- **Android channel/channel-group functions branch on platform at runtime** rather than shipping
+  as separate iOS/Android builds — off Android they resolve to the documented no-op values
+  (`[]`/`null`/void) without touching native.

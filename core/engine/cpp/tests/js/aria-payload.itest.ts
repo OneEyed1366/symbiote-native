@@ -1,8 +1,8 @@
 // The W3C aria spelling resolved into RN's own, read off the payload a commit actually SENT.
 //
 // WHY THIS FILE EXISTS, and it is the gap rather than the rule that is new. `foldAriaProps` is
-// written twice — `core/engine/src/accessibility-props.ts` and `SymbioteFabricProps.cpp` — and until
-// 2026-09-18 every assertion about it ran against the FIRST one, in vitest. The device copy could
+// written twice — `core/engine/src/accessibility-props.ts` and `SymbioteFabricProps.cpp` — and an
+// assertion against only the FIRST one, in vitest. The device copy could
 // have broken with the whole suite green. That is not a hypothetical: the same shape had just been
 // found on `foldTextInputValue`, whose `defaultValue` leg appeared in no itest at all, and before
 // that on a disabled `touchable-highlight` that shipped `focusable: true` for as long as it did.

@@ -1,26 +1,16 @@
-<!--
-  A `<style scoped>` block, and specifically the COMPOUND selector inside it — `.badge.loud`
-  applies only to an element carrying both tokens, and layers over `.badge` rather than replacing
-  it. That combination was silently dead until 2026-08-14 (the scope suffix is appended per
-  template token, while the registered key carries it once at the end; symbiote-sfc-style-compiler
-  skill §5b), so it is on screen here to keep it honest. Twin of
-  examples/svelte/components/CompoundClassDemo.svelte — the two canaries must look identical.
+<!-- A `<style scoped>` block, and specifically the COMPOUND selector inside it — `.badge.loud`
+  applies only to an element carrying both tokens, layering over `.badge` rather than replacing it
+  (symbiote-sfc-style-compiler skill §5b). Twin of the Svelte canary — must look identical. -->
 
-  What each badge proves:
-    plain    — `.badge` alone; the compound rule must NOT reach it.
-    loud     — static class="badge loud"; `.badge`'s radius/padding survive, `.badge.loud` wins
-               the two colours it restates. `.loud` has no standalone rule of its own, which is
-               the arrangement that also needed the token list, not just the key.
-    dynamic  — the same pair through a :class object the compiler cannot resolve statically, so
-               it is scoped at runtime instead of at build time. Both paths must agree.
+<!-- plain: `.badge` alone, compound rule must NOT reach it. loud: static class="badge loud",
+  `.badge.loud` wins the two colours it restates. dynamic: same pair via a :class object the
+  compiler can't resolve statically — both paths must agree. -->
 
-  The dynamic badge's LABEL is deliberately constant: the e2e journey proves the rule by
-  screenshot-diffing that badge across the toggle, and a label that changed with the state
-  would make the diff pass even with the compound rule dead.
+<!-- The dynamic badge's LABEL is deliberately constant: an e2e journey screenshot-diffs it across
+  the toggle, and a label that changed with state would pass even with the rule dead. -->
 
-  `section-nested` / `section-label` / `row` are NOT defined below — they come from App.css and
-  pass through unscoped, which is the other half of the rule.
--->
+<!-- `section-nested` / `section-label` / `row` are NOT defined below — they come from App.css and
+  pass through unscoped, which is the other half of the rule. -->
 <script setup lang="ts">
 import { ref } from 'vue';
 import ActionButton from './ActionButton.vue';

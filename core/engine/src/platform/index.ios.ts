@@ -6,6 +6,7 @@
 
 import {
   createConstantsResolver,
+  gatedIsTesting,
   UNKNOWN_VERSION,
   type IPlatformSelectSpec,
   type IPlatformStatic,
@@ -82,14 +83,14 @@ export const Platform: IPlatformStatic<IPlatformConstantsIOS> = {
   },
 
   get isTesting(): boolean {
-    return resolveConstants()?.isTesting ?? false;
+    return gatedIsTesting(resolveConstants());
   },
 
   // RN: isDisableAnimations ?? isTesting. The native flag wins; absent, it tracks
   // isTesting (test runs disable animations by default).
   get isDisableAnimations(): boolean {
     const constants = resolveConstants();
-    return constants?.isDisableAnimations ?? constants?.isTesting ?? false;
+    return constants?.isDisableAnimations ?? gatedIsTesting(constants);
   },
 
   get isMacCatalyst(): boolean {

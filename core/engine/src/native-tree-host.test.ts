@@ -1,11 +1,8 @@
 // The property that matters on a device and that nothing else in this suite can observe: binding
-// the Fabric slot INSTALLS a tree host. Without one `commitSurfaceOps` returns early, the ops stay
-// pending forever, and the screen is blank with nothing red anywhere — the exact failure shape this
-// file exists to make impossible to ship.
-//
-// The same property matters just as much headlessly: whatever host a test installs first —
-// `installRecordingFabric()` for the vast majority of the suite — a native host resolving
-// afterwards must NOT take the seam.
+// the Fabric slot INSTALLS a tree host, or the screen stays blank with nothing red anywhere.
+
+// Matters just as much headlessly: whatever host a test installs first must not be displaced by
+// a native host resolving afterward.
 
 import { afterEach, describe, expect, it } from 'vitest';
 import { installRecordingFabric } from '@symbiote-native/test-utils';
@@ -14,7 +11,7 @@ import {
   SUPPORTED_NATIVE_VERSION,
   type INativeEngineBindings,
 } from './native-engine';
-import { installNativeTreeHost, nativeTreeHost } from './native-tree-host';
+import { nativeTreeHost } from './native-tree-host';
 import { setTreeHost, treeHost } from './tree-host';
 import { getSlot, resetSlot } from './fabric';
 import type { IMutationBatch } from './mutation-buffer';

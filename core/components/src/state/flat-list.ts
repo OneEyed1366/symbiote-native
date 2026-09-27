@@ -13,6 +13,15 @@ import {
 
 export const SINGLE_COLUMN = 1;
 
+// FlatList.js's `removeClippedSubviewsOrDefault`: off-screen rows are clipped by default on
+// Android only (RN's `shouldUseRemoveClippedSubviewsAsDefaultOnIOS` is off in 0.86).
+export function removeClippedSubviewsOrDefault<TValue>(
+  removeClippedSubviews: TValue | null | undefined,
+  os: string,
+): TValue | boolean {
+  return removeClippedSubviews ?? os === 'android';
+}
+
 // A row is the slice of items packed into one virtualized cell when numColumns > 1.
 export interface IRow<ItemT> {
   items: ItemT[];

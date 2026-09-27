@@ -21,11 +21,7 @@
 import { For, type JSX } from 'solid-js';
 import { createStore, reconcile } from 'solid-js/store';
 
-import {
-  readSurfaceTelemetry,
-  setTreeHost,
-  treeHost,
-} from '@symbiote-native/engine';
+import { setTreeHost, treeHost } from '@symbiote-native/engine';
 import { mount } from '@symbiote-native/solid';
 
 import {

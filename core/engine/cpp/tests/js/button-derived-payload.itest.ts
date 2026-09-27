@@ -175,6 +175,15 @@ describe('what a button’s derived nodes send native', () => {
     expect(plain.color === tinted.color).toBe(false);
   });
 
+  // why: RN tints with ANY ColorValue (`if (color)`, Button.js:321), so a PlatformColor reaches the
+  // label as the opaque object native resolves — not silently replaced by the default blue.
+  it('tints the label with a PlatformColor, not only a string', () => {
+    const platformColor = { semantic: ['systemRed'] };
+    const tinted = commit({ color: platformColor }).text;
+
+    expect(tinted.color).toEqual(platformColor);
+  });
+
   // why: `disabled` WINS over `color` on both platforms, because RN pushes the disabled text colour
   // after the tint (`Button.js:396-399`). A disabled button that still shows its brand tint reads as
   // enabled, which is the whole point of the greying.

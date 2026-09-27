@@ -13,13 +13,27 @@ depends on) — every function is hand-ported into this package's own `core/`.
 
 ## Install
 
+**New app:**
+
+```bash
+npx @symbiote-native/cli new my-app --cellular
+```
+
+**Existing SymbioteNative app:**
+
+```bash
+npx @symbiote-native/cli add --cellular
+```
+
+Either way: installs `@symbiote-native/cellular` and wires the native autolinking automatically —
+see [`@symbiote-native/cli`](../cli).
+
+<details>
+<summary>Manual install (no CLI — installing and wiring native autolinking by hand)</summary>
+
 ```bash
 npm install @symbiote-native/cellular
 ```
-
-Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --cellular` (or
-`add --cellular` in an existing app) installs and wires this for you — see
-[`@symbiote-native/cli`](../cli).
 
 Depends on `expo-cellular` and `expo-modules-core` directly (regular dependencies, pinned to
 exact versions — never a caret range, since this package's `core/` is hand-ported against one
@@ -27,7 +41,7 @@ specific native API shape and a newer resolve could silently drift the two apart
 `expo-cellular` yourself, and never add the `expo` meta-package to this project — it bundles its
 own Metro/Babel pipeline that conflicts with this project's own.
 
-## Required one-time step: native autolinking wiring
+### Required one-time step: native autolinking wiring
 
 Unlike a plain RN native module, `expo-cellular`'s native code is discovered by
 `expo-modules-autolinking`, not RN's own `react-native.config.cjs` mechanism — this needs wiring
@@ -46,6 +60,8 @@ Full mechanics — the Podfile pieces that normally ship inside the `expo` packa
 peer-dependency exclusion list, per-module permission strings — live in the
 `symbiote-expo-native-module` project skill. This wiring is already done for all six
 `examples/expo-*` canary apps (React, Vue SFC, Vue TSX, Svelte, Solid, Angular).
+
+</details>
 
 ## Shape
 

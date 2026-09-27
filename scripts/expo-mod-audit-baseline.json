@@ -1,0 +1,212 @@
+[
+  {
+    "package": "@symbiote-native/audio",
+    "path": "ios.infoPlist.UIBackgroundModes",
+    "verdict": "already declared as native-link.json ios.infoPlistArrayKeys.UIBackgroundModes and present in every example Info.plist"
+  },
+  {
+    "package": "@symbiote-native/audio",
+    "path": "ios.infoPlist.NSMicrophoneUsageDescription",
+    "verdict": "already declared (custom wording) in native-link.json ios.infoPlistKeys and present in every example Info.plist"
+  },
+  {
+    "package": "@symbiote-native/audio",
+    "path": "android.manifest.manifest.uses-permission.5",
+    "verdict": "RECORD_AUDIO — ships in expo-audio's own bundled android/src/main/res AndroidManifest.xml, Gradle auto-merges it regardless of app-level declaration"
+  },
+  {
+    "package": "@symbiote-native/audio",
+    "path": "android.manifest.manifest.uses-permission.6",
+    "verdict": "MODIFY_AUDIO_SETTINGS — same bundled-manifest auto-merge as RECORD_AUDIO above"
+  },
+  {
+    "package": "@symbiote-native/audio",
+    "path": "android.manifest.manifest.uses-permission.7",
+    "verdict": "FOREGROUND_SERVICE — already declared in native-link.json android.manifestPermissions, present in every example manifest"
+  },
+  {
+    "package": "@symbiote-native/audio",
+    "path": "android.manifest.manifest.uses-permission.8",
+    "verdict": "FOREGROUND_SERVICE_MEDIA_PLAYBACK — same as FOREGROUND_SERVICE above"
+  },
+  {
+    "package": "@symbiote-native/audio",
+    "path": "android.manifest.manifest.application.0.service",
+    "verdict": "AudioControlsService — already declared in native-link.json android.manifestServices and present in every example manifest"
+  },
+  {
+    "package": "@symbiote-native/background-fetch",
+    "path": "ios.infoPlist.UIBackgroundModes",
+    "verdict": "already declared as native-link.json ios.infoPlistArrayKeys.UIBackgroundModes (fetch) and present in every example Info.plist"
+  },
+  {
+    "package": "@symbiote-native/background-fetch",
+    "path": "android.manifest.manifest.uses-permission.5",
+    "verdict": "RECEIVE_BOOT_COMPLETED — ships in expo-background-fetch's own bundled AndroidManifest.xml, Gradle auto-merges it"
+  },
+  {
+    "package": "@symbiote-native/background-fetch",
+    "path": "android.manifest.manifest.uses-permission.6",
+    "verdict": "WAKE_LOCK — same bundled-manifest auto-merge as RECEIVE_BOOT_COMPLETED above"
+  },
+  {
+    "package": "@symbiote-native/background-task",
+    "path": "ios.infoPlist.UIBackgroundModes",
+    "verdict": "already declared as native-link.json ios.infoPlistArrayKeys.UIBackgroundModes (processing) and present in every example Info.plist"
+  },
+  {
+    "package": "@symbiote-native/background-task",
+    "path": "ios.infoPlist.BGTaskSchedulerPermittedIdentifiers",
+    "verdict": "already declared in native-link.json ios.infoPlistArrayKeys and present in every example Info.plist"
+  },
+  {
+    "package": "@symbiote-native/brightness",
+    "path": "android.manifest.manifest.uses-permission.5",
+    "verdict": "WRITE_SETTINGS — plugin-only (expo-brightness ships an empty bundled manifest), already declared in native-link.json android.manifestPermissions and present in every example manifest"
+  },
+  {
+    "package": "@symbiote-native/cellular",
+    "path": "android.manifest.manifest.uses-permission.5",
+    "verdict": "READ_PHONE_STATE — plugin-only (expo-cellular ships an empty bundled manifest), already declared in native-link.json android.manifestPermissions and present in every example manifest"
+  },
+  {
+    "package": "@symbiote-native/localization",
+    "path": "android.manifest.manifest.application.0.activity.0.$.android:configChanges",
+    "verdict": "FIXED — allowDynamicLocaleChangesAndroid defaults true upstream; mirrored as native-link.json.mainActivityConfigChanges and applied to all 6 example manifests"
+  },
+  {
+    "package": "@symbiote-native/notifications",
+    "path": "ios.entitlements.aps-environment",
+    "verdict": "unconditional upstream, NOT wired (no .entitlements file exists in any example) — deliberately documented as a known gap in packages/notifications/README.md's \"Required one-time steps this linker does NOT cover\" section rather than silently faked"
+  },
+  {
+    "package": "@symbiote-native/local-auth",
+    "path": "ios.infoPlist.NSFaceIDUsageDescription",
+    "verdict": "already declared (custom wording) in native-link.json ios.infoPlistKeys and present in every example Info.plist"
+  },
+  {
+    "package": "@symbiote-native/local-auth",
+    "path": "android.manifest.manifest.uses-permission.5",
+    "verdict": "USE_BIOMETRIC — ships in expo-local-authentication's own bundled AndroidManifest.xml, Gradle auto-merges it"
+  },
+  {
+    "package": "@symbiote-native/local-auth",
+    "path": "android.manifest.manifest.uses-permission.6",
+    "verdict": "USE_FINGERPRINT — same bundled-manifest auto-merge as USE_BIOMETRIC above"
+  },
+  {
+    "package": "@symbiote-native/location",
+    "path": "ios.infoPlist.NSLocationAlwaysAndWhenInUseUsageDescription",
+    "verdict": "already declared in native-link.json ios.infoPlistKeys and present in every example Info.plist"
+  },
+  {
+    "package": "@symbiote-native/location",
+    "path": "ios.infoPlist.NSLocationAlwaysUsageDescription",
+    "verdict": "already declared in native-link.json ios.infoPlistKeys and present in every example Info.plist"
+  },
+  {
+    "package": "@symbiote-native/location",
+    "path": "ios.infoPlist.NSLocationWhenInUseUsageDescription",
+    "verdict": "already declared in native-link.json ios.infoPlistKeys and present in every example Info.plist"
+  },
+  {
+    "package": "@symbiote-native/location",
+    "path": "ios.infoPlist.NSMotionUsageDescription",
+    "verdict": "already declared (custom wording) in native-link.json ios.infoPlistKeys and present in every example Info.plist"
+  },
+  {
+    "package": "@symbiote-native/location",
+    "path": "android.manifest.manifest.uses-permission.5",
+    "verdict": "ACCESS_COARSE_LOCATION — ships in expo-location's own bundled AndroidManifest.xml, Gradle auto-merges it"
+  },
+  {
+    "package": "@symbiote-native/location",
+    "path": "android.manifest.manifest.uses-permission.6",
+    "verdict": "ACCESS_FINE_LOCATION — same bundled-manifest auto-merge as ACCESS_COARSE_LOCATION above"
+  },
+  {
+    "package": "@symbiote-native/media-library",
+    "path": "ios.infoPlist.NSPhotoLibraryUsageDescription",
+    "verdict": "already declared in native-link.json ios.infoPlistKeys and present in every example Info.plist"
+  },
+  {
+    "package": "@symbiote-native/media-library",
+    "path": "ios.infoPlist.NSPhotoLibraryAddUsageDescription",
+    "verdict": "already declared in native-link.json ios.infoPlistKeys and present in every example Info.plist"
+  },
+  {
+    "package": "@symbiote-native/media-library",
+    "path": "android.manifest.manifest.uses-permission.5",
+    "verdict": "READ_MEDIA_VISUAL_USER_SELECTED — already declared in native-link.json android.manifestPermissions and present in every example manifest"
+  },
+  {
+    "package": "@symbiote-native/media-library",
+    "path": "android.manifest.manifest.uses-permission.6",
+    "verdict": "READ_MEDIA_IMAGES — same as READ_MEDIA_VISUAL_USER_SELECTED above"
+  },
+  {
+    "package": "@symbiote-native/media-library",
+    "path": "android.manifest.manifest.uses-permission.7",
+    "verdict": "READ_MEDIA_VIDEO — same as READ_MEDIA_VISUAL_USER_SELECTED above"
+  },
+  {
+    "package": "@symbiote-native/media-library",
+    "path": "android.manifest.manifest.uses-permission.8",
+    "verdict": "READ_MEDIA_AUDIO — same as READ_MEDIA_VISUAL_USER_SELECTED above"
+  },
+  {
+    "package": "@symbiote-native/media-library",
+    "path": "android.manifest.manifest.application.0.$.android:requestLegacyExternalStorage",
+    "verdict": "already declared in native-link.json android.manifestApplicationAttributes and present in every example manifest"
+  },
+  {
+    "package": "@symbiote-native/secure-store",
+    "path": "ios.infoPlist.NSFaceIDUsageDescription",
+    "verdict": "already declared (custom wording) in native-link.json ios.infoPlistKeys and present in every example Info.plist"
+  },
+  {
+    "package": "@symbiote-native/secure-store",
+    "path": "android.manifest.manifest.application.0.$.android:fullBackupContent",
+    "verdict": "already declared in native-link.json android.manifestApplicationAttributes; the referenced @xml resources ship inside expo-secure-store's own bundled res/xml/, Gradle resource merge covers them"
+  },
+  {
+    "package": "@symbiote-native/secure-store",
+    "path": "android.manifest.manifest.application.0.$.android:dataExtractionRules",
+    "verdict": "same as android:fullBackupContent above"
+  },
+  {
+    "package": "@symbiote-native/sensors",
+    "path": "ios.infoPlist.NSMotionUsageDescription",
+    "verdict": "already declared in native-link.json ios.infoPlistKeys and present in every example Info.plist"
+  },
+  {
+    "package": "@symbiote-native/system-ui",
+    "path": "ios.infoPlist.UIUserInterfaceStyle",
+    "verdict": "matches vendor default (Light) — added to native-link.json ios.infoPlistKeys and present in every example Info.plist"
+  },
+  {
+    "package": "@symbiote-native/system-ui",
+    "path": "android.strings.resources.string",
+    "verdict": "empty array — the registered mod ends up a no-op by default (no app.json userInterfaceStyle/backgroundColor field to read), harmless"
+  },
+  {
+    "package": "@symbiote-native/system-ui",
+    "path": "android.styles.resources.style",
+    "verdict": "empty array — same no-op as android.strings.resources.string above"
+  },
+  {
+    "package": "@symbiote-native/task-manager",
+    "path": "ios.infoPlist.UIBackgroundModes",
+    "verdict": "already declared as native-link.json ios.infoPlistArrayKeys.UIBackgroundModes (fetch) and present in every example Info.plist"
+  },
+  {
+    "package": "@symbiote-native/tracking-transparency",
+    "path": "ios.infoPlist.NSUserTrackingUsageDescription",
+    "verdict": "already declared in native-link.json ios.infoPlistKeys and present in every example Info.plist"
+  },
+  {
+    "package": "@symbiote-native/tracking-transparency",
+    "path": "android.manifest.manifest.uses-permission.5",
+    "verdict": "AD_ID — plugin-only, already declared in native-link.json android.manifestPermissions and present in every example manifest"
+  }
+]

@@ -215,12 +215,9 @@ export const TEXT_INPUT_CALLBACK_NAMES: readonly string[] =
 // native view commands; isFocused is tracked JS-side from the focus/blur event pair (RN keeps
 // the same state in TextInputState (there is no native getter to query).
 //
-// IT IS A UNION, and that is the whole point of the type. The five TextInput methods below are what
-// the wrappers used to expose, and a wrapper that exposed ONLY those closed the node off — its ref
-// lost `measure`/`measureInWindow`/`measureLayout`/`setNativeProps`, which every other primitive's
-// ref hands over. The bare node loses the other direction: no `clear`, `isFocused` or
-// `setSelection`. Measured on Vue 2026-08-31, and the same shape held for every adapter — all five
-// hand-rolled their handle and all five listed exactly the same five names.
+// IT IS A UNION, and that is the whole point of the type. Exposing only the five TextInput
+// methods below closes the node off — losing `measure`/`measureInWindow`/`measureLayout`/
+// `setNativeProps`; the bare node loses the other way — no `clear`, `isFocused`, `setSelection`.
 export type ITextInputHandle = {
   focus(): void;
   blur(): void;

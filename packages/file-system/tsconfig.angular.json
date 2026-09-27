@@ -1,0 +1,30 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "Bundler",
+    "rootDir": "src",
+    "outDir": "build-ngc",
+    "noEmit": false,
+    "allowImportingTsExtensions": false,
+    "declaration": true,
+    "sourceMap": true,
+    "skipLibCheck": true,
+    // No DOM lib: src/angular/index.ts re-exports src/next, which relies on React Native's own
+    // ambient Blob/ReadableStream/WritableStream/URL/AbortSignal declarations (see
+    // streams-ambient.d.ts) — the real spec-shaped DOM lib types are incompatible with them
+    // (different Blob/BlobPropertyBag and ReadableStream controller shapes) and are never
+    // needed here: this entry has no @angular/core imports or templates at all.
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "ignoreDeprecations": "6.0",
+    "baseUrl": "."
+  },
+  "angularCompilerOptions": {
+    "compilationMode": "partial",
+    "strictTemplates": true
+  },
+  "include": ["src/next/**/*.ts", "src/angular/**/*.ts"],
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
+}

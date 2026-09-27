@@ -199,17 +199,12 @@ describe('the ImageBackground behavior — where a prop lands', () => {
     expect(host.payload.height).toBe(BOX.height);
   });
 
-  // The Smart Invert opt-out (`ImageBackground.js:75`) left this file on 2026-09-18: it is
-  // `foldImageBackgroundProps` in the engine now, and this host builds its payload through the
-  // TypeScript `fabricProps`, which carries no copy of the tag rules. Asserted against the committed
-  // payload in `core/engine/cpp/tests/js/image-background-payload.itest.ts`. What stays here is the
-  // COMPOSITION — which node each prop lands on, and the style the inner image derives from the box.
+  // The Smart Invert opt-out (`ImageBackground.js:75`) is `foldImageBackgroundProps` in C++ now —
+  // asserted in `image-background-payload.itest.ts`. What stays here is the COMPOSITION: which
+  // node each prop lands on, and the style the inner image derives from the box.
 
-  // why: WHICH NODE, which is this file's subject: RN spreads `...props` onto the Image, so the
-  // name is never the box's. The RENAME is `routeProp`'s since 2026-09-18 — one rule on the way in,
-  // over every node — so what the redirect carries down is already `nativeID` and the raw `id`
-  // never existed to route. A second case used to sit beside this one asserting the two layers
-  // composed; there is one layer now.
+  // why: WHICH NODE, this file's subject — RN spreads `...props` onto the Image, so the name is
+  // never the box's. The rename is `routeProp`'s, one rule on the way in over every node.
   it('puts a bare id on the image, where the spread sends it', () => {
     mount(makeImageBackground({ source: SOURCE, id: 'hero' }));
 
@@ -239,18 +234,8 @@ describe('the ImageBackground behavior — where a prop lands', () => {
   });
 });
 
-// THE DERIVED STYLE ITSELF LEFT THIS FILE ON 2026-09-18 — the absolute fill, the proxied box, and
-// the late re-derive when the owner is resized are all `foldImageBackgroundImageProps` in
-// `SymbioteFabricProps.cpp`, asserted against the committed payload in
-// `core/engine/cpp/tests/js/image-background-image-payload.itest.ts`.
-//
-// Five cases went, and the two worth naming are the RE-DERIVE pair, because they are not fold
-// content: they pin that a write to the OWNER after the first commit marks the derived image dirty
-// (`slotDerived`), which is JS's and stays a real invariant. They moved rather than being deleted —
-// their subject is reachable only where the rule runs, and asserting a frozen proxy needs a harness
-// that can produce an unfrozen one.
-//
-// What stays here is the COMPOSITION this primitive owns and no rule can see: which node each prop
+// The derived style (fill, proxied box, re-derive on resize) is `foldImageBackgroundImageProps`
+// in C++ now (`image-background-image-payload.itest.ts`). What stays: which node each prop
 // lands on, and that `imageStyle` reaches the image's own style slot.
 describe('the ImageBackground behavior — the image style it derives', () => {
   it('merges imageStyle last, so a caller overrides the absolute fill', () => {

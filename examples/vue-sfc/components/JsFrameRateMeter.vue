@@ -58,6 +58,10 @@ const SAMPLE_WINDOW_MS = 500;
 const EMPTY_COMMIT_SAMPLE: ICommitProfile = {
   commits: 0,
   propWrites: 0,
+  nodesCreated: 0,
+  applyCalls: 0,
+  applyMs: 0,
+  decodeMs: 0,
 };
 
 const framesPerSecond = ref(0);

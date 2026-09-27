@@ -35,7 +35,7 @@ import {
   type OnDestroy,
   type SimpleChanges,
 } from '@angular/core';
-import { dlog } from '@symbiote-native/engine';
+import { dlog, isDebug } from '@symbiote-native/engine';
 import { countAngular } from '../../diagnostics';
 import type { ISeparators } from '@symbiote-native/components';
 
@@ -129,9 +129,10 @@ export class VListOutletDirective<C = unknown> implements OnChanges, OnDestroy {
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['templateRef'] !== undefined) {
-      dlog(
-        `Angular VListOutlet#${this.instanceId} templateRef CHANGED (was=${changes['templateRef'].previousValue !== undefined} now=${this.templateRef !== undefined}) -> clear + recreate`,
-      );
+      if (isDebug())
+        dlog(
+          `Angular VListOutlet#${this.instanceId} templateRef CHANGED (was=${changes['templateRef'].previousValue !== undefined} now=${this.templateRef !== undefined}) -> clear + recreate`,
+        );
       this.viewContainer.clear();
       countAngular('outletCreates');
       this.viewRef =
@@ -145,9 +146,10 @@ export class VListOutletDirective<C = unknown> implements OnChanges, OnDestroy {
     }
     if (this.viewRef !== null && this.context !== undefined) {
       countAngular('outletUpdates');
-      dlog(
-        `Angular VListOutlet#${this.instanceId} context updated, markForCheck`,
-      );
+      if (isDebug())
+        dlog(
+          `Angular VListOutlet#${this.instanceId} context updated, markForCheck`,
+        );
       this.updateContext(this.viewRef.context, this.context);
       this.viewRef.markForCheck();
     }
@@ -155,7 +157,7 @@ export class VListOutletDirective<C = unknown> implements OnChanges, OnDestroy {
 
   ngOnDestroy(): void {
     countAngular('outletDestroys');
-    dlog(`Angular VListOutlet#${this.instanceId} destroyed`);
+    if (isDebug()) dlog(`Angular VListOutlet#${this.instanceId} destroyed`);
     this.viewContainer.clear();
   }
 

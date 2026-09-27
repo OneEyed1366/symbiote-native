@@ -1,5 +1,5 @@
 **Status: real content, verbatim.** `ios/`, `android/`, and `Gemfile` are a direct copy of
-`examples/react`'s equivalents (2026-08-12) — the shared, framework-agnostic native shell every
+`examples/react`'s equivalents — the shared, framework-agnostic native shell every
 `--framework` value uses, per `<native_core_is_untouched>` (root `CLAUDE.md`). Source of truth
 going forward: re-sync from `examples/react` when they change, not from any other example
 (they're expected to differ only cosmetically — bootsplash asset IDs, `Podfile.lock`
@@ -12,7 +12,7 @@ populated `templates/js/*` independently flagged its absence as a gap. `Gemfile.
 deliberately NOT copied, same reasoning as excluding `package-lock.json` from the JS
 overlays — a lockfile is generated fresh, never templated.
 
-## Renaming (2026-09-15)
+## Renaming
 
 Every file still says **"Canary"** in the template — `src/utils/apply-app-identity.ts` runs as a
 post-pass over the already-scaffolded tree (never over `templates/` itself) and substitutes the

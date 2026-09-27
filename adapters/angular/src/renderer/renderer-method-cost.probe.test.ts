@@ -1,9 +1,7 @@
 // WHERE THE REST OF AN ANGULAR CREATE GOES, split between this renderer and Angular itself.
 //
-// After the styling work of 2026-09-18 the engine's own halves are at parity with Vue's on the
-// headless bench arm — walk 26 against 28.6, `apply` 43 against 44.6, `fabric` and `layout`
-// identical — while the wall clock is 182 against 138. So the whole remaining deficit is JS above
-// the engine, and "Angular's machinery" is the usual explanation without ever having been measured.
+// The engine's own halves are at parity with Vue's on the headless bench arm; the wall-clock gap
+// is entirely JS above the engine — "Angular's machinery" is the usual explanation, unmeasured.
 //
 // It is two different things wearing one name: Angular's own work (an LView, a DI scope, the
 // template function) and OUR `Renderer2` implementation, which Angular calls ~30 000 times for a

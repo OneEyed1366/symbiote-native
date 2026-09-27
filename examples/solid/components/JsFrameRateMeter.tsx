@@ -50,6 +50,10 @@ interface IJsFrameRateMeterProps {
 const EMPTY_COMMIT_PROFILE: ICommitProfile = {
   commits: 0,
   propWrites: 0,
+  nodesCreated: 0,
+  applyCalls: 0,
+  applyMs: 0,
+  decodeMs: 0,
 };
 
 // `readCommitProfile()` is read-and-RESET, and this meter calls it once per window off rAF. A

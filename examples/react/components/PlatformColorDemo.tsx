@@ -2,6 +2,7 @@ import {
   useColorScheme,
   PlatformColor,
   DynamicColorIOS,
+  Platform,
 } from '@symbiote-native/react';
 
 // PlatformColor / DynamicColorIOS resolve on the native side: 'systemBlue' / 'label'
@@ -19,27 +20,35 @@ export function PlatformColorDemo() {
       <view className="row">
         <view
           className="color-tile"
-          style={{ backgroundColor: PlatformColor('systemBlue') }}
+          style={{
+            backgroundColor: PlatformColor(
+              'systemBlue',
+              '@android:color/holo_blue_dark',
+            ),
+          }}
         >
           <text className="tile-label">systemBlue</text>
         </view>
-        <view
-          className="color-tile-bordered"
-          style={{
-            backgroundColor: DynamicColorIOS({
-              light: '#dbeafe',
-              dark: '#13243a',
-            }),
-            borderColor: PlatformColor('separator'),
-          }}
-        >
-          <text
-            className="bold-label"
-            style={{ color: PlatformColor('label') }}
+        {/* DynamicColorIOS throws off iOS, as in RN */}
+        {Platform.OS === 'ios' && (
+          <view
+            className="color-tile-bordered"
+            style={{
+              backgroundColor: DynamicColorIOS({
+                light: '#dbeafe',
+                dark: '#13243a',
+              }),
+              borderColor: PlatformColor('separator'),
+            }}
           >
-            dynamic
-          </text>
-        </view>
+            <text
+              className="bold-label"
+              style={{ color: PlatformColor('label') }}
+            >
+              dynamic
+            </text>
+          </view>
+        )}
       </view>
     </view>
   );

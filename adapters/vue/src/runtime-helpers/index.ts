@@ -57,9 +57,9 @@ import { descriptorFor, SWITCH_TAG } from '@symbiote-native/components';
 // idiom the engine resolves in `routeProp` (`isStyleCallback`); Vue's normaliser is DOM-shaped and
 // cannot know that.
 //
-// Measured 2026-09-01 through the real SFC pipeline, which is the ONLY path that reaches this:
-// `h(Component, { ...bag })` skips `normalizeProps` entirely and shows the style arriving intact,
-// so a probe written that way reports the bug as absent.
+// Reachable only through the real SFC pipeline: `h(Component, { ...bag })` skips
+// `normalizeProps` entirely and shows the style arriving intact, so a probe written that way
+// reports the bug as absent.
 //
 //   <View v-bind="bag">       fn style   committed {testID}              <- style gone
 //   <Pressable v-bind="bag">  fn style   committed {testID}              <- style gone
@@ -152,9 +152,7 @@ export const vShow: ObjectDirective<ISymbioteNode, boolean> = {
   unmounted: el => pendingShowCommits.get(el)?.(),
 };
 
-// `v-model` on an ELEMENT, which is what `<text-input>` is. Device-found 2026-08-31 in
-// examples/vue-sfc's canary: the field echoed keystrokes and the greeting beside it never left
-// "Hello, stranger".
+// `v-model` on an ELEMENT, which is what `<text-input>` is.
 //
 // THE COMPILER PICKS A DIFFERENT TARGET FOR AN ELEMENT THAN FOR A COMPONENT, and that is the whole
 // defect. On a component `v-model="name"` expands to the prop/emit pair `modelValue` +
@@ -282,11 +280,9 @@ function syncModelListener(el: ISymbioteNode, state: IModelState): void {
   setProp(el, 'onValueChange', state.listener);
 }
 
-// Vue's compiler picks the directive by ELEMENT, and for anything it does not recognise as a DOM
-// input it emits `vModelText` — `<switch>` included. Stringifying there is what
-// upstream must do (a DOM input's value IS a string) and what we must not: the Switch behavior
-// reads `props.value === true`, so `String(true)` pins the control OFF and no tap can move it.
-// Device-confirmed on `examples/vue-sfc` 2026-09-02, both switches on `CanaryScreen`.
+// Vue's compiler picks the directive by ELEMENT: anything not recognised as a DOM input gets
+// `vModelText` — `<switch>` included. Stringifying is fatal here: Switch reads
+// `props.value === true`, so `String(true)` pins the control OFF and no tap can move it.
 //
 // Resolved through the shared descriptor table rather than a literal Fabric name, so the check
 // follows the platform the bundle actually loaded (iOS `Switch`, Android `AndroidSwitch`) instead
@@ -418,22 +414,12 @@ type IEventHandler<TEvent> = ((event: TEvent, ...args: never[]) => unknown) & {
   _withMods?: Record<string, IEventHandler<TEvent>>;
 };
 
-/**
- * Render-function/compiled-template equivalent of `v-on.stop`/`.prevent`/`.self`/etc. `fn` is
- * typed as required, matching upstream Vue's own declaration — its runtime-only `!fn` guard below
- * (for a compiler-generated call site that could pass a falsy handler) isn't reflected in the
- * type there either.
- *
- * `@press.self` on an element reaches this, and both halves were measured 2026-09-11 rather
- * than assumed — the question arose because a modifier on a COMPONENT takes Vue's own event path
- * and only an element emits the helper. `<pressable @press.self>` compiles to
- * `_withModifiers(fn, ["self"])` imported `from "@symbiote-native/vue/runtime-helpers"` (the Metro
- * transformer retargets every compiled `from 'vue'`), so the compiler-emitted call lands here and
- * not on @vue/runtime-dom's. And `ISymbioteEvent` (`core/engine/src/node.ts`) declares `target`,
- * `currentTarget` and `stopPropagation` as REQUIRED fields with the DOM semantics these guards
- * read, so `.self` genuinely filters a bubbled press instead of degenerating to
- * `undefined !== undefined`.
- */
+// Render-function/compiled-template equivalent of `v-on.stop`/`.prevent`/`.self`/etc. `fn` is
+// typed as required, matching upstream Vue's own declaration.
+
+// `@press.self` on an element reaches this — a modifier on a COMPONENT takes Vue's own event
+// path, only an element emits the helper. `ISymbioteEvent` declares `target`/`currentTarget`/
+// `stopPropagation` as REQUIRED fields with DOM semantics, so `.self` genuinely filters.
 export function withModifiers<TEvent extends IModifierGuardableEvent>(
   fn: IEventHandler<TEvent>,
   modifiers: readonly IEventModifier[],

@@ -103,14 +103,9 @@ export namespace JSX {
     key?: string | number | symbol;
     [name: string]: unknown;
   }
-  // `key` and `ref` are NOT admitted by `IntrinsicAttributes` above for a string-named (intrinsic)
-  // element — that interface's merge only reaches value-based/component elements. Measured
-  // 2026-09-13: `<pressable key={x} .../>` inside a `.map()` reported `Property 'key' does not
-  // exist` the moment `pressable` was crossed to a real (non-index-signature) type. `IViewProps`/
-  // `ITextProps` happen to declare `key`/`ref` themselves (predating this cross-typing pass); the
-  // other 16 do not. Adding both HERE, once, generically, is what lets every crossed prop type stay
-  // exactly what the adapter exports — no duplicate `key?`/`ref?` fields to keep in step across 18
-  // files, and no risk of a 19th tag joining the map without them.
+  // `key`/`ref` are NOT admitted by `IntrinsicAttributes` above for a string-named element — its
+  // merge only reaches value-based/component elements. Adding both HERE lets every crossed prop
+  // type stay exactly what the adapter exports, with no duplicate fields to keep in step per tag.
   type IWithJsxAttrs<Props> = Props & {
     key?: string | number | symbol;
     ref?: import('@vue/runtime-core').VNodeRef;

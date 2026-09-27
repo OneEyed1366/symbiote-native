@@ -126,3 +126,27 @@ describe('isOpaqueColorValue / isProcessableColor — returns false for anything
     expect(isProcessableColor(undefined)).toBe(false);
   });
 });
+
+// why: Android's ColorPropConverter reads ONLY `resource_paths` and throws "The `resource_paths`
+// must be an array" on any other map. The C++ color seam hands the object to Fabric verbatim, so
+// the iOS `{ semantic }` shape on Android is a red-box on the first PlatformColor, device-only.
+describe('android constructors', () => {
+  it('PlatformColor builds the resource_paths shape and still routes through the color seam', async () => {
+    const android = await import('./index.android');
+    const color = android.PlatformColor(
+      '?android:attr/textColor',
+      '@android:color/black',
+    );
+    expect(color).toEqual({
+      resource_paths: ['?android:attr/textColor', '@android:color/black'],
+    });
+    expect(isOpaqueColorValue(color)).toBe(true);
+  });
+
+  it('DynamicColorIOS throws, as RN does off iOS', async () => {
+    const android = await import('./index.android');
+    expect(() =>
+      android.DynamicColorIOS({ light: '#fff', dark: '#000' }),
+    ).toThrow('DynamicColorIOS is not available on this platform.');
+  });
+});

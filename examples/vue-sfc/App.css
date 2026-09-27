@@ -1,20 +1,14 @@
 /* Symbiote canary app — static styles, compiled at build time by @symbiote-native/css-parser
-   into the same RN style objects StyleSheet.create used to produce (see the
-   symbiote-sfc-style-compiler skill). Referenced via `class` across every navigation-demo
-   screen under ./screens (and ./components/ActionButton.vue) — a genuinely GLOBAL stylesheet,
-   ported verbatim from .examples/react/App.css (byte-identical, only --line-primitives and its
-   one literal-hex duplicate below swapped to Vue's brand green). Imported once via a plain
-   `import './App.css'` in App.vue's <script setup> (see the `symbiote-sfc-style-compiler`
-   skill's "standalone .css import" note) — the class-name registry it populates is shared by
-   every adapter file that renders a `class` prop, not scoped to App.vue itself, so every screen
-   under ./screens resolves these classes without importing this file again. This is a SECOND,
-   deliberately global styling mechanism alongside the existing per-component `<style scoped>`
-   blocks under ./components (and CanaryScreen.vue, which keeps its own local scoped block) —
-   the right tool for CSS that many independent screens genuinely share, vs. CSS that is
-   genuinely local to one component. `transform`/`transformOrigin`/`filter`/`box-shadow`/
-   `background-image` ARE supported (raw CSS-text passthrough, 2026-07 — see .gradient-card
-   below) — CanaryScreen.vue's existing shadow-card/filter-tile/rotated-card demos just predate
-   that and still use inline dynamic style, which is still valid, not a gap. */
+   into the same RN style objects StyleSheet.create used to produce (symbiote-sfc-style-compiler
+   skill). Referenced via `class` across every navigation-demo screen under ./screens — a
+   genuinely GLOBAL stylesheet, imported once via `import './App.css'` in App.vue's <script setup>
+   (standalone .css import note); the class-name registry it populates is shared by every adapter
+   file that renders a `class` prop, so every screen resolves these classes without re-importing.
+   A SECOND, deliberately global styling mechanism alongside per-component `<style scoped>` blocks
+   under ./components — the right tool for CSS many screens genuinely share, vs. CSS local to one
+   component. `transform`/`transformOrigin`/`filter`/`box-shadow`/`background-image` ARE supported
+   (raw CSS-text passthrough, see .gradient-card below) — inline dynamic style in CanaryScreen.vue's
+   shadow-card/filter-tile/rotated-card demos is still valid, not a gap. */
 
 :root {
   /* app-wide surface/text tokens — same values already used ad hoc across this file; named here
@@ -400,11 +394,10 @@
   background-color: #0f1e30;
 }
 
-/* App / CanaryScreen — retokenized onto the shared --ink/--paper/--mist/--chalk palette (2026-07
-   cohesion pass); accent chrome uses --line-primitives, CanaryScreen's own tour-line color (its
-   line-tag is "CN · PRIMITIVES LINE"). Demo colors that ARE the content — the shadow-card glow,
-   the rainbow chip hues, per-feature ActionButton tints in CanaryScreen.tsx/components/* — are
-   deliberately left alone; only chrome that used to duplicate these tokens ad hoc changed. */
+/* App / CanaryScreen chrome uses the shared --ink/--paper/--mist/--chalk palette; accent chrome
+   uses --line-primitives, CanaryScreen's own tour-line color ("CN · PRIMITIVES LINE"). Demo colors
+   that ARE the content — the shadow-card glow, rainbow chip hues, per-feature ActionButton tints —
+   are deliberately left alone. */
 .screen {
   flex: 1;
   background-color: var(--ink);

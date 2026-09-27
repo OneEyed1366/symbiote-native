@@ -441,9 +441,8 @@ describe('Svelte style forms — compiled markup vs. registered styles', () => {
     });
 
     // why: `class:foo={cond}` names its class in the DIRECTIVE, where the class-attribute rewrite
-    // cannot see it — it shipped unscoped until 2026-08-20 while the stylesheet registered the
-    // scoped name, so the rule was unreachable. Only a host element can carry the form (Svelte
-    // rejects it on a component, the cell above), which makes this the one place it is testable.
+    // cannot see it. Only a host element can carry the form (Svelte rejects it on a component,
+    // the cell above), which makes this the one place it is testable.
     it('scopes a class: directive token on a host element', async () => {
       const code = await driveToRegistry(
         '<script>let on = true;</script>\n' +
@@ -457,11 +456,9 @@ describe('Svelte style forms — compiled markup vs. registered styles', () => {
     });
   });
 
-  // Every one of these is a language whose syntax is NOT valid CSS. Until 2026-08-20 the block
-  // was located with `svelte/compiler`'s `parse()`, which validates <style> content as CSS
-  // whatever `lang` says, so a `$variable` threw `css_expected_identifier` and only the subset of
-  // SCSS that happens to be legal CSS (nesting) worked. The block is cut out textually now, the
-  // way svelte's own `preprocess()` does it, so the language table is actually reachable.
+  // Every one of these is a language whose syntax is NOT valid CSS. The block is cut out
+  // textually, the way svelte's own `preprocess()` does it — `svelte/compiler`'s `parse()` would
+  // validate it as CSS regardless of `lang`, throwing on anything but legal-CSS nesting.
   describe('Positive — <style lang> preprocessors', () => {
     it('compiles a SCSS variable', async () => {
       const code = await driveToRegistry(

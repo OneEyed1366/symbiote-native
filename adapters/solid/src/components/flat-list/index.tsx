@@ -40,6 +40,7 @@ import {
   expandRowViewability,
   firstItemOfRow,
   lastItemOfRow,
+  removeClippedSubviewsOrDefault,
   rowKeyExtractor,
   type IRow,
   type ISeparatorProps,
@@ -47,6 +48,7 @@ import {
   type IViewableItemsChangedInfo,
 } from '@symbiote-native/components';
 import {
+  Platform,
   dlog,
   resolveClassName,
   type IStyleProp,
@@ -98,6 +100,9 @@ const COLUMN_STYLE: IViewStyle = { flex: 1 };
 
 export function FlatList<ItemT>(props: IFlatListProps<ItemT>): JSX.Element {
   const [, passthrough] = splitProps(props, OWN_PROPS);
+  // FlatList.js always sends it, defaulted per platform.
+  const removeClippedSubviews = (): boolean =>
+    removeClippedSubviewsOrDefault(props.removeClippedSubviews, Platform.OS);
 
   const columnCount = (): number => props.numColumns ?? SINGLE_COLUMN;
   // RN treats anything at or below one column as an ordinary single-column list rather than an
@@ -202,6 +207,7 @@ export function FlatList<ItemT>(props: IFlatListProps<ItemT>): JSX.Element {
       fallback={
         <VirtualizedList<ItemT>
           {...passthrough}
+          removeClippedSubviews={removeClippedSubviews()}
           data={props.data}
           getItem={(_source: unknown, index: number): ItemT =>
             props.data[index]
@@ -217,6 +223,7 @@ export function FlatList<ItemT>(props: IFlatListProps<ItemT>): JSX.Element {
     >
       <VirtualizedList<IRow<ItemT>>
         {...passthrough}
+        removeClippedSubviews={removeClippedSubviews()}
         data={rows()}
         getItem={(_source: unknown, index: number): IRow<ItemT> =>
           rows()[index]

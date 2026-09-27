@@ -89,6 +89,21 @@ describe('DeviceSensor', () => {
       expect(sensor.hasListeners()).toBe(false);
     });
 
+    it('tolerates a subscription being removed twice, and removeSubscription() on an already-removed one', () => {
+      // why: a listener effect's cleanup can race an unmount that already tore the subscription
+      // down (React StrictMode double-invoke, an unrelated removeAllListeners()) — a second
+      // .remove() must be a no-op, not a throw that breaks the app's teardown path.
+      const nativeModule = createFakeNativeModule();
+      const sensor = new DeviceSensor(nativeModule, 'mockDidUpdate');
+      const subscription = sensor.addListener(() => {});
+
+      subscription.remove();
+      expect(sensor.hasListeners()).toBe(false);
+
+      expect(() => subscription.remove()).not.toThrow();
+      expect(() => sensor.removeSubscription(subscription)).not.toThrow();
+    });
+
     it('removeSubscription() removes via the subscription object, for callers holding a pre-subscription reference', () => {
       // why: upstream expo-sensors kept this method only for callers still holding an
       // EventSubscription from before addListener() itself started returning one.

@@ -120,6 +120,18 @@ describe('Solid Modal on the engine', () => {
       expect(committedModal().payload.visible).toBe(true);
     });
 
+    // why: Modal.js `defaultProps.visible = true` — a `<Modal>` without `visible` shows.
+    it('shows a modal written without visible, as RN defaults it', async () => {
+      mount(ROOT_TAG, () => (
+        <Modal>
+          <view />
+        </Modal>
+      ));
+      await tick();
+
+      expect(committedModal().payload.visible).toBe(true);
+    });
+
     // why: shouldRenderModal's boolean is core-tested directly; this proves the <Show> gate actually
     // keeps the node out of a real commit rather than committing an invisible placeholder host.
     it('commits no modal node when visible starts false', async () => {
@@ -158,7 +170,9 @@ describe('Solid Modal on the engine', () => {
     // render effect placed too early, or an effect that reads state and so never re-runs), the node
     // would stay committed forever after the app closed the modal — and the app would be stuck
     // behind an invisible full-screen window.
-    it('drops the committed node once a native requestClose settles the hide transition', async () => {
+    // Modal.js (iOS): the hide keeps the node through the native exit animation; only the native
+    // dismiss drops it.
+    it('holds the node after a requestClose and drops it on the native dismiss', async () => {
       const [visible, setVisible] = createSignal(true);
       mount(ROOT_TAG, () => (
         <Modal visible={visible()} onRequestClose={() => setVisible(false)}>
@@ -167,10 +181,14 @@ describe('Solid Modal on the engine', () => {
       ));
       await tick();
       expect(findCommittedModal()).toBeDefined();
+      const handle = modalHandle();
 
-      fabric.fireEvent(modalHandle(), 'topRequestClose', {});
+      fabric.fireEvent(handle, 'topRequestClose', {});
       await tick();
+      expect(findCommittedModal(), 'held for the exit animation').toBeDefined();
 
+      fabric.fireEvent(handle, 'topDismiss', {});
+      await tick();
       expect(findCommittedModal()).toBeUndefined();
     });
   });
@@ -225,6 +243,8 @@ describe('Solid Modal on the engine', () => {
         modalsCreated(),
         'the hide transition must not build anything',
       ).toBe(1);
+      fabric.fireEvent(modalHandle(), 'topDismiss', {});
+      await tick();
 
       setVisible(true);
       await tick();
@@ -365,8 +385,7 @@ describe('Solid Modal on the engine', () => {
         'the hide transition must not synthesize a dismiss',
       ).toBe(0);
 
-      // The node is unmounted by now, but the native event still reaches the listener the host node
-      // carried — which is what makes "onDismiss is native-only" observable at all.
+      // Still held (iOS keep-alive); the native dismiss is what reaches the app.
       fabric.fireEvent(handle, 'topDismiss', {});
       expect(dismissCount).toBe(1);
     });
