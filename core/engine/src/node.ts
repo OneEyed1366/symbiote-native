@@ -1,5 +1,5 @@
 // The mutation API. Adapters call it; every call appends an OPCODE to `mutation-buffer.ts` and
-// nothing else. There is no tree here — no parent, no children, no props, no mirror. Turning the
+// nothing else. There is no tree here - no parent, no children, no props, no mirror. Turning the
 // buffer into a tree is the HOST's job (`tree-host.ts`).
 
 // What a node still legitimately owns is what the framework, not Fabric, put on it: the Fabric view

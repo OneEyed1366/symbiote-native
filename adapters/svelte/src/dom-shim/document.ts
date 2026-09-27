@@ -1,15 +1,13 @@
-// The shim's `document` singleton — the six factories `init_operations()` and `from_tree`
-// require (svelte-adapter-dom-shim skill §3b), plus the two cheap stubs §4 calls for
-// explicitly (`document.body`, `getComputedStyle`) so a forbidden/dead path degrades to a
-// harmless no-op instead of a hard crash. No `<svelte:head|window|body|document>` support
-// beyond that stub — those tags are rejected at build time by the preprocessor (§7), not
-// handled here.
+// The shim's `document` singleton - the six factories `init_operations()`/`from_tree` require,
+// plus `document.body` (a minimal unattached node) and `getComputedStyle` (computed-style.ts).
+// No `<svelte:head|window|body|document>` - rejected at build time by the preprocessor.
 
 import { ShimElement } from './element';
 import { ShimText } from './text';
 import { ShimComment } from './comment';
 import { ShimDocumentFragment } from './document-fragment';
 import { registerShimDocumentFactory, type ShimNode } from './shim-node';
+import { computedStyleOf, type IComputedStyle } from './computed-style';
 
 export class ShimDocument {
   // The delegation root real Svelte events bubble toward (`dom/elements/events.js:122`).
@@ -60,11 +58,10 @@ export class ShimDocument {
     return node.cloneNode(deep);
   }
 
-  // §4: not read by any mandatory path; stubbed so a forbidden transition (which we reject
-  // at build time anyway, §7) degrades to an inert value rather than a hard crash if it is
-  // ever reached some other way.
-  getComputedStyle(): Record<string, never> {
-    return {};
+  // Kept in step with the bare global patch-globals.ts installs (computed-style.ts is the one
+  // implementation both call).
+  getComputedStyle(element: ShimElement): IComputedStyle {
+    return computedStyleOf(element);
   }
 }
 
