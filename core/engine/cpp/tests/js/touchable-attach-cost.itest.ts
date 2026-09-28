@@ -5,6 +5,7 @@ import {
   ANCHOR_COMPONENT,
   appendChild,
   createElement,
+  setBehaviorListener,
 } from '@symbiote-native/engine';
 import { takeBatch } from '@symbiote-native/engine/mutation-buffer';
 import {
@@ -40,6 +41,21 @@ const MACHINE_BUDGET = 3;
 // the same shape. Building the timing state at arm read 8.9x and deferring it reads 2.8x, so the
 // bound sits between; what is left is twf's per-item refinement closure against tnf's module one
 const TWF_OVER_TNF_BUDGET = 4;
+
+// What a `<text-input>` installs: the press machine's seven plus its own four
+const ELEVEN_NAMES: readonly string[] = [
+  'press',
+  'pressIn',
+  'pressOut',
+  'startShouldSetResponder',
+  'responderMove',
+  'responderTerminationRequest',
+  'responderGrant',
+  'change',
+  'focus',
+  'blur',
+  'selectionChange',
+];
 
 type IReading = { readonly bytes: number; readonly wall: number };
 
@@ -150,6 +166,36 @@ describe('mounting a touchable-opacity', () => {
     // `touchable-without-feedback` builds a per-item one plus its timing state, and that gap is
     // the only thing between two tags with the same shape
     expect(twfOver).toBeLessThan(tnfOver * TWF_OVER_TNF_BUDGET);
+  });
+
+  // What one installed dispatcher costs, which is the quantity every remaining behavior cost is
+  // made of: a `<text-input>` installs ELEVEN, a pressable seven
+  it('charges a flat price per installed listener, whatever the count', () => {
+    const bare = measure(() => createElement('RCTView'));
+    const one = measure(() => {
+      const node = createElement('RCTView');
+      setBehaviorListener(node, 'press', () => undefined);
+      return node;
+    });
+    const eleven = measure(() => {
+      const node = createElement('RCTView');
+      for (const name of ELEVEN_NAMES)
+        setBehaviorListener(node, name, () => undefined);
+      return node;
+    });
+
+    const first = one.bytes - bare.bytes;
+    const each = (eleven.bytes - one.bytes) / (ELEVEN_NAMES.length - 1);
+    print(
+      `DEBUG TOUCHABLE listeners bare ${bare.bytes.toFixed(0)}B ` +
+        `one ${one.bytes.toFixed(0)}B eleven ${eleven.bytes.toFixed(0)}B :: ` +
+        `first ${first.toFixed(0)}B each ${each.toFixed(0)}B ` +
+        `eleven of them ${(first + each * 10).toFixed(0)}B`,
+    );
+
+    // The FIRST one pays for the `Map` as well, so it must cost more than the ten after it. A
+    // per-listener price that caught up with the first would mean the map is being rebuilt
+    expect(first).toBeGreaterThan(each);
   });
 });
 

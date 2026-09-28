@@ -1389,6 +1389,21 @@ Still owed on the instrument: a settled reading in the other four screens (Vue `
   the_shape_to_reuse: "a behavior's `attach` runs inside `createElement`, so ANYTHING it builds is
                        paid by every node in a list and collected by almost all of them. Ask of
                        each allocation: is it read before the user touches the thing",
+  THE_LAST_ITEM_PRICED: "`touchable-attach-cost.itest.ts` case 4 prices an installed dispatcher:
+                         first 344 B (it pays for the `Map` too), each after it 147 B. The model
+                         checks out against the machine measured separately, 344 + 6 x 147 = 1 226
+                         against 1 328. So a `<text-input>`'s ELEVEN cost ~1.8 KB of its 5.2 KB per
+                         node and a pressable's seven ~1.2 KB of its 2.6, which makes the listener
+                         install the largest remaining behavior cost anywhere",
+  what_that_opens: "§18v rejected one shared dispatcher keyed on `event.type` on TIME (0.3 us) and
+                    on legibility, and the BYTES are a different quantity it never saw. A shared
+                    dispatcher drops the closure and keeps the `Map` entry, so ~70 B of the 147.
+                    The whole 1 816 needs the engine to ask `node.hostBehavior` by name instead of
+                    holding a slot per name, which is a dispatch-contract change and a DECISION,
+                    not a loop step"
+                   -> "a recorded negative is re-checked when the QUANTITY changes, not only when
+                       the ruler does. This one was priced in microseconds and the question that
+                       matters now is kilobytes",
 }
 ```
 
