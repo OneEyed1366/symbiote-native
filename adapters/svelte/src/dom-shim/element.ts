@@ -299,7 +299,11 @@ export class ShimElement extends ShimElementBase {
   // `flip`'s `get_zoom()` walks this until `null`; without it the walk hit `undefined` and threw
   // `Cannot read properties of undefined ('parentElement')`, aborting the whole reorder.
   get parentElement(): ShimElement | null {
-    return this.parent instanceof ShimElement ? this.parent : null;
+    const result = this.parent instanceof ShimElement ? this.parent : null;
+    dlog(
+      `parentElement tag=${this.tagName} -> ${result === null ? 'null' : result.tagName}`,
+    );
+    return result;
   }
 
   // `flip` divides by these for its scale factor; unset they read as `NaN`, not zero.
@@ -323,6 +327,9 @@ export class ShimElement extends ShimElementBase {
     const rect = isSymbioteNode(node)
       ? getBoundingClientRect(node, false)
       : undefined;
+    dlog(
+      `getBoundingClientRect tag=${this.tagName} hasNode=${isSymbioteNode(node)} rect=${JSON.stringify(rect)}`,
+    );
     const { x, y, width, height } = rect ?? { x: 0, y: 0, width: 0, height: 0 };
     return {
       x,
