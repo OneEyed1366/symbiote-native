@@ -42,7 +42,6 @@
   import FeatureParityChecksDemo from '../components/FeatureParityChecksDemo.svelte';
   import ScrollParityDemo from '../components/ScrollParityDemo.svelte';
   import StyleShowcaseDemo from '../components/StyleShowcaseDemo.svelte';
-  import TransitionAnimateDemo from '../components/TransitionAnimateDemo.svelte';
   // createTunnel: the Svelte answer to Vue's Teleport (neither Svelte nor Vue has a reconciler,
   // so neither has React createPortal's Fiber-level hook point either).
   import TunnelToastDemo from '../components/TunnelToastDemo.svelte';
@@ -394,8 +393,6 @@
     <CompoundClassDemo />
     <!-- Parity checks: longPress · Keyboard.dismiss · animated scroll · sticky · a11y focus -->
     <ParityDemo />
-    <!-- transition:fade / animate:flip against the dom-shim -->
-    <TransitionAnimateDemo />
     <!-- Modal, its own native window -->
     <ModalDemo />
     <!-- Only the press-state-dependent colors stay a style function (tag resolves it at both
