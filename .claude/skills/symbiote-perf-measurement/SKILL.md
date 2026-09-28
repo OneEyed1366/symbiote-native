@@ -1407,6 +1407,51 @@ Still owed on the instrument: a settled reading in the other four screens (Vue `
 }
 ```
 
+### 25. The dispatch contract, taken: a behavior installs zero listeners per node
+
+```
+25 := {
+  the_decision_24_deferred: "§23's `what_that_opens` called the shared dispatcher a contract change
+                             and a DECISION. It was taken: `ISymbioteNode.dispatch` holds ONE
+                             module-level `IEventDispatch` (`{names, deliver}`) and the engine asks
+                             it through `listenerFor` / `hasListenerFor` when `node.listeners` has
+                             no slot. Six read sites in `events/` route through the pair",
+  why_a_field_and_not_a_WeakMap: "the same reason `hostBehavior` is one: every lookup on every
+                                  ancestor of every event reads it, and every node already pays a
+                                  declared slot in the one hidden class `node-instance.ts` mints",
+  the_closure_moved: "`listenerFor` builds ONE closure per DELIVERED event where `attach` built
+                      seven per MOUNTED node. `name` is bound there rather than read off
+                      `event.type`, so a caller constructing its own event (every test driving a
+                      behavior by hand) reaches the same handler",
+  measured: "`touchable-attach-cost.itest.ts`, -O bytecode, per node: machine 1 328 -> 0 B, and 0
+             is literal, not rounded. Per 1 000 items: pressable 2 559 -> 1 263 KB ·
+             touchable-opacity 6 992 -> 3 584 · button 7 259 -> 4 068 · text-input 5 167 -> 3 824 ·
+             twf 6 800 -> 5 503",
+  the_second_half: "`touchable-opacity`'s `attach` still built an `AnimatedValue`, a feedback
+                    runtime and a timer `Set` per node, 1 343 B, which §23 had read as 'the layer'
+                    т.к. the machine beside it was larger. Deferred to `stateOf`, called from the
+                    refinement and from the re-settle branch of `afterCommit`. The mount branch of
+                    `afterCommit` moved to its own `settledAt` map, т.к. it runs for every mounted
+                    node while the fade state is owed only by one that fades. layer 1 343 -> 63 B",
+  the_gates_had_to_be_REWRITTEN: "both were a multiple of `machine`, and `machine` is now zero: a
+                                  ratio against zero carries no verdict. Re-expressed against the
+                                  plain node, bounds from the measured separation (§11): machine
+                                  0 vs 945 broken -> 0.25x · layer 63 vs 1 423 broken -> 0.5x.
+                                  Both break-tested by re-adding the eager build",
+  and_CALIBRATED_PER_BUILD: "§11 again, and it fired on the first CI-shaped run: the assert build
+                             charges its own per-attach bookkeeping (machine 304 B, layer 560),
+                             so a release-calibrated byte budget reports a regression that does not
+                             ship. Both gates are `isBenchBuild` now and print otherwise",
+  a_fixture_went_stale_with_it: "`text-input-attach-ladder.itest.ts` counted `listeners.size` and
+                                 imitated the machine's interior in a `bench-b5` rung. The rung
+                                 priced a shape production no longer has, so it was deleted rather
+                                 than left green; the structural gate now reads `hasListenerFor`",
+  what_is_left: "a `<text-input>`'s own FOUR listeners, ~590 B per node, and the eight remaining
+                 behaviors that still install per name (text-input, switch, refresh-control, twf,
+                 tnf, touchable-highlight, scroll-view responder/shared/sticky)",
+}
+```
+
 ### 24. The gated-listener clear, priced and KEPT
 
 ```
