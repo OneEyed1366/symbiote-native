@@ -1362,8 +1362,22 @@ Still owed on the instrument: a settled reading in the other four screens (Vue `
                          using default'). Seven adapter cases asserted the old non-parity value and
                          were rewritten; an authored `style.opacity` is unaffected, it reaches
                          Fabric through the ordinary style path",
-  what_is_left: "the whole touchable family sits at ~8 MB / 1 000 against pressable's 3.6 —
-                 the press machine and what each touchable adds over it is the next target",
+  then_the_machine: "same shape one layer down. `attach` built the gesture runtime (timers Set,
+                     press runtime, a host of four closures, the nine-field state, the WeakMap
+                     entry) and NOTHING reads any of it outside `dispatch`. Built in `stateOf` on
+                     the first event instead; `attach` installs the seven dispatchers, and the
+                     per-behavior options bag is hoisted out of the per-node closure.
+                     machine 2 353 -> 1 328 B, 1.85 -> 1.37 us, on EVERY tag carrying it:
+                     pressable 3 561 -> 2 559 KB / 1 000 · touchable-highlight 5 531 -> 4 531 ·
+                     touchable-native-feedback 7 614 -> 6 692 · touchable-without-feedback
+                     8 105 -> 7 183 · text-input 6 090 -> 5 168 · touchable-opacity 7 992 -> 6 992 ·
+                     button 8 259 -> 7 259. Cumulative on button: 74.5 ms / 26 127 KB -> 33.7 / 7 259",
+  the_pattern: "both fixes are one question asked twice: WHO READS THIS, and is any of them
+                reachable before the user touches the thing. A behavior's `attach` runs inside
+                `createElement`, so everything it builds is paid by every node in a list and
+                collected by almost all of them",
+  what_is_left: "~190 B per installed dispatcher, seven per node. Cutting it means one shared
+                 dispatcher keyed on `event.type`, which §18v already priced and rejected",
 }
 ```
 
