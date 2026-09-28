@@ -169,6 +169,18 @@ this needs neither a commit hook nor a retained pending root.
 INSIDE the commit, so the only tree that can be believed is the one the registry holds afterwards.
 See `adoptCommitted`.
 
+## There is no TypeScript twin of this applier, and that is deliberate
+
+`core/test-utils/src/tree-applier.ts` used to be one, held to the C++ by a 938-line property-test
+differential. `afe36f9d` (2026-09-17) deleted both rather than keep two answers to one question:
+`recording-host.ts` records what the OPS said and derives nothing, and `committedPayloadOf` throws
+there on purpose. What reads a committed tree back is `core/engine/cpp/tests/js/**`, where the real
+builder runs.
+
+So a question about what COMMITS belongs in an itest, never in a vitest file. Do not rebuild the
+mirror to answer one. `applier-is-not-forked.test.ts` guards both halves: a native publish must
+arrive with that itest suite, and the JS host must keep refusing the committed answer.
+
 ## Adding an opcode
 
 1. `mutation-buffer.ts`: the `OP_*` constant with its operand list in the trailing comment, and a
