@@ -1,5 +1,5 @@
 ---
-'@symbiote-native/engine': patch
+'@symbiote-native/engine': minor
 '@symbiote-native/components': patch
 ---
 
