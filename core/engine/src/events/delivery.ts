@@ -7,6 +7,7 @@ import {
   hasListenerFor,
   isAnchor,
   listenerFor,
+  type IListener,
   type ISymbioteEvent,
   type ISymbioteNode,
 } from '../node';
@@ -106,10 +107,11 @@ export function callOwnListener(
 // Anchors (Angular's `#anchor` component hosts) never paint and have no native view. A listener on
 // one only exists because the framework's own output binding already delivered it directly, so
 // bubbling into it would refire the same callback twice
-function capturedBy(node: ISymbioteNode, captureName: string) {
-  // Straight off `listeners`, never the behavior's dispatch: no behavior owns a `*Capture` name,
-  // and `dispatchToBehavior` reads the event's own `type`, which here is the BUBBLE name
-  return isAnchor(node) ? undefined : node.listeners?.get(captureName);
+function capturedBy(
+  node: ISymbioteNode,
+  captureName: string,
+): IListener | undefined {
+  return isAnchor(node) ? undefined : listenerFor(node, captureName);
 }
 
 // Two-phase delivery, mirroring RN's `accumulateTwoPhaseDispatches`: CAPTURE root -> target

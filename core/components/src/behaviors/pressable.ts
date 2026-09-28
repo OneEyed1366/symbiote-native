@@ -342,7 +342,10 @@ const attached = new WeakMap<ISymbioteNode, IAttachOptions>();
 
 // ONE object for every pressable in the app, where seven closures plus the `Map` holding them used
 // to sit per node. `attach` runs inside `createElement`, so what it allocates every list item pays
-const PRESS_DISPATCH: IEventDispatch = {
+
+// Exported for a tag that is a pressable PLUS something with names of its own (`./text-input`): it
+// composes a union and delegates here, since a node holds exactly one dispatch
+export const PRESS_DISPATCH: IEventDispatch = {
   names: new Set(DISPATCH_KEYS.keys()),
   deliver(node, name, event) {
     const key = DISPATCH_KEYS.get(name);

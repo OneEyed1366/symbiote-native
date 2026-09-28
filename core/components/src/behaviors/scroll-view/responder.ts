@@ -16,7 +16,6 @@ import {
   Keyboard,
   Platform,
   propOf,
-  setBehaviorListener,
   type ISymbioteEvent,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
@@ -281,30 +280,33 @@ export const RESPONDER_OWNED_LISTENERS: readonly string[] = [
   'momentumScrollEnd',
 ];
 
-// Installed once per owner, in `attach` — same beat Pressable wires its own responder pair.
-export function installResponderPredicates(owner: ISymbioteNode): void {
-  setBehaviorListener(owner, 'startShouldSetResponderCapture', event =>
-    startShouldSetResponderCapture(owner, event),
-  );
-  setBehaviorListener(owner, 'startShouldSetResponder', event =>
-    startShouldSetResponder(owner, event),
-  );
-  setBehaviorListener(owner, 'responderTerminationRequest', () =>
-    responderTerminationRequest(owner),
-  );
-  setBehaviorListener(owner, 'responderGrant', event => {
-    handleResponderGrant(owner, event);
-  });
-  setBehaviorListener(owner, 'responderRelease', event => {
-    handleResponderRelease(owner, event);
-  });
-  setBehaviorListener(owner, 'momentumScrollBegin', event => {
-    handleMomentumScrollBegin(owner, event);
-  });
-  setBehaviorListener(owner, 'scrollBeginDrag', event => {
-    handleScrollBeginDrag(owner, event);
-  });
-  setBehaviorListener(owner, 'momentumScrollEnd', event => {
-    handleMomentumScrollEnd(owner, event);
-  });
+// The eight names an owner answers, as ONE module-level table where eight closures per node used to
+// be. `./shared` composes it with its own `scroll` into the owner's `IEventDispatch`
+const HANDLERS: ReadonlyMap<
+  string,
+  (owner: ISymbioteNode, event: ISymbioteEvent) => unknown
+> = new Map([
+  ['startShouldSetResponderCapture', startShouldSetResponderCapture],
+  ['startShouldSetResponder', startShouldSetResponder],
+  [
+    'responderTerminationRequest',
+    (owner: ISymbioteNode) => responderTerminationRequest(owner),
+  ],
+  ['responderGrant', handleResponderGrant],
+  ['responderRelease', handleResponderRelease],
+  ['momentumScrollBegin', handleMomentumScrollBegin],
+  ['scrollBeginDrag', handleScrollBeginDrag],
+  ['momentumScrollEnd', handleMomentumScrollEnd],
+]);
+
+export const RESPONDER_DISPATCHED_NAMES: ReadonlySet<string> = new Set(
+  HANDLERS.keys(),
+);
+
+export function deliverResponderEvent(
+  owner: ISymbioteNode,
+  name: string,
+  event: ISymbioteEvent,
+): unknown {
+  return HANDLERS.get(name)?.(owner, event);
 }
