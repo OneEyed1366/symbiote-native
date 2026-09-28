@@ -1748,6 +1748,13 @@ profiler       SYMBIOTE_PROFILE_DIR=<dir> -> Hermes sampling trace per step (ben
                self/inclusive %. Never read RESULT/PRIM from a profiled run
 primitive-suite  <arm>-primitive-suite.itest.ts: 19 app-facing tags x create/update/swap/remove/
                clear, PINNED nodesPerItem census. Arms: angular (SYMBIOTE_ELEMENTS), vue
+createKB gate  each arm's itest file carries a `CREATE_BUDGET_KB` table, one ceiling per tag at the
+               measured value plus 10%, and a tag missing from it fails the file the way an
+               unpinned census does. Release only (`__DEV__ === false`), t.k. the assert build
+               allocates another shape. Added 2026-09-28: every earlier anomaly here lived in a
+               PRINTED number someone had to notice, and the two that were fixed this day had sat
+               in plain sight for weeks. Break-tested by undoing the pending-create skip: the first
+               tag past its ceiling was `image-background`, which nobody had attributed
 ```
 
 Measured with them (Hermes -O, 2026-09-22):
