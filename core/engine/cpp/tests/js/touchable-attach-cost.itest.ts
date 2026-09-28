@@ -25,7 +25,16 @@ const SAMPLES = 5;
 // before the fix is 7.5x, so 2x still fails a rebuilt `AnimatedProps` leaf per node
 const LAYER_BUDGET = 2;
 
+// What `attach` may allocate per pressable, as a multiple of the whole node beside it: the seven
+// dispatcher closures and the `Map` holding them. Building the gesture runtime there too read
+// 4.6x, installing the dispatchers alone reads 2.6x, so the bound sits between the two
+const MACHINE_BUDGET = 3;
+
 type IReading = { readonly bytes: number; readonly wall: number };
+
+/** Set by the first case, read by the second: both arms have to see the same machine. */
+let machineBytes = 0;
+let plainBytes = 0;
 
 // Best of `SAMPLES` on the clock, the allocation of one clean run on the bytes. Bytes carry the
 // gate, т.к. an allocation counter is deterministic and a wall clock in a 117-process suite is not
@@ -77,6 +86,19 @@ describe('mounting a touchable-opacity', () => {
     );
 
     expect(layer).toBeLessThan(machine * LAYER_BUDGET);
+    // Read by the case below, which needs arms measured on the same machine (§11)
+    machineBytes = machine;
+    plainBytes = plain.bytes;
+  });
+
+  // The gesture runtime is only ever read from a dispatcher, so a pressable nobody touches has no
+  // use for it. What `attach` still owes is the dispatchers themselves
+  it('installs its dispatchers without building the gesture runtime', () => {
+    print(
+      `DEBUG TOUCHABLE machine ${machineBytes.toFixed(0)}B = ` +
+        `${(machineBytes / Math.max(1, plainBytes)).toFixed(1)}x the node`,
+    );
+    expect(machineBytes).toBeLessThan(plainBytes * MACHINE_BUDGET);
   });
 });
 

@@ -306,10 +306,11 @@ const GESTURE_END_KEYS: ReadonlySet<string> = new Set([
 
 function dispatch(
   node: ISymbioteNode,
-  state: IBehaviorState,
+  options: IAttachOptions,
   key: string,
   args: readonly unknown[],
 ): unknown {
+  const state = stateOf(node, options);
   if (!state.isBuilt) rebuild(node, state);
   const listener = state.listeners[key];
   const result = isPressHandler(listener)
@@ -341,10 +342,10 @@ const EVENT_KEY_PAIRS: ReadonlyArray<readonly [string, string]> = [
   ['responderGrant', 'onResponderGrant'],
 ];
 
-function installListeners(node: ISymbioteNode, state: IBehaviorState): void {
+function installListeners(node: ISymbioteNode, options: IAttachOptions): void {
   for (const [event, key] of EVENT_KEY_PAIRS) {
     setBehaviorListener(node, event, symbioteEvent =>
-      dispatch(node, state, key, [symbioteEvent]),
+      dispatch(node, options, key, [symbioteEvent]),
     );
   }
 }
@@ -353,8 +354,20 @@ function attachWith(
   refine: IPressConfigRefinement | undefined,
   disabledOf: IDisabledResolver | undefined,
 ): (node: ISymbioteNode) => void {
-  return node => attach(node, { refine, disabledOf });
+  // One bag per BEHAVIOR, not per node: `refine` and `disabledOf` are fixed at registration
+  const options: IAttachOptions = { refine, disabledOf };
+  return node => attach(node, options);
 }
+
+export type IAttachOptions = {
+  readonly refine?: IPressConfigRefinement;
+  readonly disabledOf?: IDisabledResolver;
+  readonly cancelableOf?: ICancelableResolver;
+  // Where the machine READS from, when that is not the node it acts ON
+  readonly source?: ISymbioteNode;
+};
+
+const NO_OPTIONS: IAttachOptions = {};
 
 // The machine on `node`, reading props and callbacks off `options.source` when different.
 // Exported for touchable-native-feedback, whose tag commits nothing and adopts the app's single
@@ -364,25 +377,22 @@ function attachWith(
 // re-arming after detachPressMachine needs.
 export function attachPressMachine(
   node: ISymbioteNode,
-  options: {
-    readonly refine?: IPressConfigRefinement;
-    readonly disabledOf?: IDisabledResolver;
-    readonly cancelableOf?: ICancelableResolver;
-    readonly source?: ISymbioteNode;
-  } = {},
+  options: IAttachOptions = NO_OPTIONS,
 ): void {
   attach(node, options);
 }
 
-function attach(
-  node: ISymbioteNode,
-  options: {
-    readonly refine?: IPressConfigRefinement;
-    readonly disabledOf?: IDisabledResolver;
-    readonly cancelableOf?: ICancelableResolver;
-    readonly source?: ISymbioteNode;
-  },
-): void {
+// Only the dispatchers: everything below them is read from `dispatch` alone, so a pressable nobody
+// touches never builds a gesture runtime (`touchable-attach-cost.itest.ts`). A re-attach drops the
+// old state so the new options take effect on the next gesture
+function attach(node: ISymbioteNode, options: IAttachOptions): void {
+  states.delete(node);
+  installListeners(node, options);
+}
+
+function stateOf(node: ISymbioteNode, options: IAttachOptions): IBehaviorState {
+  const existing = states.get(node);
+  if (existing !== undefined) return existing;
   const timers = new Set<ReturnType<typeof setTimeout>>();
   const runtime = createPressRuntime();
   const host: IPressHost = {
@@ -425,7 +435,7 @@ function attach(
     isBuilt: false,
   };
   states.set(node, state);
-  installListeners(node, state);
+  return state;
 }
 
 /** See `attachPressMachine`: the same teardown `createPressBehavior` registers as its `detach`. */
