@@ -6,7 +6,9 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { flip } from 'svelte/animate';
 import { ShimElement } from './element';
 import { patchGlobals, restoreGlobals } from './patch-globals';
+import { setShimAnimationsEnabled } from './animations-gate';
 
+setShimAnimationsEnabled(true);
 beforeEach(patchGlobals);
 afterEach(restoreGlobals);
 

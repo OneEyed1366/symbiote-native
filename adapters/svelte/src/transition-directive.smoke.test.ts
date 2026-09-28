@@ -13,6 +13,9 @@ import {
   type ILiveNode,
 } from '@symbiote-native/test-utils';
 import { mount, unmount } from './render';
+import { setShimAnimationsEnabled } from './dom-shim/animations-gate';
+
+setShimAnimationsEnabled(true);
 
 if (globalThis.window === undefined)
   Object.assign(globalThis, { window: globalThis });

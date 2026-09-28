@@ -9,6 +9,7 @@ import {
   type ISymbioteNode,
 } from '@symbiote-native/engine';
 import type { ShimElement } from './element';
+import { areShimAnimationsEnabled } from './animations-gate';
 
 export type IKeyframe = Readonly<Record<string, string>>;
 
@@ -102,7 +103,7 @@ export function animateShimElement(
 ): IShimAnimation {
   const node = element.engineNode;
   return new ShimAnimation(
-    isSymbioteNode(node) ? node : undefined,
+    areShimAnimationsEnabled() && isSymbioteNode(node) ? node : undefined,
     element.p.style,
     keyframes,
     duration,

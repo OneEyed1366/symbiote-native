@@ -5,6 +5,9 @@
 import { describe, expect, it } from 'vitest';
 import { ShimElement } from './element';
 import { animateShimElement } from './animation';
+import { setShimAnimationsEnabled } from './animations-gate';
+
+setShimAnimationsEnabled(true);
 
 describe('ShimAnimation.cancel()', () => {
   // why: Svelte's transition machinery cancels the outgoing animation the same tick it starts a

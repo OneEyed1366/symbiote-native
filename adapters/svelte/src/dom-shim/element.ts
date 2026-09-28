@@ -40,6 +40,7 @@ import {
   type IKeyframe,
   type IShimAnimation,
 } from './animation';
+import { areShimAnimationsEnabled } from './animations-gate';
 import {
   BOOLEAN_PROP_NAMES,
   CANONICAL_BY_LOWER,
@@ -324,9 +325,10 @@ export class ShimElement extends ShimElementBase {
     bottom: number;
   } {
     const node = this.engineNode;
-    const rect = isSymbioteNode(node)
-      ? getBoundingClientRect(node, false)
-      : undefined;
+    const rect =
+      areShimAnimationsEnabled() && isSymbioteNode(node)
+        ? getBoundingClientRect(node, false)
+        : undefined;
     dlog(
       `getBoundingClientRect tag=${this.tagName} hasNode=${isSymbioteNode(node)} rect=${JSON.stringify(rect)}`,
     );

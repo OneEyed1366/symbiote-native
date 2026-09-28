@@ -2,6 +2,7 @@
 // raw engine mutation API `same-parent-reorder.itest.ts` already cleared
 
 import { mount, unmount } from '@symbiote-native/svelte';
+import { setShimAnimationsEnabled } from '../../../../../adapters/svelte/src/dom-shim/animations-gate';
 
 import {
   describe,
@@ -16,6 +17,8 @@ import { flipItemsSetter } from './svelte-flip-reorder-bridge';
 import Probe from './svelte-flip-reorder-probe.svelte';
 
 const ROOT_TAG = 1;
+
+setShimAnimationsEnabled(true);
 
 const tick = (): Promise<void> =>
   new Promise(resolve => {
