@@ -1446,9 +1446,25 @@ Still owed on the instrument: a settled reading in the other four screens (Vue `
                                  imitated the machine's interior in a `bench-b5` rung. The rung
                                  priced a shape production no longer has, so it was deleted rather
                                  than left green; the structural gate now reads `hasListenerFor`",
-  what_is_left: "a `<text-input>`'s own FOUR listeners, ~590 B per node, and the eight remaining
-                 behaviors that still install per name (text-input, switch, refresh-control, twf,
-                 tnf, touchable-highlight, scroll-view responder/shared/sticky)",
+  the_rest_followed: "`behavior-listener-installs.itest.ts` counts what each tag's `attach` leaves in
+                      `node.listeners` and holds a DEBT LIST that shrinks: converting a behavior
+                      turns the case red until its entry goes, which is what says the conversion
+                      reached the node. It opened at 31 installs over seven tags and is empty now.
+                      scroll-view 9 -> 0 (3 878 -> 2 276 KB / 1 000, create 27.7 -> 16.7 ms) ·
+                      refresh-control 1 -> 0 (5 906 -> 3 937, 31.8 -> 26.6) · text-input 4 -> 0
+                      (3 824 -> 3 105) · switch 3 -> 0 (2 461 -> 2 015)",
+  the_one_that_CANNOT_move: "a GATED name (`GATED_EVENT_PROPS`). The install is ALSO the payload
+                             write that makes Fabric fire the event at all, and a dispatch writes no
+                             payload, so `sticky-header`'s `layout` stays a `setBehaviorListener`.
+                             The fixture carries it in its own map with that reason, not as debt",
+  composing_two_dispatches: "a node holds exactly ONE. `text-input` is a pressable PLUS four names
+                             of its own, so it unions them and delegates the machine's seven back to
+                             the exported `PRESS_DISPATCH`. It must set its own AFTER
+                             `attachPressMachine`, which points the node at the machine's",
+  the_capture_path_joined: "`capturedBy` read `node.listeners` straight while the dispatch bound
+                            `name` off the event. Binding `name` in `listenerFor` instead made the
+                            capture pass safe to route the same way, which is what
+                            `startShouldSetResponderCapture` on a ScrollView needed",
 }
 ```
 
