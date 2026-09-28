@@ -47,6 +47,17 @@ export interface ISymbioteEvent {
 // ignore it
 export type IListener = (event: ISymbioteEvent) => unknown;
 
+// One shared handler standing in for a whole set of per-node listener closures. Arming a press
+// machine installed seven closures plus the `Map` holding them, 1 226 B of the 2 559 B a mounted
+// pressable costs; this is the same seven names against one module-level object
+
+// `names` is what a lookup tests before it calls, so a node carrying a dispatch still answers
+// "nothing listens" for every other event
+export type IEventDispatch = {
+  readonly names: ReadonlySet<string>;
+  readonly dispatch: (node: ISymbioteNode, event: ISymbioteEvent) => unknown;
+};
+
 // Guard narrowing `unknown` to `ISymbioteEvent`, beside the interface it tests so every adapter
 // checking for a Symbiote event shares one instead of writing its own
 export function isSymbioteEvent(value: unknown): value is ISymbioteEvent {
@@ -95,6 +106,10 @@ export interface ISymbioteNode {
   // A text container: its descendants render as virtual text spans
   readonly isText: boolean;
   listeners: Map<string, IListener> | undefined;
+
+  // The shared handler this node's behavior armed, consulted only where `listeners` has no slot.
+  // A field for the same reason `hostBehavior` is one: every lookup on every ancestor reads it
+  dispatch: IEventDispatch | undefined;
 
   // A node carries an ADDRESS and nothing else: the host holds the props and the structure, and
   // every question about either is a read through `tree-host.ts`

@@ -38,6 +38,7 @@ import {
   VOID_COMPONENT,
   isSymbioteNode,
   type IClassStyleParts,
+  type IEventDispatch,
   type IListener,
   type ISymbioteNode,
 } from './node-types';
@@ -57,6 +58,7 @@ class SymbioteNode implements ISymbioteNode {
   declare component: string;
   declare readonly isText: boolean;
   declare listeners: Map<string, IListener> | undefined;
+  declare dispatch: IEventDispatch | undefined;
   declare hasCommitHook: boolean;
   declare resolvesImageSources: boolean;
   declare nativeIdWinsOverId: boolean;
@@ -77,6 +79,7 @@ class SymbioteNode implements ISymbioteNode {
     this.component = component;
     this.isText = isText;
     this.listeners = undefined;
+    this.dispatch = undefined;
     this.hasCommitHook = false;
     this.resolvesImageSources = false;
     this.nativeIdWinsOverId = false;
