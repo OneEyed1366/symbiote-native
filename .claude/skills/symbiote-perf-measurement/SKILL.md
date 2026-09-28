@@ -1381,6 +1381,32 @@ Still owed on the instrument: a settled reading in the other four screens (Vue `
 }
 ```
 
+### 24. The gated-listener clear, priced and KEPT
+
+```
+24 := {
+  found: "`setBehaviorListener(node, name, undefined)` writes the gated flag (`layout` ->
+          `onLayout`) even when nothing was installed, and `recordSetProp` has NO identity guard,
+          so it is a real `OP_SET_PROP` on the wire. `touchable-without-feedback` and
+          `touchable-native-feedback` re-forward four names on every child insert, two of them
+          gated, so each pays two wasted ops per item",
+  fix_tried: "write the flag only on the FLIP, guarded on `node.listeners?.has(name)`",
+  it_worked_on_create: "createKB / 1 000 items: tnf 6 692 -> 5 653 · twf 7 183 -> 6 144, exactly
+                        the ~1 KB the two ops predict, with every other tag byte-identical",
+  AND_IT_LOST: "tnf's `clear` went 2.4 -> 12.5-13.8 ms, stable across three runs and reproduced by
+                disabling the guard alone (2.4 with it off, byte counter back to 6 692).
+                Mechanism unexplained: it is on the C++ side, where a key the mirror never held
+                behaves differently at teardown from one it held and deleted",
+  verdict: "REVERTED. 1 KB and ~3 ms of create do not buy 10 ms of teardown on the same tag",
+  pinned: "`gated-listener-writes.test.ts` now asserts the write HAPPENS, so the next reader finds
+           the measurement instead of the same idea",
+  method_note: "the byte counter said the change was a pure win and the wall clock said it was not.
+                §18j's 'reach for bytes first' holds for ATTRIBUTION and not for a VERDICT: an op
+                removed from the buffer is also an op the host no longer sees, and what that costs
+                downstream only a clock can report",
+}
+```
+
 ## The current numbers
 
 Headless, 1 000 rows, `bench:itest` Release on Hermes **as `hermesc -O` bytecode**
