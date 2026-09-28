@@ -1339,6 +1339,34 @@ believed. Refresh every example, not the one being measured.
 Still owed on the instrument: a settled reading in the other four screens (Vue `nextTick`, Svelte
 `tick()`, Solid post-render, Angular `afterNextRender`), which turns their floor into a reading.
 
+### 23. The touchable outlier was an animated leaf built at mount for a value that never moves
+
+```
+23 := {
+  subject: "`primitive-suite`'s two dearest tags. vue, -O bytecode, per 1 000 items:
+            touchable-opacity create 65.0 ms / 25 348 KB   against pressable's 10.5 / 3 561
+            button            create 74.5 / 26 127          against view's       7.3 / 1 272
+            Same press machine on both touchables, so the difference is not the machine",
+  fixture: "touchable-attach-cost.itest.ts — plain / pressable / touchable-opacity, three arms in
+            ONE case, BYTES as the gate and milliseconds a print (§18j)",
+  found: "`attach` called `setAnimatedBehaviorStyle`, which builds an `AnimatedProps` leaf plus its
+          style wrapper PER NODE: 5 911 B and 9.76 us on top of the press machine's 2 353 B / 1.85",
+  fix: "the leaf is registered on the FIRST FADE (`ensureLayer`). `collapsable: false` stays forced
+        from attach with a plain `setProp` — a view Fabric flattens loses the responder's tag, and
+        that half is one prop write, not a leaf",
+  after: "layer 5 911 -> 1 343 B, 9.76 -> 3.05 us. Suite: touchable-opacity 65.0 -> 27.3 ms /
+          25 348 -> 7 992 KB · button 74.5 -> 43.2 / 26 127 -> 8 259 · clear 11.0 -> 4.1 and
+          9.1 -> 4.9. Every other tag's createKB is byte-identical, which is the control",
+  behaviour_it_changed: "an untouched touchable now commits NO `opacity` key, which is what vendor
+                         does (`TouchableOpacity-itest.js`, 'does not render explicit opacity when
+                         using default'). Seven adapter cases asserted the old non-parity value and
+                         were rewritten; an authored `style.opacity` is unaffected, it reaches
+                         Fabric through the ordinary style path",
+  what_is_left: "the whole touchable family sits at ~8 MB / 1 000 against pressable's 3.6 —
+                 the press machine and what each touchable adds over it is the next target",
+}
+```
+
 ## The current numbers
 
 Headless, 1 000 rows, `bench:itest` Release on Hermes **as `hermesc -O` bytecode**
@@ -1546,8 +1574,8 @@ Measured with them (Hermes -O, 2026-09-22):
 - Per @for item Angular costs ~5 us + 1.2 KB over Vue even on a one-node item (primitive `view`
   11.9 vs 6.8 ms) — embedded LView + container insertion + an update pass per item. Runtime-only
   work cannot reach it (`<angular_no_template_transform>`).
-- Outliers on EVERY adapter: touchable-opacity (56-78 ms, 25-28 MB / 1 000) and button (70-93 ms,
-  26-28 MB). Engine/components-side, not Angular.
+- Outliers on EVERY adapter: touchable-opacity and button. Engine/components-side, not Angular.
+  Split and halved in §23; what is left of them is the press machine.
 - Hidden `modal` commits a ModalHostView on every adapter; RN commits nothing (`Modal.js:280-288`).
 
 ## Angular's per-node cost: a runtime answer to a compile-time question (researched 2026-09-22)
