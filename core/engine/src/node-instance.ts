@@ -71,6 +71,7 @@ class SymbioteNode implements ISymbioteNode {
   declare isTornDown: boolean;
   declare slot: number;
   declare slotBatch: number;
+  declare createdBatch: number;
 
   constructor(component: string, isText: boolean) {
     // Every field is assigned here, not lazily: present from the constructor, they all keep ONE
@@ -94,6 +95,7 @@ class SymbioteNode implements ISymbioteNode {
     // `slotBatch` starts at a value no real batch carries, so an untouched node needs no flag
     this.slot = 0;
     this.slotBatch = 0;
+    this.createdBatch = 0;
   }
 
   measure(callback: IMeasureOnSuccess): void {

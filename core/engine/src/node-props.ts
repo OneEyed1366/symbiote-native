@@ -2,6 +2,7 @@
 // function-prop stash and the two counters `readCommitProfile` drains
 
 import {
+  isPendingCreate,
   noteHostSideChange,
   recordSetProp,
   recordSetText,
@@ -143,11 +144,15 @@ export function functionPropsOf(
 // "Rebuild this node's payload, the fold reads state I just changed". A behavior whose payload is
 // DERIVED has no prop to write, so this is the one route that dirties it directly
 export function markPropsDirty(node: ISymbioteNode): void {
-  flushOps();
   // Announced to the buffer even though it writes no op, т.к. a commit that cannot see this change
   // would skip itself as idle
   noteHostSideChange();
   if (node.hasCommitHook) noteCommitHookNodeChanged(node);
+  // A node this batch created has no committed payload and the host cannot name it yet, so the mark
+  // is a no-op and the `flushOps` it would force is the whole of its cost
+  if (isPendingCreate(node)) return;
+  // The host call takes a HANDLE, so it has to be ORDERED after the ops that built the node
+  flushOps();
   treeHost()?.markPropsDirty(node);
 }
 

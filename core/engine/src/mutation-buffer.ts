@@ -120,6 +120,7 @@ export const KIND_ANCHOR = 2;
 export type IMutationHandle = {
   slot: number;
   slotBatch: number;
+  createdBatch: number;
 };
 
 export type IMutationBatch = {
@@ -274,7 +275,7 @@ function slotOf(handle: IMutationHandle): number {
 // it would make every commit look like it had work.
 let changedSinceCommit = false;
 
-function push(op: number, a = 0, b = 0, c = 0, d = 0, e = 0): void {
+function push(op: number, a = 0, b = 0, c = 0): void {
   if (op !== OP_COMMIT) changedSinceCommit = true;
   if (opCount + OP_STRIDE > ops.length) {
     const grown = new Int32Array(ops.length * 2);
@@ -285,9 +286,16 @@ function push(op: number, a = 0, b = 0, c = 0, d = 0, e = 0): void {
   ops[opCount + 1] = a;
   ops[opCount + 2] = b;
   ops[opCount + 3] = c;
-  ops[opCount + 4] = d;
-  ops[opCount + 5] = e;
+  ops[opCount + 4] = 0;
+  ops[opCount + 5] = 0;
   opCount += OP_STRIDE;
+}
+
+// `OP_CREATE_ELEMENT` is the only op with a FOURTH operand, and it writes it itself rather than
+// widening `push` for one call site. A rest parameter or an options bag would allocate per op,
+// which is the one thing this buffer exists to avoid
+function pushFourth(value: number): void {
+  ops[opCount - OP_STRIDE + 4] = value;
 }
 
 // Whether a commit would publish anything. See changedSinceCommit.
@@ -329,6 +337,18 @@ export function hasPendingPlacement(handle: IMutationHandle): boolean {
   return placementPending.has(handle);
 }
 
+// A field rather than a second Set, т.к. this is read on the create path and a `Set.add` per node
+// would charge the thing it saves. `createdBatch` starts at 0, which no live batch carries
+function noteCreated(handle: IMutationHandle): void {
+  placementPending.add(handle);
+  handle.createdBatch = batchId;
+}
+
+/** Has the host never heard of this node, т.к. the op that creates it is still in the buffer? */
+export function isPendingCreate(handle: IMutationHandle): boolean {
+  return handle.createdBatch === batchId;
+}
+
 export function recordCreateElement(
   handle: IMutationHandle,
   viewName: string,
@@ -336,31 +356,26 @@ export function recordCreateElement(
   instanceHandle: unknown,
 ): void {
   instanceHandles.push(instanceHandle);
-  placementPending.add(handle);
-  push(
-    OP_CREATE_ELEMENT,
-    slotOf(handle),
-    intern(viewName),
-    isText ? 1 : 0,
-    instanceHandles.length - 1,
-  );
+  noteCreated(handle);
+  push(OP_CREATE_ELEMENT, slotOf(handle), intern(viewName), isText ? 1 : 0);
+  pushFourth(instanceHandles.length - 1);
 }
 
 export function recordCreateRawText(
   handle: IMutationHandle,
   text: string,
 ): void {
-  placementPending.add(handle);
+  noteCreated(handle);
   push(OP_CREATE_RAW_TEXT, slotOf(handle), intern(text));
 }
 
 export function recordCreateAnchor(handle: IMutationHandle): void {
-  placementPending.add(handle);
+  noteCreated(handle);
   push(OP_CREATE_ANCHOR, slotOf(handle));
 }
 
 export function recordCreateVoid(handle: IMutationHandle): void {
-  placementPending.add(handle);
+  noteCreated(handle);
   push(OP_CREATE_VOID, slotOf(handle));
 }
 

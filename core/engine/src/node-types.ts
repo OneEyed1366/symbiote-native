@@ -168,6 +168,10 @@ export interface ISymbioteNode {
   slot: number;
   slotBatch: number;
 
+  // The batch whose ops CREATED this node. Narrower than a pending placement: the host has never
+  // been told the node exists, so there is no payload for `markPropsDirty` to dirty
+  createdBatch: number;
+
   // RN's `ReactFabricHostComponent` surface, what a ref hands back. PROTOTYPE methods rather than
   // closures grafted per node, т.к. six closures per node is GC-heavy at scale
   measure(callback: IMeasureOnSuccess): void;
