@@ -126,7 +126,7 @@ describe('Solid: `touchable-opacity` and `touchable-highlight` as tags', () => {
         </touchable-opacity>
       ));
       await tick();
-      expect(target().payload.opacity).toBe(1);
+      expect(target().payload.opacity).toBeUndefined();
 
       fabric.fireEvent(target().instanceHandle, TOUCH_START);
       await tick();

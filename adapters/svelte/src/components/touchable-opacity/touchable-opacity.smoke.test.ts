@@ -249,7 +249,8 @@ describe('Svelte TouchableOpacity (real compiled index.svelte)', () => {
     await tick();
     await tick();
 
-    expect(asNumber(feedbackProps().opacity, 'resting')).toBe(1);
+    // At rest no `opacity` key is published at all, and the base style is untouched
+    expect(feedbackProps().opacity).toBeUndefined();
     expect(feedbackProps().width).toBe(BASE_WIDTH);
 
     const handle = responderHandle();
@@ -270,13 +271,9 @@ describe('Svelte TouchableOpacity (real compiled index.svelte)', () => {
     expect(pressOuts).toBe(1);
   });
 
-  // why: RN picks the press-in duration by where the event came from — 0 for the responder GRANT
-  // (TouchableOpacity.js:215-220), which is what an ordinary tap is here, since Pressability
-  // re-dispatches the grant event as the delay signal when delayPressIn is 0. Every adapter used
-  // 150ms, so every tap darkened visibly slower than RN. THIS TEST AWAITS NOTHING AFTER THE
-  // TOUCH ON PURPOSE: a duration-0 timing lands its value inside `.start()` with no frame at all,
-  // while 150ms needs frames — and a flush helper burns past both
-  // (.claude/rules/test-harness-false-greens.md §5).
+  // An ordinary tap is the responder GRANT branch, duration 0 (TouchableOpacity.js:215-220).
+  // Nothing is awaited after the touch on purpose: a 0ms timing lands inside `.start()` with no
+  // frame, where a flush helper would burn past both (test-harness-false-greens §5)
   it('snaps to activeOpacity on press-in with no fade, as the grant branch does', async () => {
     const { Parent } = await loadParent();
     mount(ROOT_TAG, Parent, {
@@ -285,7 +282,7 @@ describe('Svelte TouchableOpacity (real compiled index.svelte)', () => {
     });
     await tick();
     await tick();
-    expect(asNumber(feedbackProps().opacity, 'resting')).toBe(1);
+    expect(feedbackProps().opacity).toBeUndefined();
 
     fabric.fireEvent(responderHandle(), TOUCH_START);
     // One microtask is the coalesced setNativeProps flush, not a frame: a real fade would still be
@@ -297,10 +294,8 @@ describe('Svelte TouchableOpacity (real compiled index.svelte)', () => {
     ).toBeCloseTo(ACTIVE_OPACITY, 6);
   });
 
-  // why: RN's _getChildStyleOpacityWithDefault settles the fade at the opacity the CALLER's style
-  // asks for and SEEDS the Animated.Value with it, so a Touchable styled `opacity: 0.6` neither
-  // flashes fully opaque on first paint nor brightens after its first press. A port hardcoding
-  // RESTING_OPACITY passes every other test in this file.
+  // RN's `_getChildStyleOpacityWithDefault` seeds and settles at the CALLER's own style opacity,
+  // so a Touchable styled `opacity: 0.6` neither flashes opaque on first paint nor brightens later
   it('seeds and settles at the style opacity, not at 1', async () => {
     const { Parent } = await loadParent();
     mount(ROOT_TAG, Parent, {
@@ -325,11 +320,9 @@ describe('Svelte TouchableOpacity (real compiled index.svelte)', () => {
     expect(asNumber(feedbackProps().opacity, 'released')).toBeCloseTo(0.6, 6);
   });
 
-  // why: RN's Touchables pass minPressDuration: 0 — Pressability's own 130ms floor
-  // (Pressability.js:264) never reaches them, so defaulting to it delays EVERY press-out by an
-  // eighth of a second. THIS TEST AWAITS NOTHING AFTER THE RELEASE ON PURPOSE: any flush helper
-  // burns straight past a 130ms threshold and the assertion passes either way
-  // (.claude/rules/test-harness-false-greens.md §5).
+  // RN's Touchables pass `minPressDuration: 0`, so Pressability's own 130ms floor
+  // (Pressability.js:264) never reaches them. Nothing is awaited after the release on purpose: a
+  // flush helper burns past the threshold and passes either way (test-harness-false-greens §5)
   it('deactivates synchronously — no minPressDuration floor by default', async () => {
     const { Parent } = await loadParent();
     let pressOuts = 0;
@@ -375,10 +368,8 @@ describe('Svelte TouchableOpacity (real compiled index.svelte)', () => {
     );
   });
 
-  // why: the update effect reads `disabled` and the resting opacity as two SEPARATE deriveds
-  // rather than one object, so an unrelated prop change cannot re-settle a live press. Folding
-  // them into one `$derived` object (or reading `rest` wholesale) rebuilds a fresh object every
-  // tick and cancels the fade the user is currently looking at.
+  // The update effect reads `disabled` and the resting opacity as two SEPARATE deriveds: folding
+  // them into one object rebuilds it every tick and cancels the fade the user is looking at
   it('does not re-settle a held press when an unrelated prop changes', async () => {
     const { Parent, control } = await loadParent();
     control.label = 'before';

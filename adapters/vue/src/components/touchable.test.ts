@@ -26,6 +26,7 @@
 import { defineComponent, h, ref, type VNode } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '@symbiote-native/vue';
+import type { IMeasureOnSuccess } from '@symbiote-native/engine';
 import {
   installRecordingFabric,
   payloadOf,
@@ -53,17 +54,7 @@ const installed: unknown = globalThis.nativeFabricUIManager;
 if (!isRecord(installed)) throw new Error('fabric slot was not installed');
 
 // Pressable measures its responder rect on grant (RN's _measureResponderRegion).
-installed.measure = (
-  _node: unknown,
-  callback: (
-    x: number,
-    y: number,
-    w: number,
-    h: number,
-    px: number,
-    py: number,
-  ) => void,
-): void => {
+installed.measure = (_node: unknown, callback: IMeasureOnSuccess): void => {
   callback(0, 0, 100, 40, 0, 0);
 };
 
@@ -190,9 +181,8 @@ describe('Vue TouchableOpacity', () => {
     mount(ROOT_TAG, App);
     await flush();
 
-    expect(asNumber(committedPayload(TARGET).opacity, 'resting opacity')).toBe(
-      1,
-    );
+    // At rest no `opacity` key is published at all, and the base style is untouched
+    expect(committedPayload(TARGET).opacity).toBeUndefined();
     expect(committedPayload(TARGET).width).toBe(BASE_WIDTH);
 
     const handle = responderHandle();
@@ -286,10 +276,7 @@ describe('Vue TouchableOpacity', () => {
     });
     mount(ROOT_TAG, App);
     await flush();
-    expect(asNumber(committedPayload(TARGET).opacity, 'at mount')).toBeCloseTo(
-      1,
-      6,
-    );
+    expect(committedPayload(TARGET).opacity).toBeUndefined();
 
     fabric.fireEvent(responderHandle(), TOUCH_START);
     await flushFrames();

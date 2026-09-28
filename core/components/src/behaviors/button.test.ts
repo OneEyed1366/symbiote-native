@@ -18,6 +18,7 @@ import {
   type ISymbioteNode,
 } from '@symbiote-native/engine';
 import { registerButtonBehavior, BUTTON_TAG } from './button';
+import { RESTING_OPACITY } from '../state/touchable';
 
 const fabric = installRecordingFabric();
 const live = createLiveTree(fabric);
@@ -212,17 +213,9 @@ describe('button host behavior', () => {
     expect(subtreeOf(TEST_ID).label?.payload.text).toBe('Send');
   });
 
-  // The raw text is the SLOT, so `title` reaches it through `routeProp` and lands in `props.text` —
-  // which is what `isEmptyRawText` reads. That is the whole reason the label's fold runs over its
-  // own props rather than over the owner's: a fold-only label would leave `props.text` at '' and
-  // the commit walk would drop the node before the fold ever ran, permanently.
-  //
-  // THE DROP ITSELF IS A REAL-FABRIC-COMMIT-ONLY RULE (`AttributedString::appendFragment` skips an
-  // empty fragment) — neither the recording host nor the live tree performs it, so the node this
-  // reads stays present with `text === ''` rather than vanishing. That half of the original claim
-  // ("nothing paints for an empty title") is therefore NOT verified here; it needs an itest against
-  // the real commit walk, which does not exist yet for this case. What IS verified: the label is
-  // updated in place and comes back once the title is non-empty again.
+  // NOTE: Fabric's own drop of an empty fragment (`AttributedString::appendFragment`) is not
+  // performed by this harness, so the node stays present with `text === ''`. What is verified here
+  // is only that the label updates in place and comes back once the title is non-empty again
   it('holds the raw text node empty for an empty title, and re-fills it', async () => {
     vi.useFakeTimers();
     registerButtonBehavior();
@@ -242,13 +235,9 @@ describe('button host behavior', () => {
     expect(subtreeOf(TEST_ID).label?.payload.text).toBe('Save');
   });
 
-  // The iOS half of the two-node claim: `color` tints the LABEL here and leaves the inner view at
-  // its constant `{}`, which is the exact mirror of Android, where it tints the view and leaves the
-  // label white. A projection that only ever re-folded the slot the engine marks would pass one of
-  // the two and fail the other.
-  // The RE-TINT case pins that a `color` written on the BUTTON after the first commit reaches the
-  // derived label (`addDerivedNode` extending `slotDerived`'s mark past the slot) — asserted in
-  // `button-derived-payload.itest.ts`, since this harness's `fabricProps` has no copy of the fold.
+  // On iOS `color` tints the LABEL and leaves the inner view at its constant `{}`, the mirror of
+  // Android. Both arms live in `button-derived-payload.itest.ts`, т.к. this harness's
+  // `fabricProps` carries no copy of the fold
 
   it('runs the composed press machine', async () => {
     vi.useFakeTimers();
@@ -272,17 +261,9 @@ describe('button host behavior', () => {
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 
-  // WHY THE THREE FOLDS NEED NO MEMO. `resolveButtonTextStyle` / `resolveButtonViewStyle` hand back
-  // a FRESH object per call, which under the old `setProp` projection could never satisfy
-  // `Object.is` — so it re-dirtied the label on every commit and bought a targeted flush per
-  // re-render (`.claude/rules/list-geometry-feedback-loop.md`, one node up). A payload fold reaches
-  // `reconcile` instead, which deep-compares with `propsEqual` and hands back the committed handle
-  // when nothing moved.
-  //
-  // Asserted as node IDENTITY in the committed tree, which is exactly "no clone was spent": a fresh
-  // but equal `accessibilityState` fails `setProp`'s guard, so all three folds DO re-run. Compared
-  // by HANDLE — `ILiveNode.children` is a getter that builds a fresh object per read, so `===` on
-  // two live nodes is always false.
+  // The folds hand back a FRESH object per call, so they all re-run; `reconcile` deep-compares with
+  // `propsEqual` and reuses the committed handle. Compared by HANDLE, т.к. `ILiveNode.children` is
+  // a getter building a fresh object per read
   it('spends no clone when a re-render hands back an equal accessibilityState', async () => {
     vi.useFakeTimers();
     registerButtonBehavior();
@@ -305,10 +286,8 @@ describe('button host behavior', () => {
     expect(after.label?.handle).toBe(before.label?.handle);
   });
 
-  // THE HEADLINE CLAIM, iOS half. TouchableOpacity WRAPS (TouchableOpacity.js:302,344), so the
-  // styled button view is a CHILD and the tree is one node taller than Android's — which
-  // `button-android.test.ts` counts at three. Counted rather than eyeballed: `subtreeOf`'s hops
-  // prove the shape, this proves nothing is hiding beside it.
+  // TouchableOpacity WRAPS (TouchableOpacity.js:302,344), so the styled button view is a CHILD and
+  // the tree is one node taller than Android's, which `button-android.test.ts` counts at three
   it('commits RN’s four-node iOS subtree, not Android’s three', async () => {
     vi.useFakeTimers();
     registerButtonBehavior();
@@ -321,10 +300,8 @@ describe('button host behavior', () => {
     expect(countNodes(subtreeOf(TEST_ID).host)).toBe(4);
   });
 
-  // The negative arm of the ripple. Both view commands and the background prop are Android's
-  // (TouchableNativeFeedback.js:230-252, :343-348), and the fade is what stands in their place
-  // here — so an unguarded branch shows up as a command dispatched on a platform that has no
-  // ripple drawable to move.
+  // Ripple commands and `nativeBackgroundAndroid` are Android's alone
+  // (TouchableNativeFeedback.js:230-252, :343-348); on iOS the fade stands in their place
   it('sends no ripple command, carries no ripple background, and fades', async () => {
     vi.useFakeTimers();
     registerButtonBehavior();
@@ -350,9 +327,8 @@ describe('button host behavior', () => {
     expect(typeof host.payload.opacity).toBe('number');
   });
 
-  // `focusable` is `foldButtonProps` in C++ now, three-legged precedence and all — this tag binds
-  // no `payloadFold` at all on iOS. Asserted in `button-payload.itest.ts`. What stays in JS is
-  // `onPress !== undefined`: its EXISTENCE crosses as one bit, the callback does not.
+  // `focusable` is `foldButtonProps` in C++ now (`button-payload.itest.ts`); what stays in JS is
+  // `onPress !== undefined`, т.к. only its EXISTENCE crosses
 
   // Button.js:337 resolves `props.disabled ?? aria-disabled ?? accessibilityState.disabled` and
   // passes the ANSWER down to the touchable, so on a Button — unlike a bare Pressable — either
@@ -429,11 +405,8 @@ describe('button host behavior', () => {
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 
-  // The FADE half of the same resolution, and it was open for an hour after the press half closed.
-  // `afterCommit` re-settles the view when `disabled` moves (RN's componentDidUpdate); reading the
-  // raw prop there left an aria-only flip un-settled, so a Button disabled mid-press stayed at its
-  // ACTIVE opacity while the press was already suppressed. RN's Button never had the gap — it
-  // resolves once and passes the value down as its touchable's own prop (Button.js:331,337).
+  // `afterCommit` re-settles the view when `disabled` moves, and `aria-disabled` is one of the
+  // three props that decide it (Button.js:331,337)
   it('re-settles the fade when aria-disabled arrives mid-press', async () => {
     vi.useFakeTimers();
     registerButtonBehavior();
@@ -443,20 +416,21 @@ describe('button host behavior', () => {
     routeProp(node, 'onPress', vi.fn());
     const surface = mount(node);
     await settle();
-    const resting = committedByTestId(TEST_ID).payload.opacity;
+    // An untouched button publishes no `opacity` at all, so the resting value is the constant
+    expect(committedByTestId(TEST_ID).payload.opacity).toBe(undefined);
 
     // Held down, not released — the fade is at its active value and stays there.
     listenerOf(node, 'pressIn')(TOUCH);
     listenerOf(node, 'startShouldSetResponder')(TOUCH);
     await settle();
     const active = committedByTestId(TEST_ID).payload.opacity;
-    expect(active).not.toBe(resting);
+    expect(active).not.toBe(RESTING_OPACITY);
 
     routeProp(node, 'aria-disabled', true);
     surface.commit();
     await settle();
 
-    expect(committedByTestId(TEST_ID).payload.opacity).toBe(resting);
+    expect(committedByTestId(TEST_ID).payload.opacity).toBe(RESTING_OPACITY);
   });
 
   // why: a Button's name must reach its OWNER, and `id` beats a `nativeID` written beside it —

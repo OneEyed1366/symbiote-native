@@ -26,6 +26,7 @@ import {
   createLiveTree,
   installRecordingFabric,
 } from '@symbiote-native/test-utils';
+import type { IMeasureOnSuccess } from '@symbiote-native/engine';
 
 const ROOT_TAG = 120;
 const TOUCH_START = 'topTouchStart';
@@ -45,17 +46,8 @@ const installed: unknown = globalThis.nativeFabricUIManager;
 if (!isRecord(installed)) throw new Error('fabric slot was not installed');
 
 // Pressable measures its responder rect on grant (retention region); report a fixed frame.
-installed.measure = (
-  _node: unknown,
-  cb: (
-    x: number,
-    y: number,
-    w: number,
-    h: number,
-    px: number,
-    py: number,
-  ) => void,
-): void => cb(0, 0, 100, 40, 0, 0);
+installed.measure = (_node: unknown, cb: IMeasureOnSuccess): void =>
+  cb(0, 0, 100, 40, 0, 0);
 
 // rAF polyfill: the drivers read requestAnimationFrame from the host at call time; a
 // setTimeout-based clock advancing 16ms per frame lets .start() run to completion.
@@ -214,21 +206,18 @@ describe('React TouchableOpacity animated feedback', () => {
       );
     }
     mount(ROOT_TAG, <App />);
-    // The RESTING value is published from the behavior's `afterCommit`, one commit after the
-    // mount — the wrapper carried it in the style it rendered, so it was there synchronously. This
-    // await is on the setup, NOT on the measurement: the press-in read below still takes no wait,
-    // which is what keeps the 0-vs-150ms duration observable at all.
+    // The await is on the SETUP, not on the measurement: the press-in read below still takes no
+    // wait, which is what keeps the 0-vs-150ms duration observable at all
     await flushEffectsAndFrames();
 
-    expect(asNumber(feedbackProps().opacity, 'resting opacity')).toBe(1);
+    // Untouched and with no authored `style.opacity`, nothing publishes the key, the same as
+    // vendor (`TouchableOpacity-itest.js`, "does not render explicit opacity when using default")
+    expect(feedbackProps().opacity).toBeUndefined();
 
     fabric.fireEvent(responderHandle(), TOUCH_START);
-    // A BOUNDED wait, an order of magnitude under the 150 ms it is guarding against — the engine
-    // publishes an animated value on its own commit rather than in the render that fired the
-    // event, so a strictly synchronous read now sees nothing on ANY duration and the oracle would
-    // be dead. Draining frames instead is not available here: `flushFrames` runs until nothing is
-    // pending, which burns past 150 ms and is exactly what makes every other fade assertion in
-    // this file blind to the duration (test-harness-false-greens §5).
+    // A BOUNDED wait, an order of magnitude under the 150 ms this case guards against.
+    // `flushFrames` would drain past it and go blind to the duration, a synchronous read would see
+    // nothing at all (`.claude/rules/test-harness-false-greens.md` §5)
     await new Promise(resolve => setTimeout(resolve, DURATION_PROBE_MS));
 
     // Broken (duration 150): ~0.97 here, barely started. Correct (0): already landed.
@@ -268,9 +257,9 @@ describe('React TouchableOpacity animated feedback', () => {
 
     const handle = responderHandle();
 
-    // At rest opacity sits at 1 and keeps base style.
+    // At rest no `opacity` key is published at all, and the base style is untouched
     const rest = feedbackProps();
-    expect(asNumber(rest.opacity, 'resting opacity')).toBe(1);
+    expect(rest.opacity).toBeUndefined();
     expect(rest.width).toBe(10);
 
     // Press in: the timing animation runs toward activeOpacity.
