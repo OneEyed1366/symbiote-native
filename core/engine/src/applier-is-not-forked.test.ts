@@ -1,18 +1,24 @@
 // A native path that publishes a shadow tree must arrive WITH the test that compares it to the
 // reference one — not "then we verify it", not "the canary will show it".
 
-// The risk: two TREE HOSTS over one buffer. core/test-utils/src/tree-applier.ts is the reference,
-// SymbioteTree.cpp is the device one — a divergence is invisible here, fatal there. The reference
-// applier's own property-test differential is what a native publish owes.
+// The risk: a SECOND applier over the one buffer, deciding the committed tree its own way, where a
+// divergence is invisible here and fatal on a device. It was `core/test-utils/src/tree-applier.ts`,
+// a TypeScript mirror; `afe36f9d` deleted it rather than keep two answers to one question
+
+// So the differential a native publish owes is now `core/engine/cpp/tests/js`, where the REAL
+// builder runs, and the second arm below is what keeps the JS side from growing the mirror back
 
 // Deliberately NOT policed: the node table's STORE. node-table.ts is byte-identical whether its
 // Int32Array comes from `new Int32Array(n)` or native memory — one implementation, two allocators,
 // nothing to drift. See native-engine.ts's header for the full statement.
 
-import { type Dirent, readdirSync, readFileSync, statSync } from 'node:fs';
+import { type Dirent, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
+
+import { createElement } from './node';
 
 // Resolved from this file, never from the CWD: a relative path in a test resolves against wherever
 // the runner was started, which is the defect `test-harness-false-greens.md` §15 records.
@@ -32,10 +38,10 @@ const NATIVE_APPLIER_MARKERS: readonly string[] = [
   'completeSurface',
 ];
 
-// The differential the native publish owes: the reference tree applier's property test, running
-// generated programs against independent oracles. Path relative to the engine, not this directory
-// — a JS tree may not ship inside the engine (see tree-applier.ts's header).
-const TREE_DIFFERENTIAL = '../test-utils/src/tree-applier.fuzz.test.ts';
+// Where the committed tree is read back from the builder that actually produced it. An `.itest.ts`
+// runs against `SymbioteTree.cpp` in a real runtime, which is what the deleted mirror's property
+// test used to buy and what nothing in vitest can
+const TREE_DIFFERENTIAL = 'cpp/tests/js';
 
 function filesUnder(
   directory: string,
@@ -88,12 +94,8 @@ function nativeApplierFiles(): string[] {
     });
 }
 
-function differentialExists(): boolean {
-  try {
-    return statSync(join(ENGINE_ROOT, TREE_DIFFERENTIAL)).isFile();
-  } catch {
-    return false;
-  }
+function differentialFiles(): string[] {
+  return filesUnder(join(ENGINE_ROOT, TREE_DIFFERENTIAL), ['.itest.ts']);
 }
 
 describe('a native publish arrives with its differential', () => {
@@ -120,14 +122,23 @@ describe('a native publish arrives with its differential', () => {
     if (native.length === 0) return;
 
     expect(
-      differentialExists(),
+      differentialFiles().length,
       `Native code publishes a shadow tree (${native.join(', ')}) and ` +
-        `core/engine/${TREE_DIFFERENTIAL} does not exist. Two tree hosts consume one buffer — ` +
-        'the TypeScript reference and the C++ one — and a divergence between them is a ' +
-        'device-only bug: the same ops, a different tree, nothing red. The property test is what ' +
-        'holds the reference to independent oracles, which is what makes the C++ checkable ' +
-        'against something at all. See this file’s header, and native-engine.ts for why the ' +
-        'node-table STORE is a different question.',
-    ).toBe(true);
+        `core/engine/${TREE_DIFFERENTIAL} holds no itest. That suite is the ONLY place the ` +
+        'committed tree is read back from the builder that produced it, so without it a native ' +
+        'publish is checked against nothing at all. See this file’s header for the mirror this ' +
+        'replaced, and native-engine.ts for why the node-table STORE is a different question.',
+    ).toBeGreaterThan(0);
+  });
+
+  // The other half, and the one the deleted mirror used to be: a JS host that ANSWERS a committed
+  // question is a second applier, however small it starts
+  it('keeps the JS host out of the committed answer', () => {
+    const host = installRecordingFabric();
+    const node = createElement('RCTView');
+
+    expect(() => host.committedPayloadOf(node)).toThrow(
+      /needs the real payload builder/,
+    );
   });
 });
