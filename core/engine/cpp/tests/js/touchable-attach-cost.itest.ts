@@ -28,14 +28,20 @@ import {
 const NODES = 2_000;
 const SAMPLES = 5;
 
-// What the layer may cost, as a multiple of the press machine beside it. Measured separation
-// before the fix is 7.5x, so 2x still fails a rebuilt `AnimatedProps` leaf per node
-const LAYER_BUDGET = 2;
+// `false` on `build-release` (`scripts/run-itests.mjs`), `true` on the assert build CI runs
+declare const __DEV__: boolean;
+const isBenchBuild = __DEV__ === false;
 
-// What `attach` may allocate per pressable, as a multiple of the whole node beside it: the seven
-// dispatcher closures and the `Map` holding them. Building the gesture runtime there too read
-// 4.6x, installing the dispatchers alone reads 2.6x, so the bound sits between the two
-const MACHINE_BUDGET = 3;
+// Both budgets below are a fraction of the whole plain node, never of each other: the machine
+// allocates NOTHING now, and a ratio against zero carries no verdict
+
+// What `touchable-opacity`'s attach may cost over `pressable`'s. Building the `AnimatedValue`, the
+// feedback runtime and the timer set there read 2.6x the node, a flatten guard alone reads 0.12x
+const LAYER_BUDGET = 0.5;
+
+// What `attach` may allocate per pressable. Building the gesture runtime there read 4.6x the node
+// and installing seven dispatchers 2.6x; one shared `IEventDispatch` installs neither
+const MACHINE_BUDGET = 0.25;
 
 // How much dearer `touchable-without-feedback`'s arm may be than `touchable-native-feedback`'s for
 // the same shape. Building the timing state at arm read 8.9x and deferring it reads 2.8x, so the
@@ -102,7 +108,7 @@ function measure(run: () => void): IReading {
 
 describe('mounting a touchable-opacity', () => {
   // Three arms in one case so they see the same machine, each a strict superset of the one above
-  it('costs its press machine plus a layer, not a multiple of it', () => {
+  it('costs a flatten guard over a plain pressable, not a fade runtime', () => {
     registerPressableBehavior();
     registerTouchableOpacityBehavior();
 
@@ -122,23 +128,30 @@ describe('mounting a touchable-opacity', () => {
         `press ${press.bytes.toFixed(0)}B/${press.wall.toFixed(2)}us ` +
         `opacity ${opacity.bytes.toFixed(0)}B/${opacity.wall.toFixed(2)}us :: ` +
         `machine ${machine.toFixed(0)}B layer ${layer.toFixed(0)}B = ` +
-        `${(layer / Math.max(1, machine)).toFixed(1)}x the machine`,
+        `${(layer / plain.bytes).toFixed(2)}x the node`,
     );
 
-    expect(layer).toBeLessThan(machine * LAYER_BUDGET);
-    // Read by the case below, which needs arms measured on the same machine (§11)
+    // Handed over BEFORE the assertion, so a red here leaves the case below measuring rather than
+    // dividing by a zero it reads as a second failure
     machineBytes = machine;
     plainBytes = plain.bytes;
+    // Release only: the assert build charges its own per-attach bookkeeping, 560 B against 63 here,
+    // so the budget it was calibrated on reports a regression that does not ship
+    if (isBenchBuild) expect(layer).toBeLessThan(plain.bytes * LAYER_BUDGET);
+    else print('DEBUG TOUCHABLE assert build: the budget is release-only');
   });
 
-  // The gesture runtime is only ever read from a dispatcher, so a pressable nobody touches has no
-  // use for it. What `attach` still owes is the dispatchers themselves
-  it('installs its dispatchers without building the gesture runtime', () => {
+  // Nothing under a dispatcher is read until a finger lands, and the dispatchers are one
+  // module-level `IEventDispatch` the node points at, so arming a machine allocates nothing
+  it('arms its press machine without allocating anything per node', () => {
     print(
       `DEBUG TOUCHABLE machine ${machineBytes.toFixed(0)}B = ` +
-        `${(machineBytes / Math.max(1, plainBytes)).toFixed(1)}x the node`,
+        `${(machineBytes / plainBytes).toFixed(2)}x the node`,
     );
-    expect(machineBytes).toBeLessThan(plainBytes * MACHINE_BUDGET);
+    // Release only, same reason as the case above
+    if (isBenchBuild)
+      expect(machineBytes).toBeLessThan(plainBytes * MACHINE_BUDGET);
+    else print('DEBUG TOUCHABLE assert build: the budget is release-only');
   });
 
   // Both anchor-backed touchables commit ONE node, adopt the app's child as the responder and run

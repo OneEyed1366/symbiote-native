@@ -53,8 +53,8 @@ export {
   hasListenerFor,
   listenerFor,
   setBehaviorListener,
-  setEventDispatch,
   setEventListener,
+  setNodeDispatch,
 } from './node-events';
 
 export { routeProp } from './node-route';

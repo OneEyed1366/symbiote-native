@@ -60,7 +60,7 @@ import {
   releaseResponderToNative,
 } from './responder';
 
-// Fabric calls the handler for every surface, so the registration is once per runtime
+// Fabric calls one handler for every surface, so the registration happens once per runtime
 let installed = false;
 
 function armLongPress(

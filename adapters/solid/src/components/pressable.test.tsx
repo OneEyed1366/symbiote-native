@@ -30,6 +30,11 @@ import {
   installRecordingFabric,
   type ILiveNode,
 } from '@symbiote-native/test-utils';
+import {
+  isSymbioteNode,
+  listenerFor,
+  type IListener,
+} from '@symbiote-native/engine';
 // SIDE-EFFECT IMPORT: the press machine lives in the tag's behavior, and only this module installs
 // it. An app reaches it through the package barrel; a test importing render does not.
 import '../register';
@@ -81,10 +86,6 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
 // The responder is the pressable tag's own RCTView, found by the testID every mount below sets —
 // the tree also carries the engine's synthetic box-none root.
 function createdTarget(): { instanceHandle: unknown } {
@@ -135,14 +136,9 @@ function fireAt(handle: unknown, type: string, x: number, y: number): void {
   });
 }
 
-function terminationGate(
-  handle: unknown,
-): ((event: unknown) => unknown) | undefined {
-  if (!isRecord(handle)) return undefined;
-  const listeners = handle.listeners;
-  if (!(listeners instanceof Map)) return undefined;
-  const gate: unknown = listeners.get(TERMINATION_REQUEST);
-  return typeof gate === 'function' ? gate : undefined;
+function terminationGate(handle: unknown): IListener | undefined {
+  if (!isSymbioteNode(handle)) return undefined;
+  return listenerFor(handle, TERMINATION_REQUEST);
 }
 
 describe('Solid Pressable on the engine', () => {

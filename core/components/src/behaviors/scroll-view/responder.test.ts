@@ -11,6 +11,7 @@ import {
   currentlyFocusedInput,
   Keyboard,
   Platform,
+  listenerFor,
   routeProp,
   setInputBlurred,
   setInputFocused,
@@ -27,7 +28,7 @@ const fabric = installRecordingFabric();
 let nextRootTag = 9800;
 
 function listenerOf(node: ISymbioteNode, name: string): IListener {
-  const listener = node.listeners?.get(name);
+  const listener = listenerFor(node, name);
   if (listener === undefined) {
     throw new Error(`no "${name}" listener installed`);
   }

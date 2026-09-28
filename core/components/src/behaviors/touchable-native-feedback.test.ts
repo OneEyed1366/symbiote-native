@@ -18,6 +18,7 @@ import {
   createElement,
   createSurface,
   removeChild as engineRemove,
+  listenerFor,
   routeProp,
   type IListener,
   type ISymbioteEvent,
@@ -74,7 +75,7 @@ function mount(
 }
 
 function listenerOf(node: ISymbioteNode, name: string): IListener {
-  const listener = node.listeners?.get(name);
+  const listener = listenerFor(node, name);
   if (listener === undefined)
     throw new Error(`no "${name}" listener — the behavior did not attach`);
   return listener;
@@ -159,7 +160,7 @@ describe('touchable-native-feedback host behavior', () => {
     engineAppend(owner, child);
     surface.commit();
 
-    expect(owner.listeners?.get('pressIn')).toBeUndefined();
+    expect(listenerFor(owner, 'pressIn')).toBeUndefined();
     listenerOf(child, 'pressIn')(touchAt(4, 5));
     listenerOf(child, 'startShouldSetResponder')(touchAt(4, 5));
     expect(onPressIn).toHaveBeenCalledTimes(1);
@@ -233,16 +234,14 @@ describe('touchable-native-feedback host behavior', () => {
 
     routeProp(owner, 'onLayout', undefined);
     surface.commit();
-    // ABSENT, not null, and the change of spelling is a correction rather than a weakening. The
-    // literal null was the CLONE PROTOCOL's way of saying "reset this to its default" — it existed
-    // only inside the diff the stand-in merged, and no other consumer ever saw it. The engine's op
-    // stream says the same thing with `NO_VALUE`, and a host replaying that op DELETES the key.
+    // ABSENT, not null: the engine's op stream says "reset to default" with `NO_VALUE`, and a host
+    // replaying that op DELETES the key
     expect(Object.hasOwn(subject().payload, 'onLayout')).toBe(false);
     // The half that proves the engine ACTED rather than merely stopping: the record carried
     // `onLayout` after the write above, so the key being gone from it means a clearing op was sent.
     const recorded = fabric.find(node => node.tag === subject().tag);
     expect(Object.hasOwn(recorded?.props ?? {}, 'onLayout')).toBe(false);
-    expect(child.listeners?.get('layout')).toBeUndefined();
+    expect(listenerFor(child, 'layout')).toBeUndefined();
   });
 
   // Off Android `getBackgroundProp` returns null (:402), so neither slot is written at all.
@@ -311,6 +310,6 @@ describe('touchable-native-feedback host behavior', () => {
     expect(Object.keys(committed.payload)).not.toContain('accessibilityLabel');
     expect(Object.keys(committed.payload)).not.toContain('focusable');
     expect(Object.keys(committed.payload)).not.toContain('testID');
-    expect(child.listeners?.get('pressIn')).toBeUndefined();
+    expect(listenerFor(child, 'pressIn')).toBeUndefined();
   });
 });

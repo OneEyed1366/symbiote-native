@@ -1,6 +1,9 @@
 // The responder protocol: who owns the in-flight gesture, and the negotiation that moves it.
 // Split from `./index` so the touch handler reads as four phases rather than as the negotiation
 
+// `currentResponder` is module state reached from outside through `heldResponder` and
+// `clearResponder`, т.к. the touch handler must read it between its own phases
+
 import { dlog, isDebug } from '../debug';
 import { setIsJSResponder } from '../imperative';
 import { hasListenerFor, type ISymbioteNode } from '../node';

@@ -1,6 +1,9 @@
 // The synthesized tap: Fabric has no `press` event, so one is built from a touch sequence. This
 // module owns the in-flight gestures and the long-press clock, nothing about delivery
 
+// A press is INDEPENDENT of the responder: `negotiateResponder` runs on the same touch frames and
+// neither consumes the other, т.к. a View can be a Pressable and a PanResponder target at once
+
 import { isRecord } from '../type-guards';
 import { isSymbioteNode, type ISymbioteNode } from '../node';
 import { endsWithin } from './delivery';

@@ -58,19 +58,11 @@ export function setBehaviorListener(
 
 // Arm (or release, with `undefined`) the shared handler a behavior dispatches through, instead of
 // installing one closure per name. See `IEventDispatch`
-export function setEventDispatch(
+export function setNodeDispatch(
   node: ISymbioteNode,
   dispatch: IEventDispatch | undefined,
 ): void {
   node.dispatch = dispatch;
-}
-
-// Stands in for the behavior's own closure, so the four delivery sites keep calling a listener.
-// `currentTarget` and `type` are what the caller already put in the event, т.к. every site builds
-// one before it calls
-function dispatchToBehavior(event: ISymbioteEvent): unknown {
-  const node = event.currentTarget;
-  return node.dispatch?.dispatch(node, event);
 }
 
 /** Whether anything at all would receive `name` on this node. */
@@ -87,9 +79,12 @@ export function listenerFor(
 ): IListener | undefined {
   const own = node.listeners?.get(name);
   if (own !== undefined) return own;
-  return node.dispatch?.names.has(name) === true
-    ? dispatchToBehavior
-    : undefined;
+  const dispatch = node.dispatch;
+  if (dispatch === undefined || !dispatch.names.has(name)) return undefined;
+  // ONE closure per delivered event, where a dispatcher per name built seven per mounted node.
+  // `name` is bound here rather than read off `event.type`, so a caller building its own event
+  // (every test driving a behavior by hand) reaches the same handler
+  return event => dispatch.deliver(node, name, event);
 }
 
 // The unowned names whose presence a platform rule reads

@@ -55,7 +55,13 @@ export type IListener = (event: ISymbioteEvent) => unknown;
 // "nothing listens" for every other event
 export type IEventDispatch = {
   readonly names: ReadonlySet<string>;
-  readonly dispatch: (node: ISymbioteNode, event: ISymbioteEvent) => unknown;
+  // `name` is passed rather than read off `event.type`, so the seam holds for a caller that builds
+  // its own event (every test driving a behavior by hand does)
+  readonly deliver: (
+    node: ISymbioteNode,
+    name: string,
+    event: ISymbioteEvent,
+  ) => unknown;
 };
 
 // Guard narrowing `unknown` to `ISymbioteEvent`, beside the interface it tests so every adapter

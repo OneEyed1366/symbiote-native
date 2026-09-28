@@ -22,6 +22,7 @@ import {
   createSurface,
   propsOf,
   removeChild,
+  listenerFor,
   routeProp,
   type ISymbioteEvent,
   type ISymbioteNode,
@@ -81,7 +82,7 @@ function mountSticky(
   commit();
 
   const fire = (target: ISymbioteNode, event: ISymbioteEvent): void => {
-    const listener = target.listeners?.get(event.type);
+    const listener = listenerFor(target, event.type);
     if (listener === undefined)
       throw new Error(`no ${event.type} listener installed`);
     listener(event);
@@ -288,7 +289,7 @@ describe('the owner keeps every listener it borrowed', () => {
         'onLayout',
       ),
     ).toBe(false);
-    expect(owner.listeners?.get('layout')).toBeUndefined();
+    expect(listenerFor(owner, 'layout')).toBeUndefined();
   });
 
   it('keeps the owner layout for the app after the last header leaves', () => {
@@ -303,7 +304,10 @@ describe('the owner keeps every listener it borrowed', () => {
     // The sticky claim is gone and the app's is not — one resolver owns the slot, so neither claim
     // can uninstall the other's.
     expect(commit().payload.onLayout).toBe(true);
-    owner.listeners?.get('layout')?.({
+    listenerFor(
+      owner,
+      'layout',
+    )?.({
       type: 'layout',
       target: owner,
       currentTarget: owner,

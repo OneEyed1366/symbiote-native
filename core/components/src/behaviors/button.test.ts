@@ -12,6 +12,7 @@ import {
   clearHostBehaviors,
   createElement,
   createSurface,
+  listenerFor,
   routeProp,
   type IListener,
   type ISymbioteEvent,
@@ -104,7 +105,7 @@ function countNodes(node: ILiveNode): number {
 }
 
 function listenerOf(node: ISymbioteNode, name: string): IListener {
-  const listener = node.listeners?.get(name);
+  const listener = listenerFor(node, name);
   if (listener === undefined)
     throw new Error(`no "${name}" listener — the behavior did not attach`);
   return listener;
@@ -471,6 +472,6 @@ describe('button host behavior', () => {
     await settle();
 
     expect(committedByTestId(TEST_ID).children).toHaveLength(0);
-    expect(node.listeners?.get('pressIn')).toBeUndefined();
+    expect(listenerFor(node, 'pressIn')).toBeUndefined();
   });
 });
