@@ -1,11 +1,17 @@
 // `touchable-opacity` and `pressable` run the SAME press machine, so what separates their mount
 // cost is the animated opacity layer `attach` binds through `setAnimatedBehaviorStyle`
 
-import { createElement } from '@symbiote-native/engine';
+import {
+  ANCHOR_COMPONENT,
+  appendChild,
+  createElement,
+} from '@symbiote-native/engine';
 import { takeBatch } from '@symbiote-native/engine/mutation-buffer';
 import {
   registerPressableBehavior,
+  registerTouchableNativeFeedbackBehavior,
   registerTouchableOpacityBehavior,
+  registerTouchableWithoutFeedbackBehavior,
 } from '@symbiote-native/components';
 
 import {
@@ -30,7 +36,20 @@ const LAYER_BUDGET = 2;
 // 4.6x, installing the dispatchers alone reads 2.6x, so the bound sits between the two
 const MACHINE_BUDGET = 3;
 
+// How much dearer `touchable-without-feedback`'s arm may be than `touchable-native-feedback`'s for
+// the same shape. Building the timing state at arm read 8.9x and deferring it reads 2.8x, so the
+// bound sits between; what is left is twf's per-item refinement closure against tnf's module one
+const TWF_OVER_TNF_BUDGET = 4;
+
 type IReading = { readonly bytes: number; readonly wall: number };
+
+// An anchor-backed touchable with the app child it adopts, which is what arms its press machine
+function armed(tag: string): unknown {
+  const owner = createElement(ANCHOR_COMPONENT, false, tag);
+  const child = createElement('RCTView');
+  appendChild(owner, child);
+  return child;
+}
 
 /** Set by the first case, read by the second: both arms have to see the same machine. */
 let machineBytes = 0;
@@ -99,6 +118,38 @@ describe('mounting a touchable-opacity', () => {
         `${(machineBytes / Math.max(1, plainBytes)).toFixed(1)}x the node`,
     );
     expect(machineBytes).toBeLessThan(plainBytes * MACHINE_BUDGET);
+  });
+
+  // Both anchor-backed touchables commit ONE node, adopt the app's child as the responder and run
+  // the same press machine on it, so their cost over `pressable` + that child is the tag's own
+  it('costs no more for an adopted child than the machine it arms on it', () => {
+    registerTouchableWithoutFeedbackBehavior();
+    registerTouchableNativeFeedbackBehavior();
+
+    // The floor both arms are measured against: the press machine on a node, plus the plain view
+    // the touchable adopts
+    const floor = measure(() => {
+      const child = createElement('RCTView');
+      createElement('RCTView', false, 'pressable');
+      return child;
+    });
+
+    const withoutFeedback = measure(() => armed('touchable-without-feedback'));
+    const nativeFeedback = measure(() => armed('touchable-native-feedback'));
+
+    const twfOver = withoutFeedback.bytes - floor.bytes;
+    const tnfOver = nativeFeedback.bytes - floor.bytes;
+    print(
+      `DEBUG TOUCHABLE floor ${floor.bytes.toFixed(0)}B/${floor.wall.toFixed(2)}us ` +
+        `twf ${withoutFeedback.bytes.toFixed(0)}B/${withoutFeedback.wall.toFixed(2)}us ` +
+        `tnf ${nativeFeedback.bytes.toFixed(0)}B/${nativeFeedback.wall.toFixed(2)}us :: ` +
+        `over the floor twf ${twfOver.toFixed(0)}B tnf ${tnfOver.toFixed(0)}B`,
+    );
+
+    // `touchable-native-feedback` arms with a module-level refinement where
+    // `touchable-without-feedback` builds a per-item one plus its timing state, and that gap is
+    // the only thing between two tags with the same shape
+    expect(twfOver).toBeLessThan(tnfOver * TWF_OVER_TNF_BUDGET);
   });
 });
 
