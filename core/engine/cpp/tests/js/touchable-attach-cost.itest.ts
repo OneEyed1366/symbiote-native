@@ -57,6 +57,11 @@ const ELEVEN_NAMES: readonly string[] = [
   'selectionChange',
 ];
 
+// Hoisted, so the shared-dispatcher arm installs ONE function under eleven names
+function sharedDispatcher(): undefined {
+  return undefined;
+}
+
 type IReading = { readonly bytes: number; readonly wall: number };
 
 // An anchor-backed touchable with the app child it adopts, which is what arms its press machine
@@ -184,13 +189,25 @@ describe('mounting a touchable-opacity', () => {
       return node;
     });
 
+    // The same eleven names against ONE function: what a shared dispatcher keyed on `event.type`
+    // would install, so the difference names the CLOSURE half of the price and the rest is the Map
+    const shared = measure(() => {
+      const node = createElement('RCTView');
+      for (const name of ELEVEN_NAMES)
+        setBehaviorListener(node, name, sharedDispatcher);
+      return node;
+    });
+
     const first = one.bytes - bare.bytes;
     const each = (eleven.bytes - one.bytes) / (ELEVEN_NAMES.length - 1);
+    const closureHalf = (eleven.bytes - shared.bytes) / ELEVEN_NAMES.length;
     print(
       `DEBUG TOUCHABLE listeners bare ${bare.bytes.toFixed(0)}B ` +
-        `one ${one.bytes.toFixed(0)}B eleven ${eleven.bytes.toFixed(0)}B :: ` +
+        `one ${one.bytes.toFixed(0)}B eleven ${eleven.bytes.toFixed(0)}B ` +
+        `shared ${shared.bytes.toFixed(0)}B :: ` +
         `first ${first.toFixed(0)}B each ${each.toFixed(0)}B ` +
-        `eleven of them ${(first + each * 10).toFixed(0)}B`,
+        `eleven of them ${(first + each * 10).toFixed(0)}B :: ` +
+        `closure ${closureHalf.toFixed(0)}B slot ${(each - closureHalf).toFixed(0)}B`,
     );
 
     // The FIRST one pays for the `Map` as well, so it must cost more than the ten after it. A
