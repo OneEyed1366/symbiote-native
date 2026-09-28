@@ -1376,8 +1376,19 @@ Still owed on the instrument: a settled reading in the other four screens (Vue `
                 reachable before the user touches the thing. A behavior's `attach` runs inside
                 `createElement`, so everything it builds is paid by every node in a list and
                 collected by almost all of them",
-  what_is_left: "~190 B per installed dispatcher, seven per node. Cutting it means one shared
-                 dispatcher keyed on `event.type`, which §18v already priced and rejected",
+  then_TWF: "the same question a third time, on the tag that was still dearest per COMMITTED node.
+             `touchable-attach-cost.itest.ts` case 3 prices an anchor-backed touchable plus the
+             child it adopts against `pressable` + a plain view: twf read 568 B over that floor and
+             tnf only 64, т.к. tnf arms with a MODULE-LEVEL refinement while twf built a per-item
+             `{runtime, timers}` at arm. Deferred to the first gesture: 568 -> 176 B,
+             suite 7 183 -> 6 800 KB / 1 000, wall flat (the win is allocation, not clock)",
+  what_is_left: "twf's per-item refinement CLOSURE, 112 B over tnf. Removing it means handing the
+                 refinement its `source`, a change to `IPressConfigRefinement` that four behaviors
+                 implement, and it is not worth 112 B. Under it, ~190 B per installed dispatcher,
+                 seven per node, which §18v already priced and rejected",
+  the_shape_to_reuse: "a behavior's `attach` runs inside `createElement`, so ANYTHING it builds is
+                       paid by every node in a list and collected by almost all of them. Ask of
+                       each allocation: is it read before the user touches the thing",
 }
 ```
 
