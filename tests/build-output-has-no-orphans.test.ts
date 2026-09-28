@@ -5,18 +5,11 @@
 // that, but only `pnpm run prepublish-build` calls it. A publish that skips it ships whatever the
 // last several refactors left behind.
 //
-// Device-found 2026-09-08, and the shadowing case is the one that bites rather than the merely-dead
-// one. `behaviors/scroll-view.ts` became `behaviors/scroll-view/`; the old FLAT emit stayed beside
-// the new directory, and every resolver prefers `X.js` to `X/index.js` — so the package shipped the
-// pre-move file. It still registered the ScrollView host behavior under the tag name of the era it
-// was compiled in (`symbiote-scroll-view`), which nothing emits any more. `<scroll-view>` therefore
-// got NO behavior at all: no content node, `contentContainerStyle` with nowhere to be redirected,
-// and the app's children committed straight into `RCTScrollView` — a canary with no padding, no gap
-// and overlapping subtrees. Every headless suite was green throughout, because vitest resolves
-// `src` and never reads `build`.
-//
-// The three orphans this first caught also show the quiet half: `state-style` and React's `jsx`,
-// both deleted the same day, were still being published as importable modules.
+// The shadowing case is the one that bites, not the merely-dead one: a source moved from `X.ts`
+// into `X/index.ts` leaves the old FLAT `X.js` emit beside it, and every resolver prefers `X.js`
+// to `X/index.js` — invisible to a headless suite, which resolves `src`, never `build`.
+
+// The other half this catches: a deleted source still published as an importable module.
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';

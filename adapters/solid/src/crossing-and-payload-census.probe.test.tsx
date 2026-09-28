@@ -280,10 +280,9 @@ describe('what one benchmark row actually commits', () => {
           'width',
         ],
       ),
-      // `submitBehavior` left this census when TextInput's prop resolution moved into the engine
-      // (`foldTextInputAliases`), and on 2026-09-18 `text` became `value` for exactly the same
-      // reason: the `value -> text` fold is `foldTextInputValue` in `SymbioteFabricProps.cpp` now,
-      // and this probe reads the TypeScript builder's payload, which carries no copy of it.
+      // `submitBehavior` and `text` are both absent: TextInput's prop resolution
+      // (`foldTextInputAliases`) and the `value -> text` fold (`foldTextInputValue`) are the
+      // engine's, and this probe's TypeScript builder carries no copy of either.
       //
       // The COUNT is unchanged and that is the point of the row — two keys before, two keys after.
       // Both are the MACHINE's, which is still JS: the acknowledged event count, and the controlled

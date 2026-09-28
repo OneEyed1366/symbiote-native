@@ -1,8 +1,6 @@
 // Every adapter re-exports ~100 framework-agnostic names verbatim from @symbiote-native/engine
-// and @symbiote-native/components. Nothing enforced that the four lists agreed, so they drifted:
-// PanResponder was missing from the Svelte barrel until 2026-08-12, and this test found 22 more.
-// A missing re-export is not a type error, so tsc never sees it; it surfaces only when an app
-// imports the name and its framework's package turns out not to have it.
+// and @symbiote-native/components. A missing re-export is not a type error, so tsc never sees
+// it; it surfaces only when an app imports the name and its framework's package lacks it.
 //
 // Reads the barrels as SOURCE rather than importing them: most drifting names are types, so
 // `Object.keys(await import(...))` would see none of them.

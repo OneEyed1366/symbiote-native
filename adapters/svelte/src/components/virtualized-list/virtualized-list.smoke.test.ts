@@ -47,9 +47,8 @@ if (globalThis.navigator === undefined) {
 }
 
 const ROOT_TAG = 91_101;
-// `refreshControlProps` renders a bare `<refresh-control>` TAG now (deleted 2026-09-10 — see
-// scroll-view.smoke.test.ts's equivalent note), so index.svelte needs no sibling component
-// pre-compiled and no import specifier rewritten.
+// `refreshControlProps` renders a bare `<refresh-control>` TAG, so index.svelte needs no sibling
+// component pre-compiled and no import specifier rewritten.
 const LIST_OUT = join(__dirname, '.smoke-compiled-virtualized-list.mjs');
 const ROOT_OUT = join(__dirname, '.smoke-compiled-list-root.mjs');
 const REFRESH_ROOT_OUT = join(__dirname, '.smoke-compiled-refresh-root.mjs');
@@ -246,13 +245,9 @@ describe('VirtualizedList (real compiled index.svelte)', () => {
 
       const scrollView = fabric.find(node => node.viewName === 'RCTScrollView');
       expect(scrollView).toBeDefined();
-      // Android nested-scroll gesture arbitration: without this, a FlatList/SectionList nested
-      // inside a page ScrollView never gets its own scroll gesture — only the outer page scrolls.
-      // Defaulted by the scroll TAG's own rule, which is `foldScrollViewProps` in the engine since
-      // 2026-09-18 and unreachable from this host
-      // (`core/engine/cpp/tests/js/scroll-view-payload.itest.ts`). What this still pins is the half
-      // it was really written for: hand-authoring the intrinsic reaches the same committed scroll
-      // view an app's own `<scroll-view>` does, so the rule has something to apply to.
+      // Android nested-scroll arbitration: without this, a nested FlatList never gets its own
+      // scroll gesture. Defaulted by `foldScrollViewProps`, unreachable from this host —
+      // `scroll-view-payload.itest.ts` pins that hand-authoring reaches the same scroll view.
       expect(scrollView).toBeDefined();
     });
 
@@ -441,15 +436,9 @@ describe('VirtualizedList (real compiled index.svelte)', () => {
       expect(fabric.commands[0]?.viewName).toBe('RCTScrollView');
     });
 
-    // why: WHERE a separator sits, and WHAT decides to render it, are both geometry. RN renders
-    // ItemSeparatorComponent INSIDE the cell's own measuring wrapper
-    // (VirtualizedListCellRenderer.js:218-221) and gates it on the last index of the DATA
-    // (VirtualizedList.js:793). As a SIBLING it is an extra flex child, so the chrome between two
-    // cells is gap + separator + gap while a spacer collapsing that region contributes one gap —
-    // the leading spacer lands every cell below it short by (separator + gap). Gated on the
-    // WINDOW, a cell's own height changes as the window slides past it. Both device-measured
-    // 2026-08-19; see .claude/rules/list-geometry-feedback-loop.md. Counting dividers cannot see
-    // either — the assertion has to ask which node CONTAINS one.
+    // why: WHERE a separator sits is geometry. RN renders it INSIDE the cell's own measuring
+    // wrapper (VirtualizedListCellRenderer.js:218-221) — as a SIBLING it would be an extra flex
+    // child. Counting dividers can't see this; the assertion asks which node CONTAINS one.
     it('renders the separator inside its cell rather than beside it', async () => {
       mount(ROOT_TAG, await loadMountableWithSeparator(20, 1));
       await tick();

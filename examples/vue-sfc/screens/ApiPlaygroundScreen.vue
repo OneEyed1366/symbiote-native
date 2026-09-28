@@ -1,18 +1,6 @@
-<!--
-  API Playground: a live, interactive demo of Vue's OWN template/Composition API surface — v-show,
-  v-model, KeepAlive, Suspense, provide/inject, slots, custom directives, watch/computed, and more —
-  running under Symbiote's renderer, in SFC/`<template>` syntax specifically (the sibling `vue-tsx`
-  app covers the render-function angle for the rows that have one). Scope is the FINAL, triaged
-  checklist at .docs/framework-api-surface/vue.md: every `Yes`/`Partial` row with an SFC angle gets
-  a live demo below, organized into sections matching that file's own `##` categories. Doesn't
-  duplicate HooksDemoScreen.vue (that screen demos @symbiote-native/navigation's OWN composables,
-  not Vue's core API) or CanaryScreen.vue (already demos v-show and Teleport — referenced here, not
-  re-demoed).
-
-  <KeepAlive>/<Suspense> + onActivated/onDeactivated are genuinely UNPROVEN against a real Fabric
-  tree before this screen (2026-08-17 decision, recorded in the checklist) — this screen IS the
-  first real test of them, not a port of an already-working demo.
--->
+<!-- API Playground: live demo of Vue's OWN template/Composition API surface (v-show, v-model,
+  KeepAlive, Suspense, provide/inject, slots, directives, watch/computed) under Symbiote's renderer,
+  in SFC syntax — scope is the triaged checklist at .docs/framework-api-surface/vue.md. -->
 <script setup lang="ts">
 import {
   ref,

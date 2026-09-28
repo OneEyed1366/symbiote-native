@@ -5,7 +5,7 @@
 // The reference applier is tolerant where the device is not: it would happily park a closure in
 // `node.props`, so ASSERTING ON THE TS HOST CANNOT REPRODUCE THE CRASH. What it can assert is the
 // property that prevents it — the function never reaches the host at all — and that is the same
-// observable on both. Device-found 2026-09-08 through `setNativeProps`, which is the one prop path
+// observable on both. Device-found through `setNativeProps`, which is the one prop path
 // with no `routeProp` in front of it: an `Animated.View` spread with `panResponder.panHandlers`
 // hands `AnimatedProps.__getValue()` a bag of callbacks and it copies every key it holds.
 import { describe, expect, it, vi } from 'vitest';

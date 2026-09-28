@@ -1,8 +1,6 @@
-// The input surface and prop fold `AnimatedImage` builds on. The `Image` COMPONENT that used to
-// share it is gone (2026-09-10) — the primitive is the `<image>` tag, matched by `ImageElement`,
-// and `registerImageBehavior` folds its source on that path. `Animated.Image` is not a primitive
-// and stays a component, so what it needs from here survived the deletion; the folder collapsed to
-// this one flat file with it (`symbiote-file-layout`).
+// The input surface and prop fold `AnimatedImage` builds on. The primitive is the `<image>` tag
+// (`ImageElement`), which folds its source via `registerImageBehavior`; `Animated.Image` stays a
+// component and is the only consumer left, one flat file (`symbiote-file-layout`).
 import { EventEmitter, computed, signal } from '@angular/core';
 import {
   gateWanted,
@@ -562,10 +560,9 @@ export abstract class ImageBase {
     this.inputsRevision.update(revision => revision + 1);
   }
 
-  // MEASURED 2026-08-16: as a getter this rebuilt the bag on every refresh of this view, so
-  // `[symbioteHostProps]`'s reference check failed every time and every key was re-pushed through
-  // Renderer2 -> routeProp - pure waste when nothing changed. computed() returns the SAME object
-  // until a tracked dependency actually changes, and the input setter then skips the whole spread.
+  // A getter would rebuild the bag on every refresh, failing `[symbioteHostProps]`'s reference
+  // check and re-pushing every key through Renderer2 -> routeProp for nothing. computed() returns
+  // the SAME object until a tracked dependency changes, so the input setter skips the whole spread.
   //
   // A computed FIELD cannot be overridden by a subclass accessor the way a getter can, so the
   // platform components override buildImageProps() below and this stays the single memoization

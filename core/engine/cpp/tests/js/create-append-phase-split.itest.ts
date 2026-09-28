@@ -506,7 +506,7 @@ describe('where a create and an append spend themselves, end to end', () => {
 
 report();
 
-// ── ANSWER, measured (2026-09-17) ───────────────────────────────────────────────────────────────
+// ── ANSWER ───────────────────────────────────────────────────────────────────────────────────────
 //
 //   CREATE                          APPEND onto a standing list of the same width
 //   rows  FILL APPLY COMMIT         rows  FILL APPLY COMMIT
@@ -603,8 +603,8 @@ report();
 // reading a complexity class into it.
 //
 // **The path built to avoid exactly this is `canReplaceInPlace`, and it returns false
-// unconditionally** (SymbioteTree.cpp, disabled 2026-09-15 for a fuzzer-confirmed correctness
-// reason). So this is not a missing optimisation on a fast path — it is the standing cost of that
+// unconditionally** (SymbioteTree.cpp, disabled for a fuzzer-confirmed correctness reason). So
+// this is not a missing optimisation on a fast path — it is the standing cost of that
 // path being off, and F-65's "500x" was measuring its absence from the other side.
 //
 // WHAT THIS DOES NOT ESTABLISH. JSC is not Hermes and a Mac is not a phone, so no millisecond here

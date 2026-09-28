@@ -14,13 +14,9 @@
 // and assembles the host elements. Lists have no Descriptor render fn — the cell content is the
 // user's own subtree (`symbiote-add-component` §0, category 2).
 //
-// SINCE 2026-09-11 THIS FILE NO LONGER BUILDS THE CONTENT NODE ITSELF. `registerScrollViewBehavior()`
-// makes the tag's own `buildStructure` do that (the same content node ScrollView's bare tag gets
-// anywhere else), and this file reads it back off `scroll.childHost` rather than constructing a
-// second one — building one here too would nest a content view inside the behavior's own
-// (`core/components/src/behaviors/scroll-view/shared.ts`'s header names this precondition). The
-// RefreshControl placement (a sibling on iOS, an inverting wrap on Android) moved the same way: it is
-// an ordinary child now, and the behavior's `claimedChildren` decides where it lands.
+// THIS FILE NO LONGER BUILDS THE CONTENT NODE ITSELF: `registerScrollViewBehavior()`'s tag-owned
+// `buildStructure` does that, read back off `scroll.childHost` rather than built a second time
+// here. RefreshControl is an ordinary child now; `claimedChildren` decides where it lands.
 //
 // WHY THIS FILE STILL HAND-AUTHORS THE SCROLL TAG VIA `createElement` INSTEAD OF PLAIN JSX
 // (`<scroll-view>{listBody}</scroll-view>`), unlike a component with no dynamic children. Solid's
@@ -760,24 +756,13 @@ export function createVirtualizedList(): IVirtualizedListComponent {
       return <Separator {...separatorPropsFor(index)} />;
     }
 
-    // RN renders a separator in the gap AFTER a cell, and only while there is a following rendered
-    // cell — never after the window's last one.
-    // RN renders a separator in the gap AFTER a cell, and only while there is a following rendered
-    // cell — never after the window's last one, and never after the force-mounted sticky cell, which
-    // is not adjacent to the window.
+    // RN renders a separator in the gap AFTER a cell, only while there is a following rendered
+    // cell — never after the window's last one, and never after the force-mounted sticky cell,
+    // which is not adjacent to the window.
+
     // RN gates the separator on the last index of the DATA, not of the WINDOW
-    // (VirtualizedList.js:793 `const end = getItemCount(data) - 1`), and now that the separator
-    // lives INSIDE the measuring wrapper that distinction is load-bearing: gating on the window
-    // would make a cell's own measured height change as the window slides past it. Device-measured
-    // 2026-08-19 as a run of cells all shifting by exactly the divider's 1px.
-    // Nothing about the WINDOW may enter this predicate. The separator lives inside the measuring
-    // wrapper, so whatever decides to render it decides the cell's own height — and a height that
-    // depends on where the window happens to sit moves the content under the user every time the
-    // window slides. Two window-dependent terms were removed after being measured on device
-    // 2026-08-19, each as a run of cells shifting by exactly the divider's 1px: gating on the
-    // window's `last` (RN gates on the data's, VirtualizedList.js:793), and excluding the
-    // force-mounted sticky cell. RN excludes neither — its sticky header keeps its separator like
-    // any other cell.
+    // (VirtualizedList.js:793): the separator lives INSIDE the measuring wrapper, so gating on the
+    // window would make a cell's own measured height change as the window slides past it.
     const hasSeparatorAfter = (index: number): boolean =>
       props.ItemSeparatorComponent !== undefined && index < metrics().count - 1;
 
@@ -828,13 +813,9 @@ export function createVirtualizedList(): IVirtualizedListComponent {
           separators: makeSeparators(index()),
         })),
       );
-      // The separator rides INSIDE the measuring wrapper, where RN's own cell renderer puts it
-      // (VirtualizedListCellRenderer.js:218-221). As a SIBLING it is an extra flex child, so the
-      // chrome between two cells is gap + separator + gap while a spacer collapsing that region
-      // replaces it with one gap — every cell below the leading spacer then lands short by
-      // (separator + gap), and the content jumps by that much each time the window's first index
-      // moves. Measured at exactly 17px on device 2026-08-19 (a 1px divider under a 16px container
-      // gap); see .claude/rules/list-geometry-feedback-loop.md.
+      // The separator rides INSIDE the measuring wrapper (VirtualizedListCellRenderer.js:218-221).
+      // As a SIBLING it would be an extra flex child, landing every cell below the leading spacer
+      // short by (separator + gap) — see `list-geometry-feedback-loop.md`.
       const separator = (
         <Show when={hasSeparatorAfter(index())}>
           <view>{separatorElement(index())}</view>

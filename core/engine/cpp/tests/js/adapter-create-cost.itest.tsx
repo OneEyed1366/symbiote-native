@@ -15,11 +15,9 @@
 // same ten-node row through the same calls an adapter would end up making, so subtracting it leaves
 // the reconciler: fibers, props diffing, and whatever each adapter does per element.
 //
-// It began as React only. Vue joined it, and ANGULAR joined on 2026-09-18 because the six-column
-// ruler puts its bare arm at ~15.8 us per node against Solid's 9.5 — a gap the same size as what a
-// matched element directive costs, and one nobody had split since Angular's dev mode was turned off
-// (`render/index.ts`, `settleAngularDevMode`). Every earlier split of this adapter carried the
-// assertions that switch enables, so none of them is evidence any more.
+// Covers React, Vue, Solid and Angular's bare/no-op arms. Any Angular split recorded before
+// `settleAngularDevMode` (`render/index.ts`) turned dev mode off in release carries its
+// assertion overhead and is not evidence of the adapter's real cost.
 //
 // ONE SITTING, `build-release`, identical committed trees (nodes=10003, created=10002 on all four):
 //
@@ -73,8 +71,8 @@
 // first mount, every arm here uses a component class of its own, and only one of them warmed up. On
 // device the adapter ships AOT, so that cost exists in this harness and nowhere the number is meant
 // to predict. Warmed, the delta over the engine-direct floor is 57-61 ms against React's 21-22 —
-// still the largest of the three reconcilers, and not the 4.7x the cold reading claimed. Every
-// Angular figure this file published before 2026-09-18 carries it; `warmAngular` is the fix.
+// still the largest of the three reconcilers, and not the 4.7x a cold reading would claim.
+// A cold Angular figure carries this compile cost; `warmAngular` is the fix.
 //
 // SECOND, THE NO-OP FACTORY WAS BUILDABLE AFTER ALL — `SymbioteRenderer` is exported, so its
 // PROTOTYPE can be patched for one arm and restored in a `finally`, which needs no seam in `mount`.
@@ -825,8 +823,7 @@ describe('what a reconciler adds to a create', () => {
   // It was worth ~25 ms on the ten-node row, which is a quarter of the arm and larger than any
   // optimisation this file has priced: the ladder arm read 163.9 ms cold against the split case's
   // 130-141 ms for the SAME component, and the split case was the only one that warmed up. Every
-  // Angular figure this file published before 2026-09-18 carries it, including the 92.5 ms delta
-  // over the engine-direct floor — read that one as ~63 ms.
+  // A cold Angular figure carries this cost, including the delta over the engine-direct floor.
   //
   // The cross-arm CHANNEL deltas were contaminated more subtly: both sides paid a compile, so it
   // cancels only to the extent that two different templates cost the same to compile, which nothing
@@ -1165,7 +1162,7 @@ describe('what a reconciler adds to a create', () => {
   });
 
   // why: `CLAUDE.md` prices a per-row COMPONENT at ~81 us per instance — 81 ms on this row — and
-  // that figure was taken on device with Angular's dev mode on, like every other pre-2026-09-18
+  // that figure was taken on device with Angular's dev mode on, like every earlier
   // measurement of this adapter. Both bench arms and the device screen write the row that way, so
   // if it is still 81 ms it is the single largest piece of Angular's remaining cost; if it is not,
   // a number the project plans around has expired. One process, both spellings, same tree.

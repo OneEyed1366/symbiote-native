@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/sms",
-  "version": "3.0.1",
+  "version": "3.0.2",
   "description": "expo-sms wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, Svelte, Solid, and Angular adapters. Opens the system SMS composer prefilled with recipients and a message.",
   "license": "MIT",
   "keywords": [

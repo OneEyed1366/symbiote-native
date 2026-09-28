@@ -5,12 +5,9 @@
 // SEAM SCAFFOLD: mount/unmount + the renderer seam + host intrinsic selectors. Full RN-like
 // composed components still flow through the shared @symbiote-native/components bridge.
 //
-// `View` AND `Text` ARE NO LONGER WORTH IMPORTING, and on 2026-09-18 the examples stopped. They are
-// `@Component`s on the `view` and `text` SELECTORS — a second mechanism on the same tags
-// `SYMBIOTE_ELEMENTS` covers, kept for one stated reason their own header gives: "Declaring `style`
-// as a real Angular input prevents Angular's CSS style engine from decomposing RN `StyleProp`
-// arrays". A tag takes an array or press-state callback as `[styleProp]`, a plain property binding
-// with no instance behind it.
+// `View` AND `Text` ARE NOT WORTH IMPORTING — a tag covers the same selectors via
+// `SYMBIOTE_ELEMENTS`. They stay as `@Component`s only because a real Angular `style` input stops
+// Angular's CSS engine decomposing RN `StyleProp` arrays; a tag takes it as `[styleProp]` instead.
 //
 // An app loses nothing it cannot spell better: `@ViewChild('ref')` on a template reference returns
 // Angular's own `ElementRef<IHostInstance>`, whose `nativeElement` IS the engine host node — the same
@@ -137,28 +134,9 @@ export type {
   ITextInputChangeEvent,
 } from './components';
 export { setImageSourceResolver } from './components';
-// The element directives that make a HAND-WRITTEN intrinsic tag (`<view>`, `<text-input>`, ...)
-// compile under ngtsc with no schema, and with a real type on every declared prop. See `elements.ts`
-// for why a directive rather than `CUSTOM_ELEMENTS_SCHEMA`/`NO_ERRORS_SCHEMA`.
-//
-// `imports: [SYMBIOTE_ELEMENTS]` IS THE ONLY SUPPORTED SPELLING — and the individual classes are
-// exported anyway, because ngtsc requires it and a build proves it.
-//
-// They were removed on 2026-09-18 and put back the same hour. The reason to remove them is real: a
-// withheld tag directive (`./runtime-matching`) is a compile-time declaration and nothing else, so
-// what makes `<view [onPress]="fn">` work at all is `SymbioteCallbackHost` claiming the name before
-// `setDomProperty` throws NG0306. It rides this array, so a narrow `imports: [ViewElement]`
-// type-checks and then fails on a device the first time the app binds an `on*` prop.
-//
-// WHAT PUTS THEM BACK is NG3004: `Unable to import directive ViewElement — the symbol is not
-// exported from index.d.ts`. ngtsc resolves every directive reachable through an imported array to an
-// IMPORTABLE NAME in the package's public types, so a class inside `SYMBIOTE_ELEMENTS` that the
-// barrel does not name breaks AOT for every screen that uses the array. The removal passed its own
-// vitest guard and every headless suite, and failed on the first real `ngc` run — the same
-// wrong-harness green this repo keeps finding.
-//
-// So the narrow spelling is DISCOURAGED and not prevented, and `elements-are-exported-for-aot.test.ts`
-// now asserts the opposite invariant: every member of the array is named here.
+// Element directives for a hand-written intrinsic tag (`<view>`, `<text-input>`, ...); see
+// `elements.ts` for why a directive rather than a schema. `imports: [SYMBIOTE_ELEMENTS]` is the
+// only supported spelling — a narrower array type-checks but fails AOT's NG3004 on-device.
 export {
   SYMBIOTE_ELEMENTS,
   SymbioteElement,

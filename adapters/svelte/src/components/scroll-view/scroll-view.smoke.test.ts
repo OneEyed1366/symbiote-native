@@ -8,12 +8,9 @@
 //      `bind:this` through `hostInstance()`, which is what replaced the wrapper's exported
 //      functions.
 //
-// WHY THERE IS NO index.svelte HERE ANY MORE. The wrapper was deleted 2026-09-10: both reasons its
-// header gave had expired. `Animated.ScrollView` no longer needs a component (the engine resolves
-// an AnimatedNode, and `bindAnimatedEvent`, on any host node), and the imperative handle is on
-// `ISymbioteNode`'s own prototype — `IHostInstance` IS `ISymbioteNode`, so a `bind:this` already
-// types every command. So this file compiles only its own parents, with no sibling to pre-compile
-// and no import specifier to rewrite.
+// NO index.svelte HERE ANY MORE: `Animated.ScrollView` needs no component (the engine resolves an
+// AnimatedNode on any host node), and the imperative handle is on `ISymbioteNode`'s own
+// prototype — `bind:this` already types every command.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';

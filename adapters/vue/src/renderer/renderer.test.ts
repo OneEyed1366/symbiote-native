@@ -317,16 +317,9 @@ describe('remove and reorder', () => {
   });
 });
 
-// An intrinsic TAG reaches the renderer with no component wrapper in between, so what a wrapper used
-// to do must happen somewhere else. There were TWO such things here and there is one left: the
-// kebab->camel attr fold (`normalizeVueAttrs`), whose failure is silent — a prop that never reaches
-// Fabric under a name no ViewConfig declares.
-//
-// RN's Text.js defaults were the other, and they went one layer further down on 2026-09-18 rather
-// than staying in this renderer. `foldTextDefaults` reads the authored bag at payload time, so it
-// needs no help from any adapter, and the claims are in
-// `core/engine/cpp/tests/js/committed-payload.itest.ts`. What this renderer still owes a text tag is
-// FORWARDING, which is what the cases below assert.
+// An intrinsic TAG reaches the renderer with no component wrapper in between. What's left: the
+// kebab->camel attr fold (`normalizeVueAttrs`), whose failure is silent. Text defaults are
+// `foldTextDefaults`'s now (`committed-payload.itest.ts`); this renderer owes FORWARDING only.
 describe('host primitives as intrinsic tags', () => {
   const findByTestId = (id: string): ILiveNode | undefined =>
     findCommitted(node => node.payload.testID === id);
@@ -399,12 +392,9 @@ describe('host primitives as intrinsic tags', () => {
   // camelized `ariaLabel` is invisible to it: the fold never runs and the key reaches Fabric dead,
   // where no ViewConfig declares it.
   //
-  // THE WITNESS HAS MOVED TWICE AND IS BACK WHERE IT STARTED, which is worth recording because the
-  // round trip explains the shape. It began as the raw `aria-label` surviving into the payload; that
-  // stopped being observable when the fold moved INTO `fabricProps`, which consumed the key, so the
-  // claim was re-pinned on the fold's OUTPUT (`accessibilityLabel`) plus the absence of a camelized
-  // key. On 2026-09-18 the fold left this builder for `SymbioteFabricProps.cpp`, so the key survives
-  // again and the original witness is the direct one once more.
+  // The witness is the raw `aria-label` surviving into the payload, plus the absence of a
+  // camelized key: `foldAriaProps` reads the hyphenated spelling literally in
+  // `SymbioteFabricProps.cpp` now, so this builder carries no copy to consume the key.
   //
   // Both sides still, and neither is sufficient alone: the hyphenated key must be PRESENT (a
   // camelizing pass would drop it) and the camelized spelling must be ABSENT (its presence is what

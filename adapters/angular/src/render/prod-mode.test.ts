@@ -1,11 +1,6 @@
-// ANGULAR HAS A THIRD DEV SWITCH, and until 2026-09-18 nothing in this project turned it off.
-//
-// `ngDevMode` is not `__DEV__` and not `NODE_ENV`. When the global is undefined — which is what a
-// Metro bundle leaves it as, since `@react-native/babel-preset` inlines `__DEV__` and knows nothing
-// about Angular — `initNgDevMode()` turns it ON (`ng_dev_mode.ts:85`). So every release build made
-// with this adapter has shipped dev-mode Angular: `inject()` of a special token builds a
-// `new NodeInjector` and emits two profiler events PER ELEMENT, and component definitions carry
-// debugName metadata.
+// ANGULAR HAS A THIRD DEV SWITCH: `ngDevMode` is not `__DEV__` and not `NODE_ENV`. A Metro bundle
+// leaves the global undefined (`@react-native/babel-preset` inlines `__DEV__`, knows nothing of
+// Angular), so `initNgDevMode()` turns it ON (`ng_dev_mode.ts:85`) unless this file turns it off.
 //
 // Measured on `angular-elements-suite.itest.ts`, `build-release`, three runs each, with the census
 // byte-identical on both sides (created=10000 setProps=10000 unchanged=3000 nodes=10003) and

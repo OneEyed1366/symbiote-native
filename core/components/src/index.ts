@@ -279,10 +279,8 @@ export type {
 } from './view/render-touchable-native-feedback';
 
 // Button: `resolveButtonDisabled` alone now — the `props.disabled ?? aria ?? state.disabled`
-// precedence, which the press MACHINE reads and which is therefore still JS. Every platform fold
-// Button.js performs left this barrel between 2026-09-17 and 2026-09-18 for
-// `SymbioteFabricProps.cpp`; the last two, `buttonViewStyle` and `resolveButtonViewStyle`, went with
-// the Android arm of the test host that finally made their branch assertable.
+// precedence, which the press MACHINE reads and stays JS. Every platform fold Button.js performs
+// is `SymbioteFabricProps.cpp`'s.
 export { resolveButtonDisabled } from './view/render-button';
 export type { IButtonProps } from './view/render-button';
 
@@ -432,11 +430,9 @@ export {
 } from './behaviors/touchable-highlight';
 export { registerButtonBehavior, BUTTON_TAG } from './behaviors/button';
 
-// Registered by ALL FIVE adapters since 2026-09-09, in the same commit that deleted the five
-// wrappers — which is what makes it safe. While those wrappers still rendered a `Pressable` around
-// a feedback `View`, registering would have put a second responder on every existing
-// TouchableNativeFeedback. The ActivityIndicator and ScrollView blocks below are still in the
-// withheld state this one just left.
+// Registered by ALL FIVE adapters, in the same commit that deleted the five wrappers — safe
+// only because those wrappers no longer render their own Pressable, which would put a second
+// responder on every TouchableNativeFeedback.
 export {
   registerTouchableNativeFeedbackBehavior,
   TOUCHABLE_NATIVE_FEEDBACK_TAG,
@@ -450,10 +446,9 @@ export {
   TOUCHABLE_WITHOUT_FEEDBACK_TAG,
 } from './behaviors/touchable-without-feedback';
 
-// Registered by all five adapters since 2026-09-09, in the same commit that deleted the five
-// wrappers — the tag builds its own spinner, so a surviving wrapper would have painted a second one.
-// The prop type rides along: there is no `view/render-activity-indicator.ts` any more, because the
-// only render this primitive had was the two nodes the behavior now builds.
+// Registered by all five adapters, in the same commit that deleted the five wrappers — the tag
+// builds its own spinner, so a surviving wrapper would have painted a second one. No
+// `view/render-activity-indicator.ts`: the behavior now builds the only two nodes this had.
 export {
   ACTIVITY_INDICATOR_SPINNER_TAG,
   ACTIVITY_INDICATOR_TAG,
@@ -465,9 +460,8 @@ export type {
 } from './behaviors/activity-indicator';
 export { IMAGE_TAG, registerImageBehavior } from './behaviors/image';
 
-// Registered by all five adapters since 2026-09-09, in the same commit that deleted the five
-// wrappers — the tag builds the background image itself, so a surviving wrapper would have
-// committed a second one under it.
+// Registered by all five adapters, in the same commit that deleted the five wrappers — the tag
+// builds the background image itself, so a surviving wrapper would have committed a second one.
 export {
   IMAGE_BACKGROUND_TAG,
   registerImageBackgroundBehavior,
@@ -497,9 +491,9 @@ export {
 // caller of `registerScrollViewBehavior()` names it. The shape CLAUDE.md forbids is a module whose
 // evaluation alone registers.
 //
-// EVERY ADAPTER CALLS IT since 2026-09-11, through `@symbiote-native/components/register`. It was
-// withheld while the wrappers built their own content node — registering then would have
-// double-nested every ScrollView. They are gone; the engine is the single owner.
+// EVERY ADAPTER CALLS IT, through `@symbiote-native/components/register`. Withheld while the
+// wrappers built their own content node — registering then would have double-nested every
+// ScrollView. They are gone; the engine is the single owner.
 export {
   HORIZONTAL_SCROLL_VIEW_TAG,
   registerScrollViewBehavior,

@@ -8,8 +8,8 @@
 // a style object (`react-suite.itest.tsx:41`), so the class path is exercised on the DEVICE and
 // nowhere in the comparison the ratios come from.
 //
-// That asymmetry is the same class of defect as the five fixture mismatches found on 2026-09-21,
-// moved one level up: not between two arms of the suite, but between the suite and the app it is
+// That asymmetry is the same class of defect as a fixture mismatch, moved one level up: not
+// between two arms of the suite, but between the suite and the app it is
 // supposed to describe. Which makes two questions worth separating, and this file answers them in
 // that order:
 //

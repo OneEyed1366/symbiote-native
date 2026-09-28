@@ -1,23 +1,6 @@
-// The four primitives that became TAGS on 2026-09-10 — `safe-area-view`, `input-accessory-view`,
-// `refresh-control`, `image`. With no component spelling left there is nothing to compare against,
-// so this asks the absolute question a comparison could not: does the tag alone commit the fold?
-//
-// Each case pins something the DELETED WRAPPER used to do, so a fold that failed to move down goes
-// red here rather than on a device:
-//
-//   safe-area-view        the wrapper's `normalizeVueAttrs` (kebab->camel) and its aria fold
-//   input-accessory-view  `renderInputAccessoryView`'s mapping, now the behavior's
-//   refresh-control       `id -> nativeID`, plus `onRefresh` reaching native as a real listener
-//   image                 `renderImage`'s source/width/height fold, now the behavior's
-//
-// SIDE-EFFECT IMPORT of `./register`, and MEASURED rather than assumed: dropping it reddens
-// exactly ONE of the four rows, `image`. The other three pass without any behavior registered, and
-// that is correct rather than a gap — `safe-area-view`'s two folds are the RENDERER's
-// (`normalizeVueAttrKey`, `PROP_ALIASES`) and the ENGINE's (`fabricProps`'s aria fold),
-// `refresh-control`'s row asserts the same renderer alias plus `routeProp`'s event routing, and
-// `input-accessory-view`'s behavior does no aliasing at all (see `./register`'s own note on why it
-// may share the wrapper's tag). So this file witnesses the registration for `image` only; the
-// machines those behaviors carry are `core/components`' own suites' subject.
+// Four primitives that became TAGS, with no component spelling left to compare against. Each case
+// pins what the DELETED WRAPPER used to do, so a fold that failed to move down goes red here.
+// `./register` matters only for `image` — the other three fold in the renderer/engine layer.
 import { defineComponent, h } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {

@@ -1,16 +1,9 @@
-// Negative group: ONE action kind rejects — 'scroll-to-index' with an index outside the data range,
-// which reproduces RN VirtualizedList.js's three invariants verbatim. Every other action kind is
-// total (the switch has no default/throw) and produces a state+effects pair, so the rest of the
-// scenarios below are Positive; an invalid `action.kind` is unreachable through the typed union, so
-// there is no further "must throw" case to invent.
-//
-// Coverage gap (not fabricated): commitList's maintainVisibleContentPosition 'shift' and
-// 'autoscroll-top' branches (virtualized-list.ts computeMvcpAdjustment, called from here) are not
-// exercised — only the 'none'/first-commit-records-anchor branch is. Triggering 'shift' requires a
-// genuinely virtualized window (committedWindow.first > 0) PLUS a real prepend across two commits;
-// building that without re-deriving computeWindow's own throttling arithmetic would make the
-// assertion a restatement of the implementation rather than an independently-checkable fact, so it
-// is left as an open gap rather than a characterization.
+// Negative group: only 'scroll-to-index' with an out-of-range index rejects (RN
+// VirtualizedList.js's invariants). Every other action kind is total, so the rest are Positive.
+
+// Coverage gap (not fabricated): commitList's MVCP 'shift'/'autoscroll-top' branches aren't
+// exercised — triggering 'shift' needs a real prepend across two commits against an
+// already-virtualized window, which would re-derive computeWindow's own arithmetic to build.
 import { describe, it, expect } from 'vitest';
 import {
   reduceList,
@@ -140,13 +133,9 @@ describe('reduceList metrics transitions', () => {
     expect(result.state.measured.size).toBe(0);
   });
 
-  // why: a relayout does not reproduce a float bit-for-bit, so an onLayout that changed nothing
-  // observable still comes back a few ulps off. Under a strict ===, every one of those was a change:
-  // the reducer stored it, the spacer derived from it moved in its last bits, Fabric committed,
-  // Yoga relaid out, and the next onLayout started the turn again — a loop at frame rate. Measured
-  // on device 2026-08-19: 1795 recomputes over one short drag, its log full of `27.33 -> 27.33`.
-  // Not storing the noisy value is the half that matters; a stored value that keeps twitching keeps
-  // the spacer twitching with it.
+  // why: a relayout does not reproduce a float bit-for-bit, so an unchanged onLayout comes back a
+  // few ulps off. Under a strict ===, that loops at frame rate; not storing the noisy value is
+  // the half that matters — a value that keeps twitching keeps the spacer twitching with it.
   it('treats a sub-pixel re-report as the same measurement and keeps the stored value', () => {
     const inputs = baseInputs({ getItemLayout: undefined });
     const first = reduceList(
@@ -165,8 +154,8 @@ describe('reduceList metrics transitions', () => {
     expect(noise.state.measured.get(0)).toBe(27.333333333333332);
   });
 
-  // why: the other side of the same guard — a real move is at least one device pixel (a third of a
-  // point at @3x), and must never be swallowed as noise.
+  // why: the other side of the same guard — a real move is at least one device pixel and must
+  // never be swallowed as noise.
   it('still reports a change when a cell moves by a single device pixel', () => {
     const inputs = baseInputs({ getItemLayout: undefined });
     const first = reduceList(
@@ -201,10 +190,8 @@ describe('reduceList metrics transitions', () => {
   });
 
   // why: RN's recordInteraction() ungates waitForInteraction AND runs _updateViewableItems right
-  // there (VirtualizedList.js ~288-296), so an app that calls it reports its viewable items
-  // immediately. Flipping the flag alone leaves the report waiting for the next scroll or commit —
-  // on a list that fits the viewport and is never scrolled, that next event may never come, and
-  // onViewableItemsChanged silently never fires at all.
+  // there (VirtualizedList.js ~288-296) — flipping the flag alone would leave the report waiting
+  // for a scroll or commit that, on a list that fits the viewport, may never come.
   it('record-interaction reports the newly ungated viewable items at once', () => {
     const inputs = baseInputs({
       viewabilityPairs: [
@@ -352,11 +339,8 @@ describe('reduceList commit — viewability', () => {
 
 describe('reduceList commit — batch fill', () => {
   it('schedules a refill when the throttled window lags the target', () => {
-    // A big list so the window is a real subset. windowSize 3 keeps the target small; a scroll
-    // shifts it to an overlapping window that maxToRenderPerBatch 1 cannot reach in one step, so the
-    // throttled window lags the target and a refill must be scheduled. initialNumToRender 2 makes the
-    // first paint (RN's initial region, 0..1) the settled window itself, so the scrolled target
-    // (2..4) is reached by GROWING one cell per tick - the lag this case is about.
+    // windowSize 3 + maxToRenderPerBatch 1: a scroll shifts the target past what one batch step
+    // reaches, so the throttled window lags and a refill must be scheduled.
     const bigData = Array.from({ length: 100 }, (_value, i) => `item-${i}`);
     const inputs = baseInputs({
       data: bigData,
@@ -486,11 +470,9 @@ describe('reduceList imperative scrolls', () => {
     ]);
   });
 
-  // why: RN's scrollToIndex asserts the index is inside the data range BEFORE anything else, and a
-  // caller that scrolls to a stale index must find out at the call site. Clamping silently lands the
-  // list somewhere plausible instead, so the bug surfaces later as "the wrong row is on screen" with
-  // nothing pointing back at the caller. Three separate invariants, not one, because "the list is
-  // empty" and "the index is past the end" are different diagnoses (RN VirtualizedList.js ~165-178).
+  // why: RN's scrollToIndex asserts the index is in range BEFORE anything else, so a stale index
+  // fails at the call site instead of landing plausibly and surfacing later as "wrong row on
+  // screen". Three invariants, not one: "list is empty" and "index past the end" differ.
   describe('Negative — scroll-to-index outside the data range', () => {
     const scrollTo =
       (index: number, inputs: IListReducerInputs<string>) => (): unknown =>
@@ -529,9 +511,8 @@ describe('reduceList imperative scrolls', () => {
       );
     });
 
-    // why: the range check must come FIRST. Without getItemLayout an out-of-range index would
-    // otherwise fall into the onScrollToIndexFailed branch and be reported as a measurement problem,
-    // which sends the reader looking at cell layout for what is a caller bug.
+    // why: the range check must come FIRST — otherwise an out-of-range index without
+    // getItemLayout reports as a measurement problem instead of the caller bug it is.
     it('rejects before reporting a measurement failure when getItemLayout is absent', () => {
       expect(scrollTo(9, baseInputs({ getItemLayout: undefined }))).toThrow(
         'scrollToIndex out of range: requested index 9 is out of 0 to 4',
@@ -588,16 +569,9 @@ describe('reduceList imperative scrolls', () => {
   });
 });
 
-// buildOffsets walks the WHOLE list and allocates two count-length arrays plus an object per
-// index, and deriveMetrics calls it on every scroll frame — 544 allocations per frame on the
-// canary's PATH B list, for a table that with getItemLayout is identical frame to frame. The
-// observable is ARRAY IDENTITY: a reused table is literally the same object, a recomputed one is
-// not. Asserting identity rather than a call count keeps the test off the implementation's shape.
-// buildOffsets walks the WHOLE list and allocates two count-length arrays plus an object per
-// index, and deriveMetrics calls it on every scroll frame — 544 allocations per frame on the
-// canary's PATH B list, for a table that with getItemLayout is identical frame to frame. The
-// observable is ARRAY IDENTITY: a reused table is literally the same object, a recomputed one is
-// not. Asserting identity rather than a call count keeps the test off the implementation's shape.
+// buildOffsets walks the whole list and allocates a fresh table per call; deriveMetrics calls it
+// on every scroll frame, so a table that should stay identical frame to frame must be REUSED, not
+// recomputed. Asserting array identity rather than a call count keeps the test off the shape.
 describe('the offset table is reused while nothing it depends on moves', () => {
   // A window only SLIDES when the data outruns the overscan. DATA is five items and the default
   // windowSize is 21 viewports, so the default inputs can never move `first` off 0 — the fixture
@@ -699,10 +673,7 @@ describe('listEffectSignature', () => {
   });
 });
 
-// The device bug this closes (iOS simulator, 2026-08-19): scrolling examples/solid's SectionList made
-// the whole layout shift and shift back, and the scroll view's own contentSize.height swung by up to
-// 165pt while the data never changed. Both symptoms are the offset table, and both scenarios below
-// are Positive — the table has no throwing path.
+// The offset table: both scenarios below are Positive checks — the table has no throwing path.
 describe('the offset table a list measures for itself', () => {
   // A list that measures its own cells: no getItemLayout, so every offset comes from onLayout.
   function measuringInputs(): IListReducerInputs<string> {
@@ -712,43 +683,40 @@ describe('the offset table a list measures for itself', () => {
   function measure(
     state: IListState<string>,
     inputs: IListReducerInputs<string>,
-    index: number,
-    length: number,
-    offset: number,
+    cell: { index: number; length: number; offset: number },
   ): void {
-    reduceList(state, { kind: 'measure', index, length, offset }, inputs);
+    reduceList(state, { kind: 'measure', ...cell }, inputs);
     reduceList(state, { kind: 'refresh-metrics' }, inputs);
   }
 
-  // why: the list renders chrome BETWEEN cells — an ItemSeparatorComponent, a section gap — and that
-  // chrome is part of the distance a spacer has to stand in for. A model built by summing heights is
-  // short by exactly that, so every windowed-out region pulls the content below it upward.
+  // why: the list renders chrome BETWEEN cells (a separator, a section gap) that a model built
+  // by summing heights alone would miss, pulling every windowed-out region upward.
   it('counts what the list renders between two cells, not just their heights', () => {
     const inputs = measuringInputs();
     const state = createInitialListState<string>();
     reduceList(state, { kind: 'layout', length: 200 }, inputs);
     // Five 40pt cells laid out 50pt apart: 10pt of separator sits in each gap.
     for (let index = 0; index < DATA.length; index += 1) {
-      measure(state, inputs, index, 40, index * 50);
+      measure(state, inputs, { index, length: 40, offset: index * 50 });
     }
 
     expect(state.metrics.offsets).toEqual([0, 50, 100, 150, 200]);
     expect(state.metrics.total, 'four gaps of 10pt are in there').toBe(240);
   });
 
-  // why: flinging leaves cells that were never rendered, so never measured. Their length is a guess
-  // off the running average, and that average keeps moving as real measurements arrive. A cell whose
-  // real position IS known must not ride on that guess, or it slides back and forth under the user.
+  // why: flinging leaves cells that were never rendered, so never measured — their length is a
+  // guess off the running average. A cell whose real position IS known must not ride on that
+  // guess, or it slides back and forth under the user.
   it('holds a measured cell in place while an unmeasured neighbour is still a guess', () => {
     const inputs = measuringInputs();
     const state = createInitialListState<string>();
     reduceList(state, { kind: 'layout', length: 200 }, inputs);
-    measure(state, inputs, 0, 40, 0);
-    measure(state, inputs, 3, 40, 300);
+    measure(state, inputs, { index: 0, length: 40, offset: 0 });
+    measure(state, inputs, { index: 3, length: 40, offset: 300 });
     const pinned = state.metrics.offsets[3];
 
-    // Index 1 turns out to be far taller than anything measured so far, which drags the average up.
-    measure(state, inputs, 1, 400, 40);
+    // Far taller than anything measured so far, which drags the running average up.
+    measure(state, inputs, { index: 1, length: 400, offset: 40 });
 
     expect(pinned).toBe(300);
     expect(state.metrics.offsets[3], 'still where the host put it').toBe(300);

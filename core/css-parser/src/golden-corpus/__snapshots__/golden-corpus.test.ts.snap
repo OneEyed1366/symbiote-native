@@ -671,9 +671,7 @@ exports[`svelte <style> blocks -> scopedStyles preprocessor > examples/svelte/co
 "<script lang="ts">
   // A component-local style block, and specifically the COMPOUND selector inside it —
   // \`.badge.loud\` applies only to an element carrying both tokens, and layers over \`.badge\`
-  // rather than replacing it. That combination was silently dead until 2026-08-14 (the scope
-  // suffix is appended per markup token, while the registered key carries it once at the end;
-  // symbiote-sfc-style-compiler skill §5b), so it is on screen here to keep it honest.
+  // rather than replacing it (symbiote-sfc-style-compiler skill §5b).
   //
   // What each badge proves:
   //   plain    — \`.badge\` alone; the compound rule must NOT reach it.

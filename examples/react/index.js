@@ -13,22 +13,16 @@ import App from './App';
 import { name as appName } from './app.json';
 import { installFabricCallCounter } from './fabric-call-counter';
 
-// The `BATCHED_COMMITS_VIA` arm switch was here and is GONE with the batched applier it selected
-// (2026-09-08). What replaced it is not a choice: the tree lives in C++ and the whole commit crosses
-// as one buffer, so there is no per-call arm left to pick.
-//
-// One consequence of that survives and will be read as a bug: the FABRIC CALLS table reads ZERO on a
-// runtime carrying the native tree host. The counter below wraps the JS global, and C++ talks to the
-// UIManager directly without going through it. To read those counts, run without the native module.
+// The FABRIC CALLS table reads ZERO on a runtime carrying the native tree host: C++ talks to the
+// UIManager directly, bypassing the JS global this counter wraps. Run without the native module to
+// see real counts.
 
-// Before anything mounts, and forcing getSlot() here is the whole trick: the engine caches the
-// Fabric binding on first commit, so the counting wrapper has to be installed while that cache is
-// built. See the counter's own header for why the global swap is momentary and what breaks if it
-// is not — and note the stock baseline (examples/bare-rn) carries the byte-identical file, which
-// is the only reason the two sets of numbers are comparable at all.
-//
-// Guarded because a diagnostic that can stop the canary booting is worth less than no diagnostic:
-// on any failure the app runs uncounted, and the empty FABRIC CALLS table is the signal.
+// Forcing getSlot() here is the trick: the engine caches the Fabric binding on first commit, so the
+// counting wrapper must install before that cache builds. bare-rn carries the byte-identical file,
+// which is the only reason the two number sets are comparable.
+
+// Guarded: a diagnostic that can stop the canary booting is worse than no diagnostic — on failure
+// the app runs uncounted, and the empty FABRIC CALLS table is the signal.
 try {
   installFabricCallCounter(() => {
     getSlot();

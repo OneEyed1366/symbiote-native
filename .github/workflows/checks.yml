@@ -114,6 +114,29 @@ jobs:
           list=$(node -e "import('./scripts/check-packed-consumer-bundles.mjs').then(m => console.log(JSON.stringify(Object.keys(m.FRAMEWORK_EXAMPLES))))")
           echo "list=$list" >> "$GITHUB_OUTPUT"
 
+  # Fails a PR whose changed packages outnumber its changesets - see symbiote-release-publishing
+  # skill for the incident this guards against. `fetch-depth: 0`: `--since` needs origin/master.
+  changeset-status:
+    name: Changeset status
+    needs: gate
+    if: needs.gate.outputs.cache-hit != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - run: pnpm exec changeset status --since=origin/master
+
   lint:
     name: Lint
     needs: gate
@@ -436,10 +459,11 @@ jobs:
   # both states is what keeps a docs commit from re-running lint/typecheck/test forever after.
   mark-passed:
     name: Mark tree as passed
-    needs: [gate, lint, typecheck, test, itest, bundle-isolation]
+    needs: [gate, changeset-status, lint, typecheck, test, itest, bundle-isolation]
     if: >
       always() &&
       needs.gate.outputs.cache-hit != 'true' &&
+      needs['changeset-status'].result == 'success' &&
       needs.lint.result == 'success' &&
       needs.typecheck.result == 'success' &&
       needs.test.result == 'success' &&

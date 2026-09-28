@@ -1,6 +1,6 @@
 // Is React's OWN Fabric renderer runnable in this harness, next to ours, in one binary?
 //
-// why: the device numbers of 2026-09-17 say our create-shaped rows got more expensive after the
+// why: device numbers say our create-shaped rows got more expensive after the
 // buffer architecture, and the only honest way to answer "do we drive Fabric worse than React
 // does" is to drive the SAME C++ Fabric from both, in the same process, and read the ratio. This
 // build is Debug with no `-O`, so an absolute millisecond means nothing here — a same-binary ratio

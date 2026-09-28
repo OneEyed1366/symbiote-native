@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/location",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "expo-location wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, Svelte, Solid, and Angular adapters. Foreground/background position and heading, geocoding, motion activity, and geofencing.",
   "license": "MIT",
   "repository": {

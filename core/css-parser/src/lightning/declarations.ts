@@ -1000,13 +1000,9 @@ function declarationToStyleAt(
     }
     case 'text-shadow':
       return textShadowToStyle(value, context);
-    // A CSS-Modules DIRECTIVE, not a style property — and lightningcss has ALREADY acted on it:
-    // the composed names come back through `exports[...].composes`, which
-    // `metro-css-module/index.ts` walks to flatten a chain. Measured 2026-08-20: it arrives as a
-    // first-class `property: 'composes'`, NOT under `custom` where an unknown name goes, so it fell
-    // through to the PROPERTY_TABLE miss and every author of a WORKING `.module.*` file was told
-    // "unsupported CSS property" on every build. The drop warnings are the only signal that a real
-    // rule died; a channel that cries wolf on working code is the one nobody reads when it matters.
+    // A CSS-Modules DIRECTIVE, not a style property: the composed names come back through
+    // `exports[...].composes`, which `metro-css-module/index.ts` flattens. It arrives as a
+    // first-class `property: 'composes'`, NOT under `custom`, so it must be matched here.
     case 'composes':
       return {};
     default:

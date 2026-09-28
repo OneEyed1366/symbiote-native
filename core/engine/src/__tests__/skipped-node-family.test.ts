@@ -1,8 +1,8 @@
 // A node SKIPPED at commit keeps a committed record whose Fabric family may have been orphaned
 // underneath it, and adopting that stale handle later aborts Fabric.
 //
-// Found 2026-09-05 by the commit fuzzer, one value after the generator learned to write an EMPTY
-// string. Shrunk from 150 steps to 10, and the throw came from the fake slot's `assertSameFamily`
+// Found by the commit fuzzer, one value after the generator learned to write an EMPTY string.
+// Shrunk from 150 steps to 10, and the throw came from the fake slot's `assertSameFamily`
 // rather than from any oracle — which is why the runner now treats a throw as a violation.
 //
 // THE MECHANISM, and it turns on one fact about identity. `committed.parent` holds the RETAINED

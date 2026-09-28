@@ -1632,10 +1632,9 @@ export const CanaryScreen = defineComponent({
             tap Freeze, then immediately drag the box — bar should still move
           </text>
 
-          {/* Modern style props reaching Fabric's C++ parser. Each is an A/B so the effect
-            is unmistakable on the dark theme. Kept as a dynamic style object here — the CSS
-            class form works equally well now (raw passthrough, 2026-07), see .gradient-card
-            below, this is just legacy demo wiring, not a remaining gap. */}
+          {/* Modern style props reaching Fabric's C++ parser. Each is an A/B so the effect is
+            unmistakable on the dark theme. Kept as a dynamic style object, legacy demo wiring —
+            the CSS class form works equally well too (see .gradient-card). */}
           {/* boxShadow: a BLUE glow (a black shadow is invisible on the near-black bg).
             PASS: a soft blue halo bleeds out around the panel. */}
           <view class="shadow-card" style={shadowCardExtra}>

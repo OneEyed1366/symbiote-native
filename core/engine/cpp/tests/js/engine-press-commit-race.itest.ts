@@ -1,4 +1,4 @@
-// The device regression reported 2026-08-24: the FIRST press changes nothing visually while its
+// The device regression: the FIRST press changes nothing visually while its
 // callback fires, and every press after it works. Tier-2 made a press ask the engine for a commit
 // of its own (`requestCommitFor`), which lands in the same tick as the framework's own update — so
 // the suspicion is that one of the two commits swallows the other.

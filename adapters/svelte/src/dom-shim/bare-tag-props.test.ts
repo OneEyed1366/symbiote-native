@@ -1,10 +1,6 @@
-// A BARE tag must commit what the `p={{…}}` bag commits.
-//
-// Until 2026-09-07 it committed NOTHING: `setAttribute` wrote an inert Map and no key ever reached
-// `routeProp`, so `<view testID="x">` mounted an empty node with nothing red — only the bag was
-// routed.
-//
-// The parity row is the point of the file; the rest exist so a failure says WHICH half broke.
+// A BARE tag (`<view testID="x">`) must commit what the `p={{…}}` bag commits — `setAttribute`
+// must reach `routeProp`, not just write an inert Map. The parity row is the point of the file;
+// the rest exist so a failure says WHICH half broke.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   createLiveTree,

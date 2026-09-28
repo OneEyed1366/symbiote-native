@@ -3,8 +3,8 @@
 // RN renders ItemSeparatorComponent INSIDE the cell's own measuring wrapper
 // (VirtualizedListCellRenderer.js:218-221) and gates it on the last index of the DATA
 // (VirtualizedList.js:793, `const end = getItemCount(data) - 1`). Every adapter here had it as a
-// SIBLING of the wrapper, gated on the WINDOW's last index. Both were device-measured on
-// 2026-08-19 as the list jumping mid-scroll:
+// SIBLING of the wrapper, gated on the WINDOW's last index. Both make the list visibly jump
+// mid-scroll:
 //
 //   * as a sibling it is an extra flex child, so the chrome between two cells is gap + separator +
 //     gap while a spacer collapsing that region contributes only one gap — the leading spacer lands

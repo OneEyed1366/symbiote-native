@@ -1,33 +1,25 @@
 /* Symbiote Svelte canary — static styles, compiled at build time by @symbiote-native/css-parser
-   into the same RN style objects StyleSheet.create used to produce (see the
-   symbiote-sfc-style-compiler skill). Referenced via `class` across every navigation-demo screen
-   under ./screens and ./components/ActionButton.svelte. Imported once, `import './App.css'` in
-   App.svelte's <script> — the class-name registry it populates is global, shared by every file
-   that renders a `class` prop, so no screen imports it again.
+   into the same RN style objects StyleSheet.create used to produce (symbiote-sfc-style-compiler
+   skill). Referenced via `class` across every navigation-demo screen; imported once via
+   `import './App.css'` in App.svelte's <script> — the class-name registry it populates is global.
 
-   This carries the app's whole static look, but it is no longer the ONLY mechanism: a `<style>`
-   block inside a `.svelte` file works too, scoped per file, compiled by a preprocessor rather
-   than by Svelte's own `css: 'external'` output (which is structurally empty here — see
-   adapters/svelte/src/preprocessor/scoped-styles.ts). components/ScopedStyleDemo.svelte is the
-   worked example. Keep app-wide look here; reach for a `<style>` block when a rule is genuinely
-   local to one component.
+   Not the only styling mechanism: a `<style>` block inside a `.svelte` file works too, scoped per
+   file (components/ScopedStyleDemo.svelte is the worked example). Keep app-wide look here; reach
+   for a `<style>` block when a rule is genuinely local to one component.
 
    LAYOUT IS A BYTE-FOR-BYTE PORT OF examples/vue-sfc/App.css. Only the palette differs — the
-   :root tokens below, plus the brand-coloured literals they could not reach. The two canaries
-   are meant to lay out identically and read as different frameworks purely by colour, so a
-   size, padding, radius, gap or font-size changed here without the same change there is a bug.
-   `scripts/`-free way to check: diff the two files' declaration blocks and confirm every
-   difference is colour-valued.
+   :root tokens below, plus the brand-coloured literals they could not reach. The two canaries lay
+   out identically and read as different frameworks purely by colour, so any size/padding/radius/
+   gap/font-size changed here without the same change there is a bug.
 
-   The demo's SEMANTIC colours are deliberately NOT brand-swapped: the orange/green pair marks
-   JS-driven vs native-driven animation, purple and teal mark their own demos, and the
-   leader/follower dots must differ from each other. Recolouring those to the flame would
-   destroy the thing each demo exists to show.
+   The demo's SEMANTIC colours are deliberately NOT brand-swapped: orange/green marks JS-driven vs
+   native-driven animation, purple/teal mark their own demos, leader/follower dots must differ from
+   each other — recolouring those to the flame would destroy what each demo exists to show.
 
    `transform`/`transformOrigin`/`filter`/`box-shadow`/`background-image` ARE supported (raw
-   CSS-text passthrough, 2026-07 — see .gradient-card below); CanaryScreen.svelte's
-   shadow-card/filter-tile/rotated-card demos still use inline dynamic style because they were
-   ported from the React canary, which predates that support. Still valid, not a gap. */
+   CSS-text passthrough — see .gradient-card below); CanaryScreen.svelte's shadow-card/filter-tile/
+   rotated-card demos still use inline dynamic style, ported from React before that support
+   existed. Still valid, not a gap. */
 
 :root {
   /* Surface/text tokens. GEOMETRY in this file is a byte-for-byte port of
@@ -428,11 +420,10 @@
   background-color: var(--sunken);
 }
 
-/* App / CanaryScreen — retokenized onto the shared --ink/--paper/--mist/--chalk palette (2026-07
-   cohesion pass); accent chrome uses --line-primitives, CanaryScreen's own tour-line color (its
-   line-tag is "CN · PRIMITIVES LINE"). Demo colors that ARE the content — the shadow-card glow,
-   the rainbow chip hues, per-feature ActionButton tints in CanaryScreen.tsx/components/* — are
-   deliberately left alone; only chrome that used to duplicate these tokens ad hoc changed. */
+/* App / CanaryScreen chrome uses the shared --ink/--paper/--mist/--chalk palette; accent chrome
+   uses --line-primitives, CanaryScreen's own tour-line color ("CN · PRIMITIVES LINE"). Demo colors
+   that ARE the content — the shadow-card glow, rainbow chip hues, per-feature ActionButton tints —
+   are deliberately left alone. */
 .screen {
   flex: 1;
   background-color: var(--ink);

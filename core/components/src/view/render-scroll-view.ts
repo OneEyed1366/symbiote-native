@@ -1,10 +1,6 @@
-// ScrollView: the render half (framework-agnostic). The Fabric tree is nested: the scroll
-// view wraps a content view that holds the children (RN's own ScrollView.js shape). Resolving
-// decelerationRate, picking the per-axis intrinsics/base style, reading layout dimensions, and
-// the content-size dedupe are all platform- and framework-invariant, so they live here. The
-// adapter owns the lifecycle (refs/state/effects) and the element assembly; it calls these pure
-// helpers from prepareScrollView. What diverges per platform, and how a RefreshControl
-// integrates, stays in the adapter's .ios/.android files.
+// ScrollView's render half (framework-agnostic): picking intrinsics, reading layout dimensions,
+// and the content-size dedupe are platform-invariant, so they live here; the adapter owns
+// lifecycle + element assembly, calling these pure helpers from prepareScrollView.
 
 import type {
   IStyleProp,
@@ -24,39 +20,17 @@ export function readLayoutDimension(
   return readLayoutField(event, key);
 }
 
-// 'normal'/'fast' resolve to DIFFERENT friction constants per platform — RN's
-// `processDecelerationRate.js` `Platform.select()`s them: iOS glides longer (0.998/0.99), Android
-// sooner (0.985/0.9). Hardcoding the iOS pair once made Android momentum scroll glide far too long
-// on 'fast', which is why the pair is worth naming even now that it lives elsewhere.
-//
-// `resolveDecelerationRate` WAS HERE and is gone (2026-09-18): the rule is `foldScrollViewProps` in
-// `SymbioteFabricProps.cpp`, and after the port nothing called this but its own unit test — the
-// mirror shape this migration keeps turning up, green forever and consulted by nothing on a device.
-//
-// Its four constants went with it and are `#ifdef ANDROID` there rather than `Platform.select`'d,
-// because on iOS both scroll tags resolve to `RCTScrollView` and a component name cannot tell the
-// platforms apart. That puts the Android pair outside headless reach, which is recorded at the rule.
+// 'normal'/'fast' resolve to DIFFERENT friction constants per platform (iOS 0.998/0.99, Android
+// 0.985/0.9): `foldScrollViewProps` in `SymbioteFabricProps.cpp`, `#ifdef ANDROID` since both
+// scroll tags resolve to `RCTScrollView` on iOS — no component name to branch on headlessly.
 
-// THE PER-AXIS BASE STYLE LEFT THIS FILE ON 2026-09-18 and is `scrollViewBaseStyle` in
-// `SymbioteFabricProps.cpp` alone. RN applies it to the scroll-view NODE per axis
-// (`ScrollView.js` `styles.baseHorizontal`/`baseVertical`) and two parts carry weight:
-// `overflow: 'scroll'`, which is what makes an iOS Fabric node clip its content to its own frame at
-// all, and the horizontal `flexDirection: 'row'`, which makes the single content child a MAIN-axis
-// item so Yoga sizes it to its content width and there is something to scroll.
-//
-// It had a JS copy until then, held by `scroll-view-base-parity.itest.ts` because the Android
-// RefreshControl wrap's style split ran in JS and needed the value. The split moved with it, so the
-// copy had no reader left but the guard asserting it — the orphan shape this migration keeps
-// turning up — and both went together. `IScrollIntrinsics` lost its `scrollViewBaseStyle` field for
-// the same reason: `selectScrollIntrinsics`'s one remaining caller
-// (`adapters/solid/.../virtualized-list`) reads the intrinsic NAMES and the content style, and its
-// own comment already records that the base composition is the behavior's.
+// The per-axis base style (`scrollViewBaseStyle`, `SymbioteFabricProps.cpp`) carries two load-
+// bearing parts: `overflow: 'scroll'` — what makes an iOS Fabric node clip content at all — and
+// horizontal's `flexDirection: 'row'`, which sizes the content child along the scroll axis.
 
-// The per-axis selection: the outer scroll-view intrinsic and its content intrinsic (the name
-// table maps each to the right Fabric component per platform: on Android horizontal resolves
-// to a dedicated ViewManager, on iOS both map back to RCTScrollView), the base style for the
-// scroll-view node, and the content container's style (contentContainerStyle, plus
-// flexDirection:'row' for horizontal so the content lays out along the scroll axis).
+// The per-axis selection: the outer scroll-view intrinsic and its content intrinsic (Android
+// resolves horizontal to a dedicated ViewManager, iOS maps both back to RCTScrollView), and the
+// content container's style (contentContainerStyle plus flexDirection:'row' for horizontal).
 export type IScrollIntrinsics = {
   scrollViewIntrinsic: ISymbioteIntrinsic;
   contentIntrinsic: ISymbioteIntrinsic;
@@ -87,22 +61,21 @@ export function selectScrollIntrinsics(
   };
 }
 
-// When sticky headers are active the scroll offset must reach the AnimatedValue; RN raises the scroll
-// event rate for it (ScrollView.js:1798): throttle 1 on the native driver (it can afford every frame),
-// 16 on the JS fallback (Animated.event drives the value in JS). Without sticky headers the user's
-// throttle passes through untouched. These two magic numbers were copied into all three adapters.
+// When sticky headers are active, the scroll offset must reach the AnimatedValue; RN raises the
+// scroll event rate for it (ScrollView.js:1798): throttle 1 on the native driver, 16 on the JS
+// fallback. Without sticky headers the user's throttle passes through untouched.
 const STICKY_NATIVE_SCROLL_THROTTLE = 1;
 const STICKY_JS_SCROLL_THROTTLE = 16;
 
-// Which onScroll path the adapter builds: `plain` forwards the user handler untouched; `sticky-native`
-// forwards the user handler while the native driver attaches the scroll value on the UI thread;
-// `sticky-js` wraps the user handler in an Animated.event that drives the value each JS frame.
+// Which onScroll path the adapter builds: `plain` forwards the handler untouched; `sticky-native`
+// lets the native driver attach the scroll value on the UI thread; `sticky-js` wraps the handler
+// in an Animated.event that drives the value each JS frame.
 export type IScrollForwardMode = 'plain' | 'sticky-native' | 'sticky-js';
 
 export interface IScrollForwardingInputs {
   hasStickyHeaders: boolean;
-  // hasStickyHeaders && isNativeAnimatedAvailable(), computed by the adapter (the engine check is an
-  // adapter call), passed in so this stays pure.
+  // hasStickyHeaders && isNativeAnimatedAvailable(), computed by the adapter, passed in so this
+  // stays pure.
   nativeStickyAvailable: boolean;
   invertStickyHeaders: boolean | undefined;
   scrollEventThrottle: number | undefined;
@@ -111,15 +84,9 @@ export interface IScrollForwardingInputs {
   snapToAlignment: unknown;
 }
 
-// The scroll-forwarding DECISIONS, framework-invariant, folded out of each adapter's onScroll/onLayout
-// branch: which onScroll path to build, the resolved scrollEventThrottle (the 1/16 defaults),
-// whether to wrap onLayout to capture the viewport height (inverted sticky need it, RN _handleLayout),
-// and whether to keep the content cells un-flattened (collapsableChildren=false for MVCP / snap).
-// It returns DECISIONS, not built handlers, on purpose: the actual onScroll/onLayout functions must be
-// framework-owned — Angular caches them by identity to dodge a jsonEqual re-clone cascade (a fresh
-// closure each change-detection pass forces a Fabric re-clone up every ancestor), while React/Vue
-// allocate them fresh each render. A shared helper that returned freshly-built handlers would regress
-// Angular, so the branch VALUES are shared here and the handler EXECUTION stays per-adapter.
+// The scroll-forwarding decisions, framework-invariant. Returns decisions, not built handlers:
+// Angular caches handlers by identity to dodge a re-clone cascade, while React/Vue allocate
+// fresh each render — a shared helper returning built handlers would regress Angular.
 export interface IScrollForwarding {
   mode: IScrollForwardMode;
   scrollEventThrottle: number | undefined;
@@ -127,14 +94,12 @@ export interface IScrollForwarding {
   collapsableChildren: boolean;
 }
 
-// maintainVisibleContentPosition (and Android snapToAlignment) anchor against MOUNTED cell views;
-// Android Fabric view-flattens layout-only cells away, so RN keeps them as real views with
-// collapsableChildren={false} on the content container (ScrollView.js:1731 `preserveChildren`).
-// No-op on iOS.
-//
-// Named and exported rather than inlined because the host behavior's slot fold needs the same
-// answer from a different place — it has the owner's raw props and none of the sticky inputs
-// `resolveScrollForwarding` also takes. One exported function is what keeps the two from drifting.
+// maintainVisibleContentPosition/snapToAlignment anchor against mounted cells; Android Fabric
+// view-flattens layout-only cells away, so RN keeps them real with collapsableChildren={false}
+// (ScrollView.js:1731). No-op on iOS.
+
+// Exported rather than inlined: the host behavior's slot fold needs the same answer from a
+// place with only the owner's raw props, none of `resolveScrollForwarding`'s sticky inputs.
 export function preservesContentChildren(
   maintainVisibleContentPosition: unknown,
   snapToAlignment: unknown,
@@ -182,10 +147,8 @@ export function resolveScrollForwarding(
 // The last-seen content size, kept by the adapter (in a ref) to dedupe onContentSizeChange.
 export type IContentSize = { width: number; height: number };
 
-// Did the content view's measured size actually change since the last fire? RN synthesizes
-// onContentSizeChange from the inner content view's onLayout, but that fires on every layout
-// pass; RN dedupes so the user handler only sees real size changes (ScrollView.js). First
-// measurement (last === null) always counts as a change.
+// onContentSizeChange synthesizes from the content view's onLayout, which fires on every layout
+// pass — RN dedupes so the user handler only sees real size changes.
 export function didContentSizeChange(
   last: IContentSize | null,
   next: IContentSize,

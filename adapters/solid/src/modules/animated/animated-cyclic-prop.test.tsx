@@ -1,11 +1,8 @@
 // Does anything CYCLIC reach a prop write?
 //
 // On device every prop value is converted by `jsi::dynamicFromValue`, which walks an object graph
-// with an explicit stack and keeps NO visited set (JSIDynamic.cpp). A cycle is therefore not a
-// stack overflow — it is an endless `while (!stack.empty())` allocating one `folly::dynamic` entry
-// per turn, inside `applyOps`, from which the JS thread never returns. Measured 2026-09-09 on
-// `examples/solid`: one press on an Animated control, RAM to 15 GB, JS thread dead, every JS-side
-// counter frozen because a saturated thread delivers no console line.
+// with an explicit stack and NO visited set (JSIDynamic.cpp). A cycle is not a stack overflow —
+// it's an endless `while (!stack.empty())` loop inside `applyOps` the JS thread never returns from.
 //
 // NOTHING ELSE IN THE REPO CAN SEE THIS. The headless applier assigns `node.props[key] = value` by
 // reference and walks nothing (`core/test-utils/src/tree-applier.ts`), so a cyclic value is a
@@ -151,11 +148,9 @@ describe('Solid Animated: nothing cyclic reaches a prop write', () => {
       expect(cyclicPath(appView().payload)).toBeUndefined();
     });
 
-    // why: THE BUG. RN's babel preset annotates every JSX element with `__self` (the module
-    // `this`, which is cyclic) whenever dev=true. `routeProp` strips it on the declarative path,
-    // and `AnimatedProps` re-sends its whole raw bag every frame through `setNativeProps`, which
-    // has no `routeProp` in front of it — so the strip has to exist on both paths. Device-found
-    // 2026-09-09: `prop "__self" on <RCTView>` from the C++ conversion guard.
+    // why: THE BUG. RN's babel preset annotates every JSX element with `__self` (cyclic) whenever
+    // dev=true. `routeProp` strips it declaratively, but `AnimatedProps` re-sends its whole raw
+    // bag every frame via `setNativeProps`, with no `routeProp` in front — so both paths need it.
     it('drops a JSX dev prop on the FRAME path, not only the declarative one', async () => {
       const scroll = new Animated.Value(0);
       const offset = Animated.diffClamp(scroll, 0, 48).interpolate({

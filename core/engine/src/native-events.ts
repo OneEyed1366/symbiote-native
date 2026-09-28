@@ -1,12 +1,6 @@
-// native -> JS: receiving native module events. The native side emits ALL device
-// events by invoking ONE callable JS module under the fixed name
-// `RCTDeviceEventEmitter`. On a real RN host that name is already owned by RN's own
-// RCTDeviceEventEmitter, and `RN$registerCallableModule` cannot steal it: native's
-// `callableModules_.emplace` ignores a duplicate key (ReactInstance.cpp), so a
-// second registration is a silent no-op. So we do NOT register our own hub on a
-// real host: the app injects RN's DeviceEventEmitter (the bus native actually
-// calls) via `setDeviceEventSource`, exactly like setColorProcessor. The built-in
-// hub below stays as the fallback bus for headless/non-RN runs.
+// native -> JS: receiving native module events, all under one callable JS module name. A real
+// host already owns that name, so a second registration is a no-op — the app injects RN's
+// DeviceEventEmitter instead via setDeviceEventSource; below is the fallback for headless runs.
 
 import { dlog } from './debug';
 import { runWrapped } from './dispatch';
@@ -43,10 +37,9 @@ function emit(eventType: string, ...args: unknown[]): void {
   // Diagnostic: proves native is calling OUR hub (vs RN's own RCTDeviceEventEmitter).
   dlog(`device hub emit "${eventType}" -> ${set?.size ?? 0} listener(s)`);
   if (set === undefined) return;
-  // A device event arrives outside the framework's update loop; route the fan-out
-  // through the shared dispatch wrapper so a listener's setState lands on the sync
-  // lane and flushes, the same seam Fabric touch events use. Snapshot before
-  // iterating: a listener may remove itself mid-dispatch.
+  // Route through the shared dispatch wrapper so a listener's setState flushes on the sync
+  // lane, the same seam Fabric touch events use. Snapshot first: a listener may remove
+  // itself mid-dispatch.
   const snapshot = [...set];
   runWrapped(() => {
     for (const listener of snapshot) listener(...args);
@@ -117,17 +110,14 @@ export interface IEventEmitterModule {
   removeListeners(count: number): void;
 }
 
-// The payload native emitted for an event. It is untyped at this boundary, shared
-// cannot know an event's shape, so the listener receives `unknown` and the
-// consumer narrows it with a runtime guard (the shape is the consumer's knowledge,
-// not ours). Mirrors how FabricEventHandler hands back a raw native event.
+// The payload native emitted, untyped at this boundary: shared can't know an event's shape,
+// so the listener gets `unknown` and the consumer narrows with a runtime guard, same as
+// FabricEventHandler's raw native event.
 export type INativeEventListener = (payload: unknown) => void;
 
-// True only when the module actually carries both observe-counter methods. A
-// resolved TurboModule whose spec omits addListener/removeListeners (or a host where
-// the module isn't a real event emitter) leaves them undefined, so calling through
-// would throw "undefined is not a function" — the `?.` guards the module, not a
-// missing method. Mirrors RN's NativeEventEmitter constructor probe.
+// True only when the module carries both observe-counter methods. A spec that omits
+// addListener/removeListeners leaves them undefined, so calling through would throw —
+// the guard here protects the module, not a missing method. Mirrors RN's constructor probe.
 function hasObserveCounters(module: IEventEmitterModule): boolean {
   return (
     typeof module.addListener === 'function' &&

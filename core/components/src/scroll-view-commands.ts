@@ -29,17 +29,9 @@ export interface IScrollViewHandle {
   getScrollNode(): ISymbioteNode | null;
 }
 
-// THE ANDROID WRAP SPLIT LEFT THIS FILE ON 2026-09-18, and with it the last copy of RN's
-// `splitLayoutProps` key partition. Both halves are `SymbioteFabricProps.cpp` now
-// (`splitScrollViewStyle`, `foldRefreshWrapperProps`), reached off the tag and the tree rather than
-// from a `payloadFold` per node — see `behaviors/scroll-view/index.android.ts` for what made the
-// wrapper's half possible at all.
-//
-// Nothing replaced them here on purpose: a JS copy kept for a caller that no longer exists is the
-// mirror shape this migration keeps deleting, and the twenty-eight layout keys are exactly the kind
-// of list that drifts in silence. `core/engine/cpp/tests/js/scroll-view-wrap-payload.itest.ts`
-// asserts the split on the payload a commit actually sent, which is the only place it can now be
-// wrong.
+// The Android wrap's style split (`splitScrollViewStyle`, `foldRefreshWrapperProps`) is
+// `SymbioteFabricProps.cpp`'s, reached off the tag and tree rather than a `payloadFold` per node.
+// Contract: `scroll-view-wrap-payload.itest.ts`, asserted on the payload a commit actually sent.
 
 // Re-exported so the package barrel (index.ts) can still export this guard to
 // '@symbiote-native/components' callers, now that it lives in the engine, next to ISymbioteEvent.

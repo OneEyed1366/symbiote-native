@@ -118,16 +118,11 @@ const NOUNS = [
 const ROW_BATCH = 1000;
 const ROW_BATCH_LARGE = 10000;
 
-// The number that decides whether a row COUNT is even feasible here, and the one krausest cannot
-// tell us: its counts are DOM-node counts. `BenchmarkRow` below expands to NINE native views
-// (1 View + 3x[Text + RawText] + 2 Pressable Views), so 10 000 rows mounted at once is 90 000
-// UIViews. Measured 2026-08-18 on the iOS 26.5 simulator, that never completed: RAM climbed
-// 2.1 -> 2.8 GB and the JS thread sat at 0 fps. 1 000 rows (9 000 views) completes in ~880 ms.
-// That ceiling is the native host's, not the engine's — which is exactly why the two mount modes
-// below exist, so the claim can be measured instead of asserted.
-// ONE row shape, everywhere. The `plain` / `with-input` pair existed to price a single TextInput
-// as a delta inside one column; that number has been taken, so the arm now only splits every
-// future measurement in two. Ten views, not eleven: `<text-input>` is a single native input, and
+// krausest's row counts are DOM-node counts, not ours: `BenchmarkRow` expands to NINE native
+// views (1 View + 3x[Text + RawText] + 2 Pressable Views), so 10 000 rows is 90 000 UIViews - a
+// ceiling the native host hits, not the engine.
+
+// ONE row shape, everywhere. Ten views, not eleven: `<text-input>` is a single native input, and
 // its `value` is a prop rather than a child, so it adds no RawText.
 const NATIVE_VIEWS_PER_ROW = 10;
 // Fixed so getItemLayout is exact in virtualized mode and both modes lay rows out identically.
@@ -755,26 +750,13 @@ export function BenchmarkScreen() {
     });
   };
 
-  /**
-   * The whole ruler in one press, in a FIXED order, each timed operation starting from exactly
-   * SUITE_ROWS rows.
-   *
-   * Pressing the buttons by hand does not measure what it looks like it measures. `Remove` and
-   * `Append` cost scale with the rows currently on screen (a flat parent re-appends every child
-   * handle on any structural change), so their numbers depend on which buttons were pressed
-   * before them. Measured 2026-08-18, React Debug, same build twice: Remove 87-107 ms against
-   * 418.6 ms, Append 953 against 1678 ms, while Create / Replace / Partial / Select / Swap
-   * reproduced inside 1-3%. Two runs of the SAME adapter disagreed 4x — so a cross-ADAPTER
-   * comparison off those rows was measuring press order, not the adapter.
-   *
-   * Hence: untimed setup steps in between, awaited through the same engine post-commit seam as
-   * the timed ones, so each measurement begins from a state this function chose rather than one
-   * the operator happened to leave behind.
-   *
-   * Runs in EITHER mount mode — the pressed button picks it. No 10,000-row step in either: 10,000
-   * rows is 100,000 native views, which the host does not survive in all-mounted (see
-   * NATIVE_VIEWS_PER_ROW), and a suite that hangs the screen measures nothing.
-   */
+  // The whole ruler in one press, FIXED order, each timed op starting from exactly SUITE_ROWS
+  // rows: Remove/Append cost scales with rows on screen (a flat parent re-appends every child
+  // handle on structural change), so untimed setup steps run between the timed ones instead.
+
+  // Runs in EITHER mount mode — the pressed button picks it. No 10 000-row step in either:
+  // 100 000 native views don't survive in all-mounted (see NATIVE_VIEWS_PER_ROW), and a hung
+  // screen measures nothing.
   const runSuite = async (mode: IMountMode): Promise<void> => {
     resetRowData();
 
@@ -1161,13 +1143,8 @@ export function BenchmarkScreen() {
           frame.
         </text>
 
-        {/* These sat BELOW the rows until 2026-09-07, deliberately, so nobody would report
-          numbers from them: their Remove and Append act on whatever happened to be on screen,
-          which is the whole reason the suite above exists. That is still true and the note under
-          them still says so — what changed is that "below the fold" became UNREACHABLE once the
-          list holds a thousand rows, which is exactly the state you are in when you want to poke
-          at one commit shape. A caveat keeps working from the top of the screen; a scroll position
-          does not. */}
+        {/* Kept above the rows: with a thousand rows mounted, "below the fold" is unreachable
+          by scroll — exactly the state you're in when you want to poke at one commit shape. */}
         <text class="section-label">OPERATIONS · LAST RUN</text>
         <For each={operations()}>
           {operation => (

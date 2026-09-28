@@ -1,5 +1,24 @@
 # @symbiote-native/engine
 
+## 1.3.1
+
+### Patch Changes
+
+- [`e3530d5`](https://github.com/OneEyed1366/symbiote-native/commit/e3530d570f066c90d3bbfd62a95b2ccbae8431a8) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - `c17d33f1` added `setAssetSourceResolver`/`resolveAssetSource` and wired them into
+  `bootstrapHost` (`@symbiote-native/components`) with no changeset for `@symbiote-native/engine`
+  itself. `@symbiote-native/components@3.1.1` published the next day already calling the new
+  export, but `@symbiote-native/engine` stayed on the already-published `1.3.0` and never
+  re-shipped - every consumer's `bootstrapHost()` crashes with `TypeError: undefined is not a
+function` (`setAssetSourceResolver` resolves to `undefined`). This changeset bumps
+  `@symbiote-native/engine` so the existing code actually gets published.
+
+- [`99fdbbb`](https://github.com/OneEyed1366/symbiote-native/commit/99fdbbb54b72d5d06cfd95fbf0d82f2d9fe17a6a) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Force a clean republish of every publishable package. `engine@1.3.0`/`components@3.1.1` proved a
+  missing changeset on a producer package can leave its published tarball silently behind its own
+  source (see the `symbiote-release-publishing` skill's changeset-skips-callee gap) with no CI
+  signal. A blanket patch here is the cheap way to rule out the same gap sitting anywhere else:
+  every package rebuilds and republishes from current HEAD, and `updateInternalDependencies: patch`
+  bumps every internal `workspace:*`/`workspace:^` pin along with it.
+
 ## 1.3.0
 
 ### Minor Changes

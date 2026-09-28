@@ -7,7 +7,7 @@
 // ShadowNode and not a tag — so a test written on that harness would pass with the call never
 // made.
 //
-// Device-diagnosed 2026-09-08 on the canary's PanResponder drag box, inside a ScrollView:
+// Device-diagnosed on the canary's PanResponder drag box, inside a ScrollView:
 // `onStartShouldSetResponder` returned true, native never learned, and every move after
 // `topTouchStart` arrived as `topScroll` rather than `topTouchMove` — so the gesture was gone
 // before a grant could happen. RN's whole contribution to this is

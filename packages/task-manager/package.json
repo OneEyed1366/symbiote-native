@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/task-manager",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "expo-task-manager wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, Svelte, Solid, and Angular adapters. Defines and tracks background tasks that native code invokes headlessly.",
   "license": "MIT",
   "repository": {

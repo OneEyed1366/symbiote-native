@@ -46,12 +46,9 @@ describe('applyExpoModulesPodfileAutolinking', () => {
     return fs.readFileSync(path.join(root, 'ios', 'Podfile'), 'utf8');
   }
 
-  // why: `use_native_modules!` only autolinks React Native's own modules — Expo modules
-  // (ExpoModulesCore/ExpoModulesJSI) need Expo's OWN autolinking, wired by requiring
-  // `expo/scripts/autolinking` and calling `use_expo_modules!` inside the target. Without it,
-  // `Expo.podspec`'s `defined?(use_expo_modules!)` check is false, so it never declares its
-  // ExpoModulesCore dependency, and the build fails with `'ExpoModulesCore/Platform.h' file not
-  // found` / `could not build Objective-C module 'Expo'` — a real device failure (2026-09-18).
+  // why: `use_native_modules!` only autolinks React Native's own modules — Expo modules need
+  // Expo's OWN autolinking, wired by requiring `expo/scripts/autolinking` and calling
+  // `use_expo_modules!`, or CocoaPods never sets up ExpoModulesCore's header search path.
   it('requires expo autolinking and calls use_expo_modules! inside the target', () => {
     const root = setupApp(BASE_PODFILE);
     applyExpoModulesPodfileAutolinking(root);

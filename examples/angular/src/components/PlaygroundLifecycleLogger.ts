@@ -16,29 +16,12 @@ import {
 import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 
 // Every lifecycle hook, in the order Angular actually calls them, each emitting one log line the
-// parent renders in an @for list. `tick` is a plain @Input (not `style`/`class`), so it propagates
-// and dirties this view normally - none of the angular-adapter-change-detection §13 gotcha
-// applies here. Projected content (<ng-content>) is what gives ngAfterContentInit/Checked
-// something real to fire for.
-//
-// THE THREE `*Checked` HOOKS REPORT ONCE, and that is a correctness requirement rather than a
-// tidy-up. They run on EVERY change-detection pass, and a template listener is wrapped in
-// `wrapListenerIn_markDirtyAndPreventDefault`, which dirties the view it is bound in - so emitting
-// a BOUND @Output from one of them re-dirties the parent forever and Angular gives up with NG0103
-// after MAXIMUM_REFRESH_RERUNS. Writing the handler's result into a signal the parent's template
-// reads does the same thing a second way.
-//
-// Device-diagnosed 2026-09-20: this screen ran on a permanent NG0103, quietly, because a scheduler
-// tick catches it and hands it to `ErrorHandler`. The first keystroke in the `[(ngModel)]` field
-// took the same throw through the adapter's synchronous read-back flush, which runs outside that
-// handler, and killed the app - `RCTFatalException: Unhandled JS Exception: Error: NG0103`, with no
-// redbox because Release has none. The adapter's half of that is fixed separately; a component
-// that cannot be change-detected is this file's half.
-//
-// Reporting once loses nothing the log was for: what it shows is the hook ORDER. That these three
-// keep running afterwards is shown by COUNTERS in a plain field instead - a plain field dirties
-// nothing, so the numbers below are simply as of the last pass anything else rendered, which is
-// the honest reading of "this ran again".
+// parent renders in an @for list. Projected content (<ng-content>) gives ngAfterContentInit/
+// Checked something real to fire for.
+
+// THE THREE `*Checked` HOOKS REPORT ONCE: they run on every change-detection pass, and emitting a
+// BOUND @Output from one re-dirties the parent forever, so Angular gives up with NG0103 after
+// MAXIMUM_REFRESH_RERUNS. A plain-field counter tracks that they keep firing, without dirtying.
 @Component({
   selector: 'PlaygroundLifecycleLogger',
   standalone: true,

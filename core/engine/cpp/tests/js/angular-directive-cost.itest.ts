@@ -758,8 +758,8 @@ describe('what a matched element directive costs', () => {
         `WITHHOLDING it        ${verdict('minimal', 'unmatched')}`,
         `what withholding LEFT ${verdict('unmatched', 'bare')}`,
         // `full` IS NO LONGER A FAT-DIRECTIVE ARM, and this row is the proof rather than a caveat.
-        // It imports `SYMBIOTE_ELEMENTS`, whose tag directives are withheld from runtime matching as
-        // of 2026-09-18 — so what it now measures is the adapter's CURRENT shape: no tag directive
+        // It imports `SYMBIOTE_ELEMENTS`, whose tag directives are withheld from runtime matching —
+        // so what it measures is the adapter's CURRENT shape: no tag directive
         // instantiated, one thin `SymbioteStyleHost` matching instead. Read against `bare`, which
         // instantiates nothing at all, it is what a screen still pays for its element directives.
         //

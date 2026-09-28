@@ -336,7 +336,7 @@ export function flushValue(rootNode: AnimatedNode): void {
 // in RELEASE builds only (dev was fine, every headless test was fine, and the code was even
 // present in the bundle — it just never ran). Adding a bare `import './interpolation-node'` to
 // the barrel does NOT fix it either: Babel merges that import with the adjacent re-export of the
-// same specifier, and the merged dependency stays lazy. Both were tried on device 2026-08-14.
+// same specifier, and the merged dependency stays lazy. Both were tried on device.
 //
 // Keeping the class next to its base class removes the cycle, the factory, and the entire class
 // of load-order bug with it: `interpolate()` constructs it directly and there is nothing left to

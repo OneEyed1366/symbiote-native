@@ -240,7 +240,7 @@ describe('what a scroll view sends native', () => {
     expect(vertical({ snapToInterval: 100 }).payload.pagingEnabled).toBe(false);
   });
 
-  // why: THE PRICE, and it is ZERO for the whole primitive as of 2026-09-18 — both nodes.
+  // why: THE PRICE, and it is ZERO for the whole primitive — both nodes.
   //
   // This assertion read `1` for one iteration, with a comment saying the content node's fold could
   // never move because "no per-node rule can reach" the owner it derives from. That was wrong about

@@ -47,21 +47,11 @@ function isRawText(node: ISymbioteNode): boolean {
   return isRawTextNode(node);
 }
 
-// RN's two Text defaults left this renderer entirely on 2026-09-18, in two steps a month apart. The
-// CREATE seed went first, because writing them as props cost a crossing every time the app authored
-// the same value — 6 000 per 1 000-row create, measured with `writesOfUnchanged`. What stayed was a
-// clear-back: an explicit `undefined` at patch time was substituted for the default, since RN treats
-// a missing prop and an explicit `undefined` alike.
-//
-// That substitution is gone too, and it was redundant rather than wrong. The rule reads the AUTHORED
-// bag at payload time (`foldTextDefaults`, `SymbioteFabricProps.cpp`), so it cannot tell a cleared
-// prop from one never written — both are absent by the time it looks, and both get the default. The
-// adapter was re-supplying an answer the layer below already had.
+// RN's two Text defaults are `foldTextDefaults`'s rule now (`SymbioteFabricProps.cpp`), reading
+// the AUTHORED bag at payload time — this renderer keeps no seed or clear-back of either default.
 
-// `PROP_ALIASES` (`id` -> `nativeID`) left this renderer on 2026-09-18 — `routeProp` resolves it
-// for every adapter now, and carries the per-node state the caveat here said was not worth it: with
-// both names on one element upstream gives `id` unconditional priority, where a per-key rename
-// resolved it by write order.
+// `id` -> `nativeID` is `routeProp`'s fold for every adapter now; with both names on one element
+// it gives `id` unconditional priority.
 
 // RN-style event prop naming ('onPress', 'onValueChange', ...), the same convention JSX itself
 // uses to separate an event from a plain value prop — good enough to decide whether to wrap,
@@ -137,15 +127,9 @@ export function createSymbioteRenderer(surface: SymbioteSurface) {
       dlog(
         () => `vue createElement ${descriptor.component} -> public instance`,
       );
-      // markRaw is load-bearing, not an optimization: useTemplateRef()'s return value is
-      // `readonly(shallowRef(null))` (runtime-core.cjs.js), and Vue's readonly() wraps ANY
-      // `.value` whose Object.prototype.toString reads "[object Object]" — true of a plain class
-      // instance, unlike a real DOM Element, which fails that check for free. Unmarked, a node
-      // reached through useTemplateRef() (not a plain ref()/shallowRef(), both of which skip the
-      // wrap) came back as a deep-readonly Proxy: reads worked, so `committedOf`/`whenCommitted`
-      // saw a "committed" node, but `setNativeProps`'s `node.props.style = …` silently no-op'd
-      // with a dev-only "Set operation… target is readonly" warning — device-reported 2026-09-11
-      // as "flash the right chip" doing nothing on press.
+      // markRaw is load-bearing: useTemplateRef()'s `readonly(shallowRef(null))` wraps any
+      // `.value` that isn't a real DOM Element, and unmarked, `setNativeProps` silently
+      // no-ops against the resulting readonly Proxy.
       return markRaw(toPublicInstance(node));
     },
 

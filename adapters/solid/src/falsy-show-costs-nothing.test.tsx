@@ -1,11 +1,8 @@
 // A falsy `<Show>` costs NO native node, and exactly ONE retained anchor.
 //
-// Written for the benchmark's `with-input` arm (2026-08-31). That arm appends a `<TextInput>` to
-// the row under a `<Show>`, and the plain arm's acceptance criterion is that its Fabric counters
-// stay BYTE-IDENTICAL to every number recorded before the arm existed. `createNode` is all that
-// check reads, so the retained side is asked here: a placeholder invisible to it still costs a C++
-// node per row. Svelte's retained tree carried 23 006 nodes against every other adapter's 9 001,
-// 14 004 of them block anchors, `{#if}` worth two per site (`svelte-adapter-dom-shim` §32).
+// For the benchmark's `with-input` arm (a `<TextInput>` under a `<Show>`): the plain arm's
+// acceptance criterion is its Fabric counters stay BYTE-IDENTICAL. `createNode` is all that
+// reads, so the retained side is asked here — a placeholder invisible to it still costs a node.
 //
 // The one anchor is structural, not a leak: solid-js/universal's `cleanChildren` needs a node
 // holding the position of a dynamic expression or the siblings after it reorder, and

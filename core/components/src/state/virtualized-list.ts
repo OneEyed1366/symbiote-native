@@ -1,44 +1,26 @@
-// VirtualizedList logic: the framework-agnostic windowing engine. Every adapter
-// (React hooks, Vue reactivity) drives the SAME math from here, so a windowing /
-// viewability / edge-reached bug is fixed once for all adapters. The adapter
-// supplies only its lifecycle (refs/state/effects), the imperative handle
-// wiring, and the per-cell element creation (createElement / h) - never the
-// geometry.
-//
-// What lives here:
-//   - the RN-matching defaults + sentinels,
-//   - the nativeEvent payload readers (scroll offset / layout length),
-//   - offset table + window computation + batch throttling,
-//   - viewability classification, the viewable-set diff, and the minimumViewTime fold,
-//   - the edge-reached (onEndReached / onStartReached) distance + threshold compute,
-//   - the assembled child PLAN (spacer extents, in-window cell keys, sticky child
-//     positions) the adapter maps onto its host elements,
-//   - the shared data + imperative-handle types.
-//
-// What stays in the adapter (genuinely framework-bound): the cell CONTENT is the
-// framework's own children (renderItem -> ReactNode / VNode), so there is no
-// Descriptor render fn for a list - the shared layer for lists is this STATE/logic
-// module, not a view/render-*.ts.
+// VirtualizedList logic: the framework-agnostic windowing engine every adapter drives the same
+// math from, so a windowing/viewability/edge-reached bug is fixed once for all. The adapter
+// supplies only its lifecycle, the imperative handle wiring, and per-cell element creation.
+
+// What stays in the adapter: the cell CONTENT is the framework's own children (renderItem ->
+// ReactNode / VNode), so there is no Descriptor render fn for a list — this state/logic module is
+// the shared layer, not a view/render-*.ts.
 
 import { dlog, Platform } from '@symbiote-native/engine';
 import type { IViewStyle } from '@symbiote-native/engine';
 import type { ISymbioteEvent } from '@symbiote-native/engine';
 import type { IScrollRoutingHandle } from './scroll-routing-handle';
 
-// Defaults match RN. windowSize is measured in viewport-lengths (21 => ten screens
-// of buffer on each side of the visible region). initialNumToRender bounds the first
-// paint before any layout is measured. maxToRenderPerBatch / batching period mirror
-// RN's incremental fill defaults.
+// Defaults match RN. windowSize is in viewport-lengths (21 => ten screens of buffer each side).
+// initialNumToRender bounds the first paint before any layout is measured.
 export const DEFAULT_WINDOW_SIZE = 21;
 export const DEFAULT_INITIAL_NUM_TO_RENDER = 10;
 export const DEFAULT_MAX_TO_RENDER_PER_BATCH = 10;
 export const DEFAULT_UPDATE_CELLS_BATCHING_PERIOD = 50;
 export const DEFAULT_VIEW_AREA_COVERAGE_PERCENT_THRESHOLD = 0;
-// `_maybeCallOnEdgeReached`'s OWN fallback (`VirtualizedList.js:1567`) for whether to actually
-// FIRE onEndReached/onStartReached when the app gives no threshold — a flat 2 PIXELS. This is a
-// different RN default from `onEndReachedThresholdOrDefault`'s `?? 2`, which is a MULTIPLE of the
-// visible length used only for internal render-ahead windowing (a concern this engine does not
-// separate out); conflating the two here used to fire the callback two whole screens early.
+// RN's own fallback for whether to actually FIRE onEndReached/onStartReached when the app gives no
+// threshold — a flat 2 PIXELS, distinct from the windowing-only `?? 2` MULTIPLE elsewhere in RN;
+// conflating the two fires the callback two whole screens early.
 export const DEFAULT_EDGE_REACHED_THRESHOLD_PX = 2;
 export const FIRST_INDEX = 0;
 export const EMPTY_OFFSET = 0;
@@ -50,10 +32,8 @@ export const ON_EDGE_REACHED_EPSILON = 0.001;
 // Sentinel for "onEndReached / onStartReached has not fired for any content length
 // yet". Real content lengths are >= 0, so -1 can never collide with one.
 export const NO_CONTENT_LENGTH_SENT = -1;
-// Inversion flips the content container along the scroll axis; each cell re-flips so
-// its own content stays upright. VirtualizedList.js `styles.verticallyInverted`: Android flips
-// with `scale: -1` because `scaleY: -1` can ANR on API 33+ (react-native#35350); the native side
-// then moves the scrollbar back via `isInvertedVirtualizedList`.
+// Inversion flips the content container along the scroll axis; each cell re-flips so its own
+// content stays upright. Android flips with `scale: -1` since `scaleY: -1` can ANR on API 33+.
 export function invertedYStyleFor(os: string): IViewStyle {
   return os === 'android'
     ? { transform: [{ scale: -1 }] }
@@ -68,10 +48,9 @@ export interface ICellLayout {
   offset: number;
 }
 
-// The props RN hands ItemSeparatorComponent (VirtualizedListCellRenderer.js plus the
-// section fields VirtualizedSectionList layers on): the highlight flag the cell can
-// toggle, the items on either side of the gap, and (for section lists) the section the
-// separator sits in. `section` stays optional because a flat VirtualizedList has none.
+// The props RN hands ItemSeparatorComponent: the highlight flag the cell can toggle, the items on
+// either side of the gap, and (for section lists) the section. `section` stays optional since a
+// flat VirtualizedList has none.
 export interface ISeparatorProps<ItemT> {
   highlighted: boolean;
   leadingItem?: ItemT;
@@ -80,10 +59,8 @@ export interface ISeparatorProps<ItemT> {
   [key: string]: unknown;
 }
 
-// The imperative separator handle passed to renderItem (RN CellRenderer._separators).
-// highlight/unhighlight flip the highlighted flag on the separators flanking this cell;
-// updateProps merges arbitrary props onto the leading (previous gap) or trailing
-// (this gap) separator so a row can drive its own dividers.
+// The imperative separator handle passed to renderItem: highlight/unhighlight flip the flanking
+// separators' highlighted flag; updateProps merges props onto the leading or trailing separator.
 export interface ISeparators {
   highlight(): void;
   unhighlight(): void;
@@ -111,10 +88,9 @@ export interface IViewableItemsChangedInfo<ItemT> {
   viewabilityConfig?: IViewabilityConfig;
 }
 
-// Viewability tuning, mirroring RN's IViewabilityConfig. Either a coverage percentage
-// OR a minimum visible pixel height qualifies a cell as viewable;
-// itemVisiblePercentThreshold is the common one. waitForInteraction gates a config so
-// nothing is reported viewable until the first scroll interaction has happened.
+// Viewability tuning, mirroring RN. Either a coverage percentage OR a minimum visible pixel
+// height qualifies a cell as viewable; waitForInteraction gates a config so nothing reports
+// viewable until the first scroll interaction.
 export interface IViewabilityConfig {
   minimumViewTime?: number;
   viewAreaCoveragePercentThreshold?: number;
@@ -127,11 +103,9 @@ export interface IViewabilityConfigCallbackPair<ItemT> {
   onViewableItemsChanged: (info: IViewableItemsChangedInfo<ItemT>) => void;
 }
 
-// The imperative API RN exposes on a VirtualizedList/FlatList ref. Every scroll
-// resolves to an offset. The scrollTo* family is this handle's own primary surface; the
-// flash/get*/record tail is the inner-scroll routing shared with VirtualizedSectionList
-// (see IScrollRoutingHandle) - extending it, rather than re-declaring it, is what keeps
-// the two handle types from drifting from each other.
+// The imperative API RN exposes on a VirtualizedList/FlatList ref. The scrollTo* family is this
+// handle's own surface; the flash/get*/record tail extends IScrollRoutingHandle, shared with
+// VirtualizedSectionList, so the two handle types can't drift apart.
 export interface IVirtualizedListHandle extends IScrollRoutingHandle {
   scrollToOffset(params: { offset: number; animated?: boolean }): void;
   scrollToIndex(params: {
@@ -173,10 +147,8 @@ export function readScrollOffset(
   return readNumber(offset, horizontal ? 'x' : 'y');
 }
 
-// The cell's own position inside the scroll content, as the host reported it. Paired with
-// readLayoutLength at the same onLayout: this is the value buildOffsets stores VERBATIM, and it is
-// what lets the table describe where the content actually is rather than where a sum of heights
-// says it should be.
+// The cell's own position in the scroll content, as the host reported it — the value buildOffsets
+// stores VERBATIM, so the table describes where content actually is, not a sum of heights.
 export function readLayoutOffset(
   event: ISymbioteEvent,
   horizontal: boolean,
@@ -199,36 +171,16 @@ export function readLayoutLength(
   return readNumber(layout, horizontal ? 'width' : 'height');
 }
 
-// Resolve every cell offset/length from the cache (or getItemLayout), filling gaps with
-// the running average so an unmeasured tail still has a plausible total. Returns the
-// per-index offset table plus the grand total extent.
-//
-// THE COORDINATE SPACE IS THE HOST'S, NOT A MODEL'S. `measuredOffsets` holds each cell's raw y (x
-// when horizontal) exactly as onLayout reported it — content-container relative, so it carries the
-// container's padding, the list header, and whatever spacer stood above the cell at the time. A
-// measured cell is placed at that value VERBATIM. It is never re-derived from a neighbour, never
-// rebased onto a running sum. This is react-native's ListMetricsAggregator: `getCellMetricsApprox`
-// returns a laid-out cell's real frame untouched and approximates only what has never been seen.
-//
-// That "verbatim" is the whole safety property, and it is not a stylistic preference — it is the
-// fix for the canary going blank mid-scroll (diagnosed on device 2026-08-19). The table is not
-// merely an output: buildListPlan sizes the leading spacer from it, the host lays the window's
-// cells out below that spacer, and their measured y — spacer included — comes straight back in
-// here. It is a closed loop. Combining two measurements arithmetically inside that loop feeds the
-// model's own error back to itself: with a Yoga `gap` on the content container (the canary's .grid
-// has one) a spacer is an extra flex child, so its presence shifts the layout by one more gap than
-// any pure-arithmetic model predicts, and differencing two cells measured either side of that
-// change banks the difference. Measured, at one gap per recompute, unbounded — onScroll fires per
-// frame, so the spacer walks thousands of pixels away from reality within a second of dragging and
-// the window lands nowhere near the viewport. Regression test:
-// core/components/src/state/virtualized-list-feedback.test.ts.
-//
-// Unmeasured cells are the only place an estimate lives, and they advance by the average STRIDE
-// (measured cell-origin to cell-origin) rather than by the average LENGTH. A height is not the
-// distance to the next cell: separators, section gaps and container `gap` all live in between, and
-// sizing an unmeasured region by heights alone leaves it short by exactly that chrome.
-//
-// A fixed getItemLayout skips all of it — authoritative by contract, and its offsets are exact.
+// Resolve every cell offset/length from the cache (or getItemLayout), filling gaps with the
+// running average so an unmeasured tail still has a plausible total.
+
+// The coordinate space is the HOST's, not a model's: a measured cell is placed at onLayout's raw
+// value VERBATIM, never rebased onto a running sum — differencing two measurements would compound
+// a Yoga `gap` shift unboundedly once buildListPlan feeds a sized spacer back through this table.
+
+// Unmeasured cells advance by the average STRIDE (origin to origin), not the average LENGTH —
+// separators/gaps live between cells, so heights alone fall short. A fixed getItemLayout skips
+// all of it, authoritative by contract.
 export function buildOffsets(
   count: number,
   measured: Map<number, number>,
@@ -239,10 +191,8 @@ export function buildOffsets(
 ): { offsets: number[]; lengths: number[]; total: number } {
   const offsets: number[] = new Array<number>(count);
   const lengths: number[] = new Array<number>(count);
-  // What the average stride has left over once the average cell is accounted for: the chrome drawn
-  // BETWEEN two cells. Estimating with this rather than the stride itself keeps a cell whose own
-  // length IS known from being overwritten by an average — the stride is only ever used for the
-  // part nobody measured.
+  // What the average stride leaves over once the average cell is accounted for: the chrome drawn
+  // BETWEEN two cells, used only for the part nobody measured.
   const interCellChrome = Math.max(EMPTY_OFFSET, averageStride - averageLength);
   // Where the next cell goes when its own position has never been reported.
   let cursor = EMPTY_OFFSET;
@@ -311,14 +261,11 @@ export function initialRenderRegion(
 }
 
 // Clamp a freshly computed window against the previously-committed one so at most
-// maxToRenderPerBatch new cells are added on each side per tick (RN's incremental fill).
-// The window grows toward the target over successive batch ticks rather than snapping in
-// one render: cheaper first paint on a big jump.
-//
-// With NO previous window - the list just received data - RN paints its initial region and grows
-// from there (`_createRenderMask` adds `_initialRenderRegion` to a window constrained from empty),
-// even when the viewport is already known. Snapping to the target instead mounted ~125 rows where
-// RN mounts 10 on a 420pt viewport (`stock-virtualized-suite.itest.tsx`).
+// maxToRenderPerBatch new cells are added on each side per tick — the window grows toward the
+// target over successive ticks rather than snapping in one render.
+
+// With NO previous window, RN paints its initial region and grows from there even when the
+// viewport is already known; snapping to the target instead mounts far more rows than RN would.
 export function throttleWindow(
   target: { first: number; last: number },
   previous: { first: number; last: number },
@@ -334,12 +281,9 @@ export function throttleWindow(
   return { first, last };
 }
 
-// A cell is viewable when its visible fraction clears the configured threshold
-// (`ViewabilityHelper.js`'s `_isViewable` + `computeViewableItems`). Two percents exist and they
-// are NOT interchangeable: `viewAreaCoveragePercentThreshold` is a fraction of the VIEWPORT,
-// `itemVisiblePercentThreshold` a fraction of the CELL's own length — a short cell mostly visible
-// in a tall viewport clears the second easily while failing the first. Area wins whenever it is
-// set (vendor checks `viewAreaCoveragePercentThreshold != null` first); item only when it is not.
+// A cell is viewable when its visible fraction clears the configured threshold. Two percents exist
+// and are NOT interchangeable: viewAreaCoveragePercentThreshold is a fraction of the VIEWPORT,
+// itemVisiblePercentThreshold a fraction of the CELL's own length. Area wins whenever set.
 export function isCellViewable(
   cellOffset: number,
   cellLength: number,
@@ -353,10 +297,8 @@ export function isCellViewable(
   // (`top < viewportHeight && bottom > 0` gates the whole scan), so this is exclusion by
   // construction, not a zero percent happening to clear a zero threshold.
   if (bottom <= EMPTY_OFFSET || top >= viewportLength) return false;
-  // RN's own `_isEntirelyVisible` shortcut: viewable in EITHER mode regardless of the cell's
-  // share of the viewport, since an area threshold sized to the viewport could otherwise reject
-  // every fully-visible cell smaller than that share. `bottom > top` excludes a zero-length cell
-  // (no measurement yet), which vendor falls through to the percent math instead.
+  // Fully inside the viewport is viewable in EITHER mode, or an area threshold sized to the
+  // viewport could reject every fully-visible cell smaller than that share.
   if (top >= EMPTY_OFFSET && bottom <= viewportLength && bottom > top) {
     return true;
   }
@@ -393,18 +335,9 @@ export function offsetForIndex(
   return Math.max(EMPTY_OFFSET, positioned - viewOffset);
 }
 
-// Two layout readings are the SAME measurement unless they differ by more than this.
-//
-// A relayout does not reproduce a float bit-for-bit: the cell positions are derived from a spacer
-// height that is itself a float, so an onLayout that changed nothing observable still comes back a
-// few ulps off. Compared with ===, every one of those counts as a change — the reducer stores it,
-// the spacer derived from it moves in its last bits, Fabric commits the new value, Yoga relays out,
-// and the fresh onLayout starts the next turn. A loop at frame rate, from a difference no screen
-// can show. Device-measured 2026-08-19: 1203 recomputes over one short drag, its log full of
-// `27.33 -> 27.33 (-0.00)`.
-//
-// The smallest change a host can actually express is one device pixel — a third of a point at @3x —
-// so this sits ~30x below any real move and ~1e11 above the noise.
+// Two layout readings are the SAME measurement unless they differ by more than this — a relayout
+// doesn't reproduce a float bit-for-bit, so comparing with === loops at frame rate on noise no
+// screen can show. One device pixel (a third of a point at @3x) sits far above that noise.
 export const LAYOUT_EPSILON = 0.01;
 
 // `known` is optional because a first measurement has nothing to settle against, and must count as
@@ -425,15 +358,13 @@ export function averageMeasuredLength(measured: Map<number, number>): number {
   return sum / measured.size;
 }
 
-// Average origin-to-origin distance between two ADJACENT measured cells — the length plus whatever
-// chrome the list draws in the gap (a separator, a section gap, the content container's Yoga
-// `gap`). Only adjacent pairs qualify: across a hole the distance covers cells nobody measured.
-//
-// This is what an unmeasured cell advances by, and it is deliberately not averageMeasuredLength.
-// Sizing an unmeasured region by heights alone makes the model shorter than the content, so the
-// spacer standing in for that region under-reserves and everything below it slides up — the
-// jump-and-return the canary showed before the offsets became host-absolute. Falls back to the
-// length average while no adjacent pair has been measured yet.
+// Average origin-to-origin distance between two ADJACENT measured cells — length plus whatever
+// chrome the list draws in the gap. Only adjacent pairs qualify: across a hole the distance
+// covers cells nobody measured.
+
+// Deliberately not averageMeasuredLength: sizing an unmeasured region by heights alone makes the
+// model shorter than the content, so its spacer under-reserves and everything below slides up.
+// Falls back to the length average while no adjacent pair has been measured yet.
 export function averageMeasuredStride(
   measuredOffsets: Map<number, number>,
   fallback: number,
@@ -459,13 +390,11 @@ export function highestMeasuredIndex(measured: Map<number, number>): number {
   return highest;
 }
 
-// onEndReached distance + threshold test (RN _maybeCallOnEdgeReached). The adapter still
-// gates on "the last cell is actually rendered" and dedups by content length via its own
-// ref; this returns only the pure geometry.
-//
-// `thresholdMultiplier` is `undefined` for "the app gave no onEndReachedThreshold" — RN's own
-// unset-case answer is a flat `DEFAULT_EDGE_REACHED_THRESHOLD_PX`, never a viewport-length
-// multiple, so `undefined` must NOT be defaulted to a multiplier at the call site.
+// onEndReached distance + threshold test. The adapter still gates on "the last cell is actually
+// rendered" and dedups by content length via its own ref; this returns only the pure geometry.
+
+// `thresholdMultiplier` undefined means the app gave no onEndReachedThreshold — RN's own answer
+// is a flat DEFAULT_EDGE_REACHED_THRESHOLD_PX, never a viewport-length multiple.
 export function computeEndReached(
   total: number,
   scrollOffset: number,
@@ -576,10 +505,8 @@ export function computeViewableSet<ItemT>(params: IViewableSetParams<ItemT>): {
   return { tokens, map };
 }
 
-// The `changed` delta between two viewable sets: newly viewable (true) and newly hidden
-// (false). hasChanged is false when the viewable KEY set is identical, so the adapter can
-// skip firing (RN dedups the same way). Hidden tokens come straight from the previous map,
-// so no rescan of all N items.
+// The `changed` delta between two viewable sets: newly viewable (true) and newly hidden (false).
+// hasChanged is false when the viewable KEY set is identical, so the adapter can skip firing.
 export function diffViewable<ItemT>(
   previous: Map<string, IViewToken<ItemT>>,
   current: Map<string, IViewToken<ItemT>>,
@@ -634,13 +561,9 @@ export interface IListPlan {
   // The in-WINDOW cells only ([first..last]) — unchanged meaning from before forcedStickyCell
   // existed. Does NOT include forcedStickyCell; render that separately, ahead of these.
   cells: IListCellPlan[];
-  // The nearest sticky index BELOW `first`, force-mounted outside the normal window —
-  // the twin of RN's VirtualizedList._ensureClosestStickyHeader (stock RN keeps a
-  // non-contiguous CellRenderMask region for it). Without this, a pinned section's cell
-  // gets destroyed the moment scrolling carries its origin position out of [first,last],
-  // and recreated from scratch (losing its measured layout) every time the window slides
-  // back over it — the actual cause of a sticky header vanishing/flickering mid-scroll,
-  // not a native-driver issue.
+  // The nearest sticky index BELOW `first`, force-mounted outside the normal window. Without this
+  // a pinned section's cell gets destroyed and recreated (losing its measured layout) every time
+  // the window slides past it — the actual cause of a sticky header flickering mid-scroll.
   forcedStickyCell: IListCellPlan | undefined;
   // Child positions (in the final emitted child array) of the sticky headers that landed
   // in the window, INCLUDING forcedStickyCell (counted first, at position 0 or 1) when set.
@@ -672,11 +595,9 @@ function findClosestStickyIndexBelow(
   return NO_INDEX;
 }
 
-// Compute the windowed child PLAN: the spacer extents, the in-window cells (index + key),
-// the force-mounted sticky cell (if any) ahead of the window, and the sticky child
-// positions. The adapter walks this plan and creates the host elements (createElement / h)
-// plus the framework cell content. This is the shared half of the render; only the element
-// creation and the user's renderItem stay per-adapter.
+// Compute the windowed child PLAN: spacer extents, in-window cells, the force-mounted sticky cell
+// (if any), and sticky child positions. The adapter walks this and creates the host elements;
+// only element creation and the user's renderItem stay per-adapter.
 export function buildListPlan(params: IListPlanParams): IListPlan {
   const cells: IListCellPlan[] = [];
   const closestStickyIndex =
@@ -688,14 +609,9 @@ export function buildListPlan(params: IListPlanParams): IListPlan {
       ? undefined
       : { index: closestStickyIndex, key: params.keyFor(closestStickyIndex) };
 
-  // A spacer stands in for a contiguous run of cells, so its extent is the distance from the first
-  // of them to the far edge of the last — a difference between two positions the host itself
-  // reported, never a sum of heights. That is what carries the chrome BETWEEN those cells
-  // (separators, section gaps, the container's Yoga `gap`) without the model having to know it
-  // exists, and it is why the spacer lands the following cell exactly where it already was: the
-  // spacer occupies one child slot, precisely as the region it replaces began and ended on a cell
-  // boundary. Summing heights instead under-reserves by the chrome; rebasing onto a running model
-  // re-introduces the feedback loop buildOffsets exists to avoid.
+  // A spacer's extent is the distance from the first cell it replaces to the far edge of the
+  // last — a difference between two host-reported positions, never a sum of heights, so the next
+  // cell lands exactly where it was. Rebasing would reintroduce buildOffsets' feedback loop.
   const regionExtent = (from: number, to: number): number =>
     to < from
       ? EMPTY_OFFSET
@@ -716,11 +632,9 @@ export function buildListPlan(params: IListPlanParams): IListPlan {
       : EMPTY_OFFSET;
 
   const stickyChildPositions: number[] = [];
-  // The header (when present) is child 0; the leading spacer (when non-empty) is the next
-  // child; the forced sticky cell (when present) plus its own gap spacer follow. Each cell is
-  // EXACTLY one child — an ItemSeparatorComponent rides INSIDE the cell's own measuring wrapper
-  // (RN VirtualizedListCellRenderer.js:218-221), so it neither shifts these positions nor shows
-  // up in the geometry as chrome the spacers would have to account for separately.
+  // The header (when present) is child 0; the leading spacer is the next child; the forced sticky
+  // cell plus its own gap spacer follow. Each cell is EXACTLY one child — an ItemSeparatorComponent
+  // rides INSIDE the cell's own measuring wrapper, so it never shifts these positions.
   let childPosition =
     (params.hasHeader ? 1 : 0) + (leadingExtent > EMPTY_OFFSET ? 1 : 0);
   if (forcedStickyCell !== undefined) {
@@ -743,12 +657,12 @@ export function buildListPlan(params: IListPlanParams): IListPlan {
   };
 }
 
-// maintainVisibleContentPosition JS anchor adjustment (RN getDerivedStateFromProps): native MVCP
-// cannot see prepended items collapsed into the leading SPACER above the window, so JS replicates
-// the shift for exactly those. This is the pure DECISION: track the key at minIndexForVisible; when
-// a prepend moves it down, return the inserted extent to add to scrollOffset (or an autoscroll-to-top
-// when the anchor sits within autoscrollToTopThreshold). The adapter owns the timing (layout effect /
-// post-flush watch) and the imperative scroll — this returns only WHAT to do, framework-agnostic.
+// maintainVisibleContentPosition JS anchor adjustment: native MVCP can't see prepended items
+// collapsed into the leading SPACER above the window, so JS replicates the shift for those.
+
+// The pure DECISION: track the key at minIndexForVisible, and when a prepend moves it down,
+// return the inserted extent to add to scrollOffset. The adapter owns timing and the imperative
+// scroll; this returns only WHAT to do, framework-agnostic.
 export type IMvcpAction =
   | { kind: 'none' }
   | { kind: 'autoscroll-top' }
@@ -836,10 +750,8 @@ export function computeMvcpAdjustment(
   };
 }
 
-// RN's real default (`VirtualizeUtils.js`'s `keyExtractor`): an object item's own `key`, else its
-// `id`, else the index. Most apps never pass `keyExtractor` at all and rely on this to keep list
-// identity stable across inserts/removes — falling straight to the index (what this used to do)
-// silently breaks that the moment two items swap position.
+// RN's real default: an object item's own `key`, else its `id`, else the index. Most apps rely on
+// this to keep list identity stable across inserts/removes — the index alone breaks on a swap.
 export function defaultKeyExtractor<ItemT>(item: ItemT, index: number): string {
   if (typeof item === 'object' && item !== null) {
     const record = item as Record<string, unknown>;
@@ -889,10 +801,9 @@ export function isSeparatorGapInRange(
   return gapIndex >= FIRST_INDEX && gapIndex <= count - 2;
 }
 
-// onEndReached / onStartReached fire decision + content-length dedup (RN _maybeCallOnEdgeReached).
-// The geometry (withinThreshold) comes from computeEndReached/computeStartReached; this folds in the
-// "edge cell actually rendered" gate, the dedup against the last-fired content length, and the
-// re-arm once scrolled away from the edge. Returns whether to fire plus the next dedup sentinel.
+// onEndReached / onStartReached fire decision + content-length dedup. The geometry comes from
+// computeEndReached/computeStartReached; this folds in the "edge cell rendered" gate and the
+// dedup against the last-fired content length.
 export function decideEdgeReached(params: {
   withinThreshold: boolean;
   edgeCellRendered: boolean;

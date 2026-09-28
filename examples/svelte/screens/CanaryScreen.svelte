@@ -297,11 +297,9 @@
     mvcpItems = [...prepended, ...mvcpItems];
   }
 
-  // Text PROP updates after mount. Not a cosmetic demo: Text.svelte handed its host tag the LIVE
-  // rest-props proxy, so the shim diffed that object against itself, found nothing changed, and
-  // dropped every non-children prop update. Children still rendered, so the component looked fine.
-  // Nothing on any canary changed a Text prop after mount, which is why it survived until the
-  // Animated rewrite tripped over it (2026-08-19).
+  // Text PROP updates after mount. Not a cosmetic demo: a shim diffing a LIVE rest-props proxy
+  // against itself finds nothing changed and drops every non-children prop update, while children
+  // still render fine — a regression class no canary that never re-props Text would catch.
   let textLines = $state(1);
   function onToggleTextLines(): void {
     textLines = textLines === 1 ? 3 : 1;

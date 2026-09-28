@@ -1,7 +1,7 @@
 // A targeted replace must leave every SIBLING it did not touch still reachable — by tag, and by the
 // event the platform aims at that tag.
 //
-// why: device regression 2026-09-17, the first Release build carrying the re-enabled
+// why: device regression, the first Release build carrying the re-enabled
 // `canReplaceInPlace`. Taps did nothing, a slider moved its thumb without its label following,
 // `findNodeHandle` printed "native tag —", and a drag reported `dx 0 dy 0` while visibly dragging.
 // Every one of those is the same shape: the view is on screen and the platform is talking to it, but

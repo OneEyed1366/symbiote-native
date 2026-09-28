@@ -1,10 +1,6 @@
-// JS-side port of RN's processAspectRatio (Libraries/StyleSheet/processAspectRatio.js).
-// Same root cause family as boxShadow/filter: RN registers `aspectRatio` with a JS
-// `process` because enableNativeCSSParsing() defaults to false, so the CSS ratio string
-// ('16 / 9') is resolved to a number IN JS before native. A plain number (the common,
-// already-working form) passes through untouched; this is a no-op for it.
-//
-// RN throws via invariant() in __DEV__ on a malformed value; we dlog and return undefined.
+// JS-side port of RN's processAspectRatio: resolves a CSS ratio string ('16 / 9') to a number
+// before native, same root cause as boxShadow/filter. A plain number passes through untouched.
+// RN throws via invariant() on a malformed value; here we dlog and return undefined instead.
 
 import { dlog } from './debug';
 

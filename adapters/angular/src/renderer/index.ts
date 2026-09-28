@@ -62,17 +62,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-// RN's TWO TEXT DEFAULTS LEFT THIS RENDERER ENTIRELY ON 2026-09-18, in two steps a fortnight apart.
-// The SEED went first, to the payload builder — writing them as props cost a crossing every time an
-// app authored the same value (6 000 per 1 000-row create, `writesOfUnchanged`). What stayed was a
-// resolver for the clear-back path: a write of `undefined` looked up the default instead of clearing.
-//
-// That is gone too, and for the reason the seed was: `applyTextDefaults` (and its C++ twin) runs on
-// EVERY commit of every `RCTText`, so a cleared key is absent for exactly as long as it takes the
-// payload builder to supply the default again. The resolver was answering a question nothing asks.
-//
-// `PROP_ALIASES` (`id` -> `nativeID`) left this renderer on 2026-09-18 — `routeProp` resolves it
-// for every adapter now, so every path that can set a prop still reaches it.
+// RN's two TEXT DEFAULTS and `PROP_ALIASES` (`id` -> `nativeID`) are NOT resolved here: text
+// defaults run once per commit in `applyTextDefaults` (C++ twin included), and `routeProp` resolves
+// aliases for every adapter — every path that can set a prop still reaches both.
 // Angular's two-way sugar `[(value)]` compiles to a `(valueChange)` binding; the engine knows the
 // same fold as the function prop `onValueChange`. See `listen()`. The two names live in a leaf
 // module so `elements.ts`'s ControlValueAccessor can name them without importing this cyclic file.
@@ -636,19 +628,9 @@ export class SymbioteRenderer implements Renderer2 {
     this.surface.requestCommit();
   }
 
-  // FlatList/VirtualizedList cells are content projected into a component host (our
-  // ANCHOR_HOST_COMPONENTS, e.g. ScrollView) — Angular's own addLViewToLContainer
-  // (.vendors/angular node_manipulation.ts/container.ts) treats a null parent here as "defer —
-  // the child component's own <ng-content>/ɵɵprojection will place this once its structure
-  // resolves" (e.g. ScrollView's `@if(isHorizontal)` branch). Renderer2's contract types this
-  // return as nullable for exactly that reason; returning `this.surface` as a non-null fallback
-  // defeated that defer check and caused premature top-level insertion (2026-07: FlatList cells
-  // rendered outside their ScrollView).
-  //
-  // Safe only because appendChild/insertBefore above now also treat a null parent as "skip, wait
-  // for projection" — a second Angular call site (`insertAnchorNode`, hit whenever a directive
-  // does `inject(ViewContainerRef)`, e.g. VListOutletDirective) forwards this null straight into
-  // insertBefore without checking it; without that guard it crashed on-device.
+  // FlatList/VirtualizedList cells project into a component host (ANCHOR_HOST_COMPONENTS, e.g.
+  // ScrollView); Angular defers insertion on a null parent until projection resolves, so a
+  // non-null fallback here breaks that. appendChild/insertBefore/insertAnchorNode skip null too.
   parentNode(node: IHostNode): IHostElement | null {
     return parentOf(node) ?? null;
   }

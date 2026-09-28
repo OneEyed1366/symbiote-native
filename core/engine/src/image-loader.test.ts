@@ -1,9 +1,6 @@
-// Unit test for the Image statics imperative module (getSize / getSizeWithHeaders / prefetch /
-// abortPrefetch / queryCache / resolveAssetSource), extracted out of the VIEW layer's
-// render-image.ts into this native-bridge-touching module (same shape as alert.test.ts / the
-// Share test - a fake ImageLoader installed via __turboModuleProxy, the same global
-// getNativeModule reads). Platform is mocked directly to control the iOS/Android prefetch-call
-// branch without depending on a real PlatformConstants native module.
+// Unit test for the Image statics imperative module, same shape as alert.test.ts / the Share test:
+// a fake ImageLoader installed via __turboModuleProxy. Platform is mocked directly to control the
+// iOS/Android prefetch-call branch without a real PlatformConstants native module.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 

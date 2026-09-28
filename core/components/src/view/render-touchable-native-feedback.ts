@@ -59,20 +59,12 @@ export function rippleBackground(
   return { type: 'RippleAndroid', color, borderless, rippleRadius };
 }
 
-// `backgroundProps` WAS HERE AND IS GONE (2026-09-18). It mapped the resolved background plus
-// `useForeground` onto the native slot Android reads, and that is the `#ifdef ANDROID` tail of
-// `foldCloneOntoChild` in `SymbioteFabricProps.cpp`.
-//
-// A JS COPY OF A RULE THAT RUNS IN C++, with no runtime caller and no test, reachable only through
-// the package barrel. Found by asking what each `Platform.OS` branch still left in
-// `core/components` is FOR. Its C++ twin is covered on both arms —
-// `android-rules.android.itest.ts` asserts the foreground slot and `clone-onto-child-payload.itest.ts`
-// asserts its absence off Android — and break-testing the gate fires exactly one of them.
-//
-// `canUseNativeForeground` below stays, and the distinction is the reusable half: it is a QUESTION
-// an app asks the platform (`TouchableNativeFeedback.canUseNativeForeground()` is RN's own public
-// static), not a rule that decides a payload. Same class as the slider reading a folded
-// `accessibilityState` — asking is not reimplementing.
+// `backgroundProps` mapped the resolved background + `useForeground` onto the native slot — now
+// the `#ifdef ANDROID` tail of `foldCloneOntoChild` in `SymbioteFabricProps.cpp`, covered by
+// `android-rules.android.itest.ts` and `clone-onto-child-payload.itest.ts`.
+
+// `canUseNativeForeground` below stays: it's a QUESTION an app asks the platform (RN's own public
+// static), not a rule deciding a payload — same class as reading a folded `accessibilityState`.
 
 /**
  * RN's four statics, under RN's own spelling — `TouchableNativeFeedback.Ripple(color, borderless)`.

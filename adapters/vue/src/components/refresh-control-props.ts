@@ -18,9 +18,7 @@ export interface IRefreshControlProps extends IAccessibilityProps, IAriaProps {
   // RN's W3C alias for `nativeID`, folded by the spec entry's ID_ALIAS.
   id?: string;
   // RN's onRefresh is `() => void | Promise<void>`, so the handler may be async; the promise is
-  // fire-and-forget (native already starts refreshing on the gesture). Measured 2026-09-13: this
-  // was missing entirely until `refresh-control` was cross-typed for real — invisible while it
-  // fell through to the untyped host bag (`<adapters_reach_full_feature_parity>`).
+  // fire-and-forget (native already starts refreshing on the gesture).
   onRefresh?: () => void | Promise<void>;
   tintColor?: string;
   title?: string;

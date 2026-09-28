@@ -1,5 +1,5 @@
-// EXACTLY ONE thing may build a ScrollView's content node, and from 2026-09-07 that thing is the
-// engine: `registerScrollViewBehavior()` puts a `buildStructure` on the scroll tags. Anything in
+// EXACTLY ONE thing may build a ScrollView's content node: the engine —
+// `registerScrollViewBehavior()` puts a `buildStructure` on the scroll tags. Anything in
 // this adapter that ALSO emits `scroll-content` gives the tree a second `RCTScrollContentView`
 // nested inside the first — no error, no warning, and on a device only a layout that is subtly
 // wrong. This file is the guard for that, across every Svelte component that reaches a scroll node.

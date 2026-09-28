@@ -2,9 +2,8 @@
 // (svelte-adapter-dom-shim skill §2, §3a, §6). Must run before `mount()` (§3f) — not
 // necessarily before `svelte` is imported.
 //
-// Single-root only, by design (§10, decided during Svelte adapter planning 2026-08-11): one
-// Symbiote app = one process = one Svelte root, so `restoreGlobals()` needs no ref-counting —
-// `unmount()` calls it unconditionally.
+// Single-root only, by design (§10): one Symbiote app = one process = one Svelte root, so
+// `restoreGlobals()` needs no ref-counting — `unmount()` calls it unconditionally.
 //
 // Deliberately NOT patched, and must stay that way (§6b, §6c, §6d) — both verified against the
 // real vendored RN source (.vendors/react-native/packages/react-native/Libraries/Core/), not
@@ -54,20 +53,9 @@ const PATCHED_KEYS = [
 // with (unlike `navigator`/`requestAnimationFrame`, verified against .vendors/react-native —
 // see the header comment above), so patching this is safe.
 //
-// `get()` returns a TRUTHY stand-in, and that is the whole reason `set_custom_element_data` can be
-// made lossless. Its condition (attributes.js:245-265) is a ternary, not a fallback:
-//
-//   setters_cache.has(nodeName) || !customElements || customElements.get(nodeName)
-//     ? get_setters(node).includes(prop)     <- a real setter decides; the value passes through
-//     : value && typeof value === 'object'   <- a HEURISTIC: an object is set as a property and
-//                                               every scalar is handed on as String(value)
-//
-// Returning `undefined` — which it did until 2026-09-07 — selects the heuristic, so
-// `<text-input multiline={false}>` committed the STRING "false" and an object-valued prop with no
-// prototype setter was assigned to a plain JS property and silently lost. Anything truthy steers
-// it to `get_setters`, which reaches `ShimElement.prototype`'s accessors (see
-// `svelte-shim-element-global-must-be-an-ancestor.md` for why that walk terminates where it does).
-// One reader in the whole client runtime, so nothing else is affected.
+// `get()` returns a TRUTHY stand-in — the whole reason `set_custom_element_data` stays lossless.
+// Falsy selects attributes.js's HEURISTIC path instead of `get_setters`: it stringifies scalars
+// and drops any object-valued prop with no prototype setter.
 const FAKE_CUSTOM_ELEMENT_REGISTRY = {
   get: (): unknown => ShimElement,
 };

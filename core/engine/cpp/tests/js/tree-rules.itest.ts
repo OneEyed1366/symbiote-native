@@ -88,7 +88,7 @@ describe('the tree rules, through the engine', () => {
 
   // why: a move is the one mutation where the node itself did not change and the tree did. Fabric
   // answers a child reusing a family it no longer belongs to with an abort inside
-  // `ShadowNodeFamily::setParent` — the 2026-09-15 device crash, invisible to a stand-in because a
+  // `ShadowNodeFamily::setParent` — a device crash invisible to a stand-in because a
   // stand-in has no families.
   it('a moved child is rebuilt under its new parent', () => {
     const surface = createSurface(1);

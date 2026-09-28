@@ -104,15 +104,9 @@ describe('the structure the behavior builds', () => {
     expect(slotPropsOf(owner)).toEqual({});
   });
 
-  // why: the builder seeds NO props onto the content node, on either axis — which is what makes the
-  // tag rule the single source of everything that node sends. It used to seed `collapsable: false`
-  // with a `setProp`; that is `foldScrollContentProps` since 2026-09-18, because it is unconditional
-  // on both axes (`ScrollView.js:1747`) and therefore a constant of the tag rather than of a builder.
-  //
-  // WHAT IT SENDS is asserted where a rule's output is visible at all —
-  // `core/engine/cpp/tests/js/scroll-content-payload.itest.ts`, "from the rule and not a seed". This
-  // harness builds payloads through the TypeScript `fabricProps`, which carries no copy of the tag
-  // rules, so a `collapsable` assertion here could only ever have been about the seed.
+  // why: the builder seeds NO props onto the content node — `foldScrollContentProps` is the sole
+  // source, including `collapsable: false`. Asserted in `scroll-content-payload.itest.ts`; this
+  // harness's `fabricProps` carries no copy of the tag rules.
   it('seeds nothing onto the content node, both axes', () => {
     expect(slotPropsOf(scrollNode(SCROLL_VIEW_TAG))).toEqual({});
     expect(slotPropsOf(scrollNode(HORIZONTAL_SCROLL_VIEW_TAG))).toEqual({});
@@ -153,10 +147,9 @@ describe('owner props that belong to the slot', () => {
     expect(slotPropsOf(owner).style).toEqual([undefined, { padding: 12 }]);
   });
 
-  // Device-found 2026-09-08: every canary writes `contentContainerStyle="scroll-content"`, a class
-  // NAME. Renamed verbatim onto the slot it becomes a `style` holding a string — not a style, so
-  // the whole rule (here the padding AND the gap) vanished with nothing red. React never showed it
-  // because its wrapper calls resolveClassName itself before the engine sees the prop.
+  // `contentContainerStyle` can be a class NAME (every canary writes one). Renamed verbatim onto
+  // the slot it becomes a `style` holding a plain string, so the rule must resolve it through the
+  // class registry rather than trust it as a style object.
   it('resolves a class-NAME contentContainerStyle through the registry', () => {
     registerRules([
       {
@@ -209,14 +202,9 @@ describe('style precedence, which is opposite on the two nodes', () => {
     return { owner, slot };
   }
 
-  // BOTH HALVES OF THIS PAIR HAVE NOW LEFT — the owner's base style on 2026-09-18 and the slot's row
-  // constant the same day, once `fabricProps` gained `ownerProps` and the content rule could move
-  // too (`core/engine/cpp/tests/js/scroll-content-payload.itest.ts`). This host builds its payload
-  // through the TypeScript `fabricProps`, which carries no copy of the tag rules.
-  //
-  // What survives here is the ROUTING, which is the half that was always this file's: an app writes
-  // `contentContainerStyle` on the OWNER and it has to arrive on the SLOT, which no rule does — the
-  // behavior's `slotProps` redirect does, in JS, before any payload exists.
+  // The owner's base style and the slot's row constant are C++ folds now
+  // (`scroll-content-payload.itest.ts`), no copy here. What survives is the ROUTING: the
+  // behavior's `slotProps` redirect gets `contentContainerStyle` from the OWNER onto the SLOT.
   it('routes contentContainerStyle onto the slot', () => {
     const { slot } = commitScroll(HORIZONTAL_SCROLL_VIEW_TAG, {
       style: { flexGrow: 9, backgroundColor: 'red' },
@@ -286,11 +274,9 @@ function layoutEvent(
 }
 
 describe('decelerationRate reaches Fabric as a number', () => {
-  // RN's two WORDS resolve to different friction constants per platform, and that resolution left
-  // this file with `resolveDecelerationRate` itself (2026-09-18): it is `foldScrollViewProps` in the
-  // engine now, and this host builds its payload through the TypeScript `fabricProps`, which carries
-  // no copy of the tag rules. Both words are asserted against the committed payload in
-  // `core/engine/cpp/tests/js/scroll-view-payload.itest.ts`.
+  // RN's two WORDS resolve to different friction constants per platform — `foldScrollViewProps`
+  // in C++ now, asserted on the committed payload in `scroll-view-payload.itest.ts`; this host's
+  // `fabricProps` carries no copy.
   //
   // The two cases below stay because neither depends on a rule this host cannot run: a NUMBER is
   // passed through by the same rule, and an absent rate must invent nothing. They would also both
@@ -327,14 +313,9 @@ describe('pure-native scroll props reach Fabric untouched', () => {
   });
 });
 
-// THE AXIS, THE BOUNCE PAIR AND `nestedScrollEnabled` ALL LEFT THIS FILE on 2026-09-18, four
-// describes at once, and the grouping is the point rather than tidiness.
-//
-// All three are `foldScrollViewProps` in the engine now, and this host builds its payload through
-// the TypeScript `fabricProps`, which carries no copy of the tag rules. Every one of them is
-// asserted against the committed payload in `core/engine/cpp/tests/js/scroll-view-payload.itest.ts`,
-// including the ignored-`horizontal` WARNING, which has no JS equivalent at all
-// (`core/engine/cpp/tests/js/native-debug-log.itest.ts`).
+// THE AXIS, THE BOUNCE PAIR AND `nestedScrollEnabled` are all `foldScrollViewProps` in C++ now,
+// asserted on the committed payload in `scroll-view-payload.itest.ts` (the ignored-`horizontal`
+// warning in `native-debug-log.itest.ts`). This host's `fabricProps` carries no copy.
 //
 // WHY ALL FOUR AND NOT JUST THE RED ONES. Each described pair had a deliberate control — "invents no
 // key on the vertical tag", "honours an explicit false", "lets an explicit value win" — and every

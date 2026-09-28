@@ -122,7 +122,7 @@ describe('append commit cost against a growing standing sibling count', () => {
 
 report();
 
-// ── ANSWER, measured (2026-09-17) ───────────────────────────────────────────────────────────────
+// ── ANSWER ───────────────────────────────────────────────────────────────────────────────────────
 //
 // DEBUG standing=500  commitMs=2.09  perRow=0.0104ms
 // DEBUG standing=2000 commitMs=5.90  perRow=0.0295ms   (4x standing -> 2.83x per-row)

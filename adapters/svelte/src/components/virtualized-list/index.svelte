@@ -12,8 +12,7 @@
   //
   // This file authors the raw `scroll-view` intrinsic directly, and needs to: it walks an indexable
   // `plan.cells` list rather than taking an opaque children Snippet, so it can mark sticky cells
-  // itself. (There is no ScrollView component to render instead — it was deleted 2026-09-10 and an
-  // app writes the tag too.)
+  // itself. (There is no ScrollView component to render instead — an app writes the tag too.)
   //
   // It does NOT author the CONTENT node. `registerScrollViewBehavior()` puts a `buildStructure` on
   // the scroll tags, and exactly one thing may build `RCTScrollContentView` — emitting one here as

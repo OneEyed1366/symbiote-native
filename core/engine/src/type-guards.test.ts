@@ -1,7 +1,6 @@
-// Runtime guards narrowing `unknown` at trust boundaries (native payloads, ViewConfig
-// attributes, style values) without an `as` cast. Every guard is total (typeof-based, never
-// throws), so there is no Negative (toThrow) group — the "rejects" describes below play that
-// role: a guard signals rejection by returning `false`, not by throwing.
+// Runtime guards narrowing `unknown` at trust boundaries without an `as` cast. Every guard is
+// total (typeof-based, never throws) — a guard signals rejection by returning `false`, so the
+// "rejects" describes below play the role a Negative/toThrow group would elsewhere.
 
 import { describe, expect, it } from 'vitest';
 import { isBoolean, isNumber, isRecord, isString } from './type-guards';

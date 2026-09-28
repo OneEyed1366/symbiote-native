@@ -1,14 +1,11 @@
 // Hand an error to the host the way React Native itself does, for the seams where an adapter
 // catches something its framework would otherwise have surfaced on its own.
-//
-// RN routes an uncaught render error through ReactFiberErrorDialog -> ExceptionsManager
-// (Libraries/Core/ReactFiberErrorDialog.js), which is reachable only by a deep path into RN's
-// Libraries. `global.ErrorUtils` is the same surface through the documented global that
-// @react-native/js-polyfills installs before any module evaluates - RN's own
-// Libraries/vendor/core/ErrorUtils.js is nothing but `export default global.ErrorUtils`. Off a
-// native host (vitest, node smokes) the global is absent and console.error is the whole channel.
-//
-// This is NOT the dlog channel. dlog is DEBUG-gated and therefore the developer's; an error that
+
+// RN routes an uncaught render error through ReactFiberErrorDialog -> ExceptionsManager.
+// `global.ErrorUtils` is the same surface via the documented global @react-native/js-polyfills
+// installs. Off a native host, console.error is the whole channel.
+
+// This is NOT the dlog channel: dlog is DEBUG-gated and therefore the developer's; an error that
 // blanked the screen has to reach the app whether or not anyone turned diagnostics on.
 
 type IErrorReporter = (error: unknown) => void;
@@ -20,12 +17,9 @@ export type IUncaughtErrorInfo = {
   readonly componentStack?: string | null;
 };
 
-// Read off globalThis through Reflect rather than named as an identifier, and deliberately NOT
-// declared in an ambient block: react-native ships its own `const ErrorUtils: ErrorUtils` in
-// src/types/globals.d.ts, so a `declare global { var ErrorUtils }` here redeclares it (TS2451) for
-// every package whose tsconfig pulls in RN's types - the engine's own does not, so it typechecks
-// clean here and breaks ngc downstream. RN's declared shape also lists only the two
-// get/setGlobalHandler members, not reportError, which the polyfill does install.
+// Read off globalThis via Reflect, not a named identifier or an ambient declare: react-native
+// ships its own `ErrorUtils` global type, so redeclaring it here breaks any package whose tsconfig
+// pulls in RN's types. RN's declared shape also omits reportError, which the polyfill installs.
 function nativeReporter(): IErrorReporter | null {
   const utils: unknown = Reflect.get(globalThis, 'ErrorUtils');
   if (typeof utils !== 'object' || utils === null) return null;
@@ -69,8 +63,7 @@ export function reportUncaughtError(
   const report = nativeReporter();
   if (report !== null) {
     // Exactly one channel, never both: RN routes console.error into LogBox as well, so logging
-    // here too would double-report every error. Upstream returns false from showErrorDialog for
-    // this same reason (Libraries/Core/ReactFiberErrorDialog.js:57).
+    // here too would double-report every error.
     report(error);
     return;
   }

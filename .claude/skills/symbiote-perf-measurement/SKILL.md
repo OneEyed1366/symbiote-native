@@ -1339,6 +1339,100 @@ believed. Refresh every example, not the one being measured.
 Still owed on the instrument: a settled reading in the other four screens (Vue `nextTick`, Svelte
 `tick()`, Solid post-render, Angular `afterNextRender`), which turns their floor into a reading.
 
+### 23. The touchable outlier was an animated leaf built at mount for a value that never moves
+
+```
+23 := {
+  subject: "`primitive-suite`'s two dearest tags. vue, -O bytecode, per 1 000 items:
+            touchable-opacity create 65.0 ms / 25 348 KB   against pressable's 10.5 / 3 561
+            button            create 74.5 / 26 127          against view's       7.3 / 1 272
+            Same press machine on both touchables, so the difference is not the machine",
+  fixture: "touchable-attach-cost.itest.ts — plain / pressable / touchable-opacity, three arms in
+            ONE case, BYTES as the gate and milliseconds a print (§18j)",
+  found: "`attach` called `setAnimatedBehaviorStyle`, which builds an `AnimatedProps` leaf plus its
+          style wrapper PER NODE: 5 911 B and 9.76 us on top of the press machine's 2 353 B / 1.85",
+  fix: "the leaf is registered on the FIRST FADE (`ensureLayer`). `collapsable: false` stays forced
+        from attach with a plain `setProp` — a view Fabric flattens loses the responder's tag, and
+        that half is one prop write, not a leaf",
+  after: "layer 5 911 -> 1 343 B, 9.76 -> 3.05 us. Suite: touchable-opacity 65.0 -> 27.3 ms /
+          25 348 -> 7 992 KB · button 74.5 -> 43.2 / 26 127 -> 8 259 · clear 11.0 -> 4.1 and
+          9.1 -> 4.9. Every other tag's createKB is byte-identical, which is the control",
+  behaviour_it_changed: "an untouched touchable now commits NO `opacity` key, which is what vendor
+                         does (`TouchableOpacity-itest.js`, 'does not render explicit opacity when
+                         using default'). Seven adapter cases asserted the old non-parity value and
+                         were rewritten; an authored `style.opacity` is unaffected, it reaches
+                         Fabric through the ordinary style path",
+  then_the_machine: "same shape one layer down. `attach` built the gesture runtime (timers Set,
+                     press runtime, a host of four closures, the nine-field state, the WeakMap
+                     entry) and NOTHING reads any of it outside `dispatch`. Built in `stateOf` on
+                     the first event instead; `attach` installs the seven dispatchers, and the
+                     per-behavior options bag is hoisted out of the per-node closure.
+                     machine 2 353 -> 1 328 B, 1.85 -> 1.37 us, on EVERY tag carrying it:
+                     pressable 3 561 -> 2 559 KB / 1 000 · touchable-highlight 5 531 -> 4 531 ·
+                     touchable-native-feedback 7 614 -> 6 692 · touchable-without-feedback
+                     8 105 -> 7 183 · text-input 6 090 -> 5 168 · touchable-opacity 7 992 -> 6 992 ·
+                     button 8 259 -> 7 259. Cumulative on button: 74.5 ms / 26 127 KB -> 33.7 / 7 259",
+  the_pattern: "both fixes are one question asked twice: WHO READS THIS, and is any of them
+                reachable before the user touches the thing. A behavior's `attach` runs inside
+                `createElement`, so everything it builds is paid by every node in a list and
+                collected by almost all of them",
+  then_TWF: "the same question a third time, on the tag that was still dearest per COMMITTED node.
+             `touchable-attach-cost.itest.ts` case 3 prices an anchor-backed touchable plus the
+             child it adopts against `pressable` + a plain view: twf read 568 B over that floor and
+             tnf only 64, т.к. tnf arms with a MODULE-LEVEL refinement while twf built a per-item
+             `{runtime, timers}` at arm. Deferred to the first gesture: 568 -> 176 B,
+             suite 7 183 -> 6 800 KB / 1 000, wall flat (the win is allocation, not clock)",
+  what_is_left: "twf's per-item refinement CLOSURE, 112 B over tnf. Removing it means handing the
+                 refinement its `source`, a change to `IPressConfigRefinement` that four behaviors
+                 implement, and it is not worth 112 B. Under it, ~190 B per installed dispatcher,
+                 seven per node, which §18v already priced and rejected",
+  the_shape_to_reuse: "a behavior's `attach` runs inside `createElement`, so ANYTHING it builds is
+                       paid by every node in a list and collected by almost all of them. Ask of
+                       each allocation: is it read before the user touches the thing",
+  THE_LAST_ITEM_PRICED: "`touchable-attach-cost.itest.ts` case 4 prices an installed dispatcher:
+                         first 344 B (it pays for the `Map` too), each after it 147 B. The model
+                         checks out against the machine measured separately, 344 + 6 x 147 = 1 226
+                         against 1 328. So a `<text-input>`'s ELEVEN cost ~1.8 KB of its 5.2 KB per
+                         node and a pressable's seven ~1.2 KB of its 2.6, which makes the listener
+                         install the largest remaining behavior cost anywhere",
+  what_that_opens: "§18v rejected one shared dispatcher keyed on `event.type` on TIME (0.3 us) and
+                    on legibility, and the BYTES are a different quantity it never saw. A shared
+                    dispatcher drops the closure and keeps the `Map` entry, so ~70 B of the 147.
+                    The whole 1 816 needs the engine to ask `node.hostBehavior` by name instead of
+                    holding a slot per name, which is a dispatch-contract change and a DECISION,
+                    not a loop step"
+                   -> "a recorded negative is re-checked when the QUANTITY changes, not only when
+                       the ruler does. This one was priced in microseconds and the question that
+                       matters now is kilobytes",
+}
+```
+
+### 24. The gated-listener clear, priced and KEPT
+
+```
+24 := {
+  found: "`setBehaviorListener(node, name, undefined)` writes the gated flag (`layout` ->
+          `onLayout`) even when nothing was installed, and `recordSetProp` has NO identity guard,
+          so it is a real `OP_SET_PROP` on the wire. `touchable-without-feedback` and
+          `touchable-native-feedback` re-forward four names on every child insert, two of them
+          gated, so each pays two wasted ops per item",
+  fix_tried: "write the flag only on the FLIP, guarded on `node.listeners?.has(name)`",
+  it_worked_on_create: "createKB / 1 000 items: tnf 6 692 -> 5 653 · twf 7 183 -> 6 144, exactly
+                        the ~1 KB the two ops predict, with every other tag byte-identical",
+  AND_IT_LOST: "tnf's `clear` went 2.4 -> 12.5-13.8 ms, stable across three runs and reproduced by
+                disabling the guard alone (2.4 with it off, byte counter back to 6 692).
+                Mechanism unexplained: it is on the C++ side, where a key the mirror never held
+                behaves differently at teardown from one it held and deleted",
+  verdict: "REVERTED. 1 KB and ~3 ms of create do not buy 10 ms of teardown on the same tag",
+  pinned: "`gated-listener-writes.test.ts` now asserts the write HAPPENS, so the next reader finds
+           the measurement instead of the same idea",
+  method_note: "the byte counter said the change was a pure win and the wall clock said it was not.
+                §18j's 'reach for bytes first' holds for ATTRIBUTION and not for a VERDICT: an op
+                removed from the buffer is also an op the host no longer sees, and what that costs
+                downstream only a clock can report",
+}
+```
+
 ## The current numbers
 
 Headless, 1 000 rows, `bench:itest` Release on Hermes **as `hermesc -O` bytecode**
@@ -1546,8 +1640,8 @@ Measured with them (Hermes -O, 2026-09-22):
 - Per @for item Angular costs ~5 us + 1.2 KB over Vue even on a one-node item (primitive `view`
   11.9 vs 6.8 ms) — embedded LView + container insertion + an update pass per item. Runtime-only
   work cannot reach it (`<angular_no_template_transform>`).
-- Outliers on EVERY adapter: touchable-opacity (56-78 ms, 25-28 MB / 1 000) and button (70-93 ms,
-  26-28 MB). Engine/components-side, not Angular.
+- Outliers on EVERY adapter: touchable-opacity and button. Engine/components-side, not Angular.
+  Split and halved in §23; what is left of them is the press machine.
 - Hidden `modal` commits a ModalHostView on every adapter; RN commits nothing (`Modal.js:280-288`).
 
 ## Angular's per-node cost: a runtime answer to a compile-time question (researched 2026-09-22)

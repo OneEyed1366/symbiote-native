@@ -104,7 +104,7 @@ the child function an **`Accessor`** instead, and call it once, untracked:
 <MyRenderProp>{state => <text>{state().active ? 'on' : 'off'}</text>}</MyRenderProp>
 ```
 
-<Aside type="caution" title="Measured on device, 2026-08-17, against the render-prop `Pressable` this page used to show">
+<Aside type="caution" title="Measured on device">
   A value-shaped child rebuilding on every state change is not just wasted work - a rebuild
   landing mid-touch-gesture destroyed the view mid-grant, so `onPress` fired on only every
   *other* tap and a label stuck on its pressed reading. The bug is invisible in a headless

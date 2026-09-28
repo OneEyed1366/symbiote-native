@@ -104,11 +104,8 @@ export function measurePair({ raw, wrapped, rounds, warmups }) {
  * Two controls, and the second is the one a node census cannot supply.
  *
  * 1. Both arms built the SAME DOM. Two arms over different trees are not an A/B.
- * 2. Arm B actually INSTANTIATED components. Measured 2026-09-01: React's delta came out at
- *    exactly 0.0 ms, which is equally what a bug that ran the raw builder in both arms would
- *    produce — with control 1 passing, because the DOM would be identical. The page therefore
- *    counts wrapper invocations and this refuses to report unless the count is what the row shape
- *    predicts.
+ * 2. Arm B actually INSTANTIATED components — a delta of 0.0 ms is equally what running the raw
+ *    builder in both arms would produce, and control 1 alone can't tell them apart.
  */
 export function report({ raw, wrapped }, rows, wrapperCalls) {
   const expected = rows * ELEMENTS_PER_ROW;

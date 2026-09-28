@@ -1,7 +1,8 @@
 // Mount a Svelte app onto a Fabric surface. The native host hands us a rootTag; we create a
 // surface for it, install the DOM shim, and let stock compiled Svelte output drive it while
-// believing it is talking to the real DOM. Decided during Svelte adapter planning
-// (2026-08-11, svelte-adapter-dom-shim skill §10): single root per process, so
+// believing it is talking to the real DOM.
+
+// Single root per process (svelte-adapter-dom-shim skill §10), so
 // patchGlobals()/restoreGlobals() need no ref-counting.
 
 import {

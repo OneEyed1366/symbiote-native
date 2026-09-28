@@ -629,83 +629,43 @@ const workspaceSources = {
   },
 };
 const testsDir = path.join(root, 'core/engine/cpp/tests/js');
-/**
- * `SYMBIOTE_ITEST_BUILD=build-release` picks the optimized tester instead of the assert build.
- *
- * The default build is Debug with `NDEBUG` OFF, deliberately — `react_native_assert` is the whole
- * point of this harness, and two device aborts once hid under a green suite because a JS stand-in
- * could not abort. But `NDEBUG` off also defines `REACT_NATIVE_DEBUG`
- * (`ReactCommon/react/debug/flags.h`), and that compiles in consistency checks that walk a whole
- * child list on every mutation — `YogaLayoutableShadowNode::appendChild` calls `ensureConsistency`
- * plus `ensureYogaChildrenLookFine` and `ensureYogaChildrenAlignment`, so building a list of N
- * children one at a time is O(N²) in this build and O(N) in the one that ships.
- *
- * Measured 2026-09-17: 10 000 appends onto one parent took 3 554 ms here. A PERFORMANCE reading off
- * the default build is therefore not merely un-transferable in absolute terms, which was already
- * known — its SHAPE is wrong, and a quadratic that only exists under asserts is exactly the kind of
- * finding that sends a day's work at nothing.
- *
- * So: correctness runs on `build`, timings run on `build-release`. Neither replaces the other.
- */
+// `SYMBIOTE_ITEST_BUILD=build-release` picks the optimized tester. Default Debug (`NDEBUG` OFF) is
+// deliberate — `react_native_assert` is the point — but it also enables `REACT_NATIVE_DEBUG`
+// consistency checks walking the whole child list per mutation: O(N²) here, O(N) in the ship build.
+
+// Correctness runs on `build`, timings run on `build-release`. Neither replaces the other.
 const buildDirectory = process.env.SYMBIOTE_ITEST_BUILD ?? 'build';
 
-/**
- * The JS half of the `build` / `build-release` split, and it was missing for as long as the split
- * has existed.
- *
- * `__DEV__` and `NODE_ENV` used to be pinned to development for every run. That is right for the
- * correctness build — it is what keeps React Native's invariants and warnings armed, the reason the
- * C++ side is Debug there. On `build-release` it is the JS twin of the mistake `CLAUDE.md` already
- * records for the native side ("never benchmark adapters in a Debug build; the sign of the headline
- * comparison flipped"): `react/index.js` picks `react.development.js` off `NODE_ENV`, so every React
- * arm this directory has ever timed ran the DEVELOPMENT React — validation, warnings and all — and
- * the reconciler deltas published off those arms carry it.
- *
- * It also blocks the stock arm outright. `ReactFabric-prod` sets up React's internals in their
- * production shape, and a development `createElement` then reaches for `dispatcher.getOwner()`,
- * which production does not carry. The component renders nothing and REPORTS nothing — the error
- * goes to `console.error` through RN's error dialog — so the failure reads as "components do not
- * work here" rather than as a mixed build.
- */
+// The JS half of the `build`/`build-release` split: `__DEV__`/`NODE_ENV` must track it too.
+// Pinned to development, `build-release` would time the DEVELOPMENT React (`react/index.js` picks
+// `react.development.js` off `NODE_ENV`) — the JS twin of never benchmarking a Debug native build.
+
+// It also blocks the stock arm outright: `ReactFabric-prod` sets up React's internals in production
+// shape, and a development `createElement` reaching for `dispatcher.getOwner()` (absent there)
+// renders and reports nothing — reading as "components do not work here", not as a mixed build.
 const isBenchBuild = buildDirectory !== 'build';
 const binary = path.join(
   root,
   `core/engine/cpp/tests/${buildDirectory}/symbiote_tester`,
 );
 
-/**
- * `SYMBIOTE_ITEST_BYTECODE=1` compiles each bundle with `hermesc -O` and runs the BYTECODE, which is
- * what a device runs and what this harness has never measured.
- *
- * `runtime.evaluateJavaScript(StringBuffer(source))` makes Hermes compile at load, and that compile
- * does NOT run the optimizer — measured 2026-09-22, a plain counting loop reads identically off
- * source and off `hermesc -O0` bytecode, and 2.7x faster off `hermesc -O`. A release app ships
- * `.hbc` built with `-O`, so every JS-side figure this directory has ever published is an `-O0`
- * figure. It is not a uniform scale factor either: `-O` left the RAW Fabric arm untouched (25.4 vs
- * 26.4 ms — its cost is JSI calls into C++) and nearly halved our own fill (34.1 -> 17.5), because
- * the optimizer works on exactly what the buffer is made of, JS loops and small function calls.
- *
- * `-Xes6-block-scoping` IS NOT OPTIONAL and its absence does not look like a compiler flag.
- * `symbiote-host.h` builds the runtime with `withES6BlockScoping(true)`, which only reaches code the
- * RUNTIME compiles; `hermesc` defaults it off, so `const one` in a `for…of` stops being per-iteration
- * and every closure in `report()`'s case chain captures the LAST case. The run then reports that one
- * case N times and every earlier arm as "did not run" — a wrong ANSWER rather than an error, which is
- * the worst shape a harness defect has. A single-case fixture passes happily, which is how this hides.
- */
+// `SYMBIOTE_ITEST_BYTECODE=1` compiles each bundle with `hermesc -O` and runs the BYTECODE — what a
+// device runs. `runtime.evaluateJavaScript(StringBuffer(source))` compiles at load WITHOUT the
+// optimizer, so a release app's `.hbc` (`-O`) is not what this harness measures by default.
+
+// `-Xes6-block-scoping` IS NOT OPTIONAL: `hermesc` defaults it off, so `const one` in a `for…of`
+// stops being per-iteration and every closure in `report()`'s case chain captures the LAST case —
+// a wrong ANSWER, not an error. A single-case fixture passes happily, which is how this hides.
 const wantsBytecode = process.env.SYMBIOTE_ITEST_BYTECODE === '1';
 
-/**
- * `hermesc`, out of whichever example has run `pod install`.
- *
- * It ships inside the `hermes-engine` pod rather than on npm, so there is no version to pin here —
- * and that is the point: it is the SAME compiler the app build uses, from the same pod as the
- * `hermesvm.framework` the tester links against. A mismatched pair would compile bytecode the
- * runtime refuses, which at least fails loudly.
- */
+// `hermesc` ships inside the `hermes-engine` pod, not on npm, so it is the SAME compiler the app
+// build uses and pairs with the `hermesvm.framework` the tester links against
 function findHermesc() {
   const examples = path.join(root, 'examples');
-  if (!existsSync(examples)) return undefined;
-  for (const entry of readdirSync(examples, { withFileTypes: true })) {
+  const entries = existsSync(examples)
+    ? readdirSync(examples, { withFileTypes: true })
+    : [];
+  for (const entry of entries) {
     if (!entry.isDirectory()) continue;
     const candidate = path.join(
       examples,
@@ -714,13 +674,16 @@ function findHermesc() {
     );
     if (existsSync(candidate)) return candidate;
   }
-  return undefined;
+  // `scripts/fetch-hermes.mjs` unpacks the same pod, and on a runner that never runs `pod install`
+  // it is the only copy - the path CMake already searches for `hermesvm.framework`
+  const fetched = path.join(root, '.hermes/destroot/bin/hermesc');
+  return existsSync(fetched) ? fetched : undefined;
 }
 
 const hermesc = wantsBytecode ? findHermesc() : undefined;
 if (wantsBytecode && hermesc === undefined) {
   console.error(
-    'SYMBIOTE_ITEST_BYTECODE=1 but no hermesc found — run `pod install` in any example first',
+    'SYMBIOTE_ITEST_BYTECODE=1 but no hermesc found - run `node scripts/fetch-hermes.mjs`',
   );
   process.exit(2);
 }
@@ -747,6 +710,25 @@ function compileToBytecode(bundle) {
         : reject(new Error(`hermesc failed on ${bundle}:\n${stderr.trim()}`)),
     );
   });
+}
+
+// Kept out of the print loop so the loop stays one line per finished bundle: this is the whole
+// per-run report, and it returns how many failures it saw
+function reportRun(run) {
+  let failures = 0;
+  for (const line of run.stdout.split('\n').filter(Boolean)) {
+    if (line.startsWith('FAIL ')) failures += 1;
+    console.log(line);
+  }
+  if (run.status === 0 && run.signal === null) return failures;
+  // A tester killed by a SIGNAL exits with `status` `null` and writes NOTHING to stderr, so without
+  // the file name and the signal a dead run is indistinguishable from a silent one
+  const how =
+    run.signal !== null ? `killed by ${run.signal}` : `exit status ${run.status}`;
+  const silent = run.stdout.trim() === '' ? ', no output' : '';
+  console.error(`CRASH ${path.relative(testsDir, run.file)} - ${how}${silent}`);
+  if (run.stderr.trim() !== '') console.error(run.stderr.trim());
+  return failures + 1;
 }
 
 /**
@@ -799,9 +781,8 @@ const nodePaths = [
 ].filter(existsSync);
 
 // The tester binary is a clean per-process invocation — one bundle in on argv, stdout/stderr out,
-// no shared file or port across runs — so nothing here needs the runs to be sequential. Measured
-// 2026-09-17: of a 76s run over 59 files, 74s was `symbiote_tester` wall time and 2.3s was esbuild;
-// running the binary sequentially was the whole cost, not the bundling this file already caches.
+// no shared file or port across runs — so nothing here needs the runs to be sequential. The binary
+// wall time dominates a run, not the bundling this file already caches.
 const testConcurrency = Math.max(1, availableParallelism());
 
 /**
@@ -973,32 +954,7 @@ try {
   const runPromises = bundles.map(({ file, bundle }) =>
     limitTestRun(() => runTester(bundle).then(run => ({ ...run, file }))),
   );
-  for (const runPromise of runPromises) {
-    const run = await runPromise;
-    for (const line of run.stdout.split('\n').filter(Boolean)) {
-      if (line.startsWith('FAIL ')) failed += 1;
-      console.log(line);
-    }
-    if (run.status !== 0 || run.signal !== null) {
-      failed += 1;
-      // A CRASH HAS TO NAME ITSELF, and this used to print `run.stderr.trim()` and nothing else.
-      // When the tester dies on a SIGNAL the exit code is `null` rather than a number, so the
-      // `status !== 0` above is true while stderr is EMPTY — a killed process writes nothing. CI run
-      // 35716368308 was exactly that: 541 passes, no FAIL line anywhere, one blank line, exit 1, and
-      // no way to tell which of 119 files had died or why. The file name and the signal are the two
-      // facts a reader needs and the two this branch was throwing away.
-      const how =
-        run.signal !== null
-          ? `killed by ${run.signal}`
-          : `exit status ${run.status}`;
-      console.error(
-        `CRASH ${path.relative(testsDir, run.file)} — ${how}${
-          run.stdout.trim() === '' ? ', no output' : ''
-        }`,
-      );
-      if (run.stderr.trim() !== '') console.error(run.stderr.trim());
-    }
-  }
+  for (const runPromise of runPromises) failed += reportRun(await runPromise);
   runMs += performance.now() - runStart;
 } finally {
   // `SYMBIOTE_KEEP_BUNDLES=1` leaves them on disk and says where. A stack trace out of the tester

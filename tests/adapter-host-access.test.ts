@@ -1,11 +1,8 @@
 // An adapter must reach an engine node only through the host-access API, never through its fields.
 //
-// The narrowing landed on 2026-09-05 — every renderer seam and four non-seam files moved from
-// `node.parent` / `node.children` / `node.component` onto parentOf / childrenOf / componentOf and
-// friends — and nothing held it. A single `node.parent` in the next PR puts an adapter back on the
-// tree's SHAPE, which is what makes the representation impossible to change: the whole point of
-// `symbiote-fabric-cxx-surface` §9 is that the retained node can become an address, or move onto
-// the framework's own object, without any adapter noticing.
+// A single `node.parent` in the next PR puts an adapter back on the tree's SHAPE, which is what
+// makes the representation impossible to change: `symbiote-fabric-cxx-surface` §9's whole point
+// is that the retained node can become an address, or move onto the framework's own object.
 //
 // TYPE-AWARE, not textual, and that is the difference between this and a grep. The survey that
 // started the narrowing counted `.props` and `.children` across whole adapters and reported 275-453

@@ -66,23 +66,9 @@ const SHEET_CONTENT_WRAPPER_STYLE = {
   bottom: undefined,
 };
 
-// Android's native header (react-native-screens' CustomToolbar in a CoordinatorLayout alongside
-// an AppBarLayout) auto-offsets screen content below the header via a Material
-// `AppBarLayout.ScrollingViewBehavior` (ScreenStackFragment.kt's setToolbarTranslucent: `behavior
-// = if (translucent) null else ScrollingViewBehavior()`). A plain (non-translucent) header gets
-// this offset for free and needs no JS compensation. `headerTranslucent: true` removes that
-// behavior: react-native-screens' contract for translucent is "background goes away AND content
-// is no longer auto-pushed below it", meant for a screen painting under a see-through header. An
-// app that sets headerTranslucent just for a custom (still opaque) header look, while relying on
-// its own SafeAreaView for safe-area content, loses the free offset and gets clipped:
-// SafeAreaView's Android inset only reflects WindowInsetsCompat's systemBars() (status
-// bar/cutout), with no awareness of the sibling Toolbar, so content paints its first 56dp under
-// the header. Verified empirically (2026-07-10) via `adb shell uiautomator dump`: a
-// translucent-header screen's content measured starting at y=0 (see the
-// navigation-header-content-offset skill for the full incident). iOS's UINavigationController
-// already lays out below its real nav bar regardless of translucency, so this compensation is
-// Android-only and applies only when translucent (a non-translucent header already gets the
-// native offset; padding there would double it).
+// Android's native header auto-offsets content via `AppBarLayout.ScrollingViewBehavior`, removed
+// by `headerTranslucent: true`. An opaque custom header relying on SafeAreaView (blind to the
+// sibling Toolbar) then clips its first 56dp — Android-only, and only when translucent.
 const ANDROID_HEADER_TOOLBAR_HEIGHT = 56;
 
 // react-native-screens' own Screen.tsx picks a different Fabric component for a modally-presented

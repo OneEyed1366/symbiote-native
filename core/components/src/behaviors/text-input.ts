@@ -1,26 +1,13 @@
-// TextInput's machine, on the engine node instead of inside a framework component — the tier-2
-// half of `.claude/rules/host-primitive-tier.md` for the second primitive to get one.
-//
-// WHAT A `TextInput` COMPONENT ACTUALLY DOES, and why none of it needs a framework. It holds three
-// mirrors of native state (the acknowledged event count, the last text native reported, whether the
-// input is focused), it commands text back down when the app's `value` diverges from that mirror,
-// it fires `focus` once at mount when `autoFocus` is set, it composes a small press machine so a
-// tap focuses the input (`TextInput.js`'s own `usePressability` — FOUND MISSING 2026-09-20, since
-// nothing here wired ANY press listener at all), and it exposes five imperative methods. The
-// TEMPLATE reads none of it — which is the whole tier-2 test. Every framework was paying an
-// instance for a machine that only ever needed a per-node home.
-//
-// WHY IT NEEDED A NEW ENGINE HOOK AND `Pressable` DID NOT. A press machine is driven entirely by
-// events, which arrive long after commit. The controlled handshake is driven by a PROP: `value`
-// changing is what must re-run the divergence check, and in a component the render is what does
-// that. A tag has no render, so `IHostBehavior.afterCommit` is the equivalent beat —
-// see that interface for why it is not a hook on `setProp`.
-//
-// THE ORDER OF THE TWO COMMIT HOOKS IS LOAD-BEARING HERE, which is why the engine pins it with a
-// test: `attachAfterCommit` seeds `lastNativeText` from the mount-time props, and `afterCommit`
-// compares against that seed. Reversed, the very first beat would see an empty mirror, decide the
-// app's value had diverged, and command a redundant `setTextAndSelection` down to native on every
-// input in the tree.
+// TextInput's machine, on the engine node instead of inside a framework component. It holds three
+// native-state mirrors (event count, last native text, focus), commands text back down on
+// divergence, fires focus once at mount for autoFocus, composes a press machine for tap-to-focus.
+
+// Needed a new engine hook where Pressable did not: the controlled handshake is driven by a PROP
+// (`value`), and a tag has no render to re-run the divergence check, so afterCommit is the beat.
+
+// The order of the two commit hooks is load-bearing, pinned by a test: attachAfterCommit seeds
+// lastNativeText from mount-time props, afterCommit compares against that seed. Reversed, the
+// first beat would see an empty mirror and command a redundant write on every input.
 import {
   appListenerFor,
   blurTextInput,
@@ -73,25 +60,14 @@ interface IBehaviorState {
   // Mirrored from the focus/blur events. Native exposes no synchronous focus getter, and RN's own
   // TextInputState holds the same mirror for the same reason.
   isFocused: boolean;
-  /**
-   * Whether the mirror was seeded on THIS commit, so the beat that follows has nothing to compare.
-   *
-   * `attachAfterCommit` and `afterCommit` both run on the commit that lands the node, in that
-   * order, and the first seeds `lastNativeText` from the very `value` the second would read back.
-   * The comparison is therefore decided before it is made: a string `value` equals the mirror it
-   * just set, and a non-string one fails `shouldCommandText`'s own narrowing. So the first beat
-   * cannot command, and the read it makes to prove that is a host crossing per input per create.
-   *
-   * TEXT ONLY — `afterCommit` no longer lets this skip the SELECTION half. See `lastNativeSelection`.
-   */
+  // Whether the mirror was seeded on THIS commit, so the beat that follows has nothing to compare:
+  // attachAfterCommit and afterCommit both run on the landing commit, and the first seeds
+  // lastNativeText from the value the second would read back. TEXT ONLY — see lastNativeSelection.
   isMirrorFreshlySeeded: boolean;
-  /**
-   * What native last acknowledged for the caret, mirroring `TextInput.js`'s own
-   * `lastNativeSelectionState`, seeded at the SENTINEL rather than left absent — a real selection
-   * always differs from it, so an authored `selection` moves the caret on the very first commit,
-   * with no preceding value write at all (`TextInput.js`'s `useTextInputStateSynchronization`,
-   * whose own `lastNativeSelection` starts at `{start:-1,end:-1}` for the identical reason).
-   */
+
+  // What native last acknowledged for the caret, seeded at the SENTINEL rather than left absent —
+  // a real selection always differs from it, so an authored `selection` moves the caret on the
+  // very first commit, with no preceding value write.
   lastNativeSelection: { start: number; end: number };
 }
 
@@ -130,20 +106,12 @@ function callAppListener(
   if (typeof listener === 'function') listener(event);
 }
 
-// `onValueChange(event)` is NOT a Fabric event — it is a fold the component wrapper used to do
-// over the raw `change` payload, so it lives on the node as a plain prop key and
-// `fabricProps` drops it on the way to native. A tag has no wrapper to run that fold, so before
-// this the callback was simply never called: the field echoed keystrokes natively (native owns its
-// own text) while every value the app derived from it stayed frozen. Device-found 2026-08-31 in
-// examples/solid's canary — the greeting never left "Hello, stranger".
-//
-// Same class as `value -> text` (`core/engine/src/fabric-props.ts`) and the same repair: below the
-// fork, where all five adapters inherit it.
-//
-// The listener takes ONE argument, `text` carried on the event itself (`ITextInputChangeEvent`),
-// not `(text, event)` — Svelte's compiler forces every individual `on*` attribute through a native
-// listener wrapper that calls with exactly one argument, always a real object, so a second
-// argument is silently dropped and a bare string as the sole argument crashes.
+// `onValueChange(event)` is NOT a Fabric event — it lives on the node as a plain prop key, and
+// fabricProps drops it on the way to native.
+
+// The listener takes ONE argument, `text` carried on the event itself, not `(text, event)` —
+// Svelte's compiler forces every `on*` attribute through a wrapper that calls with exactly one
+// argument, always a real object, so a bare string as the sole argument crashes.
 function callValueChange(
   node: ISymbioteNode,
   text: string,
@@ -155,70 +123,33 @@ function callValueChange(
   listener(changeEvent);
 }
 
-// The alias list and its two narrowing helpers went with the fold. They existed only to feed
-// `resolveTextInputProps`, and that resolution is `foldTextInputAliases` in
-// `SymbioteFabricProps.cpp` now — keeping a copy of the names here would be a second statement of
-// the same rule, which is the thing the move was for.
+// `multiline` picks between TWO Fabric views, so the TAG decides it and no later prop write moves
+// a node between them. An author writing the tag can still spell a contradicting `multiline`
+// prop, which silently commits the wrong view with nothing to read.
 
-// `multiline` picks between TWO Fabric views, so the TAG decides it and no later prop write moves a
-// node between them. The wrapper that used to stand here CONSUMED the prop to pick its intrinsic;
-// an author writing the tag can spell the two apart, which leaves two silent, device-only
-// divergences, measured on the committed payload:
-//
-//   <text-input-multiline value="a" />   RCTMultilineTextInputView, folded as SINGLE-line:
-//                                        submitBehavior 'blurAndSubmit', so Return blurs instead
-//                                        of inserting a newline
-//   <text-input multiline value="b" />   RCTSinglelineTextInputView carrying the multiline fold
-//
-// So the tag is the authority here, and a prop that contradicts it throws rather than being
-// quietly overridden — an ignored `multiline` is a wrong native view with nothing to read.
-// Found on Solid, fixed here because all five adapters produce the same two divergences: a
-// decision the wrapper used to make by CONSUMING a prop has no owner once the author writes the
-// tag directly.
-// The COMPLAINT cannot live here, only the correction. `foldPayload` runs inside the commit, so a
-// throw from it surfaces as an uncaught exception a tick after the author's write with no frame
-// naming the call site — measured: a test awaiting the mount sees `nothing committed` instead of
-// the error. Refusing a contradicting prop therefore stays in each adapter's own prop-write path,
-// where the author's stack still exists (Solid's `renderer.ts` is the reference); this file only
-// guarantees that whatever the props say, the payload matches the TAG.
-// THE FOLD IS GONE — the rule lives in the engine now, `foldTextInputAliases` in
-// `core/engine/cpp/SymbioteFabricProps.cpp`, beside the tree it writes into.
-//
-// It is UA behavior in the browser sense: mapping the web-facing spelling (`inputMode`,
-// `enterKeyHint`, `readOnly`, the W3C `autoComplete` token) onto React Native's own is a property of
-// the PLATFORM, not of any app, framework or component instance. Blink resolves `<input>`'s
-// attributes in the engine and every framework on top pays nothing for it; this is the same move.
-//
-// And it had a price. A `payloadFold` is a JS closure the C++ walk calls per node per commit, which
-// means converting the whole props bag to a `jsi::Value` and the result back again — ~17 us apiece,
-// and the entire gap between React's walk (24-27 ms, no folds) and every other adapter's (41-44 ms,
-// `foldsFound=1000`) on a byte-identical benchmark tree.
-//
-// There is deliberately NO TypeScript twin. `core/engine/cpp/tests/js/text-input-payload.itest.ts`
-// is the contract, and it reads the payload the commit actually sent rather than a second copy of
-// the rule.
-//
-// What stays here is the MACHINE: the controlled-value handshake, the event-count acknowledgement,
-// autofocus. Those run at gesture and lifecycle rate and call back into app code — which is exactly
-// what a browser keeps above the engine too.
+// So the tag is the authority: a contradicting prop throws rather than being quietly overridden.
+// The throw stays in each adapter's own prop-write path, not here, since a throw from foldPayload
+// inside the commit surfaces a tick later with no frame naming the call site.
+
+// The alias/fold rule lives in the engine now (foldTextInputAliases in SymbioteFabricProps.cpp),
+// UA behavior mapping the web-facing spelling onto RN's own — a property of the platform, paid
+// once, not per app or framework. No TypeScript twin: the itest reads the payload directly.
+
+// What stays here is the MACHINE: the controlled-value handshake, event-count acknowledgement,
+// autofocus — running at gesture/lifecycle rate and calling back into app code.
 
 function onChange(node: ISymbioteNode, event: ISymbioteEvent): void {
   const state = stateOf(node);
   if (state === undefined) return;
 
-  // TextInput.js:502-518's `_onChange` — `onChange` first, THEN `onChangeText`, UNCONDITIONALLY on
-  // every native change, and only THEN the mirrors ("This must happen last", vendor's own comment
-  // on the count). Ours used to run backwards: the mirror first, then `onChangeText`, with the real
-  // `onChange` called dead last — an app with side effects observable across `onChange` and
-  // `onChangeText` saw them in the opposite order from a real device.
+  // Mirrors vendor's own ordering: `onChange` first, then `onChangeText`, unconditionally on
+  // every native change, and only THEN the mirrors update.
   callAppListener(node, 'change', event);
 
   const text = textFromChange(event);
   if (text !== undefined) {
-    // TextInput.js:506 — fired right alongside `onChange`, off the same event, `text` riding on it
-    // as a field for the same reason `onValueChange` does. Read directly rather than owned/stashed:
-    // like `onValueChange`, it is not a Fabric event name, so nothing routes it and nothing native
-    // could overwrite it.
+    // Read directly, not owned/stashed: like onValueChange, onChangeText isn't a Fabric event
+    // name, so nothing routes it and nothing native could overwrite it.
     const onChangeText = propOf(node, 'onChangeText');
     if (typeof onChangeText === 'function') {
       onChangeText(Object.assign(event, { text }));
@@ -258,11 +189,9 @@ function onBlur(node: ISymbioteNode, event: ISymbioteEvent): void {
   callAppListener(node, 'blur', event);
 }
 
-// The out-of-commit half of the same check `afterCommit` runs on every commit: given the mirror
-// already updated from a real native report, send the authored `selection` back down if it still
-// disagrees. Kept separate from `afterCommit`'s own combined text+selection dispatch rather than
-// shared with it — this path has no `freshlySeeded`/text-divergence concept, and folding the two
-// would risk a double command on a commit where both diverge at once.
+// The out-of-commit half of the check afterCommit runs on every commit: given the mirror already
+// updated from a real native report, send the authored `selection` back down if it still
+// disagrees. Kept separate from afterCommit's own dispatch to avoid a double command.
 function correctSelectionIfNeeded(
   node: ISymbioteNode,
   state: IBehaviorState,
@@ -293,12 +222,8 @@ function correctSelectionIfNeeded(
   state.lastNativeSelection = { start, end };
 }
 
-// TextInput.js:522-533 — `_onSelectionChange` forwards to the app FIRST, then folds the REAL native
-// position into `lastNativeSelection`, whichever way the caret moved (a controlled write we sent
-// ourselves, or the user dragging it). That update alone is what schedules React's next render,
-// which is what re-runs the divergence check with the freshly-updated mirror. We have no render to
-// ride, so `correctSelectionIfNeeded` is called directly, right after the mirror moves — same shape
-// as `refresh-control.ts`'s own re-check after a native report.
+// Forwards to the app FIRST, then folds the real native position into lastNativeSelection. With
+// no render to ride the mirror update, correctSelectionIfNeeded is called directly right after.
 function onSelectionChange(node: ISymbioteNode, event: ISymbioteEvent): void {
   callAppListener(node, 'selectionChange', event);
   const state = stateOf(node);
@@ -309,12 +234,9 @@ function onSelectionChange(node: ISymbioteNode, event: ISymbioteEvent): void {
   correctSelectionIfNeeded(node, state);
 }
 
-// `TextInput.js`'s own `usePressability(config)` — the same Pressability class every Touchable
-// uses, wired for exactly one reason: `onPress` calls `inputRef.current.focus()` when
-// `editable !== false`, so a tap landing inside an authored `hitSlop` but outside the native
-// view's own focus zone still focuses the input. `onPressIn`/`onPressOut` need NO wrapping here —
-// `configFor`'s defaults already forward them raw, which is exactly what upstream does
-// (`onPressIn, onPressOut` destructured straight into the config with no wrapper function).
+// The same Pressability class every Touchable uses, wired so a tap inside an authored `hitSlop`
+// but outside the native view's own focus zone still focuses the input. onPressIn/onPressOut need
+// no wrapping — configFor's defaults already forward them raw.
 const focusOnPress: IPressConfigRefinement = (node, config) => ({
   ...config,
   onPress(event) {
@@ -348,13 +270,11 @@ function attach(node: ISymbioteNode): void {
     isMirrorFreshlySeeded: false,
     lastNativeSelection: { start: SELECTION_NONE, end: SELECTION_NONE },
   });
-  // The mirror's seed has to reach the PAYLOAD too, not just this state object. The wrappers handed
-  // the count over on every render, so an input committed the key at create; the behavior used to
-  // write it only inside the change handshake, so the tag carried no such key until the user typed.
-  // Found independently by three adapters, 2026-09-01.
-  //
-  // No `requestCommitFor` here: at create the renderer commits anyway, and on a re-attach the key is
-  // already standing at this same value, so `setProp`'s identity guard makes the write a no-op.
+  // The mirror's seed must reach the PAYLOAD too, not just this state object — otherwise the tag
+  // carries no `mostRecentEventCount` key until the user types.
+
+  // No `requestCommitFor` here: at create the renderer commits anyway, and on a re-attach the key
+  // is already at this value, so `setProp`'s identity guard makes the write a no-op.
   setProp(node, 'mostRecentEventCount', INITIAL_EVENT_COUNT);
   setBehaviorListener(node, 'change', event => onChange(node, event));
   setBehaviorListener(node, 'focus', event => onFocus(node, event));
@@ -381,10 +301,8 @@ function textInputCancelable(source: ISymbioteNode): boolean | undefined {
 function attachAfterCommit(node: ISymbioteNode): void {
   const state = stateOf(node);
   if (state === undefined) return;
-  // ONE question, not three. `propOf` crosses the host boundary per call — `flushOps()` plus a JSI
-  // read — and this runs once per input on the commit that lands it, so three reads of the same
-  // bag were three crossings per `<text-input>` on every create. `propsOf` fetches it whole and
-  // hands back the host's own object when nothing is stashed, which is every node here.
+  // ONE question, not three: propOf crosses the host boundary per call, so propsOf fetches the
+  // whole bag instead, handing back the host's own object when nothing is stashed.
   const props = propsOf(node);
   state.lastNativeText = foldText(
     stringFrom(props.value),
@@ -393,11 +311,8 @@ function attachAfterCommit(node: ISymbioteNode): void {
   state.isMirrorFreshlySeeded = true;
 
   if (props.autoFocus !== true) return;
-  // Driven in JS rather than as a native `autoFocus` prop (RN's own ViewConfigs DO declare one —
-  // `RCTTextInputViewConfig.js`/`AndroidTextInputNativeComponent.js` — but we don't forward it, so
-  // this is the one mechanism that focuses the input). Routed through `focusTextInput`, not a raw
-  // command, so an autoFocused input also updates the app-wide tracker `Keyboard.dismiss()` reads —
-  // a raw command left it unset until the native focus event round-tripped back.
+  // Driven in JS, not a native `autoFocus` prop (RN declares one but we don't forward it). Routed
+  // through focusTextInput, not a raw command, so it also updates the app-wide focus tracker.
   dlog('TextInput behavior: autoFocus -> focus command');
   focusTextInput(node);
 }
@@ -408,10 +323,9 @@ function attachAfterCommit(node: ISymbioteNode): void {
 function afterCommit(node: ISymbioteNode): void {
   const state = stateOf(node);
   if (state === undefined) return;
-  // The seed ran on this same commit, so the TEXT comparison below is already decided — see
-  // `isMirrorFreshlySeeded`. SELECTION is not seeded by anything, so it is checked regardless: an
-  // authored `selection` must move the caret on this very commit, matching `TextInput.js`'s own
-  // sentinel-seeded `lastNativeSelection`.
+  // The seed ran on this same commit, so the TEXT comparison below is already decided. SELECTION
+  // is not seeded by anything, so it's checked regardless — an authored `selection` must move the
+  // caret on this very commit.
   const freshlySeeded = state.isMirrorFreshlySeeded;
   if (freshlySeeded) state.isMirrorFreshlySeeded = false;
 
@@ -422,11 +336,8 @@ function afterCommit(node: ISymbioteNode): void {
   const textDiverged =
     !freshlySeeded && shouldCommandText(state.lastNativeText, value);
 
-  // `selection` is `{ start, end? }` when present. SELECTION_NONE (-1) is RN's "leave the cursor
-  // where native put it" sentinel, so an absent selection must not be read as position 0 — that
-  // would jump the caret to the front of the field on every controlled write. `lastNativeSelection`
-  // is seeded at the same sentinel, so a real selection always "diverges" from it until this behavior
-  // has actually sent one.
+  // SELECTION_NONE (-1) is RN's "leave the cursor where native put it" sentinel, so an absent
+  // selection must not read as position 0, or every controlled write would jump the caret to front.
   const { start, end } = selectionOf(props.selection);
   const selectionAuthored = start !== SELECTION_NONE || end !== SELECTION_NONE;
   const selectionDiverged =
@@ -463,14 +374,8 @@ function detach(node: ISymbioteNode): void {
   detachPressMachine(node);
 }
 
-/**
- * The imperative API RN exposes on a TextInput ref, built over the engine node. Reached through
- * each adapter's own `host-instance` accessor — the capability, not a shape
- * (`.claude/rules/adapter-parity-audit.md`).
- *
- * `focus`/`blur` are native view commands; `clear` and `setSelection` reuse `setTextAndSelection`,
- * the same stale-safe path a controlled write takes, so they cannot race a keystroke either.
- */
+// The imperative API RN exposes on a TextInput ref, built over the engine node. `clear` and
+// `setSelection` reuse setTextAndSelection, the same stale-safe path a controlled write takes.
 export function buildTextInputHandle(node: ISymbioteNode): ITextInputHandle {
   return {
     // Forwarded, not re-implemented: these are the engine node's own prototype methods, and a
@@ -481,16 +386,11 @@ export function buildTextInputHandle(node: ISymbioteNode): ITextInputHandle {
     measureLayout: (relativeTo, onSuccess, onFail) =>
       node.measureLayout(relativeTo, onSuccess, onFail),
     setNativeProps: nativeProps => node.setNativeProps(nativeProps),
-    // Through TextInputState, NOT a raw command — RN's `ReactNativeElement.focus()` routes a text
-    // input through `TextInputState.focusTextInput` for the same reason blur below does: app-wide
-    // tracking, plus the already-focused/`editable: false` no-op RN's own guard carries.
+    // Through TextInputState, NOT a raw command: app-wide tracking, plus the
+    // already-focused/editable:false no-op RN's own guard carries.
     focus: () => focusTextInput(node),
-    // Through TextInputState, NOT a raw command — the same route the component path takes
-    // (`react/.../text-input/index.ts`, "so the app-wide focus tracking clears too"). The native
-    // `blur` event also clears the tracking via this behavior's own listener, so a raw command
-    // looks equivalent and is not: the event is the NATIVE side's, and it does not arrive when the
-    // input was already blurred. `Keyboard.dismiss()` reads `currentlyFocusedInput()`, so a stale
-    // entry there aims a blur at a node that no longer holds focus.
+    // Through TextInputState, NOT a raw command: a raw command looks equivalent and isn't, since
+    // Keyboard.dismiss() reads currentlyFocusedInput() and a stale entry blurs the wrong node.
     blur: () => blurTextInput(node),
     isFocused: () => stateOf(node)?.isFocused === true,
     clear: () => {
@@ -522,12 +422,8 @@ export function buildTextInputHandle(node: ISymbioteNode): ITextInputHandle {
 // Idempotent: an adapter entry may be imported more than once in a bundle, and re-registering the
 // same tag with an equivalent behavior must not double-install anything.
 export function registerTextInputBehavior(): void {
-  // THE TWO TAGS NOW SHARE ONE BEHAVIOR OBJECT, and that is the port showing up in the shape of the
-  // code. `multiline` was the only thing the two registrations did not share: each closed over its
-  // own answer to feed `foldPayload`. With the fold gone the machine is identical for both, and the
-  // engine answers `multiline` from the component name it already holds
-  // (`foldTextInputAliases`'s `isMultiline` argument, `SymbioteFabricProps.cpp`) — which is the
-  // better place for it anyway, since the component name is what Fabric actually keys the view on.
+  // The two tags share one behavior object: with the fold gone the machine is identical for both,
+  // and the engine answers `multiline` from the component name it already holds.
   const behavior = {
     attach,
     attachAfterCommit,

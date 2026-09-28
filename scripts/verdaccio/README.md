@@ -19,8 +19,8 @@ cd examples/react/ios && pod install                     # still owed, see below
 
 The documented loop (`<examples_vs_dot_examples>` in the root CLAUDE.md) re-points an example's
 manifest at a `.tarballs/*.tgz`. It works. It also writes machine-local install state into a
-**tracked** file, and the only thing between that and a commit is somebody remembering — measured
-2026-09-01, six manifests and five lockfiles were dirty with it at once.
+**tracked** file, and the only thing between that and a commit is somebody remembering — several
+manifests and lockfiles have gone dirty with it at once.
 
 Here the manifest is never touched. Only a gitignored `examples/<app>/.npmrc` says where the
 version resolves from.
@@ -53,7 +53,7 @@ in clang argument dumps that read as a broken toolchain.
 
 ## Why not a real npm dist-tag
 
-Tried on this project and reverted the same day — 2026-07-24, full record in the
+Tried on this project and reverted the same day — full record in the
 `symbiote-release-publishing` skill. npm's `unpublish` and `deprecate` are OTP-gated even for a
 token carrying an explicit 2FA bypass (that bypass only ever covers `publish`), so a snapshot can
 never be removed and every iteration would be a permanent, public, immutable version.

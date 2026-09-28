@@ -409,13 +409,9 @@ export class AnimatedImage
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AnimatedScrollView extends AnimatedComponentBase {
-  // Nothing left to override: `registerScrollViewBehavior()` (`../../register.ts`) now owns the
-  // content node, `scrollViewBaseStyle`/`nestedScrollEnabled` defaults, and the sticky seam for
-  // this SAME `scroll-view` tag. This class used to build its own `<scroll-content>` child by
-  // hand — deleted 2026-09-11, since that made TWO owners of the content node the moment the
-  // behavior registered on this tag: the engine's own `buildStructure` and this template both
-  // creating one. `<ng-content>` now lands directly under the owner and the behavior redirects it
-  // into the content node it builds, same as every other `<scroll-view>` in the app.
+  // Nothing left to override: `registerScrollViewBehavior()` owns the content node, base style
+  // and sticky seam for this SAME `scroll-view` tag. Building `<scroll-content>` here too would
+  // give the node two owners; `<ng-content>` lands under the one the behavior already builds.
 }
 
 // List components are already explicit AOT-compiled Angular components with their own full input

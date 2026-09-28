@@ -76,19 +76,12 @@
   const ROW_BATCH = 1000;
   const ROW_BATCH_LARGE = 10000;
 
-  // The number that decides whether a row COUNT is even feasible here, and the one krausest cannot
-  // tell us: its counts are DOM-node counts. `BenchmarkRow` expands to TEN native views
-  // (1 View + 3x[Text + RawText] + 2 Pressable Views + 1 TextInput), so 10 000 rows mounted at once
-  // is 100 000 UIViews. Measured 2026-08-18 on the nine-view row, iOS 26.5 simulator: that never
-  // completed — RAM climbed 2.1 -> 2.8 GB and the JS thread sat at 0 fps, while 1 000 rows
-  // completed in ~880 ms. That ceiling is the native host's, not the engine's - which is exactly
-  // why the two mount modes below exist, so the claim can be measured instead of asserted.
-  //
+  // krausest's row counts are DOM-node counts, not ours: `BenchmarkRow` expands to TEN native
+  // views (1 View + 3x[Text + RawText] + 2 Pressable Views + 1 TextInput), so 10 000 rows is
+  // 100 000 UIViews - a ceiling the native host hits, not the engine.
+
   // A TextInput is exactly ONE native view — no wrapper, no raw-text child (its text rides as the
-  // `text` prop, not as a child node). It was briefly a second row shape behind a toggle, so the
-  // input's cost could be read as a delta against the nine-view row; that delta has been taken on
-  // every column, so the arm is gone and the ten-view row is the one shape every number here is
-  // measured on.
+  // `text` prop, not as a child node). ONE row shape, everywhere: no plain/with-input split.
   const NATIVE_VIEWS_PER_ROW = 10;
   // Fixed so getItemLayout is exact in virtualized mode and both modes lay rows out identically.
   const BENCH_ROW_HEIGHT = 44;
@@ -333,25 +326,13 @@
 </script>
 
 <script lang="ts">
-  /**
-   * On-device twin of the js-framework-benchmark (krausest) suite: the same nine list operations
-   * every framework there is scored on, run against @symbiote-native/engine's commit path on a
-   * real device instead of in isolation. A micro-benchmark times pure JS; this screen times the
-   * whole round trip - Svelte's own update, the engine's mutation -> clone-on-write translation,
-   * and completeRoot - and puts a JS-thread frame counter next to it so a saved millisecond can be
-   * checked against frames the user actually sees. Svelte twin of
-   * examples/react/screens/BenchmarkScreen.tsx; every constant and operation above is copied
-   * verbatim because this screen is a RULER shared across the four canaries.
-   *
-   * Markup is ordinary, readable Svelte - normal indentation, siblings on their own lines, long
-   * sentences wrapped. The edge-to-edge packing §16 once required is no longer needed: the
-   * `collapseTextWhitespace()` preprocessor registered in svelte.config.js deletes a
-   * whitespace-only node that spans a newline and collapses a wrapped sentence, which covers both
-   * shapes normal formatting produces. Verified 2026-08-19 by compiling this file through the real
-   * preprocessor chain: zero whitespace-only literals, zero text nodes carrying a newline. Only a
-   * same-LINE gap between two siblings (`<view><A /> <B /></view>`) is still uncaught, and normal
-   * formatting does not produce one.
-   */
+  // On-device twin of js-framework-benchmark (krausest): same nine list operations, timed against
+  // @symbiote-native/engine's commit path on a real device, with a JS-thread frame counter beside
+  // it. Svelte twin of examples/react/screens/BenchmarkScreen.tsx — same constants, verbatim.
+
+  // Markup is ordinary, readable Svelte. The `collapseTextWhitespace()` preprocessor
+  // (svelte.config.js) deletes whitespace-only newline-spanning nodes, so normal formatting needs
+  // no edge-to-edge packing — only a same-line gap between siblings (`<A /> <B />`) is uncaught.
   import {
     FlatList,
     SectionList,
@@ -543,26 +524,13 @@
 
   const isAllMounted = $derived(mountMode === MOUNT_MODE.All);
 
-  /**
-   * The whole ruler in one press, in a FIXED order, each timed operation starting from exactly
-   * SUITE_ROWS rows.
-   *
-   * Pressing the buttons by hand does not measure what it looks like it measures. `Remove` and
-   * `Append` cost scale with the rows currently on screen (a flat parent re-appends every child
-   * handle on any structural change), so their numbers depend on which buttons were pressed
-   * before them. Measured 2026-08-18, React Debug, same build twice: Remove 87-107 ms against
-   * 418.6 ms, Append 953 against 1678 ms, while Create / Replace / Partial / Select / Swap
-   * reproduced inside 1-3%. Two runs of the SAME adapter disagreed 4x - so a cross-ADAPTER
-   * comparison off those rows was measuring press order, not the adapter.
-   *
-   * Hence: untimed setup steps in between, awaited through the same engine post-commit seam as
-   * the timed ones, so each measurement begins from a state this function chose rather than one
-   * the operator happened to leave behind.
-   *
-   * Runs in EITHER mount mode - the pressed button picks it. No 10,000-row step in either: 10,000
-   * rows is 100,000 native views, which the host does not survive in all-mounted (see
-   * NATIVE_VIEWS_PER_ROW), and a suite that hangs the screen measures nothing.
-   */
+  // The whole ruler in one press, FIXED order, each timed op starting from exactly SUITE_ROWS
+  // rows: Remove/Append cost scales with rows on screen (a flat parent re-appends every child
+  // handle on structural change), so untimed setup steps run between the timed ones instead.
+
+  // Runs in EITHER mount mode - the pressed button picks it. No 10 000-row step in either:
+  // 100 000 native views don't survive in all-mounted (see NATIVE_VIEWS_PER_ROW), and a hung
+  // screen measures nothing.
   async function runSuite(mode: IMountMode): Promise<void> {
     resetRowData();
 
@@ -879,14 +847,9 @@
     <text class="section-label">
       STICKY PATH A · ScrollView · sticky-header tag
     </text>
-    <!-- A header is MARKED with the `sticky-header` TAG, not wrapped in a component and not named
-      by an index. The ScrollView host behavior registers that tag, each header finds this
-      ScrollView by walking up, and the collision point — the y at which one pin is pushed off by
-      the next — comes from the owner's DOCUMENT order, so nothing here computes or forwards an
-      index. `stickyHeaderIndices` WOULD work here too, since 2026-09-10 — the behavior walks the
-      committed children, so deleting the ScrollView component (which used to strip the prop) turned
-      RN's own API on. This path stays index-free on purpose: an index has to be kept in step with
-      the children, and a tag does not. -->
+    <!-- A header is MARKED with the `sticky-header` TAG, not named by an index — the collision
+      point comes from the owner's DOCUMENT order, so a tag never drifts out of step with the
+      children the way a hand-kept index can. -->
     <scroll-view
       testID="benchmark-sticky-scroll"
       class="bench-sticky"
@@ -941,15 +904,11 @@
       boxes differ only in which sticky implementation carries the frame.
     </text>
 
-    <!-- These sat BELOW the rows until 2026-09-07, deliberately, so nobody would report numbers
-      from them: their Remove and Append act on whatever happened to be on screen, which is the
-      whole reason the suite above exists. That is still true and the note under them still says
-      so — what changed is that "below the fold" became UNREACHABLE once the list holds a thousand
-      rows, which is exactly the state you are in when you want to poke at one commit shape.
-      A caveat keeps working from the top of the screen; a scroll position does not.
+    <!-- Kept above the rows: with a thousand rows mounted, "below the fold" is unreachable by
+      scroll — exactly the state you're in when you want to poke at one commit shape. -->
 
-      No `{#if}` added here: on this adapter one costs an anchor per instantiation even when its
-      condition is false, and this block sits above the row loop now. -->
+    <!-- No `{#if}` here: on this adapter one costs an anchor per instantiation even when its
+      condition is false. -->
     <text class="section-label">OPERATIONS · LAST RUN</text>
     {#each operations as operation (operation.id)}
       <view class="bench-op-row">

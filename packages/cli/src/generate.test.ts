@@ -405,13 +405,9 @@ describe('scaffoldApp splash-screen option wires hide() into the App entry (real
   );
 });
 
-// `useStackNavigation()`'s return type differs per framework: React returns the handle directly,
-// Solid an Accessor (`navigation()`), Svelte a rune object (`navigation.current`) — but Vue
-// returns a ComputedRef (`navigation.value`). vue-sfc's `.vue` template auto-unwraps a top-level
-// ref referenced in `<template>`/`@press`, so `navigation.push(...)` compiles correctly there —
-// but vue-tsx's App is a plain JSX render function, which Vue's compiler never touches, so the
-// SAME unwrapped call leaves `navigation` a bare ComputedRef with no `.push`/`.pop` method. Real
-// device bug (2026-09-18): tapping "Go to Details" threw `TypeError: undefined is not a function`.
+// `useStackNavigation()`'s return type differs per framework: Vue alone returns a ComputedRef.
+// vue-sfc's template auto-unwraps a top-level ref, so `navigation.push(...)` compiles there;
+// vue-tsx's plain JSX render function isn't touched by Vue's compiler, leaving no `.push`/`.pop`.
 describe('scaffoldApp vue-tsx navigation dereferences the ComputedRef with .value (real bug)', () => {
   const tmpDirs: string[] = [];
 
@@ -462,11 +458,9 @@ describe('scaffoldApp vue-tsx navigation dereferences the ComputedRef with .valu
   );
 });
 
-// Real bug (2026-09-18): svelte's scaffolded screen rendered zero logos on device, every other
-// element (text, counter, buttons) fine. `require('./assets/x.png')`'s numeric-asset-id path has
-// no working precedent anywhere in this project for Svelte — every other Svelte image use,
-// examples/svelte included, is a plain `{uri}` object. Switched the templates to inline data-URI
-// `{uri}` sources instead, the one shape proven to work.
+// `require('./assets/x.png')`'s numeric-asset-id path has no working precedent in this project
+// for Svelte — every other Svelte image use, examples/svelte included, is a plain `{uri}` object.
+// The templates use inline data-URI `{uri}` sources instead, the one shape proven to work.
 describe('scaffoldApp svelte images use {uri} sources, not require() (real bug)', () => {
   const tmpDirs: string[] = [];
 
@@ -1458,19 +1452,9 @@ describe('scaffoldApp declares @symbiote-native/engine as a direct dependency fo
   });
 });
 
-// A lockfile is dependency-installer OUTPUT, never scaffolder input — real bug found on-device
-// 2026-09-18: a checked-in ios/Podfile.lock ships a dependency resolution (incl. the
-// `ReactNativeDependencies` pod, RN 0.86's split for glog/boost/folly/etc.) frozen from WHATEVER
-// environment produced it. applyAppIdentity then text-renames "Canary" -> the real app name
-// INSIDE Podfile itself (it's in TEXT_FILE_EXTENSIONS's '' bucket for extension-less files),
-// which changes Podfile's SHA1 that Podfile.lock's own "PODFILE CHECKSUM" line records. `pod
-// install` compares them, sees a mismatch, and silently discards the shipped lock for a full
-// fresh resolve — which, without RCT_USE_RN_DEP=1 in the developer's shell, resolves
-// ReactNativeDependencies as build-from-source instead of the prebuilt framework the ALWAYS-USED
-// prebuilt React-Core-prebuilt binary hard-links via @rpath — `dyld: Library not loaded:
-// @rpath/ReactNativeDependencies.framework` at launch, no red-box, no build error. The template
-// Podfile.lock was never a real fix for anything — it only ever appeared to work by accident,
-// for apps whose target name happened to stay "Canary".
+// A lockfile is dependency-installer OUTPUT, never scaffolder input: applyAppIdentity's rename
+// of "Canary" inside Podfile changes the SHA1 a checked-in Podfile.lock's checksum records, so
+// `pod install` discards the shipped lock for a fresh resolve that can pick the wrong linkage.
 describe('scaffoldApp does not ship a lockfile for any package manager', () => {
   const tmpDirs: string[] = [];
 

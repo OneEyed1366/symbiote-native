@@ -1,7 +1,5 @@
-// resolveImageSourceProp's Android `source` rule. `Image.android.js` lifts headers only from an
-// ARRAY source, and ReactImageView never reads per-source headers, so a single `{uri, headers}`
-// object sends none. Our write wraps every source in an array; only there is the authored shape
-// still visible.
+// resolveImageSourceProp's Android `source` rule: RN lifts headers only from an array source, so
+// a single `{uri, headers}` object sends none — only visible once the write wraps it in an array.
 
 import { describe, expect, it } from 'vitest';
 

@@ -1,32 +1,20 @@
 // The local-registry half of the dev loop: publish this working tree's build of a
 // `@symbiote-native/*` package to a Verdaccio running on localhost, and point an example at it.
-//
-// WHAT PROBLEM THIS REPLACES. The documented loop (<examples_vs_dot_examples> in CLAUDE.md)
-// re-points an example's manifest at a `.tarballs/*.tgz`. It works, and it leaves machine-local
-// install state inside a TRACKED file — measured 2026-09-01, six manifests and five lockfiles were
-// dirty with it at once, and the only thing standing between that and a commit is somebody
-// remembering. Here the manifest keeps its ordinary public version literal and never changes; only
-// a gitignored `.npmrc` says where that version resolves from.
-//
-// THE FALLBACK, which is the whole reason this shape was chosen. npm has NO registry fallback
-// chain: a configured registry that is unreachable is a hard failure, not a quiet fall-through to
-// npmjs. So a tracked pointer at localhost would break every clone that does not run Verdaccio. It
-// is not tracked, a clone has no `.npmrc`, and the manifest's public version resolves from npmjs
-// exactly as it does today. Opting in is this script; opting out is `off`.
-//
-// WHAT IT DOES NOT FIX, measured rather than assumed. npm's lockfile still short-circuits: publish
-// new bytes under the SAME version, run a plain `npm install`, and npm prints `up to date` and
-// leaves the old copy in place — the identical failure the `file:` dance has, and the reason
-// CLAUDE.md tells you to delete both the lockfile and the folder. `refresh` below does exactly
-// that: wipes `node_modules` and `package-lock.json`, then a full install. A targeted
-// `npm install <pkg>@<version>` is faster but trusts that the rest of an example's `node_modules`
-// is already consistent — device-observed 2026-09-13, an interrupted manual reinstall left
-// `node_modules` on a stale build with no lockfile at all, and a targeted install would have
-// layered on top of that instead of fixing it.
-//
-// And `pod install` is still owed afterwards, for the reason CLAUDE.md gives: replacing a package
-// folder deletes `@symbiote-native/splash-screen/.rn-bootsplash/`, which the podspec vendors at
-// pod-install time.
+
+// Replaces the documented `.tarballs/*.tgz` loop (<examples_vs_dot_examples> in CLAUDE.md), which
+// leaves machine-local install state inside a TRACKED manifest. Here the manifest keeps its
+// ordinary public version literal; only a gitignored `.npmrc` says where it resolves from.
+
+// npm has NO registry fallback chain — a configured registry that's unreachable is a hard failure,
+// not a fall-through to npmjs — so the pointer stays untracked: a clone has no `.npmrc` and
+// resolves from npmjs as normal. Opting in is this script; opting out is `off`.
+
+// npm's lockfile still short-circuits: publishing new bytes under the SAME version and running
+// `npm install` prints `up to date` and keeps the old copy. `refresh` wipes `node_modules`/
+// `package-lock.json` for a full install; a targeted install trusts the rest is consistent.
+
+// `pod install` is still owed afterwards: replacing a package folder deletes
+// `@symbiote-native/splash-screen/.rn-bootsplash/`, which the podspec vendors at pod-install time.
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
@@ -176,9 +164,8 @@ async function commandPublish(dirs) {
   const selected = dirs.length > 0 ? dirs : entries.map(entry => entry.dir);
   const failed = [];
   // Progress is printed BEFORE the work, not after it. `pnpm pack` runs each package's own build
-  // and takes seconds; with a completion-only line a 30-package run shows one header and then
-  // nothing for minutes, which reads as a hang and gets killed — observed 2026-09-01. The step
-  // that is CURRENTLY running is the only one worth naming, because it is the one that can wedge.
+  // and takes seconds; with a completion-only line a large run shows one header and then nothing
+  // for minutes, reading as a hang. The step CURRENTLY running is the only one worth naming.
   let done = 0;
   for (const dir of selected) {
     const entry = entries.find(candidate => candidate.dir === dir);

@@ -1,7 +1,6 @@
-// The `<text-input>` / `<text-input-multiline>` tag's prop surface. The tags are matched by
-// `TextInputElement` / `MultilineTextInputElement` (`../elements`) and carry the controlled-input
-// machine as an engine behavior (`registerTextInputBehavior`), so the wrapper that used to run the
-// handshake, the imperative handle and the autoFocus command in Angular was deleted 2026-09-11.
+// The `<text-input>` / `<text-input-multiline>` tag's prop surface. The tags
+// (`TextInputElement`/`MultilineTextInputElement`) carry the controlled-input handshake, the
+// imperative handle and the autoFocus command as an engine behavior (`registerTextInputBehavior`).
 //
 // Which of the two intrinsics a `<text-input multiline>` commits is the ENGINE's decision
 // (`intrinsicWhen` on the spec entry), not a template branch — the wrapper's `@if`/`@else` over two

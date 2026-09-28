@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/sqlite",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "expo-sqlite wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, Svelte, Solid, and Angular adapters. Database / Statement / Session (transactions, changesets), a Bun-style SQL tagged-template helper, and a SQLite-backed key-value store.",
   "license": "MIT",
   "keywords": [

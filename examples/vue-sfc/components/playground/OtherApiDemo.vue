@@ -1,41 +1,21 @@
-<!--
-  Render Function / Low-level / Misc: h()/createVNode()/cloneVNode()/isVNode()/Fragment/
-  withDirectives()/mergeProps() — the primitives `vue-tsx` render functions build on directly,
-  exercised here from an ordinary `<script setup>` since a vnode still needs SOME template anchor
-  to actually render (`RenderVNode` below, a one-line functional wrapper — the same technique
-  CanaryScreen.vue already uses for its RefreshControl's element-valued prop).
+<!-- Render Function / Low-level / Misc: h()/createVNode()/cloneVNode()/isVNode()/Fragment/
+  withDirectives()/mergeProps() — the primitives `vue-tsx` render functions build on directly.
+  Exercised here since a vnode still needs SOME anchor (`RenderVNode`, a one-line wrapper). -->
 
-  defineAsyncComponent() resolves its loader with a plain in-memory component object instead of a
-  real dynamic `import()` — this repo's Metro pipeline doesn't need proving here, only the
-  loading/error/delay contract does.
+<!-- defineAsyncComponent() resolves its loader with a plain in-memory component object, not a real
+  dynamic `import()` — only the loading/error/delay contract needs proving here. -->
 
-  GAP UPDATE 2026-08-17: `withModifiers()`/`withKeys()` were found missing from both this
-  project's typecheck shim and its Metro runtime shim — exported only from `@vue/runtime-dom`,
-  never `@vue/runtime-core`, so `import { withModifiers } from 'vue'` failed at both typecheck and
-  runtime here. Rather than fake a passing demo around it, the real fix landed in
-  `runtime-helpers.ts` itself (pure event-object logic, no DOM dependency, same shape as the
-  existing `vShow` shim) — `withModifiers` is now real, demoed below in its render-function/
-  programmatic form (its TEMPLATE form, `@press.self`, already has a live demo in the Template
-  Directives section above).
+<!-- `withModifiers`/`withKeys` ship only from `@vue/runtime-dom`, never `@vue/runtime-core`, so
+  importing from `vue` fails here. Fixed in `runtime-helpers.ts` (pure event-object logic,
+  same shape as the `vShow` shim). -->
 
-  `useCssModule()` stays a genuine, NOT-a-clean-shim gap, still undemoed on purpose: the function
-  itself is now a correct copy of upstream Vue's implementation (reads `instance.type.__cssModules`),
-  but THIS PROJECT'S OWN `<style module>` compiler (`examples/vue-sfc/metro-vue-transformer.js`,
-  documented in the `symbiote-sfc-style-compiler` skill's "Inline Vue `<style module>`" section)
-  emits a plain top-level `const $style = {...}` closed over by `setup()`, never `__cssModules` on
-  the component's own options — so calling `useCssModule()` against a real `<style module>` block
-  here would just hit the "no CSS module named" warning path and return `{}`, not a genuine
-  passing demo. Making it work for real means teaching the COMPILER to also emit `__cssModules`,
-  not a plain adapter-level function shim — a bigger, different fix than `withModifiers`, left for
-  a future task rather than blurred into this one.
+<!-- `useCssModule()` stays undemoed: it's a correct copy of upstream Vue, but this project's own
+  `<style module>` compiler emits a plain `const $style` closed over by `setup()`, never
+  `__cssModules` — fixing it means teaching the COMPILER to emit that, a separate task. -->
 
-  `$refs`/`$slots`/`$emit`/`$parent`/`$root`/`$forceUpdate`/`mixins`/`extends`/`inheritAttrs` are
-  NOT re-demoed here even though they're listed under this same "Other" category in the checklist —
-  they're the Options-API-instance-property flavor of the exact same surface Component
-  Communication's OptionsApiChild already demos live, just above. `resolveComponent`/
-  `resolveDirective` are likewise cross-referenced to the Global/Application API section, where
-  app.component()/app.directive() register the names they resolve.
--->
+<!-- `$refs`/`$slots`/`$emit`/`$parent`/`$root`/`mixins`/`extends`/`inheritAttrs` are NOT re-demoed:
+  they're the Options-API flavor of what Component Communication's OptionsApiChild already demos.
+  `resolveComponent`/`resolveDirective` are cross-referenced to Global/Application API. -->
 <script setup lang="ts">
 import {
   ref,

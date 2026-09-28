@@ -59,7 +59,7 @@ type IBenchmarkRow = { id: number; label: string };
 const ROW_CLASS = 'bench-row';
 const ROW_CLASS_SELECTED = 'bench-row bench-row-selected';
 
-// FIXTURE ONLY as of 2026-09-01 — see the itest twin's identical comment.
+// FIXTURE ONLY — see the itest twin's identical comment.
 const COMPOSED_ROW_TEMPLATE = `
     <view [class]="rowClass">
       <text class="bench-row-id">{{ rowId }}</text>
@@ -72,7 +72,7 @@ const COMPOSED_ROW_TEMPLATE = `
     </view>
   `;
 
-// THE SCREEN'S ONLY ROW as of 2026-09-01 — the one constant here still fenced against the screen.
+// THE SCREEN'S ONLY ROW — the one constant here still fenced against the screen.
 const WITH_INPUT_ROW_TEMPLATE = `
     <view [class]="rowClass">
       <text class="bench-row-id">{{ rowId }}</text>

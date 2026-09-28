@@ -1,11 +1,6 @@
-// EXACTLY ONE thing may build a ScrollView's content node, and from 2026-09-11 that thing is the
-// engine: `registerScrollViewBehavior()` (`../../register.ts`) puts a `buildStructure` on the
-// scroll tags. The Angular wrapper that used to build the content node itself (its own projection
-// bridge in `scroll-view/shared.ts` + `.ios.ts`/`.android.ts`) is deleted along with `RefreshControl`
-// and `ScrollView` as components — see `../scroll-view-props.ts` and
-// `../refresh-control-props.ts`. This is Angular's twin of
-// `adapters/svelte/src/components/scroll-view/scroll-view-content-owner.test.ts` and
-// `adapters/react/src/components/scroll-view/scroll-view-content-owner.test.tsx`.
+// EXACTLY ONE thing may build a ScrollView's content node: the engine's `buildStructure`
+// (`registerScrollViewBehavior()`), never an Angular wrapper. Twin of adapters/svelte's and
+// adapters/react's `scroll-view-content-owner.test`.
 //
 // THE CONTROL ARM is what makes the count mean anything: a mount producing NOTHING would also
 // satisfy `toBe(1)` on a count taken from an empty tree, so every case pins the owner count AND

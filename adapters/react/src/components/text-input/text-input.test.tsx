@@ -67,9 +67,9 @@ describe('<text-input>', () => {
   // why: `value` is the controlled React prop but native reads a private `text` prop plus an
   // event-count handshake (mostRecentEventCount) — get the fold or the derived onValueChange
   // wrong and the input either doesn't render the caller's text or never reports keystrokes back.
-  // The `value -> text` fold left this case on 2026-09-18 — it is `foldTextInputValue` in
-  // `SymbioteFabricProps.cpp`, and this harness's payload comes from the TypeScript builder, which
-  // holds no copy of it (`core/engine/cpp/tests/js/text-input-payload.itest.ts` has the fold). What
+
+  // The `value -> text` fold is `foldTextInputValue`'s in `SymbioteFabricProps.cpp`; this
+  // harness's TypeScript builder holds no copy — asserted in `text-input-payload.itest.ts`. What
   // stays is the pair that is the MACHINE's: the counter it maintains and the change it derives.
   it('sends the controlled value with a count and derives onValueChange', () => {
     let changedText: string | undefined;

@@ -412,9 +412,7 @@ describe('buildListPlan', () => {
 
   // why: an ItemSeparatorComponent rides INSIDE its cell's measuring wrapper (RN
   // VirtualizedListCellRenderer.js:218-221), so it emits no child of its own and cannot shift a
-  // sticky index's position. Counting it as a sibling — which this plan used to do — also made the
-  // leading spacer short by (separator + one container gap), which is the 17px jump measured on
-  // device 2026-08-19. Nothing about a separator may reach these positions again.
+  // sticky index's position.
   it('keeps sticky child positions independent of any separator', () => {
     const plan = buildListPlan({
       count: 20,

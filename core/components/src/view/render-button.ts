@@ -4,9 +4,7 @@
 //
 // The inner view is not optional chrome. RN's Button is the one control in the library that ships
 // a finished appearance, and on Android that appearance — a filled, elevated, rounded Material
-// button with an uppercased label — lives entirely on that node. A port that renders only the
-// touchable and the text is an iOS port, which is what this file was until 2026-09-09: blue text on
-// nothing, wherever Android was.
+// button with an uppercased label — lives entirely on that node.
 //
 // What is NOT here, because a layer below already does it: the `aria-*` -> `accessibilityState`
 // fold RN performs in `Button.js:326-331`. The engine folds those for every node
@@ -36,50 +34,21 @@ export interface IButtonProps extends IAccessibilityProps, IAriaProps {
   nextFocusUp?: number;
 }
 
-// `BUTTON_ACCESSIBILITY_ROLE` and `resolveButtonImportantForAccessibility` WERE HERE and are gone
-// (2026-09-18). Both are `foldButtonProps` in `SymbioteFabricProps.cpp` now, and neither had a
-// caller left afterwards — only its own unit test, which is the shape this project calls a mirror:
-// a JS copy of a rule that runs elsewhere, kept alive by the test that asserts it. It would have
-// stayed green forever while meaning nothing.
+// `BUTTON_ACCESSIBILITY_ROLE`, `resolveButtonImportantForAccessibility`, and the Android style
+// constants are `foldButtonProps`/`foldButtonLabelStyle` in `SymbioteFabricProps.cpp` now — no JS
+// mirror is kept here to avoid a rule with no caller staying green for the wrong reason.
 
-// `buttonTextStyle` AND `resolveButtonTextStyle` ARE GONE (2026-09-18) — the label's style is
-// `foldButtonLabelStyle` in `SymbioteFabricProps.cpp`, reached off the label text's own tag. Its
-// constants live THERE now and are not mirrored here; this file keeps only what Android's own fold
-// still needs.
-//
-// It was the last rule in this primitive to move and it needed a seam none of the others did. Its
-// inputs are the BUTTON's `color` and `disabled`, and the node it hangs on is the button's
-// GRANDCHILD on iOS (`button -> view -> text`) and its child on Android — so `ownerProps`, which
-// answers "my parent", could not reach it. `IAncestorLookup` asks for the nearest ancestor carrying
-// a tag instead, which is a CSS ancestor selector and makes one rule right on both trees.
+// `foldButtonLabelStyle` reaches the label's style off its own tag via `IAncestorLookup` —
+// needed because the label is the button's GRANDCHILD on iOS but its CHILD on Android, so
+// `ownerProps` (nearest parent) can't reach it either way.
 
-// `buttonViewStyle` AND `resolveButtonViewStyle` ARE GONE (2026-09-18), and with them the last of
-// Button's folds. The Material look is inside `foldButtonProps` in `SymbioteFabricProps.cpp`, behind
-// `#ifdef ANDROID` — where it belongs, since `{}` on iOS was the whole of its other branch.
-//
-// Its five constants went too rather than staying as a copy nothing reads.
-//
-// WHAT MADE THIS ONE DIFFERENT from the four ports before it: the Android branch is no longer
-// untestable. The test host grew an arm that compiles `#ifdef ANDROID`
-// (`core/engine/cpp/tests/CMakeLists.txt`, `SYMBIOTE_PLATFORM_ANDROID`), so the style, the `color`
-// override and the disabled greying are asserted against the COMMITTED PAYLOAD in
-// `core/engine/cpp/tests/js/android-rules.itest.ts` — strictly better than the mocked-`Platform.OS`
-// unit test that went with them, which asserted a JS function rather than what Fabric receives.
+// The Material look (`foldButtonProps`, `SymbioteFabricProps.cpp`, `#ifdef ANDROID`) — style,
+// `color` override, disabled greying — is asserted against the COMMITTED PAYLOAD in
+// `android-rules.itest.ts`, not a JS unit test mocking `Platform.OS`.
 
-// `resolveButtonTitle` IS GONE (2026-09-18) — the uppercase-on-Android rule is `foldButtonLabel` in
-// `SymbioteFabricProps.cpp`, reached off the label's own tag. It had no caller left but its own two
-// unit tests, which is the orphan shape this migration keeps turning up: a JS copy of a rule that
-// runs elsewhere, kept alive by the test asserting it, green forever and proving nothing.
-//
-// A COVERAGE GAP WENT WITH IT, recorded rather than hidden. The C++ rule is `#ifdef ANDROID` — a raw
-// text commits as `RCTRawText` on both platforms, so unlike `Switch`/`AndroidSwitch` there is no view
-// NAME for a rule to branch on — and this host is not Android. The deleted Android test reached the
-// branch by mocking `Platform.OS`; what it mocked was a JS function that no longer exists. Same
-// class as `android_ripple` and `decelerationRate`'s constants, and closing it means an Android arm
-// of the test host, not a mock.
-//
-// One behaviour difference shipped with the move and is deliberate: RN uppercases through
-// JavaScript's full-Unicode `toUpperCase`, and the C++ rule is ASCII-only. See `foldButtonLabel`.
+// The uppercase-on-Android rule is `foldButtonLabel` in `SymbioteFabricProps.cpp`. Untested here
+// (this host isn't Android, and raw text has no view NAME for a rule to branch on). Deliberate
+// divergence: RN uppercases via full-Unicode `toUpperCase`, the C++ rule is ASCII-only.
 
 /**
  * Whether the button is disabled, which `aria-disabled` may decide on its own.

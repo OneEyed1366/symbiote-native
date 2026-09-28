@@ -1,21 +1,6 @@
-// What the Angular adapter contributes to a `<text>`'s props — the FORWARDING, as of 2026-09-18.
-//
-// THIS FILE'S OLD SUBJECT WAS AN ANGULAR-SPECIFIC ARGUMENT, and it is worth recording why it stopped
-// being one. Angular declared `ellipsizeMode` and `allowFontScaling` as real `@Input()`s rather than
-// letting them pass through, because a default can only be applied by code that can SEE whether the
-// caller supplied a value, and a pass-through host binding is invisible to the component. That was
-// sound while the defaulting lived in the component.
-//
-// It does not any more. The rule reads the AUTHORED bag at payload time (`foldTextDefaults`,
-// `SymbioteFabricProps.cpp`), which can tell an absent prop from an explicit `clip` without anyone
-// declaring anything — so the two `@Input()`s were deleted and `TextHost` is an ordinary primitive
-// host again. The defaults' own claims live in `core/engine/cpp/tests/js/committed-payload.itest.ts`,
-// read off a payload a commit actually sent.
-//
-// So the cases here are the ones that are still Angular's: the pass-through carries an authored
-// value, and a bare `<text>` with no component behind it commits the same component as one with.
-// Read off `fabricProps`, not `fabric.find`: createNode never re-runs, so a prop applied through a
-// lifecycle hook only shows up on the live clone.
+// What the Angular adapter contributes to a `<text>`'s props: the FORWARDING. Defaults
+// (`ellipsizeMode`/`allowFontScaling`) resolve in `foldTextDefaults` (C++) off the authored bag,
+// so this file only covers pass-through and bare-vs-component parity, read off `fabricProps`.
 
 import '@angular/compiler';
 import { Component, CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';

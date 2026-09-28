@@ -144,8 +144,8 @@ describe('runAdd', () => {
   });
 
   // splash-screen's hide() JS wiring is spliced into the App source by addLayersToApp itself
-  // (apply-splash-screen-hide.ts, real bug fixed 2026-09-18: 6 already-scaffolded apps never got
-  // it) — `add` no longer prints manual per-framework instructions for a step it now does itself.
+  // (apply-splash-screen-hide.ts) — `add` prints no manual per-framework instructions for a
+  // step it does itself.
   it('does not print manual hide() instructions when splash-screen is applied', async () => {
     mockEligibleApp('vue');
     vi.mocked(resolveAddLayers).mockResolvedValue(['splash-screen']);

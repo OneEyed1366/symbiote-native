@@ -1,28 +1,17 @@
-// RN's `aria-*` / `role` -> `accessibility*` fold, at the layer every path goes through.
-//
-// WHY IT IS HERE AND NOT IN A WRAPPER. It used to run inside each primitive's COMPONENT, and a tag
-// has none. It also cannot run per attribute — `aria-checked` has to be folded against a sibling
-// `accessibilityState` — so it belongs at the one point where the whole bag is known, which is the
-// payload build.
-//
-// IT IS A MOVE, NOT A REWRITE, AND THAT IS DELIBERATE. The function carries TWO CONTRADICTORY
-// PRECEDENCE RULES: for the scalars an explicit `accessibility*` WINS and the alias only fills a
-// hole (`if (next.X === undefined)`), while INSIDE the `accessibilityState` / `accessibilityValue`
-// composites the ALIAS wins per field (`ariaBusy ?? existing?.busy`). Both mirror RN's View.js.
-// Anyone "cleaning this up" collapses them into one rule, and every component test stays green
-// while real accessibility silently changes. `core/components/src/accessibility-props.test.ts`
-// pins both directions; read it before touching the branches below.
-//
-// Record-level rather than typed, because the engine's caller has a raw `node.props` bag and an
-// interface is not assignable to `Record<string, unknown>` (no index signature). The typed
-// `resolveAccessibilityProps<T>` in `core/components` stays where adapters already import it and
-// delegates here, keeping its own typed gate so the fast path allocates nothing.
+// RN's aria-* / role -> accessibility* fold, at the layer every path goes through: it can't run
+// per attribute (aria-checked folds against a sibling accessibilityState), so it belongs at the
+// one point where the whole bag is known, the payload build.
+
+// A move, not a rewrite: the function carries two contradictory precedence rules — scalars let an
+// explicit accessibility* win, alias only fills a hole; the composites let the alias win per field
+// instead. Both mirror RN's View.js. accessibility-props.test.ts pins both directions.
+
+// Record-level rather than typed: the engine's caller has a raw node.props bag with no index
+// signature. The typed resolveAccessibilityProps<T> in core/components delegates here.
 import { dlog } from './debug';
 
-// Copied line for line from the wrapper this replaces. The first copy silently dropped five
-// entries (`button`, `grid`, `link`, `list`, `listitem`) — a role that falls through simply passes
-// unmapped, so `role="listitem"` would have reached Fabric as `listitem` instead of `list` with
-// nothing red anywhere. Diff this against RN's View.js rather than reading it for plausibility.
+// A role that falls through here passes unmapped, reaching Fabric under the wrong name with
+// nothing red anywhere. Diff against RN's View.js, don't just read for plausibility.
 const ROLE_TO_ACCESSIBILITY_ROLE: Readonly<Record<string, string>> = {
   alert: 'alert',
   button: 'button',
@@ -54,14 +43,12 @@ const ROLE_TO_ACCESSIBILITY_ROLE: Readonly<Record<string, string>> = {
   toolbar: 'toolbar',
 };
 
-// Exported so a behavior that folds a DIFFERENT node's bag can name them without restating the
-// list. `slotDerived` (host-behavior.ts) takes prop NAMES, so a primitive whose payload derives
-// from an owner's aria props has to enumerate them — and a second hand-written copy is exactly what
-// `.claude/rules/adapter-parity-audit.md` records going stale one member at a time.
-// `as const` rather than `readonly string[]`, so the members are LITERALS. That is what lets a
-// consumer index a prop type with them — `pickAccessibilityProps` in the Svelte adapter forwards the
-// aria half by looping this list — and it makes the two sides check each other: a name here that is
-// not a key of `IAriaProps` stops compiling at the use site rather than going quietly unforwarded.
+// Exported so a behavior folding a different node's bag can name these without restating the
+// list — slotDerived (host-behavior.ts) takes prop names, so a derived primitive enumerates them.
+
+// as const rather than readonly string[], so the members are literals: pickAccessibilityProps
+// (Svelte adapter) indexes IAriaProps with them, and a name here not a key of IAriaProps then
+// fails to compile at the use site instead of going quietly unforwarded.
 export const ARIA_ALIAS_KEYS = [
   'role',
   'aria-label',
@@ -89,12 +76,6 @@ function hasAnyAriaKey(props: Readonly<Record<string, unknown>>): boolean {
   return false;
 }
 
-// `isAriaAliasKey` WAS HERE AND IS GONE (2026-09-18). Its whole reason was to maintain
-// `node.hasAriaAlias` from `setProp` — the hottest write path in the engine, 32 001 writes on one
-// benchmark create — and that flag existed only to gate the aria fold inside the headless payload
-// builder. The fold left for `SymbioteFabricProps.cpp`, which recomputes presence from the bag it
-// holds, so the flag became write-only and this function became its only maintainer. Both went.
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
@@ -103,17 +84,12 @@ function fieldOf(source: unknown, field: string): unknown {
   return isRecord(source) ? source[field] : undefined;
 }
 
-/**
- * Fold the web-alias `aria-*` / `role` props into RN's canonical `accessibility*` props.
- *
- * Returns the input BY IDENTITY when no alias is present — the fast path that keeps this off the
- * hot path for the ~99% of nodes carrying none, and the property idempotence rests on: pass 1
- * blanks every alias, so a second pass finds nothing and returns by identity again.
- *
- * The alias keys are blanked to `undefined` rather than deleted. That is not laziness: `setProp`
- * treats an `undefined` write as a delete and `fabricProps` skips undefined, so a blanked alias
- * cannot reach Fabric, while a `delete` would deoptimise the object's shape on every folded node.
- */
+// Fold the web-alias aria-*/role props into RN's canonical accessibility* props. Returns the input
+// by identity when no alias is present, keeping this off the hot path for nodes carrying none —
+// and idempotent, since pass 1 blanks every alias so a second pass finds nothing.
+
+// Alias keys are blanked to undefined rather than deleted: setProp treats undefined as a delete
+// and fabricProps skips it, while a real delete would deoptimise the object's shape.
 export function foldAriaProps(
   props: Record<string, unknown>,
 ): Record<string, unknown> {
@@ -176,27 +152,19 @@ export function foldAriaProps(
     bag.accessibilityRole = ROLE_TO_ACCESSIBILITY_ROLE[role] ?? role;
   }
 
-  // RULE TWO, INSIDE the composites: the polarity INVERTS and the ALIAS wins per field. Read from
-  // the ORIGINAL props, not from `bag` — the loop above has already blanked the aliases there.
-  //
-  // UPSTREAM-BUG(react-native): View.js:96 is `checked: ariaChecked ?? accessibilityState?.checked`
-  // — NO type coercion. A template writes `aria-checked="true"` as a STRING in every framework we
-  // support, so `accessibilityState.checked` reaches native as `'true'` where the native side
-  // declares `boolean | 'mixed'`. Ported verbatim for parity; do NOT add a cast without recording
-  // a deliberate divergence. Found by the Svelte session 2026-08-31 and pinned as an ASSERTION in
-  // `adapters/svelte/src/aria-fold-parity.test.ts`, so a future decision to coerce shows up as a
-  // failing test at the point the decision was made rather than as a silent behaviour change.
-  //
-  // A SECOND, SMALLER DIVERGENCE, and this one is ours rather than upstream's — it predates the
-  // move down and is kept only because changing it here would be an undeclared behaviour change:
-  // upstream gates the composite on `!= null` (View.js:87-92) and this gates on `!== undefined`.
-  // So an explicit `aria-busy={null}` builds an all-undefined `accessibilityState` here and builds
-  // nothing upstream. The VALUES agree either way — `??` treats null and undefined alike — so only
-  // the composite's existence differs.
-  //
-  // The composite is REPLACED by a fresh literal listing exactly the known fields, so an unknown
-  // field riding on the incoming object is dropped. Faithful to RN and pinned by a test; it is the
-  // shape of bug that only shows for whoever passes a field RN adds later.
+  // Rule two, inside the composites: the polarity inverts and the alias wins per field. Read from
+  // the original props, not bag — the loop above has already blanked the aliases there.
+
+  // Upstream bug, ported verbatim: RN's View.js does `checked: ariaChecked ?? accessibilityState
+  // ?.checked` with no coercion, so a string "true" reaches native where it declares boolean |
+  // 'mixed'. No cast without recording a divergence (aria-fold-parity.test.ts pins it).
+
+  // A second, smaller divergence, ours rather than upstream's: upstream gates the composite on
+  // `!= null`, this on `!== undefined`, so `aria-busy={null}` builds an all-undefined
+  // accessibilityState here but nothing upstream — the values agree either way.
+
+  // The composite is replaced by a fresh literal listing exactly the known fields, so an unknown
+  // field riding on the incoming object is dropped, faithful to RN.
   const existingState = fieldOf(props, 'accessibilityState');
   if (
     existingState !== undefined ||

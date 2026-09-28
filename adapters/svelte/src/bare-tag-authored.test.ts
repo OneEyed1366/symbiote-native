@@ -21,13 +21,9 @@
 //   style={…}           set_style -> cssText (stringified) + a private Symbol (the real value)
 //   on<Name>={fn}       $.event('<Name>') -> addEventListener
 //
-// All four the shim now answers, and the last two were recorded here as unfixable until
-// 2026-09-07. The lowercased NAMES and the stringified VALUES are settled by the compiler before
-// any code of ours runs, but neither is beyond repair from below: a lowercased name is recovered
-// through `dom-shim/canonical-prop-names.ts`, and a stringified value never happens once
-// `get_setters` finds a real prototype setter — which it does only because `customElements.get()`
-// returns something truthy. See those two files for the mechanism; the last two `it`s below are
-// what pin it.
+// All four the shim answers now. The compiler-settled lowercased NAMES and stringified VALUES are
+// both recovered from below: a name via `dom-shim/canonical-prop-names.ts`, a value via
+// `get_setters` finding a real prototype setter — pinned by the last two `it`s below.
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
 import { rmSync, writeFileSync } from 'node:fs';
@@ -399,22 +395,12 @@ describe('a callback prop a behavior reads off node.props', () => {
     await settle();
   });
 
-  // why: the case above proves ROUTING — the handler lands on `node.props.onValueChange` rather
-  // than in the listener stash. This proves it is actually CALLABLE from a native event.
-  // `target_handler` (Svelte's own listener wrapper — `$.event()` calls `create_event`, which
-  // builds `target_handler` and passes THAT to `dom.addEventListener`, never the app's raw closure;
-  // `svelte-shim-element-global-must-be-an-ancestor.md`, "the fifth door") ALWAYS calls with exactly
-  // one argument, a real object, and mutates it internally
-  // (`Object.defineProperty(event, 'currentTarget', …)`, then `event[event_symbol] = …`). A
-  // two-argument `(text, event)` callback used to crash the moment `text` — a bare string — landed
-  // in that sole argument slot. `callValueChange` (`core/components/src/behaviors/text-input.ts`)
-  // now calls `listener(event)` with `text` (or `value`, for Switch) carried as a FIELD on that same
-  // real object, which survives both of `target_handler`'s mutation attempts. Device-reproduced
-  // crash fixed 2026-09-10.
-  //
-  // `onPress`/`onFocus`/responder callbacks never had this problem — their sole argument already IS
-  // the event object, so `target_handler(event)` merely reroutes the call through Svelte's own
-  // dispatch before invoking the real handler.
+  // why: the case above proves ROUTING; this proves it's actually CALLABLE. `target_handler`
+  // (Svelte's listener wrapper) always calls with ONE real-object argument and mutates it — a
+  // two-argument `(text, event)` callback crashes; `text`/`value` ride the event as a FIELD.
+
+  // `onPress`/`onFocus`/responder callbacks never had this problem — their sole argument already
+  // IS the event object.
   it('calls the app fn through the compiled wrapper, text carried on the event', async () => {
     const received: unknown[] = [];
     Object.assign(globalThis, {

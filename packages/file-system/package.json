@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/file-system",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "expo-file-system wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, Svelte, Solid, and Angular adapters. Matches upstream's own layout: the modern JSI shared-object File/Directory/Paths API (including upload/download tasks and filesystem watching) at the package root, and the legacy function-based API (read/write/copy/move/delete, directory listing, disk-space queries, resumable download/upload, Android Storage Access Framework) at the ./legacy subpath. See the module's own README.",
   "license": "MIT",
   "repository": {

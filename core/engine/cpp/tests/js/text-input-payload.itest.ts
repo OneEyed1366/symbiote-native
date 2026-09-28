@@ -303,8 +303,8 @@ describe('what a text input sends native, resolved by the engine', () => {
   });
 
   // why: RN HAS NO `value` FABRIC PROP — the controlled value rides as the private `text`. The four
-  // cases below pinned only the TypeScript twin of this rule until 2026-09-18, in a vitest that
-  // builds payloads through `fabric-props.ts` and therefore cannot see the C++ copy at all. The
+  // cases below pin only the TypeScript twin of this rule, in a vitest that builds payloads
+  // through `fabric-props.ts` and therefore cannot see the C++ copy at all. The
   // device rule could have broken with every one of them green. Same shape as the disabled
   // `touchable-highlight` that committed `focusable: true` for as long as it did.
   it('folds an uncontrolled defaultValue the same way', () => {

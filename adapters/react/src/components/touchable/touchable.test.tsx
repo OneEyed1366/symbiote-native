@@ -26,6 +26,7 @@ import {
   createLiveTree,
   installRecordingFabric,
 } from '@symbiote-native/test-utils';
+import type { IMeasureOnSuccess } from '@symbiote-native/engine';
 
 const ROOT_TAG = 120;
 const TOUCH_START = 'topTouchStart';
@@ -45,17 +46,8 @@ const installed: unknown = globalThis.nativeFabricUIManager;
 if (!isRecord(installed)) throw new Error('fabric slot was not installed');
 
 // Pressable measures its responder rect on grant (retention region); report a fixed frame.
-installed.measure = (
-  _node: unknown,
-  cb: (
-    x: number,
-    y: number,
-    w: number,
-    h: number,
-    px: number,
-    py: number,
-  ) => void,
-): void => cb(0, 0, 100, 40, 0, 0);
+installed.measure = (_node: unknown, cb: IMeasureOnSuccess): void =>
+  cb(0, 0, 100, 40, 0, 0);
 
 // rAF polyfill: the drivers read requestAnimationFrame from the host at call time; a
 // setTimeout-based clock advancing 16ms per frame lets .start() run to completion.
@@ -173,17 +165,12 @@ function containerProps(): Record<string, unknown> {
   return committedViews()[0];
 }
 
-// TouchableHighlight's underlay is `foldTouchableHighlightUnderlay` in the engine since 2026-09-18,
-// and this host builds payloads through the TypeScript `fabricProps`, which carries no copy of the
-// tag rules — so the painted colour is not readable here. The BIT is (`OP_SET_UNDERLAY_SHOWN`), and
-// it is the right witness for what these cases claim: that REACT's wiring reaches the machine,
-// through a real reconciler and a real commit. What a showing underlay looks like belongs to
-// `core/engine/cpp/tests/js/touchable-highlight-underlay.itest.ts`.
-// Located by TAG, not by view name plus a `pointerEvents` filter the way the payload helpers above
-// are. A `<touchable-highlight>` commits as a plain `RCTView` — that is the whole reason the tag has
-// to cross at all — so the filter those helpers use is a heuristic that happens to work on the
-// shapes in this file, and it picked the wrong node the first time this was written. The tag is
-// exact.
+// `foldTouchableHighlightUnderlay` in the engine owns the underlay colour; this harness's
+// `fabricProps` holds no copy — only the `OP_SET_UNDERLAY_SHOWN` bit is readable here, the right
+// witness that REACT's wiring reaches the machine. Colour itself: the underlay itest.
+
+// Located by TAG, not by view name plus a `pointerEvents` filter: `<touchable-highlight>` commits
+// as a plain `RCTView`, so the payload helpers' heuristic filter can pick the wrong node.
 function isUnderlayShown(): boolean {
   const node = fabric.find(n => n.tagName === 'touchable-highlight');
   if (node === undefined) throw new Error('no touchable-highlight was created');
@@ -203,16 +190,12 @@ function asNumber(value: unknown, label: string): number {
 }
 
 describe('React TouchableOpacity animated feedback', () => {
-  // why: RN picks the press-in duration from WHERE the press-in came from
-  // (TouchableOpacity.js:215-220) — 0 when it rides the responder grant, 150 on a drift-back-in
-  // re-activation. An ordinary tap is the grant branch, so RN snaps INSTANTLY; our engine
-  // dispatches pressIn from topTouchStart only (events/index.ts:391) and has no re-activation
-  // path, so 0 is the branch that applies. All five adapters used 150 until 2026-08-19.
-  //
-  // This test deliberately does NOT await a frame flush. Every other fade assertion here sits
-  // behind `await flushFrames()`, which burns past 150 ms, so the duration is invisible to them —
-  // swapping 0 for 150 left all 79 adapter tests green (.claude/rules/test-harness-false-greens
-  // §5: the test that pins a duration is the one that does not wait).
+  // why: RN picks the press-in duration from WHERE the press-in came from — 0 on the responder
+  // grant (an ordinary tap), 150 on a drift-back-in re-activation. Our engine dispatches pressIn
+  // from topTouchStart only, with no re-activation path, so 0 is the branch that applies.
+
+  // Deliberately does NOT await a frame flush: every other fade assertion here waits past 150ms,
+  // so the duration is invisible to them (.claude/rules/test-harness-false-greens §5).
   it('snaps to activeOpacity on press-in with no fade, as the grant branch does', async () => {
     function App(): ReactElement {
       return (
@@ -223,21 +206,18 @@ describe('React TouchableOpacity animated feedback', () => {
       );
     }
     mount(ROOT_TAG, <App />);
-    // The RESTING value is published from the behavior's `afterCommit`, one commit after the
-    // mount — the wrapper carried it in the style it rendered, so it was there synchronously. This
-    // await is on the setup, NOT on the measurement: the press-in read below still takes no wait,
-    // which is what keeps the 0-vs-150ms duration observable at all.
+    // The await is on the SETUP, not on the measurement: the press-in read below still takes no
+    // wait, which is what keeps the 0-vs-150ms duration observable at all
     await flushEffectsAndFrames();
 
-    expect(asNumber(feedbackProps().opacity, 'resting opacity')).toBe(1);
+    // Untouched and with no authored `style.opacity`, nothing publishes the key, the same as
+    // vendor (`TouchableOpacity-itest.js`, "does not render explicit opacity when using default")
+    expect(feedbackProps().opacity).toBeUndefined();
 
     fabric.fireEvent(responderHandle(), TOUCH_START);
-    // A BOUNDED wait, an order of magnitude under the 150 ms it is guarding against — the engine
-    // publishes an animated value on its own commit rather than in the render that fired the
-    // event, so a strictly synchronous read now sees nothing on ANY duration and the oracle would
-    // be dead. Draining frames instead is not available here: `flushFrames` runs until nothing is
-    // pending, which burns past 150 ms and is exactly what makes every other fade assertion in
-    // this file blind to the duration (test-harness-false-greens §5).
+    // A BOUNDED wait, an order of magnitude under the 150 ms this case guards against.
+    // `flushFrames` would drain past it and go blind to the duration, a synchronous read would see
+    // nothing at all (`.claude/rules/test-harness-false-greens.md` §5)
     await new Promise(resolve => setTimeout(resolve, DURATION_PROBE_MS));
 
     // Broken (duration 150): ~0.97 here, barely started. Correct (0): already landed.
@@ -277,9 +257,9 @@ describe('React TouchableOpacity animated feedback', () => {
 
     const handle = responderHandle();
 
-    // At rest opacity sits at 1 and keeps base style.
+    // At rest no `opacity` key is published at all, and the base style is untouched
     const rest = feedbackProps();
-    expect(asNumber(rest.opacity, 'resting opacity')).toBe(1);
+    expect(rest.opacity).toBeUndefined();
     expect(rest.width).toBe(10);
 
     // Press in: the timing animation runs toward activeOpacity.
@@ -431,13 +411,9 @@ describe('React TouchableOpacity animated feedback', () => {
 });
 
 describe('React TouchableHighlight underlay feedback', () => {
-  // why: RN paints TouchableHighlight's feedback with a synchronous style swap (not Animated),
-  // unlike TouchableOpacity above — and it SPLITS that swap across two nodes: the underlay color
-  // on the container, the lowered opacity cloned onto the child (TouchableHighlight.js
-  // _createExtraStyles + render). Folding both onto the container — what every adapter did before
-  // the 2026-08-19 audit — fades the very underlay it is meant to reveal, so `underlayColor:
-  // 'black'` paints grey. React is the only adapter that can reach the child (cloneElement), so
-  // this test is the split's only guard in the repo.
+  // why: RN's synchronous style swap SPLITS across two nodes — underlay color on the container,
+  // lowered opacity cloned onto the child. Folding both onto the container fades the underlay it's
+  // meant to reveal; React alone reaches the child (cloneElement), so this is the only guard.
   it('paints underlayColor and activeOpacity while pressed, and clears the child', async () => {
     mount(
       ROOT_TAG,
@@ -628,18 +604,11 @@ describe('React Touchable* accessibility default', () => {
   });
 });
 
-// `focusable`'s six cases LEFT THIS FILE on 2026-09-18. RN gives Pressable a one-leg default
-// (Pressable.js:258) and the Touchables a three-leg one (TouchableOpacity.js:336-340), and that
-// three-leg form is `foldPressableProps`'s now, keyed off the tag — so the payload this harness
-// builds through the TypeScript `fabricProps` no longer carries it, and asserting on it here would
-// be asserting on the absence of a rule. They are
-// `core/engine/cpp/tests/js/touchable-focusable-payload.itest.ts`, read off a real commit.
-//
-// The middle leg is what had kept them here: `onPress !== undefined` is an OWNED name, stashed in
-// JS and never a prop, so no rule could see it. What crosses now is the EXISTENCE as one bit
-// (`OP_SET_OWNED_LISTENER`) while the callback stays in JS — a browser's own split, since a UA knows
-// which elements carry a click handler without the handler leaving the page.
-//
-// React contributes nothing to the resolution, which is why these could move rather than be
-// rewritten: its part is routing `onPress` through `setEventListener`, and every press case above
-// fails outright if it stops — a handler that never reached the stash does not fire.
+// `focusable`'s three-leg form is `foldPressableProps`'s rule now, keyed off the tag; this
+// harness's `fabricProps` holds no copy — asserted in `touchable-focusable-payload.itest.ts`.
+
+// `onPress !== undefined` is an OWNED name, stashed in JS and never a prop: what crosses is the
+// EXISTENCE as one bit (`OP_SET_OWNED_LISTENER`) while the callback stays in JS.
+
+// React contributes only routing `onPress` through `setEventListener`; every press case above
+// fails outright if that stops happening.

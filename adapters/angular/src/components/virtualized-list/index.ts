@@ -362,13 +362,9 @@ interface IWindowCell<ItemT> {
           @if (gapSpacerStyle !== null) {
             <view [style]="gapSpacerStyle"></view>
           }
-          <!-- The separator sits INSIDE the measuring view, as RN's own cell renderer places it
-               (VirtualizedListCellRenderer.js:218-221). As a sibling it is an extra flex child, so
-               the chrome between two cells is gap + separator + gap while a spacer collapsing that
-               region replaces it with a single gap — every cell below the leading spacer then lands
-               short by (separator + gap) and the content jumps by that much whenever the window's
-               first index moves. Measured at exactly 17px on device 2026-08-19; see
-               .claude/rules/list-geometry-feedback-loop.md. -->
+          <!-- Separator sits INSIDE the measuring view, matching RN's cell renderer
+               (VirtualizedListCellRenderer.js:218-221) — as a sibling it'd add an extra flex gap.
+               See list-geometry-feedback-loop.md. -->
           @for (cell of windowCells; track cell.key) {
             @if (cell.isSticky) {
               <sticky-header
@@ -1205,11 +1201,9 @@ export class VirtualizedList<ItemT = unknown>
 
     const cells: IWindowCell<ItemT>[] = [];
     for (const planned of plan.cells) {
-      // RN gates the separator on the last index of the DATA, not of the WINDOW
-      // (VirtualizedList.js:793 `const end = getItemCount(data) - 1`), and now that the separator
-      // lives INSIDE the measuring wrapper that distinction is load-bearing: gating on the window
-      // would make a cell's own measured height change as the window slides past it. Device-measured
-      // 2026-08-19 as a run of cells all shifting by exactly the divider's 1px.
+      // RN gates the separator on the last index of the DATA, not the WINDOW
+      // (VirtualizedList.js:793 `getItemCount(data) - 1`). The separator lives INSIDE the
+      // measuring wrapper, so gating on the window would shift a cell's height as it slides past.
       const includeSeparator = hasSeparators && planned.index < m.count - 1;
       cells.push(
         this.buildWindowCell(

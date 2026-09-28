@@ -1,12 +1,9 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-// CocoaPods' `platform :ios` line only sets the deployment target CocoaPods generates FOR PODS —
-// the app's own .xcodeproj target keeps whatever IPHONEOS_DEPLOYMENT_TARGET RN's template set
-// (15.1), independent of the Podfile. Real device failure (2026-09-18): `xcodebuild` fails with
-// "compiling for iOS 15.1, but module 'ExpoModulesCore' has a minimum deployment target of iOS
-// 16.4" even after the Podfile fix, because the APP target itself still targets 15.1.
-// examples/expo-react/ios/CanaryExpo.xcodeproj already carries 16.4 in all 4 build configs.
+// CocoaPods' `platform :ios` line only sets the deployment target FOR PODS — the app's own
+// .xcodeproj target keeps whatever IPHONEOS_DEPLOYMENT_TARGET RN's template set, independent of
+// the Podfile, so `xcodebuild` fails against ExpoModulesCore's higher minimum unless raised here.
 const MIN_EXPO_IOS_VERSION = 16.4;
 const DEPLOYMENT_TARGET_LINE = /IPHONEOS_DEPLOYMENT_TARGET = (\d+(?:\.\d+)?);/g;
 

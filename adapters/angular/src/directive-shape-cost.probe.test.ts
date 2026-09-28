@@ -5,10 +5,9 @@
 // instance over the seven a row carries. That number is the whole remaining Angular deficit and it
 // has never been taken apart, so the next fix would be aimed by guesswork.
 //
-// EVERY NUMBER THIS FILE PUBLISHED BEFORE 2026-09-18 WAS READ ACROSS A CENSUS IT NEVER TOOK, and
-// three of its four findings are void. The arms do not push the same prop writes at the engine —
-// they cannot, because a matched directive CLAIMS a binding that would otherwise reach
-// `setProperty` — so several pairs it compared were never two spellings of one workload:
+// The arms do not push the same prop writes at the engine — they cannot, because a matched
+// directive CLAIMS a binding that would otherwise reach `setProperty` — so several pairs below
+// are never two spellings of one workload:
 //
 //   bare        20 001 writes    testID as a property + ellipsizeMode as a static ATTRIBUTE
 //   inert       10 001           testID claimed by the directive and forwarded nowhere

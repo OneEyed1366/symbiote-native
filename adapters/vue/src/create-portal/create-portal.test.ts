@@ -426,19 +426,9 @@ describe('Teleport — the Vue adapter portal', () => {
     });
   });
 
-  // Every case above builds its Teleport vnode with h(Teleport, ...) — a value the test controls
-  // directly. A real .vue SFC never does that: `<Teleport>` is a reserved tag name @vue/compiler-sfc
-  // recognises at COMPILE TIME regardless of what it resolves to at runtime, and compiles its
-  // children as a raw array carrying a PROPS-only patchFlag (dynamicProps: ["to"]) — the shape real
-  // Teleport wants, since it bypasses Vue's component-slot machinery entirely. Substituting our
-  // guarded wrapper under that name (as `../runtime-helpers` used to) makes Vue mount it as an
-  // ordinary STATEFUL component instead, and `shouldUpdateComponent`'s PROPS-only branch checks only
-  // the props named in `dynamicProps` — never children — so the wrapper's render() fires once at
-  // mount and never again. A toast/modal whose content is `v-if`-gated (the ordinary shape; `to`
-  // itself never changes) silently stops updating. Device-reported 2026-09-11: "Show toast
-  // (Teleport)" did nothing on Vue SFC while the h()-only suite above stayed green throughout,
-  // because it never exercises the real compiler. Fixed by no longer shadowing Teleport in
-  // `runtime-helpers` — this proves the fix through the same pipeline the app actually runs.
+  // Every case above builds its Teleport vnode with h(Teleport, ...); a real .vue SFC compiles
+  // `<Teleport>` at COMPILE TIME to a PROPS-only patchFlag. A wrapper shadowing that name mounts
+  // as an ordinary STATEFUL component instead, whose update check never fires on children alone.
   describe('Through the real compiled SFC (not h())', () => {
     const moduleRequire = (specifier: string): unknown => {
       if (specifier === '@symbiote-native/engine') return engine;

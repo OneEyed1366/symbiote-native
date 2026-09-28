@@ -80,13 +80,8 @@ function resolveSpecifier(fromFile, spec) {
 }
 
 // --- Source scanner -----------------------------------------------------------------------------
-// The old approach ran two regexes over the whole file, so `from './x'` INSIDE a comment or a
-// string literal matched and was reported UNRESOLVED — a false positive that failed the publish
-// gate (a `// … import styles from './Card.module.css'` doc-comment, 2026-07). core/css-parser
-// makes the string case real: it emits JS source AS strings, some containing `from './…'`.
-// A regex comment-strip can't fix this (it corrupts `//` inside a `'https://…'` URL). So we walk
-// the source char-by-char tracking whether we're in a string / comment / regex, and only ever
-// touch a single-quoted specifier string that sits in real code right after `from` or `import(`.
+// A whole-file regex would match `from './x'` inside a comment or string too — real for
+// core/css-parser, which emits JS source as strings containing `from './…'`.
 
 // Advance past a quoted string starting at `start` (the opening quote). Returns the index AFTER
 // the closing quote, honoring backslash escapes.

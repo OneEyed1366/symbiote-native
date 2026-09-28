@@ -91,8 +91,7 @@ export interface ICrossedPrimitiveProps {
   'activity-indicator': IActivityIndicatorProps;
 }
 
-// Three gaps a real per-tag type exposes that the open bag hid, found via svelte-check against a
-// locally-published build (2026-09-14):
+// Three gaps a real per-tag type exposes that the open bag hid, found via svelte-check:
 //
 // 1. `p={{ ... }}` (`ISymbioteHostAttributes.p` above) is legitimate on every intrinsic, crossed
 //    or not - `NumberStepper.svelte`/`CanaryScreen.svelte` use it directly on `pressable`/

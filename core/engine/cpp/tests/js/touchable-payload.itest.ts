@@ -90,11 +90,8 @@ const accessory = (props: Record<string, unknown>): ICommitted =>
   commit('RCTInputAccessoryView', 'input-accessory-view', props);
 
 describe('what the fold-only touchables send native', () => {
-  // THE `id` ALIAS LEFT THIS FILE ON 2026-09-18, and it left because it stopped being a PAYLOAD
-  // rule at all. It was `foldIdAlias` in the payload builder, keyed on the tag; it is `routeProp`'s
-  // now, resolved on the way IN and for every node rather than only the ones carrying a behavior.
-  // Seven implementations collapsed into that one — `core/engine/cpp/tests/js/id-alias-coverage.itest.ts`
-  // holds the whole story and both cases that used to be here.
+  // THE `id` ALIAS IS NOT A PAYLOAD RULE: it is `routeProp`'s, resolved on the way IN for every
+  // node. `id-alias-coverage.itest.ts` holds the case.
   //
   // This fixture could not keep them even as passthrough: it writes with `setProp`, which is the raw
   // write and skips routing entirely. That was invisible while the rule ran at commit time and is

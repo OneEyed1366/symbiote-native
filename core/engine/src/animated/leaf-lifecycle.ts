@@ -7,7 +7,7 @@
 // create-animated-component.tsx, Vue's create-animated-component.ts, Svelte's
 // animated-props-runtime.ts, Angular's animated-leaf-binder.ts). Each re-derived the same policy,
 // and they drifted: only Svelte ever grew the rebuild guard below, after a day of device
-// debugging in 2026-08. React's `useMemo(..., [rest])` LOOKS like the same guard but is not - its
+// debugging. React's `useMemo(..., [rest])` LOOKS like the same guard but is not - its
 // dependency is a fresh rest-destructured object every render - and Vue's `pendingLeaf === null`
 // answers "has render run yet", not "did anything change". A fix landing in one copy is exactly
 // what <adapters_reach_full_feature_parity> forbids: parity has to be structural.
@@ -122,7 +122,7 @@ export function createAnimatedLeafLifecycle(
       lastWantsNative = wantsNative;
       // A SNAPSHOT, never the reference. A caller can legitimately hand back the SAME object on
       // every update, mutating what its keys resolve to rather than allocating (Svelte's rest
-      // proxy does exactly that, device-confirmed 2026-08-13); storing it would make the next
+      // proxy does exactly that, device-confirmed); storing it would make the next
       // call run shallowEqualProps on that object against ITSELF - reading the same current values
       // through both sides - which is unconditionally true. `propsChanged` could then never be
       // true again and reconcile would be skipped forever, so every rebuilt AnimatedInterpolation

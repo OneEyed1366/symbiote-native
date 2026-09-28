@@ -5,14 +5,9 @@ import { describe, expect, it } from 'vitest';
 
 const readSource = (path: string): string => readFileSync(path, 'utf8');
 
-// Both sides are stripped of whitespace before comparing. The product rule these fences encode
-// is "this binding / declaration exists at all", and both Angular templates and TS declarations
-// wrap freely without changing meaning — prettier turns
-// `[x]="y"` into `[x]="\n  y\n"` and `class A extends B` into `class A\n  extends B` the moment
-// the line passes printWidth. Comparing the literal text made a reformat fail the fence while the
-// binding it guards was still there (measured 2026-08-18, when the repo moved to 80 columns:
-// AnimatedImage's declaration and Button's accessibilityRespondsToUserInteraction binding both
-// broke this way). Stripping keeps the guard and drops the coupling to layout.
+// Both sides are stripped of whitespace before comparing. The rule these fences encode is "this
+// binding/declaration exists at all", and prettier reflows freely without changing meaning
+// (`[x]="y"` -> `[x]="\n  y\n"`) — stripping keeps the guard and drops the coupling to layout.
 const withoutSpacing = (code: string): string => code.replace(/\s+/g, '');
 
 const expectSourceToDeclare = (source: string, snippet: string): void => {
@@ -34,10 +29,8 @@ const expectSourceToDeclare = (source: string, snippet: string): void => {
 // (they read a file and grep it) — no Positive/Negative split applies; each test is its own
 // named regression fence instead.
 describe('Angular adapter gap regressions', () => {
-  // why: VirtualizedList feeds its scroll TAG through scrollViewBag() (`[symbioteHostProps]`,
-  // since 2026-09-11 — ScrollView is no longer a component to bind individual @Input()s onto) —
-  // if it declares the accessibility/aria @Input()s but forgets to spread foldedAccessibility()
-  // into that bag, or forgets one of the @Input()s entirely, an app passing
+  // why: VirtualizedList feeds its scroll TAG through scrollViewBag() (`[symbioteHostProps]`) — if
+  // it forgets to spread foldedAccessibility() into that bag, an app passing
   // accessibilityLabel/ariaBusy to <VirtualizedList> silently loses it one layer down.
   it('VirtualizedList exposes accessibility and aria inputs and forwards them to the scroll tag', () => {
     const source = readSource(
@@ -134,9 +127,8 @@ describe('Angular adapter gap regressions', () => {
   // payload (`core/components/src/behaviors/image.test.ts`) rather than source text.
 
   // The FULL accessibility + TV-focus surface of `Pressable`, `TouchableOpacity` and
-  // `TouchableHighlight` was fenced here as SOURCE TEXT — a list of `[prop]="expr"` bindings that
-  // had to appear in each wrapper's template — until all three became TAGS (2026-09-11). There is
-  // no Angular source to fence any more, and the replacement is strictly stronger in both halves:
+  // `TouchableHighlight` is no longer fenced as SOURCE TEXT — there is no Angular wrapper source
+  // to fence any more, and the replacement below is strictly stronger in both halves:
   //
   //   the PROP SURFACE   `DECLARES_EVERY_PROP` in `elements.ts` resolves each element directive
   //                      against its own prop interface under `tsc --build`, so a missing name is a

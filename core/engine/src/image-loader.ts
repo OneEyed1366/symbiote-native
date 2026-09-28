@@ -1,18 +1,10 @@
-// Image static methods (RN's Image.getSize / prefetch / queryCache / etc).
-//
-// These mirror RN's iOS Image statics (Libraries/Image/Image.ios.js), which delegate to the
-// `ImageLoader` native (Turbo)Module declared in NativeImageLoaderIOS.js. The Android spec
-// (NativeImageLoaderAndroid.js) registers under the SAME module name ('ImageLoader'), so this
-// stays a flat, non-platform-split module - only the Android prefetch call signature differs (a
-// second `requestId` arg), branched on Platform.OS below, not on module name. NOTE the asymmetry
-// in the iOS spec: `getSize` resolves a `[width, height]` ARRAY, while `getSizeWithHeaders`
-// resolves a `{width, height}` OBJECT, both are guarded below before reading. The native result
-// crosses the I/O boundary as `unknown`; we never cast it, we narrow its shape.
-//
-// This is a stateful, native-bridge-touching imperative module (module-level ImageLoader cache +
-// prefetch requestId counter) with no view of its own - it belongs in @symbiote-native/engine
-// alongside Alert/Share, not in a view/render-*.ts file (whose contract is zero state / zero
-// native bridge).
+// Image static methods (RN's Image.getSize/prefetch/queryCache/etc). Both iOS and Android specs
+// register under the same module name ('ImageLoader'), so this stays flat, non-platform-split —
+// only the Android prefetch call signature differs (a second requestId arg), branched below.
+
+// The native result crosses the I/O boundary as unknown; we never cast it, we narrow its shape.
+// This is a stateful, native-bridge-touching imperative module with no view of its own — it
+// belongs here alongside Alert/Share, not in a view/render-*.ts file.
 
 import { dlog } from './debug';
 import {
@@ -33,31 +25,24 @@ export type IImageCacheStatus = 'memory' | 'disk' | 'disk/memory';
 type ISizeSuccess = (width: number, height: number) => void;
 type ISizeFailure = (error: unknown) => void;
 
-// The `ImageLoader` native module surface we consume. Promise-based on the New Architecture (the
-// spec returns Promises directly). One name, two signatures: Android's `prefetchImage` takes a
-// second `requestId` arg (abortRequest keys off it) via NativeImageLoaderAndroid.js; iOS takes
-// only `uri` and throws on the extra arg, so the call below branches on Platform.OS instead of
-// passing requestId unconditionally. `abortRequest` cancels an in-flight prefetch keyed by its
-// requestId; it exists on the Android spec only (NativeImageLoaderAndroid.js), so calling it where
-// unsupported (iOS, headless) is a no-op rather than a throw.
+// The ImageLoader native module surface we consume. One name, two signatures: Android's
+// prefetchImage takes a second requestId arg (abortRequest keys off it), iOS takes only uri and
+// throws on the extra arg, so the call below branches on Platform.OS.
 type INativeImageLoader = {
   getSize(uri: string): Promise<unknown>;
   getSizeWithHeaders(
     uri: string,
     headers: Record<string, string>,
   ): Promise<unknown>;
-  // iOS takes ONLY the uri (NativeImageLoaderIOS); Android adds the requestId so abortRequest can
-  // key off it. The arg is optional here so the iOS call passes exactly one - a second arg makes the
-  // bridgeless TurboModule throw "Exception in HostFunction".
+  // The arg is optional so the iOS call passes exactly one — a second arg makes the bridgeless
+  // TurboModule throw "Exception in HostFunction".
   prefetchImage(uri: string, requestId?: number): Promise<unknown>;
   abortRequest?(requestId: number): void;
   queryCache(uris: string[]): Promise<unknown>;
 };
 
-// The iOS native module name RN registers this under (NativeImageLoaderIOS.js resolves
-// `TurboModuleRegistry.getEnforcing<Spec>('ImageLoader')`). A module name like this is only
-// provable on a real host - a headless fake answers to any name - so this iOS name is
-// device-verify-pending.
+// The native module name RN registers this under. A module name like this is only provable on a
+// real host — a headless fake answers to any name.
 const IMAGE_LOADER_MODULE = 'ImageLoader';
 
 let imageLoaderModule: INativeImageLoader | null | undefined;
@@ -248,10 +233,8 @@ async function queryCache(
     });
 }
 
-// PURE JS: run the currently-installed source resolver (the same machinery the Image component
-// uses via resolveImageSource). RN's resolveAssetSource turns a require() asset id into
-// {uri, scale, ...}; the app injects the real one with setImageSourceResolver, and this exposes
-// its output to callers directly.
+// Pure JS: run the currently-installed source resolver (the same machinery the Image component
+// uses via resolveImageSource). The app injects the real one with setImageSourceResolver.
 function resolveAssetSource(source: IImageSourceProp): unknown {
   return resolveImageSource(source);
 }

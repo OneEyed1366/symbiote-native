@@ -103,7 +103,7 @@ describe('native pipeline cost at the real benchmark scale (1 000 standing, appe
 
 report();
 
-// ── ANSWER, measured (2026-09-17) ───────────────────────────────────────────────────────────────
+// ── ANSWER ───────────────────────────────────────────────────────────────────────────────────────
 //
 // DEBUG commitMs=8.12  layoutMs=7.11  layoutNodes=3002  total=15.23ms  deviceGap=107-147ms
 //

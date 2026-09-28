@@ -280,11 +280,9 @@ async function compileSfc(src, filename) {
   // re-parse, which is what we need anyway.
 
   parseCache.clear();
-  // element-vs-component is decided by the PARSER, not by the later `isCustomElement` in
+  // element-vs-component is decided by the PARSER, not the later `isCustomElement` in
   // templateOptions — `compileScript` reuses this descriptor's already-parsed AST, where `tagType`
-  // is already fixed. So a hand-written `<pressable>` needs the answer here or it stays a component
-  // whatever templateOptions says, which is how it read until 2026-09-07:
-  // `resolveComponent("pressable")`, a blank subtree with no error.
+  // is fixed. Without the answer here, `<pressable>` stays a component: `resolveComponent(...)`.
   const { descriptor, errors } = parse(src, {
     filename,
     templateParseOptions: { isCustomElement: tag => INTRINSIC_TAGS.has(tag) },
@@ -362,13 +360,9 @@ async function compileSfc(src, filename) {
   ];
   if (scopedClassNames.size > 0)
     nodeTransforms.push(createScopeClassNodeTransform(scopedClassNames));
-  // UNCONDITIONAL, and covering EVERY intrinsic rather than the ones this file happens to import.
-  // Both narrowings were live until 2026-09-07 and both broke a hand-written tag: a file importing
-  // no wrapper got no `isCustomElement` at all, and a file importing one got an answer scoped to
-  // that import, so `<pressable>` written by hand compiled to `resolveComponent("pressable")` —
-  // a blank subtree with no error — whichever way the file was written. `<switch v-model>` failed
-  // louder: `@vue/compiler-dom`'s transformModel rejects v-model on an element that is neither
-  // input/textarea/select nor a custom element, so it was a hard compile error.
+  // UNCONDITIONAL, and covering EVERY intrinsic rather than the ones this file happens to import:
+  // a narrower `isCustomElement` leaves `<pressable>` compiling to `resolveComponent(...)` (blank
+  // subtree, no error), and `<switch v-model>` a hard compile error (non-custom, non-form element).
   const templateOptions = {
     compilerOptions: {
       ...(nodeTransforms.length > 0 ? { nodeTransforms } : {}),

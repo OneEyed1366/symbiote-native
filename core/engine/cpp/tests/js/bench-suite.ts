@@ -315,7 +315,7 @@ export const ROW_HEIGHT = ROW_STYLE.height;
 export const VIEWPORT_WIDTH = 390;
 
 /**
- * Rows React Native's own `FlatList` holds once its window has filled (stock arm, 2026-09-22) —
+ * Rows React Native's own `FlatList` holds once its window has filled (the stock arm) —
  * `announceListLayout` delivers the layout events, and the batches run inside the step. An adapter
  * mounting a different number is running a different window, not a faster list.
  */

@@ -136,14 +136,8 @@ const MOUNT_MODE = {
 type IMountMode = (typeof MOUNT_MODE)[keyof typeof MOUNT_MODE];
 
 // Angular has exactly one row shape, the same instrument every other adapter's canary is: a row
-// component and two real <Pressable>s, plus the unconditional <TextInput> below. It used to carry
-// four switchable shapes built to isolate whether
-// Angular's ~3x Create gap against its siblings was composed-component anchors, Angular's own
-// LView/TView/DI machinery, or Pressable instantiation specifically — none of that decomposition
-// ran to a device conclusion, and a benchmark with a shape-changing control is not one ruler across
-// adapters, it is several instruments sharing a screen. Dropped 2026-09-01, not commented out:
-// still in git history for whoever wants to pick the investigation back up.
-//
+// component and two real <Pressable>s, plus the unconditional <TextInput> below.
+
 // The row's class in each state, as literals rather than a template concatenation so a
 // change-detection pass hands `[class]` the same string it saw last time.
 const ROW_CLASS = 'bench-row';
@@ -810,13 +804,8 @@ export class StickySectionListBlock {
           frame.
         </text>
 
-        <!-- These sat BELOW the rows until 2026-09-07, deliberately, so nobody would report
-             numbers from them: their Remove and Append act on whatever happened to be on screen,
-             which is the whole reason the suite above exists. That is still true and the note
-             under them still says so — what changed is that "below the fold" became UNREACHABLE
-             once the list holds a thousand rows, which is exactly the state you are in when you
-             want to poke at one commit shape. A caveat keeps working from the top of the screen;
-             a scroll position does not. -->
+        <!-- Kept above the rows: with a thousand rows mounted, "below the fold" is unreachable
+             by scroll — exactly the state you're in when you want to poke at one commit shape. -->
         <text class="section-label">OPERATIONS · LAST RUN</text>
         @for (operation of operations; track operation.id) {
           <view class="bench-op-row">
@@ -847,10 +836,7 @@ export class StickySectionListBlock {
 
         <text class="section-label">{{ rowsSectionLabel() }}</text>
         <!-- The only row shape: a row component and two real <Pressable>s, plus the unconditional
-             <TextInput> — the same instrument every other adapter's column mounts. This used to
-             switch across four shapes built to isolate Angular's ~3x Create gap; dropped
-             2026-09-01 so this benchmark measures one thing, the way every other adapter's does
-             (root CLAUDE.md, "Where we stand against stock React Native"). -->
+             <TextInput> — the same instrument every other adapter's column mounts. -->
         @if (isAllMounted()) {
           @for (row of rows(); track row.id) {
             <BenchmarkRow
@@ -1223,26 +1209,13 @@ export class BenchmarkScreen implements OnInit, OnDestroy {
     });
   }
 
-  /**
-   * The whole ruler in one press, in a FIXED order, each timed operation starting from exactly
-   * SUITE_ROWS rows.
-   *
-   * Pressing the buttons by hand does not measure what it looks like it measures. `Remove` and
-   * `Append` cost scale with the rows currently on screen (a flat parent re-appends every child
-   * handle on any structural change), so their numbers depend on which buttons were pressed
-   * before them. Measured 2026-08-18, React Debug, same build twice: Remove 87-107 ms against
-   * 418.6 ms, Append 953 against 1678 ms, while Create / Replace / Partial / Select / Swap
-   * reproduced inside 1-3%. Two runs of the SAME adapter disagreed 4x - so a cross-ADAPTER
-   * comparison off those rows was measuring press order, not the adapter.
-   *
-   * Hence: untimed setup steps in between, awaited through the same engine post-commit seam as
-   * the timed ones, so each measurement begins from a state this function chose rather than one
-   * the operator happened to leave behind.
-   *
-   * Runs in EITHER mount mode - the pressed button picks it. No 10,000-row step in either: 10,000
-   * rows is 100,000 native views, which the host does not survive in all-mounted (see
-   * NATIVE_VIEWS_PER_ROW), and a suite that hangs the screen measures nothing.
-   */
+  // The whole ruler in one press, FIXED order, each timed op starting from exactly SUITE_ROWS
+  // rows: Remove/Append cost scales with rows on screen (a flat parent re-appends every child
+  // handle on structural change), so untimed setup steps run between the timed ones instead.
+
+  // Runs in EITHER mount mode - the pressed button picks it. No 10 000-row step in either:
+  // 100 000 native views don't survive in all-mounted (see NATIVE_VIEWS_PER_ROW), and a hung
+  // screen measures nothing.
   private async runSuite(mode: IMountMode): Promise<void> {
     resetRowData();
 

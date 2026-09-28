@@ -316,10 +316,9 @@ const retentionStyle = ({ pressed }: IPressState) => ({
   backgroundColor: pressed ? LINE_COLOR.primitives : '#13243a',
 });
 
-// Modern style props reaching Fabric's C++ parser, kept as dynamic style objects here (not CSS)
-// only because these demos predate @symbiote-native/css-parser's `raw` passthrough for transform/
-// box-shadow/filter/transform-origin (2026-07) — the CSS property itself now works identically
-// (see .gradient-card below, authored via CSS) — legacy demo wiring, not a remaining gap.
+// Modern style props reaching Fabric's C++ parser, kept as dynamic style objects (not CSS) as
+// legacy demo wiring — the CSS property works identically too (see .gradient-card, authored via
+// CSS).
 const shadowCardExtra = {
   boxShadow: '0px 0px 22px 3px rgba(20,158,202,0.85)',
 };

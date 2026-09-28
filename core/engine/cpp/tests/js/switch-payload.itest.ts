@@ -151,9 +151,8 @@ describe('what a switch sends native, resolved by the engine', () => {
 
   // why: `Switch.js:255` and `:293` — `accessibilityRole={props.accessibilityRole ?? 'switch'}`, on
   // BOTH platforms. Without it a screen reader announces the control as a plain view, with nothing
-  // visual to notice: the same silent class of gap `accessible`/`focusable` were on Pressable until
-  // 2026-09-09. Found by reading `Switch.js` to port the rule; fixed in its own commit AFTER the
-  // port, so the move and the correction each have their own before and after.
+  // visual to notice: the same silent class of gap `accessible`/`focusable` were on Pressable.
+  // Found by reading `Switch.js` to port the rule.
   it('announces itself as a switch, unless the app says otherwise', () => {
     expect(commit({ value: true }).payload.accessibilityRole).toBe('switch');
     expect(commitAndroid({ value: true }).payload.accessibilityRole).toBe(

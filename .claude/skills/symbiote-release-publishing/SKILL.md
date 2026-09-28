@@ -281,6 +281,25 @@ adapter code sat under 22.09's 1.2.0 / 3.0.1.
   still depends on the old sibling (navigation 5.0.1 pinned `components` 3.0.1). Check with
   `npm view <pkg>@latest dependencies`, not with a source diff.
 
+## A changeset on the caller does not publish the callee (measured 2026-09-26)
+
+`c17d33f1` added `setAssetSourceResolver` to `engine` and wired a call to it from
+`components/bootstrap.ts` in one commit, but carried a changeset for neither package. Next day a
+separate PR gave `components` its own changeset (3.1.0 to 3.1.1, calling the new export) with
+still no changeset for `engine`. `engine`'s version never moved past the already-published 1.3.0,
+so `changeset publish` saw nothing to do for it: same silent "already published" skip as the
+version-collision case above, but the trigger is a missing changeset, not a dropped merge. Real
+consumers installed `components@3.1.1` plus `engine@1.3.0`, and every `bootstrapHost()` call threw
+`TypeError: undefined is not a function` (`setAssetSourceResolver` resolved to `undefined`).
+
+Diagnose it by comparing `git show <release-commit>:pkg/src/index.ts` (has the export) against
+`node_modules/<pkg>/build/index.js` in a real install (export missing), plus `npm view <pkg> time
+--json` on both packages: the producer's last publish predates the caller's.
+
+**Rule: a commit that adds an export in package A and a call to it in package B needs a changeset
+for BOTH A and B**, not just the caller. A changeset only on the caller lets the producer's code
+sit unpublished indefinitely with no CI failure to flag it.
+
 ## A MINOR on a 0.x `engine` is a MAJOR for the whole repo (measured 2026-09-21)
 
 Every publishable package peers `"@symbiote-native/engine": "workspace:^"`, and `^0.5.0` does not

@@ -80,9 +80,6 @@ afterEach(() => unmount(ROOT_TAG));
 // "Delivered to outlet X" means INSIDE X — React's contract for the same API
 // (`isDescendantOf` in adapters/react/src/create-portal/create-portal.test.tsx) and what a layout
 // assumes. It holds only because the marker sits on an `<ng-container>` within the host.
-//
-// This file asserted the SIBLING placement until 2026-09-02, i.e. it pinned the divergence instead
-// of catching it.
 
 function containsText(handle: object, text: string): boolean {
   return childrenOf(handle).some(child => {
@@ -128,8 +125,7 @@ function portaledContent(): IAuthoredNode | undefined {
   );
 }
 
-// The placement that shipped until 2026-09-02 and that the guard now refuses: the marker on the
-// host ELEMENT rather than on an anchor inside it.
+// The placement the guard refuses: the marker on the host ELEMENT, not an anchor inside it.
 @Component({
   selector: 'symbiote-portal-bad-outlet-app',
   standalone: true,

@@ -123,8 +123,7 @@ describe('touchable-opacity host behavior', () => {
     mount(node);
     await settle();
 
-    // At REST, before any press: RN's Animated.View carries `{opacity: anim}` from its first
-    // render, so the key is there from mount and not only once a fade has run.
+    // At REST the author's own `opacity` is what reaches Fabric, through the ordinary style path
     expect(committedPropsOf(TEST_ID).opacity).toBe(0.6);
 
     pressIn(node);
@@ -136,11 +135,8 @@ describe('touchable-opacity host behavior', () => {
     expect(committedPropsOf(TEST_ID).opacity).toBe(0.6);
   });
 
-  // why: `TouchableOpacity.js:215-220` picks the fade duration from WHERE the press-in came from —
-  // 0ms for an ordinary grant, 150ms for a drift-out/drift-back-in reactivation
-  // (`RESPONDER_INACTIVE_PRESS_OUT -> RESPONDER_ACTIVE_PRESS_IN`, driven by `onResponderMove`). Our
-  // press machine (`state/pressable.ts`'s `handleResponderMove`) already re-`activate()`s on a
-  // drift-back-in; this pins that the reactivation still eases in over 150ms rather than snapping.
+  // TouchableOpacity.js:215-220 picks the fade duration from WHERE the press-in came from: 0ms for
+  // an ordinary grant, 150ms for a drift-back-in arriving as `onResponderMove`
   it('eases back in over 150ms on a drift-out/drift-back-in reactivation, not instantly', async () => {
     vi.useFakeTimers();
     registerTouchableOpacityBehavior();
@@ -205,11 +201,8 @@ describe('touchable-opacity host behavior', () => {
     expect(onPressOut).toHaveBeenCalledTimes(1);
   });
 
-  // TouchableOpacity.js:187-190 — `disabled ?? aria-disabled ?? accessibilityState?.disabled`. The
-  // standalone tag never passed a resolver to the press machine, so only the raw `disabled` prop
-  // gated a press: an app disabling through `accessibilityState` alone (a real a11y pattern) kept
-  // pressing. `./button` already threads the same three-way answer through its own composed
-  // touchable; this tag never wired its own copy.
+  // TouchableOpacity.js:187-190 gates the press on
+  // `disabled ?? aria-disabled ?? accessibilityState?.disabled`, not on the raw prop alone
   it('suppresses press when only accessibilityState.disabled is set', async () => {
     vi.useFakeTimers();
     registerTouchableOpacityBehavior();
@@ -263,24 +256,12 @@ describe('touchable-opacity host behavior', () => {
     expect(getExplicitStyle(node)).toBe(authored);
   });
 
-  // `id -> nativeID` and `accessible !== false` USED TO BE ASSERTED HERE and are not any more, which
-  // is a move rather than a loss: both are the engine's rules now (`foldIdAlias` /
-  // `foldPressableProps`, `SymbioteFabricProps.cpp`) and this host builds its payloads through the
-  // TypeScript `fabricProps`, which deliberately carries no copy of them. An assertion left here
-  // would fail for the right reason today and, once someone "fixed" it by mirroring the rule in JS,
-  // pass forever for the wrong one. Contract: `core/engine/cpp/tests/js/touchable-payload.itest.ts`.
+  // `id -> nativeID` / `accessible !== false` are the engine's rules now (`foldIdAlias` /
+  // `foldPressableProps`, `SymbioteFabricProps.cpp`); this host's `fabricProps` carries no copy, so
+  // an assertion here would pass for the wrong reason. Contract: `touchable-payload.itest.ts`.
 
-  // `focusable` LEFT ON 2026-09-18 and it was the LAST thing in this tag's fold, so the tag now
-  // costs zero trips into JS. Same reason as the two rules above: it is `foldPressableProps`'s, and
-  // this host carries no copy of the tag rules.
-  //
-  // It held out longer because its middle leg is `onPress !== undefined` — an OWNED name, stashed
-  // in JS and never a prop. The comment that used to sit here said a props-only fold "cannot answer
-  // this", and that was two claims in one: the callback's IDENTITY genuinely cannot cross, its
-  // EXISTENCE is one bit and now does (`OP_SET_OWNED_LISTENER`).
-  //
-  // Contract, including the late-wiring and cleared-handler cases this used to carry:
-  // `core/engine/cpp/tests/js/touchable-focusable-payload.itest.ts`.
+  // `focusable` is `foldPressableProps` too; its `onPress !== undefined` leg crosses as one bit
+  // through `OP_SET_OWNED_LISTENER`. Contract: `touchable-focusable-payload.itest.ts`
 
   // TouchableOpacity.js:186-189 resolves `disabled ?? aria-disabled ?? accessibilityState.disabled`
   // for its OWN Pressability config — the same three-way answer Button resolves, wired here for the
@@ -307,12 +288,9 @@ describe('touchable-opacity host behavior', () => {
     expect(onPress).not.toHaveBeenCalled();
   });
 
-  // NO CASE FOR LEG 1 ALONE, and that is a finding rather than a gap: `focusable` is an ordinary
-  // prop, so an authored `false` commits as `false` whether the fold runs or not. Break-tested —
-  // deleting the fold leaves such a case green. The opt-out is witnessed only where it CONTRADICTS
-  // the other legs, which is the `focusable: true` step above.
-  // The control: without a registration nothing writes an opacity at all, so the assertions above
-  // cannot be satisfied by an unrelated default.
+  // NOTE: leg 1 alone has no case on purpose: an authored `focusable: false` commits as `false`
+  // whether the fold runs or not, so it is only witnessed where it CONTRADICTS the other legs
+  // The control below: unregistered, nothing writes an opacity at all
   it('writes no opacity when the behavior is not registered', async () => {
     vi.useFakeTimers();
     const node = makeTouchable();
@@ -325,5 +303,25 @@ describe('touchable-opacity host behavior', () => {
     // a green `false` there cannot be some engine default.
     expect(committedPropsOf(TEST_ID).focusable).toBeUndefined();
     expect(node.listeners?.get('pressIn')).toBeUndefined();
+  });
+
+  // Vendor parity: `TouchableOpacity-itest.js` ("does not render explicit opacity when using
+  // default") commits no `opacity` for an untouched touchable. `collapsable` still has to be
+  // forced from mount, т.к. a flattened view has no tag for the responder to land on
+  it('commits no opacity until the first press, but blocks flattening from mount', async () => {
+    vi.useFakeTimers();
+    registerTouchableOpacityBehavior();
+    const node = makeTouchable();
+    routeProp(node, 'testID', TEST_ID);
+    mount(node);
+    await settle();
+
+    expect(committedPropsOf(TEST_ID).opacity).toBeUndefined();
+    expect(committedPropsOf(TEST_ID).collapsable).toBe(false);
+
+    pressIn(node);
+    await settle();
+
+    expect(committedPropsOf(TEST_ID).opacity).toBe(DEFAULT_ACTIVE_OPACITY);
   });
 });

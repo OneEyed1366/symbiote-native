@@ -74,9 +74,6 @@ describe('no tracked file points npm at a local registry', () => {
   // failure, same misleading network error, and this one arrives through an ordinary `npm install`
   // rather than through anyone editing a config.
   //
-  // Measured 2026-09-02: one `registry:refresh` across the examples left every tracked lockfile
-  // carrying 8-31 such lines. Nothing was committed, and nothing would have said so.
-  //
   // Read from the INDEX (`git show :path`), never from disk. A working tree full of localhost is
   // the NORMAL state while the local loop is in use — a disk check would fail for everyone using
   // the thing this repo recommends. What must never happen is that state being staged.
@@ -96,10 +93,9 @@ describe('no tracked file points npm at a local registry', () => {
     expect(offenders).toEqual([]);
   });
 
-  // The RULE, rather than a check on whoever is still tracked. As of 2026-09-02 eleven examples
-  // gitignore their lockfile and only `bare-rn` does not — so the row above now inspects one file
-  // that carries no `@symbiote-native` dependency and therefore cannot be contaminated. Left alone
-  // it would be a guard reading a permanently clean subject.
+  // The RULE, rather than a check on whoever is still tracked. Every example but `bare-rn`
+  // gitignores its lockfile, so the row above inspects one file that carries no
+  // `@symbiote-native` dependency and cannot be contaminated — a permanently clean subject.
   //
   // This asserts the property that keeps it that way: an example that resolves our packages does
   // not track its lockfile. Derived from `examples/` on disk, so the next example added is covered
