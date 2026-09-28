@@ -41,6 +41,14 @@ export type { IAppConfigurator } from './render';
 // into an <Out/> the destination has to render. See create-portal/index.ts.
 export { Teleport, type ITeleportTarget } from './create-portal';
 export { createTunnel, type ITunnel } from './create-tunnel';
+// Vue's own Transition/TransitionGroup are runtime-dom-only (CSS class toggling) and
+// would otherwise come from the wildcard above as unusable DOM stubs. These fade over
+// the engine's Animated graph instead. See create-transition/index.ts.
+export {
+  Transition,
+  TransitionGroup,
+  type ITransitionProps,
+} from './create-transition';
 // `View` and `Text` are TAGS — `<view>` and `<text>` — and there is nothing to import in their
 // place. Both wrappers were `h(tag, normalizeVueAttrs(attrs))`, and both folds now run in the
 // renderer: kebab->camel plus `id -> nativeID` in `patchProp`, RN's Text defaults in

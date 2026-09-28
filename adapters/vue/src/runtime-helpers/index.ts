@@ -10,6 +10,7 @@
 // vModelText below for why that is in scope.
 
 export * from '@vue/runtime-core';
+export { Transition, TransitionGroup } from '../create-transition';
 
 import {
   getCurrentInstance,
