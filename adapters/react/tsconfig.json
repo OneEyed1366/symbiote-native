@@ -9,7 +9,8 @@
     // @types/react's table, where `view` / `text` / `image` / `switch` are SVG entries), and
     // dropping it while the adapter still compiled against React's namespace would leave the
     // adapter's own `createElement(tag, …)` calls untyped.
-    "jsxImportSource": "@symbiote-native/react"
+    "jsxImportSource": "@symbiote-native/react",
+    "types": ["node"]
   },
   "include": ["src"],
   "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"],
