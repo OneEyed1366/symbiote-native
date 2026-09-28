@@ -1494,6 +1494,36 @@ Still owed on the instrument: a settled reading in the other four screens (Vue `
 }
 ```
 
+### 26. `markPropsDirty` on a node its own batch created, skipped
+
+```
+26 := {
+  found: "`markPropsDirty` opened with `flushOps()`, a full drain to the host, т.к. the host call
+          takes a HANDLE and must be ordered after the ops that built the node. A behavior's
+          `onChildInserted` marks the slot it just adopted, so an anchor-backed touchable paid one
+          whole drain PER ITEM",
+  ladder: "`anchor-touchable-item-cost.itest.ts`, release bytecode, per item: plain view 678 B ·
+           owner+child 1 345 B · adoption alone +3 B · ITS DIRTY MARK +1 530 B / +3.29 us. That was
+           82% of what the behavior cost the item, and the four unwired gated clears of §24 were
+           +1 B, so the suspect there was the wrong one",
+  fix: "a node whose create op is still in the buffer has no committed payload and the host has
+        never heard it named, so the mark is a no-op. `isPendingCreate` skips it and the drain",
+  narrower_than_placement: "`hasPendingPlacement` also holds a node an EARLIER batch created and
+                            this one is moving, which the host does know and which does need the
+                            mark. So a separate answer, carried as `node.createdBatch` against the
+                            live `batchId`: a field and not a second Set, т.к. it is read on the
+                            create path and a `Set.add` per node would charge what it saves",
+  measured: "per item, tnf 3 158 B / 12.47 us -> 1 386 / 8.50 · twf 3 271 / 12.13 -> 1 499 / 9.16.
+             Vue primitive suite createKB: twf 5 503 -> 2 967, tnf 5 395 -> 2 859, wall 20.5 -> 15.1
+             and 20.8 -> 14.9. Every other tag unmoved, which is the control",
+  opcode_NOT_taken: "an `OP_MARK_PROPS_DIRTY` was built first, to defer the mark instead of skipping
+                     it. Wrong shape: for a node the walk is about to build anyway the op is pure
+                     waste, and it costs a C++ case and a recording-host case to carry",
+  gate: "the ladder asserts the mark costs < 200 B per item. Break-tested by inverting the skip:
+         1 530 B red on release, and the same budget passes the assert build at 85 B",
+}
+```
+
 ## The current numbers
 
 Headless, 1 000 rows, `bench:itest` Release on Hermes **as `hermesc -O` bytecode**
