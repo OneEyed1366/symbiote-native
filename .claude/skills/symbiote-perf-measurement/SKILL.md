@@ -1524,6 +1524,34 @@ Still owed on the instrument: a settled reading in the other four screens (Vue `
 }
 ```
 
+### 27. What `touchable-opacity` has left is the price of `componentDidUpdate`, not an anomaly
+
+```
+27 := {
+  where_it_sits: "against the ladder's plain two-node pair (1 345 B/item), the behavior costs are
+                  twf +199 B · tnf +86 B · opacity +885. The first two are done; opacity is the
+                  one row still 6-10x its siblings",
+  split: "`afterCommit`, 537 B of the 885: `propsOf` 296 · `restingOpacityOf` 80 · the `settledAt`
+          record and the resolver 161. Bisected by stubbing one at a time",
+  why_it_cannot_just_go: "`afterCommit` IS RN's `componentDidUpdate`, and a change needs a
+                          BASELINE. React is handed `prevProps` for free; we retain no props in JS
+                          by design, so the snapshot is what the comparison costs",
+  both_cheap_escapes_are_closed: "narrow key reads are measured and REVERTED (see the negative
+                                  results table: +12 ms on button's `clear`), and skipping the
+                                  snapshot on the mount drops a `disabled` flip on the first update
+                                  after it, which is a parity loss, not an optimisation",
+  what_is_left_untried: "a KEYED write hook, so a behavior re-settles only when one of its own prop
+                         keys was written and never polls. `setProp` already short-circuits on
+                         `node.childHost !== undefined`; this would add a second field read there,
+                         on the engine's hottest path, which is exactly what `afterCommit`'s own
+                         comment refused. Not priced yet, and it needs §8's one-change-alone run",
+  and_the_rest_of_the_table: "button 4 068 KB and refresh-control 3 937 are 4 and 3 NODES per item
+                              at ~1.0-1.3 KB each, which is what their trees cost. `refresh-control`
+                              attaches one `setNodeDispatch` and its `evaluateSnapBack` returns on
+                              the first branch for a node nothing has reported yet",
+}
+```
+
 ## The current numbers
 
 Headless, 1 000 rows, `bench:itest` Release on Hermes **as `hermesc -O` bytecode**
