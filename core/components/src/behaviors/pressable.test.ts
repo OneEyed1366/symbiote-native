@@ -15,6 +15,7 @@ import {
   clearHostBehaviors,
   createElement,
   createSurface,
+  listenerFor,
   propOf,
   registerRules,
   removeChild,
@@ -43,7 +44,7 @@ function mount(node: ISymbioteNode) {
 }
 
 function listenerOf(node: ISymbioteNode, name: string): IListener {
-  const listener = node.listeners?.get(name);
+  const listener = listenerFor(node, name);
   if (listener === undefined) {
     throw new Error(
       `no "${name}" listener installed — the behavior did not attach`,
@@ -269,7 +270,7 @@ describe('pressable host behavior', () => {
     registerPressableBehavior();
     const plain = createElement(PRESSABLE_VIEW_NAME);
 
-    expect(plain.listeners?.get('startShouldSetResponder')).toBeUndefined();
+    expect(listenerFor(plain, 'startShouldSetResponder')).toBeUndefined();
   });
 
   // why: `Pressability.js:479` returns `blockNativeResponder === true` from `onResponderGrant`,

@@ -37,6 +37,7 @@ import {
   registerHostBehavior,
   requestCommitFor,
   setAnimatedBehaviorStyle,
+  setProp,
   timing,
   type IHostBehavior,
   type ISymbioteEvent,
@@ -59,7 +60,6 @@ import {
   OPACITY_ACTIVE_DURATION_MS,
   OPACITY_ACTIVE_GRANT_DURATION_MS,
   OPACITY_INACTIVE_DURATION_MS,
-  RESTING_OPACITY,
   restingOpacityFromStyle,
   TOUCHABLE_MIN_PRESS_DURATION_MS,
   type ITouchableFeedbackRuntime,
@@ -73,12 +73,36 @@ interface IFeedbackState {
   readonly runtime: ITouchableFeedbackRuntime;
   // Tracked so `detach` can cancel them — a deferred press-out outlives the tree that armed it.
   readonly timers: Set<ReturnType<typeof setTimeout>>;
-  // What the last commit settled at. `undefined` until the first, because RN re-settles on UPDATE
-  // only (componentDidUpdate) and firing at mount would animate over the value just seeded.
-  settled: { disabled: unknown; resting: number } | undefined;
+  // Whether the animated layer is registered on the node yet, see `ensureLayer`
+  isBound: boolean;
 }
 
 const states = new WeakMap<ISymbioteNode, IFeedbackState>();
+
+// Built on the FIRST FADE, not at attach: the three together read 1 343 B per node
+// (`touchable-attach-cost.itest.ts`) and nothing reads them until a finger lands
+function stateOf(node: ISymbioteNode): IFeedbackState {
+  const existing = states.get(node);
+  if (existing !== undefined) return existing;
+  // Seeded at the CURRENT resting opacity, which the first `afterCommit` used to set
+  const state: IFeedbackState = {
+    opacity: new AnimatedValue(restingOpacityOf(node)),
+    runtime: createTouchableFeedbackRuntime(),
+    timers: new Set(),
+    isBound: false,
+  };
+  states.set(node, state);
+  return state;
+}
+
+// What the last commit settled at, apart from the state above т.к. `afterCommit` runs for every
+// mounted node while that state is owed only by one that actually fades
+
+// `undefined` is the mount, where RN re-settles nothing (it is `componentDidUpdate` only)
+const settledAt = new WeakMap<
+  ISymbioteNode,
+  { disabled: unknown; resting: number }
+>();
 
 // `modules/animated`'s barrel swaps the whole driver namespace for the mock when the host reports
 // reduced motion; the one driver used here is swapped on the same flag.
@@ -98,7 +122,21 @@ function restingOpacityOf(node: ISymbioteNode): number {
   return restingOpacityFromStyle(getExplicitStyle(node));
 }
 
-function fadeTo(state: IFeedbackState, toValue: number, ms: number): void {
+// Registered on FIRST FADE, not at attach: the leaf costs 9.8 us and 5.9 KB per node
+// (`touchable-attach-cost.itest.ts`) and a list nobody presses pays it for a value that never moves
+function ensureLayer(node: ISymbioteNode, state: IFeedbackState): void {
+  if (state.isBound) return;
+  state.isBound = true;
+  setAnimatedBehaviorStyle(node, { opacity: state.opacity });
+}
+
+function fadeTo(
+  node: ISymbioteNode,
+  state: IFeedbackState,
+  toValue: number,
+  ms: number,
+): void {
+  ensureLayer(node, state);
   dlog(`touchable-opacity opacity -> ${toValue} over ${ms}ms`);
   // useNativeDriver is RN's own (TouchableOpacity.js:242): opacity is natively drivable, so the
   // fade survives a busy JS thread, which is the whole point of press feedback.
@@ -114,8 +152,7 @@ function fadeTo(state: IFeedbackState, toValue: number, ms: number): void {
 // hold when a finger lands, and the handlers it builds are discarded with the gesture. The runtime
 // that must outlive one — an in-flight delayPressIn timer, the activation clock — is on the node.
 const refine: IPressConfigRefinement = (node, config) => {
-  const state = states.get(node);
-  if (state === undefined) return config;
+  const state = stateOf(node);
   const resting = restingOpacityOf(node);
   const activeOpacity = numberOr(
     propOf(node, 'activeOpacity'),
@@ -147,19 +184,17 @@ const refine: IPressConfigRefinement = (node, config) => {
     state.runtime,
     {
       activate(event: ISymbioteEvent): void {
-        // TouchableOpacity.js:215-220 picks the duration from WHERE the press-in came from: our
-        // engine's own 'pressIn' event (an ordinary grant, or its delayed replay) is the 0ms leg;
-        // a drift-out/drift-back-in reactivation arrives as 'responderMove'
-        // (`state/pressable.ts`'s `handleResponderMove`) and gets the 150ms ease-back-in instead.
+        // TouchableOpacity.js:215-220 picks the duration from WHERE the press-in came from: a
+        // plain grant fades instantly, a drift-back-in arrives as `responderMove` and eases
         const duration =
           event.type === 'responderMove'
             ? OPACITY_ACTIVE_DURATION_MS
             : OPACITY_ACTIVE_GRANT_DURATION_MS;
-        fadeTo(state, activeOpacity, duration);
+        fadeTo(node, state, activeOpacity, duration);
         config.onPressIn?.(event);
       },
       deactivate(event: ISymbioteEvent): void {
-        fadeTo(state, resting, OPACITY_INACTIVE_DURATION_MS);
+        fadeTo(node, state, resting, OPACITY_INACTIVE_DURATION_MS);
         config.onPressOut?.(event);
       },
     },
@@ -185,13 +220,11 @@ const touchableOpacityDisabled: IDisabledResolver = props =>
     asAccessibilityState(props.accessibilityState),
   );
 
-/**
- * The behavior as PARTS, so a tag that is a TouchableOpacity plus something — `button`, which RN
- * builds as exactly that (Button.js:283) — composes the fade instead of re-implementing it.
- *
- * Safe to hand to two tags: every piece of runtime is keyed by NODE (`states`), and `press` is
- * itself already shared that way.
- */
+// The behavior as PARTS, so a tag that is a TouchableOpacity plus something composes the fade
+// instead of re-implementing it (`button` is exactly that, Button.js:283)
+
+// Safe to hand to two tags: every piece of runtime is keyed by NODE, `press` included
+
 export function createTouchableOpacityBehavior(
   disabledOf?: IDisabledResolver,
 ): IHostBehavior {
@@ -202,69 +235,46 @@ export function createTouchableOpacityBehavior(
   return {
     ...machine,
     attach(node: ISymbioteNode): void {
-      const state: IFeedbackState = {
-        opacity: new AnimatedValue(RESTING_OPACITY),
-        runtime: createTouchableFeedbackRuntime(),
-        timers: new Set(),
-        settled: undefined,
-      };
-      states.set(node, state);
-      // Bound at ATTACH rather than at the first press, matching RN: the binding is what forces
-      // `collapsable: false`, and a view Fabric un-flattens mid-gesture would lose the responder.
-      // Nothing is published until a fade runs — the leaf writes only when its value moves.
-      setAnimatedBehaviorStyle(node, { opacity: state.opacity });
+      // The half of the binding that CANNOT wait for the first press: a view Fabric flattens
+      // mid-gesture loses the tag the responder lands on. Everything else follows in `stateOf`
+      setProp(node, 'collapsable', false);
       machine.attach(node);
     },
     // RN's componentDidUpdate: a changed `disabled` or a changed style opacity re-settles the view,
     // so a Touchable disabled mid-press does not stay stuck at its active opacity.
     afterCommit(node: ISymbioteNode): void {
-      const state = states.get(node);
-      if (state === undefined) return;
       const resting = restingOpacityOf(node);
-      // Through the SAME resolver the press machine uses, not the raw prop: on Button `disabled` is
-      // the three-way answer of `props.disabled ?? aria-disabled ?? accessibilityState.disabled`
-      // (Button.js:331,337), so reading the prop here left an aria-only flip un-settled — the view
-      // stayed at its active opacity while the press was already suppressed. RN's Button has no
-      // such gap because it passes the resolved value DOWN as its touchable's prop.
+      // Through the SAME resolver the press machine uses, not the raw prop: on `button` `disabled`
+      // also answers to `aria-disabled` / `accessibilityState` (Button.js:331,337), and reading the
+      // prop alone left an aria-only flip un-settled at its active opacity
       const props = propsOf(node);
       const disabled = disabledOf?.(props) ?? props.disabled;
-      const previous = state.settled;
-      state.settled = { disabled, resting };
-      if (previous === undefined) {
-        // NOT vendor parity, despite this comment's old claim: `TouchableOpacity-itest.js` ("does
-        // not render explicit opacity when using default") proves a resting, untouched
-        // TouchableOpacity commits no `opacity` key at all. Vendor's native-animated leaf is a
-        // separate channel from the ordinary style diff, so forcing non-flattening never implies
-        // publishing a value. Ours publishes anyway: `setAnimatedBehaviorStyle`/`bindAnimatedValue`
-        // (`host-binding.ts`) force `collapsable: false` and resolve+write the leaf's value in the
-        // SAME call. Untangling that is a change to shared animation infrastructure, not a one-line
-        // fix here — deferred, see the audit skill. Set rather than animate: this is the mount, and
-        // RN re-settles on componentDidUpdate only.
-        //
-        // TODO(rn-parity): skip this initial publish when `resting === RESTING_OPACITY` (1, Fabric's
-        // own opacity default) and no authored `style.opacity` needs another route to Fabric, so a
-        // resting default TouchableOpacity commits no `opacity` key — matching vendor. Needs
-        // `bindAnimatedValue`/`host-binding.ts` to separate "force collapsable:false" from "publish
-        // the leaf's value" (shared by every animated-behavior consumer, not just this tag), plus a
-        // new test for the untouched-default case (no existing case in touchable-opacity.test.ts
-        // covers it — every case authors an explicit style.opacity first).
-        state.opacity.setValue(resting);
-        return;
-      }
+      const previous = settledAt.get(node);
+      settledAt.set(node, { disabled, resting });
+      // The mount, where RN re-settles nothing. An untouched node holds no `AnimatedValue` yet, and
+      // `stateOf` seeds the one it eventually builds at whatever `resting` is by then
+      if (previous === undefined) return;
       if (previous.disabled === disabled && previous.resting === resting)
         return;
-      fadeTo(state, resting, OPACITY_INACTIVE_DURATION_MS);
+      fadeTo(node, stateOf(node), resting, OPACITY_INACTIVE_DURATION_MS);
     },
     detach(node: ISymbioteNode): void {
       machine.detach(node);
+      settledAt.delete(node);
       const state = states.get(node);
-      if (state === undefined) return;
+      // Never faded, so the flatten guard `attach` wrote is the only thing owed back
+      if (state === undefined) {
+        setProp(node, 'collapsable', undefined);
+        return;
+      }
       for (const id of state.timers) clearTimeout(id);
       state.timers.clear();
       // RN's componentWillUnmount: stop the animation so a teardown mid-fade leaves no driver
       // running against a node that is gone.
       state.opacity.resetAnimation();
-      setAnimatedBehaviorStyle(node, undefined);
+      // Dropping the layer clears `collapsable` on its way out, so only an unbound node still owes
+      if (state.isBound) setAnimatedBehaviorStyle(node, undefined);
+      else setProp(node, 'collapsable', undefined);
       states.delete(node);
       dlog('touchable-opacity behavior detached');
     },

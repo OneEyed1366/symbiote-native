@@ -19,6 +19,7 @@ import {
   createElement,
   createSurface,
   removeChild as engineRemove,
+  listenerFor,
   routeProp,
   type IListener,
   type ISymbioteEvent,
@@ -80,7 +81,7 @@ function mountIdentified(
 }
 
 function listenerOf(node: ISymbioteNode, name: string): IListener {
-  const listener = node.listeners?.get(name);
+  const listener = listenerFor(node, name);
   if (listener === undefined)
     throw new Error(`no "${name}" listener — the behavior did not attach`);
   return listener;
@@ -171,7 +172,7 @@ describe('touchable-without-feedback host behavior', () => {
     engineAppend(owner, child);
     surface.commit();
 
-    expect(owner.listeners?.get('pressIn')).toBeUndefined();
+    expect(listenerFor(owner, 'pressIn')).toBeUndefined();
     pressIn(child, touchAt(4, 5));
     expect(onPressIn).toHaveBeenCalledTimes(1);
 
@@ -277,10 +278,8 @@ describe('touchable-without-feedback host behavior', () => {
     const committedRoot = findCommitted(ROOT_TEST_ID);
     expect(committedRoot.children).toHaveLength(1);
     expect(committedRoot.children[0].payload.backgroundColor).toBe('blue');
-    // WHAT THE OWNER PUT ON IT is the rule's, and the rule is in C++ — asserted in
-    // `clone-onto-child-payload.itest.ts`. What this case owes is that the moved node is ADOPTED at
-    // all: it writes no prop of its own, so without the adoption's `markPropsDirty` it would keep
-    // the payload it had outside and never be folded.
+    // Only that the move was ADOPTED. What the owner then folds ONTO it is the C++ rule's, asserted
+    // in `clone-onto-child-payload.itest.ts`
     expect(child.hasCommitHook || owner.childHost === stranger).toBe(true);
   });
 
@@ -306,16 +305,14 @@ describe('touchable-without-feedback host behavior', () => {
 
     routeProp(owner, 'onLayout', undefined);
     surface.commit();
-    // ABSENT, not null, and the change of spelling is a correction rather than a weakening. The
-    // literal null was the CLONE PROTOCOL's way of saying "reset this to its default" — it existed
-    // only inside the diff the stand-in merged, and no other consumer ever saw it. The engine's op
-    // stream says the same thing with `NO_VALUE`, and a host replaying that op DELETES the key.
+    // ABSENT, not null: the engine's op stream says "reset to default" with `NO_VALUE`, and a host
+    // replaying that op DELETES the key
     expect(Object.hasOwn(subject().payload, 'onLayout')).toBe(false);
     // The half that proves the engine ACTED rather than merely stopping: the record carried
     // `onLayout` after the write above, so the key being gone from it means a clearing op was sent.
     const recorded = fabric.find(node => node.props.testID === SUBJECT_TEST_ID);
     expect(Object.hasOwn(recorded?.props ?? {}, 'onLayout')).toBe(false);
-    expect(child.listeners?.get('layout')).toBeUndefined();
+    expect(listenerFor(child, 'layout')).toBeUndefined();
   });
 
   // :152-153, the pair TNF drops. Not gate-flagged, so the observable is the listener alone.
@@ -388,12 +385,9 @@ describe('touchable-without-feedback host behavior', () => {
     expect(owner.childHost).toBe(replacement);
   });
 
-  // THE CONTROL, and its absence half is WEAKER than it was — recorded rather than quietly kept.
-  // The three `not.toContain` lines used to say "no clone ran"; this host can no longer produce a
-  // clone at all, so they now pass whether or not the behavior is registered. What still controls is
-  // the LISTENER: an unregistered tag attaches no press machine, which is the half this harness
-  // owns. The absence half lives in `clone-onto-child-payload.itest.ts`, where a missing rule is
-  // distinguishable from a missing registration.
+  // THE CONTROL, and only its LISTENER half controls anything here: this host cannot produce a
+  // clone at all, so the three `not.toContain` lines pass registered or not. The absence half lives
+  // in `clone-onto-child-payload.itest.ts`
   it('clones nothing and attaches nothing when the behavior is not registered', () => {
     clearHostBehaviors();
     const { root, owner, child, surface } = mountIdentified({
@@ -410,6 +404,6 @@ describe('touchable-without-feedback host behavior', () => {
     const committed = committedRoot.children[0];
     for (const absent of ['accessibilityLabel', 'focusable', 'testID'])
       expect(Object.keys(committed.payload)).not.toContain(absent);
-    expect(child.listeners?.get('pressIn')).toBeUndefined();
+    expect(listenerFor(child, 'pressIn')).toBeUndefined();
   });
 });
