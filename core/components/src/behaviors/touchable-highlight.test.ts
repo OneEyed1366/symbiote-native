@@ -9,6 +9,7 @@ import {
   clearHostBehaviors,
   createElement,
   createSurface,
+  listenerFor,
   routeProp,
   type IListener,
   type ISymbioteEvent,
@@ -45,7 +46,7 @@ function mount(node: ISymbioteNode) {
 }
 
 function listenerOf(node: ISymbioteNode, name: string): IListener {
-  const listener = node.listeners?.get(name);
+  const listener = listenerFor(node, name);
   if (listener === undefined)
     throw new Error(`no "${name}" listener — the behavior did not attach`);
   return listener;
@@ -304,7 +305,7 @@ describe('touchable-highlight host behavior', () => {
     mount(node);
     await settle();
 
-    expect(node.listeners?.get('pressIn')).toBeUndefined();
+    expect(listenerFor(node, 'pressIn')).toBeUndefined();
     expect(isUnderlayShown(node)).toBe(false);
   });
 });

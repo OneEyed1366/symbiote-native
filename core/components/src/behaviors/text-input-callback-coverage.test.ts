@@ -24,6 +24,7 @@ import {
   appListenerFor,
   createElement,
   createSurface,
+  listenerFor,
   routeProp,
   type IListener,
   type ISymbioteEvent,
@@ -134,7 +135,7 @@ function mount(node: ISymbioteNode): void {
 }
 
 function listenerOf(node: ISymbioteNode, name: string): IListener {
-  const listener = node.listeners?.get(name);
+  const listener = listenerFor(node, name);
   if (listener === undefined) {
     throw new Error(`no "${name}" listener installed`);
   }
@@ -151,17 +152,16 @@ describe('TextInput callbacks on the tag', () => {
     );
   });
 
-  // CONTROL. Seven of the eight rows below would also pass on a node carrying NO behavior at all —
-  // a pass-through reaches the app through plain event routing, machine or not. So a green table is
-  // not by itself evidence that the tag is wired, and this asserts the one thing that distinguishes
-  // the two: an OWNED event lands in the stash instead of overwriting the machine.
+  // CONTROL: seven of the eight rows below pass on a node carrying NO behavior too, т.к. a
+  // pass-through reaches the app through plain routing. What separates the two is asserted here,
+  // that an OWNED event lands in the stash instead of overwriting the machine
   it('attaches the machine to the tag, so the rows below mean something', () => {
     const node = makeTextInput();
     const appHandler = vi.fn();
     routeProp(node, 'onChange', appHandler);
 
     expect(appListenerFor(node, 'change')).toBe(appHandler);
-    expect(node.listeners?.get('change')).not.toBe(appHandler);
+    expect(listenerFor(node, 'change')).not.toBe(appHandler);
   });
 
   it.each(Object.entries(CALLBACK_CASES))(

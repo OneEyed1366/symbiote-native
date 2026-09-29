@@ -141,6 +141,8 @@ const reconciler = createReconciler<
   noTimeout: -1,
   scheduleTimeout: setTimeout,
   cancelTimeout: clearTimeout,
+  supportsMicrotasks: true,
+  scheduleMicrotask: queueMicrotask,
 
   getRootHostContext: () => ({ isInsideText: false }),
   getChildHostContext(parentHostContext, type) {

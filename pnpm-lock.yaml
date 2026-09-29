@@ -520,6 +520,9 @@ importers:
       '@symbiote-native/test-utils':
         specifier: workspace:*
         version: link:../../core/test-utils
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.1.0
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17

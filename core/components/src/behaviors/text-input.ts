@@ -19,10 +19,11 @@ import {
   propsOf,
   registerHostBehavior,
   requestCommitFor,
-  setBehaviorListener,
   setInputBlurred,
   setInputFocused,
+  setNodeDispatch,
   setProp,
+  type IEventDispatch,
   type ISymbioteEvent,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
@@ -30,6 +31,7 @@ import {
 import {
   attachPressMachine,
   detachPressMachine,
+  PRESS_DISPATCH,
   type IPressConfigRefinement,
 } from './pressable';
 
@@ -276,17 +278,33 @@ function attach(node: ISymbioteNode): void {
   // No `requestCommitFor` here: at create the renderer commits anyway, and on a re-attach the key
   // is already at this value, so `setProp`'s identity guard makes the write a no-op.
   setProp(node, 'mostRecentEventCount', INITIAL_EVENT_COUNT);
-  setBehaviorListener(node, 'change', event => onChange(node, event));
-  setBehaviorListener(node, 'focus', event => onFocus(node, event));
-  setBehaviorListener(node, 'blur', event => onBlur(node, event));
-  setBehaviorListener(node, 'selectionChange', event =>
-    onSelectionChange(node, event),
-  );
   attachPressMachine(node, {
     refine: focusOnPress,
     cancelableOf: textInputCancelable,
   });
+  // AFTER the machine, which points the node at its own: a node holds exactly one dispatch, and
+  // `TEXT_INPUT_DISPATCH` is the union that delegates the machine's seven back to it
+  setNodeDispatch(node, TEXT_INPUT_DISPATCH);
 }
+
+const OWN_HANDLERS: ReadonlyMap<
+  string,
+  (node: ISymbioteNode, event: ISymbioteEvent) => void
+> = new Map([
+  ['change', onChange],
+  ['focus', onFocus],
+  ['blur', onBlur],
+  ['selectionChange', onSelectionChange],
+]);
+
+const TEXT_INPUT_DISPATCH: IEventDispatch = {
+  names: new Set([...OWN_HANDLERS.keys(), ...PRESS_DISPATCH.names]),
+  deliver(node, name, event) {
+    const own = OWN_HANDLERS.get(name);
+    if (own !== undefined) return own(node, event);
+    return PRESS_DISPATCH.deliver(node, name, event);
+  },
+};
 
 // TextInput.js:597 with its `rejectResponderTermination = true` default (:905): iOS keeps the
 // gesture unless the app opts in; Android hands Pressability `null`, i.e. its own default (yield).

@@ -70,7 +70,9 @@ describe('useAudioRecorderState (Positive: reads the initial status, polls for a
     setStatus({ isRecording: true, durationMillis: 0 });
     await vi.advanceTimersByTimeAsync(10);
 
-    expect(captured).toEqual({ isRecording: true, durationMillis: 0 });
+    await vi.waitFor(() =>
+      expect(captured).toEqual({ isRecording: true, durationMillis: 0 }),
+    );
   });
 
   it('does not update on a poll with no meaningful change', async () => {

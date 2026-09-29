@@ -12,6 +12,7 @@ import {
   createElement,
   createSurface,
   getExplicitStyle,
+  listenerFor,
   routeProp,
   type IListener,
   type ISymbioteEvent,
@@ -71,7 +72,7 @@ function mount(node: ISymbioteNode) {
 }
 
 function listenerOf(node: ISymbioteNode, name: string): IListener {
-  const listener = node.listeners?.get(name);
+  const listener = listenerFor(node, name);
   if (listener === undefined)
     throw new Error(`no "${name}" listener — the behavior did not attach`);
   return listener;
@@ -302,7 +303,27 @@ describe('touchable-opacity host behavior', () => {
     // The same control for the two `focusable` cases above: unregistered, nothing computes it, so
     // a green `false` there cannot be some engine default.
     expect(committedPropsOf(TEST_ID).focusable).toBeUndefined();
-    expect(node.listeners?.get('pressIn')).toBeUndefined();
+    expect(listenerFor(node, 'pressIn')).toBeUndefined();
+  });
+
+  // Vendor parity: `TouchableOpacity-itest.js` ("does not render explicit opacity when using
+  // default") commits no `opacity` for an untouched touchable. `collapsable` still has to be
+  // forced from mount, т.к. a flattened view has no tag for the responder to land on
+  it('commits no opacity until the first press, but blocks flattening from mount', async () => {
+    vi.useFakeTimers();
+    registerTouchableOpacityBehavior();
+    const node = makeTouchable();
+    routeProp(node, 'testID', TEST_ID);
+    mount(node);
+    await settle();
+
+    expect(committedPropsOf(TEST_ID).opacity).toBeUndefined();
+    expect(committedPropsOf(TEST_ID).collapsable).toBe(false);
+
+    pressIn(node);
+    await settle();
+
+    expect(committedPropsOf(TEST_ID).opacity).toBe(DEFAULT_ACTIVE_OPACITY);
   });
 
   // Vendor parity: `TouchableOpacity-itest.js` ("does not render explicit opacity when using

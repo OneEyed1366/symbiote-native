@@ -38,6 +38,7 @@ import {
   VOID_COMPONENT,
   isSymbioteNode,
   type IClassStyleParts,
+  type IEventDispatch,
   type IListener,
   type ISymbioteNode,
 } from './node-types';
@@ -57,6 +58,7 @@ class SymbioteNode implements ISymbioteNode {
   declare component: string;
   declare readonly isText: boolean;
   declare listeners: Map<string, IListener> | undefined;
+  declare dispatch: IEventDispatch | undefined;
   declare hasCommitHook: boolean;
   declare resolvesImageSources: boolean;
   declare nativeIdWinsOverId: boolean;
@@ -69,6 +71,7 @@ class SymbioteNode implements ISymbioteNode {
   declare isTornDown: boolean;
   declare slot: number;
   declare slotBatch: number;
+  declare createdBatch: number;
 
   constructor(component: string, isText: boolean) {
     // Every field is assigned here, not lazily: present from the constructor, they all keep ONE
@@ -77,6 +80,7 @@ class SymbioteNode implements ISymbioteNode {
     this.component = component;
     this.isText = isText;
     this.listeners = undefined;
+    this.dispatch = undefined;
     this.hasCommitHook = false;
     this.resolvesImageSources = false;
     this.nativeIdWinsOverId = false;
@@ -91,6 +95,7 @@ class SymbioteNode implements ISymbioteNode {
     // `slotBatch` starts at a value no real batch carries, so an untouched node needs no flag
     this.slot = 0;
     this.slotBatch = 0;
+    this.createdBatch = 0;
   }
 
   measure(callback: IMeasureOnSuccess): void {

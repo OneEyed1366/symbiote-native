@@ -19,6 +19,7 @@ import {
   createElement,
   createSurface,
   removeChild,
+  listenerFor,
   routeProp,
   type ISymbioteEvent,
   type ISymbioteNode,
@@ -50,7 +51,7 @@ interface IMounted {
 }
 
 function fire(target: ISymbioteNode, event: ISymbioteEvent): void {
-  const listener = target.listeners?.get(event.type);
+  const listener = listenerFor(target, event.type);
   if (listener === undefined)
     throw new Error(
       `no ${event.type} listener installed on ${target.component}`,

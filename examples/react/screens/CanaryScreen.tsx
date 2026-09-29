@@ -161,7 +161,7 @@ export function CanaryScreen() {
   // JS -> native imperative modules. A Promise reject (no native module / user
   // cancel) is expected, so it's swallowed; this is a demo, not a flow to handle.
   const onShare = useCallback(() => {
-    void Share.share({
+    Share.share({
       message: 'Sent from symbiote',
       url: 'https://reactnative.dev',
     }).catch(() => {});
@@ -182,7 +182,7 @@ export function CanaryScreen() {
     );
   }, [onShare]);
   const onOpenUrl = useCallback(() => {
-    void Linking.openURL('https://reactnative.dev').catch(() => {});
+    Linking.openURL('https://reactnative.dev').catch(() => {});
   }, []);
 
   return (
@@ -475,6 +475,7 @@ export function CanaryScreen() {
             </text>
           )}
         </pressable>
+
 
         {/* Horizontal FlatList: real windowing. */}
         <text className="section-label">FlatList · 24 chips, windowed</text>

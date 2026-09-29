@@ -12,6 +12,7 @@ export {
   isSymbioteEvent,
   isSymbioteNode,
   type IClassStyleParts,
+  type IEventDispatch,
   type IListener,
   type ISymbioteEvent,
   type ISymbioteNode,
@@ -48,7 +49,13 @@ export {
   setNodeUnderlayShown,
 } from './node-style';
 
-export { setBehaviorListener, setEventListener } from './node-events';
+export {
+  hasListenerFor,
+  listenerFor,
+  setBehaviorListener,
+  setEventListener,
+  setNodeDispatch,
+} from './node-events';
 
 export { routeProp } from './node-route';
 

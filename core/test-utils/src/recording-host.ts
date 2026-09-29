@@ -17,40 +17,23 @@
  */
 
 import {
-  NO_VALUE,
-  OP_APPEND_CHILD,
-  OP_COMMIT,
-  OP_CREATE_ANCHOR,
-  OP_CREATE_ELEMENT,
-  OP_CREATE_RAW_TEXT,
-  OP_INSERT_BEFORE,
-  OP_REMOVE_CHILD,
-  OP_SET_COMPONENT,
-  OP_SET_OWNED_LISTENER,
-  OP_SET_TAG,
-  OP_SET_UNDERLAY_SHOWN,
-  OP_SET_PROP,
-  OP_SET_TEXT,
-  OP_STRIDE,
-  type IMutationBatch,
-} from '@symbiote-native/engine/mutation-buffer';
-import {
   fabricProps,
-  isSymbioteNode,
   propsOf,
   setTreeHost,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
 import type {
   ICommittedRecord,
+  IDomRect,
   IMeasureInWindowOnSuccess,
   IMeasureLayoutOnSuccess,
   IMeasureOnSuccess,
   ITreeCensus,
   ITreeHost,
 } from '@symbiote-native/engine';
+import { createRecordedTree, type IRecordedTree } from './recorded-tree';
 
-type IRecorded = {
+export type IRecorded = {
   handle: ISymbioteNode;
   instanceHandle: unknown;
   viewName: string;
@@ -239,181 +222,28 @@ export function payloadOf(node: ISymbioteNode): Record<string, unknown> {
 const NO_TAG = -1;
 
 export function createRecordingHost(): IRecordingHost {
-  let recorded = new WeakMap<object, IRecorded>();
+  const tree: IRecordedTree = createRecordedTree();
+  const { nodeOf } = tree;
   let eventHandler: IEventHandler | undefined;
-  // The WeakMap above cannot be enumerated, and `find` has to start somewhere. Strong references,
-  // so `forget()` is what a long file calls to stop this growing — the same deal `installFabric`'s
-  // `created` array made.
-  let created: IRecorded[] = [];
+  const commands: IRecordingHost['commands'] = [];
+  const responderHandovers: IRecordingHost['responderHandovers'] = [];
+  const accessibilityEvents: IRecordingHost['accessibilityEvents'] = [];
 
-  const nodeOf = (handle: object, what: string): IRecorded => {
-    const node = recorded.get(handle);
-    if (node === undefined) {
-      throw new Error(`${what}: handle names no node in this tree`);
-    }
-    return node;
+  const clearRecords = (): void => {
+    tree.reset();
+    commands.length = 0;
+    responderHandovers.length = 0;
+    accessibilityEvents.length = 0;
   };
 
-  const detach = (node: IRecorded): void => {
-    const { parent } = node;
-    if (parent === undefined) return;
-    const at = parent.children.indexOf(node);
-    if (at >= 0) parent.children.splice(at, 1);
-    node.parent = undefined;
-  };
-
-  // Lands a rootTag onto a whole subtree at OP_COMMIT, the same moment the real engine hands every
-  // node in the walk its own `ShadowNode`. `committedRootTag` never gets cleared afterwards, so a
-  // node removed after this still answers `committedRecordOf` — see that field's own comment.
-  const markCommitted = (node: IRecorded, rootTag: number): void => {
-    node.committedRootTag = rootTag;
-    for (const child of node.children) markCommitted(child, rootTag);
-  };
-
-  const host: IRecordingHost = {
-    commits: 0,
-    commands: [],
-    responderHandovers: [],
-    accessibilityEvents: [],
-
-    applyOps(batch: IMutationBatch): void {
-      const { ops, strings, values, handles, instanceHandles } = batch;
-
-      const handleAt = (slot: number): object => {
-        const handle = handles[slot];
-        if (handle === undefined) {
-          throw new Error(
-            `applyOps: slot ${slot} is outside this batch's handles`,
-          );
-        }
-        return handle;
-      };
-      const at = (slot: number): IRecorded =>
-        nodeOf(handleAt(slot), 'applyOps');
-      const create = (
-        slot: number,
-        viewName: string,
-        props: Record<string, unknown>,
-        instanceHandle?: unknown,
-      ): void => {
-        const handle = handleAt(slot);
-        // Checked rather than assumed: the batch types handles as `object`, and the whole value of
-        // holding the node is being able to hand it back to the engine's own API.
-        if (!isSymbioteNode(handle)) {
-          throw new Error(
-            'applyOps: a handle in this batch is not an engine node',
-          );
-        }
-        const node: IRecorded = {
-          handle,
-          instanceHandle,
-          viewName,
-          tagName: '',
-          ownedListeners: {},
-          underlayShown: false,
-          props,
-          parent: undefined,
-          children: [],
-          committedRootTag: undefined,
-        };
-        recorded.set(handle, node);
-        created.push(node);
-      };
-
-      for (
-        let cursor = 0;
-        cursor + OP_STRIDE <= ops.length;
-        cursor += OP_STRIDE
-      ) {
-        const code = ops[cursor];
-        const a = ops[cursor + 1];
-        const b = ops[cursor + 2];
-        const c = ops[cursor + 3];
-        const d = ops[cursor + 4];
-        switch (code) {
-          case OP_CREATE_ELEMENT:
-            // Slot 4 is the index into `instanceHandles` — the object Fabric would hand back with
-            // an event. Recorded because it is what the op SAYS, and because a test firing an
-            // event has to name the same object the engine registered.
-            create(a, strings[b], {}, instanceHandles[d]);
-            break;
-          case OP_CREATE_RAW_TEXT:
-            create(a, 'RCTRawText', { text: strings[b] });
-            break;
-          case OP_CREATE_ANCHOR:
-            create(a, '', {});
-            break;
-          case OP_APPEND_CHILD: {
-            const child = at(b);
-            detach(child);
-            child.parent = at(a);
-            at(a).children.push(child);
-            break;
-          }
-          case OP_INSERT_BEFORE: {
-            const parent = at(a);
-            const child = at(b);
-            const before = at(c);
-            detach(child);
-            child.parent = parent;
-            const index = parent.children.indexOf(before);
-            parent.children.splice(
-              index < 0 ? parent.children.length : index,
-              0,
-              child,
-            );
-            break;
-          }
-          case OP_REMOVE_CHILD:
-            detach(at(b));
-            break;
-          case OP_SET_PROP: {
-            const node = at(a);
-            if (c === NO_VALUE) delete node.props[strings[b]];
-            else node.props[strings[b]] = values[c];
-            break;
-          }
-          case OP_SET_TEXT:
-            at(a).props.text = strings[b];
-            break;
-          case OP_SET_COMPONENT:
-            at(a).viewName = strings[b];
-            break;
-          // RECORDED AND NOT ACTED ON, deliberately. The real host resolves a tag's platform props
-          // off this (`foldPressableProps`); this host builds its payload through the TypeScript
-          // `fabricProps`, which carries no copy of those rules and must not grow one — a second
-          // implementation is how a test goes green over a rule that no longer runs. A test that
-          // needs to read what a tag actually sends belongs in `core/engine/cpp/tests/js`.
-          case OP_SET_TAG:
-            at(a).tagName = strings[b];
-            break;
-          // RECORDED, NOT APPLIED, exactly like the tag above. The real host resolves `focusable`'s
-          // three-leg touchable form off this bit; this host builds its payload through the
-          // TypeScript `fabricProps`, which carries no copy of the tag rules and must not grow one.
-          // So a test that wants the resolved key reads the committed payload in an itest, and what
-          // this records is the fact a test can ASK about.
-          case OP_SET_OWNED_LISTENER:
-            at(a).ownedListeners[strings[b]] = c !== 0;
-            break;
-          // Same treatment, and for the same reason: the real host paints TouchableHighlight's
-          // underlay from this bit (`foldTouchableHighlightUnderlay`), and this one must not grow a
-          // copy of that rule. Recorded so a test can ask whether the MACHINE flipped it — which is
-          // the half that is still JS — while what the flip LOOKS like is asserted on a committed
-          // payload in `core/engine/cpp/tests/js/touchable-highlight-underlay.itest.ts`.
-          case OP_SET_UNDERLAY_SHOWN:
-            at(a).underlayShown = b !== 0;
-            break;
-          case OP_COMMIT: {
-            host.commits += 1;
-            markCommitted(at(b), a);
-            break;
-          }
-          default:
-            throw new Error(`applyOps: unknown opcode ${String(code)}`);
-        }
-      }
+  return {
+    get commits(): number {
+      return tree.commits;
     },
-
+    commands,
+    responderHandovers,
+    accessibilityEvents,
+    applyOps: tree.applyOps,
     propOf(handle: object, key: string): unknown {
       return nodeOf(handle, 'propOf').props[key];
     },
@@ -422,29 +252,11 @@ export function createRecordingHost(): IRecordingHost {
     },
     // Nothing is memoized here, so there is nothing to invalidate.
     markPropsDirty(): void {},
-    /**
-     * A record for a node standing under a surface the ops COMMITTED, and nothing more.
-     *
-     * The engine gates every imperative call on this, so answering `undefined` always would make
-     * `dispatchCommand` unreachable and quietly turn four command tests green-by-absence. What is
-     * answered here is read straight off the op stream — there WAS a commit, and this node is under
-     * that surface — with no claim about what the renderer did with it: no tag Fabric minted, no
-     * view that survived flattening, no guarantee it is mounted. A test that needs any of those
-     * belongs in `core/engine/cpp/tests/js`.
-     *
-     * `handle` is the authored node and `tag` is `NO_TAG`, so a test reading either gets something
-     * obviously not-from-Fabric rather than a plausible number. `rootTag` is real, not invented —
-     * see `IRecorded.committedRootTag`'s own comment for why the JS-level surface identifier is a
-     * different unknown from the native Fabric tag.
-     *
-     * Read off `committedRootTag` (set once per node at the commit that landed it, never cleared),
-     * not a live walk to a committed root — `removeChild` cuts the parent link before a behavior's
-     * teardown sweep runs in the SAME commit, so a walk answers `undefined` for exactly the node a
-     * parting write (`TextInput`'s unmount blur) needs to still reach. `node->committed` in the real
-     * engine works the same way, and for the same reason.
-     */
+    // That the ops COMMITTED this node, and nothing more. Read off `committedRootTag` and not a
+    // live walk, т.к. `removeChild` cuts the parent link before the teardown sweep runs in the
+    // SAME commit
     committedRecordOf(handle: object): ICommittedRecord | undefined {
-      const node = recorded.get(handle);
+      const node = tree.recordedOf(handle);
       if (node === undefined || node.committedRootTag === undefined) {
         return undefined;
       }
@@ -454,18 +266,9 @@ export function createRecordingHost(): IRecordingHost {
         rootTag: node.committedRootTag,
       };
     },
-    /**
-     * REFUSED, loudly, and that is the whole point of implementing it here.
-     *
-     * This host records the OPS it was handed; it never builds a Fabric payload, because building
-     * one is `SymbioteFabricProps.cpp`'s job and that code does not exist in a vitest process. An
-     * answer synthesised from the JS twin would be a test asserting against the wrong
-     * implementation — the exact drift `ITreeHost.committedPayloadOf` was added to close.
-     *
-     * So a test asking this question belongs in `core/engine/cpp/tests/js/` (`pnpm run test:itest`),
-     * where the real builder runs. `.props` on this host stays the read for "what did the adapter
-     * SAY", which is a different and still-useful question.
-     */
+    // REFUSED loudly, т.к. the payload is `SymbioteFabricProps.cpp`'s and that code does not run
+    // in vitest. A test asking this belongs in `core/engine/cpp/tests/js`, where the real builder
+    // does run
     committedPayloadOf(): Readonly<Record<string, unknown>> | undefined {
       throw new Error(
         'recording host: committedPayloadOf needs the real payload builder — move this to an itest',
@@ -498,9 +301,9 @@ export function createRecordingHost(): IRecordingHost {
       for (const root of roots) walk(nodeOf(root, 'subtreesOf'));
       return out;
     },
-    // The twin of the engine's narrowed walk, and it MUST narrow here too: the vitest suite is where
-    // the sweep's behaviour is asserted, so a recording host that handed back everything would make
-    // every one of those cases pass whatever the engine does.
+    // The twin of the engine's narrowed walk, and it MUST narrow here too: the vitest suite is
+    // where the sweep is asserted, so handing back everything would pass those cases whatever the
+    // engine does
     teardownSubtreesOf(roots: readonly object[]): readonly object[] {
       const out: object[] = [];
       const walk = (node: IRecorded, isRoot: boolean): boolean => {
@@ -553,7 +356,7 @@ export function createRecordingHost(): IRecordingHost {
       commandName: string,
       args: readonly unknown[],
     ): void {
-      host.commands.push({
+      commands.push({
         handle,
         viewName: nodeOf(handle, 'dispatchCommand').viewName,
         commandName,
@@ -561,13 +364,17 @@ export function createRecordingHost(): IRecordingHost {
       });
     },
     sendAccessibilityEvent(handle: object, eventType: string): void {
-      host.accessibilityEvents.push({ handle, eventType });
+      accessibilityEvents.push({ handle, eventType });
     },
     measure(_handle: object, _callback: IMeasureOnSuccess): void {},
     measureInWindow(
       _handle: object,
       _callback: IMeasureInWindowOnSuccess,
     ): void {},
+    // No Yoga layout runs headless, so every node reads one zero rect instead of a fake number
+    getBoundingClientRect(): IDomRect {
+      return { x: 0, y: 0, width: 0, height: 0 };
+    },
     measureLayout(
       _handle: object,
       _relativeTo: object,
@@ -581,11 +388,7 @@ export function createRecordingHost(): IRecordingHost {
       isResponder: boolean,
       blockNativeResponder: boolean,
     ): void {
-      host.responderHandovers.push({
-        handle,
-        isResponder,
-        blockNativeResponder,
-      });
+      responderHandovers.push({ handle, isResponder, blockNativeResponder });
     },
 
     registerEventHandler(handler: IEventHandler): void {
@@ -595,11 +398,11 @@ export function createRecordingHost(): IRecordingHost {
     find(
       predicate: (node: IAuthoredNode) => boolean,
     ): IAuthoredNode | undefined {
-      return created.find(predicate);
+      return tree.authored.find(predicate);
     },
 
     findAll(predicate: (node: IAuthoredNode) => boolean): IAuthoredNode[] {
-      return created.filter(predicate);
+      return tree.authored.filter(predicate);
     },
 
     fireEvent(
@@ -613,20 +416,11 @@ export function createRecordingHost(): IRecordingHost {
       eventHandler(handle, topLevelType, nativeEvent);
     },
 
-    reset(): void {
-      created = [];
-      host.commits = 0;
-      host.commands.length = 0;
-      host.responderHandovers.length = 0;
-      host.accessibilityEvents.length = 0;
-    },
+    reset: clearRecords,
 
     forget(): void {
-      recorded = new WeakMap();
-      created = [];
-      host.reset();
+      tree.forget();
+      clearRecords();
     },
   };
-
-  return host;
 }

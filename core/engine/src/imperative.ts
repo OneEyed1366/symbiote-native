@@ -15,7 +15,12 @@ import type {
 } from './fabric';
 import { clearPublishedStyle, writeProp, type ISymbioteNode } from './node';
 import { flattenStyle } from './style';
-import { flushOps, treeHost, type ICommittedRecord } from './tree-host';
+import {
+  flushOps,
+  treeHost,
+  type ICommittedRecord,
+  type IDomRect,
+} from './tree-host';
 
 // What Fabric currently holds for `node`, or undefined before its first commit. Flushes first: an
 // imperative call can land between a mutation and its commit, and the host can't answer about ops
@@ -175,6 +180,28 @@ export function measureInWindow(
     return;
   }
   treeHost()?.measureInWindow(node, callback);
+}
+
+// Synchronous, unlike the six above, mirroring nativeFabricUIManager's own shape. `undefined`
+// covers "not committed", "host predates this member", and a build without react/renderer/dom
+// (the native call throws there) - all read the same to a caller, like a detached element's rect.
+export function getBoundingClientRect(
+  node: ISymbioteNode,
+  includeTransform: boolean,
+): IDomRect | undefined {
+  const record = committedRecordOf(node);
+  if (record === undefined) {
+    dlog('getBoundingClientRect skipped: node not committed');
+    return undefined;
+  }
+  try {
+    return treeHost()?.getBoundingClientRect?.(node, includeTransform);
+  } catch (error) {
+    dlog(
+      `getBoundingClientRect skipped - ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return undefined;
+  }
 }
 
 // RN's public signature is (relative, onSuccess, onFail) but the native slot wants the fail

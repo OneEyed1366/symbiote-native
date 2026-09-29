@@ -13,7 +13,7 @@ import {
   type SymbioteSurface,
 } from '@symbiote-native/engine';
 import reconciler, { flushExternalUpdate } from './host-config';
-import { LegacyRoot } from './reconciler-constants';
+import { ConcurrentRoot } from './reconciler-constants';
 
 const noop = (): void => {};
 
@@ -104,7 +104,7 @@ export function mount(rootTag: IRootTag, element: ReactNode): SymbioteSurface {
 
   const container = reconciler.createContainer(
     surface,
-    LegacyRoot,
+    ConcurrentRoot,
     null,
     false,
     null,
@@ -120,9 +120,7 @@ export function mount(rootTag: IRootTag, element: ReactNode): SymbioteSurface {
   );
   containers.set(rootTag, container);
 
-  // react-reconciler 0.33 exposes updateContainerSync + flushSyncWork for an
-  // immediate render/commit; @types 0.32 still lists the older updateContainer /
-  // flushSync names, so these calls are type-suppressed until the types catch up.
+  // react-reconciler 0.33 renamed updateContainer/flushSync; @types 0.32 still has the old names.
   // @ts-expect-error updateContainerSync exists at runtime in react-reconciler 0.33
   reconciler.updateContainerSync(element, container, null, noop);
   // @ts-expect-error flushSyncWork exists at runtime in react-reconciler 0.33

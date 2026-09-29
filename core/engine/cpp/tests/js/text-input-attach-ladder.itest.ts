@@ -5,19 +5,13 @@
 // attaching is 0.31. Nothing else measured in this investigation is within an order of magnitude, so
 // this is the last thing left to split and the first one worth splitting.
 //
-// WHAT `attach` ACTUALLY DOES (`core/components/src/behaviors/text-input.ts:342`):
-//
-//   states.set(node, {…})                    a WeakMap set plus two object allocations
-//   setProp(node, 'mostRecentEventCount', 0) a prop write, and a prop write is 0.56 us (§18n)
-//   4 x setBehaviorListener(…)               four fresh closures, four Map writes
-//   attachPressMachine(node, {…})            a Set, a runtime, a host object of four closures, a
-//                                            nine-field state object, a second WeakMap set, and
-//                                            SEVEN more `setBehaviorListener` calls
-//
-// So a `<TextInput>` installs **eleven listeners**, each with its own closure. None of the eleven is
-// in `GATED_EVENT_PROPS`, so none of them fires the extra `setProp` that would otherwise multiply
-// the cost — checked rather than assumed, because that was the first guess.
-//
+// WHAT `attach` DOES (`core/components/src/behaviors/text-input.ts:342`): a `WeakMap` set plus two
+// objects, one `setProp`, four `setBehaviorListener` calls, and `attachPressMachine`
+
+// So a `<TextInput>` installs FOUR listeners of its own and answers the press machine's seven
+// through one shared `IEventDispatch`. None of the four is in `GATED_EVENT_PROPS`, so none fires
+// the extra `setProp` that would otherwise multiply the cost
+
 // FIVE SYNTHETIC BEHAVIORS, each a strict superset of the one before, registered under its own tag
 // and built from the ENGINE's own exported functions. Four subtractions then name every part.
 //
@@ -31,6 +25,7 @@
 
 import {
   createElement,
+  hasListenerFor,
   registerHostBehavior,
   setBehaviorListener,
   setProp,
@@ -51,7 +46,7 @@ const SAMPLES = 5;
 
 /** The four names `text-input`'s own `attach` wires, before the press machine adds seven more. */
 const INPUT_EVENTS = ['change', 'focus', 'blur', 'selectionChange'];
-/** What the press machine installs on top — `KEY_BY_EVENT` in `behaviors/pressable.ts`. */
+/** The names the press machine answers, `DISPATCH_KEYS` in `behaviors/pressable.ts`. */
 const PRESS_EVENTS = 7;
 
 /** Best of `SAMPLES`, buffer drained around each so no arm inherits the last one's tables (§10). */
@@ -68,10 +63,7 @@ function best(run: () => void, after?: () => void): number {
   return lowest;
 }
 
-/** Kept live so the imitated press host's closures capture something and cannot be folded away. */
-let machineSink = 0;
-
-/** What one `setBehaviorListener` costs on its own — set by the closure case, read by the last one. */
+/** What one `setBehaviorListener` costs alone, set by the closure case and read by the last one. */
 let perInstall = 0;
 
 /** The state object `text-input`'s `attach` builds, field for field. */
@@ -86,10 +78,10 @@ function makeState(): object {
 }
 
 describe('what a text-input behavior spends its eight microseconds on', () => {
-  // why: THE SPLIT §18s asked for. Five rungs, each adding exactly one thing the real `attach` does,
-  // so four subtractions attribute all of it — and the last rung should land on the real behavior's
-  // own reading, which is the check that the imitation is faithful.
-  it('installs eleven listeners, and that is where the time goes', () => {
+  // Each rung adds exactly one thing the real `attach` does, so the subtractions attribute all of
+  // it, and the last rung landing on the real behavior's reading is what says the imitation is
+  // faithful
+  it('installs four listeners, and that is where the time goes', () => {
     const sink: ISymbioteNode[] = [];
     const drop = (): void => {
       sink.length = 0;
@@ -131,62 +123,6 @@ describe('what a text-input behavior spends its eight microseconds on', () => {
       },
       detach(): void {},
     });
-    // THE PRESS MACHINE'S BODY WITHOUT ITS LISTENERS, imitated field for field from `attach` in
-    // `behaviors/pressable.ts:380` — a timer `Set`, the twelve-field runtime, the host object with
-    // its four closures, the nine-field state, and the second `WeakMap` entry. `installListeners` is
-    // the one thing left out, so `b4 - b5` is the seven listeners and `b5 - b3` is everything else
-    // the machine builds. Without this rung the 3.9 us has no interior at all.
-    const machineStates = new WeakMap<object, object>();
-    registerHostBehavior('bench-b5', {
-      attach(node): void {
-        states.set(node, makeState());
-        setProp(node, 'mostRecentEventCount', 0);
-        for (const event of INPUT_EVENTS) {
-          setBehaviorListener(node, event, () => undefined);
-        }
-        const timers = new Set<number>();
-        const runtime = {
-          longPressCancel: undefined,
-          longPressFired: false,
-          pressDelayCancel: undefined,
-          pressOutCancel: undefined,
-          pressOrigin: undefined,
-          activatePosition: undefined,
-          driftedOut: false,
-          region: undefined,
-          active: false,
-          activatedAt: undefined,
-          delayElapsed: false,
-          disposed: false,
-        };
-        const host = {
-          setPressed: (pressed: boolean) => {
-            machineSink += pressed ? 1 : 0;
-          },
-          getMeasureFn: () => (callback: unknown) => {
-            machineSink += callback === undefined ? 0 : 1;
-          },
-          schedule: (callback: unknown, ms: number) => {
-            machineSink += ms + (callback === undefined ? 0 : 1);
-            return () => {
-              timers.clear();
-            };
-          },
-          now: Date.now,
-        };
-        machineStates.set(node, {
-          runtime,
-          host,
-          refine: undefined,
-          disabledOf: undefined,
-          source: node,
-          timers,
-          listeners: {},
-          isBuilt: false,
-        });
-      },
-      detach(): void {},
-    });
     registerTextInputBehavior();
 
     const arm = (tag: string, component = 'RCTView'): number =>
@@ -204,11 +140,8 @@ describe('what a text-input behavior spends its eight microseconds on', () => {
     const b1 = arm('bench-b1');
     const b2 = arm('bench-b2');
     const b3 = arm('bench-b3');
-    const b5 = arm('bench-b5');
     const b4 = arm('bench-b4');
     const real = arm('text-input', 'RCTSinglelineTextInputView');
-    if (machineSink === -1)
-      throw new Error('unreachable, and it keeps the captures live');
 
     // ONE NODE OF EACH, kept for the structural gate below. Built outside every clock.
     const built = new Map<string, ISymbioteNode>();
@@ -231,45 +164,33 @@ describe('what a text-input behavior spends its eight microseconds on', () => {
         `press machine ${each(b4 - b3).toFixed(3)} · ` +
         `imitation vs real ${each(real - b4).toFixed(3)}`,
     );
-    print(
-      `DEBUG ATTACHLADDER machine  its objects ${each(b5 - b3).toFixed(3)} us · ` +
-        `its seven listeners ${each(b4 - b5).toFixed(3)} us ` +
-        `(${each((b4 - b5) / PRESS_EVENTS).toFixed(3)} each)`,
-    );
 
-    // THE STRUCTURAL GATES, which no machine load can overturn and which are the only way to know
-    // the rungs are what they claim: each must have installed exactly the listeners it names. An arm
-    // whose tag failed to register — the failure that made §18r's timing gate pass its own
-    // break-test — lands here instead of in a print.
+    // THE STRUCTURAL GATES, which no machine load can overturn: each rung must hold exactly the
+    // listeners it names, so an arm whose tag failed to register lands here and not in a print
     expect(built.get('bench-b0')?.listeners?.size ?? 0).toBe(0);
     expect(built.get('bench-b3')?.listeners?.size ?? 0).toBe(
       INPUT_EVENTS.length,
     );
-    expect(built.get('bench-b4')?.listeners?.size ?? 0).toBe(
-      INPUT_EVENTS.length + PRESS_EVENTS,
-    );
+    // The press machine adds no `listeners` entry any more, so the seam is what proves it armed
+    const armed = built.get('bench-b4');
+    expect(armed?.listeners?.size ?? 0).toBe(INPUT_EVENTS.length);
+    expect(armed !== undefined && hasListenerFor(armed, 'press')).toBe(true);
   });
 
-  // why: 0.20 us PER LISTENER times eleven is 2.2 us of the eight, and the press machine's seven are
-  // seven distinct arrow closures that differ only by the `key` they pass to one shared `dispatch`
-  // (`installListeners` in `behaviors/pressable.ts`). If the closure is most of that 0.20, a single
-  // shared dispatcher reading the key off the event would save six allocations per input; if the
-  // `Map` write is, it would save nothing and the idea is dead before anyone writes it.
-  //
-  // BOTH ARMS IN THIS CASE, install for install, so the only difference is where the function came
-  // from (§11 — a comparison across cases inside a 117-process suite compares two machine loads).
+  // What a listener install is MADE of: the closure half against the `Map`-write half. The answer
+  // is why the press machine stopped installing one per name and points at one `IEventDispatch`
+
+  // BOTH ARMS IN ONE CASE, install for install, so the only difference is where the function came
+  // from: a comparison across cases inside a 117-process suite compares two machine loads (§11)
   it('pays more for a fresh closure per listener than for a shared one', () => {
     const nodes: ISymbioteNode[] = [];
     for (let at = 0; at < NODES; at += 1) nodes.push(createElement('RCTView'));
     const names = [...INPUT_EVENTS, 'press', 'pressIn', 'pressOut'];
     const shared = (): undefined => undefined;
 
-    // THE FRESH ARM CAPTURES, and the first draft of this case did not — which understated it and
-    // would have sent the verdict the wrong way. `() => undefined` closes over nothing, so the
-    // optimizer is free to hand back ONE function object for every iteration of the loop; the press
-    // machine's dispatchers close over `node` and their key, which forces a real environment per
-    // listener. **An arm has to be the shape production has, not the cheapest shape that
-    // type-checks** (§18l).
+    // THE FRESH ARM CAPTURES, т.к. `() => undefined` closes over nothing and the optimizer may hand
+    // back ONE function object for the whole loop, which understates it and sends the verdict the
+    // wrong way. An arm has to be the shape production has (§18l)
     let sink = 0;
     const install = (fresh: boolean): number =>
       best(() => {
@@ -288,8 +209,8 @@ describe('what a text-input behavior spends its eight microseconds on', () => {
         }
       });
 
-    // DISCARDED: the first arm pays the `node.listeners ??= new Map()` on every one of the ten
-    // thousand nodes, and that allocation happens once per node for the whole case.
+    // DISCARDED: the first arm pays `node.listeners ??= new Map()` on every one of the ten thousand
+    // nodes, once per node for the whole case
     install(false);
 
     const sharedWall = install(false);
@@ -305,26 +226,18 @@ describe('what a text-input behavior spends its eight microseconds on', () => {
     if (sink === -1)
       throw new Error('unreachable, and it keeps the capture live');
 
-    // STRUCTURAL, not comparative: every name must actually be standing on every node. An arm whose
-    // loop was hoisted or whose `setBehaviorListener` became a no-op lands here, and no machine load
-    // can overturn it (§11, §18h).
+    // STRUCTURAL, not comparative: every name must be standing on every node, so an arm whose loop
+    // was hoisted or whose `setBehaviorListener` went no-op lands here (§11, §18h)
     expect(nodes[0]?.listeners?.size ?? 0).toBe(names.length);
     perInstall = each(freshWall);
     expect(nodes[NODES - 1]?.listeners?.size ?? 0).toBe(names.length);
   });
 
-  // why: THE 2.7x THAT DOES NOT ADD UP. A `setBehaviorListener` costs 0.127 us measured on its own,
-  // and the press machine's seven cost 0.345 each. The install cannot be dearer inside a loop than
-  // outside one — so the difference is the LOOP, and `installListeners`
-  // (`behaviors/pressable.ts:343`) iterates a `Map` and destructures every entry:
-  //
-  //   for (const [event, key] of KEY_BY_EVENT) …
-  //
-  // A `Map` iterator yields a fresh two-element ARRAY per step, and the destructuring reads it back
-  // — seven array allocations plus seven iterator steps per input, for a table of seven fixed pairs
-  // that never changes. A pair of plain arrays would allocate nothing.
-  //
-  // BOTH ARMS IN THIS CASE, same shape, same body, only the container differs.
+  // A `Map` iterator yields a fresh two-element ARRAY per step and the destructuring reads it back,
+  // so a fixed table walked per node allocates once per pair for nothing
+
+  // Kept as a priced negative after the press machine stopped walking its table per attach: the
+  // same trap is one `for (const [a, b] of someMap)` away in any behavior. Both arms in one case
   it('pays for iterating a Map where a plain array would do', () => {
     const pairs: ReadonlyArray<readonly [string, string]> = [
       ['press', 'onPress'],
@@ -354,9 +267,8 @@ describe('what a text-input behavior spends its eight microseconds on', () => {
       }
     });
 
-    // THE THIRD SHAPE, and the one worth having if it is cheap: an array of TUPLES keeps the pairing
-    // that two parallel arrays give up, and the tuples already exist — destructuring them allocates
-    // nothing per step, unlike a `Map` iterator which builds the pair as it goes.
+    // THE THIRD SHAPE: an array of TUPLES keeps the pairing two parallel arrays give up, and the
+    // tuples already exist, so destructuring them allocates nothing per step
     const tupleWall = best(() => {
       for (let at = 0; at < ROUNDS; at += 1) {
         for (const [event, key] of pairs) sink += event.length + key.length;
@@ -372,8 +284,8 @@ describe('what a text-input behavior spends its eight microseconds on', () => {
         `(one install alone is ${perInstall.toFixed(3)} us; the machine's seven read 0.345 each)`,
     );
 
-    // STRUCTURAL: both arms must have walked all seven pairs every round. The sum of the name lengths
-    // is fixed, so it is the same number on both sides or one of them is not doing the work.
+    // STRUCTURAL: every arm must have walked all seven pairs each round, and the name lengths sum
+    // to a fixed number, so it matches on every side or one of them is not doing the work
     const expected =
       ROUNDS *
       pairs.reduce(

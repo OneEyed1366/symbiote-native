@@ -33,9 +33,10 @@ import {
   createElement,
   dlog,
   registerHostBehavior,
-  setBehaviorListener,
+  setNodeDispatch,
   setEventListener,
   type IClaimMode,
+  type IEventDispatch,
   type IHostBehavior,
   type ISymbioteEvent,
   type ISymbioteNode,
@@ -50,7 +51,8 @@ import {
   type IContentSize,
 } from '../../view/render-scroll-view';
 import {
-  installResponderPredicates,
+  deliverResponderEvent,
+  RESPONDER_DISPATCHED_NAMES,
   RESPONDER_OWNED_LISTENERS,
 } from './responder';
 import {
@@ -159,6 +161,17 @@ function syncContentSizeWiring(owner: ISymbioteNode, wired: boolean): void {
   }
 }
 
+// The nine names an owner answers, as ONE object for every ScrollView in the app. `scroll` is in
+// here unconditionally т.к. it drives the sticky `AnimatedValue`, and a header may register long
+// after the node was created
+const OWNER_DISPATCH: IEventDispatch = {
+  names: new Set([...RESPONDER_DISPATCHED_NAMES, 'scroll']),
+  deliver(node, name, event) {
+    if (name === 'scroll') return handleOwnerScroll(node, event);
+    return deliverResponderEvent(node, name, event);
+  },
+};
+
 // Two owned names answer to a flip, and they answer on DIFFERENT nodes: `contentSizeChange` wires
 // the SLOT's layout, `layout` wires the owner's own — which an inverted sticky header also wants,
 // so the two claims are resolved in one place (`syncOwnerLayout`) rather than by whoever wrote last.
@@ -205,16 +218,14 @@ function scrollBehavior(
     // a header can register long after this node was created.
     attach(node) {
       markScrollOwner(node);
-      setBehaviorListener(node, 'scroll', event =>
-        handleOwnerScroll(node, event),
-      );
-      installResponderPredicates(node);
+      setNodeDispatch(node, OWNER_DISPATCH);
     },
     onOwnedListenerChange: syncOwnedListener,
     // The one beat where the app's children are all present — no hook reports a children CHANGE,
     // and reconcileStickyIndices returns on a WeakSet miss for any that never used the prop.
     afterCommit: reconcileStickyIndices,
     detach(node) {
+      setNodeDispatch(node, undefined);
       lastContentSize.delete(node);
       releaseStickyOwner(node);
     },

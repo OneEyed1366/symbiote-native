@@ -1,6 +1,7 @@
 <script lang="ts">
   // The native view name is mixed-case, which a literal tag would parse as a component reference,
   // so the tag is dynamic. The platform decision is made once at mount, like the other adapters
+  import { hostProps } from '@symbiote-native/svelte/native-view-bridge';
   import {
     contactAccessButtonViewName,
     ensureContactAccessButtonRegistered,
@@ -13,5 +14,5 @@
 </script>
 
 {#if isRegistered}
-  <svelte:element this={viewName} p={{ ...props }} />
+  <svelte:element this={viewName} {@attach hostProps({ ...props })} />
 {/if}

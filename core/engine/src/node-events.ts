@@ -14,7 +14,12 @@ import {
   anyImageLoadEventListenerWired,
 } from './image-source-write';
 import { setProp } from './node-props';
-import type { IListener, ISymbioteEvent, ISymbioteNode } from './node-types';
+import type {
+  IEventDispatch,
+  IListener,
+  ISymbioteEvent,
+  ISymbioteNode,
+} from './node-types';
 
 // Fabric gates a handful of events behind a BOOLEAN prop: unlike scroll/touch/change these fire
 // only when the shadow node carries the flag, and a gated handler would otherwise attach on our
@@ -49,6 +54,37 @@ export function setBehaviorListener(
   const flagProp = GATED_EVENT_PROPS.get(name);
   if (flagProp !== undefined)
     setProp(node, flagProp, listener === undefined ? undefined : true);
+}
+
+// Arm (or release, with `undefined`) the shared handler a behavior dispatches through, instead of
+// installing one closure per name. See `IEventDispatch`
+export function setNodeDispatch(
+  node: ISymbioteNode,
+  dispatch: IEventDispatch | undefined,
+): void {
+  node.dispatch = dispatch;
+}
+
+/** Whether anything at all would receive `name` on this node. */
+export function hasListenerFor(node: ISymbioteNode, name: string): boolean {
+  if (node.listeners?.has(name) === true) return true;
+  return node.dispatch?.names.has(name) === true;
+}
+
+// The app's own listener first: a behavior owns its names, so the two never collide, and an
+// unarmed node stops at one `Map` probe
+export function listenerFor(
+  node: ISymbioteNode,
+  name: string,
+): IListener | undefined {
+  const own = node.listeners?.get(name);
+  if (own !== undefined) return own;
+  const dispatch = node.dispatch;
+  if (dispatch === undefined || !dispatch.names.has(name)) return undefined;
+  // ONE closure per delivered event, where a dispatcher per name built seven per mounted node.
+  // `name` is bound here rather than read off `event.type`, so a caller building its own event
+  // (every test driving a behavior by hand) reaches the same handler
+  return event => dispatch.deliver(node, name, event);
 }
 
 // The unowned names whose presence a platform rule reads

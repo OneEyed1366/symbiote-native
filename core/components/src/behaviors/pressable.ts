@@ -14,8 +14,9 @@ import {
   propOf,
   registerHostBehavior,
   requestCommitFor,
-  setBehaviorListener,
+  setNodeDispatch,
   setNodePressed,
+  type IEventDispatch,
   type IHostBehavior,
   type ISymbioteEvent,
   type ISymbioteNode,
@@ -322,17 +323,10 @@ function dispatch(
   return result;
 }
 
-// Installed straight into the listener slot, not through routeProp: the behavior OWNS these
-// names, and setEventListener diverts an owned name into the app stash — routing the dispatcher
-// through there would stash it and leave the slot empty.
-
-// Engine event name -> the app-facing callback key its dispatcher routes to. An array of pairs
-// rather than a Map: installListeners runs once per node carrying a press machine, and a `for…of`
-// over a Map allocates a fresh pair per entry where these tuples already exist.
-
-// NOT the same list as createPressBehavior's ownedListeners — that's every name the machine takes
-// as an INPUT, this is only the names it installs a dispatcher for.
-const EVENT_KEY_PAIRS: ReadonlyArray<readonly [string, string]> = [
+// Engine event name -> the app-facing callback key it routes to. NOT the same list as
+// `createPressBehavior`'s `ownedListeners`, which is every name the machine takes as an INPUT;
+// this is only what it answers when Fabric fires
+const DISPATCH_KEYS: ReadonlyMap<string, string> = new Map([
   ['press', 'onPress'],
   ['pressIn', 'onPressIn'],
   ['pressOut', 'onPressOut'],
@@ -340,22 +334,36 @@ const EVENT_KEY_PAIRS: ReadonlyArray<readonly [string, string]> = [
   ['responderMove', 'onResponderMove'],
   ['responderTerminationRequest', 'onResponderTerminationRequest'],
   ['responderGrant', 'onResponderGrant'],
-];
+]);
 
-function installListeners(node: ISymbioteNode, options: IAttachOptions): void {
-  for (const [event, key] of EVENT_KEY_PAIRS) {
-    setBehaviorListener(node, event, symbioteEvent =>
-      dispatch(node, options, key, [symbioteEvent]),
-    );
-  }
-}
+// The per-node half of what the seven dispatcher closures used to capture. A behavior that
+// registered no refinement leaves its nodes out of here entirely
+const attached = new WeakMap<ISymbioteNode, IAttachOptions>();
+
+// ONE object for every pressable in the app, where seven closures plus the `Map` holding them used
+// to sit per node. `attach` runs inside `createElement`, so what it allocates every list item pays
+
+// Exported for a tag that is a pressable PLUS something with names of its own (`./text-input`): it
+// composes a union and delegates here, since a node holds exactly one dispatch
+export const PRESS_DISPATCH: IEventDispatch = {
+  names: new Set(DISPATCH_KEYS.keys()),
+  deliver(node, name, event) {
+    const key = DISPATCH_KEYS.get(name);
+    if (key === undefined) return undefined;
+    return dispatch(node, attached.get(node) ?? NO_OPTIONS, key, [event]);
+  },
+};
 
 function attachWith(
   refine: IPressConfigRefinement | undefined,
   disabledOf: IDisabledResolver | undefined,
 ): (node: ISymbioteNode) => void {
-  // One bag per BEHAVIOR, not per node: `refine` and `disabledOf` are fixed at registration
-  const options: IAttachOptions = { refine, disabledOf };
+  // One bag per BEHAVIOR, not per node: `refine` and `disabledOf` are fixed at registration, and a
+  // behavior with neither shares the empty one so a plain `<pressable>` stores nothing
+  const options: IAttachOptions =
+    refine === undefined && disabledOf === undefined
+      ? NO_OPTIONS
+      : { refine, disabledOf };
   return node => attach(node, options);
 }
 
@@ -382,12 +390,15 @@ export function attachPressMachine(
   attach(node, options);
 }
 
-// Only the dispatchers: everything below them is read from `dispatch` alone, so a pressable nobody
-// touches never builds a gesture runtime (`touchable-attach-cost.itest.ts`). A re-attach drops the
-// old state so the new options take effect on the next gesture
+// One pointer, plus one map slot for a refined behavior: everything below is read from `dispatch`
+// alone, so a pressable nobody touches never builds a gesture runtime
+
+// A re-attach drops the old state so the new options take effect on the next gesture
 function attach(node: ISymbioteNode, options: IAttachOptions): void {
   states.delete(node);
-  installListeners(node, options);
+  if (options === NO_OPTIONS) attached.delete(node);
+  else attached.set(node, options);
+  setNodeDispatch(node, PRESS_DISPATCH);
 }
 
 function stateOf(node: ISymbioteNode, options: IAttachOptions): IBehaviorState {
@@ -444,7 +455,10 @@ export function detachPressMachine(node: ISymbioteNode): void {
 }
 
 function detach(node: ISymbioteNode): void {
+  setNodeDispatch(node, undefined);
+  attached.delete(node);
   const state = states.get(node);
+  // A pressable nobody touched has no state at all, and the two releases above are all it owes
   if (state === undefined) return;
   // The machine's own teardown. Not load-bearing here: host.schedule puts every timer the machine
   // arms into state.timers, so the loop below already cancels them — kept as the contract.
