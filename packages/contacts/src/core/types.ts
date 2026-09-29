@@ -180,6 +180,39 @@ export type ContactDetails = {
   imAddresses: ExistingImAddress[];
 };
 
+export type ContactFieldKey = {
+  [ContactField.IS_FAVOURITE]: 'isFavourite';
+  [ContactField.FULL_NAME]: 'fullName';
+  [ContactField.GIVEN_NAME]: 'givenName';
+  [ContactField.MIDDLE_NAME]: 'middleName';
+  [ContactField.FAMILY_NAME]: 'familyName';
+  [ContactField.MAIDEN_NAME]: 'maidenName';
+  [ContactField.NICKNAME]: 'nickname';
+  [ContactField.PREFIX]: 'prefix';
+  [ContactField.SUFFIX]: 'suffix';
+  [ContactField.PHONETIC_GIVEN_NAME]: 'phoneticGivenName';
+  [ContactField.PHONETIC_MIDDLE_NAME]: 'phoneticMiddleName';
+  [ContactField.PHONETIC_FAMILY_NAME]: 'phoneticFamilyName';
+  [ContactField.COMPANY]: 'company';
+  [ContactField.PHONETIC_COMPANY_NAME]: 'phoneticCompanyName';
+  [ContactField.DEPARTMENT]: 'department';
+  [ContactField.JOB_TITLE]: 'jobTitle';
+  [ContactField.NOTE]: 'note';
+  [ContactField.IMAGE]: 'image';
+  [ContactField.THUMBNAIL]: 'thumbnail';
+  [ContactField.BIRTHDAY]: 'birthday';
+  [ContactField.NON_GREGORIAN_BIRTHDAY]: 'nonGregorianBirthday';
+  [ContactField.EMAILS]: 'emails';
+  [ContactField.PHONES]: 'phones';
+  [ContactField.ADDRESSES]: 'addresses';
+  [ContactField.DATES]: 'dates';
+  [ContactField.EXTRA_NAMES]: 'extraNames';
+  [ContactField.RELATIONS]: 'relations';
+  [ContactField.URL_ADDRESSES]: 'urlAddresses';
+  [ContactField.SOCIAL_PROFILES]: 'socialProfiles';
+  [ContactField.IM_ADDRESSES]: 'imAddresses';
+};
+
 export type PartialContactDetails<T extends readonly ContactField[]> = {
   id: string;
 } & {

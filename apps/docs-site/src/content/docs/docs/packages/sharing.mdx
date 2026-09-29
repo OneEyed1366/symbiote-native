@@ -8,10 +8,9 @@ import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 `@symbiote-native/sharing` wraps
 [`expo-sharing`](https://github.com/expo/expo/tree/main/packages/expo-sharing) — the platform
 share sheet that hands a local file to any other app that can accept it — so every SymbioteNative
-adapter can reach it, not just React. Like [secure store](/docs/packages/secure-store/) and
-[local auth](/docs/packages/local-auth/), every export is a free function with no per-instance
-state, so there is no hook/composable/service to wrap — the React, Vue, Angular, Svelte, and
-Solid entry points are plain re-exports of the same `core`.
+adapter can reach it, not just React. Outgoing share is two free functions in a shared `core`;
+the incoming half ships as `useIncomingShare` on React, Vue, Svelte and Solid, and
+`injectIncomingShare` on Angular.
 
 | OS platform | Support |
 | ----------- | ------- |
@@ -26,28 +25,40 @@ Solid entry points are plain re-exports of the same `core`.
 | Svelte            | ✅ live |
 | Solid             | ✅ live |
 
-## Scope: outgoing share only
+## Scope: outgoing and incoming share
 
-`expo-sharing` has two halves, and this package ships one of them.
+`expo-sharing` has two halves, and both are ported to every adapter.
 
-| Half                                                          | Upstream API                                                                                     | Here              |
-| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ----------------- |
-| **Outgoing** — hand a local file to another app               | `shareAsync`, `isAvailableAsync`                                                                 | ✅ ported in full |
-| **Incoming** — receive files other apps share _into_ your app | `useIncomingShare`, `getSharedPayloads`, `getResolvedSharedPayloadsAsync`, `clearSharedPayloads` | ❌ not ported     |
+| Half                                                          | Upstream API                                                                                     | Here           |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | -------------- |
+| **Outgoing** - hand a local file to another app               | `shareAsync`, `isAvailableAsync`                                                                 | ported in full |
+| **Incoming** - receive files other apps share _into_ your app | `useIncomingShare`, `getSharedPayloads`, `getResolvedSharedPayloadsAsync`, `clearSharedPayloads` | ported in full |
 
 <Aside
   type="caution"
-  title="Incoming share needs an iOS Share Extension target"
+  title="Incoming share needs a share target in the host app"
 >
-  The incoming half is not a thinner JS surface. Upstream's config plugin
-  generates a whole second Xcode target: its own build phases, its own
-  `Info.plist`, an entitlements file, and an App Group ID shared between the app
-  and the extension, plus Android intent filters on the main activity. That is
-  native app-extension scaffolding — the same category `expo-widgets` sits in —
-  and SymbioteNative has no native-target scaffolding story yet, so the surface
-  is documented as out of scope rather than shipped half-working. Everything on
-  this page describes the outgoing half.
+  The incoming functions return data only once the app carries a share target: an
+  iOS Share Extension (a second Xcode target with its own `Info.plist`,
+  entitlements and an App Group shared with the app) plus Android intent filters
+  on the main activity. Upstream's config plugin generates it. It is native
+  scaffolding this package does not generate or touch, so without it the
+  incoming functions return empty arrays.
 </Aside>
+
+### Receiving shared data
+
+```ts
+import { useIncomingShare } from '@symbiote-native/sharing/react';
+
+const { sharedPayloads, resolvedSharedPayloads, isResolving, error, clearSharedPayloads } =
+  useIncomingShare();
+```
+
+The payloads are read synchronously, resolved after mount, and re-read whenever the app returns
+to the foreground. `refreshSharePayloads()` forces a re-read. Resolving a shared URL may need the
+network. Vue returns a `ComputedRef`, Solid an `Accessor`, Svelte a `{ current }` box, and
+Angular's `injectIncomingShare()` a `Signal`.
 
 ## Installation
 
@@ -304,19 +315,17 @@ installs:
 
 ```
 packages/sharing/src/
-├── core/     # framework-agnostic: isAvailableAsync + shareAsync. native-module.ts resolves
-│             # ExpoSharing via requireNativeModule
-├── react/    # @symbiote-native/sharing/react   — export * from '../core'
-├── vue/      # @symbiote-native/sharing/vue     — export * from '../core'
-├── svelte/   # @symbiote-native/sharing/svelte  — export * from '../core'
-├── angular/  # @symbiote-native/sharing/angular — export * from '../core'
-└── solid/    # @symbiote-native/sharing/solid   — export * from '../core'
+core/      framework-agnostic: shareAsync, isAvailableAsync, the payload functions and the
+           incoming-share store. native-module.ts resolves ExpoSharing via requireNativeModule
+react/     @symbiote-native/sharing/react    (core + useIncomingShare)
+vue/       @symbiote-native/sharing/vue      (core + useIncomingShare)
+svelte/    @symbiote-native/sharing/svelte   (core + useIncomingShare)
+angular/   @symbiote-native/sharing/angular  (core + injectIncomingShare)
+solid/     @symbiote-native/sharing/solid    (core + useIncomingShare)
 ```
 
-Same shape as [secure store](/docs/packages/secure-store/)'s and
-[local auth](/docs/packages/local-auth/)'s five adapter entries: single-file re-exports with no
-lifecycle code, since every export is a stateless free function — there is nothing for a hook,
-composable, rune, or service to subscribe to or clean up. The incoming-share half in the scope section
-above is exactly the part that _would_ have needed one. The native code itself is never
+The store owns the refresh logic (payload comparison, the foreground resync, error capture) once,
+and each adapter binds it with its own event-value primitive, so the lifecycle code is a few lines
+per framework. The native code itself is never
 vendored or copied — `expo-modules-autolinking` resolves it straight out of `node_modules` (see
 [the native setup guide](/docs/howtos/expo-native-module-setup/)).

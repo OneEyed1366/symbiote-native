@@ -6,7 +6,7 @@ secure random bytes, `randomUUID`, and string/buffer digest hashing — usable f
 adapter, React, Vue, Svelte, Solid, and Angular. Like `@symbiote-native/local-auth`, every
 function here is a plain sync/async call with no per-instance state or event stream, so there is
 no hook/composable/service to wrap — every adapter's entry point is a plain re-export of the same
-`core`. AES encryption (`expo-crypto`'s `aes/` subfolder) is out of scope for this pass.
+`core`. AES-GCM encryption (`expo-crypto`'s `aes/` subfolder) is ported too.
 
 ## Install
 
@@ -275,6 +275,32 @@ only), `CryptoEncoding` (`HEX`/`BASE64`), `ICryptoDigestOptions`, `IDigest`, `IT
 — ported from upstream's `Crypto.types.ts`/`Crypto.ts`, renamed with this repo's `I`-prefix
 convention for exported types (`ts-js-best-practices`).
 
+### AES-GCM
+
+Ported from upstream's `aes/` subfolder onto a second native module, `ExpoCryptoAES`:
+
+```ts
+import {
+  AESEncryptionKey,
+  AESKeySize,
+  AESSealedData,
+  aesDecryptAsync,
+  aesEncryptAsync,
+} from '@symbiote-native/crypto';
+
+const key = await AESEncryptionKey.generate(AESKeySize.AES256);
+const sealed = await aesEncryptAsync(plaintextBase64, key);
+const plain = await aesDecryptAsync(sealed, key, { output: 'base64' });
+```
+
+`AESEncryptionKey` and `AESSealedData` extend the native classes: `generate`/`import`/`bytes`/
+`encoded` on the key, `fromParts`/`fromCombined` plus `iv`/`tag`/`ciphertext`/`combined` on the
+sealed data. A string input is base64. `ArrayBuffer` inputs become a `Uint8Array`, and binary
+`nonce.bytes`/`additionalData` go to native as base64, as upstream does. `tagLength` is ignored on
+Apple (always 16), and `AES192` is unsupported on web. Option and input types carry the
+`I`-prefix: `IAesEncryptOptions`, `IAesDecryptOptions`, `IAesSealedDataConfig`, `IBinaryInput`,
+`IGcmNonceParam`, `IGcmTagByteLength`.
+
 ```ts
 import { digestStringAsync, randomUUID } from '@symbiote-native/crypto';
 // or the framework-scoped entry points — identical surface, re-exported verbatim:
@@ -302,7 +328,7 @@ import { randomUUID } from '@symbiote-native/crypto/angular';
 
 No Fabric/Descriptor angle at all — every function here is a pure sync/async-function surface,
 never a view or per-instance state. Tests inject a fake native-module object in place of the
-real `requireNativeModule` resolution (`src/core/crypto.test.ts`, `vitest`) — no
+real `requireNativeModule` resolution (`src/core/crypto.test.ts`, `src/core/aes/aes.test.ts`, `vitest`) — no
 `installFabric()`, no ViewConfig. Native rendering itself is verified on-device (see the parent
 [README](../../README.md) for the project's testing model).
 

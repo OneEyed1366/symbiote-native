@@ -5,6 +5,7 @@ export {
 } from 'expo-modules-core';
 
 export { getCurrentWatchId } from './subscribers';
+export { installWebGeolocationPolyfill } from './geolocation-polyfill';
 
 export * from './location';
 export * from './types';

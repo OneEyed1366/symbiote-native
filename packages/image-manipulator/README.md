@@ -52,14 +52,21 @@ for the full table; nothing package-specific here.
 ## Shape
 
 ```
-src/core/                 the whole API: manipulate + manipulateAsync + FlipType + SaveFormat.
-                          native-module.ts resolves ExpoImageManipulator through
-                          expo-modules-core's requireNativeModule.
-src/angular/              @symbiote-native/image-manipulator/angular
+src/core/                 manipulate + manipulateAsync + FlipType + SaveFormat + the shared
+                          releasing-context controller. native-module.ts resolves
+                          ExpoImageManipulator through expo-modules-core's requireNativeModule.
+src/react/                useImageManipulator (hook)
+src/vue/                  useImageManipulator (composable)
+src/solid/                useImageManipulator (primitive)
+src/svelte/               useImageManipulator (rune)
+src/angular/              injectImageManipulator
 ```
 
-`./react`, `./vue`, `./svelte`, and `./solid` are `exports`-map aliases straight onto `src/core/` —
-every export here is a stateless free function, nothing to wrap in a hook/composable/service.
+`manipulate`/`manipulateAsync`/`FlipType`/`SaveFormat` stay framework-agnostic free functions,
+re-exported by every adapter's own barrel. Upstream's `useImageManipulator` is ported to
+**every** adapter, not just React: the recreate/release rule lives once in
+`src/core/manipulator-context-controller.ts`, each adapter supplies only its own reactive
+lifecycle, per this project's `components_split_logic_view_lifecycle` convention.
 
 ## Use it
 
@@ -100,12 +107,20 @@ const { uri } = await manipulateAsync(
 | `FlipType`         | `{ Vertical, Horizontal }`                                                | Enum for the `flip` action.                    |
 | `SaveFormat`       | `{ JPEG, PNG, WEBP }`                                                     | Enum for `ISaveOptions.format`.                |
 
+## Declarative `useImageManipulator`
+
+```
+useImageManipulator(source) -> IImageManipulatorContext
+```
+
+React takes a plain value, re-invoked per render (matches upstream exactly). Vue/Solid/Svelte
+take a reactive source (`Ref`/getter/`MaybeRefOrGetter`/accessor) so switching it recreates the
+context and releases the stale one. Angular's `injectImageManipulator(source)` takes a `Signal`
+and returns one, `injectX` shape matching `@symbiote-native/navigation`'s
+`injectLinkingIntegration`.
+
 ## Notes
 
-- **`useImageManipulator` is not ported.** It is a real React hook (`useReleasingSharedObject`
-  from `expo-modules-core`, built on `useEffect`/`useRef`) — reachable only from the React
-  adapter, per `<third_party_rn_packages_are_react_only>`. See the
-  `symbiote-expo-native-module` skill §11 for the same finding against `createPermissionHook`.
 - **`extent` action is not ported.** It's web-only in upstream — neither the iOS nor the Android
   native module registers an `extent` function (verified by reading both `ImageManipulatorModule`
   sources). Calling `.extent()` on a native context is a type error here, matching runtime reality.

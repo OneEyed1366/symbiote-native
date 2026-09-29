@@ -87,12 +87,19 @@ both.
 
 ## What's not ported
 
-- **`useCalendarPermissions`/`useRemindersPermissions`** - real React hooks
-  (`createPermissionHook`), same §11 class as image-picker's dropped hooks. Call
-  `getCalendarPermissions`/`requestCalendarPermissions` (and the reminders pair) directly
-  instead, from either surface.
-- **The deprecated `requestPermissionsAsync`** legacy alias (upstream: "use
-  `requestCalendarPermissionsAsync` instead") - call `requestCalendarPermissionsAsync` directly.
+Nothing from `expo-calendar`'s public surface. The legacy `requestPermissionsAsync` is kept as the
+deprecated alias upstream ships: it warns and calls `requestCalendarPermissionsAsync`.
+
+## Permission hooks
+
+`useCalendarPermissions`/`useRemindersPermissions` are ported to every adapter (originally
+dropped as React-only, since reversed):
+
+- React/Vue/Solid: `createPermissionHook` from `@symbiote-native/{react,vue,solid}`, a tuple
+  `[status, request, get]`.
+- Svelte: `createPermissionHook` from `@symbiote-native/svelte/runes/create-permission-hook`, a
+  boxed getter `{status, requestPermission, getPermission}`.
+- Angular: `CalendarPermissionsService`/`RemindersPermissionsService`, `connect(): Signal<...>`.
 
 ## Shape
 

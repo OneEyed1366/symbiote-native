@@ -1,4 +1,10 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const { installPushTokenAutoRegistration } = vi.hoisted(() => ({
+  installPushTokenAutoRegistration: vi.fn(() => () => undefined),
+}));
+
+vi.mock('./auto-registration', () => ({ installPushTokenAutoRegistration }));
 
 function createFakePushTokenManager() {
   let listener: ((event: { devicePushToken: string }) => void) | undefined;
@@ -51,6 +57,17 @@ vi.mock('expo-modules-core', () => ({
 }));
 
 vi.mock('@symbiote-native/engine', () => ({ dlog: vi.fn() }));
+
+const { getIosPushNotificationServiceEnvironmentAsync } = vi.hoisted(() => ({
+  getIosPushNotificationServiceEnvironmentAsync: vi.fn(
+    async () => 'production',
+  ),
+}));
+
+vi.mock('@symbiote-native/application', () => ({
+  applicationId: 'com.symbiote.default',
+  getIosPushNotificationServiceEnvironmentAsync,
+}));
 
 const {
   addPushTokenListener,
@@ -119,6 +136,28 @@ describe('getExpoPushTokenAsync', () => {
     );
   });
 
+  it('defaults appId to the app applicationId and development to the iOS push environment', async () => {
+    getIosPushNotificationServiceEnvironmentAsync.mockResolvedValueOnce(
+      'development',
+    );
+    const fetchMock = vi.fn(
+      async (_url: string, _init?: RequestInit) =>
+        new Response(
+          JSON.stringify({ data: { expoPushToken: 'ExponentPushToken[abc]' } }),
+          { status: 200 },
+        ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await getExpoPushTokenAsync({ projectId: 'proj-1' });
+
+    const [, init] = fetchMock.mock.calls[0] ?? [];
+    expect(JSON.parse(String(init?.body))).toMatchObject({
+      appId: 'com.symbiote.default',
+      development: true,
+    });
+  });
+
   it('rejects with a CodedError when projectId is missing (error path)', async () => {
     await expect(
       getExpoPushTokenAsync({ applicationId: 'com.symbiote.canary' }),
@@ -140,6 +179,20 @@ describe('getExpoPushTokenAsync', () => {
         applicationId: 'com.symbiote.canary',
       }),
     ).rejects.toThrow(/Malformed response/);
+  });
+});
+
+describe('setAutoServerRegistrationEnabledAsync (auto-registration wiring)', () => {
+  beforeEach(() => installPushTokenAutoRegistration.mockClear());
+
+  it('installs the token-change resync when enabled', async () => {
+    await setAutoServerRegistrationEnabledAsync(true);
+    expect(installPushTokenAutoRegistration).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not install the resync when disabled', async () => {
+    await setAutoServerRegistrationEnabledAsync(false);
+    expect(installPushTokenAutoRegistration).not.toHaveBeenCalled();
   });
 });
 

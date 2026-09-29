@@ -7,4 +7,5 @@
 export { useBatteryLevel } from './hooks/use-battery-level';
 export { useBatteryState } from './hooks/use-battery-state';
 export { useLowPowerMode } from './hooks/use-low-power-mode';
+export { usePowerState } from './hooks/use-power-state';
 export * from '../core';

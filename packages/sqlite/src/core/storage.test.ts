@@ -378,3 +378,64 @@ describe('migration', () => {
     expect(readUserVersion(databaseName)).toBe(1);
   });
 });
+
+describe('synchronous API and async-storage aliases', () => {
+  it('setItemSync accepts an update function computed from the previous value', () => {
+    const storage = freshStorage();
+    storage.setItemSync('key1', 'initialValue');
+    const updater = vi.fn((prevValue: string | null) => `${prevValue}_updated`);
+    storage.setItemSync('key1', updater);
+    expect(updater).toHaveBeenCalledWith('initialValue');
+    expect(storage.getItemSync('key1')).toBe('initialValue_updated');
+  });
+
+  it('getAllKeysSync and clearSync operate over every stored key', () => {
+    const storage = freshStorage();
+    storage.setItemSync('key1', 'value1');
+    storage.setItemSync('key2', 'value2');
+    expect(storage.getAllKeysSync()).toEqual(
+      expect.arrayContaining(['key1', 'key2']),
+    );
+    expect(storage.clearSync()).toBe(true);
+    expect(storage.getAllKeysSync()).toHaveLength(0);
+  });
+
+  it('getAllKeys and clear alias the *Async methods', async () => {
+    const storage = freshStorage();
+    await storage.setItem('key1', 'value1');
+    await storage.setItem('key2', 'value2');
+    await expect(storage.getAllKeys()).resolves.toEqual(
+      expect.arrayContaining(['key1', 'key2']),
+    );
+    await storage.clear();
+    await expect(storage.getAllKeys()).resolves.toHaveLength(0);
+  });
+
+  it('mergeItem keeps nested keys the patch does not mention', async () => {
+    const storage = freshStorage();
+    await storage.setItem(
+      '@MyApp_user',
+      JSON.stringify({
+        name: 'Tom',
+        age: 20,
+        traits: { hair: 'black', eyes: 'blue' },
+      }),
+    );
+    await storage.mergeItem(
+      '@MyApp_user',
+      JSON.stringify({
+        name: 'Sarah',
+        age: 21,
+        hobby: 'cars',
+        traits: { eyes: 'green' },
+      }),
+    );
+    const stored = await storage.getItem('@MyApp_user');
+    expect(stored ? JSON.parse(stored) : null).toEqual({
+      name: 'Sarah',
+      age: 21,
+      hobby: 'cars',
+      traits: { eyes: 'green', hair: 'black' },
+    });
+  });
+});

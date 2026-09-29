@@ -1,0 +1,12 @@
+{
+  "android": {
+    "gradleProjectName": "expo-age-range",
+    "modules": [
+      {
+        "importPath": "expo.modules.agerange.AgeRangeModule",
+        "className": "AgeRangeModule",
+        "nativeName": "ExpoAgeRange"
+      }
+    ]
+  }
+}

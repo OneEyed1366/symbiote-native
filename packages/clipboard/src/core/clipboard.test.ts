@@ -14,6 +14,7 @@ const FAKE_NATIVE_CLIPBOARD = {
   setImageAsync: vi.fn(async () => undefined),
   hasImageAsync: vi.fn(async () => true),
   addListener: vi.fn(() => ({ remove: vi.fn() })),
+  isPasteButtonAvailable: true,
 };
 
 // The real ExpoClipboard native module only exists on device — resolving it via
@@ -29,7 +30,11 @@ vi.mock('./native-module', () => ({
 // TurboModuleRegistry, whose Flow-typed source Vitest's Oxc transform can't parse — same fake
 // @symbiote-native/local-auth's local-authentication.test.ts uses.
 vi.mock('expo-modules-core', () => ({
-  Platform: { OS: 'ios' },
+  Platform: {
+    OS: 'ios',
+    select: (spec: Record<string, unknown>): unknown =>
+      spec['ios'] ?? spec['default'],
+  },
   UnavailabilityError: class UnavailabilityError extends Error {
     constructor(moduleName: string, propertyName: string) {
       super(`${propertyName} is not available on ${moduleName}`);
@@ -49,6 +54,7 @@ const {
   hasImageAsync,
   addClipboardListener,
   removeClipboardListener,
+  isPasteButtonAvailable,
 } = await import('./clipboard');
 
 // Every optional native method (everything except addListener/removeAllListeners, which come
@@ -70,6 +76,12 @@ function withNativeMethodRemoved<K extends keyof typeof FAKE_NATIVE_CLIPBOARD>(
 
 afterEach(() => {
   vi.clearAllMocks();
+});
+
+describe('isPasteButtonAvailable', () => {
+  it('reads the native flag on iOS', () => {
+    expect(isPasteButtonAvailable).toBe(true);
+  });
 });
 
 describe('Positive (delegates to the native module without error)', () => {

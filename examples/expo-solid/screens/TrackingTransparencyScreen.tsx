@@ -1,6 +1,6 @@
 import { createSignal } from 'solid-js';
 import { getAdvertisingId } from '@symbiote-native/tracking-transparency';
-import { createPermissions } from '@symbiote-native/tracking-transparency/solid';
+import { useTrackingPermissions } from '@symbiote-native/tracking-transparency/solid';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
@@ -14,22 +14,13 @@ function ValueRow(props: { label: string; value: string }) {
   );
 }
 
-/**
- * @symbiote-native/tracking-transparency canary demo: createPermissions() auto-fetches status on
- * mount and exposes get/request as imperative callbacks; getAdvertisingId() is a plain sync
- * call fetched once on mount, expected to read null on Android/the iOS simulator.
- */
+// `getAdvertisingId()` reads null on Android and the iOS simulator
 export function TrackingTransparencyScreen() {
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.TrackingTransparency];
   const lineColor = LINE_COLOR[lineInfo.line];
 
-  const {
-    status,
-    request: requestPermission,
-    get: getPermission,
-  } = createPermissions();
-  // getAdvertisingId() is a synchronous native read (unlike the async permission fetch above), so
-  // seeding the signal once in the component body - which runs exactly once - is the whole thing.
+  const [status, requestPermission, getPermission] = useTrackingPermissions();
+  // Synchronous native read, so seeding once in the component body is enough
   const [advertisingId] = createSignal<string | null>(getAdvertisingId());
 
   return (

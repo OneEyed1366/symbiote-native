@@ -12,6 +12,9 @@ import type { ISymbioteExpoLinkOptionalBundle } from '@symbiote-native/expo-modu
 // derives a multiselect option per entry, and add-layers.ts's generic dependency-only branch
 // already handles any id in here with no per-package code.
 export type IExpoPackageLayerName =
+  | 'age-range'
+  | 'app-integrity'
+  | 'app-metrics'
   | 'application'
   | 'asset'
   | 'audio'
@@ -24,6 +27,7 @@ export type IExpoPackageLayerName =
   | 'calendar'
   | 'cellular'
   | 'clipboard'
+  | 'constants'
   | 'contacts'
   | 'crypto'
   | 'device'
@@ -33,12 +37,14 @@ export type IExpoPackageLayerName =
   | 'haptics'
   | 'image-manipulator'
   | 'image-picker'
+  | 'intent-launcher'
   | 'keep-awake'
   | 'local-auth'
   | 'localization'
   | 'location'
   | 'mail-composer'
   | 'media-library'
+  | 'navigation-bar'
   | 'network'
   | 'notifications'
   | 'print'
@@ -73,6 +79,21 @@ export type IExpoPackageLayer = {
 };
 
 export const EXPO_PACKAGE_LAYERS: readonly IExpoPackageLayer[] = [
+  {
+    id: 'age-range',
+    label: 'Age range',
+    symbiotePackage: '@symbiote-native/age-range',
+  },
+  {
+    id: 'app-integrity',
+    label: 'App integrity',
+    symbiotePackage: '@symbiote-native/app-integrity',
+  },
+  {
+    id: 'app-metrics',
+    label: 'App metrics',
+    symbiotePackage: '@symbiote-native/app-metrics',
+  },
   {
     id: 'application',
     label: 'Application info',
@@ -150,6 +171,11 @@ export const EXPO_PACKAGE_LAYERS: readonly IExpoPackageLayer[] = [
     symbiotePackage: '@symbiote-native/clipboard',
   },
   {
+    id: 'constants',
+    label: 'Constants',
+    symbiotePackage: '@symbiote-native/constants',
+  },
+  {
     id: 'contacts',
     label: 'Contacts',
     symbiotePackage: '@symbiote-native/contacts',
@@ -185,6 +211,11 @@ export const EXPO_PACKAGE_LAYERS: readonly IExpoPackageLayer[] = [
     id: 'image-picker',
     label: 'Image picker',
     symbiotePackage: '@symbiote-native/image-picker',
+  },
+  {
+    id: 'intent-launcher',
+    label: 'Intent launcher',
+    symbiotePackage: '@symbiote-native/intent-launcher',
   },
   {
     id: 'keep-awake',
@@ -230,6 +261,11 @@ export const EXPO_PACKAGE_LAYERS: readonly IExpoPackageLayer[] = [
     id: 'media-library',
     label: 'Media library',
     symbiotePackage: '@symbiote-native/media-library',
+  },
+  {
+    id: 'navigation-bar',
+    label: 'Navigation bar',
+    symbiotePackage: '@symbiote-native/navigation-bar',
   },
   {
     id: 'network',

@@ -1,0 +1,41 @@
+{
+  "entry": [
+    "packages/*/src/{core,react,vue,solid,svelte,angular,legacy}/index.ts",
+    "adapters/*/src/index.ts",
+    "core/*/src/index.ts",
+    "**/*.config.{js,ts,mjs,cjs}",
+    "**/*.{android,ios}.{ts,tsx}",
+    "packages/cli/src/cli.ts",
+    "packages/cli/src/index.ts",
+    "packages/cli/templates/**",
+    "packages/*/templates/**",
+    "apps/docs-site/astro.config.mjs",
+    "apps/docs-site/src/content.config.ts",
+    "apps/docs-site/src/pages/**/*.ts",
+    "scripts/*.{mjs,cjs}",
+    "scripts/lib/*.mjs",
+    "benchmarks/**/harness.js",
+    "**/*.d.{ts,cts}",
+    "**/bin/*.cjs",
+    "adapters/*/babel-preset.cjs",
+    "adapters/*/metro-*.cjs",
+    "core/css-parser/typescript-plugin.cjs",
+    "core/engine/codegen-specs/**/*.ts",
+    "packages/*/react-native.config.{js,cjs}",
+    "packages/android/react-native.config.js",
+    "vitest.setup.ts",
+    "packages/*/src/svelte/svelte-compile.test-helper.ts",
+    "core/css-parser/src/golden-corpus/**",
+    "examples/*/index.js",
+    "examples/*/App.{js,jsx,ts,tsx}",
+    "examples/angular/src/App.ts",
+    "examples/*/e2e/**"
+  ],
+  "project": ["**/*.{ts,tsx,js,jsx}"],
+  "ignore": [
+    "packages/cli/templates/**",
+    "packages/*/templates/**",
+    "core/css-parser/src/golden-corpus/**",
+    ".vendors/**"
+  ]
+}

@@ -95,6 +95,8 @@ catalog:
   # All four must move in lock-step — compiler-cli peer-requires @angular/compiler at an EXACT
   # version. The unpin condition is RN shipping a Babel 8 preset, or moving the linker out of
   # Metro into a post-`ngc` pass run under Angular's own Babel 8 (see the angular-adapter skill).
+  # Re-tried 2026-09-28 for `@boundary`/`@error` (@symbiote-native/app-metrics's README) -
+  # `assertVersion(8)` still throws under the real `@babel/core@7.29.7`, no legacy linker exists
   '@angular/core': ~22.0.8
   '@angular/common': ~22.0.8
   '@angular/compiler': ~22.0.8
@@ -356,6 +358,14 @@ catalog:
   # its native ios/android folders. Version verified against .vendors/expo at origin/sdk-57
   # (57.0.2) and npm-published `latest`, same expo-modules-core 57.0.5 peer/runtime line.
   expo-video-thumbnails: 57.0.2
+  # Same exact-pin reasoning: packages/intent-launcher depends on expo-intent-launcher ONLY for
+  # its native android folder (Android-only package), version 57.0.1 matching the real
+  # npm-published `latest`, same expo-modules-core 57.0.5 peer/runtime line
+  expo-intent-launcher: 57.0.1
+  # Same exact-pin reasoning: packages/navigation-bar depends on expo-navigation-bar ONLY for
+  # its native android folder (Android-only package), version 57.0.2 matching the real
+  # npm-published `latest`, same expo-modules-core 57.0.5 peer/runtime line
+  expo-navigation-bar: 57.0.2
   # Same exact-pin reasoning: packages/blob depends on expo-blob ONLY for its native
   # ios/android folders. Version verified against .vendors/expo at origin/sdk-57 (57.0.2)
   # and npm-published `latest`, same expo-modules-core 57.0.5 peer/runtime line.
@@ -460,6 +470,18 @@ catalog:
   # packages/asset). Version verified against .vendors/expo at origin/sdk-57 (57.0.4) and matches
   # the real npm-published `latest`, same expo-modules-core 57.0.5 peer/runtime line.
   expo-font: 57.0.4
+  # Same exact-pin reasoning: packages/age-range depends on expo-age-range ONLY for its native
+  # ios/android folders (JS hand-ported into our own core), version 57.0.5 matching the real
+  # npm-published `latest`, same expo-modules-core 57.0.5 peer/runtime line
+  expo-age-range: 57.0.5
+  # Same exact-pin reasoning: packages/app-integrity depends on @expo/app-integrity ONLY for its
+  # native folders, version 57.0.2 matching npm-published `latest`. Scoped, unlike the rest of
+  # this catalog - autolinking still derives Gradle project name `expo-app-integrity` from it
+  '@expo/app-integrity': 57.0.2
+  # Same exact-pin reasoning: packages/app-metrics depends on expo-app-metrics ONLY for its
+  # native folders, version 57.0.21 matching npm-published `latest`. Its own real dependency
+  # expo-updates-interface resolves transitively, no separate catalog entry needed for it
+  expo-app-metrics: 57.0.21
   # expo-sqlite's own real runtime dependency (its kv-store's write-serialization lock) —
   # pinned to match .vendors/expo's exact vendored version rather than a newer semver-compatible
   # release, same reasoning as unimodules-app-loader above.

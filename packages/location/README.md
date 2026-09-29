@@ -2,10 +2,10 @@
 
 A wrapper package for [SymbioteNative](../../README.md) that makes
 [`expo-location`](https://github.com/expo/expo/tree/main/packages/expo-location) usable from
-**every** adapter — React, Vue, Svelte, Solid, and Angular. Every export is a plain async
-function or a `usePermissions`-style hook built by `expo-modules-core`'s `createPermissionHook`,
-so there is no adapter-specific state to wrap: the React, Vue, Svelte, Solid, and Angular entry
-points are plain re-exports of the same `core`.
+**every** adapter - React, Vue, Svelte, Solid, and Angular. Functions and streams live in a
+shared `core`; the three permission hooks (`useForegroundPermissions`, `useBackgroundPermissions`,
+`useMotionActivityPermissions`) are per-adapter over the shared `createPermissionHook` factory,
+and Angular gets one `*PermissionsService` each.
 
 Foreground position, heading, geocoding, and motion activity, plus background location updates
 and geofencing — registered as tasks through [`@symbiote-native/task-manager`](../task-manager).
@@ -79,14 +79,15 @@ Idempotent — safe to run again even if already granted.
 ## Shape
 
 ```
-src/core/     location.ts (every function + the two useXPermissions hooks), subscribers.ts (the
-              watchId-keyed event-subscriber machinery shared by position/heading/motion-activity
-              watches), native-module.ts (requireNativeModule resolution), types.ts.
-src/angular/  @symbiote-native/location/angular — export * from '../core'
+src/core/     location.ts (every function), subscribers.ts (the watchId-keyed event-subscriber
+              machinery shared by position/heading/motion-activity watches),
+              geolocation-polyfill.ts, location-permission-api.ts (get/request pairs the hooks
+              bind to), native-module.ts (requireNativeModule resolution), types.ts.
+src/react|vue|solid|svelte/  use-location-permissions: the three permission hooks
+src/angular/  location-permissions.service: Foreground/Background/MotionActivityPermissionsService
 ```
 
-`./react`, `./vue`, `./svelte`, and `./solid` are `exports`-map aliases straight onto
-`src/core/`. `./angular` stays a physical file/subpath since Angular ships through a separate
+Each adapter subpath re-exports `core` plus its own hooks. `./angular` ships through a separate
 `ngc`/AOT build (`build-ngc/`).
 
 ## Use it
@@ -140,8 +141,10 @@ if (granted) {
 }
 ```
 
-Identical import surface on every adapter — `@symbiote-native/location/react`, `/vue`, `/svelte`,
-`/solid`, `/angular` all re-export the same functions.
+Identical function surface on every adapter: `@symbiote-native/location/react`, `/vue`, `/svelte`,
+`/solid`, `/angular`. The permission hooks return the adapter's own reactive box (React tuple,
+Vue `Ref`, Solid `Accessor`, Svelte rune object); on Angular inject the matching service and call
+`connect()` for a signal, `get()` / `request()` to refresh.
 
 ## API
 
@@ -156,12 +159,13 @@ watchHeadingAsync(callback, errorHandler?): Promise<ILocationSubscription>
 geocodeAsync(address: string): Promise<ILocationGeocodedLocation[]>
 reverseGeocodeAsync(location): Promise<ILocationGeocodedAddress[]>
 getForegroundPermissionsAsync() / requestForegroundPermissionsAsync(): Promise<ILocationPermissionResponse>
-useForegroundPermissions(options?)
+useForegroundPermissions(options?)                                   // Angular: ForegroundPermissionsService
 getBackgroundPermissionsAsync() / requestBackgroundPermissionsAsync(): Promise<PermissionResponse>
 useBackgroundPermissions(options?)
 hasServicesEnabledAsync(): Promise<boolean>
 getMotionActivityPermissionsAsync() / requestMotionActivityPermissionsAsync(): Promise<PermissionResponse>
 useMotionActivityPermissions(options?)
+installWebGeolocationPolyfill(): void                                // navigator.geolocation
 getMotionActivityAsync(): Promise<IMotionActivityObject>
 watchMotionActivityAsync(callback, errorHandler?): Promise<ILocationSubscription>       // foreground only
 isBackgroundLocationAvailableAsync(): Promise<boolean>

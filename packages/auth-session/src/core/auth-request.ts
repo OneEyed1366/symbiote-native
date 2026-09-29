@@ -11,18 +11,12 @@ import type {
 import { CodeChallengeMethod, ResponseType } from './auth-request.types';
 import type { IAuthSessionResult } from './auth-session.types';
 import { AuthError } from './errors';
+import { createPromptString } from './prompt-string';
 import { getQueryParams } from './query-params';
 import { buildCodeAsync, generateRandom } from './pkce';
 import { TokenResponse } from './token-request';
 
 let authLock = false;
-
-function createPromptString(
-  prompt: Prompt | Prompt[] | undefined,
-): string | undefined {
-  if (!prompt) return undefined;
-  return Array.isArray(prompt) ? prompt.join(' ') : prompt;
-}
 
 /** Manages an authorization request, https://tools.ietf.org/html/rfc6749#section-4.1.1 */
 export class AuthRequest implements Omit<IAuthRequestConfig, 'state'> {

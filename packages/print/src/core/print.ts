@@ -1,4 +1,4 @@
-import { UnavailabilityError } from 'expo-modules-core';
+import { Platform, UnavailabilityError } from 'expo-modules-core';
 import { expoPrint } from './native-module';
 import type {
   IFilePrintOptions,
@@ -13,12 +13,22 @@ let isPrinting = false;
 
 /** Opens the native print window (AirPrint / Android's print framework). */
 export async function printAsync(options: IPrintOptions): Promise<void> {
-  if (!options.uri && !options.html) {
+  // The deprecated formatter option stands in for `html` and `uri` on iOS only
+  const hasMarkupFormatter = Platform.select({
+    ios: Boolean(options.markupFormatterIOS),
+    default: false,
+  });
+  if (!options.uri && !options.html && !hasMarkupFormatter) {
     throw new Error('Must provide either `html` or `uri` to print');
   }
   if (options.uri && options.html) {
     throw new Error(
       'Must provide exactly one of `html` and `uri` but both were specified',
+    );
+  }
+  if (options.markupFormatterIOS !== undefined) {
+    console.warn(
+      'The markupFormatterIOS option is deprecated. Use useMarkupFormatter instead.',
     );
   }
   if (isPrinting) {

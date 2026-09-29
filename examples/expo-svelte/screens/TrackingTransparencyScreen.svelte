@@ -1,12 +1,9 @@
 <script lang="ts">
-  // @symbiote-native/tracking-transparency tour stop — usePermissions() auto-fetches the current
-  // status on mount; get()/request() re-fetch on demand. getAdvertisingId() is a plain synchronous
-  // core call that may return null (iOS Simulator, not yet authorized, or declined). Svelte twin
-  // of ../../expo-vue-sfc/screens/TrackingTransparencyScreen.vue.
+  // `getAdvertisingId()` may return null: iOS Simulator, not yet authorized, or declined
   import { ScrollView } from '@symbiote-native/svelte';
   import {
     getAdvertisingId,
-    usePermissions,
+    useTrackingPermissions,
   } from '@symbiote-native/tracking-transparency/svelte';
   import ActionButton from '../components/ActionButton.svelte';
   import { ROUTE_NAME } from '../routes';
@@ -19,7 +16,7 @@
 
   // The rune hands back a boxed object whose `status` is a getter — Svelte 5 reactivity is
   // lexically scoped, so destructuring it here would freeze the value at its initial null.
-  const permissions = usePermissions();
+  const permissions = useTrackingPermissions();
   let advertisingId = $state<string | null>(getAdvertisingId());
 
   const statusText = $derived(permissions.status?.status ?? 'checking…');
@@ -37,11 +34,11 @@
   }
 
   function handleGet(): void {
-    void permissions.get();
+    void permissions.getPermission();
   }
 
   function handleRequest(): void {
-    void permissions.request().then(() => {
+    void permissions.requestPermission().then(() => {
       advertisingId = getAdvertisingId();
     });
   }

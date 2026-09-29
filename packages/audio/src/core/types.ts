@@ -48,6 +48,9 @@ export type IAudioPlayerOptions = {
   downloadFirst?: boolean;
 };
 
+/** @deprecated Use `IAudioPlayerOptions` instead */
+export type IAudioLoadOptions = IAudioPlayerOptions;
+
 export type IPreloadOptions = {
   /** @default 10 */
   preferredForwardBufferDuration?: number;
@@ -184,6 +187,8 @@ export type IAudioMode = {
   playsInSilentMode: boolean;
   /** @default 'mixWithOthers' */
   interruptionMode: IInterruptionMode;
+  /** @platform android @deprecated Use `interruptionMode`, which now works on both platforms */
+  interruptionModeAndroid?: IInterruptionMode;
   /** @default false @platform ios */
   allowsRecording: boolean;
   /** @default false */

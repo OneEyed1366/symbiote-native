@@ -112,8 +112,8 @@ await printAsync({ html: '<h1>Invoice #1234</h1>', printerUrl: url });
 
 - **One print job at a time.** A second `printAsync` call while one is in flight rejects
   immediately — same guard upstream keeps as module-level state.
-- **`markupFormatterIOS` was dropped.** Upstream deprecated it in favor of `useMarkupFormatter`;
-  this port only carries the replacement.
+- **`markupFormatterIOS` is kept as upstream's deprecated option.** On iOS it stands in for
+  `html`/`uri`, warns on every call, and `useMarkupFormatter` is the replacement.
 
 ## Test it
 

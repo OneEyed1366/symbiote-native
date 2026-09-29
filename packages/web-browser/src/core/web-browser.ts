@@ -1,8 +1,5 @@
-// Hand-ported from .vendors/expo/packages/expo-web-browser/src/WebBrowser.ts (sdk-57). Two
-// deliberate departures from upstream, both because SymbioteNative has no web target:
-// `maybeCompleteAuthSession` is not ported (it exists only to close a `window.open` popup; on a
-// native platform it can do nothing but return `{ type: 'failed' }`), and the web-only open
-// options are gone from IWebBrowserOpenOptions.
+// Hand-ported from .vendors/expo/packages/expo-web-browser/src/WebBrowser.ts (sdk-57)
+// The web-only open options are gone from IWebBrowserOpenOptions, SymbioteNative has no web target
 import { Platform, UnavailabilityError } from 'expo-modules-core';
 import type { AppStateStatus, EmitterSubscription } from 'react-native';
 import { AppState, Linking, processColor } from 'react-native';
@@ -14,6 +11,8 @@ import {
   type IProcessedOpenOptions,
   type IRedirectEvent,
   type IWebBrowserAuthSessionResult,
+  type IWebBrowserCompleteAuthSessionOptions,
+  type IWebBrowserCompleteAuthSessionResult,
   type IWebBrowserCoolDownResult,
   type IWebBrowserCustomTabsResults,
   type IWebBrowserDismissResult,
@@ -207,6 +206,17 @@ export function dismissAuthSession(): void {
     throw new UnavailabilityError(NATIVE_MODULE_NAME, 'dismissBrowser');
   }
   void expoWebBrowser.dismissBrowser();
+}
+
+// Native has no popup to close, so it reports `failed` and shared code can call it at module scope
+/** @platform web */
+export function maybeCompleteAuthSession(
+  options: IWebBrowserCompleteAuthSessionOptions = {},
+): IWebBrowserCompleteAuthSessionResult {
+  if (expoWebBrowser.maybeCompleteAuthSession) {
+    return expoWebBrowser.maybeCompleteAuthSession(options);
+  }
+  return { type: 'failed', message: 'Not supported on this platform' };
 }
 
 function processOptions(

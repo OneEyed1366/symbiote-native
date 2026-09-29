@@ -18,7 +18,8 @@ export async function setAudioModeAsync(
       : {
           shouldPlayInBackground: mode.shouldPlayInBackground,
           shouldRouteThroughEarpiece: mode.shouldRouteThroughEarpiece,
-          interruptionMode: mode.interruptionMode,
+          interruptionMode:
+            mode.interruptionMode ?? mode.interruptionModeAndroid,
           allowsBackgroundRecording: mode.allowsBackgroundRecording,
           playsInSilentMode: mode.playsInSilentMode,
         };

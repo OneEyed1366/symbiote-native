@@ -48,16 +48,12 @@ npm install @symbiote-native/auth-session
 - **The Expo Go / `auth.expo.io` proxy flow** (`SessionUrlProvider`, the legacy
   `AuthSession.getRedirectUrl`/`getDefaultReturnUrl`) - built entirely on `expo-constants`'
   app-manifest concept (`Constants.expoConfig`, `ExecutionEnvironment`), which doesn't exist in
-  this bare, Metro-only, non-Expo-CLI project (`expo-constants` is deliberately unported - see the
-  `symbiote-expo-package-catalog` skill).
+  this bare, Metro-only, non-Expo-CLI project. `@symbiote-native/constants` ports only the native
+  fields of `expo-constants` and never the manifest, so it does not bring this flow back.
 - **`makeRedirectUri`'s manifest-scheme auto-detection.** Upstream's version calls
   `expo-linking`'s `createURL`/`resolveScheme`, which read a scheme out of the same app manifest.
   This port's `makeRedirectUri` never reads a manifest: pass `native` for a production build, or
   `scheme` otherwise - it throws if neither is given, rather than guessing.
-- **`useAuthRequest`/`useIdTokenAuthRequest`/`useAutoDiscovery`** (both the base hooks and each
-  provider's) - real React hooks (`useState`/`useEffect`/`useMemo`). Use `AuthRequest` (or
-  `GoogleAuthRequest`/`FacebookAuthRequest`) and `resolveDiscoveryAsync`/`loadAsync` directly
-  instead; an adapter-specific hook can wrap them the way other packages' adapters do.
 - **Upstream's `Request<T, B>` base class is renamed `TokenRequest`'s internal `BaseRequest`** to
   avoid shadowing the global `Request` type used by `fetch`.
 
@@ -68,15 +64,37 @@ five are ported (`src/core/*.test.ts`). `AuthSession-test.*.ts` and `SessionUrlP
 are **not** ported: both test only the dropped manifest/proxy flow above. `auth-session.test.ts`
 here instead covers this port's own trimmed `makeRedirectUri` contract.
 
+## Hooks
+
+Every hook upstream ships is ported to every adapter, the load, prompt and code-exchange logic is
+shared in `core/` and each adapter supplies only its lifecycle:
+
+| Upstream | React | Vue / Solid / Svelte | Angular |
+|---|---|---|---|
+| `useAutoDiscovery` | `useAutoDiscovery(issuer)` | same name, getter or ref arguments | `injectAutoDiscovery` |
+| `useLoadedAuthRequest` | `useLoadedAuthRequest(config, discovery, RequestClass)` | same name | `injectLoadedAuthRequest` |
+| `useAuthRequestResult` | `useAuthRequestResult(request, discovery, options?)` | same name | `injectAuthRequestResult` |
+| `useAuthRequest` | `useAuthRequest(config, discovery)` | same name | `injectAuthRequest` |
+| Google `useAuthRequest` / `useIdTokenAuthRequest` | `useGoogleAuthRequest` / `useGoogleIdTokenAuthRequest` | same names | `injectGoogleAuthRequest` / `injectGoogleIdTokenAuthRequest` |
+| Facebook `useAuthRequest` | `useFacebookAuthRequest` | same name | `injectFacebookAuthRequest` |
+
+Each returns `[request, result, promptAsync]`, as boxes in the adapter's own shape (a `ShallowRef`
+in Vue, an accessor in Solid, `{ current }` in Svelte, a `Signal` in Angular; React returns the
+values). Arguments are getters in Solid, Svelte and Angular, refs or getters in Vue.
+
+Provider hooks are flat exports with the provider in the name, since there is no `providers/*`
+subpath. The Google hook exchanges the code for a token on its own when the code flow is used, the
+id token is then in `result.params.id_token`. Off web, `useGoogleIdTokenAuthRequest` follows the
+default code flow, as upstream does.
+
 ## Shape
 
 ```
 src/core/         AuthRequest, TokenRequest family, Discovery, Errors, PKCE, Base64, QueryParams,
-                  Fetch, AuthSession (dismiss/makeRedirectUri/loadAsync), providers/{google,facebook}
-src/angular/      @symbiote-native/auth-session/angular
+                  Fetch, AuthSession (dismiss/makeRedirectUri/loadAsync), providers/{google,facebook},
+                  the hook controllers and `createAuthRequestHooks`
+src/{react,vue,solid,svelte,angular}/   each adapter's hook bindings
 ```
-
-`./react`, `./vue`, `./svelte`, and `./solid` are `exports`-map aliases straight onto `src/core/`.
 
 ## Use it
 

@@ -378,6 +378,7 @@ export {
   createInitialListState,
   listEffectSignature,
 } from './state/virtualized-list-reducer';
+export { LIST_ACTION_KIND, LIST_EFFECT_KIND } from './state/list-kinds';
 export type {
   IListState,
   IListMetrics,

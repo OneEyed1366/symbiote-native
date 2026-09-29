@@ -27,6 +27,8 @@ export type IGoogleAuthRequestConfig = IProviderAuthRequestConfig & {
   webClientId?: string;
   iosClientId?: string;
   androidClientId?: string;
+  /** Exchange the response code for a token in the hook, on by default for the code flow */
+  shouldAutoExchangeCode?: boolean;
 };
 
 /** Extends `AuthRequest`, applying Google's minimum scopes and an id-token nonce. */

@@ -97,19 +97,24 @@ const {
   updateAttendeeAsync,
   deleteAttendeeAsync,
   getDefaultCalendarAsync,
+  getSourcesAsync,
+  getSourceAsync,
+  openEventInCalendar,
+} = await import('./calendar');
+const {
   getRemindersAsync,
   getReminderAsync,
   createReminderAsync,
   updateReminderAsync,
   deleteReminderAsync,
-  getSourcesAsync,
-  getSourceAsync,
-  openEventInCalendar,
+} = await import('./reminders');
+const {
   getCalendarPermissionsAsync,
   requestCalendarPermissionsAsync,
+  requestPermissionsAsync,
   getRemindersPermissionsAsync,
   requestRemindersPermissionsAsync,
-} = await import('./calendar');
+} = await import('./permissions');
 
 afterEach(() => {
   vi.clearAllMocks();
@@ -331,5 +336,18 @@ describe('permissions', () => {
     expect(
       FAKE_NATIVE_CALENDAR.requestRemindersPermissionsAsync,
     ).toHaveBeenCalled();
+  });
+
+  it('keeps the deprecated requestPermissionsAsync alias, warning once per call', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const response = await requestPermissionsAsync();
+    expect(response.granted).toBe(true);
+    expect(
+      FAKE_NATIVE_CALENDAR.requestCalendarPermissionsAsync,
+    ).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith(
+      'requestPermissionsAsync is deprecated. Use requestCalendarPermissionsAsync instead.',
+    );
+    warn.mockRestore();
   });
 });

@@ -388,7 +388,11 @@ reads only these two.
 
 ## Not ported
 
-Three pieces of upstream are deliberately left out rather than silently dropped:
+`maybeCompleteAuthSession` is ported so shared code can call it at module scope: it closes the web
+popup of an auth session, so on iOS and Android it returns
+`{ type: 'failed', message: 'Not supported on this platform' }`.
+
+Two pieces of upstream are deliberately left out rather than silently dropped:
 
 - **The `experimentalLauncherActivity` config plugin.** Upstream's
   `plugin/src/withWebBrowserAndroid.ts` exists only for that opt-in flag: it writes a
@@ -396,10 +400,6 @@ Three pieces of upstream are deliberately left out rather than silently dropped:
   `AndroidManifest.xml`, as a workaround for a specific redirect edge case. It is opt-in upstream
   and unnecessary for anything on this page, so this package does not reproduce it. If you
   genuinely need that workaround, add the activity to your app by hand.
-- **`maybeCompleteAuthSession`.** Genuinely web-only — it closes the `window.open` popup the web
-  implementation creates. On a native platform upstream's own version can only ever return
-  `{ type: 'failed', message: 'Not supported on this platform' }`, so it is left out rather than
-  shipped as a function that can never succeed.
 - **The web-only open options `windowName` and `windowFeatures`**, for the same reason:
   SymbioteNative has no web target, so nothing could read them.
 

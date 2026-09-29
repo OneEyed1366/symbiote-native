@@ -1,0 +1,12 @@
+{
+  "android": {
+    "gradleProjectName": "expo-navigation-bar",
+    "modules": [
+      {
+        "importPath": "expo.modules.navigationbar.NavigationBarModule",
+        "className": "NavigationBarModule",
+        "nativeName": "ExpoNavigationBar"
+      }
+    ]
+  }
+}

@@ -6,4 +6,5 @@
 // shape of @symbiote-native/sensors' useAccelerometer composable.
 
 export { useClipboard } from './composables/use-clipboard';
+export { ClipboardPasteButton } from './clipboard-paste-button';
 export * from '../core';

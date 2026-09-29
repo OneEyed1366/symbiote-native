@@ -242,6 +242,7 @@ export {
   NativeEventEmitter,
   setDeviceEventSource,
 } from './native-events';
+export type { IEventValueSource } from './event-value-source';
 export type {
   IEventSubscription,
   IEventEmitterModule,
@@ -514,3 +515,20 @@ export type { IClaimMode, IHostBehavior, IPayloadFold } from './host-behavior';
 // other dirtying route goes through a prop write, and a derived-payload behavior has no prop to
 // write. Pair it with requestCommitFor: dirtying is not publishing.
 export { setBehaviorListener, markPropsDirty } from './node';
+export {
+  createPermissionApi,
+  resolveInitialPermission,
+  fetchInitialPermission,
+  splitWriteOnlyPermissionOptions,
+} from './permission-hook-runtime';
+export type { IWriteOnlyPermissionOptions } from './permission-hook-runtime';
+export { expoViewManagerName, tryRegisterNativeView } from './expo-native-view';
+export { createResourceController } from './resource-controller';
+export type { IResourceController } from './resource-controller';
+export type {
+  IPermissionHookBehavior,
+  IPermissionHookMethods,
+  IPermissionHookOptions,
+  IPermissionApi,
+  IPermissionHookResult,
+} from './permission-hook-runtime';

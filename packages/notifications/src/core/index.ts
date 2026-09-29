@@ -10,6 +10,10 @@ export {
   unsubscribeFromTopicAsync,
   type IPushTokenListener,
 } from './tokens';
+export {
+  installPushTokenAutoRegistration,
+  type IDevicePushTokenRegistration,
+} from './auto-registration';
 
 export {
   dismissAllNotificationsAsync,
@@ -53,7 +57,9 @@ export {
   addNotificationResponseReceivedListener,
   addNotificationsDroppedListener,
   clearLastNotificationResponse,
+  clearLastNotificationResponseAsync,
   getLastNotificationResponse,
+  getLastNotificationResponseAsync,
 } from './emitter';
 
 export {
@@ -61,6 +67,8 @@ export {
   registerTaskAsync,
   unregisterTaskAsync,
 } from './background-task';
+
+export { determineNextResponse } from './last-notification-response';
 
 export type {
   IAudioAttributes,

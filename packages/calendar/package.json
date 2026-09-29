@@ -32,10 +32,10 @@
   "types": "src/core/index.ts",
   "exports": {
     ".": "./src/core/index.ts",
-    "./vue": "./src/core/index.ts",
-    "./react": "./src/core/index.ts",
-    "./svelte": "./src/core/index.ts",
-    "./solid": "./src/core/index.ts",
+    "./vue": "./src/vue/index.ts",
+    "./react": "./src/react/index.ts",
+    "./svelte": "./src/svelte/index.ts",
+    "./solid": "./src/solid/index.ts",
     "./angular": {
       "types": "./build-ngc/angular/index.d.ts",
       "react-native": "./build-ngc/angular/index.js",
@@ -63,20 +63,20 @@
         "default": "./build/core/index.js"
       },
       "./vue": {
-        "types": "./build/core/index.d.ts",
-        "default": "./build/core/index.js"
+        "types": "./build/vue/index.d.ts",
+        "default": "./build/vue/index.js"
       },
       "./react": {
-        "types": "./build/core/index.d.ts",
-        "default": "./build/core/index.js"
+        "types": "./build/react/index.d.ts",
+        "default": "./build/react/index.js"
       },
       "./svelte": {
-        "types": "./build/core/index.d.ts",
-        "default": "./build/core/index.js"
+        "types": "./build/svelte/index.d.ts",
+        "default": "./build/svelte/index.js"
       },
       "./solid": {
-        "types": "./build/core/index.d.ts",
-        "default": "./build/core/index.js"
+        "types": "./build/solid/index.d.ts",
+        "default": "./build/solid/index.js"
       },
       "./angular": {
         "types": "./build-ngc/angular/index.d.ts",

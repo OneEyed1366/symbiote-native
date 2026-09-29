@@ -34,14 +34,12 @@ import {
   type OnChanges,
 } from '@angular/core';
 import type { ControlValueAccessor } from '@angular/forms';
-import { anchorHostStyle } from '@symbiote-native/angular';
+import {
+  AccessibilityInputsBase,
+  anchorHostStyle,
+} from '@symbiote-native/angular';
 import { resolveAccessibilityProps } from '@symbiote-native/components';
-import type {
-  IAccessibilityProps,
-  IAccessibilityStateValue,
-  IAriaProps,
-  IDescriptor,
-} from '@symbiote-native/components';
+import type { IDescriptor } from '@symbiote-native/components';
 import { dlog, type ISymbioteEvent } from '@symbiote-native/engine';
 import {
   sanitizeSliderValue,
@@ -92,6 +90,7 @@ function asStyle(value: unknown): ISliderProps['style'] {
 
 @Directive()
 export abstract class SliderBase
+  extends AccessibilityInputsBase
   implements ISliderProps, OnChanges, ControlValueAccessor
 {
   @Input() value?: number;
@@ -119,45 +118,9 @@ export abstract class SliderBase
   @Input() style?: ISliderProps['style'];
 
   @Input() nativeID?: string;
-  @Input() accessible?: boolean;
-  @Input() accessibilityLabel?: string;
-  @Input() accessibilityHint?: string;
-  @Input() accessibilityRole?: IAccessibilityProps['accessibilityRole'];
-  @Input() accessibilityState?: IAccessibilityStateValue;
-  @Input() accessibilityValue?: IAccessibilityProps['accessibilityValue'];
-  @Input() accessibilityActions?: IAccessibilityProps['accessibilityActions'];
-  @Input() accessibilityLabelledBy?: string | string[];
-  @Input()
-  importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
-  @Input()
-  accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
-  @Input() screenReaderFocusable?: boolean;
-  @Input() accessibilityViewIsModal?: boolean;
-  @Input() accessibilityElementsHidden?: boolean;
-  @Input() accessibilityIgnoresInvertColors?: boolean;
-  @Input() accessibilityLanguage?: string;
-  @Input() accessibilityRespondsToUserInteraction?: boolean;
-  @Input() accessibilityShowsLargeContentViewer?: boolean;
-  @Input() accessibilityLargeContentTitle?: string;
   @Input() onAccessibilityTap?: (event: ISymbioteEvent) => void;
   @Input() onMagicTap?: (event: ISymbioteEvent) => void;
   @Input() onAccessibilityEscape?: (event: ISymbioteEvent) => void;
-
-  @Input() role?: IAriaProps['role'];
-  @Input('aria-label') ariaLabel?: string;
-  @Input('aria-labelledby') ariaLabelledBy?: string;
-  @Input('aria-live') ariaLive?: IAriaProps['aria-live'];
-  @Input('aria-hidden') ariaHidden?: boolean;
-  @Input('aria-busy') ariaBusy?: boolean;
-  @Input('aria-checked') ariaChecked?: boolean | 'mixed';
-  @Input('aria-disabled') ariaDisabled?: boolean;
-  @Input('aria-expanded') ariaExpanded?: boolean;
-  @Input('aria-selected') ariaSelected?: boolean;
-  @Input('aria-modal') ariaModal?: boolean;
-  @Input('aria-valuemax') ariaValueMax?: number;
-  @Input('aria-valuemin') ariaValueMin?: number;
-  @Input('aria-valuenow') ariaValueNow?: number;
-  @Input('aria-valuetext') ariaValueText?: string;
 
   // The four native callbacks, as real EventEmitters — no v-model-style two-way twin (that was
   // Vue-specific v-model sugar; Angular has no equivalent concept here).
@@ -274,49 +237,29 @@ export abstract class SliderBase
       testID: this.testID,
       style: [asStyle(anchorHostStyle(this.elementRef)), this.style],
       nativeID: this.nativeID,
-      accessible: this.accessible,
-      accessibilityLabel: this.accessibilityLabel,
-      accessibilityHint: this.accessibilityHint,
-      accessibilityRole: this.accessibilityRole,
-      accessibilityState: this.accessibilityState,
-      accessibilityValue: this.accessibilityValue,
-      accessibilityActions: this.accessibilityActions,
-      accessibilityLabelledBy: this.accessibilityLabelledBy,
-      importantForAccessibility: this.importantForAccessibility,
-      accessibilityLiveRegion: this.accessibilityLiveRegion,
-      screenReaderFocusable: this.screenReaderFocusable,
-      accessibilityViewIsModal: this.accessibilityViewIsModal,
-      accessibilityElementsHidden: this.accessibilityElementsHidden,
-      accessibilityIgnoresInvertColors: this.accessibilityIgnoresInvertColors,
-      accessibilityLanguage: this.accessibilityLanguage,
-      accessibilityRespondsToUserInteraction:
-        this.accessibilityRespondsToUserInteraction,
-      accessibilityShowsLargeContentViewer:
-        this.accessibilityShowsLargeContentViewer,
-      accessibilityLargeContentTitle: this.accessibilityLargeContentTitle,
+      ...this.accessibilityInputProps(),
       onAccessibilityTap: this.onAccessibilityTap,
       onMagicTap: this.onMagicTap,
       onAccessibilityEscape: this.onAccessibilityEscape,
-      role: this.role,
-      'aria-label': this.ariaLabel,
-      'aria-labelledby': this.ariaLabelledBy,
-      'aria-live': this.ariaLive,
-      'aria-hidden': this.ariaHidden,
-      'aria-busy': this.ariaBusy,
-      'aria-checked': this.ariaChecked,
-      'aria-disabled': this.ariaDisabled,
-      'aria-expanded': this.ariaExpanded,
-      'aria-selected': this.ariaSelected,
-      'aria-modal': this.ariaModal,
-      'aria-valuemax': this.ariaValueMax,
-      'aria-valuemin': this.ariaValueMin,
-      'aria-valuenow': this.ariaValueNow,
-      'aria-valuetext': this.ariaValueText,
     };
   }
 
   get descriptor(): IDescriptor {
     const props = resolveAccessibilityProps<ISliderProps>(this.inputProps());
+    const view = this.viewFor(props);
+    // No custom marker slot on Angular yet, so the overlay depends only on `renderStepNumber`
+    if (!shouldRenderStepsIndicator(false, props.renderStepNumber)) {
+      return renderSlider(view, this.platform, { onLayout: this.handleLayout });
+    }
+    return renderSlider(view, this.platform, {
+      steps: this.stepsFor(view, props),
+      onLayout: this.handleLayout,
+    });
+  }
+
+  // Kept apart from `descriptor` so the value, limit and disabled folds read as one step and the
+  // step-overlay decision as another
+  private viewFor(props: ISliderProps): ISliderViewProps {
     const {
       value,
       minimumValue: minimumValueInput,
@@ -329,37 +272,30 @@ export abstract class SliderBase
       thumbTintColor,
       thumbImage,
       accessibilityState,
-      renderStepNumber,
+      renderStepNumber: _renderStepNumber,
       style,
       ...passthrough
     } = props;
 
-    const minimumValue = minimumValueInput ?? SLIDER_DEFAULT_MINIMUM_VALUE;
-    const maximumValue = maximumValueInput ?? SLIDER_DEFAULT_MAXIMUM_VALUE;
-    const step = stepInput ?? SLIDER_DEFAULT_STEP;
     const lowerLimit = resolveSliderLowerLimit(lowerLimitInput);
     const upperLimit = resolveSliderUpperLimit(upperLimitInput);
     if (isInvalidLimitConfig(lowerLimit, upperLimit)) {
       dlog('Slider: lowerLimit must be smaller than upperLimit');
     }
-    const inverted = invertedInput ?? false;
     const hasThumbImage = thumbImage !== undefined;
-    // No custom-StepMarker slot on Angular yet (see the module doc comment above) — showSteps
-    // only ever considers renderStepNumber.
-    const showSteps = shouldRenderStepsIndicator(false, renderStepNumber);
     const nativeThumbImage = shouldPassNativeThumbImage(false, hasThumbImage)
       ? thumbImage
       : undefined;
 
-    const view: ISliderViewProps = {
+    return {
       value: sanitizeSliderValue(value),
-      minimumValue,
-      maximumValue,
-      step,
+      minimumValue: minimumValueInput ?? SLIDER_DEFAULT_MINIMUM_VALUE,
+      maximumValue: maximumValueInput ?? SLIDER_DEFAULT_MAXIMUM_VALUE,
+      step: stepInput ?? SLIDER_DEFAULT_STEP,
       lowerLimit,
       upperLimit,
       disabled: resolveSliderDisabled(disabled, accessibilityState),
-      inverted,
+      inverted: invertedInput ?? false,
       thumbTintColor: resolveThumbTintColor(
         thumbTintColor,
         false,
@@ -372,39 +308,38 @@ export abstract class SliderBase
       ),
       width: this.width,
       style,
-      passthrough: {
-        ...passthrough,
-        [SLIDER_ON_CHANGE]: this.handleValueChange,
-        [SLIDER_ON_VALUE_CHANGE]: this.handleValueChange,
-        [SLIDER_ON_SLIDING_START]: this.handleSlidingStart,
-        [SLIDER_ON_SLIDING_COMPLETE]: this.handleSlidingComplete,
-        [SLIDER_ON_ACCESSIBILITY_ACTION]: this.handleAccessibilityAction,
-      },
+      passthrough: { ...passthrough, ...this.nativeEventHandlers() },
     };
+  }
 
-    if (!showSteps) {
-      return renderSlider(view, this.platform, { onLayout: this.handleLayout });
-    }
+  private nativeEventHandlers(): Record<
+    string,
+    (event: ISymbioteEvent) => void
+  > {
+    return {
+      [SLIDER_ON_CHANGE]: this.handleValueChange,
+      [SLIDER_ON_VALUE_CHANGE]: this.handleValueChange,
+      [SLIDER_ON_SLIDING_START]: this.handleSlidingStart,
+      [SLIDER_ON_SLIDING_COMPLETE]: this.handleSlidingComplete,
+      [SLIDER_ON_ACCESSIBILITY_ACTION]: this.handleAccessibilityAction,
+    };
+  }
 
+  private stepsFor(view: ISliderViewProps, props: ISliderProps): IDescriptor {
     const options = computeStepOptions(
-      minimumValue,
-      maximumValue,
-      step,
+      view.minimumValue,
+      view.maximumValue,
+      view.step,
       this.platform.stepResolution,
     );
-    const currentValue = this.reportedValue ?? view.value ?? minimumValue;
-    const steps = renderStepsIndicator({
+    return renderStepsIndicator({
       options,
-      currentValue,
+      currentValue: this.reportedValue ?? view.value ?? view.minimumValue,
       width: this.width,
-      renderStepNumber: renderStepNumber === true,
-      thumbImage,
-      inverted,
+      renderStepNumber: props.renderStepNumber === true,
+      thumbImage: props.thumbImage,
+      inverted: view.inverted,
       platform: this.platform,
-    });
-    return renderSlider(view, this.platform, {
-      steps,
-      onLayout: this.handleLayout,
     });
   }
 }

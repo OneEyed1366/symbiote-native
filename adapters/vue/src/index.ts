@@ -249,6 +249,9 @@ export type {
 // Vue composables over the core device-state modules.
 export { useColorScheme } from './composables/use-color-scheme';
 export { useWindowDimensions } from './composables/use-window-dimensions';
+export { createPermissionHook } from './composables/create-permission-hook';
+export { createResourceHook } from './composables/create-resource-hook';
+export { createEventValueHook } from './composables/create-event-value-hook';
 
 // Imperative runtime modules: the SAME module both adapters share, re-exported from @symbiote-native/engine.
 export {

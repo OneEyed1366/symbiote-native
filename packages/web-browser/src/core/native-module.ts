@@ -1,6 +1,8 @@
 import { requireNativeModule } from 'expo-modules-core';
 import type {
   IProcessedOpenOptions,
+  IWebBrowserCompleteAuthSessionOptions,
+  IWebBrowserCompleteAuthSessionResult,
   IWebBrowserAuthSessionResult,
   IWebBrowserCoolDownResult,
   IWebBrowserCustomTabsResults,
@@ -39,6 +41,10 @@ export type INativeWebBrowserModule = {
     browserPackage?: string,
   ): Promise<IWebBrowserMayInitWithUrlResult>;
   getCustomTabsSupportingBrowsersAsync?(): Promise<IWebBrowserCustomTabsResults>;
+  // Web only upstream, neither native platform registers it
+  maybeCompleteAuthSession?(
+    options: IWebBrowserCompleteAuthSessionOptions,
+  ): IWebBrowserCompleteAuthSessionResult;
 };
 
 export const expoWebBrowser = requireNativeModule<INativeWebBrowserModule>(

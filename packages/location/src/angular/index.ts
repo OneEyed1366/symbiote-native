@@ -1,4 +1,8 @@
-// @symbiote-native/location/angular: the Angular entry over the framework-agnostic core. Same
-// reasoning as the React/Vue entries — no per-instance state or event stream to wrap in a
-// service, so this is a plain re-export.
+// @symbiote-native/location/angular: the core plus the permission services, the location
+// streams need no service wrapper
 export * from '../core';
+export {
+  ForegroundPermissionsService,
+  BackgroundPermissionsService,
+  MotionActivityPermissionsService,
+} from './services/location-permissions.service';

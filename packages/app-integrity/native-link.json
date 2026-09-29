@@ -1,0 +1,12 @@
+{
+  "android": {
+    "gradleProjectName": "expo-app-integrity",
+    "modules": [
+      {
+        "importPath": "expo.modules.integrity.IntegrityModule",
+        "className": "IntegrityModule",
+        "nativeName": "ExpoAppIntegrity"
+      }
+    ]
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "allow": [
+    {
+      "path": "packages/audio/src/svelte/use-audio-stream.svelte.ts",
+      "why": "$effect is a compiler macro and can't be passed by reference, so it needs its own cleanups-array shim not shareable with Solid/Vue/Angular's use-audio-stream.ts bodies, approved by the user 2026-09-29"
+    }
+  ]
+}

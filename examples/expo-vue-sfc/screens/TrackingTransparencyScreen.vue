@@ -1,15 +1,12 @@
 <!--
-  @symbiote-native/tracking-transparency tour stop — usePermissions() auto-fetches the current
-  status on mount; get()/request() re-fetch on demand. getAdvertisingId() is a plain synchronous
-  core call that may return null (iOS Simulator, not yet authorized, or declined). Vue SFC twin of
-  ../../react/screens/TrackingTransparencyScreen.tsx.
+  `getAdvertisingId()` may return null: iOS Simulator, not yet authorized, or declined
 -->
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import {} from '@symbiote-native/vue';
 import {
   getAdvertisingId,
-  usePermissions,
+  useTrackingPermissions,
 } from '@symbiote-native/tracking-transparency/vue';
 import ActionButton from '../components/ActionButton.vue';
 import { ROUTE_NAME } from '../routes';
@@ -20,7 +17,7 @@ type ICapabilityStatus = 'checking' | 'yes' | 'no';
 const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.TrackingTransparency];
 const lineColor = LINE_COLOR[lineInfo.line];
 
-const { status, get, request } = usePermissions();
+const [status, request, get] = useTrackingPermissions();
 const advertisingId = ref<string | null>(getAdvertisingId());
 
 const statusText = computed(() => status.value?.status ?? 'checking…');

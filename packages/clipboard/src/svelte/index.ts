@@ -5,4 +5,5 @@
 // adapters/svelte/src/runes (never `hooks/`/`composables/`, those are React's and Vue's terms).
 
 export { useClipboard } from './runes/use-clipboard.svelte';
+export { default as ClipboardPasteButton } from './clipboard-paste-button.svelte';
 export * from '../core';

@@ -1,2 +1,4 @@
-// No per-instance state or event stream to wrap in an injectable service - plain re-export.
 export * from '../core';
+export { PreventScreenCaptureService } from './services/prevent-screen-capture.service';
+export { ScreenshotListenerService } from './services/screenshot-listener.service';
+export { PermissionsService } from './services/permissions.service';

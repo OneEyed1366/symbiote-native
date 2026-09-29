@@ -1243,6 +1243,48 @@ not yet implemented — this section is the map for whoever ports these next.
 }
 ```
 
+## 13. A Svelte permission-hook factory can't cross a package boundary in tests
+
+```
+§13_svelte_rune_factory_boundary := {
+  found: "2026-09-28, porting useCalendarPermissions/useMediaLibraryPermissions to Svelte",
+  bug: "a `createPermissionHook(methods)` factory using $state/$effect, exported from
+        @symbiote-native/svelte and imported by name from a wrapper package, throws
+        `rune_outside_svelte` at test time",
+  cause: "`svelte-compile.test-helper.ts` only runs the real rune-desugaring compiler on files
+          reached via a RELATIVE `.svelte`-suffixed specifier walk from the compiled app source;
+          a bare package import (`@symbiote-native/svelte`) resolves to raw, undesugared source",
+  not_a_svelte_limit: "confirmed via vite-plugin-svelte docs - real bundlers (and Metro, same
+                       mechanism) compile .svelte.ts rune modules found in node_modules BY
+                       DEFAULT (dynamicCompileOptions exists specifically to EXCLUDE them) - this
+                       is a deliberate scope-limit of this repo's minimal test harness only",
+  fix: "keep the factory PACKAGE-LOCAL: `packages/<pkg>/src/svelte/create-permission-hook.svelte.ts`,
+        imported by sibling hooks via a relative specifier (`from './create-permission-hook.svelte'`) -
+        stays inside the harness's walk, gets desugared. Cross-package duplication of this one
+        small file is unavoidable and pre-approved in `.claude/reuse.json`
+        (`packages/*/src/svelte/create-permission-hook.svelte.ts`)",
+  rule: "any future Svelte rune-based helper meant to be shared across Expo-wrapper packages hits
+         this same wall - don't try the adapter-level export again without fixing the harness first",
+}
+```
+
+## 14. The local expo source checkout lags the pinned dependency - check versions before trusting "upstream has no X"
+
+```
+§14_stale_vendor := {
+  found: "2026-09-29, expo-audio: AudioStream/useAudioStream looked fabricated",
+  cause: "the shared local expo checkout sat at sdk-55 (55.x for every package) while
+          pnpm-workspace.yaml pins sdk-57 (57.x); 57.0.4 really ships AudioStream on iOS/Android/JS",
+  rule: "before any claim 'upstream has no X' / 'not in upstream': compare the checkout's
+         packages/<name>/package.json version with the catalog pin; the installed copy under
+         node_modules/.pnpm/<name>@<pin>*/node_modules/<name> is ground truth",
+  find_commit: "the commit for a pin is the one whose package.json holds that version
+                (`git log --all -S'\"version\": \"<pin>\"'`, take the parent when the hit is the bump
+                AWAY from it); read files with `git show <commit>:packages/<name>/<path>`",
+  note: "expo-modules-core 57.0.5 has no commit in the checkout - use node_modules",
+}
+```
+
 ## References
 
 - `symbiote-new-package-skeleton` — read FIRST if the package doesn't exist yet at all: resolves

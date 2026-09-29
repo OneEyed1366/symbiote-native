@@ -1,4 +1,4 @@
-import { UnavailabilityError } from 'expo-modules-core';
+import { Platform, UnavailabilityError } from 'expo-modules-core';
 import type { EventSubscription } from 'expo-modules-core';
 
 import { CLIPBOARD_CHANGED_EVENT_NAME, expoClipboard } from './native-module';
@@ -162,6 +162,12 @@ export function addClipboardListener(
 ): EventSubscription {
   return expoClipboard.addListener(CLIPBOARD_CHANGED_EVENT_NAME, listener);
 }
+
+/** Whether `ClipboardPasteButton` can render, needs iOS 16 or newer */
+export const isPasteButtonAvailable: boolean = Platform.select({
+  ios: expoClipboard.isPasteButtonAvailable ?? false,
+  default: false,
+});
 
 /**
  * Removes the listener added by `addClipboardListener`.

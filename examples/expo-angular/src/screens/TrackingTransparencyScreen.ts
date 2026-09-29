@@ -1,20 +1,14 @@
 import { Component, inject, signal } from '@angular/core';
 import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import {
-  PermissionsService,
+  TrackingPermissionsService,
   getAdvertisingId,
 } from '@symbiote-native/tracking-transparency/angular';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
-/**
- * @symbiote-native/tracking-transparency canary demo: a permission card driven by
- * PermissionsService (connect() auto-fetches once; get()/request() are imperative one-shot
- * methods), plus the synchronous getAdvertisingId() — null on the iOS Simulator, before
- * authorization, or when the user declined. Angular twin of
- * ../../react/screens/TrackingTransparencyScreen.tsx.
- */
+// `getAdvertisingId()` is null on the iOS Simulator, before authorization, or when declined
 @Component({
   selector: 'TrackingTransparencyScreen',
   standalone: true,
@@ -102,7 +96,7 @@ export class TrackingTransparencyScreen {
   readonly lineColor = LINE_COLOR[this.lineInfo.line];
   readonly heroBadgeStyle = { backgroundColor: this.lineColor };
 
-  private readonly permissionsService = inject(PermissionsService);
+  private readonly permissionsService = inject(TrackingPermissionsService);
   readonly status = this.permissionsService.connect();
 
   readonly advertisingId = signal<string | null>(getAdvertisingId());

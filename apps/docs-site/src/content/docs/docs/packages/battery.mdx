@@ -11,9 +11,8 @@ the [slider](/docs/packages/slider/) (a native **view**) or [splash screen](/doc
 (one imperative **TurboModule**), `expo-battery` is built on `expo-modules-core` — a pure async-function
 
 - `EventEmitter` surface, no Fabric view or `ViewConfig` involved. Like [sensors](/docs/packages/sensors/),
-  battery exposes three independent subscriptions (level, state, low-power-mode) rather than one
-  combined hook — matching upstream's own `useBatteryLevel`/`useBatteryState`/`useLowPowerMode` being
-  three separate hooks, not one.
+  battery exposes three independent subscriptions (level, state, low-power-mode), each with its own
+  hook, plus `usePowerState`, which merges all three into one `PowerState` value.
 
 | OS platform | Support |
 | ----------- | ------- |
@@ -329,6 +328,7 @@ const { batteryLevel, batteryState, lowPowerMode } = await getPowerStateAsync();
 | `useBatteryLevel` | `useBatteryLevel` | `BatteryLevelService.connect()` | `useBatteryLevel`  | `createBatteryLevel` | `()`      | Live battery level — `number` (React), `Ref<number>` (Vue), `Signal<number>` (Angular), `{ readonly current: number }` (Svelte), `Accessor<number>` (Solid), seeded `-1`                 |
 | `useBatteryState` | `useBatteryState` | `BatteryStateService.connect()` | `useBatteryState`  | `createBatteryState` | `()`      | Live `BatteryState` — plain value (React/Vue `Ref`), `Signal<BatteryState>` (Angular), `{ readonly current: BatteryState }` (Svelte), `Accessor<BatteryState>` (Solid), seeded `UNKNOWN` |
 | `useLowPowerMode` | `useLowPowerMode` | `LowPowerModeService.connect()` | `useLowPowerMode`  | `createLowPowerMode` | `()`      | Live `boolean` — plain value (React/Vue `Ref`), `Signal<boolean>` (Angular), `{ readonly current: boolean }` (Svelte), `Accessor<boolean>` (Solid), seeded `false`                       |
+| `usePowerState`   | `usePowerState`   | `PowerStateService.connect()`   | `usePowerState`    | `createPowerState`   | `()`      | Live `PowerState` (`{ lowPowerMode, batteryLevel, batteryState }`) in each adapter's own box, seeded `{ false, -1, UNKNOWN }`                                                            |
 
 Angular's `connect()` returns a `Signal` — read it as `batteryLevel()` in code or in a template,
 same as every other `connect()`-based service in this project. Solid's `create*` primitives return
@@ -382,15 +382,17 @@ free functions and event-name constants are hand-ported, verbatim, into this pac
 
 ```
 packages/battery/src/
-├── core/              isAvailableAsync/getBatteryLevelAsync/getBatteryStateAsync/
-│                       isLowPowerModeEnabledAsync/isBatteryOptimizationEnabledAsync/
-│                       getPowerStateAsync + addBatteryLevelListener/addBatteryStateListener/
-│                       addLowPowerModeListener; native-module.ts resolves the single
-│                       `ExpoBattery` native module via expo-modules-core's requireNativeModule
-├── react/hooks/        @symbiote-native/battery/react   — useBatteryLevel, useBatteryState, useLowPowerMode
-├── vue/composables/    @symbiote-native/battery/vue     — useBatteryLevel, useBatteryState, useLowPowerMode (same names)
-├── svelte/runes/       @symbiote-native/battery/svelte  — useBatteryLevel, useBatteryState, useLowPowerMode (same names)
-└── angular/services/   @symbiote-native/battery/angular — BatteryLevelService, BatteryStateService, LowPowerModeService
+|-- core/              isAvailableAsync/getBatteryLevelAsync/getBatteryStateAsync/
+|                       isLowPowerModeEnabledAsync/isBatteryOptimizationEnabledAsync/
+|                       getPowerStateAsync + addBatteryLevelListener/addBatteryStateListener/
+|                       addLowPowerModeListener; watchPowerState merges the three for usePowerState;
+|                       native-module.ts resolves the single `ExpoBattery` native module via
+|                       expo-modules-core's requireNativeModule
+|-- react/hooks/        @symbiote-native/battery/react   - useBatteryLevel, useBatteryState, useLowPowerMode, usePowerState
+|-- vue/composables/    @symbiote-native/battery/vue     - same four names
+|-- svelte/runes/       @symbiote-native/battery/svelte  - same four names
+|-- solid/primitives/   @symbiote-native/battery/solid   - createBatteryLevel, createBatteryState, createLowPowerMode, createPowerState
+`-- angular/services/   @symbiote-native/battery/angular - BatteryLevelService, BatteryStateService, LowPowerModeService, PowerStateService
 ```
 
 Each adapter's hook/composable/rune/service is a thin lifecycle wrapper — seed from the one-shot

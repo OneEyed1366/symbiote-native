@@ -23,6 +23,8 @@ export type IPrintOptions = {
   printerUrl?: string;
   /** Uses UIMarkupTextPrintFormatter instead of WebView — no images. iOS only. */
   useMarkupFormatter?: boolean;
+  /** @deprecated Use `useMarkupFormatter` instead. iOS only */
+  markupFormatterIOS?: string;
   orientation?: string;
   margins?: IPageMargins;
 };

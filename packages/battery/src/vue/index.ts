@@ -7,4 +7,5 @@
 export { useBatteryLevel } from './composables/use-battery-level';
 export { useBatteryState } from './composables/use-battery-state';
 export { useLowPowerMode } from './composables/use-low-power-mode';
+export { usePowerState } from './composables/use-power-state';
 export * from '../core';

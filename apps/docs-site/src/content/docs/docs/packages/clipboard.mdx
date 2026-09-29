@@ -397,7 +397,9 @@ every other SymbioteNative component (see [how it works](/docs/how-it-works/)). 
 itself is never vendored or copied — `expo-modules-autolinking` resolves it straight out of
 `node_modules` (see [the native setup guide](/docs/howtos/expo-native-module-setup/)).
 
-Upstream's `ClipboardPasteButton` (a native paste-button view, iOS 16+) is **not** ported in this
-pass — it would follow the [third-party native-view wrapper](/docs/packages/slider/#how-the-wrapper-works)
-recipe, not this package's `expo-modules-core` one, since it's a real Fabric view rather than an
-event/async surface.
+`ClipboardPasteButton` (the `UIPasteControl` view, iOS 16+) is ported on every adapter. It is an
+Expo native view: the core registers it through `requireNativeViewManager` when it renders, and it
+paints nothing on Android. Check `isPasteButtonAvailable` before rendering it, give it a width and
+a height in `style`, and style it through `backgroundColor`, `foregroundColor`, `cornerStyle` and
+`displayMode` since Apple restricts the control. `onPress` receives `{ type: 'text', text }` or
+`{ type: 'image', data, size }`: Vue takes `@press`, Angular `[onPress]`, the others `onPress`.

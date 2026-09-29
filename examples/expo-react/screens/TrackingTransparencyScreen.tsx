@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   getAdvertisingId,
-  usePermissions,
+  useTrackingPermissions,
 } from '@symbiote-native/tracking-transparency/react';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
@@ -16,16 +16,13 @@ function ValueRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-/**
- * @symbiote-native/tracking-transparency canary demo: usePermissions() auto-fetches status on
- * mount and exposes get/request as imperative callbacks; getAdvertisingId() is a plain sync
- * call fetched once on mount, expected to read null on Android/the iOS simulator.
- */
+// `getAdvertisingId()` reads null on Android and the iOS simulator
+
 export function TrackingTransparencyScreen() {
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.TrackingTransparency];
   const lineColor = LINE_COLOR[lineInfo.line];
 
-  const [status, requestPermission, getPermission] = usePermissions();
+  const [status, requestPermission, getPermission] = useTrackingPermissions();
   const [advertisingId, setAdvertisingId] = useState<string | null>(null);
 
   useEffect(() => {

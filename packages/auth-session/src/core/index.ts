@@ -51,6 +51,39 @@ export {
   type ITokenResponseConfig,
   type ITokenType,
 } from './token-request.types';
+export {
+  AUTH_CELL_CHANGE,
+  createAutoDiscoveryController,
+  createLoadedRequestController,
+  createRequestResultController,
+} from './auth-request-controllers';
+export type {
+  IAuthCell,
+  IAuthRequestClass,
+  ILoadableRequest,
+  IPromptMethod,
+  IRequestResultHolder,
+} from './auth-request-controllers';
+export { GETTER_ARGS, createAuthRequestHooks } from './auth-request-hooks';
+export type {
+  IApply,
+  IAuthHooksKit,
+  IAuthRequestHooks,
+  IAuthResourceController,
+  IBoxedKind,
+  IGetterKind,
+  IHkt,
+} from './auth-request-hooks';
+export { createGoogleExchangeController } from './providers/google-exchange-controller';
+export {
+  resolveFacebookRequestSetup,
+  resolveGoogleRequestSetup,
+  toGoogleIdTokenConfig,
+} from './providers/provider-hook-setup';
+export type {
+  IGoogleExchangeParams,
+  IGoogleRequestSetup,
+} from './providers/provider-hook-setup';
 export type { IProviderAuthRequestConfig } from './providers/provider.types';
 export {
   FacebookAuthRequest,

@@ -10,9 +10,9 @@ React, Vue, Svelte, Solid, and Angular. Built the same way as
 depended on directly and never the `expo` meta-package, why the upstream JS is hand-ported into
 `core/` rather than imported, and how autolinking picks up the native module).
 
-Every export is a plain async function or a module-level listener registration — no hook/
-composable/service to wrap, so the React, Vue, Svelte, Solid, and Angular entry points are plain
-re-exports of the same `core`.
+Every core export is a plain async function or a module-level listener registration. One
+adapter-specific hook - `useLastNotificationResponse` - is ported to all five adapters (originally
+dropped as React-only; since reversed, see "Push-token resync and defaults" below).
 
 ## Install
 
@@ -90,12 +90,19 @@ src/core/                 permissions.ts, tokens.ts, presenter.ts, badge.ts, sch
                           types.ts (I-prefixed, ported from upstream's Notifications.types.ts /
                           Tokens.types.ts / NotificationChannel(Group)Manager.types.ts /
                           NotificationScheduler.types.ts)
-src/angular/index.ts      export * from '../core'
+src/core/last-notification-response.ts  determineNextResponse - the dedup rule every adapter's
+                          useLastNotificationResponse shares
+src/react/hooks/use-last-notification-response/
+src/vue/composables/use-last-notification-response/
+src/solid/primitives/create-last-notification-response.ts
+src/svelte/use-last-notification-response.svelte.ts
+src/angular/services/last-notification-response.service/   LastNotificationResponseService,
+                          connect(): Signal<IMaybeNotificationResponse>
 ```
 
-`./react`, `./vue`, `./svelte`, and `./solid` are `exports`-map aliases straight onto `src/core/`.
-`./angular` stays a physical file/subpath since Angular ships through a separate `ngc`/AOT build
-(`build-ngc/`).
+Every adapter barrel (`src/{react,vue,solid,svelte}/index.ts`, `src/angular/index.ts`) re-exports
+`../core` plus its own `useLastNotificationResponse`/`createLastNotificationResponse`/
+`LastNotificationResponseService`.
 
 ## Use it
 
@@ -197,6 +204,11 @@ registerTaskAsync(taskName: string): Promise<null>
 unregisterTaskAsync(taskName: string): Promise<null>
 ```
 
+Per-adapter: `useLastNotificationResponse()` (React/Vue/Solid/Svelte) /
+`inject(LastNotificationResponseService).connect()` (Angular) - the last tapped/received response,
+deduped by notification identifier, kept in sync with `addNotificationResponseReceivedListener` and
+`addNotificationResponseClearedListener`.
+
 Plus the enums `IosAlertStyle`, `IosAllowsPreviews`, `IosAuthorizationStatus`,
 `AndroidNotificationVisibility`, `AndroidAudioContentType`, `AndroidImportance`,
 `AndroidAudioUsage`, `AndroidNotificationPriority`, `SchedulableTriggerInputTypes`,
@@ -204,28 +216,31 @@ Plus the enums `IosAlertStyle`, `IosAllowsPreviews`, `IosAuthorizationStatus`,
 precedent `@symbiote-native/sensors` uses), and the full `I`-prefixed type surface for content,
 triggers, and native-facing payloads — see `src/core/types.ts`.
 
-## What this port deliberately does not carry over from upstream
+## Push-token resync and defaults
 
-- **No automatic push-token server-resync daemon.** Upstream's `DevicePushTokenAutoRegistration.fx.ts`
-  wires a permanent, module-load background listener that re-POSTs a rolled device token to Expo's
-  push backend with exponential retry/backoff (via the `abort-controller` package), whenever
-  registration was left enabled. This port ships `setAutoServerRegistrationEnabledAsync` (used
-  internally by `getExpoPushTokenAsync`) but not the daemon itself — call `getExpoPushTokenAsync()`
-  again from your own `addPushTokenListener` callback for the same effect, without an unconditional
-  background retry loop and its extra dependency.
-- **No `expo-constants`/`expo-application` defaults.** Upstream's `getExpoPushTokenAsync` fills in
-  `projectId` from `Constants.expoConfig.extra.eas.projectId` and `applicationId` from
-  `Application.applicationId` when omitted. Neither package is part of this port (per the
-  `symbiote-expo-native-module` skill, this project depends on `expo-modules-core` only) — pass
-  both explicitly. [`@symbiote-native/application`](../application)'s own `applicationId` export
-  covers the second one.
-- **No `useLastNotificationResponse` React hook.** This package's whole surface is
-  adapter-agnostic plain functions by design — read the last response with
-  `getLastNotificationResponse()` and subscribe to changes with
-  `addNotificationResponseClearedListener`/`addNotificationResponseReceivedListener` directly in
-  whichever lifecycle your framework prefers.
-- **The deprecated `*Async` aliases for `getLastNotificationResponse`/`clearLastNotificationResponse`**
-  are not ported — call the non-`Async` forms upstream itself now recommends.
+- **Token resync is ported, and explicit.** Upstream's `DevicePushTokenAutoRegistration.fx.ts`
+  re-POSTs a rolled device token to Expo's push backend with exponential backoff whenever
+  registration was left enabled. Here it is `installPushTokenAutoRegistration()` (`core/auto-registration.ts`,
+  with the upstream `backoff`/`updateDevicePushTokenAsync` helpers and their tests): idempotent, and
+  installed by `setAutoServerRegistrationEnabledAsync(true)` (so also by `getExpoPushTokenAsync`). Call it
+  once at app startup as well, so a token that rolled while the app was closed is re-sent too. It is
+  explicit rather than a module-load side effect because Metro's `inlineRequires` skips a barrel
+  re-export that nothing names as a value.
+- **`applicationId` and `development` default like upstream**, from
+  [`@symbiote-native/application`](../application) (its `applicationId` and the iOS push-notification
+  service environment). `projectId` still has to be passed: upstream reads it from
+  `expo-constants`, and `@symbiote-native/constants` does not exist yet.
+- **`useLastNotificationResponse` is ported to every adapter** (React, Vue, Solid, Svelte,
+  Angular) - each wraps `getLastNotificationResponse()` +
+  `addNotificationResponseClearedListener`/`addNotificationResponseReceivedListener` with the
+  shared `determineNextResponse` dedup rule from `core/last-notification-response.ts` behind its
+  own lifecycle (hook/composable/primitive/rune/service). Angular's `LastNotificationResponseService`
+  matches `PreventScreenCaptureService`'s `connect()` shape.
+- **The deprecated `getLastNotificationResponseAsync`/`clearLastNotificationResponseAsync`** are ported
+  too, as thin wrappers over the sync forms, exactly like upstream.
+
+## Scope exclusions
+
 - **`SetBadgeCountOptions.web`** (a `badgin` options bag) is web-only; this project targets
   iOS/Android and `setBadgeCountAsync` takes no options here.
 

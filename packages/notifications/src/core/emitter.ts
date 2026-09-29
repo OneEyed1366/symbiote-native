@@ -87,6 +87,16 @@ export function clearLastNotificationResponse(): void {
   emitter.emit(RESPONSE_CLEARED_EVENT, []);
 }
 
+/** @deprecated Use `getLastNotificationResponse` instead */
+export async function getLastNotificationResponseAsync(): Promise<INotificationResponse | null> {
+  return getLastNotificationResponse();
+}
+
+/** @deprecated Use `clearLastNotificationResponse` instead */
+export async function clearLastNotificationResponseAsync(): Promise<void> {
+  clearLastNotificationResponse();
+}
+
 /** Fires whenever `clearLastNotificationResponse` runs. */
 export function addNotificationResponseClearedListener(
   listener: () => void,

@@ -19,7 +19,15 @@ vi.mock('./native-module', () => ({
 // expo-modules-core's real entry transitively imports 'react-native' for Platform/
 // TurboModuleRegistry, whose Flow-typed source Vitest's Oxc transform can't parse — same fake
 // packages/application/src/core/application.test.ts uses.
+const mockPlatform = vi.hoisted(() => ({
+  OS: 'ios',
+  select(spec: Record<string, unknown>): unknown {
+    return spec[this.OS] ?? spec['default'];
+  },
+}));
+
 vi.mock('expo-modules-core', () => ({
+  Platform: mockPlatform,
   UnavailabilityError: class UnavailabilityError extends Error {
     constructor(moduleName: string, propertyName: string) {
       super(`${propertyName} is not available on ${moduleName}`);
@@ -48,6 +56,27 @@ describe('printAsync', () => {
     await expect(printAsync({})).rejects.toThrow(
       'Must provide either `html` or `uri` to print',
     );
+  });
+
+  it('keeps the deprecated markupFormatterIOS on iOS: no html needed, warns, reaches native', async () => {
+    mockPlatform.OS = 'ios';
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    await printAsync({ markupFormatterIOS: '<p>x</p>' });
+    expect(warn).toHaveBeenCalledWith(
+      'The markupFormatterIOS option is deprecated. Use useMarkupFormatter instead.',
+    );
+    expect(FAKE_NATIVE_PRINT.print).toHaveBeenCalledWith({
+      markupFormatterIOS: '<p>x</p>',
+    });
+    warn.mockRestore();
+  });
+
+  it('still needs html or uri on Android even with markupFormatterIOS', async () => {
+    mockPlatform.OS = 'android';
+    await expect(printAsync({ markupFormatterIOS: 'x' })).rejects.toThrow(
+      'Must provide either `html` or `uri` to print',
+    );
+    mockPlatform.OS = 'ios';
   });
 
   it('rejects when both uri and html are given', async () => {

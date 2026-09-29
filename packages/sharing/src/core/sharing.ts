@@ -1,7 +1,11 @@
 import { UnavailabilityError } from 'expo-modules-core';
 
 import { expoSharing } from './native-module';
-import type { ISharingOptions } from './types';
+import type {
+  IResolvedSharePayload,
+  ISharePayload,
+  ISharingOptions,
+} from './types';
 
 const NATIVE_MODULE_NAME = 'expo-sharing';
 
@@ -36,6 +40,34 @@ export async function shareAsync(
     throw new UnavailabilityError(NATIVE_MODULE_NAME, 'shareAsync');
   }
   await expoSharing.shareAsync(url, options);
+}
+
+// Empty until the host app carries the share target (iOS Share Extension, Android intent filters)
+export function getSharedPayloads(): ISharePayload[] {
+  if (!expoSharing.getSharedPayloads) {
+    throw new UnavailabilityError(NATIVE_MODULE_NAME, 'getSharedPayloads');
+  }
+  return expoSharing.getSharedPayloads();
+}
+
+// Adds display details per payload, resolving a shared URL may need the network
+export async function getResolvedSharedPayloadsAsync(): Promise<
+  IResolvedSharePayload[]
+> {
+  if (!expoSharing.getResolvedSharedPayloadsAsync) {
+    throw new UnavailabilityError(
+      NATIVE_MODULE_NAME,
+      'getResolvedSharedPayloadsAsync',
+    );
+  }
+  return expoSharing.getResolvedSharedPayloadsAsync();
+}
+
+export function clearSharedPayloads(): void {
+  if (!expoSharing.clearSharedPayloads) {
+    throw new UnavailabilityError(NATIVE_MODULE_NAME, 'clearSharedPayloads');
+  }
+  expoSharing.clearSharedPayloads();
 }
 
 // Not in upstream, which hands anything straight to the native module. An empty or non-string

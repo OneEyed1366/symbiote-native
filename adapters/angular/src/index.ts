@@ -224,7 +224,17 @@ export type {
   ITaskCanceller,
   ITaskCancelProvider,
 } from './modules/app-registry';
-export { ColorSchemeService, WindowDimensionsService } from './services';
+export {
+  ColorSchemeService,
+  WindowDimensionsService,
+  createResourceHook,
+  createEventValueHook,
+  connectWatchedSignal,
+  PermissionsServiceBase,
+} from './services';
+export { AccessibilityInputsBase } from './accessibility-inputs';
+export { NativeViewBase } from './native-view-base';
+export { anchorStyleProp } from './primitives/shared';
 
 // Framework-agnostic runtime modules from @symbiote-native/engine. Every adapter re-exports them so
 // app code names only @symbiote-native/angular.

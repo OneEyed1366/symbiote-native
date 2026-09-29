@@ -23,6 +23,7 @@
     { "path": "packages/sms" },
     { "path": "packages/haptics" },
     { "path": "packages/clipboard" },
+    { "path": "packages/constants" },
     { "path": "packages/battery" },
     { "path": "packages/brightness" },
     { "path": "packages/cellular" },
@@ -46,6 +47,9 @@
     { "path": "packages/notifications" },
     { "path": "packages/sqlite" },
     { "path": "packages/asset" },
-    { "path": "packages/font" }
+    { "path": "packages/font" },
+    { "path": "packages/age-range" },
+    { "path": "packages/app-integrity" },
+    { "path": "packages/app-metrics" }
   ]
 }

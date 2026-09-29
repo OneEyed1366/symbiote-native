@@ -104,6 +104,25 @@ describe('setAudioModeAsync', () => {
       playsInSilentMode: true,
     });
   });
+
+  it('falls back to the deprecated interruptionModeAndroid on Android', async () => {
+    mockPlatform.OS = 'android';
+    await setAudioModeAsync({ interruptionModeAndroid: 'duckOthers' });
+    expect(FAKE_EXPO_AUDIO.setAudioModeAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ interruptionMode: 'duckOthers' }),
+    );
+  });
+
+  it('prefers interruptionMode over the deprecated field', async () => {
+    mockPlatform.OS = 'android';
+    await setAudioModeAsync({
+      interruptionMode: 'doNotMix',
+      interruptionModeAndroid: 'duckOthers',
+    });
+    expect(FAKE_EXPO_AUDIO.setAudioModeAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ interruptionMode: 'doNotMix' }),
+    );
+  });
 });
 
 describe('requestNotificationPermissionsAsync', () => {

@@ -3,7 +3,7 @@ import type { Ref } from 'vue';
 import {} from '@symbiote-native/vue';
 import {
   getAdvertisingId,
-  usePermissions,
+  useTrackingPermissions,
 } from '@symbiote-native/tracking-transparency/vue';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
@@ -18,18 +18,14 @@ function ValueRow(props: { label: string; value: string }) {
   );
 }
 
-/**
- * Tracking Transparency demo: @symbiote-native/tracking-transparency/vue's usePermissions
- * composable auto-fetches the current status on mount; get()/request() re-fetch on demand.
- * getAdvertisingId() is a plain synchronous core call, may be null (simulator, not authorized).
- */
+// `getAdvertisingId()` may be null: simulator or not authorized
 export const TrackingTransparencyScreen = defineComponent(
   () => {
     const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.TrackingTransparency];
     const lineColor =
       LINE_COLOR[ROUTE_LINE_INFO[ROUTE_NAME.TrackingTransparency].line];
 
-    const { status, get, request } = usePermissions();
+    const [status, request, get] = useTrackingPermissions();
     const advertisingId: Ref<string | null> = ref(getAdvertisingId());
 
     function handleGet() {

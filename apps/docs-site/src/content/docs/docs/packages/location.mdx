@@ -11,8 +11,8 @@ SymbioteNative adapter can read foreground position, heading, and motion activit
 addresses, and run background location updates or geofencing — registered as tasks through
 [`@symbiote-native/task-manager`](/docs/packages/task-manager/).
 
-Every export is a plain async function or a permission hook with no adapter-specific state — every
-adapter's entry point is a plain re-export of the same core.
+Functions and streams live in a shared core. The three permission hooks are per-adapter, and
+Angular gets one `*PermissionsService` each.
 
 | OS platform | Support |
 | ----------- | ------- |
@@ -109,8 +109,9 @@ if (granted) {
 }
 ```
 
-Identical import surface on every adapter — `@symbiote-native/location/react`, `/vue`, `/svelte`,
-`/solid`, `/angular` all re-export the same functions.
+Identical function surface on every adapter: `@symbiote-native/location/react`, `/vue`, `/svelte`,
+`/solid`, `/angular`. Permission hooks return the adapter's own reactive box; on Angular inject the
+matching service and call `connect()` for a signal.
 
 ## API
 
@@ -131,6 +132,7 @@ useBackgroundPermissions(options?)
 hasServicesEnabledAsync(): Promise<boolean>
 getMotionActivityPermissionsAsync() / requestMotionActivityPermissionsAsync(): Promise<PermissionResponse>
 useMotionActivityPermissions(options?)
+installWebGeolocationPolyfill(): void
 getMotionActivityAsync(): Promise<IMotionActivityObject>
 watchMotionActivityAsync(callback, errorHandler?): Promise<ILocationSubscription>       // foreground only
 isBackgroundLocationAvailableAsync(): Promise<boolean>

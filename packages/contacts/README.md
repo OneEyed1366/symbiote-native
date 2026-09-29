@@ -57,13 +57,22 @@ for the full table; nothing package-specific here.
 
 </details>
 
+## ContactAccessButton
+
+Every adapter exports `ContactAccessButton` from its own entry (`/react`, `/vue`, `/solid`,
+`/svelte`, `/angular`), plus `ContactAccessButton.isAvailable()`. The button is a native view,
+iOS 18+ only, and renders nothing on any other platform or version.
+
+Props: `query`, `caption` (`default` / `email` / `phone`), `ignoredEmails`,
+`ignoredPhoneNumbers`, `tintColor`, `backgroundColor`, `textColor`, `style`, `testID`,
+`nativeID`, `onLayout`, the accessibility and aria props and the responder props.
+
+The view is registered lazily, at the first render: bundlers that inline requires drop a barrel's
+load-time side effects. Verifying it on a real iOS 18 device is the app owner's step.
+
 ## What's not ported
 
-- **`ContactAccessButton`** - a real native VIEW component (`requireNativeView`, iOS-only,
-  a `React.PureComponent`). Per `<third_party_rn_packages_are_react_only>`, a native-view-backed
-  React component is out of scope for a module-only (`symbiote-expo-native-module`) wrapper; it
-  would need the `symbiote-third-party-native-view` recipe as a separate follow-up. Its own
-  native module (`ExpoContactAccessButton`) is not referenced anywhere in this package.
+Nothing from `expo-contacts`' public surface.
 
 ## Platform availability (next API)
 

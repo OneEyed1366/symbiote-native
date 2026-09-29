@@ -159,6 +159,12 @@ await WebBrowser.coolDownAsync(servicePackage);
 `useProxyActivity`; iOS's `controlsColor`, `dismissButtonStyle`, `readerMode`, `presentationStyle`.
 `IAuthSessionOpenOptions` adds iOS's `preferEphemeralSession` and `preferUniversalLinks`.
 
+## maybeCompleteAuthSession
+
+Ported so shared code that calls it at module scope, as Expo apps do, keeps working. It closes the
+web popup of an auth session, so on iOS and Android it returns
+`{ type: 'failed', message: 'Not supported on this platform' }`.
+
 ## Not ported
 
 - **The `experimentalLauncherActivity` config plugin.** Upstream's
@@ -168,10 +174,6 @@ await WebBrowser.coolDownAsync(servicePackage);
   upstream and unnecessary for `openBrowserAsync`, `openAuthSessionAsync`, or anything else on this
   page, so this package does not reproduce it. An app that genuinely wants that workaround adds the
   activity by hand.
-- **`maybeCompleteAuthSession`.** Genuinely web-only: it closes the `window.open` popup the web
-  implementation of `openAuthSessionAsync` created. On a native platform upstream's own version can
-  only ever return `{ type: 'failed', message: 'Not supported on this platform' }`, so it is left
-  out rather than shipped as a function that can never succeed.
 - **The web-only open options** `windowName` and `windowFeatures`, for the same reason —
   SymbioteNative has no web target, so nothing could read them.
 

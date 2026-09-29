@@ -2,12 +2,10 @@
 
 A wrapper package for [SymbioteNative](../../README.md) that makes
 [`expo-audio`](https://github.com/expo/expo/tree/main/packages/expo-audio) usable from **every**
-adapter — React, Vue, Svelte, Solid, and Angular. `AudioPlayer`, `AudioRecorder`, `AudioPlaylist`,
-and `AudioStream` are JSI-backed `SharedObject` instances — per-instance native objects with real
-state and methods, not one-shot functions — so there is no hook/composable/service wrapper here
-either: the React, Vue, Svelte, Solid, and Angular entry points are plain re-exports of the same
-`core`, and each adapter's own lifecycle code (the equivalent of upstream's `useAudioPlayer`)
-decides when to create one and when to call `.remove()` / `.destroy()`.
+adapter - React, Vue, Svelte, Solid, and Angular. `AudioPlayer`, `AudioRecorder`, `AudioPlaylist`,
+and `AudioStream` are JSI-backed `SharedObject` instances - per-instance native objects with real
+state and methods, not one-shot functions. Every upstream lifecycle-wrapper hook, including
+`useAudioStream`, is ported to every adapter (see "Hooks" below).
 
 ## Install
 
@@ -144,11 +142,10 @@ recorder.addListener(RECORDING_STATUS_UPDATE, status => console.log(status));
 await recorder.stop();
 ```
 
-Playlist and real-time PCM streaming follow the same `create*` + `addListener` shape:
-`createAudioPlaylist({ sources: [...], loop: 'all' })` and `createAudioStream()` — the stream
-factory takes no `onBuffer` callback (unlike upstream's `useAudioStream` hook); subscribe with
-`stream.addListener(AUDIO_STREAM_BUFFER, ...)` after `stream.start()`, same as every other event
-on these classes.
+Playlist follows the same `create*` + `addListener` shape: `createAudioPlaylist({ sources: [...],
+loop: 'all' })`. Real-time PCM streaming has both a bare factory (`createAudioStream()` plus
+`stream.addListener(AUDIO_STREAM_BUFFER, ...)` after `stream.start()`) and the full
+`useAudioStream(options)` hook on every adapter, see "Hooks" below.
 
 Identical import surface on every adapter — `@symbiote-native/audio/react`, `/vue`, `/svelte`,
 `/solid`, `/angular` all re-export the same classes and functions.
@@ -224,17 +221,39 @@ barrel — see `src/core/types.ts`.
 option is ported too: the player starts with no source and `replace()`s it once
 `Asset.downloadAsync()` resolves a local cache file, same as upstream's `useAudioPlayer`.
 
-## Deliberately not ported
+## Hooks
 
-- **`useAudioPlayer` / `useAudioPlayerStatus` / `useAudioSampleListener` / `useAudioRecorder` /
-  `useAudioRecorderState` / `useAudioPlaylist` / `useAudioPlaylistStatus` / `useAudioStream`** —
-  React hooks, framework-specific by construction. `createAudioPlayer` / `createAudioPlaylist` /
-  `createAudioStream` are the framework-agnostic equivalents each already exposes (upstream's own
-  hooks are thin wrappers over these plus `useReleasingSharedObject` for cleanup-on-unmount); each
-  adapter's own lifecycle wrapper is where a hook/composable/service belongs, per
-  `<components_split_logic_view_lifecycle>` in the root project CLAUDE.md. None ship yet.
-- **`interruptionModeAndroid`** on `IAudioMode` — upstream marks it `@deprecated`, superseded by
-  the cross-platform `interruptionMode`.
+Every upstream hook is ported to all five adapters (Angular names each `injectX` per its own
+`injectX` convention). Framework-name suffix is dropped below; read `useAudioPlayer` as
+`useAudioPlayer`/`injectAudioPlayer` depending on adapter.
+
+- **`useAudioPlayer(source?, options?)`** - resource lifecycle (recreate-on-source-change, dispose
+  the stale one), via `createResourceController`/`createResourceHook` in
+  `core/audio-player-controller.ts`.
+- **`useAudioPlayerStatus(player)`** - subscribes to `playbackStatusUpdate`, via the shared
+  `createEventValueHook` factory (`core/index.ts`'s `IEventValueSource` contract).
+- **`useAudioSampleListener(player, listener)`** - enables sampling and subscribes to
+  `audioSampleUpdate`, via `subscribeAudioSampleListener` in `core/audio-sample-listener.ts`.
+- **`useAudioPlaylist(options?)`** - same resource-lifecycle shape as `useAudioPlayer`, via
+  `core/audio-playlist-controller.ts`.
+- **`useAudioPlaylistStatus(playlist)`** - subscribes to `playlistStatusUpdate`, same
+  `createEventValueHook` factory.
+- **`useAudioRecorder(options, statusListener?)`** - resource lifecycle plus a
+  `recordingStatusUpdate` subscription, via `core/audio-recorder-controller.ts` and
+  `subscribeRecordingStatus` in `core/audio-recorder-status.ts`.
+- **`useAudioRecorderState(recorder, interval?)`** - polls `recorder.getStatus()` and only writes
+  a meaningful change, via `pollRecorderState`/`shouldUpdateRecorderState` in
+  `core/audio-recorder-polling.ts`.
+- **`useAudioStream(options)`** - resource lifecycle keyed on `{sampleRate, channels, encoding}`
+  plus an `audioStreamStatus`/`audioStreamBuffer` subscription, via `createAudioStreamHooks`/
+  `runAudioStreamBufferEffect` in `core/audio-stream-hooks.ts`/`core/audio-stream-lifecycle.ts`.
+
+Every adapter shares the framework-agnostic diffing/subscription logic from `core/`; only the
+lifecycle primitive differs (React/Solid/Vue/Angular's own `createResourceHook`/
+`createEventValueHook`, Svelte's from `@symbiote-native/svelte/runes/*`).
+
+## Scope exclusions
+
 - **Web-only surfaces** (`ExpoAudio.web.ts`, `AudioPlayer.web.ts`, `AudioStream.web.ts`,
   `MediaSessionController.web.ts`) — this project targets iOS + Android only.
 

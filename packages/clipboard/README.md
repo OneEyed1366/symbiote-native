@@ -257,7 +257,8 @@ removeClipboardListener(subscription: EventSubscription) // deprecated, use subs
 ```
 
 Plus `ContentType`, `StringFormat`, `IGetStringOptions`, `ISetStringOptions`, `IGetImageOptions`,
-`IClipboardImage`, `IClipboardEvent` — ported from upstream's `Clipboard.types.ts`, renamed with
+`IClipboardImage`, `IClipboardEvent`, `IAcceptedContentType`, `ICornerStyle`, `IDisplayMode` and
+`IPasteEventPayload`, ported from upstream's `Clipboard.types.ts`, renamed with
 this repo's `I`-prefix convention for exported types (`ts-js-best-practices`); `ContentType` and
 `StringFormat` stay unprefixed enums, matching `AuthenticationType`/`SecurityLevel` in
 `@symbiote-native/local-auth`.
@@ -284,9 +285,32 @@ import { ClipboardService } from '@symbiote-native/clipboard/angular';
 readonly clipboardEvent = inject(ClipboardService).connect(); // Signal<IClipboardEvent | null>
 ```
 
-`ClipboardPasteButton` (upstream's native paste-button view component, iOS 16+) is **not**
-ported — out of scope for this pass. If it's ever wrapped, it follows
-`symbiote-third-party-native-view`, not this package's `expo-modules-core` recipe.
+### ClipboardPasteButton
+
+`UIPasteControl`, iOS 16+, lets the user paste without the system permission prompt. It renders
+nothing on Android, and `isPasteButtonAvailable` (from the package root) tells whether the device
+supports it. Give it a width and a height in `style`, or it does not appear. Apple restricts the
+control, so `style` takes no `backgroundColor`, `borderRadius` or `color`: use `backgroundColor`,
+`foregroundColor`, `cornerStyle` and `displayMode` instead.
+
+```tsx
+// React, `onPress` gets `{ type: 'text', text }` or `{ type: 'image', data, size }`
+import { ClipboardPasteButton, isPasteButtonAvailable } from '@symbiote-native/clipboard/react';
+
+{isPasteButtonAvailable && (
+  <ClipboardPasteButton
+    style={{ width: 160, height: 44 }}
+    cornerStyle="capsule"
+    acceptedContentTypes={['plain-text', 'image']}
+    onPress={data => (data.type === 'text' ? setText(data.text) : setImage(data.data))}
+  />
+)}
+```
+
+Vue takes `@press`, Angular `[onPress]`, Svelte and Solid `onPress`, all from their own entry
+(`ClipboardPasteButton`). It is an Expo native view reached through `requireNativeViewManager`,
+which the core registers when the button renders. The pasted payload is read through a guard in
+`toPasteEventPayload`, a malformed native event is dropped.
 
 ## Test it
 

@@ -1,4 +1,4 @@
-import { createPermissionHook, Platform } from 'expo-modules-core';
+import { Platform } from 'expo-modules-core';
 import { expoLocation } from './native-module';
 import {
   headingSubscriber,
@@ -147,11 +147,6 @@ export async function requestForegroundPermissionsAsync(): Promise<ILocationPerm
   return expoLocation.requestForegroundPermissionsAsync();
 }
 
-export const useForegroundPermissions = createPermissionHook({
-  getMethod: getForegroundPermissionsAsync,
-  requestMethod: requestForegroundPermissionsAsync,
-});
-
 export async function getBackgroundPermissionsAsync(): Promise<PermissionResponse> {
   return expoLocation.getBackgroundPermissionsAsync();
 }
@@ -159,11 +154,6 @@ export async function getBackgroundPermissionsAsync(): Promise<PermissionRespons
 export async function requestBackgroundPermissionsAsync(): Promise<PermissionResponse> {
   return expoLocation.requestBackgroundPermissionsAsync();
 }
-
-export const useBackgroundPermissions = createPermissionHook({
-  getMethod: getBackgroundPermissionsAsync,
-  requestMethod: requestBackgroundPermissionsAsync,
-});
 
 export async function hasServicesEnabledAsync(): Promise<boolean> {
   return expoLocation.hasServicesEnabledAsync();
@@ -176,11 +166,6 @@ export async function getMotionActivityPermissionsAsync(): Promise<PermissionRes
 export async function requestMotionActivityPermissionsAsync(): Promise<PermissionResponse> {
   return expoLocation.requestMotionActivityPermissionsAsync();
 }
-
-export const useMotionActivityPermissions = createPermissionHook({
-  getMethod: getMotionActivityPermissionsAsync,
-  requestMethod: requestMotionActivityPermissionsAsync,
-});
 
 /** No location permission required — uses Play Services activity recognition / the iOS motion
  *  coprocessor directly. */

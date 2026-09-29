@@ -1,0 +1,56 @@
+const byLabel = (a, b) => a.label.localeCompare(b.label, 'en', { sensitivity: 'base' });
+
+// The `Packages` sidebar group, kept beside the config so adding a package page does not grow it
+export const packagesSidebar = {
+  label: 'Packages',
+  collapsed: true,
+  items: [
+    {
+      label: 'Bare',
+      items: [
+        { label: 'Android host shims', slug: 'docs/packages/android' },
+        { label: 'CSS parser', slug: 'docs/packages/css-parser' },
+        { label: 'Slider', slug: 'docs/packages/slider' },
+        { label: 'Splash screen', slug: 'docs/packages/splash-screen' },
+        { label: 'Test utils', slug: 'docs/packages/test-utils' },
+      ].sort(byLabel),
+    },
+    {
+      label: 'Expo',
+      items: [
+        { label: 'Application', slug: 'docs/packages/application' },
+        { label: 'Audio', slug: 'docs/packages/audio' },
+        { label: 'Background fetch', slug: 'docs/packages/background-fetch' },
+        { label: 'Background task', slug: 'docs/packages/background-task' },
+        { label: 'Battery', slug: 'docs/packages/battery' },
+        { label: 'Brightness', slug: 'docs/packages/brightness' },
+        { label: 'Cellular', slug: 'docs/packages/cellular' },
+        { label: 'Clipboard', slug: 'docs/packages/clipboard' },
+        { label: 'Constants', slug: 'docs/packages/constants' },
+        { label: 'Crypto', slug: 'docs/packages/crypto' },
+        { label: 'Device', slug: 'docs/packages/device' },
+        { label: 'File system', slug: 'docs/packages/file-system' },
+        { label: 'Haptics', slug: 'docs/packages/haptics' },
+        { label: 'Keep awake', slug: 'docs/packages/keep-awake' },
+        { label: 'Local auth', slug: 'docs/packages/local-auth' },
+        { label: 'Localization', slug: 'docs/packages/localization' },
+        { label: 'Location', slug: 'docs/packages/location' },
+        { label: 'Media library', slug: 'docs/packages/media-library' },
+        { label: 'Network', slug: 'docs/packages/network' },
+        { label: 'Notifications', slug: 'docs/packages/notifications' },
+        { label: 'Screen orientation', slug: 'docs/packages/screen-orientation' },
+        { label: 'Secure store', slug: 'docs/packages/secure-store' },
+        { label: 'Sensors', slug: 'docs/packages/sensors' },
+        { label: 'Sharing', slug: 'docs/packages/sharing' },
+        { label: 'SMS', slug: 'docs/packages/sms' },
+        { label: 'SQLite', slug: 'docs/packages/sqlite' },
+        { label: 'Standard web crypto', slug: 'docs/packages/standard-web-crypto' },
+        { label: 'Store review', slug: 'docs/packages/store-review' },
+        { label: 'System UI', slug: 'docs/packages/system-ui' },
+        { label: 'Task manager', slug: 'docs/packages/task-manager' },
+        { label: 'Tracking transparency', slug: 'docs/packages/tracking-transparency' },
+        { label: 'Web browser', slug: 'docs/packages/web-browser' },
+      ].sort(byLabel),
+    },
+  ],
+};

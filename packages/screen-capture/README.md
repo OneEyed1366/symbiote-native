@@ -55,15 +55,21 @@ for the full table; nothing package-specific here.
 ## Shape
 
 ```
-src/core/                 the whole API - native-module.ts resolves ExpoScreenCapture through
-                          expo-modules-core's requireNativeModule.
-src/angular/              @symbiote-native/screen-capture/angular
+src/core/                 the async functions + the shared permissions-runtime get/request wrapper.
+                          native-module.ts resolves ExpoScreenCapture through expo-modules-core's
+                          requireNativeModule.
+src/react/                usePreventScreenCapture + useScreenshotListener + usePermissions (hooks)
+src/vue/                  same three, as composables
+src/solid/                same three, as primitives
+src/svelte/               same three, as runes
+src/angular/              PreventScreenCaptureService + ScreenshotListenerService +
+                          PermissionsService, `connect()` shape matching
+                          `@symbiote-native/keep-awake`/`brightness`'s own services
 ```
 
-`./react`, `./vue`, `./svelte`, and `./solid` are `exports`-map aliases straight onto `src/core/`.
-`usePreventScreenCapture`, `useScreenshotListener`, and `usePermissions` are real React hooks
-(built on `useEffect`/`createPermissionHook`, same §11 class as image-picker's dropped hooks) and
-are not ported, call the plain async functions below directly instead.
+The plain async functions stay framework-agnostic, re-exported by every adapter's own barrel.
+`usePreventScreenCapture`/`useScreenshotListener`/`usePermissions` are ported to **every**
+adapter, not just React, per this project's `components_split_logic_view_lifecycle` convention.
 
 ## Use it
 

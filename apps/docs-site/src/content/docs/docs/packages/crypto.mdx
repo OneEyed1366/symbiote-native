@@ -10,8 +10,9 @@ import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 secure random bytes, `randomUUID`, and string/buffer digest hashing — so every SymbioteNative
 adapter can reach it. Like [local auth](/docs/packages/local-auth/), every function here is a
 plain sync/async call with no per-instance state or event stream — no hook/composable/service to
-reach for. The AES-encryption surface from upstream's `expo-crypto` (its `aes/` subfolder) is out
-of scope for this pass.
+reach for. Upstream's AES-GCM surface (its `aes/` subfolder) is ported too: `AESEncryptionKey`,
+`AESSealedData`, `aesEncryptAsync` and `aesDecryptAsync`, plain classes and functions on every
+adapter.
 
 | OS platform | Support |
 | ----------- | ------- |
@@ -286,6 +287,31 @@ or a subscription.
 | Field      | Type             | Default              | Description                             |
 | ---------- | ---------------- | -------------------- | --------------------------------------- |
 | `encoding` | `CryptoEncoding` | `CryptoEncoding.HEX` | Format the digest string is returned in |
+
+### AES-GCM
+
+```ts
+import {
+  AESEncryptionKey,
+  AESKeySize,
+  aesDecryptAsync,
+  aesEncryptAsync,
+} from '@symbiote-native/crypto';
+
+const key = await AESEncryptionKey.generate(AESKeySize.AES256);
+const sealed = await aesEncryptAsync(plaintextBase64, key);
+const plain = await aesDecryptAsync(sealed, key, { output: 'base64' });
+```
+
+| Symbol                                          | Description                                                                              |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `AESEncryptionKey`                              | `generate(size?)`, `import(bytes)`, `import(string, 'hex' \| 'base64')`, `bytes()`, `encoded()` |
+| `AESSealedData`                                 | `fromParts(iv, ciphertext, tag \| tagLength?)`, `fromCombined(combined, config?)`, `iv()`, `tag()`, `ciphertext()`, `combined()` |
+| `aesEncryptAsync(plaintext, key, options?)`     | `options`: `nonce` (`{ length }` or `{ bytes }`), `tagLength`, `additionalData`          |
+| `aesDecryptAsync(sealedData, key, options?)`    | `options`: `output` (`'bytes'` or `'base64'`), `additionalData`                          |
+
+A string input is base64. `tagLength` is ignored on Apple, where the tag is always 16 bytes, and
+`AESKeySize.AES192` is unsupported on web.
 
 ## Notes
 

@@ -6,7 +6,7 @@ A wrapper package for [SymbioteNative](../../README.md) that makes
 — usable from **every** adapter, React, Vue, Svelte, Solid, and Angular, not just React. Like
 [`@symbiote-native/brightness`](../brightness), this package's surface is mostly stateless free
 async functions; only the permission surface gets its own per-adapter lifecycle wrapper,
-mirroring upstream's own `usePermissions`. Built the same way as
+mirroring upstream's own `useTrackingPermissions`. Built the same way as
 [`@symbiote-native/local-auth`](../local-auth), [`@symbiote-native/battery`](../battery), and
 [`@symbiote-native/brightness`](../brightness) — an `expo-modules-core`-based wrapper (see the
 `symbiote-expo-native-module` project skill for the full mechanism: why `expo-modules-core` is
@@ -74,32 +74,31 @@ module project is included, no extra wiring needed on our side.
 src/core/                 getAdvertisingId, get/requestTrackingPermissionsAsync, isAvailable;
                           native-module.ts resolves ExpoTrackingTransparency through
                           expo-modules-core's requireNativeModule.
-src/react/hooks/           @symbiote-native/tracking-transparency/react   — usePermissions
-src/vue/composables/       @symbiote-native/tracking-transparency/vue     — usePermissions (same name)
-src/svelte/runes/          @symbiote-native/tracking-transparency/svelte  — usePermissions (same name)
-src/solid/primitives/      @symbiote-native/tracking-transparency/solid   — createPermissions
-                           (Solid reserves `use*` for consuming existing state)
-src/angular/services/      @symbiote-native/tracking-transparency/angular — PermissionsService
+src/react/                 @symbiote-native/tracking-transparency/react: useTrackingPermissions
+src/vue/                   @symbiote-native/tracking-transparency/vue: useTrackingPermissions
+src/svelte/                @symbiote-native/tracking-transparency/svelte: useTrackingPermissions
+src/solid/                 @symbiote-native/tracking-transparency/solid: useTrackingPermissions
+src/angular/               @symbiote-native/tracking-transparency/angular: TrackingPermissionsService
 ```
 
-Each adapter's wrapper puts the same one-shot `getTrackingPermissionsAsync`/
-`requestTrackingPermissionsAsync` pair in its own lifecycle idiom (auto-fetch when the wrapper is
-created, exposed as a tuple/object/signal/accessor). `getAdvertisingId`/`isAvailable` are stateless
-free-function re-exports, written once in `core/` and shared verbatim by every adapter.
+Each adapter binds the same `getTrackingPermissionsAsync`/`requestTrackingPermissionsAsync` pair
+(`core/tracking-permission-api.ts`) to the shared `createPermissionHook` of its adapter, or to
+`PermissionsServiceBase` on Angular. `getAdvertisingId`/`isAvailable` are stateless free-function
+re-exports, written once in `core/` and shared verbatim by every adapter.
 
-Upstream's own `createPermissionHook`/`useTrackingPermissions` is **not** ported — that helper is
-React-only (built on `useState`/`useEffect`), and this repo's convention is for each adapter to
-hand-roll its own permission hook instead, exactly like `brightness`/`cellular` already do.
+`useTrackingPermissions` takes upstream's `{ get, request }` options: it fetches on mount by
+default, `{ request: true }` asks instead, `{ get: false }` does nothing until called. Unlike the
+former `usePermissions`, the hooks carry no `error` slot; Angular's service keeps `error`.
 
 ## Use it
 
 ```tsx
 // React
-import { usePermissions } from '@symbiote-native/tracking-transparency/react';
+import { useTrackingPermissions } from '@symbiote-native/tracking-transparency/react';
 import { getAdvertisingId } from '@symbiote-native/tracking-transparency';
 
 function TrackingScreen() {
-  const [permissionStatus, requestPermission] = usePermissions();
+  const [permissionStatus, requestPermission] = useTrackingPermissions();
 
   return (
     <view>
@@ -118,11 +117,10 @@ function TrackingScreen() {
 ```vue
 <!-- Vue -->
 <script setup lang="ts">
-import { usePermissions } from '@symbiote-native/tracking-transparency/vue';
+import { useTrackingPermissions } from '@symbiote-native/tracking-transparency/vue';
 import { getAdvertisingId } from '@symbiote-native/tracking-transparency';
 
-const { status: permissionStatus, request: requestPermission } =
-  usePermissions();
+const [permissionStatus, requestPermission] = useTrackingPermissions();
 </script>
 
 <template>
@@ -142,7 +140,7 @@ const { status: permissionStatus, request: requestPermission } =
 // Angular
 import { Component, inject } from '@angular/core';
 import {
-  PermissionsService,
+  TrackingPermissionsService,
   getAdvertisingId,
 } from '@symbiote-native/tracking-transparency/angular';
 
@@ -162,7 +160,7 @@ import {
   `,
 })
 export class TrackingScreen {
-  protected readonly permissionsService = inject(PermissionsService);
+  protected readonly permissionsService = inject(TrackingPermissionsService);
   readonly permissionStatus = this.permissionsService.connect();
 
   logAdvertisingId(): void {
@@ -177,15 +175,15 @@ export class TrackingScreen {
 <script lang="ts">
   import {
     getAdvertisingId,
-    usePermissions,
+    useTrackingPermissions,
   } from '@symbiote-native/tracking-transparency/svelte';
 
-  const permissions = usePermissions();
+  const permissions = useTrackingPermissions();
 </script>
 
 <view>
   <text>{permissions.status?.status ?? 'checking…'}</text>
-  <pressable onPress={() => permissions.request()}>
+  <pressable onPress={() => permissions.requestPermission()}>
     <text>Request tracking permission</text>
   </pressable>
   <pressable onPress={() => console.log(getAdvertisingId())}>
@@ -196,12 +194,11 @@ export class TrackingScreen {
 
 ```tsx
 // Solid — the accessors are CALLED; a Solid component body runs once, so a snapshot would freeze.
-import { createPermissions } from '@symbiote-native/tracking-transparency/solid';
+import { useTrackingPermissions } from '@symbiote-native/tracking-transparency/solid';
 import { getAdvertisingId } from '@symbiote-native/tracking-transparency';
 
 function TrackingScreen() {
-  const { status: permissionStatus, request: requestPermission } =
-    createPermissions();
+  const [permissionStatus, requestPermission] = useTrackingPermissions();
 
   return (
     <view>
@@ -252,37 +249,35 @@ import {
 
 // framework-scoped entry points re-export the same free functions, plus a per-adapter
 // permission wrapper:
-import { usePermissions } from '@symbiote-native/tracking-transparency/react';
-import { usePermissions } from '@symbiote-native/tracking-transparency/vue';
-import { usePermissions } from '@symbiote-native/tracking-transparency/svelte';
-import { createPermissions } from '@symbiote-native/tracking-transparency/solid';
-import { PermissionsService } from '@symbiote-native/tracking-transparency/angular';
+import { useTrackingPermissions } from '@symbiote-native/tracking-transparency/react';
+import { useTrackingPermissions } from '@symbiote-native/tracking-transparency/vue';
+import { useTrackingPermissions } from '@symbiote-native/tracking-transparency/svelte';
+import { useTrackingPermissions } from '@symbiote-native/tracking-transparency/solid';
+import { TrackingPermissionsService } from '@symbiote-native/tracking-transparency/angular';
 ```
 
-`usePermissions` auto-fetches the current permission status on mount and returns a
-`[status, request, get, error]` tuple (React) / `{ status, error, request, get }` object (Vue,
-destructurable — `status` is a `Ref`). Solid's `createPermissions` returns the same shape with
-`Accessor`s instead of `Ref`s, and Angular's `PermissionsService.connect()` returns a readonly
-`Signal`. **Svelte's rune returns a boxed object whose `status` is a getter — do not destructure
-it**, or the value freezes at its initial `null` (Svelte 5 reactivity is lexically scoped to the
-property access):
+`useTrackingPermissions` returns a `[status, request, get]` tuple: plain value (React), `Ref` (Vue),
+`Accessor` (Solid). Angular's `TrackingPermissionsService.connect()` returns a readonly `Signal`.
+**Svelte's rune returns a boxed object whose `status` is a getter — do not destructure it**, or
+the value freezes at its initial `null` (Svelte 5 reactivity is lexically scoped to the property
+access); its actions are `requestPermission()` and `getPermission()`:
 
 ```ts
 // React
-const [status, request] = usePermissions();
+const [status, request] = useTrackingPermissions();
 
 // Vue
-const { status, request } = usePermissions();
+const [status, request] = useTrackingPermissions();
 
 // Svelte — read permissions.status, never destructure it
-const permissions = usePermissions();
+const permissions = useTrackingPermissions();
 permissions.status;
 
 // Solid — status is an accessor, called at the read site
-const { status, request } = createPermissions();
+const [status, request] = useTrackingPermissions();
 
 // Angular
-readonly status = inject(PermissionsService).connect();
+readonly status = inject(TrackingPermissionsService).connect();
 ```
 
 ## Platform notes
