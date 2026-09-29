@@ -1339,6 +1339,219 @@ believed. Refresh every example, not the one being measured.
 Still owed on the instrument: a settled reading in the other four screens (Vue `nextTick`, Svelte
 `tick()`, Solid post-render, Angular `afterNextRender`), which turns their floor into a reading.
 
+### 23. The touchable outlier was an animated leaf built at mount for a value that never moves
+
+```
+23 := {
+  subject: "`primitive-suite`'s two dearest tags. vue, -O bytecode, per 1 000 items:
+            touchable-opacity create 65.0 ms / 25 348 KB   against pressable's 10.5 / 3 561
+            button            create 74.5 / 26 127          against view's       7.3 / 1 272
+            Same press machine on both touchables, so the difference is not the machine",
+  fixture: "touchable-attach-cost.itest.ts — plain / pressable / touchable-opacity, three arms in
+            ONE case, BYTES as the gate and milliseconds a print (§18j)",
+  found: "`attach` called `setAnimatedBehaviorStyle`, which builds an `AnimatedProps` leaf plus its
+          style wrapper PER NODE: 5 911 B and 9.76 us on top of the press machine's 2 353 B / 1.85",
+  fix: "the leaf is registered on the FIRST FADE (`ensureLayer`). `collapsable: false` stays forced
+        from attach with a plain `setProp` — a view Fabric flattens loses the responder's tag, and
+        that half is one prop write, not a leaf",
+  after: "layer 5 911 -> 1 343 B, 9.76 -> 3.05 us. Suite: touchable-opacity 65.0 -> 27.3 ms /
+          25 348 -> 7 992 KB · button 74.5 -> 43.2 / 26 127 -> 8 259 · clear 11.0 -> 4.1 and
+          9.1 -> 4.9. Every other tag's createKB is byte-identical, which is the control",
+  behaviour_it_changed: "an untouched touchable now commits NO `opacity` key, which is what vendor
+                         does (`TouchableOpacity-itest.js`, 'does not render explicit opacity when
+                         using default'). Seven adapter cases asserted the old non-parity value and
+                         were rewritten; an authored `style.opacity` is unaffected, it reaches
+                         Fabric through the ordinary style path",
+  then_the_machine: "same shape one layer down. `attach` built the gesture runtime (timers Set,
+                     press runtime, a host of four closures, the nine-field state, the WeakMap
+                     entry) and NOTHING reads any of it outside `dispatch`. Built in `stateOf` on
+                     the first event instead; `attach` installs the seven dispatchers, and the
+                     per-behavior options bag is hoisted out of the per-node closure.
+                     machine 2 353 -> 1 328 B, 1.85 -> 1.37 us, on EVERY tag carrying it:
+                     pressable 3 561 -> 2 559 KB / 1 000 · touchable-highlight 5 531 -> 4 531 ·
+                     touchable-native-feedback 7 614 -> 6 692 · touchable-without-feedback
+                     8 105 -> 7 183 · text-input 6 090 -> 5 168 · touchable-opacity 7 992 -> 6 992 ·
+                     button 8 259 -> 7 259. Cumulative on button: 74.5 ms / 26 127 KB -> 33.7 / 7 259",
+  the_pattern: "both fixes are one question asked twice: WHO READS THIS, and is any of them
+                reachable before the user touches the thing. A behavior's `attach` runs inside
+                `createElement`, so everything it builds is paid by every node in a list and
+                collected by almost all of them",
+  then_TWF: "the same question a third time, on the tag that was still dearest per COMMITTED node.
+             `touchable-attach-cost.itest.ts` case 3 prices an anchor-backed touchable plus the
+             child it adopts against `pressable` + a plain view: twf read 568 B over that floor and
+             tnf only 64, т.к. tnf arms with a MODULE-LEVEL refinement while twf built a per-item
+             `{runtime, timers}` at arm. Deferred to the first gesture: 568 -> 176 B,
+             suite 7 183 -> 6 800 KB / 1 000, wall flat (the win is allocation, not clock)",
+  what_is_left: "twf's per-item refinement CLOSURE, 112 B over tnf. Removing it means handing the
+                 refinement its `source`, a change to `IPressConfigRefinement` that four behaviors
+                 implement, and it is not worth 112 B. Under it, ~190 B per installed dispatcher,
+                 seven per node, which §18v already priced and rejected",
+  the_shape_to_reuse: "a behavior's `attach` runs inside `createElement`, so ANYTHING it builds is
+                       paid by every node in a list and collected by almost all of them. Ask of
+                       each allocation: is it read before the user touches the thing",
+  THE_LAST_ITEM_PRICED: "`touchable-attach-cost.itest.ts` case 4 prices an installed dispatcher:
+                         first 344 B (it pays for the `Map` too), each after it 147 B. The model
+                         checks out against the machine measured separately, 344 + 6 x 147 = 1 226
+                         against 1 328. So a `<text-input>`'s ELEVEN cost ~1.8 KB of its 5.2 KB per
+                         node and a pressable's seven ~1.2 KB of its 2.6, which makes the listener
+                         install the largest remaining behavior cost anywhere",
+  what_that_opens: "§18v rejected one shared dispatcher keyed on `event.type` on TIME (0.3 us) and
+                    on legibility, and the BYTES are a different quantity it never saw. A shared
+                    dispatcher drops the closure and keeps the `Map` entry, so ~70 B of the 147.
+                    The whole 1 816 needs the engine to ask `node.hostBehavior` by name instead of
+                    holding a slot per name, which is a dispatch-contract change and a DECISION,
+                    not a loop step"
+                   -> "a recorded negative is re-checked when the QUANTITY changes, not only when
+                       the ruler does. This one was priced in microseconds and the question that
+                       matters now is kilobytes",
+}
+```
+
+### 25. The dispatch contract, taken: a behavior installs zero listeners per node
+
+```
+25 := {
+  the_decision_24_deferred: "§23's `what_that_opens` called the shared dispatcher a contract change
+                             and a DECISION. It was taken: `ISymbioteNode.dispatch` holds ONE
+                             module-level `IEventDispatch` (`{names, deliver}`) and the engine asks
+                             it through `listenerFor` / `hasListenerFor` when `node.listeners` has
+                             no slot. Six read sites in `events/` route through the pair",
+  why_a_field_and_not_a_WeakMap: "the same reason `hostBehavior` is one: every lookup on every
+                                  ancestor of every event reads it, and every node already pays a
+                                  declared slot in the one hidden class `node-instance.ts` mints",
+  the_closure_moved: "`listenerFor` builds ONE closure per DELIVERED event where `attach` built
+                      seven per MOUNTED node. `name` is bound there rather than read off
+                      `event.type`, so a caller constructing its own event (every test driving a
+                      behavior by hand) reaches the same handler",
+  measured: "`touchable-attach-cost.itest.ts`, -O bytecode, per node: machine 1 328 -> 0 B, and 0
+             is literal, not rounded. Per 1 000 items: pressable 2 559 -> 1 263 KB ·
+             touchable-opacity 6 992 -> 3 584 · button 7 259 -> 4 068 · text-input 5 167 -> 3 824 ·
+             twf 6 800 -> 5 503",
+  the_second_half: "`touchable-opacity`'s `attach` still built an `AnimatedValue`, a feedback
+                    runtime and a timer `Set` per node, 1 343 B, which §23 had read as 'the layer'
+                    т.к. the machine beside it was larger. Deferred to `stateOf`, called from the
+                    refinement and from the re-settle branch of `afterCommit`. The mount branch of
+                    `afterCommit` moved to its own `settledAt` map, т.к. it runs for every mounted
+                    node while the fade state is owed only by one that fades. layer 1 343 -> 63 B",
+  the_gates_had_to_be_REWRITTEN: "both were a multiple of `machine`, and `machine` is now zero: a
+                                  ratio against zero carries no verdict. Re-expressed against the
+                                  plain node, bounds from the measured separation (§11): machine
+                                  0 vs 945 broken -> 0.25x · layer 63 vs 1 423 broken -> 0.5x.
+                                  Both break-tested by re-adding the eager build",
+  and_CALIBRATED_PER_BUILD: "§11 again, and it fired on the first CI-shaped run: the assert build
+                             charges its own per-attach bookkeeping (machine 304 B, layer 560),
+                             so a release-calibrated byte budget reports a regression that does not
+                             ship. Both gates are `isBenchBuild` now and print otherwise",
+  a_fixture_went_stale_with_it: "`text-input-attach-ladder.itest.ts` counted `listeners.size` and
+                                 imitated the machine's interior in a `bench-b5` rung. The rung
+                                 priced a shape production no longer has, so it was deleted rather
+                                 than left green; the structural gate now reads `hasListenerFor`",
+  the_rest_followed: "`behavior-listener-installs.itest.ts` counts what each tag's `attach` leaves in
+                      `node.listeners` and holds a DEBT LIST that shrinks: converting a behavior
+                      turns the case red until its entry goes, which is what says the conversion
+                      reached the node. It opened at 31 installs over seven tags and is empty now.
+                      scroll-view 9 -> 0 (3 878 -> 2 276 KB / 1 000, create 27.7 -> 16.7 ms) ·
+                      refresh-control 1 -> 0 (5 906 -> 3 937, 31.8 -> 26.6) · text-input 4 -> 0
+                      (3 824 -> 3 105) · switch 3 -> 0 (2 461 -> 2 015)",
+  the_one_that_CANNOT_move: "a GATED name (`GATED_EVENT_PROPS`). The install is ALSO the payload
+                             write that makes Fabric fire the event at all, and a dispatch writes no
+                             payload, so `sticky-header`'s `layout` stays a `setBehaviorListener`.
+                             The fixture carries it in its own map with that reason, not as debt",
+  composing_two_dispatches: "a node holds exactly ONE. `text-input` is a pressable PLUS four names
+                             of its own, so it unions them and delegates the machine's seven back to
+                             the exported `PRESS_DISPATCH`. It must set its own AFTER
+                             `attachPressMachine`, which points the node at the machine's",
+  the_capture_path_joined: "`capturedBy` read `node.listeners` straight while the dispatch bound
+                            `name` off the event. Binding `name` in `listenerFor` instead made the
+                            capture pass safe to route the same way, which is what
+                            `startShouldSetResponderCapture` on a ScrollView needed",
+}
+```
+
+### 24. The gated-listener clear, priced and KEPT
+
+```
+24 := {
+  found: "`setBehaviorListener(node, name, undefined)` writes the gated flag (`layout` ->
+          `onLayout`) even when nothing was installed, and `recordSetProp` has NO identity guard,
+          so it is a real `OP_SET_PROP` on the wire. `touchable-without-feedback` and
+          `touchable-native-feedback` re-forward four names on every child insert, two of them
+          gated, so each pays two wasted ops per item",
+  fix_tried: "write the flag only on the FLIP, guarded on `node.listeners?.has(name)`",
+  it_worked_on_create: "createKB / 1 000 items: tnf 6 692 -> 5 653 · twf 7 183 -> 6 144, exactly
+                        the ~1 KB the two ops predict, with every other tag byte-identical",
+  AND_IT_LOST: "tnf's `clear` went 2.4 -> 12.5-13.8 ms, stable across three runs and reproduced by
+                disabling the guard alone (2.4 with it off, byte counter back to 6 692).
+                Mechanism unexplained: it is on the C++ side, where a key the mirror never held
+                behaves differently at teardown from one it held and deleted",
+  verdict: "REVERTED. 1 KB and ~3 ms of create do not buy 10 ms of teardown on the same tag",
+  pinned: "`gated-listener-writes.test.ts` now asserts the write HAPPENS, so the next reader finds
+           the measurement instead of the same idea",
+  method_note: "the byte counter said the change was a pure win and the wall clock said it was not.
+                §18j's 'reach for bytes first' holds for ATTRIBUTION and not for a VERDICT: an op
+                removed from the buffer is also an op the host no longer sees, and what that costs
+                downstream only a clock can report",
+}
+```
+
+### 26. `markPropsDirty` on a node its own batch created, skipped
+
+```
+26 := {
+  found: "`markPropsDirty` opened with `flushOps()`, a full drain to the host, т.к. the host call
+          takes a HANDLE and must be ordered after the ops that built the node. A behavior's
+          `onChildInserted` marks the slot it just adopted, so an anchor-backed touchable paid one
+          whole drain PER ITEM",
+  ladder: "`anchor-touchable-item-cost.itest.ts`, release bytecode, per item: plain view 678 B ·
+           owner+child 1 345 B · adoption alone +3 B · ITS DIRTY MARK +1 530 B / +3.29 us. That was
+           82% of what the behavior cost the item, and the four unwired gated clears of §24 were
+           +1 B, so the suspect there was the wrong one",
+  fix: "a node whose create op is still in the buffer has no committed payload and the host has
+        never heard it named, so the mark is a no-op. `isPendingCreate` skips it and the drain",
+  narrower_than_placement: "`hasPendingPlacement` also holds a node an EARLIER batch created and
+                            this one is moving, which the host does know and which does need the
+                            mark. So a separate answer, carried as `node.createdBatch` against the
+                            live `batchId`: a field and not a second Set, т.к. it is read on the
+                            create path and a `Set.add` per node would charge what it saves",
+  measured: "per item, tnf 3 158 B / 12.47 us -> 1 386 / 8.50 · twf 3 271 / 12.13 -> 1 499 / 9.16.
+             Vue primitive suite createKB: twf 5 503 -> 2 967, tnf 5 395 -> 2 859, wall 20.5 -> 15.1
+             and 20.8 -> 14.9. Every other tag unmoved, which is the control",
+  opcode_NOT_taken: "an `OP_MARK_PROPS_DIRTY` was built first, to defer the mark instead of skipping
+                     it. Wrong shape: for a node the walk is about to build anyway the op is pure
+                     waste, and it costs a C++ case and a recording-host case to carry",
+  gate: "the ladder asserts the mark costs < 200 B per item. Break-tested by inverting the skip:
+         1 530 B red on release, and the same budget passes the assert build at 85 B",
+}
+```
+
+### 27. What `touchable-opacity` has left is the price of `componentDidUpdate`, not an anomaly
+
+```
+27 := {
+  where_it_sits: "against the ladder's plain two-node pair (1 345 B/item), the behavior costs are
+                  twf +199 B · tnf +86 B · opacity +885. The first two are done; opacity is the
+                  one row still 6-10x its siblings",
+  split: "`afterCommit`, 537 B of the 885: `propsOf` 296 · `restingOpacityOf` 80 · the `settledAt`
+          record and the resolver 161. Bisected by stubbing one at a time",
+  why_it_cannot_just_go: "`afterCommit` IS RN's `componentDidUpdate`, and a change needs a
+                          BASELINE. React is handed `prevProps` for free; we retain no props in JS
+                          by design, so the snapshot is what the comparison costs",
+  both_cheap_escapes_are_closed: "narrow key reads are measured and REVERTED (see the negative
+                                  results table: +12 ms on button's `clear`), and skipping the
+                                  snapshot on the mount drops a `disabled` flip on the first update
+                                  after it, which is a parity loss, not an optimisation",
+  what_is_left_untried: "a KEYED write hook, so a behavior re-settles only when one of its own prop
+                         keys was written and never polls. `setProp` already short-circuits on
+                         `node.childHost !== undefined`; this would add a second field read there,
+                         on the engine's hottest path, which is exactly what `afterCommit`'s own
+                         comment refused. Not priced yet, and it needs §8's one-change-alone run",
+  and_the_rest_of_the_table: "button 4 068 KB and refresh-control 3 937 are 4 and 3 NODES per item
+                              at ~1.0-1.3 KB each, which is what their trees cost. `refresh-control`
+                              attaches one `setNodeDispatch` and its `evaluateSnapBack` returns on
+                              the first branch for a node nothing has reported yet",
+}
+```
+
 ## The current numbers
 
 Headless, 1 000 rows, `bench:itest` Release on Hermes **as `hermesc -O` bytecode**
@@ -1487,6 +1700,7 @@ Recorded so they are not re-derived. Each was measured.
 | split the style-write path                                         | 5 ms of a 29 ms fill, of a 72 ms engine, of a 106-164 ms create — 3-4% at best, in the most delicate code in the engine. **RE-PRICED ON HERMES and the verdict holds**: the parts object plus `pushClassStyle` is 0.94 us over ~4 000 style writes = 3.8 ms of a 156 ms create, 2.4%. A new ruler is a reason to re-check this table, not a licence to re-derive it.                                                                                                                       |
 | replace the CSS-class path with style objects on the device screen | priced in `class-vs-style-cost.itest.ts` (§18f): +0.07 us/node on a create — 0.35 ms — and the class path is 0.78x on a select. The two device arms genuinely style differently; it is not a cost.                                                                                                                                                                                                                                                                                         |
 | move off `RawProps(folly::dynamic)`, the path RN deprecated        | priced in `raw-props-mode-cost.itest.ts` (§18h): 44 ns per scalar prop and 347 ns per style prop inside `createNode`, which is **1.61 ms of a 162 ms create — 1.0%**. Escaping it means building a `jsi::Object` per node, i.e. re-introducing the per-prop JSI writes the buffer exists to remove. The cure costs more than the disease.                                                                                                                                                  |
+| read `disabled` through a KEY READER instead of `propsOf` in `afterCommit`      | `propsOf` builds the node's whole bag across the wire for every mounted node, and three narrow reads answer the same question for 296 B less per item (`anchor-touchable-item-cost`, opacity behavior 884 to 588 B; Vue suite createKB touchable-opacity 3 584 to 3 302, button 4 068 to 3 740). **REVERTED: button's `clear` went 3.8 to 12.6-18.2 ms**, three runs, and a probe that skipped the resolver entirely still read 16.5, so it is `propOf` on the TEARDOWN path and not the resolver body. The same trade §24 refused, at the same tag: 8% of a create does not buy 4x a teardown. It also meant changing `IDisabledResolver` across four behaviors, which is why this row names the shape and not only the number. |
 | attack GC pressure from the retained tree, buffer and side tables  | `allocation-volume.itest.ts` + its stock half (§18j): React on our engine allocates **6 381 bytes/node against stock's 6 680** — we are 4.5% UNDER. The engine adds ~2 600 bytes over the protocol floor where React's reconciler adds ~6 100, and an app pays that either way. There is no pressure to remove.                                                                                                                                                                            |
 | presize or recycle the buffer's four side tables                   | `side-table-growth-cost.itest.ts` (§18i): growing from empty is **24-25 ns/entry and FLAT** (24 at 3 000, 24 at 12 000 — doubling amortises completely), recycling a warm array reads the same 24, and `new Array(n)` + index writes is **42 ns, 1.7x WORSE**. There is no growth cost to remove, and the obvious fix is an anti-optimisation.                                                                                                                                             |
 | intern `PropNameID`s / cache `UIManagerBinding::getBinding`        | 1.8% of the prologue — **and reverted**: both keyed on `&runtime`, which treats an ADDRESS as a lifetime. `symbiote_tree_tests` builds a JSCRuntime per case, so it aborted in `~JSCRuntime` with a dangling API string. Green on `bench:itest`, red on CI.                                                                                                                                                                                                                                |
@@ -1534,6 +1748,13 @@ profiler       SYMBIOTE_PROFILE_DIR=<dir> -> Hermes sampling trace per step (ben
                self/inclusive %. Never read RESULT/PRIM from a profiled run
 primitive-suite  <arm>-primitive-suite.itest.ts: 19 app-facing tags x create/update/swap/remove/
                clear, PINNED nodesPerItem census. Arms: angular (SYMBIOTE_ELEMENTS), vue
+createKB gate  each arm's itest file carries a `CREATE_BUDGET_KB` table, one ceiling per tag at the
+               measured value plus 10%, and a tag missing from it fails the file the way an
+               unpinned census does. Release only (`__DEV__ === false`), t.k. the assert build
+               allocates another shape. Added 2026-09-28: every earlier anomaly here lived in a
+               PRINTED number someone had to notice, and the two that were fixed this day had sat
+               in plain sight for weeks. Break-tested by undoing the pending-create skip: the first
+               tag past its ceiling was `image-background`, which nobody had attributed
 ```
 
 Measured with them (Hermes -O, 2026-09-22):
@@ -1546,8 +1767,8 @@ Measured with them (Hermes -O, 2026-09-22):
 - Per @for item Angular costs ~5 us + 1.2 KB over Vue even on a one-node item (primitive `view`
   11.9 vs 6.8 ms) — embedded LView + container insertion + an update pass per item. Runtime-only
   work cannot reach it (`<angular_no_template_transform>`).
-- Outliers on EVERY adapter: touchable-opacity (56-78 ms, 25-28 MB / 1 000) and button (70-93 ms,
-  26-28 MB). Engine/components-side, not Angular.
+- Outliers on EVERY adapter: touchable-opacity and button. Engine/components-side, not Angular.
+  Split and halved in §23; what is left of them is the press machine.
 - Hidden `modal` commits a ModalHostView on every adapter; RN commits nothing (`Modal.js:280-288`).
 
 ## Angular's per-node cost: a runtime answer to a compile-time question (researched 2026-09-22)

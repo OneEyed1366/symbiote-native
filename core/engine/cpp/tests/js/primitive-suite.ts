@@ -25,6 +25,7 @@ import {
 // Set by the runner from `SYMBIOTE_PROFILE_DIR`: non-empty samples each tag's CREATE into
 // `<dir>/<arm>-<tag>-create.json`. Never read a PRIM line from such a run.
 declare const __SYMBIOTE_PROFILE_DIR__: string;
+declare const __DEV__: boolean;
 const PROFILE_HZ = 10_000;
 
 export const PRIMITIVE_COUNT = 1_000;
@@ -146,6 +147,9 @@ export type IPrimitiveDriver = {
   readonly name: string;
   /** Committed nodes that are not items: root, surface container, the screen's own wrapper. */
   readonly chrome: number;
+  // Ceiling on each tag's `createKB`, per TAG and per ARM т.к. an adapter allocates its own way.
+  // A tag missing from here fails the file the way an unpinned census does
+  readonly createBudgetKB: ReadonlyMap<string, number>;
   /** Render `spec` with `state` and settle it (framework flush + commit). */
   apply(spec: IPrimitiveSpec, state: IPrimitiveState): void | Promise<void>;
 };
@@ -183,17 +187,15 @@ function censusOf(): string {
     .join(' ');
 }
 
-/**
- * Run the five steps for every spec and print one `PRIM` line per tag.
- *
- * `PRIM <arm> <tag> create=.. update=.. swap=.. remove=.. clear=.. createKB=..` is the grep target;
- * sampling is off, so the wall clocks are readings (still single runs: take the minimum across runs).
- */
+// Runs the five steps for every spec and prints one line per tag. The grep target is
+// `PRIM <arm> <tag> create=.. update=.. swap=.. remove=.. clear=.. createKB=..`, where each wall
+// clock is a SINGLE run, so a reader takes the minimum across runs
 export async function runPrimitiveSuite(
   driver: IPrimitiveDriver,
   specs: readonly IPrimitiveSpec[] = PRIMITIVE_SPECS,
 ): Promise<void> {
   const unpinned: string[] = [];
+  const unbudgeted: string[] = [];
   for (const spec of specs) {
     const count = spec.count ?? PRIMITIVE_COUNT;
     const timings = new Map<IStep, number>();
@@ -272,7 +274,30 @@ export async function runPrimitiveSuite(
           : ` createKB=${(createBytes / 1_024).toFixed(0)}`),
     );
     if (spec.nodesPerItem === undefined) unpinned.push(spec.tag);
+    if (!gateCreateBytes(driver, spec.tag, createBytes))
+      unbudgeted.push(spec.tag);
   }
   // Pinning is a gate, not a note: an unpinned tag fails the file after printing its census.
   expect(unpinned).toEqual([]);
+  expect(unbudgeted).toEqual([]);
+}
+
+// The anomaly this file exists to catch used to live in a PRINTED number a reader had to notice.
+// Release only, т.к. the assert build allocates a different shape and its budget is another table
+function gateCreateBytes(
+  driver: IPrimitiveDriver,
+  tag: string,
+  createBytes: number | undefined,
+): boolean {
+  const budget = driver.createBudgetKB.get(tag);
+  if (budget === undefined) return false;
+  if (createBytes === undefined) return true;
+  if (__DEV__) {
+    print(
+      `DEBUG ${driver.name} ${tag} assert build: the budget is release-only`,
+    );
+    return true;
+  }
+  expect(createBytes / 1_024).toBeLessThan(budget);
+  return true;
 }

@@ -8,6 +8,7 @@ import {
   createElement,
   createSurface,
   Platform,
+  listenerFor,
   routeProp,
   type IListener,
   type ISymbioteEvent,
@@ -29,7 +30,7 @@ function setOs(os: string): void {
 }
 
 function listenerOf(node: ISymbioteNode, name: string): IListener {
-  const listener = node.listeners?.get(name);
+  const listener = listenerFor(node, name);
   if (listener === undefined) throw new Error(`no "${name}" listener`);
   return listener;
 }

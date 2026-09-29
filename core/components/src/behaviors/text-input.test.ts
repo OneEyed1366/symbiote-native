@@ -15,6 +15,7 @@ import {
   createSurface,
   currentlyFocusedInput,
   removeChild,
+  listenerFor,
   routeProp,
   type IListener,
   type ISymbioteEvent,
@@ -64,7 +65,7 @@ function commitValue(
 }
 
 function listenerOf(node: ISymbioteNode, name: string): IListener {
-  const listener = node.listeners?.get(name);
+  const listener = listenerFor(node, name);
   if (listener === undefined) {
     throw new Error(
       `no "${name}" listener installed — the behavior did not attach`,
@@ -476,7 +477,7 @@ describe('text input host behavior', () => {
     registerTextInputBehavior();
     const plain = createElement(TEXT_INPUT_VIEW_NAME);
 
-    expect(plain.listeners?.get('change')).toBeUndefined();
+    expect(listenerFor(plain, 'change')).toBeUndefined();
   });
 
   // why: TextInput.js wraps the input in `usePressability` so `onPress` focuses it when editable

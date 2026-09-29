@@ -39,8 +39,13 @@ vi.mock('@symbiote-native/engine', async () => {
   };
 });
 
-const { clearHostBehaviors, createElement, createSurface, routeProp } =
-  await import('@symbiote-native/engine');
+const {
+  clearHostBehaviors,
+  createElement,
+  createSurface,
+  listenerFor,
+  routeProp,
+} = await import('@symbiote-native/engine');
 type IListener = import('@symbiote-native/engine').IListener;
 type ISymbioteEvent = import('@symbiote-native/engine').ISymbioteEvent;
 type ISymbioteNode = import('@symbiote-native/engine').ISymbioteNode;
@@ -96,7 +101,7 @@ function mountButton(props: Readonly<Record<string, unknown>> = {}) {
 }
 
 function listenerOf(node: ISymbioteNode, name: string): IListener {
-  const listener = node.listeners?.get(name);
+  const listener = listenerFor(node, name);
   if (listener === undefined)
     throw new Error(`no "${name}" listener — the behavior did not attach`);
   return listener;
@@ -147,9 +152,9 @@ afterEach(() => {
 });
 
 describe('button host behavior on Android', () => {
-  // THE HEADLINE CLAIM. RN's Android Button commits ONE FEWER NODE than its iOS Button, because
-  // TNF clones onto Button's own view instead of wrapping it. Counted rather than eyeballed: the
-  // hop assertions in `subtreeOf` prove the SHAPE, this proves nothing extra is hiding beside it.
+  // THE HEADLINE CLAIM: RN's Android Button commits ONE FEWER NODE than its iOS one, т.к. TNF
+  // clones onto Button's own view instead of wrapping it. `subtreeOf` proves the SHAPE, the count
+  // proves nothing extra hides beside it
   it('commits RN’s three-node Android subtree, not iOS’s four', async () => {
     const { node } = mountButton();
     await settle();
@@ -185,11 +190,9 @@ describe('button host behavior on Android', () => {
     const host = subtreeOf(TEST_ID).host;
     fabric.commands.length = 0;
 
-    // NO `settle()` anywhere inside the gesture, and that is the assertion about
-    // `minPressDuration: 0` (TouchableNativeFeedback.js:226). The press machine's 130 ms
-    // deactivation floor defers `onPressOut`, so with the floor left in place the release below
-    // dispatches NOTHING synchronously and the ripple stays lit after the finger is gone — while a
-    // test that advanced its timers first would see the command anyway and pass.
+    // NO `settle()` inside the gesture: that IS the assertion about `minPressDuration: 0`
+    // (TouchableNativeFeedback.js:226). With the machine's 130 ms floor left in, the release below
+    // dispatches nothing synchronously and the ripple stays lit after the finger is gone
     listenerOf(node, 'pressIn')(touchAt(12, 34));
     listenerOf(node, 'startShouldSetResponder')(touchAt(12, 34));
     // RN's order inside onPressIn: hotspot first, so the ripple starts under the finger.
@@ -248,6 +251,6 @@ describe('button host behavior on Android', () => {
     );
     expect(host?.children).toHaveLength(0);
     expect(host?.payload.nativeBackgroundAndroid).toBeUndefined();
-    expect(node.listeners?.get('pressIn')).toBeUndefined();
+    expect(listenerFor(node, 'pressIn')).toBeUndefined();
   });
 });

@@ -26,6 +26,7 @@ import {
   clearHostBehaviors,
   createElement,
   isSymbioteNode,
+  listenerFor,
   propOf,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
@@ -118,7 +119,7 @@ function mountModel(options: {
     node,
     // The native beat: RN fires `change` per keystroke and the machine owns that listener.
     type: async (text: string) => {
-      const listener = node().listeners?.get('change');
+      const listener = listenerFor(node(), 'change');
       if (listener === undefined)
         throw new Error('no "change" listener — the behavior did not attach');
       listener({ nativeEvent: { text, eventCount: 1 } });

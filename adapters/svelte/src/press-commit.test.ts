@@ -12,7 +12,12 @@ import { compile } from 'svelte/compiler';
 import { writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { installRecordingFabric, waitUntil } from '@symbiote-native/test-utils';
-import { childrenOf, propOf } from '@symbiote-native/engine';
+import {
+  childrenOf,
+  hasListenerFor,
+  isSymbioteNode,
+  propOf,
+} from '@symbiote-native/engine';
 import './register';
 import { mount, unmount } from './render';
 
@@ -39,11 +44,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 function pressedNode(): Record<string, unknown> {
   const view = fabric.find(node => {
     const handle = node.instanceHandle;
-    return (
-      isRecord(handle) &&
-      handle.listeners instanceof Map &&
-      handle.listeners.has('press')
-    );
+    return isSymbioteNode(handle) && hasListenerFor(handle, 'press');
   });
   const handle = view?.instanceHandle;
   if (!isRecord(handle)) throw new Error('no pressable responder found');

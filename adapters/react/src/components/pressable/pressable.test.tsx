@@ -24,6 +24,11 @@ import {
   createLiveTree,
   installRecordingFabric,
 } from '@symbiote-native/test-utils';
+import {
+  isSymbioteNode,
+  listenerFor,
+  type IListener,
+} from '@symbiote-native/engine';
 
 const ROOT_TAG = 110;
 const TOUCH_START = 'topTouchStart';
@@ -60,10 +65,6 @@ afterEach(() => {
   unmount(ROOT_TAG);
   vi.useRealTimers();
 });
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
 
 // The responder is the Pressable's own non-box-none RCTView. `testID` disambiguates multiple
 // simultaneously mounted Pressables; omitted retains the common single-Pressable lookup.
@@ -112,14 +113,9 @@ function fireAt(handle: unknown, type: string, x: number, y: number): void {
   });
 }
 
-function terminationGate(
-  handle: unknown,
-): ((event: unknown) => unknown) | undefined {
-  if (!isRecord(handle)) return undefined;
-  const listeners = handle.listeners;
-  if (!(listeners instanceof Map)) return undefined;
-  const gate = listeners.get(TERMINATION_REQUEST);
-  return typeof gate === 'function' ? gate : undefined;
+function terminationGate(handle: unknown): IListener | undefined {
+  if (!isSymbioteNode(handle)) return undefined;
+  return listenerFor(handle, TERMINATION_REQUEST);
 }
 
 describe('React Pressable on the engine', () => {

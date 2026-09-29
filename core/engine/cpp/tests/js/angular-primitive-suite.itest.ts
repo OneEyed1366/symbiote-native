@@ -18,6 +18,30 @@ import { describe, flushTimers, it, mounted, report } from './harness';
 
 const ROOT_TAG = 1;
 
+// Each tag's measured `createKB` plus 10%. Its own table т.к. Angular reads 1.2-1.7x the Vue arm
+// on every tag, which is the framework's own cost and not the engine's
+const CREATE_BUDGET_KB: ReadonlyMap<string, number> = new Map([
+  ['view', 2_400],
+  ['text', 3_170],
+  ['image', 2_780],
+  ['image-background', 3_360],
+  ['pressable', 2_390],
+  ['touchable-opacity', 5_230],
+  ['touchable-highlight', 4_330],
+  ['touchable-native-feedback', 3_910],
+  ['touchable-without-feedback', 4_030],
+  ['button', 6_000],
+  ['text-input', 5_200],
+  ['text-input-multiline', 5_200],
+  ['switch', 3_750],
+  ['activity-indicator', 3_320],
+  ['scroll-view', 4_020],
+  ['horizontal-scroll-view', 4_020],
+  ['safe-area-view', 2_510],
+  ['modal', 280],
+  ['refresh-control', 5_500],
+]);
+
 function templateFor(spec: IPrimitiveSpec): string {
   const bindings = [...Object.keys(spec.props), 'style']
     .map(name => `[${name}]="item.props['${name}']"`)
@@ -81,6 +105,7 @@ describe('every primitive through the Angular adapter', () => {
     await runPrimitiveSuite({
       name: 'ng',
       chrome: 3,
+      createBudgetKB: CREATE_BUDGET_KB,
       apply: async (spec, state) => {
         if (current?.spec !== spec) {
           if (current !== undefined) {

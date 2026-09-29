@@ -29,8 +29,13 @@ vi.mock('@symbiote-native/engine', async () => {
   };
 });
 
-const { clearHostBehaviors, createElement, createSurface, routeProp } =
-  await import('@symbiote-native/engine');
+const {
+  clearHostBehaviors,
+  createElement,
+  createSurface,
+  listenerFor,
+  routeProp,
+} = await import('@symbiote-native/engine');
 type IListener = import('@symbiote-native/engine').IListener;
 type ISymbioteEvent = import('@symbiote-native/engine').ISymbioteEvent;
 type ISymbioteNode = import('@symbiote-native/engine').ISymbioteNode;
@@ -59,7 +64,7 @@ function mount(props: Readonly<Record<string, unknown>>): ISymbioteNode {
 }
 
 function listenerOf(node: ISymbioteNode, name: string): IListener {
-  const listener = node.listeners?.get(name);
+  const listener = listenerFor(node, name);
   if (listener === undefined)
     throw new Error(`no "${name}" listener — the behavior did not attach`);
   return listener;

@@ -1,5 +1,5 @@
 /**
- * A tree host that RECORDS and derives nothing - for the 141 test files that never read a tree.
+ * A tree host that RECORDS and derives nothing — for the 141 test files that never read a tree.
  *
  * Those files call `installFabric()` only because that is how a test gets a host at all: they
  * assert on state machines, prop resolution, listeners, styles. Attaching them to a second
@@ -17,26 +17,7 @@
  */
 
 import {
-  NO_VALUE,
-  OP_APPEND_CHILD,
-  OP_COMMIT,
-  OP_CREATE_ANCHOR,
-  OP_CREATE_ELEMENT,
-  OP_CREATE_RAW_TEXT,
-  OP_INSERT_BEFORE,
-  OP_REMOVE_CHILD,
-  OP_SET_COMPONENT,
-  OP_SET_OWNED_LISTENER,
-  OP_SET_TAG,
-  OP_SET_UNDERLAY_SHOWN,
-  OP_SET_PROP,
-  OP_SET_TEXT,
-  OP_STRIDE,
-  type IMutationBatch,
-} from '@symbiote-native/engine/mutation-buffer';
-import {
   fabricProps,
-  isSymbioteNode,
   propsOf,
   setTreeHost,
   type ISymbioteNode,
@@ -50,8 +31,9 @@ import type {
   ITreeCensus,
   ITreeHost,
 } from '@symbiote-native/engine';
+import { createRecordedTree, type IRecordedTree } from './recorded-tree';
 
-type IRecorded = {
+export type IRecorded = {
   handle: ISymbioteNode;
   instanceHandle: unknown;
   viewName: string;
@@ -239,376 +221,157 @@ export function payloadOf(node: ISymbioteNode): Record<string, unknown> {
  */
 const NO_TAG = -1;
 
-// One mutable record instead of several reassignable `let`s: `forget()` replaces the map by
-// replacing this object's field, so every closure below keeps working off the same reference.
-type IRecordingState = {
-  recorded: WeakMap<object, IRecorded>;
-  // The WeakMap above cannot be enumerated, and `find` has to start somewhere. Strong references,
-  // so `forget()` is what a long file calls to stop this growing — the same deal `installFabric`'s
-  // `created` array made.
-  created: IRecorded[];
-  eventHandler: IEventHandler | undefined;
-};
+export function createRecordingHost(): IRecordingHost {
+  const tree: IRecordedTree = createRecordedTree();
+  const { nodeOf } = tree;
+  let eventHandler: IEventHandler | undefined;
+  const commands: IRecordingHost['commands'] = [];
+  const responderHandovers: IRecordingHost['responderHandovers'] = [];
+  const accessibilityEvents: IRecordingHost['accessibilityEvents'] = [];
 
-function nodeOf(
-  state: IRecordingState,
-  handle: object,
-  what: string,
-): IRecorded {
-  const node = state.recorded.get(handle);
-  if (node === undefined) {
-    throw new Error(`${what}: handle names no node in this tree`);
-  }
-  return node;
-}
-
-function detachNode(node: IRecorded): void {
-  const { parent } = node;
-  if (parent === undefined) return;
-  const at = parent.children.indexOf(node);
-  if (at >= 0) parent.children.splice(at, 1);
-  node.parent = undefined;
-}
-
-// Lands a rootTag onto a whole subtree at OP_COMMIT, the same moment the real engine hands every
-// node in the walk its own `ShadowNode`. `committedRootTag` never gets cleared afterwards, so a
-// node removed after this still answers `committedRecordOf` — see that field's own comment.
-function markCommitted(node: IRecorded, rootTag: number): void {
-  node.committedRootTag = rootTag;
-  for (const child of node.children) markCommitted(child, rootTag);
-}
-
-// One helper per opcode instead of a growing switch, kept apart so applyOps stays a short loop:
-// each handler closes over nothing but its own arguments, so adding an opcode never touches the
-// ones around it.
-type IApplyContext = {
-  strings: readonly string[];
-  values: readonly unknown[];
-  instanceHandles: readonly unknown[];
-  at: (slot: number) => IRecorded;
-  create: (
-    slot: number,
-    viewName: string,
-    props: Record<string, unknown>,
-    instanceHandle?: unknown,
-  ) => void;
-};
-// [a, b, c] together, not three positional params: several handlers below need all three, and a
-// fixed-length tuple keeps every handler at arity 3 instead of growing with the widest opcode.
-type IOpFields = readonly [a: number, b: number, c: number];
-type IOpHandler = (
-  ctx: IApplyContext,
-  host: IRecordingHost,
-  fields: IOpFields,
-) => void;
-
-const OP_HANDLERS: Record<number, IOpHandler> = {
-  [OP_CREATE_RAW_TEXT]: (ctx, _host, [a, b]) =>
-    ctx.create(a, 'RCTRawText', { text: ctx.strings[b] }),
-  [OP_CREATE_ANCHOR]: (ctx, _host, [a]) => ctx.create(a, '', {}),
-  [OP_APPEND_CHILD]: (ctx, _host, [a, b]) => {
-    const child = ctx.at(b);
-    detachNode(child);
-    child.parent = ctx.at(a);
-    ctx.at(a).children.push(child);
-  },
-  [OP_INSERT_BEFORE]: (ctx, _host, [a, b, c]) => {
-    const parent = ctx.at(a);
-    const child = ctx.at(b);
-    const before = ctx.at(c);
-    detachNode(child);
-    child.parent = parent;
-    const index = parent.children.indexOf(before);
-    parent.children.splice(
-      index < 0 ? parent.children.length : index,
-      0,
-      child,
-    );
-  },
-  [OP_REMOVE_CHILD]: (ctx, _host, [, b]) => detachNode(ctx.at(b)),
-  [OP_SET_PROP]: (ctx, _host, [a, b, c]) => {
-    const node = ctx.at(a);
-    if (c === NO_VALUE) delete node.props[ctx.strings[b]];
-    else node.props[ctx.strings[b]] = ctx.values[c];
-  },
-  [OP_SET_TEXT]: (ctx, _host, [a, b]) => {
-    ctx.at(a).props.text = ctx.strings[b];
-  },
-  [OP_SET_COMPONENT]: (ctx, _host, [a, b]) => {
-    ctx.at(a).viewName = ctx.strings[b];
-  },
-  // RECORDED, NOT APPLIED: the real host resolves platform props off the tag, and the
-  // TypeScript `fabricProps` this host uses must not grow a second copy of that rule.
-  [OP_SET_TAG]: (ctx, _host, [a, b]) => {
-    ctx.at(a).tagName = ctx.strings[b];
-  },
-  // Same treatment, same reason - `focusable`'s three-leg touchable form and TouchableHighlight's
-  // underlay are both resolved off these bits by the real host, never re-derived here.
-  [OP_SET_OWNED_LISTENER]: (ctx, _host, [a, b, c]) => {
-    ctx.at(a).ownedListeners[ctx.strings[b]] = c !== 0;
-  },
-  [OP_SET_UNDERLAY_SHOWN]: (ctx, _host, [a, b]) => {
-    ctx.at(a).underlayShown = b !== 0;
-  },
-  [OP_COMMIT]: (ctx, host, [a, b]) => {
-    host.commits += 1;
-    markCommitted(ctx.at(b), a);
-  },
-};
-
-function buildApplyContext(
-  state: IRecordingState,
-  batch: IMutationBatch,
-): IApplyContext {
-  const { strings, values, handles, instanceHandles } = batch;
-  const handleAt = (slot: number): object => {
-    const handle = handles[slot];
-    if (handle === undefined) {
-      throw new Error(`applyOps: slot ${slot} is outside this batch's handles`);
-    }
-    return handle;
+  const clearRecords = (): void => {
+    tree.reset();
+    commands.length = 0;
+    responderHandovers.length = 0;
+    accessibilityEvents.length = 0;
   };
-  const at = (slot: number): IRecorded =>
-    nodeOf(state, handleAt(slot), 'applyOps');
-  const create = (
-    slot: number,
-    viewName: string,
-    props: Record<string, unknown>,
-    instanceHandle?: unknown,
-  ): void => {
-    const handle = handleAt(slot);
-    // Checked rather than assumed: the batch types handles as `object`, and the whole value of
-    // holding the node is being able to hand it back to the engine's own API.
-    if (!isSymbioteNode(handle)) {
-      throw new Error('applyOps: a handle in this batch is not an engine node');
-    }
-    const node: IRecorded = {
-      handle,
-      instanceHandle,
-      viewName,
-      tagName: '',
-      ownedListeners: {},
-      underlayShown: false,
-      props,
-      parent: undefined,
-      children: [],
-      committedRootTag: undefined,
-    };
-    state.recorded.set(handle, node);
-    state.created.push(node);
-  };
-  return { strings, values, instanceHandles, at, create };
-}
 
-function runApplyOps(
-  state: IRecordingState,
-  host: IRecordingHost,
-  batch: IMutationBatch,
-): void {
-  const { ops, strings, instanceHandles } = batch;
-  const ctx = buildApplyContext(state, batch);
-
-  for (let cursor = 0; cursor + OP_STRIDE <= ops.length; cursor += OP_STRIDE) {
-    const code = ops[cursor];
-    const a = ops[cursor + 1];
-    const b = ops[cursor + 2];
-    if (code === OP_CREATE_ELEMENT) {
-      // Slot 4 (`instanceHandles[d]`) is the object Fabric would hand back with an event -
-      // the only opcode reading a fifth field, so it stays out of IOpHandler's signature.
-      ctx.create(a, strings[b], {}, instanceHandles[ops[cursor + 4]]);
-      continue;
-    }
-    const handler = OP_HANDLERS[code];
-    if (handler === undefined) {
-      throw new Error(`applyOps: unknown opcode ${String(code)}`);
-    }
-    handler(ctx, host, [a, b, ops[cursor + 3]]);
-  }
-}
-
-type ITreeReadMethods = Pick<
-  IRecordingHost,
-  | 'propOf'
-  | 'propsOf'
-  | 'markPropsDirty'
-  | 'committedRecordOf'
-  | 'committedPayloadOf'
-  | 'parentOf'
-  | 'childrenOf'
-  | 'firstChildOf'
-  | 'nextSiblingOf'
-  | 'parentsOf'
-  | 'subtreesOf'
-  | 'teardownSubtreesOf'
-  | 'ancestorsOf'
-  | 'census'
->;
-
-// Answers straight off the op stream - there WAS a commit - with no claim about what Fabric did
-// with the node. `tag` is `NO_TAG`, not invented, so a caller cannot mistake it for a real one.
-function readCommittedRecord(
-  state: IRecordingState,
-  handle: object,
-): ICommittedRecord | undefined {
-  const node = state.recorded.get(handle);
-  if (node === undefined || node.committedRootTag === undefined)
-    return undefined;
-  return { handle, tag: NO_TAG, rootTag: node.committedRootTag };
-}
-
-// Refused, loudly: building a real Fabric payload is SymbioteFabricProps.cpp's job, which does
-// not run in vitest. A test that needs one belongs in core/engine/cpp/tests/js.
-function readCommittedPayload(): Readonly<Record<string, unknown>> | undefined {
-  throw new Error(
-    'recording host: committedPayloadOf needs the real payload builder — move this to an itest',
-  );
-}
-
-function walkSubtree(node: IRecorded, out: object[]): void {
-  out.push(node.handle);
-  for (const child of node.children) walkSubtree(child, out);
-}
-
-function readSubtrees(
-  state: IRecordingState,
-  roots: readonly object[],
-): object[] {
-  const out: object[] = [];
-  for (const root of roots) walkSubtree(nodeOf(state, root, 'subtreesOf'), out);
-  return out;
-}
-
-// The narrowed twin of readSubtrees: a root, or any descendant carrying an intrinsic tag,
-// survives; an untagged node with no tagged descendant does not, matching what the vitest suite
-// asserts about the real teardown sweep.
-function walkTeardownSubtree(
-  node: IRecorded,
-  isRoot: boolean,
-  out: object[],
-): boolean {
-  const reserved = out.length;
-  out.push(node.handle);
-  let isWanted = isRoot || node.tagName !== '';
-  for (const child of node.children) {
-    if (walkTeardownSubtree(child, false, out)) isWanted = true;
-  }
-  if (!isWanted) out.length = reserved;
-  return isWanted;
-}
-
-function readTeardownSubtrees(
-  state: IRecordingState,
-  roots: readonly object[],
-): object[] {
-  const out: object[] = [];
-  for (const root of roots) {
-    walkTeardownSubtree(nodeOf(state, root, 'teardownSubtreesOf'), true, out);
-  }
-  return out;
-}
-
-function readAncestors(state: IRecordingState, handle: object): object[] {
-  const chain: object[] = [];
-  for (
-    let node: IRecorded | undefined = nodeOf(state, handle, 'ancestorsOf');
-    node !== undefined;
-    node = node.parent
-  ) {
-    chain.push(node.handle);
-  }
-  return chain;
-}
-
-function readCensus(
-  state: IRecordingState,
-  roots: readonly object[],
-): ITreeCensus {
-  let nodes = 0;
-  const walk = (node: IRecorded): void => {
-    nodes += 1;
-    for (const child of node.children) walk(child);
-  };
-  for (const root of roots) walk(nodeOf(state, root, 'census'));
-  // The skip counts belong to the commit rules, which this host does not have. Zero is honest:
-  // nothing here was skipped, because nothing here was decided.
   return {
-    nodes,
-    anchors: 0,
-    emptyRawTexts: 0,
-    renderable: nodes,
-    flattenWidths: [],
-  };
-}
-
-function createTreeReadMethods(state: IRecordingState): ITreeReadMethods {
-  return {
-    propOf: (handle, key) => nodeOf(state, handle, 'propOf').props[key],
-    propsOf: handle => nodeOf(state, handle, 'propsOf').props,
-    // Nothing is memoized here, so there is nothing to invalidate.
-    markPropsDirty: () => {},
-    committedRecordOf: handle => readCommittedRecord(state, handle),
-    committedPayloadOf: readCommittedPayload,
-    parentOf: handle => nodeOf(state, handle, 'parentOf').parent?.handle,
-    childrenOf: handle =>
-      nodeOf(state, handle, 'childrenOf').children.map(child => child.handle),
-    firstChildOf: handle =>
-      nodeOf(state, handle, 'firstChildOf').children[0]?.handle,
-    nextSiblingOf: handle => {
-      const node = nodeOf(state, handle, 'nextSiblingOf');
-      const siblings = node.parent?.children;
-      return siblings?.[siblings.indexOf(node) + 1]?.handle;
+    get commits(): number {
+      return tree.commits;
     },
-    parentsOf: handles =>
-      handles.map(handle => nodeOf(state, handle, 'parentsOf').parent?.handle),
-    subtreesOf: roots => readSubtrees(state, roots),
-    teardownSubtreesOf: roots => readTeardownSubtrees(state, roots),
-    ancestorsOf: handle => readAncestors(state, handle),
-    census: roots => readCensus(state, roots),
-  };
-}
+    commands,
+    responderHandovers,
+    accessibilityEvents,
+    applyOps: tree.applyOps,
+    propOf(handle: object, key: string): unknown {
+      return nodeOf(handle, 'propOf').props[key];
+    },
+    propsOf(handle: object): Readonly<Record<string, unknown>> {
+      return nodeOf(handle, 'propsOf').props;
+    },
+    // Nothing is memoized here, so there is nothing to invalidate.
+    markPropsDirty(): void {},
+    // That the ops COMMITTED this node, and nothing more. Read off `committedRootTag` and not a
+    // live walk, т.к. `removeChild` cuts the parent link before the teardown sweep runs in the
+    // SAME commit
+    committedRecordOf(handle: object): ICommittedRecord | undefined {
+      const node = tree.recordedOf(handle);
+      if (node === undefined || node.committedRootTag === undefined) {
+        return undefined;
+      }
+      return {
+        handle,
+        tag: NO_TAG,
+        rootTag: node.committedRootTag,
+      };
+    },
+    // REFUSED loudly, т.к. the payload is `SymbioteFabricProps.cpp`'s and that code does not run
+    // in vitest. A test asking this belongs in `core/engine/cpp/tests/js`, where the real builder
+    // does run
+    committedPayloadOf(): Readonly<Record<string, unknown>> | undefined {
+      throw new Error(
+        'recording host: committedPayloadOf needs the real payload builder — move this to an itest',
+      );
+    },
+    parentOf(handle: object): object | undefined {
+      return nodeOf(handle, 'parentOf').parent?.handle;
+    },
+    childrenOf(handle: object): readonly object[] {
+      return nodeOf(handle, 'childrenOf').children.map(child => child.handle);
+    },
+    firstChildOf(handle: object): object | undefined {
+      return nodeOf(handle, 'firstChildOf').children[0]?.handle;
+    },
+    nextSiblingOf(handle: object): object | undefined {
+      const node = nodeOf(handle, 'nextSiblingOf');
+      const siblings = node.parent?.children;
+      if (siblings === undefined) return undefined;
+      return siblings[siblings.indexOf(node) + 1]?.handle;
+    },
+    parentsOf(handles: readonly object[]): readonly (object | undefined)[] {
+      return handles.map(handle => nodeOf(handle, 'parentsOf').parent?.handle);
+    },
+    subtreesOf(roots: readonly object[]): readonly object[] {
+      const out: object[] = [];
+      const walk = (node: IRecorded): void => {
+        out.push(node.handle);
+        for (const child of node.children) walk(child);
+      };
+      for (const root of roots) walk(nodeOf(root, 'subtreesOf'));
+      return out;
+    },
+    // The twin of the engine's narrowed walk, and it MUST narrow here too: the vitest suite is
+    // where the sweep is asserted, so handing back everything would pass those cases whatever the
+    // engine does
+    teardownSubtreesOf(roots: readonly object[]): readonly object[] {
+      const out: object[] = [];
+      const walk = (node: IRecorded, isRoot: boolean): boolean => {
+        const reserved = out.length;
+        out.push(node.handle);
+        let isWanted = isRoot || node.tagName !== '';
+        for (const child of node.children) {
+          if (walk(child, false)) isWanted = true;
+        }
+        if (!isWanted) out.length = reserved;
+        return isWanted;
+      };
+      for (const root of roots) walk(nodeOf(root, 'teardownSubtreesOf'), true);
+      return out;
+    },
+    ancestorsOf(handle: object): readonly object[] {
+      const chain: object[] = [];
+      for (
+        let node: IRecorded | undefined = nodeOf(handle, 'ancestorsOf');
+        node !== undefined;
+        node = node.parent
+      ) {
+        chain.push(node.handle);
+      }
+      return chain;
+    },
+    census(roots: readonly object[]): ITreeCensus {
+      let nodes = 0;
+      const walk = (node: IRecorded): void => {
+        nodes += 1;
+        for (const child of node.children) walk(child);
+      };
+      for (const root of roots) walk(nodeOf(root, 'census'));
+      // The skip counts belong to the commit rules, which this host does not have. Zero is the
+      // honest answer: nothing here was skipped, because nothing here was decided.
+      return {
+        nodes,
+        anchors: 0,
+        emptyRawTexts: 0,
+        renderable: nodes,
+        flattenWidths: [],
+      };
+    },
 
-type IImperativeMethods = Pick<
-  IRecordingHost,
-  | 'dispatchCommand'
-  | 'sendAccessibilityEvent'
-  | 'measure'
-  | 'measureInWindow'
-  | 'getBoundingClientRect'
-  | 'measureLayout'
-  | 'setIsJSResponder'
->;
-
-// The imperative six ask the PLATFORM; three carry a request the engine MADE and are recorded,
-// the measuring three want a platform answer this host has none of. `getHost`, not `host`, since
-// this factory runs while `createRecordingHost`'s own `host` binding is still being assigned.
-function createImperativeMethods(
-  state: IRecordingState,
-  getHost: () => IRecordingHost,
-): IImperativeMethods {
-  return {
+    // The imperative six ask the PLATFORM — a frame, a gesture, an announcement. Three of them
+    // carry a request the engine MADE, so they are recorded; the measuring three want an answer
+    // only a platform has, and there is none here.
     dispatchCommand(
       handle: object,
       commandName: string,
       args: readonly unknown[],
     ): void {
-      getHost().commands.push({
+      commands.push({
         handle,
-        viewName: nodeOf(state, handle, 'dispatchCommand').viewName,
+        viewName: nodeOf(handle, 'dispatchCommand').viewName,
         commandName,
         args,
       });
     },
     sendAccessibilityEvent(handle: object, eventType: string): void {
-      getHost().accessibilityEvents.push({ handle, eventType });
+      accessibilityEvents.push({ handle, eventType });
     },
     measure(_handle: object, _callback: IMeasureOnSuccess): void {},
     measureInWindow(
       _handle: object,
       _callback: IMeasureInWindowOnSuccess,
     ): void {},
-    // Same "answers nothing real" precedent as measure/measureInWindow above: a headless run has
-    // no Yoga layout to report, so every node reads the same zero rect rather than a fake number
-    // that would look like layout without ever having run one.
+    // No Yoga layout runs headless, so every node reads one zero rect instead of a fake number
     getBoundingClientRect(): IDomRect {
       return { x: 0, y: 0, width: 0, height: 0 };
     },
@@ -625,82 +388,39 @@ function createImperativeMethods(
       isResponder: boolean,
       blockNativeResponder: boolean,
     ): void {
-      getHost().responderHandovers.push({
-        handle,
-        isResponder,
-        blockNativeResponder,
-      });
+      responderHandovers.push({ handle, isResponder, blockNativeResponder });
     },
-  };
-}
 
-type ILifecycleMethods = Pick<
-  IRecordingHost,
-  'registerEventHandler' | 'find' | 'findAll' | 'fireEvent' | 'reset' | 'forget'
->;
-
-// `getHost`, not `host` - same reason as createImperativeMethods above.
-function createLifecycleMethods(
-  state: IRecordingState,
-  getHost: () => IRecordingHost,
-): ILifecycleMethods {
-  return {
     registerEventHandler(handler: IEventHandler): void {
-      state.eventHandler = handler;
+      eventHandler = handler;
     },
+
     find(
       predicate: (node: IAuthoredNode) => boolean,
     ): IAuthoredNode | undefined {
-      return state.created.find(predicate);
+      return tree.authored.find(predicate);
     },
+
     findAll(predicate: (node: IAuthoredNode) => boolean): IAuthoredNode[] {
-      return state.created.filter(predicate);
+      return tree.authored.filter(predicate);
     },
+
     fireEvent(
       handle: object,
       topLevelType: string,
       nativeEvent: Record<string, unknown> = {},
     ): void {
-      if (state.eventHandler === undefined) {
+      if (eventHandler === undefined) {
         throw new Error('no event handler registered by the renderer');
       }
-      state.eventHandler(handle, topLevelType, nativeEvent);
+      eventHandler(handle, topLevelType, nativeEvent);
     },
-    reset(): void {
-      const host = getHost();
-      state.created = [];
-      host.commits = 0;
-      host.commands.length = 0;
-      host.responderHandovers.length = 0;
-      host.accessibilityEvents.length = 0;
-    },
+
+    reset: clearRecords,
+
     forget(): void {
-      state.recorded = new WeakMap();
-      state.created = [];
-      getHost().reset();
+      tree.forget();
+      clearRecords();
     },
   };
-}
-
-export function createRecordingHost(): IRecordingHost {
-  const state: IRecordingState = {
-    recorded: new WeakMap(),
-    created: [],
-    eventHandler: undefined,
-  };
-
-  const host: IRecordingHost = {
-    commits: 0,
-    commands: [],
-    responderHandovers: [],
-    accessibilityEvents: [],
-    applyOps(batch: IMutationBatch): void {
-      runApplyOps(state, host, batch);
-    },
-    ...createTreeReadMethods(state),
-    ...createImperativeMethods(state, () => host),
-    ...createLifecycleMethods(state, () => host),
-  };
-
-  return host;
 }
