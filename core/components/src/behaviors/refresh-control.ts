@@ -34,7 +34,8 @@ import {
   dispatchViewCommand,
   dlog,
   registerHostBehavior,
-  setBehaviorListener,
+  setNodeDispatch,
+  type IEventDispatch,
   type ISymbioteEvent,
   type ISymbioteNode,
   propOf,
@@ -94,11 +95,18 @@ function onRefresh(node: ISymbioteNode, event: ISymbioteEvent): void {
   queueMicrotask(() => evaluateSnapBack(node));
 }
 
+// ONE object for every RefreshControl in the app, where a closure per node used to be
+const REFRESH_DISPATCH: IEventDispatch = {
+  names: new Set(['refresh']),
+  deliver: (node, _name, event) => onRefresh(node, event),
+};
+
 function attach(node: ISymbioteNode): void {
-  setBehaviorListener(node, 'refresh', event => onRefresh(node, event));
+  setNodeDispatch(node, REFRESH_DISPATCH);
 }
 
 function detach(node: ISymbioteNode): void {
+  setNodeDispatch(node, undefined);
   reported.delete(node);
 }
 

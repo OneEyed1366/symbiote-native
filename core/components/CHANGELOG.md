@@ -1,5 +1,33 @@
 # @symbiote-native/components
 
+## 3.1.3
+
+### Patch Changes
+
+- [`cfbb0f7`](https://github.com/OneEyed1366/symbiote-native/commit/cfbb0f7dd8251fb74553f04e58f7e368f63289f5) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - TouchableWithoutFeedback builds its press-timing runtime on the first gesture instead of when it
+  adopts a child, so a list of them nobody touches stops paying for it: 383 bytes per item,
+  7 183 -> 6 800 KB per thousand.
+
+- [`cfbb0f7`](https://github.com/OneEyed1366/symbiote-native/commit/cfbb0f7dd8251fb74553f04e58f7e368f63289f5) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - The press machine builds its gesture runtime on the first event instead of at mount, so a pressable
+  nobody touches pays for its dispatchers and nothing else. Every tag carrying the machine drops
+  ~1 KB per node: `button` 8 259 -> 7 259 KB / 1 000, `touchable-opacity` 7 992 -> 6 992,
+  `pressable` 3 561 -> 2 559, `text-input` 6 090 -> 5 168.
+
+- [`cfbb0f7`](https://github.com/OneEyed1366/symbiote-native/commit/cfbb0f7dd8251fb74553f04e58f7e368f63289f5) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - ScrollView, RefreshControl, Switch and TextInput answer their events through the shared dispatch
+  too, so no behavior installs a listener closure per node any more except where the name is
+  Fabric-gated. Per thousand items: scroll-view 3 878 -> 2 276 KB, refresh-control 5 906 -> 3 937,
+  text-input 3 824 -> 3 105, switch 2 461 -> 2 015.
+
+- [`cfbb0f7`](https://github.com/OneEyed1366/symbiote-native/commit/cfbb0f7dd8251fb74553f04e58f7e368f63289f5) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - TouchableOpacity and Button bind their animated opacity layer on the first press instead of at
+  mount. Mounting a thousand touchables drops from 65 ms / 25 MB to 27 ms / 8 MB, a button from
+  74 ms / 26 MB to 43 ms / 8 MB. An untouched touchable now commits no `opacity` key, matching
+  vendor (`TouchableOpacity-itest.js`); `collapsable: false` is still forced from mount.
+
+- [`cfbb0f7`](https://github.com/OneEyed1366/symbiote-native/commit/cfbb0f7dd8251fb74553f04e58f7e368f63289f5) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - A host behavior answers its events through one shared dispatch instead of installing a closure per
+  name, and TouchableOpacity builds its fade runtime on the first press rather than at attach. Per
+  thousand items: pressable 2 559 -> 1 263 KB, touchable-opacity 6 992 -> 3 584, button 7 259 ->
+  4 068, text-input 5 167 -> 3 824.
+
 ## 3.1.2
 
 ### Patch Changes

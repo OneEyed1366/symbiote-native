@@ -8,12 +8,7 @@ import {
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
-/**
- * Deep-linking demo: APP_LINKING_CONFIG (navigation-linking.ts) is the SAME config wired at the
- * root via useLinkingIntegration (App.tsx) for real OS deep links — here resolveRouteFromUrl is
- * called directly against a typed-in URL so the resolution itself is provable inside the running
- * app without needing an actual OS-level deep link.
- */
+/** Deep-linking demo: APP_LINKING_CONFIG (navigation-linking.ts) is the SAME config wired at the */
 export function DeepLinkingScreen() {
   const [url, setUrl] = useState(SAMPLE_DEEP_LINK_URL);
   const [resolved, setResolved] = useState<string | undefined>(undefined);

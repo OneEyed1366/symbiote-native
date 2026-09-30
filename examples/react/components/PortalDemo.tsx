@@ -41,10 +41,10 @@ export function PortalDemo() {
         )}
       <CaveatNote testID="portal-caveat">
         This adapter's createPortal is same-surface-only — the target must
-        already be mounted in the SAME surface as the call site
-        (react-adapter-portal skill); it can't reach a second,
-        independently-mounted surface the way react-dom's createPortal reaches
-        an arbitrary DOM node.
+        already be mounted in the SAME surface as the call site; it can't
+        reach a second, independently-mounted surface the way react-dom's
+        createPortal reaches an arbitrary DOM node. See create-tunnel for
+        cross-surface sharing instead.
       </CaveatNote>
     </view>
   );

@@ -47,9 +47,11 @@ export function SuspenseActivityLazyDemo() {
         </text>
       </Activity>
       <CaveatNote testID="suspense-activity-caveat">
-        host-config.ts's hideInstance/unhideInstance are no-op stubs, so content
-        Suspense/Activity mark as hidden likely stays visually painted — only
-        React's own bookkeeping treats it as hidden, not the actual view tree.
+        Activity hide/unhide is real (host-config.ts's hideInstance/
+        unhideInstance actually toggle the view). Suspense's fallback swap
+        still runs on React's legacy sync root, so it lacks true
+        commit-suspension: it works for lazy/mount-unmount cases like this
+        one, not for deferring a commit while a resource loads.
       </CaveatNote>
     </view>
   );

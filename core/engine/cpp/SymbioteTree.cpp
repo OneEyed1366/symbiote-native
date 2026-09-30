@@ -1540,33 +1540,16 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
 
   size_t opsLength = 0;
   const int32_t *ops = int32ArrayData(runtime, arguments[0], opsLength);
-  // ── THE PROLOGUE WAS THE COST, AND THIS LINE WAS THE PROLOGUE ──────────────────────────────────
-  //
-  // `getObject`/`getArray` rather than `asObject`/`asArray`. The checking pair runs an `isObject`
-  // and an `isArray` per table — eight JSI round trips for four arguments — and they were 2.8 us of
-  // a 4.4 us fixed entry cost. Measured on an EMPTY batch against a 0.13 us bare host call
-  // (`small-batch-crossing-cost.itest.ts`): prologue 4.38 -> 1.54 us, and a whole small drain
-  // 5.54 -> 2.76 us.
-  //
-  // WHY IT IS SAFE TO DROP THEM, and it is the harness's own split rather than a shrug: `takeBatch`
-  // is the only producer on this wire and always hands over four arrays, and `jsi::Value::getObject`
-  // / `Object::getArray` carry `assert`s that are LIVE in the correctness build — `core/engine/cpp/
-  // tests/build` is Debug with `NDEBUG` off, which is the whole reason it exists. So a fixture that
-  // hand-builds a malformed batch aborts there and the build that ships pays nothing for the check.
-  //
-  // WHAT IT COSTS ANYONE: a framework that navigates between mutations pays this entry per
-  // mutation, not per commit. Solid's `cleanChildren` enters `applyOps` 2 000 times to clear a
-  // thousand rows.
+  // `getObject`/`getArray` and never the checking pair, which was 2.8 us of a 4.4 us entry. Why
+  // that is safe: `symbiote-engine-op-application` skill, "The prologue"
   auto strings = arguments[1].getObject(runtime).getArray(runtime);
   auto values = arguments[2].getObject(runtime).getArray(runtime);
   auto instanceHandles = arguments[3].getObject(runtime).getArray(runtime);
   auto handles = arguments[4].getObject(runtime).getArray(runtime);
   const size_t slotCount = handles.size(runtime);
 
-  // Slot -> node, resolved at most ONCE per batch and usually not at all: a slot this batch creates
-  // is written by its own create op and never read from JS, which on a create-shaped commit is
-  // nearly every slot. Only a slot naming a node an EARLIER batch created costs a read, and it costs
-  // exactly one however many ops go on to name it.
+  // Slot -> node, resolved at most ONCE per batch and usually not at all. See the skill,
+  // "The three per-batch tables"
   std::vector<NodePtr> bySlot(slotCount);
 
   auto checkSlot = [&](int32_t slot) -> size_t {
@@ -1606,18 +1589,8 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
     walkCost_.publishNs += nanosSince(publishStartedAt);
   };
 
-  // Decoded ONCE per batch, not once per op that names a string.
-  //
-  // This used to read the JSI array and allocate a fresh `std::string` inside the op loop, which
-  // spent exactly the saving `mutation-buffer.ts` interns for: its own comment says a 1 000-row
-  // create emits about a dozen distinct view names across 10 000 elements and draws every prop key
-  // from a set of a few hundred, and none of that reached here. Counted through a real adapter
-  // (`adapters/solid/src/batch-decode-census.probe.test.tsx`): 16 005 decodes against a table of
-  // 2 008 entries on a create, and the same 8.0x on an append.
-  //
-  // Two costs go, and only one of them is measurable without a device. The allocation half a bench
-  // puts at 3.26x for the whole path (`core/engine/bench/batch-string-decode.cpp`); the other half
-  // is 13 997 JSI crossings that simply stop happening, and nothing headless can price those.
+  // Decoded ONCE per batch, not once per op that names a string. The 8.0x this turns on, and what
+  // is not measurable headless: the skill, "The three per-batch tables"
   std::vector<std::string> decodedStrings;
   {
     const auto stringsStartedAt = ISteadyClock::now();
@@ -1630,17 +1603,8 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
     walkCost_.stringDecodeNs += nanosSince(stringsStartedAt);
   }
 
-  // Prop VALUES, converted at most once per entry per batch — the other half of the buffer's
-  // interning, and useless without it. `mutation-buffer.ts` gives one entry to one object however
-  // many nodes were handed it, so a `StyleSheet.create` style shared by a thousand rows arrives as
-  // one entry; this is what turns that into one conversion instead of a thousand identical ones.
-  //
-  // LAZY rather than eager, unlike the strings above: a batch's value table can hold entries no
-  // surviving op names — a prop written and then overwritten in the same batch — and converting one
-  // eagerly would charge for work the ops do not ask for. The strings table has no such shape.
-  //
-  // One consequence worth knowing when a conversion throws: `boundedDynamicFrom`'s message names the
-  // prop and view of the FIRST op to reach a given entry, not every op that shares it.
+  // Prop VALUES, converted at most once per entry per batch, and LAZILY unlike the strings above.
+  // Why lazily, and what that costs a thrown conversion: the skill, "The three per-batch tables"
   std::vector<folly::dynamic> convertedValues(values.size(runtime));
   std::vector<bool> valueIsConverted(convertedValues.size(), false);
   walkCost_.valueEntries += convertedValues.size();
@@ -1657,10 +1621,8 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
     return decodedStrings[static_cast<size_t>(index)];
   };
 
-  // `auto &&describe` and not a `std::function`: the description must stay a lambda the compiler can
-  // inline away, for the reason `boundedDynamicFrom`'s own comment gives — building the string
-  // eagerly was 48.8% of the decode path once, and a `std::function` per op would allocate to
-  // reintroduce half of it.
+  // `auto &&describe` and not a `std::function`: the description must stay a lambda the compiler
+  // can inline away. See `boundedDynamicFrom`, and the skill for the 48.8% behind it
   auto valueAt = [&](int32_t index, auto &&describe) -> const folly::dynamic & {
     if (index < 0 || static_cast<size_t>(index) >= convertedValues.size()) {
       throw jsi::JSError(
@@ -1729,8 +1691,8 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
         const auto holdStartedAt = ISteadyClock::now();
         holdHandle(runtime, *child);
         walkCost_.holdHandleNs += nanosSince(holdStartedAt);
-        // The hint the detach path reads back. Appending past a hole is harmless — the hole keeps
-        // its place until the next read compacts, and order is preserved either way.
+        // A HINT the detach path reads back, and appending past a hole is harmless: the hole keeps
+        // its place until the next read compacts
         child->slotInParent = parent->children.size();
         parent->children.push_back(std::move(child));
         markDirty(*parent);
@@ -1741,10 +1703,8 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
         const auto &parent = nodeAt(ops[at + 1]);
         auto child = nodeAt(ops[at + 2]);
         const auto &before = nodeAt(ops[at + 3]);
-        // A MOVE WITHIN THE SAME PARENT ERASES RATHER THAN PUNCHING A HOLE, and the reason is that
-        // an insert shifts this vector anyway: a hole would force a compaction pass on top of the
-        // shift, which measured 2.4x worse on a 4 000-row reorder than simply erasing. A move to a
-        // DIFFERENT parent holes the old one as usual — nothing is about to shift it.
+        // A MOVE WITHIN THE SAME PARENT ERASES RATHER THAN PUNCHING A HOLE, 2.4x better on a
+        // 4 000-row reorder. See the skill, "Child-vector maintenance"
         if (child->parent == parent.get()) {
           auto &standing = parent->children;
           const size_t hinted = child->slotInParent;
@@ -1770,60 +1730,34 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
                   std::find(siblings.begin(), siblings.end(), before) - siblings.begin());
         siblings.insert(siblings.begin() + static_cast<std::ptrdiff_t>(index), std::move(child));
         siblings[index]->slotInParent = index;
-        // THE TAIL'S HINTS ARE NOW ONE TOO LOW, AND THEY ARE DELIBERATELY LEFT THAT WAY.
-        //
-        // Renumbering them is O(width) per insert, which was tried and made a reorder of 4 000 rows
-        // 34.6 ms against 6.7 — five times worse, to keep a hint exact that nothing requires to be.
-        // `detachFromParent` validates before it believes (`siblings[hinted] == child`) and falls
-        // back to a scan, so a stale hint costs one detach its old price and never costs correctness.
-        //
-        // What IS still linear here is the vector insert itself. Finding the anchor is a load now;
-        // making the insert a load needs a different container, not a different search.
+        // THE TAIL'S HINTS ARE NOW ONE TOO LOW AND ARE LEFT THAT WAY: renumbering was five times
+        // worse on a 4 000-row reorder. See the skill, "Child-vector maintenance"
         markDirty(*parent);
         break;
       }
       case kOpRemoveChild: {
         const auto &parent = nodeAt(ops[at + 1]);
         auto child = nodeAt(ops[at + 2]);
-        // Named rather than implied: `detachFromParent` reads the child's OWN parent pointer, which
-        // is the truth even when the adapter names a stale parent — frameworks spell a move as
-        // remove-then-insert and can arrive here after the insert already re-parented the node.
+        // The child's OWN parent pointer, which is the truth even when the adapter names a stale
+        // one. See the skill, "Child-vector maintenance"
         if (child->parent == parent.get()) {
           detachFromParent(child);
-          // Out of the tree, so nothing pins its placeholder any more. Released HERE and not inside
-          // `detachFromParent`, which the two attach ops also call to spell a MOVE: dropping the
-          // pin there would leave a window, mid-batch, where the node is in no tree and a
-          // collection could take the handle a re-attach is about to need.
+          // Released HERE and not inside `detachFromParent`, which the attach ops also call to
+          // spell a MOVE. Why that window would matter: the skill
           child->attachedHandle.reset();
         }
         break;
       }
-      // Writing a value the node already holds is a NO-OP and returns before `markDirty`. Fabric
-      // never saw a difference either way — `diffProps` would find the key unchanged and drop it —
-      // but the mark is not free: it climbs to the first already-dirty ancestor and strips every one
-      // of them of the reuse fast path, so an otherwise untouched subtree gets rebuilt purely to
-      // prove it is untouched. Measured: Angular's Pressable host bag pushed 104 000 setProp calls
-      // for a screen Solid built in 12 000, 90 000 of them writing `undefined` over an absent key.
-      //
-      // The guard lives HERE and not in the engine's `setProp` because it needs the value the node
-      // already holds — a read JS would have to make over the wire, ~44 001 times on a 1 000-row
-      // create, which is exactly the traffic this design removes.
-      //
-      // ONE DELIBERATE ASYMMETRY with the reference applier, and it is in the safe direction. TS
-      // compares with `Object.is`, so for a style object or a handler the guard simply never fires:
-      // an adapter may hand back the SAME reference with mutated contents, and identity cannot see
-      // that. Here the value is a fresh `folly::dynamic` copied off the JSI value, so nothing can
-      // mutate it behind us and a deep compare is both available and correct. It therefore turns
-      // away strictly MORE writes than TS does. That changes the work, never the committed tree —
-      // `diffProps` drops an unchanged key either way — so the two still agree on output.
+      // Writing a value the node already holds returns before `markDirty`, т.к. the MARK is what
+      // costs: it strips every ancestor of the reuse fast path. Why the guard is here and not in
+      // JS, and the one asymmetry with the TS applier: the skill, "The two guards"
       case kOpSetProp: {
         const auto setPropStartedAt = ISteadyClock::now();
         const auto &node = nodeAt(ops[at + 1]);
         const auto &key = stringAt(ops[at + 2]);
         if (ops[at + 3] == kNoValue) {
-          // An absent key is not a key holding null: deleting one that is not there changes nothing,
-          // while deleting one that is there changes what the next `diffProps` sends, since a
-          // vanished key has to go out as an explicit null.
+          // An absent key is not a key holding null, and a vanished one goes out as an explicit
+          // null. See the skill, "The two guards"
           if (node->props.get_ptr(key) == nullptr) {
             walkCost_.deletesOfAbsent += 1;
             break;
@@ -1838,9 +1772,7 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
             walkCost_.writesOfUnchanged += 1;
             break;
           }
-          // A COPY, where this used to move: the entry is shared by every node the same object was
-          // handed to, so it has to survive this op. One `folly::dynamic` copy against one JS ->
-          // dynamic conversion, and the conversion is the JSI crossing.
+          // A COPY and not a move: the entry is shared by every node the same object was handed to
           node->props[key] = value;
         }
         markDirty(*node);
@@ -1848,14 +1780,8 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
         walkCost_.setProps += 1;
         break;
       }
-      // The same guard, and here it is strictly stronger than a reference check even in TS: `text`
-      // is a string, so this is a real value comparison. A framework that re-renders a subtree and
-      // hands back an unchanged label — every list row whose text did not move, on every update —
-      // stops dirtying its ancestors.
-      // The one op that changes what a node IS rather than what it holds. `materialize`'s
-      // `needsFreshFamily` already covers the consequence — a name differing from
-      // `committedViewName` re-creates the node and re-parents its children — so this only moves the
-      // name and marks. `TextInput`'s `multiline` flip is the whole reason it exists.
+      // The one op that changes what a node IS rather than what it holds, and `materialize`'s
+      // `needsFreshFamily` covers the consequence. `TextInput`'s `multiline` flip is why it exists
       case kOpSetComponent: {
         const auto &node = nodeAt(ops[at + 1]);
         const auto &viewName = stringAt(ops[at + 2]);
@@ -1864,19 +1790,15 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
         markDirty(*node);
         break;
       }
-      // No `markDirty`: this arrives at `createElement`, before any prop is routed and long before
-      // the node's first commit, so the payload it changes has not been built yet.
+      // No `markDirty`: this arrives at `createElement`, before the node's first commit, so there
+      // is no payload yet. The table of which ops mark and why is in the skill
       case kOpSetTag: {
         const auto &node = nodeAt(ops[at + 1]);
         node->tagName = stringAt(ops[at + 2]);
         break;
       }
-      // `markDirty`, unlike `kOpSetTag` above, and the difference is WHEN each arrives. A tag is set
-      // at `attachHostBehavior`, before any prop is routed and before the node's first commit, so
-      // there is no payload yet to invalidate. A listener can flip at any point in a screen's life —
-      // a row that becomes pressable once its data loads — and the key it decides is already
-      // committed by then. Without this the control renders permanently unfocusable while visibly
-      // interactive, and nothing else in the batch would mark it: a listener is not a prop write.
+      // `markDirty`, unlike `kOpSetTag`, т.к. a listener can flip at any point in a screen's life
+      // and the key it decides is committed by then. See the skill
       case kOpSetOwnedListener: {
         const auto &node = nodeAt(ops[at + 1]);
         // Only the names a platform rule actually reads. Anything else is a JS-side concern that
@@ -1898,13 +1820,8 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
         if (node->underlayShown == shown) break;
         node->underlayShown = shown;
         markDirty(*node);
-        // AND THE CHILD, because this bit drives a rule on BOTH nodes: the container takes the
-        // background and the child takes the opacity (`foldTouchableHighlightChild`). A descendant
-        // rule runs when ITS node is dirty, so without this the child would freeze in its unpressed
-        // shape and never dim — the hazard `ownerProps` already carries for ScrollView's content.
-        //
-        // FIRST child and no walk: RN takes `React.Children.only` (`TouchableHighlight.js:306`), so
-        // one is the whole population rather than a simplification. Twice per tap, not per frame.
+        // AND THE CHILD, т.к. the bit drives a rule on BOTH (`foldTouchableHighlightChild`), and
+        // the FIRST child is the whole population since RN takes `React.Children.only`
         if (!node->children.empty()) {
           compactChildren(*node);
           if (!node->children.empty() && node->children.front() != nullptr)
@@ -1917,16 +1834,8 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
         const auto &text = stringAt(ops[at + 2]);
         const auto *existing = node->props.get_ptr("text");
         if (existing != nullptr && existing->isString() && existing->asString() == text) break;
-        // Read BEFORE the write, and only a FLIP marks the parent.
-        //
-        // A write to or from '' takes this node out of its parent's renderable child list or puts it
-        // back, which is a structural change to the PARENT that nothing else here would record.
-        // Marking unconditionally made every ordinary relabel do it too, and `markDirty` sets the
-        // parent's SELF-dirty bit — which forces a full `fabricProps` + `diffProps` on a node whose
-        // own props did not move. Counted through three adapters on a 1 000-row relabel
-        // (`adapters/*/src/work-ledger.probe.test.*`): 3 000 payload keys rebuilt to send 1 000.
-        // The walk still reaches this node either way, because `markDirty(*node)` raises
-        // `pathDirty` on every ancestor.
+        // Read BEFORE the write, and only a FLIP to or from `''` marks the parent, т.к. that is
+        // what moves the node in or out of its parent's renderable list. See the skill
         const bool wasEmpty =
             existing == nullptr || !existing->isString() || existing->asString().empty();
         node->props["text"] = text;
@@ -1938,43 +1847,25 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
         const auto surfaceId = static_cast<react::SurfaceId>(ops[at + 1]);
         const auto &surface = nodeAt(ops[at + 2]);
         auto childSet = std::make_shared<ChildSet>();
-        // The surface NODE is contributed, not its children — it is the AppContainer view
-        // (`createSurfaceRoot`, `flex: 1` + `box-none`) and it commits. Routing it through the same
-        // call keeps the two shapes one path: an ANCHOR in this position hoists its children.
-        //
-        // `nullptr` as the Fabric parent: the root CHILD SET is not a node. So a top-level node
-        // moving between two surfaces is NOT caught by the parent comparison — both sides are
-        // `nullptr` — and the surface id is what separates them, which is why `materialize`
-        // compares that too.
-        // The root child set goes to `completeSurface`, which commits it through a transaction we
-        // never see the result of — so there is nothing to adopt back here, and these owners are
-        // collected only because `appendRenderable` needs somewhere to put them.
+        // The surface NODE is contributed, not its children, and `nullptr` stands for the root
+        // child set т.к. it is not a node. What that costs a cross-surface move: the skill
         IOwnerTally rootOwners;
-        // THE ONE TIMER THAT IS NOT PER NODE, and it has to be here rather than inside
-        // `materialize`: the walk is recursive, so a timer around the recursive call would count
-        // every ancestor's time again for every descendant. This is the walk's single entry point.
+        // THE ONE TIMER THAT IS NOT PER NODE, т.к. the walk is recursive and a timer inside
+        // `materialize` would count every ancestor again for every descendant
         const auto walkStartedAt = ISteadyClock::now();
         appendRenderable(
             runtime, uiManager, *childSet, rootOwners, *surface, false, surfaceId, nullptr);
         walkCost_.walkNs += nanosSince(walkStartedAt);
-        // SKIPPED when the root child set comes back identical. `materialize` already declines to
-        // clone a node nothing changed, so an unchanged tree produces the same handles — and
-        // `completeSurface` on them is a full `ShadowTree::commit`, with layout and a mount pass,
-        // for no change at all.
-        //
-        // This is what makes the JS side's commit fan-out free: every commit names every live root,
-        // because a cross-surface mutation dirties a surface whose renderer nobody is holding
-        // (`commitSurfaceOps` in tree-host.ts). An untouched root reaches here with an identical
-        // list and stops.
+        // SKIPPED when the root child set comes back identical, which is what makes the JS side's
+        // commit fan-out free. See the skill, "kOpCommit"
         if (surface->hasCommittedRenderable &&
             sameNodes(surface->committedRenderable, *childSet)) {
           break;
         }
         surface->committedRenderable = *childSet;
         surface->hasCommittedRenderable = true;
-        // `completeSurface` runs `ShadowTree::commit` itself, with a lambda that REPLACES the root's
-        // children outright — so a retry against a moved root is harmless and there is nothing to
-        // rebase. That is why this needs neither a commit hook nor a retained pending root.
+        // `completeSurface` runs `ShadowTree::commit` with a lambda that REPLACES the root's
+        // children, so this needs neither a commit hook nor a retained pending root
         uiManager.completeSurface(
             surfaceId,
             childSet,
@@ -1983,9 +1874,8 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
              .source = react::ShadowTree::CommitSource::React});
         uiManager.getShadowTreeRegistry().visit(
             surfaceId, [&rootOwners](const react::ShadowTree &shadowTree) {
-              // THE REPAIR, and it must run here rather than in `materialize`: substitution happens
-              // INSIDE the commit, so the only tree that can be believed is the one the registry
-              // holds once `completeSurface` has returned. See `adoptCommitted`.
+              // THE REPAIR, here and not in `materialize` т.к. substitution happens INSIDE the
+              // commit. See `adoptCommitted`
               const ChildSet &landedRoot =
                   shadowTree.getCurrentRevision().rootShadowNode->getChildren();
               const size_t rootCount =
@@ -2408,6 +2298,10 @@ jsi::Value Tree::measureLayout(jsi::Runtime &runtime, const jsi::Value *, size_t
   throw jsi::JSError(runtime, "symbiote engine: measureLayout is not built on this platform");
 }
 
+jsi::Value Tree::getBoundingClientRect(jsi::Runtime &runtime, const jsi::Value *, size_t) {
+  throw jsi::JSError(runtime, "symbiote engine: getBoundingClientRect is not built on this platform");
+}
+
 #else
 
 jsi::Value Tree::measure(jsi::Runtime &runtime, const jsi::Value *arguments, size_t count) {
@@ -2469,6 +2363,37 @@ jsi::Value Tree::measureInWindow(
        jsi::Value{runtime, rect.width},
        jsi::Value{runtime, rect.height}});
   return jsi::Value::undefined();
+}
+
+// No callback, unlike its siblings above - the JS caller (imperative.ts) expects a direct return.
+// `undefined` (no revision yet) reads the same as an uncommitted node to that caller.
+jsi::Value Tree::getBoundingClientRect(
+    jsi::Runtime &runtime,
+    const jsi::Value *arguments,
+    size_t count) {
+  if (count < 2) {
+    throw jsi::JSError(
+        runtime, "symbiote engine: expected getBoundingClientRect(handle, includeTransform)");
+  }
+  const auto node = nodeFrom(runtime, arguments[0].asObject(runtime), "getBoundingClientRect");
+  const bool includeTransform = arguments[1].getBool();
+
+  auto revision = node->committed == nullptr
+      ? nullptr
+      : uiManagerFor(runtime, "getBoundingClientRect")
+            .getShadowTreeRevisionProvider()
+            ->getCurrentRevision(node->committed->getSurfaceId());
+  if (revision == nullptr) {
+    return jsi::Value::undefined();
+  }
+
+  auto rect = react::dom::getBoundingClientRect(revision, *node->committed, includeTransform);
+  auto result = jsi::Object(runtime);
+  result.setProperty(runtime, "x", jsi::Value(rect.x));
+  result.setProperty(runtime, "y", jsi::Value(rect.y));
+  result.setProperty(runtime, "width", jsi::Value(rect.width));
+  result.setProperty(runtime, "height", jsi::Value(rect.height));
+  return result;
 }
 
 jsi::Value Tree::measureLayout(

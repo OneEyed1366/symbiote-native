@@ -26,12 +26,21 @@
 import {
   createElement,
   dlog,
+  getBoundingClientRect,
+  isSymbioteNode,
   routeProp,
   toPublicInstance,
+  type IDomRect,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
 import { descriptorFor } from '@symbiote-native/components';
 import { normalizeSvelteClass } from '../class-value';
+import {
+  animateShimElement,
+  type IKeyframe,
+  type IShimAnimation,
+} from './animation';
+import { areShimAnimationsEnabled } from './animations-gate';
 import {
   BOOLEAN_PROP_NAMES,
   CANONICAL_BY_LOWER,
@@ -286,6 +295,67 @@ export class ShimElement extends ShimElementBase {
         clone.appendChild(child.cloneNode(true));
     }
     return clone;
+  }
+
+  // `flip`'s `get_zoom()` walks this until `null`; without it the walk hit `undefined` and threw
+  // `Cannot read properties of undefined ('parentElement')`, aborting the whole reorder.
+  get parentElement(): ShimElement | null {
+    const result = this.parent instanceof ShimElement ? this.parent : null;
+    dlog(
+      `parentElement tag=${this.tagName} -> ${result === null ? 'null' : result.tagName}`,
+    );
+    return result;
+  }
+
+  // `flip` divides by these for its scale factor; unset they read as `NaN`, not zero.
+  get clientWidth(): number {
+    return this.getBoundingClientRect().width;
+  }
+
+  get clientHeight(): number {
+    return this.getBoundingClientRect().height;
+  }
+
+  // Real DOM shape (top/left/right/bottom derived), for svelte/animate's `flip` and
+  // svelte/transition's `crossfade`, both of which measure before and after a reorder.
+  getBoundingClientRect(): IDomRect & {
+    top: number;
+    left: number;
+    right: number;
+    bottom: number;
+  } {
+    const node = this.engineNode;
+    const rect =
+      areShimAnimationsEnabled() && isSymbioteNode(node)
+        ? getBoundingClientRect(node, false)
+        : undefined;
+    dlog(
+      `getBoundingClientRect tag=${this.tagName} hasNode=${isSymbioteNode(node)} rect=${JSON.stringify(rect)}`,
+    );
+    const { x, y, width, height } = rect ?? { x: 0, y: 0, width: 0, height: 0 };
+    return {
+      x,
+      y,
+      width,
+      height,
+      top: y,
+      left: x,
+      right: x + width,
+      bottom: y + height,
+    };
+  }
+
+  // `transitions.js`'s `dispatch_event` fires introstart/introend/outrostart/outroend at this;
+  // nothing in this adapter listens, so a no-op is the correct answer, not a missing method.
+  dispatchEvent(): boolean {
+    return true;
+  }
+
+  animate(
+    keyframes: readonly IKeyframe[],
+    options: { duration: number },
+  ): IShimAnimation {
+    return animateShimElement(this, keyframes, options.duration);
   }
 
   // measure/measureInWindow/measureLayout/setNativeProps/focus/blur — the imperative API a

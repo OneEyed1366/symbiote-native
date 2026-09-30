@@ -113,9 +113,11 @@ export {
   measure,
   measureInWindow,
   measureLayout,
+  getBoundingClientRect,
   disposeRoot,
   requestCommitFor,
 } from './imperative';
+export type { IDomRect } from './tree-host';
 // The tree host: the seam a runtime installs to answer about the tree JS does not hold. `setTreeHost`
 // is what `installFabric()` (@symbiote-native/test-utils) calls with the TypeScript applier.
 export {
@@ -513,4 +515,8 @@ export type { IClaimMode, IHostBehavior, IPayloadFold } from './host-behavior';
 // markPropsDirty is a behavior's only way to say "the fold reads state I just changed" — every
 // other dirtying route goes through a prop write, and a derived-payload behavior has no prop to
 // write. Pair it with requestCommitFor: dirtying is not publishing.
-export { setBehaviorListener, markPropsDirty } from './node';
+export { setBehaviorListener, markPropsDirty, setNodeDispatch } from './node';
+// The only correct way to ask what would receive an event: a behavior may answer a name through
+// one shared `IEventDispatch` rather than a closure in `node.listeners`
+export { hasListenerFor, listenerFor } from './node';
+export type { IEventDispatch } from './node';

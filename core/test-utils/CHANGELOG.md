@@ -1,5 +1,14 @@
 # @symbiote-native/test-utils
 
+## 0.4.5
+
+### Patch Changes
+
+- [`bb26a15`](https://github.com/OneEyed1366/symbiote-native/commit/bb26a15d87bf55ac43895b6ab4acd53fcd7436da) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Recording host implements `getBoundingClientRect` and is split into per-concern helpers.
+
+- Updated dependencies [[`cfbb0f7`](https://github.com/OneEyed1366/symbiote-native/commit/cfbb0f7dd8251fb74553f04e58f7e368f63289f5), [`bb26a15`](https://github.com/OneEyed1366/symbiote-native/commit/bb26a15d87bf55ac43895b6ab4acd53fcd7436da), [`cfbb0f7`](https://github.com/OneEyed1366/symbiote-native/commit/cfbb0f7dd8251fb74553f04e58f7e368f63289f5)]:
+  - @symbiote-native/engine@1.4.0
+
 ## 0.4.4
 
 ### Patch Changes

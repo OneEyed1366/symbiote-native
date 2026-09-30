@@ -23,6 +23,7 @@ import {
   insertBefore,
   removeChild,
   registerRules,
+  listenerFor,
   routeProp,
   type ISymbioteEvent,
   type ISymbioteNode,
@@ -390,7 +391,7 @@ describe('onContentSizeChange is synthesized from the content view layout', () =
     // `onLayout` is a GATED event: wiring it unconditionally would put the flag in every
     // ScrollView's payload and buy a native event nobody reads.
     expect(Object.hasOwn(commit().slot.payload, 'onLayout')).toBe(false);
-    expect(slot.listeners?.get('layout')).toBeUndefined();
+    expect(listenerFor(slot, 'layout')).toBeUndefined();
   });
 
   it('wires the slot layout and reports positional width/height', () => {
@@ -404,7 +405,7 @@ describe('onContentSizeChange is synthesized from the content view layout', () =
     // slot before the first commit — the wrapper has no two-pass mount either.
     expect(commit().slot.payload.onLayout).toBe(true);
 
-    const listener = slot.listeners?.get('layout');
+    const listener = listenerFor(slot, 'layout');
     if (listener === undefined)
       throw new Error('no layout listener on the slot');
 
@@ -443,7 +444,7 @@ describe('onContentSizeChange is synthesized from the content view layout', () =
         'onLayout',
       ),
     ).toBe(false);
-    expect(slot.listeners?.get('layout')).toBeUndefined();
+    expect(listenerFor(slot, 'layout')).toBeUndefined();
   });
 });
 

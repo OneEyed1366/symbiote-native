@@ -658,18 +658,14 @@ const binary = path.join(
 // a wrong ANSWER, not an error. A single-case fixture passes happily, which is how this hides.
 const wantsBytecode = process.env.SYMBIOTE_ITEST_BYTECODE === '1';
 
-/**
- * `hermesc`, out of whichever example has run `pod install`.
- *
- * It ships inside the `hermes-engine` pod rather than on npm, so there is no version to pin here —
- * and that is the point: it is the SAME compiler the app build uses, from the same pod as the
- * `hermesvm.framework` the tester links against. A mismatched pair would compile bytecode the
- * runtime refuses, which at least fails loudly.
- */
+// `hermesc` ships inside the `hermes-engine` pod, not on npm, so it is the SAME compiler the app
+// build uses and pairs with the `hermesvm.framework` the tester links against
 function findHermesc() {
   const examples = path.join(root, 'examples');
-  if (!existsSync(examples)) return undefined;
-  for (const entry of readdirSync(examples, { withFileTypes: true })) {
+  const entries = existsSync(examples)
+    ? readdirSync(examples, { withFileTypes: true })
+    : [];
+  for (const entry of entries) {
     if (!entry.isDirectory()) continue;
     const candidate = path.join(
       examples,
@@ -678,13 +674,16 @@ function findHermesc() {
     );
     if (existsSync(candidate)) return candidate;
   }
-  return undefined;
+  // `scripts/fetch-hermes.mjs` unpacks the same pod, and on a runner that never runs `pod install`
+  // it is the only copy - the path CMake already searches for `hermesvm.framework`
+  const fetched = path.join(root, '.hermes/destroot/bin/hermesc');
+  return existsSync(fetched) ? fetched : undefined;
 }
 
 const hermesc = wantsBytecode ? findHermesc() : undefined;
 if (wantsBytecode && hermesc === undefined) {
   console.error(
-    'SYMBIOTE_ITEST_BYTECODE=1 but no hermesc found — run `pod install` in any example first',
+    'SYMBIOTE_ITEST_BYTECODE=1 but no hermesc found - run `node scripts/fetch-hermes.mjs`',
   );
   process.exit(2);
 }
@@ -711,6 +710,25 @@ function compileToBytecode(bundle) {
         : reject(new Error(`hermesc failed on ${bundle}:\n${stderr.trim()}`)),
     );
   });
+}
+
+// Kept out of the print loop so the loop stays one line per finished bundle: this is the whole
+// per-run report, and it returns how many failures it saw
+function reportRun(run) {
+  let failures = 0;
+  for (const line of run.stdout.split('\n').filter(Boolean)) {
+    if (line.startsWith('FAIL ')) failures += 1;
+    console.log(line);
+  }
+  if (run.status === 0 && run.signal === null) return failures;
+  // A tester killed by a SIGNAL exits with `status` `null` and writes NOTHING to stderr, so without
+  // the file name and the signal a dead run is indistinguishable from a silent one
+  const how =
+    run.signal !== null ? `killed by ${run.signal}` : `exit status ${run.status}`;
+  const silent = run.stdout.trim() === '' ? ', no output' : '';
+  console.error(`CRASH ${path.relative(testsDir, run.file)} - ${how}${silent}`);
+  if (run.stderr.trim() !== '') console.error(run.stderr.trim());
+  return failures + 1;
 }
 
 /**
@@ -936,32 +954,7 @@ try {
   const runPromises = bundles.map(({ file, bundle }) =>
     limitTestRun(() => runTester(bundle).then(run => ({ ...run, file }))),
   );
-  for (const runPromise of runPromises) {
-    const run = await runPromise;
-    for (const line of run.stdout.split('\n').filter(Boolean)) {
-      if (line.startsWith('FAIL ')) failed += 1;
-      console.log(line);
-    }
-    if (run.status !== 0 || run.signal !== null) {
-      failed += 1;
-      // A CRASH HAS TO NAME ITSELF, and this used to print `run.stderr.trim()` and nothing else.
-      // When the tester dies on a SIGNAL the exit code is `null` rather than a number, so the
-      // `status !== 0` above is true while stderr is EMPTY — a killed process writes nothing. CI run
-      // 35716368308 was exactly that: 541 passes, no FAIL line anywhere, one blank line, exit 1, and
-      // no way to tell which of 119 files had died or why. The file name and the signal are the two
-      // facts a reader needs and the two this branch was throwing away.
-      const how =
-        run.signal !== null
-          ? `killed by ${run.signal}`
-          : `exit status ${run.status}`;
-      console.error(
-        `CRASH ${path.relative(testsDir, run.file)} — ${how}${
-          run.stdout.trim() === '' ? ', no output' : ''
-        }`,
-      );
-      if (run.stderr.trim() !== '') console.error(run.stderr.trim());
-    }
-  }
+  for (const runPromise of runPromises) failed += reportRun(await runPromise);
   runMs += performance.now() - runStart;
 } finally {
   // `SYMBIOTE_KEEP_BUNDLES=1` leaves them on disk and says where. A stack trace out of the tester

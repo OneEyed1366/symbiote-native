@@ -1,0 +1,11 @@
+{
+  "layers": [
+    { "name": "packages", "paths": ["packages/**"] },
+    { "name": "adapters", "paths": ["adapters/**"] },
+    { "name": "components", "paths": ["core/components/**"] },
+    {
+      "name": "core",
+      "paths": ["core/engine/**", "core/css-parser/**", "core/test-utils/**"]
+    }
+  ]
+}

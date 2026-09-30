@@ -111,3 +111,4 @@ packages/*/.rn-*
 # excluded, so no negation can rescue it from there.
 scripts/verdaccio/token
 examples/*/.npmrc
+.claude/ralph-loop.local.md

@@ -44,6 +44,7 @@ import {
   committedPayloadOf,
   createElement,
   createSurface,
+  listenerFor,
   readSurfaceTelemetry,
   routeProp,
   setEventListener,
@@ -111,7 +112,7 @@ function touchable(
   settle();
 
   const fire = (name: string): void => {
-    const listener = node.listeners?.get(name);
+    const listener = listenerFor(node, name);
     if (listener === undefined)
       throw new Error(`no "${name}" listener — the behavior did not attach`);
     listener(TOUCH);
@@ -475,7 +476,7 @@ function touchableWithChild(props: Readonly<Record<string, unknown>> = {}): {
   settle();
 
   const fire = (name: string): void => {
-    const listener = owner.listeners?.get(name);
+    const listener = listenerFor(owner, name);
     if (listener === undefined)
       throw new Error(`no "${name}" listener — the behavior did not attach`);
     listener(TOUCH);

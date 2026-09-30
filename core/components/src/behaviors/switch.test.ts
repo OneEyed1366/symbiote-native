@@ -10,6 +10,7 @@ import {
   clearHostBehaviors,
   createElement,
   createSurface,
+  listenerFor,
   routeProp,
   type IListener,
   type ISymbioteEvent,
@@ -40,7 +41,7 @@ function mount(node: ISymbioteNode) {
 }
 
 function listenerOf(node: ISymbioteNode, name: string): IListener {
-  const listener = node.listeners?.get(name);
+  const listener = listenerFor(node, name);
   if (listener === undefined) {
     throw new Error(
       `no "${name}" listener installed — the behavior did not attach`,

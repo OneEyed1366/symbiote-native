@@ -30,6 +30,7 @@ import { ShimComment } from './comment';
 import { ShimDocumentFragment } from './document-fragment';
 import { ShimNode } from './shim-node';
 import { getShimDocument } from './document';
+import { computedStyleOf, type IComputedStyle } from './computed-style';
 
 const PATCHED_KEYS = [
   'Node',
@@ -42,7 +43,42 @@ const PATCHED_KEYS = [
   'document',
   'customElements',
   'HTMLMediaElement',
+  'getComputedStyle',
+  'CustomEvent',
 ] as const;
+
+// `svelte/transition`'s fade/fly/scale/slide/blur call this BARE global, not
+// `document.getComputedStyle`, so it must be a real assigned property too.
+function getComputedStyleGlobal(element: unknown): IComputedStyle {
+  return element instanceof ShimElement
+    ? computedStyleOf(element)
+    : computedStyleOf(new ShimElement('view'));
+}
+
+// `createEventDispatcher`'s own event object; `svelte/events`'s `on()` also constructs one.
+// RN installs no CustomEvent of its own, so this must be a real assigned property, matching the
+// same class of trap as `customElements`/`HTMLMediaElement` below.
+class FakeCustomEvent<T = unknown> {
+  readonly type: string;
+  readonly detail: T | undefined;
+  readonly bubbles: boolean;
+  readonly cancelable: boolean;
+  defaultPrevented = false;
+
+  constructor(
+    type: string,
+    options?: { detail?: T; bubbles?: boolean; cancelable?: boolean },
+  ) {
+    this.type = type;
+    this.detail = options?.detail;
+    this.bubbles = options?.bubbles ?? false;
+    this.cancelable = options?.cancelable ?? false;
+  }
+
+  preventDefault(): void {
+    if (this.cancelable) this.defaultPrevented = true;
+  }
+}
 
 // Real DOM's `CustomElementRegistry`. `set_custom_element_data` (svelte's
 // dom/elements/attributes.js) reads the BARE global `customElements` unconditionally, with no
@@ -87,6 +123,8 @@ export function patchGlobals(): void {
     document: g.document,
     customElements: g.customElements,
     HTMLMediaElement: g.HTMLMediaElement,
+    getComputedStyle: g.getComputedStyle,
+    CustomEvent: g.CustomEvent,
   };
   g.Node = ShimNode;
   // ShimElementBase, NOT ShimElement: `get_setters` stops AT `Element.prototype`, so pointing this
@@ -103,6 +141,8 @@ export function patchGlobals(): void {
   g.document = getShimDocument();
   g.customElements = FAKE_CUSTOM_ELEMENT_REGISTRY;
   g.HTMLMediaElement = FakeHTMLMediaElement;
+  g.getComputedStyle = getComputedStyleGlobal;
+  g.CustomEvent = FakeCustomEvent;
   dlog('svelte dom-shim: patchGlobals installed');
 }
 

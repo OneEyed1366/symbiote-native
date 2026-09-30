@@ -1,5 +1,16 @@
 # @symbiote-native/react
 
+## 3.1.0
+
+### Minor Changes
+
+- [`bb26a15`](https://github.com/OneEyed1366/symbiote-native/commit/bb26a15d87bf55ac43895b6ab4acd53fcd7436da) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Render into a `ConcurrentRoot` and schedule microtasks, so `useTransition` and `startTransition` defer updates instead of running them synchronously.
+
+### Patch Changes
+
+- Updated dependencies [[`cfbb0f7`](https://github.com/OneEyed1366/symbiote-native/commit/cfbb0f7dd8251fb74553f04e58f7e368f63289f5), [`cfbb0f7`](https://github.com/OneEyed1366/symbiote-native/commit/cfbb0f7dd8251fb74553f04e58f7e368f63289f5), [`cfbb0f7`](https://github.com/OneEyed1366/symbiote-native/commit/cfbb0f7dd8251fb74553f04e58f7e368f63289f5), [`cfbb0f7`](https://github.com/OneEyed1366/symbiote-native/commit/cfbb0f7dd8251fb74553f04e58f7e368f63289f5), [`cfbb0f7`](https://github.com/OneEyed1366/symbiote-native/commit/cfbb0f7dd8251fb74553f04e58f7e368f63289f5)]:
+  - @symbiote-native/components@3.1.3
+
 ## 3.0.4
 
 ### Patch Changes

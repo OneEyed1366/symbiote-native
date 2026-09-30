@@ -11,6 +11,7 @@ import { mount, unmount } from '@symbiote-native/vue';
 // A RECORDING host: the node is found over the AUTHORED nodes and the touch is aimed at the
 // `instanceHandle` the ops named — no commit rule decides either.
 import { installRecordingFabric } from '@symbiote-native/test-utils';
+import { hasListenerFor, isSymbioteNode } from '@symbiote-native/engine';
 
 const ROOT_TAG = 518;
 const PRESS_DELAY_MS = 30;
@@ -27,12 +28,7 @@ function responderHandle(): unknown {
   const node = fabric.find(candidate => {
     if (candidate.viewName !== 'RCTView') return false;
     const handle = candidate.instanceHandle;
-    return (
-      typeof handle === 'object' &&
-      handle !== null &&
-      Reflect.get(handle, 'listeners') instanceof Map &&
-      Reflect.get(handle, 'listeners').has('press')
-    );
+    return isSymbioteNode(handle) && hasListenerFor(handle, 'press');
   });
   if (node === undefined)
     throw new Error('no Vue Pressable responder was created');

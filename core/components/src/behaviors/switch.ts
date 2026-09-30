@@ -43,7 +43,8 @@ import {
   Platform,
   propOf,
   registerHostBehavior,
-  setBehaviorListener,
+  setNodeDispatch,
+  type IEventDispatch,
   type ISymbioteEvent,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
@@ -158,18 +159,28 @@ function neverYieldsResponder(): boolean {
   return false;
 }
 
+// ONE object for every Switch in the app, where three closures per node used to be
+const SWITCH_DISPATCH: IEventDispatch = {
+  names: new Set([
+    'change',
+    'startShouldSetResponder',
+    'responderTerminationRequest',
+  ]),
+  deliver(node, name, event) {
+    if (name === 'change') return onChange(node, event);
+    return name === 'startShouldSetResponder'
+      ? alwaysClaimsResponder()
+      : neverYieldsResponder();
+  },
+};
+
 function attach(node: ISymbioteNode): void {
   states.set(node, createInitialSwitchState());
-  setBehaviorListener(node, 'change', event => onChange(node, event));
-  setBehaviorListener(node, 'startShouldSetResponder', alwaysClaimsResponder);
-  setBehaviorListener(
-    node,
-    'responderTerminationRequest',
-    neverYieldsResponder,
-  );
+  setNodeDispatch(node, SWITCH_DISPATCH);
 }
 
 function detach(node: ISymbioteNode): void {
+  setNodeDispatch(node, undefined);
   states.delete(node);
 }
 

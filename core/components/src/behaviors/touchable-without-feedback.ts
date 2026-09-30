@@ -109,18 +109,22 @@ function numberOr(value: unknown, fallback: number): number {
 // copies only when SET, unlike TNF's unconditional list. One upstream quirk it reproduces:
 // `nativeID` wins over `id` here (`node.nativeIdWinsOverId`, `clone-onto-child-payload.itest.ts`).
 
-/**
- * `delayPressIn` / `delayPressOut` (:186-188) plus RN's unconditional `minPressDuration: 0` (:190).
- *
- * The scheduler is `../state/touchable`'s — the one `./touchable-opacity` drives its fade with,
- * here with `activate` / `deactivate` forwarding and painting nothing. It reads the OWNER, so the
- * owner is closed over rather than taken from the refinement's argument, which is the CHILD.
- */
-function refinementFor(
-  owner: ISymbioteNode,
-  state: ITimingState,
-): IPressConfigRefinement {
+// Built on the FIRST GESTURE, not at arm: nothing reads the runtime or the timer set until a
+// finger lands, and a list of touchables nobody presses paid ~500 B per item for them
+function stateOf(owner: ISymbioteNode): ITimingState {
+  const existing = states.get(owner);
+  if (existing !== undefined) return existing;
+  const state: ITimingState = {
+    runtime: createTouchableFeedbackRuntime(),
+    timers: new Set(),
+  };
+  states.set(owner, state);
+  return state;
+}
+
+function refinementFor(owner: ISymbioteNode): IPressConfigRefinement {
   return (_node, config) => {
+    const state = stateOf(owner);
     const handlers = createTouchableFeedbackHandlers(
       {
         delayPressIn: numberOr(propOf(owner, 'delayPressIn'), 0),
@@ -186,18 +190,13 @@ function forwardListener(
   );
 }
 
-// The machine plus the forwarded listeners. Split from adoption because a parked subtree comes back
-// with its child and its fold intact but its machine torn down — `attach` re-runs this, and must
-// NOT re-chain the fold.
+// The machine plus the forwarded listeners. Split from adoption т.к. a parked subtree comes back
+// with its child and its fold intact but its machine torn down, so `attach` re-runs this and must
+// NOT re-chain the fold
 function arm(owner: ISymbioteNode, child: ISymbioteNode): void {
-  let state = states.get(owner);
-  if (state === undefined) {
-    state = { runtime: createTouchableFeedbackRuntime(), timers: new Set() };
-    states.set(owner, state);
-  }
   attachPressMachine(child, {
     source: owner,
-    refine: refinementFor(owner, state),
+    refine: refinementFor(owner),
   });
   for (const name of FORWARDED_LISTENERS) {
     forwardListener(

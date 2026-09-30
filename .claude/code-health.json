@@ -1,0 +1,93 @@
+{
+  "overrides": [
+    {
+      "path": "core/engine/src/native-engine.ts",
+      "symbol": "applyOps",
+      "args": 5,
+      "why": "type describing a fixed JSI HostFunction ABI (the engine's hottest per-commit path); an options object would cost a property read per field on every native call"
+    },
+    {
+      "path": "core/engine/src/native-engine.ts",
+      "symbol": "callback",
+      "args": 6,
+      "why": "measure's callback signature mirrors nativeFabricUIManager.measure's own fixed protocol verbatim"
+    },
+    {
+      "path": "core/test-utils/src/recording-host.ts",
+      "file": 500,
+      "why": "one cohesive fake ITreeHost implementation for every adapter's headless tests (~25 interface methods); splitting it across files would fragment a single test double, not reduce real complexity"
+    },
+    {
+      "path": "core/engine/src/node.ts",
+      "symbol": "setEventListener",
+      "ccn": 20,
+      "why": "pre-existing debt, unrelated to any change this session made (git diff on this file is empty); a real fix means restructuring the event-vs-prop dispatch every adapter's every prop write goes through, unverifiable here beyond vitest, and belongs to its own reviewed task"
+    },
+    {
+      "path": "core/engine/src/node.ts",
+      "symbol": "routeProp",
+      "ccn": 30,
+      "lines": 90,
+      "why": "same as setEventListener above: pre-existing, unrelated, the single hottest prop-write path in the engine - not a change to make as a side effect of an unrelated task"
+    },
+    {
+      "path": "core/engine/src/node.ts",
+      "file": 850,
+      "why": "pre-existing debt, unrelated to any change this session made; see setEventListener/routeProp overrides above"
+    },
+    {
+      "path": "examples/svelte/node_modules/svelte/**",
+      "file": 600,
+      "why": "gitignored vendored svelte source, temporarily patched with console.error for on-device flip diagnostics, never committed"
+    },
+    {
+      "path": "examples/svelte/node_modules/svelte/**",
+      "symbol": "reconcile",
+      "lines": 200,
+      "ccn": 60,
+      "nesting": 6,
+      "args": 6,
+      "why": "gitignored vendored svelte source, temporarily patched with console.error for on-device flip diagnostics, never committed"
+    },
+    {
+      "path": "examples/svelte/node_modules/svelte/**",
+      "symbol": "animation",
+      "lines": 90,
+      "why": "gitignored vendored svelte source, temporarily patched with console.error for on-device flip diagnostics, never committed"
+    },
+    {
+      "path": "examples/svelte/node_modules/svelte/**",
+      "symbol": "transition",
+      "lines": 100,
+      "nesting": 5,
+      "why": "gitignored vendored svelte source, temporarily patched with console.error for on-device flip diagnostics, never committed"
+    },
+    {
+      "path": "examples/svelte/node_modules/svelte/**",
+      "symbol": "animate",
+      "lines": 90,
+      "args": 6,
+      "why": "gitignored vendored svelte source, temporarily patched with console.error for on-device flip diagnostics, never committed"
+    },
+    {
+      "path": "examples/svelte/node_modules/svelte/**",
+      "symbol": "queue_micro_task",
+      "lines": 70,
+      "why": "gitignored vendored svelte source, temporarily patched with console.error for on-device flip diagnostics, never committed"
+    },
+    {
+      "path": "examples/svelte/node_modules/svelte/**",
+      "symbol": "each",
+      "lines": 200,
+      "args": 6,
+      "why": "gitignored vendored svelte source, temporarily patched with console.error for on-device flip diagnostics, never committed"
+    },
+    {
+      "path": "examples/svelte/node_modules/svelte/**",
+      "symbol": "effect",
+      "ccn": 40,
+      "lines": 100,
+      "why": "gitignored vendored svelte source, temporarily patched with console.error for on-device flip diagnostics, never committed"
+    }
+  ]
+}
