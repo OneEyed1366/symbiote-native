@@ -1,5 +1,20 @@
 # @symbiote-native/engine
 
+## 1.4.0
+
+### Minor Changes
+
+- [`bb26a15`](https://github.com/OneEyed1366/symbiote-native/commit/bb26a15d87bf55ac43895b6ab4acd53fcd7436da) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Add `getBoundingClientRect(node, includeTransform)`: a synchronous layout read from the committed Fabric tree, `undefined` for an uncommitted node.
+
+- [`cfbb0f7`](https://github.com/OneEyed1366/symbiote-native/commit/cfbb0f7dd8251fb74553f04e58f7e368f63289f5) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - A host behavior answers its events through one shared dispatch instead of installing a closure per
+  name, and TouchableOpacity builds its fade runtime on the first press rather than at attach. Per
+  thousand items: pressable 2 559 -> 1 263 KB, touchable-opacity 6 992 -> 3 584, button 7 259 ->
+  4 068, text-input 5 167 -> 3 824.
+
+### Patch Changes
+
+- [`cfbb0f7`](https://github.com/OneEyed1366/symbiote-native/commit/cfbb0f7dd8251fb74553f04e58f7e368f63289f5) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - A node whose create op is still in the batch no longer forces a full drain to the host when a behavior marks its props dirty: the host has never heard of it, so the mark is a no-op. Per item, `touchable-without-feedback` 3 158 -> 1 386 B and `touchable-opacity` 3 271 -> 1 499 B; the other tags are unmoved.
+
 ## 1.3.1
 
 ### Patch Changes
