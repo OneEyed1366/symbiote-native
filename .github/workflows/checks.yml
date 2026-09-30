@@ -119,7 +119,8 @@ jobs:
   changeset-status:
     name: Changeset status
     needs: gate
-    if: needs.gate.outputs.cache-hit != 'true'
+    # Release PR `changeset-release/master` consumes the changesets, so it would always fail
+    if: needs.gate.outputs.cache-hit != 'true' && github.head_ref != 'changeset-release/master'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
