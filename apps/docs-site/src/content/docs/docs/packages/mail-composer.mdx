@@ -1,0 +1,282 @@
+---
+title: Mail composer
+description: Open the system mail composer with a prefilled draft, and list installed mail apps, on every SymbioteNative adapter.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+Let users email you (or anyone) from inside the app: open the system mail composer with
+recipients, subject, body and attachments already filled in. `@symbiote-native/mail-composer`
+wraps [`expo-mail-composer`](https://github.com/expo/expo/tree/main/packages/expo-mail-composer)
+so every SymbioteNative adapter can reach it, not just React. Like
+[SMS](/docs/packages/sms/), every export is a free function with no per-instance state, so the
+React, Vue, Angular, Svelte, and Solid entry points are plain re-exports of the same `core`.
+
+Nothing is ever sent on the user's behalf. Both platforms open their own composer with the draft
+filled in; the user presses send, edits, or discards it.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | live    |
+| Android     | live    |
+
+| Framework adapter | Support |
+| ----------------- | ------- |
+| React             | live    |
+| Vue               | live    |
+| Angular           | live    |
+| Svelte            | live    |
+| Solid             | live    |
+
+## Installation
+
+```sh
+npm install @symbiote-native/mail-composer
+```
+
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --mail-composer` (or
+`add --mail-composer` in an existing app) installs and wires this for you - see
+[`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
+
+`expo-mail-composer` and `expo-modules-core` come along as regular dependencies, pinned to exact
+versions. Never install either yourself, and never add the `expo` meta-package to your project (it
+bundles its own Metro/Babel pipeline, which conflicts with this project's own).
+
+<Aside type="danger" title="Native setup is required before first use">
+  `expo-mail-composer`'s native code is discovered by `expo-modules-autolinking`, a different
+  mechanism from the `react-native.config.cjs`/podspec autolinking every other SymbioteNative
+  wrapper uses. Follow [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers this package and
+  every other `expo-modules-core` package with zero further native changes.
+</Aside>
+
+No runtime permission is needed on either platform. Two native details land automatically on
+install:
+
+- **iOS `LSApplicationQueriesSchemes`.** `getClients()` checks each candidate mail app with
+  `canOpenURL`, which iOS silently refuses for an undeclared scheme. The package's
+  `native-link.json` carries the same 22-scheme list upstream's config plugin writes and merges it
+  into your `Info.plist`.
+- **Android package visibility.** `expo-mail-composer` ships its own `<queries>` block for Android
+  11+, which merges in once the Gradle project is included.
+
+## Usage
+
+All five adapters re-export the exact same functions; there is no per-adapter hook, composable or
+service, since nothing here holds live state or a subscription.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { composeAsync, isAvailableAsync } from '@symbiote-native/mail-composer/react';
+
+    export default function ContactSupport() {
+      async function onPress() {
+        if (!(await isAvailableAsync())) return;
+        await composeAsync({
+          recipients: ['support@example.com'],
+          subject: 'Order #1234',
+          body: 'Hi, I have a question about my order.',
+        });
+      }
+
+      return <button title="Email support" onPress={onPress} />;
+    }
+    ```
+
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { composeAsync, isAvailableAsync } from '@symbiote-native/mail-composer/vue';
+
+    async function onPress() {
+      if (!(await isAvailableAsync())) return;
+      await composeAsync({
+        recipients: ['support@example.com'],
+        subject: 'Order #1234',
+        body: 'Hi, I have a question about my order.',
+      });
+    }
+    </script>
+
+    <template>
+      <button title="Email support" @press="onPress" />
+    </template>
+    ```
+
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component } from '@angular/core';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
+    import { composeAsync, isAvailableAsync } from '@symbiote-native/mail-composer/angular';
+
+    @Component({
+      standalone: true,
+      imports: [SYMBIOTE_ELEMENTS],
+      template: `<button title="Email support" (press)="onPress()" />`,
+    })
+    export class ContactSupport {
+      async onPress(): Promise<void> {
+        if (!(await isAvailableAsync())) return;
+        await composeAsync({
+          recipients: ['support@example.com'],
+          subject: 'Order #1234',
+          body: 'Hi, I have a question about my order.',
+        });
+      }
+    }
+    ```
+
+    There is no service to `inject()`: every function is a plain export off the core package,
+    called straight from a template event binding.
+
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { composeAsync, isAvailableAsync } from '@symbiote-native/mail-composer/svelte';
+
+      async function onPress(): Promise<void> {
+        if (!(await isAvailableAsync())) return;
+        await composeAsync({
+          recipients: ['support@example.com'],
+          subject: 'Order #1234',
+          body: 'Hi, I have a question about my order.',
+        });
+      }
+    </script>
+
+    <button title="Email support" onPress={onPress} />
+    ```
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { composeAsync, isAvailableAsync } from '@symbiote-native/mail-composer/solid';
+
+    export function ContactSupport() {
+      async function onPress() {
+        if (!(await isAvailableAsync())) return;
+        await composeAsync({
+          recipients: ['support@example.com'],
+          subject: 'Order #1234',
+          body: 'Hi, I have a question about my order.',
+        });
+      }
+
+      return <button title="Email support" onPress={onPress} />;
+    }
+    ```
+
+  </TabItem>
+</Tabs>
+
+### Attach a file
+
+```ts
+await composeAsync({
+  recipients: ['support@example.com'],
+  attachments: ['file:///path/to/receipt.pdf'],
+});
+```
+
+### List installed mail apps
+
+```ts
+import { getClients } from '@symbiote-native/mail-composer';
+
+const clients = getClients();
+// iOS:     [{ label: 'Gmail', url: 'googlegmail://' }, ...]
+// Android: [{ label: 'Gmail', packageName: 'com.google.android.gm' }, ...]
+```
+
+## API
+
+### Functions
+
+| Signature                                            | Description                                                                                          |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `isAvailableAsync(): Promise<boolean>`               | Whether a mail composer can open. `false` on iOS under an MDM profile that blocks outgoing mail      |
+| `composeAsync(options): Promise<IMailComposerResult>` | Opens the composer with the draft filled in. Resolves when the composer closes                       |
+| `getClients(): IMailClient[]`                        | Lists the installed mail apps. Synchronous: no native round trip                                     |
+
+### `IMailComposerOptions`
+
+| Field           | Type                   | Description                                                                 |
+| --------------- | ---------------------- | --------------------------------------------------------------------------- |
+| `recipients`    | `string[] \| undefined`  | Addresses for the To field                                                  |
+| `ccRecipients`  | `string[] \| undefined`  | Addresses for the Cc field                                                  |
+| `bccRecipients` | `string[] \| undefined`  | Addresses for the Bcc field                                                 |
+| `subject`       | `string \| undefined`    | Subject line                                                                |
+| `body`          | `string \| undefined`    | Message body. Plain text unless `isHtml` is `true`                          |
+| `isHtml`        | `boolean \| undefined`   | Treat `body` as HTML                                                        |
+| `attachments`   | `string[] \| undefined`  | File URIs inside the app's own storage to attach                            |
+
+### `IMailComposerResult` and `IMailClient`
+
+| Type                  | Field         | Description                                                                                  |
+| --------------------- | ------------- | -------------------------------------------------------------------------------------------- |
+| `IMailComposerResult` | `status`      | One of `'undetermined'`, `'sent'`, `'saved'`, `'cancelled'`. See Notes for what Android reports |
+| `IMailClient`         | `label`       | Display name of the mail app                                                                 |
+| `IMailClient`         | `url`         | iOS only: the app's URL scheme                                                               |
+| `IMailClient`         | `packageName` | Android only: the app's package name                                                         |
+
+## Notes
+
+- **Android always resolves `sent`.** It cannot read the composer's real outcome back, and
+  upstream reports the same fixed status there. Only iOS distinguishes `sent`, `saved` and
+  `cancelled`.
+- **iOS needs a signed-in Mail app.** `isAvailableAsync` and `composeAsync` fail without one. This
+  is the check `MFMailComposeViewController.canSendMail()` makes natively, which is also why the
+  composer cannot be used on an iOS simulator (you cannot sign in to a mail account there). Check
+  `isAvailableAsync()` first and offer a fallback, such as copying the address.
+- **Attachments must live in the app's own storage.** Pass `file://` URIs from the
+  [file system](/docs/packages/file-system/) package or the cache directory.
+- **Composer behavior can only be verified on a device.** The headless tests fake the native
+  module, so they prove argument marshalling, not the composer.
+
+## Common questions
+
+**It does nothing on the iOS Simulator.** The Simulator cannot sign in to a mail account, so there
+is no composer to open. Test on a device that has Mail set up.
+
+**`isAvailableAsync()` says `true` on Android but no composer appears.** On Android the check is
+weaker than on iOS, and on some devices the system opens a plain share sheet instead of a mail app.
+Treat the composer as best-effort and offer a fallback, such as copying the address.
+
+**My HTML body shows as plain text on Android.** HTML formatting (`isHtml: true`) is not reliable
+across Android mail apps. Send plain text when the layout matters little.
+
+**How do I know whether the email was sent?** On iOS the result is `sent`, `saved` or `cancelled`.
+On Android it is always `sent`, whatever the user did.
+
+**An attachment is missing.** Attach files that live in the app's own storage, with a `file://`
+URI. A path owned by another app can be unreadable by the mail app.
+
+Sources: [Expo docs: MailComposer](https://docs.expo.dev/versions/latest/sdk/mail-composer/),
+[expo/expo#35466 isAvailableAsync not working on Android](https://github.com/expo/expo/issues/35466),
+[expo/expo#37740 plain text share screen on some Androids](https://github.com/expo/expo/issues/37740),
+[expo/expo#16690 cannot send HTML emails and never resolves](https://github.com/expo/expo/issues/16690),
+[expo/expo#20509 composeAsync does not return a result on Android](https://github.com/expo/expo/issues/20509).
+
+## How the wrapper works
+
+`expo-mail-composer`'s JS is hand-ported into this package's `core/`, resolving
+`ExpoMailComposer` through `expo-modules-core` rather than the `expo` meta-package:
+
+```
+packages/mail-composer/src/
+|-- core/     # composeAsync, isAvailableAsync, getClients; native-module.ts
+|-- react/    # export * from '../core'
+|-- vue/      # export * from '../core'
+|-- svelte/   # export * from '../core'
+|-- solid/    # export * from '../core'
+`-- angular/  # export * from '../core' (separate ngc/AOT build)
+```
+
+Every export is a stateless free function, so there is nothing for a hook, composable, rune or
+service to subscribe to or clean up. The native code is never vendored:
+`expo-modules-autolinking` resolves it from `node_modules` (see
+[the native setup guide](/docs/howtos/expo-native-module-setup/)).

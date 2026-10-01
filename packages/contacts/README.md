@@ -1,11 +1,13 @@
 # @symbiote-native/contacts
 
-A wrapper package for [SymbioteNative](../../README.md) that makes
-[`expo-contacts`](https://github.com/expo/expo/tree/main/packages/expo-contacts) - reading,
-creating, and editing the device address book - usable from **every** adapter, React, Vue,
-Svelte, Solid, and Angular, not just React. Built the same way as
-[`@symbiote-native/print`](../print): an `expo-modules-core`-based wrapper (see the
-`symbiote-expo-native-module` project skill for the full mechanism).
+Look up a person, add a contact, edit one in the system form, or let the user grant access to just
+the contacts you need (iOS 18). One API for every [SymbioteNative](../../README.md) adapter (React,
+Vue, Svelte, Solid and Angular).
+
+It wraps [`expo-contacts`](https://github.com/expo/expo/tree/main/packages/expo-contacts) the same
+way [`@symbiote-native/print`](../print) wraps its upstream: `expo-modules-core` is a direct
+dependency and the upstream JS is hand-ported into `core/`. See the `symbiote-expo-native-module`
+project skill for the full mechanism.
 
 **Both of upstream's API surfaces are ported**, matching its own layout: the modern
 `SharedObject`-class `Contact`/`Group`/`Container` API (default entry) and the legacy
@@ -69,6 +71,15 @@ Props: `query`, `caption` (`default` / `email` / `phone`), `ignoredEmails`,
 
 The view is registered lazily, at the first render: bundlers that inline requires drop a barrel's
 load-time side effects. Verifying it on a real iOS 18 device is the app owner's step.
+
+## Notes
+
+- **Request permission first.** Reads and writes fail without it. On iOS 18 a `'limited'`
+  `accessPrivileges` means the app sees only the contacts the user shared.
+- **`Group` and `Container` are iOS only.** On Android they fall back to a stub that throws
+  `Not implemented`.
+- **`ContactAccessButton` needs iOS 18.** It renders nothing elsewhere; call
+  `ContactAccessButton.isAvailable()` to check.
 
 ## What's not ported
 
@@ -140,6 +151,21 @@ import { getContactsAsync, requestPermissionsAsync } from '@symbiote-native/cont
 await requestPermissionsAsync();
 const { data } = await getContactsAsync({ name: 'Jane' });
 ```
+
+## Common questions
+
+- **`getAll` returns too few contacts.** Check the permission; on iOS 18 `'limited'` means the user
+  shared only some. Use `ContactAccessButton` or `Contact.presentAccessPicker()`.
+- **Slow with many contacts.** Page with `limit` / `offset` and use `Contact.getAllDetails(fields)`
+  for only the fields you show.
+- **No phone or email in a list row.** Fetch `getPhones()` / `getEmails()` per contact when needed.
+- **Writes fail on Android.** Request `WRITE_CONTACTS` via `requestPermissionsAsync()` first.
+- **Own picker?** Prefer `Contact.presentPicker()` or `ContactAccessButton`.
+
+Sources: [Expo docs: Contacts](https://docs.expo.dev/versions/latest/sdk/contacts/),
+[expo/expo#386](https://github.com/expo/expo/issues/386),
+[expo/expo#200](https://github.com/expo/expo/issues/200),
+[expo/expo#29224](https://github.com/expo/expo/issues/29224).
 
 ## Test it
 

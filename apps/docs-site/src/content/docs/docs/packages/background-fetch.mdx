@@ -1,14 +1,14 @@
 ---
 title: Background fetch
-description: expo-background-fetch wrapped for every SymbioteNative adapter — periodic background execution registered through @symbiote-native/task-manager.
+description: Run a task periodically in the background (the older fetch-style API), on every SymbioteNative adapter.
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-`@symbiote-native/background-fetch` wraps
-[`expo-background-fetch`](https://github.com/expo/expo/tree/main/packages/expo-background-fetch)
+Refresh data on a rough schedule while the app is not open. `@symbiote-native/background-fetch`
+wraps [`expo-background-fetch`](https://github.com/expo/expo/tree/main/packages/expo-background-fetch)
 so every SymbioteNative adapter can register a task that fires periodically in the background. It
-does not define what the task does — define it first with
+does not define what the task does: define it first with
 [`@symbiote-native/task-manager`](/docs/packages/task-manager/)'s `defineTask`, then register it
 here for periodic execution.
 
@@ -94,14 +94,29 @@ Identical import surface on every adapter — `@symbiote-native/background-fetch
 
 ## API
 
-```ts
-getStatusAsync(): Promise<BackgroundFetchStatus | null>
-setMinimumIntervalAsync(minimumInterval: number): Promise<void>
-registerTaskAsync(taskName: string, options?: IBackgroundFetchOptions): Promise<void>
-unregisterTaskAsync(taskName: string): Promise<void>
-```
+### Functions
 
-Plus the `BackgroundFetchResult` and `BackgroundFetchStatus` enums and `IBackgroundFetchOptions`.
+| Signature                                                  | Description                                                                         |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `registerTaskAsync(taskName, options?): Promise<void>`     | Registers a defined task to fire periodically. Throws if the task is not defined    |
+| `unregisterTaskAsync(taskName): Promise<void>`             | Stops background-fetch callbacks for the task                                       |
+| `getStatusAsync(): Promise<BackgroundFetchStatus \| null>` | Whether the app can receive background fetches right now                            |
+| `setMinimumIntervalAsync(minimumInterval): Promise<void>`  | Sets the minimum interval in seconds. A no-op on Android                            |
+
+### `IBackgroundFetchOptions`
+
+| Field             | Type                  | Description                                                                                     |
+| ----------------- | --------------------- | ----------------------------------------------------------------------------------------------- |
+| `minimumInterval` | `number \| undefined` | Inexact interval in seconds between fetches. The OS may stretch it to save battery. Android defaults to 10 minutes; iOS uses its smallest supported interval (10 to 15 minutes) |
+| `stopOnTerminate` | `boolean \| undefined` | Android only. Stop receiving events once the user terminates the app. Defaults to `true`        |
+| `startOnBoot`     | `boolean \| undefined` | Android only. Restart events after the device finishes booting. Defaults to `false`             |
+
+### Enums
+
+| Enum                    | Values                                                                                                            |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `BackgroundFetchResult` | What the task executor returns, used by iOS to schedule future fetches: `NoData`, `NewData`, `Failed`. Android ignores it |
+| `BackgroundFetchStatus` | `Denied` (user disabled background behavior), `Restricted` (unavailable, for example parental controls), `Available` |
 
 ## Notes
 
@@ -113,3 +128,31 @@ Plus the `BackgroundFetchResult` and `BackgroundFetchStatus` enums and `IBackgro
   native equivalent call there.
 - **Every function warns once, on first call, that this API is deprecated.** It still works; the
   warning is a nudge toward `@symbiote-native/background-task`, not a functional restriction.
+
+## Common questions
+
+**The task never fires.** The `minimumInterval` is a hint, not a promise. iOS decides when to run it
+from usage patterns and may run it every half hour, every few hours, or not at all on a given day.
+Also check that `defineTask` runs at module scope, outside any component, and that it ran before
+`registerTaskAsync`.
+
+**`registerTaskAsync` is rejected on Android in a release build.** This is reported upstream for
+release builds only. Test a release build, and register after the task is defined.
+
+**Does it run when the user kills the app?** On Android `stopOnTerminate` defaults to `true`, so it
+stops. Set `stopOnTerminate: false` and `startOnBoot: true` to keep it going. iOS stops when the user
+force-quits the app.
+
+**What should the task return?** On iOS return `BackgroundFetchResult.NewData`, `NoData` or `Failed`,
+so the system can schedule future fetches. Android ignores the value.
+
+**Should I use this for new code?** No. Use
+[background task](/docs/packages/background-task/), the modern replacement.
+
+**iOS needs a background mode.** `UIBackgroundModes: fetch` is added for you through the task
+manager's link manifest.
+
+Sources: [Expo docs: BackgroundFetch](https://docs.expo.dev/versions/latest/sdk/background-fetch/),
+[expo/expo#35551 registerTaskAsync rejected on Android, release build only](https://github.com/expo/expo/issues/35551),
+[expo/expo#33596 background fetch does not execute the task on Android](https://github.com/expo/expo/issues/33596),
+[expo/expo#36492 background task never executing](https://github.com/expo/expo/issues/36492).

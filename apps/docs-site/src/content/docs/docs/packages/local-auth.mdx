@@ -367,6 +367,21 @@ A discriminated union — always check `success` before reading `error`:
   not just the passcode fallback.
 </Aside>
 
+## Common questions
+
+- **Face ID falls back to the passcode, or logs "FaceID is available but has not been configured".**
+  `NSFaceIDUsageDescription` is missing from Info.plist; add it.
+- **How do I check before prompting?** Call `hasHardwareAsync` and `isEnrolledAsync` first;
+  authenticate only when both are true.
+- **How do I customize the prompt?** `promptMessage`, `cancelLabel`, `fallbackLabel`, and
+  `disableDeviceFallback` to block the device passcode after failed attempts.
+- **Face ID does not work on a device.** See the upstream report; check the usage description and
+  that Face ID is enabled for the app in iOS settings.
+
+Sources: [Expo docs: LocalAuthentication](https://docs.expo.dev/versions/latest/sdk/local-authentication/),
+[expo/expo#25055](https://github.com/expo/expo/issues/25055),
+[Face ID and Touch ID with Expo](https://medium.com/nerd-for-tech/expo-local-authentication-face-id-and-touch-id-530e6a37e860).
+
 ## How the wrapper works
 
 `@symbiote-native/local-auth` ships **zero React/Vue/Angular/Svelte/Solid logic in `expo-local-authentication`

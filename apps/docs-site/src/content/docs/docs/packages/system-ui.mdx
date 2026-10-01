@@ -179,6 +179,18 @@ or a subscription.
 - **On iOS/Android, a non-null color is run through RN's own `processColor` before reaching the
   native module** — the same conversion RN's style pipeline uses internally.
 
+## Common questions
+
+- **Where do I call `setBackgroundColorAsync`?** In the root file, outside any component, so the
+  color is set before the first frame and no flash shows during transitions.
+- **How do I follow dark and light mode?** Read the color scheme and call it again when it changes.
+- **`getBackgroundColorAsync` returns `null`.** No root background color has been set yet.
+- **Can I set `userInterfaceStyle` at runtime?** No. The Android style and iOS background color
+  are native build settings and need a new binary.
+
+Sources: [Expo docs: SystemUI](https://docs.expo.dev/versions/latest/sdk/system-ui/),
+[Evan Bacon: stack-based root background component](https://gist.github.com/EvanBacon/d148b2425c5a0bd11b6cecb5f4b72bb8).
+
 ## How the wrapper works
 
 `@symbiote-native/system-ui` ships zero React/Vue/Angular/Svelte/Solid logic in `expo-system-ui`

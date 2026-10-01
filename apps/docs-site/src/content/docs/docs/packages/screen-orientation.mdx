@@ -307,6 +307,22 @@ React returns this shape as a plain value; Vue returns `Ref<ScreenOrientationSta
   landscape take a different rotation-to-orientation branch, so a tablet and a phone held at the
   same physical angle can report different values.
 
+## Common questions
+
+- **`lockAsync` does nothing on tablets and unfolded foldables (Android 16+).** Android ignores
+  portrait and landscape locks on screens 600dp or wider; Android 17 removes the opt-out. Design
+  the layout to rotate and resize there.
+- **How do I lock only one screen?** Keep the app default orientation unlocked and call `lockAsync`
+  on that screen, then `unlockAsync` when leaving.
+- **iPad.** Orientation locking on iPad needs the app declared as full screen; without it iPadOS
+  multitasking decides the orientation.
+- **Initial orientation.** Upstream sets it through a config plugin, which this project does not
+  use; set it in the native project instead.
+
+Sources: [Expo docs: ScreenOrientation](https://docs.expo.dev/versions/latest/sdk/screen-orientation/),
+[Android 17 will ignore your portrait lock](https://rorklab.net/en/articles/rork-dev/rork-android-17-large-screen-resizability-preparation),
+[Managing orientation changes in React Native](https://blog.logrocket.com/managing-orientation-changes-react-native-apps/).
+
 ## How the wrapper works
 
 `@symbiote-native/screen-orientation` ships zero React/Vue/Angular/Svelte/Solid logic in

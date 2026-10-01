@@ -71,6 +71,18 @@ has a counterpart in `constants.test.ts`.
 Because the manifest is missing, this package does not unlock `expo-auth-session`'s `auth.expo.io`
 proxy flow or the scheme auto-detection of `makeRedirectUri`: both read `Constants.expoConfig`.
 
+## Common questions
+
+- **Where is `Constants.expoConfig`?** Not ported (no Expo manifest here); inline build-time values
+  through your own Babel or Metro config.
+- **`Constants.manifest` is `null`.** Deprecated upstream and not available here.
+- **Where is `installationId`?** Deprecated upstream; use `@symbiote-native/application`'s Android ID
+  or a stored id in `@symbiote-native/secure-store`.
+- **`makeRedirectUri` needs a scheme.** Pass `scheme` explicitly.
+
+Sources: [Expo docs: Constants](https://docs.expo.dev/versions/latest/sdk/constants/),
+[expo/expo#44527](https://github.com/expo/expo/issues/44527).
+
 ## Test it
 
 Tests inject a fake native module in place of the real `requireNativeModule` resolution

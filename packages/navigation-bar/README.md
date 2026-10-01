@@ -1,14 +1,15 @@
 # @symbiote-native/navigation-bar
 
-A wrapper package for [SymbioteNative](../../README.md) that makes
-[`expo-navigation-bar`](https://github.com/expo/expo/tree/main/packages/expo-navigation-bar)
-- setting the Android navigation bar's button style and visibility - usable from **every**
-adapter, React, Vue, Svelte, Solid, and Angular, not just React. **Android only**: upstream ships
-no iOS implementation at all, so every function throws `UnavailabilityError` off Android,
-matching this repo's own normalization convention for every other platform-gated package. Built
-the same way as [`@symbiote-native/intent-launcher`](../intent-launcher): an
-`expo-modules-core`-based wrapper (see the `symbiote-expo-native-module` project skill for the
-full mechanism).
+Make the Android navigation bar match your screen: light or dark buttons, hidden for an immersive
+view. One API for every [SymbioteNative](../../README.md) adapter (React, Vue, Svelte, Solid and
+Angular).
+
+It wraps [`expo-navigation-bar`](https://github.com/expo/expo/tree/main/packages/expo-navigation-bar).
+**Android only**: upstream ships no iOS implementation, so every function throws
+`UnavailabilityError` off Android, matching this repo's normalization for platform-gated packages.
+Built the same way as [`@symbiote-native/intent-launcher`](../intent-launcher): an
+`expo-modules-core`-based wrapper (see the `symbiote-expo-native-module` project skill for the full
+mechanism).
 
 ## Install
 
@@ -127,6 +128,18 @@ unmounting the last one falls back to `defaultNavigationBarProps`.
   packages already apply.
 - **`setVisibilityAsync` forwards straight to the native module**, not through this package's own
   `setHidden`, matching upstream's exact observable behavior (and the ported test asserting it).
+
+## Common questions
+
+- **`setBackgroundColorAsync` has no effect.** Reported on Expo Go; test in a development build.
+- **"The current activity is no longer available".** A setter ran with no activity attached; retry
+  once the app is foregrounded.
+- **`PlatformColor` fails.** Pass a plain color string.
+- **Black bar with `inset-swipe`.** Reported on phones that hide the bottom bar by default.
+
+Sources: [expo/expo#36814](https://github.com/expo/expo/issues/36814),
+[expo/expo#33950](https://github.com/expo/expo/issues/33950),
+[expo/expo#18515](https://github.com/expo/expo/issues/18515).
 
 ## Test it
 

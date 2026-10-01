@@ -1,12 +1,14 @@
 # @symbiote-native/age-range
 
-A wrapper package for [SymbioteNative](../../README.md) that makes
-[`expo-age-range`](https://github.com/expo/expo/tree/main/packages/expo-age-range)
-(Apple's Declared Age Range API on iOS 26+, and Google Play's Age Signals) usable from **every**
-adapter, React, Vue, Svelte, Solid, and Angular. Like
+Show age-appropriate content, or meet an age-assurance law, without collecting a birth date
+yourself: ask the platform. One API for every [SymbioteNative](../../README.md) adapter (React,
+Vue, Svelte, Solid and Angular).
+
+It wraps [`expo-age-range`](https://github.com/expo/expo/tree/main/packages/expo-age-range)
+(Apple's Declared Age Range API on iOS 26+, and Google Play's Age Signals). Like
 [`@symbiote-native/application`](../application), everything here is a one-shot async call (or a
-single sync setter) with no per-instance state, so there is no hook/composable/service to wrap:
-every adapter's entry point is a plain re-export of the same `core`.
+single sync setter) with no per-instance state, so there is no hook, composable or service to wrap:
+every adapter entry point is a plain re-export of the same `core`.
 
 ## Install
 
@@ -56,6 +58,10 @@ implementation: `examples/expo-react/ios/Podfile` and
 
 No app-level permission strings are needed. Apple's age-range prompt and Google Play's Age
 Signals consent screen are both system UI, carrying no `Info.plist`/manifest entry of their own.
+
+**iOS needs one entitlement, added by hand.** Build with Xcode 26 or later and add
+`com.apple.developer.declared-age-range` (`<true/>`) to your app's `.entitlements` file.
+`native-link.json` does not generate it.
 
 </details>
 
@@ -110,8 +116,20 @@ import { requestAgeRangeAsync } from '@symbiote-native/age-range/angular';
   first, unlike iOS where the consent is folded into `requestAgeRangeAsync` itself.
 - `setFakeAgeSignals` only works in a debuggable build. The native side throws otherwise unless
   the argument is `null` (which always goes back to real signals).
-- **Known gap (2026-09-28): no canary demo screen in any of the 6 `examples/expo-*` apps**, same
-  status as `@symbiote-native/asset`/`@symbiote-native/font`. Wiring one is a separate follow-up.
+- **Test on a real device.** Simulators and emulators may not behave as expected; the canary
+  `AgeRangeScreen` in the `examples/expo-*` apps exercises every call.
+
+## Common questions
+
+- **iOS `IOS_ENTITLEMENT_ERROR`.** Add `com.apple.developer.declared-age-range`; the Simulator lacks the feature.
+- **Xcode?** 26.0 or later.
+- **Android `API_NOT_AVAILABLE` / `PLAY_STORE_NOT_FOUND` / `NETWORK_ERROR`.** Needs an up-to-date
+  Play Store, a network, and a Google Play install.
+- **No range on Android.** Reported only while the user consents to share it.
+
+Sources: [Expo docs: AgeRange](https://docs.expo.dev/versions/latest/sdk/age-range/),
+[expo/expo#46365](https://github.com/expo/expo/issues/46365),
+[AgeSignalsException](https://developer.android.com/google/play/age-signals/reference/com/google/android/play/agesignals/AgeSignalsException).
 
 ## Test it
 

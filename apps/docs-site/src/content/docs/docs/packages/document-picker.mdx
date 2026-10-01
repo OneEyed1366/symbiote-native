@@ -1,0 +1,270 @@
+---
+title: Document picker
+description: Let users pick documents from any provider on the device, on every SymbioteNative adapter.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+Let users attach a PDF, a spreadsheet or any other file from wherever it lives: local storage,
+iCloud, Google Drive. `@symbiote-native/document-picker` wraps
+[`expo-document-picker`](https://github.com/expo/expo/tree/main/packages/expo-document-picker),
+which opens the system's own document UI, so every SymbioteNative adapter can reach it, not just
+React. Like [print](/docs/packages/print/), the single export is a free function with no
+per-instance state, so the React, Vue, Angular, Svelte, and Solid entry points are plain re-exports
+of the same `core`.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | live    |
+| Android     | live    |
+
+| Framework adapter | Support |
+| ----------------- | ------- |
+| React             | live    |
+| Vue               | live    |
+| Angular           | live    |
+| Svelte            | live    |
+| Solid             | live    |
+
+## Installation
+
+```sh
+npm install @symbiote-native/document-picker
+```
+
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --document-picker`
+(or `add --document-picker` in an existing app) installs and wires this for you - see
+[`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
+
+`expo-document-picker` and `expo-modules-core` come along as regular dependencies, pinned to exact
+versions. Never install either yourself, and never add the `expo` meta-package to your project (it
+bundles its own Metro/Babel pipeline, which conflicts with this project's own).
+
+<Aside type="danger" title="Native setup is required before first use">
+  `expo-document-picker`'s native code is discovered by `expo-modules-autolinking`, a different
+  mechanism from the `react-native.config.cjs`/podspec autolinking every other SymbioteNative
+  wrapper uses. Follow [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers this package and
+  every other `expo-modules-core` package with zero further native changes.
+</Aside>
+
+No runtime permission or manifest edit is needed: the picker is the OS's own UI and runs outside
+your app's permission surface. Android 11+ package visibility is handled by a `<queries>` block the
+package ships.
+
+<Aside type="caution" title="iCloud entitlements are not generated">
+  Upstream's config plugin adds iCloud entitlements only when the Expo config sets
+  `ios.usesIcloudStorage`. This project has no Expo config to read it from, so nothing is
+  generated. If your app needs iCloud-backed picking, add the entitlement keys to your own iOS
+  project by hand.
+</Aside>
+
+## Usage
+
+All five adapters re-export the same function; there is no per-adapter hook, composable or
+service, since nothing here holds live state.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { useState } from 'react';
+    import { getDocumentAsync } from '@symbiote-native/document-picker/react';
+
+    export default function PickPdf() {
+      const [name, setName] = useState<string | null>(null);
+
+      async function onPress() {
+        const result = await getDocumentAsync({ type: 'application/pdf' });
+        if (!result.canceled) setName(result.assets[0].name);
+      }
+
+      return (
+        <view>
+          <text>{name ?? 'nothing picked'}</text>
+          <button title="Pick a PDF" onPress={onPress} />
+        </view>
+      );
+    }
+    ```
+
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { ref } from 'vue';
+    import { getDocumentAsync } from '@symbiote-native/document-picker/vue';
+
+    const name = ref<string | null>(null);
+
+    async function onPress() {
+      const result = await getDocumentAsync({ type: 'application/pdf' });
+      if (!result.canceled) name.value = result.assets[0].name;
+    }
+    </script>
+
+    <template>
+      <view>
+        <text>{{ name ?? 'nothing picked' }}</text>
+        <button title="Pick a PDF" @press="onPress" />
+      </view>
+    </template>
+    ```
+
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component, signal } from '@angular/core';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
+    import { getDocumentAsync } from '@symbiote-native/document-picker/angular';
+
+    @Component({
+      standalone: true,
+      imports: [SYMBIOTE_ELEMENTS],
+      template: `
+        <view>
+          <text>{{ name() ?? 'nothing picked' }}</text>
+          <button title="Pick a PDF" (press)="onPress()" />
+        </view>
+      `,
+    })
+    export class PickPdf {
+      readonly name = signal<string | null>(null);
+
+      async onPress(): Promise<void> {
+        const result = await getDocumentAsync({ type: 'application/pdf' });
+        if (!result.canceled) this.name.set(result.assets[0].name);
+      }
+    }
+    ```
+
+    There is no service to `inject()`: the function is a plain export off the core package.
+
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { getDocumentAsync } from '@symbiote-native/document-picker/svelte';
+
+      let name = $state<string | null>(null);
+
+      async function onPress(): Promise<void> {
+        const result = await getDocumentAsync({ type: 'application/pdf' });
+        if (!result.canceled) name = result.assets[0].name;
+      }
+    </script>
+
+    <view>
+      <text>{name ?? 'nothing picked'}</text>
+      <button title="Pick a PDF" onPress={onPress} />
+    </view>
+    ```
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { createSignal } from 'solid-js';
+    import { getDocumentAsync } from '@symbiote-native/document-picker/solid';
+
+    export function PickPdf() {
+      const [name, setName] = createSignal<string | null>(null);
+
+      async function onPress() {
+        const result = await getDocumentAsync({ type: 'application/pdf' });
+        if (!result.canceled) setName(result.assets[0].name);
+      }
+
+      return (
+        <view>
+          <text>{name() ?? 'nothing picked'}</text>
+          <button title="Pick a PDF" onPress={onPress} />
+        </view>
+      );
+    }
+    ```
+
+  </TabItem>
+</Tabs>
+
+### Pick several files
+
+```ts
+const result = await getDocumentAsync({ type: ['application/pdf', 'image/*'], multiple: true });
+if (!result.canceled) {
+  for (const asset of result.assets) console.log(asset.name, asset.uri, asset.size);
+}
+```
+
+## API
+
+### `getDocumentAsync(options?)`
+
+| Signature                                                                    | Description                                                              |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `getDocumentAsync(options?: IDocumentPickerOptions): Promise<IDocumentPickerResult>` | Opens the system document picker and resolves what the user chose or that they cancelled |
+
+### `IDocumentPickerOptions`
+
+| Field                  | Type                           | Description                                                                                       |
+| ---------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------- |
+| `type`                 | `string \| string[] \| undefined` | MIME types to show; wildcards such as `image/*` are allowed. Defaults to any type              |
+| `copyToCacheDirectory` | `boolean \| undefined`         | Copy each pick into the app's cache so it is readable right away. Defaults to `true`              |
+| `multiple`             | `boolean \| undefined`         | Allow picking more than one document. Defaults to `false`                                         |
+
+### `IDocumentPickerResult` and `IDocumentPickerAsset`
+
+| Type                   | Field          | Description                                                                |
+| ---------------------- | -------------- | -------------------------------------------------------------------------- |
+| `IDocumentPickerResult` | `canceled`    | `true` when the user dismissed the picker. Then `assets` is `null`         |
+| `IDocumentPickerResult` | `assets`      | `IDocumentPickerAsset[]` when not cancelled, `null` when cancelled         |
+| `IDocumentPickerAsset` | `name`         | File name, including extension                                             |
+| `IDocumentPickerAsset` | `uri`          | Location of the file: the cache copy unless `copyToCacheDirectory` is `false` |
+| `IDocumentPickerAsset` | `lastModified` | Last-modified time in milliseconds since the epoch                         |
+| `IDocumentPickerAsset` | `size`         | Size in bytes, when the provider reports it                                |
+| `IDocumentPickerAsset` | `mimeType`     | MIME type, when the provider reports it                                    |
+
+## Notes
+
+- **Check `canceled` before reading `assets`.** The result is a union: `assets` is `null` when the
+  user backs out, so index into it only after `!result.canceled`.
+- **The cache copy is on by default.** With `copyToCacheDirectory: true` the file is copied into the
+  app's cache and `uri` points at the copy, which the [file system](/docs/packages/file-system/)
+  package can read. Turn it off to skip the copy for large files, and read `uri` the way the
+  provider allows.
+- **`size` and `mimeType` can be missing.** Not every provider reports them.
+- **Web-only fields are dropped.** Upstream's `base64`, `file` and `output` exist only on the web
+  platform; this package targets iOS and Android.
+- **The picker can only be verified on a device or simulator.** The headless tests fake the native
+  module, so they prove option defaults and the `type` string-to-array coercion, not the picker.
+
+## Common questions
+
+**The `uri` is a `content://` URI on Android and I cannot read it.** That happens with
+`copyToCacheDirectory: false`: the URI belongs to the document provider and is not a normal file
+path. Leave `copyToCacheDirectory` at its default of `true` so the file is copied into the app's
+cache and `uri` is a readable path (for example for the
+[file system](/docs/packages/file-system/) package).
+
+**`size` is `null` or missing.** Some Android document providers do not report a size. Read the file
+(after copying it) if you need the exact size.
+
+**How do I limit the picker to PDFs or images?** Pass `type`, for example `'application/pdf'` or
+`'image/*'`, or an array of them.
+
+**Do I need a permission?** No. The picker is system UI and runs outside your app's permission
+surface.
+
+**Can I pick several files?** Yes, set `multiple: true`. `result.assets` is then an array of every
+file picked.
+
+Sources: [Expo docs: DocumentPicker](https://docs.expo.dev/versions/latest/sdk/document-picker/),
+[expo/expo#11075 handling content:// URIs on Android](https://github.com/expo/expo/issues/11075).
+
+## How the wrapper works
+
+`expo-document-picker`'s JS is hand-ported into this package's `core/`, resolving
+`ExpoDocumentPicker` through `expo-modules-core` rather than the `expo` meta-package. The five
+adapter entry points are plain re-exports of `core` (Angular stays a physical subpath for its
+separate `ngc`/AOT build). Upstream's config plugin is build-time code this project does not run;
+the Android module entry lives in a static `native-link.json`. The native code is never vendored:
+`expo-modules-autolinking` resolves it from `node_modules` (see
+[the native setup guide](/docs/howtos/expo-native-module-setup/)).

@@ -1,12 +1,12 @@
 # @symbiote-native/local-auth
 
 A wrapper package for [SymbioteNative](../../README.md) that makes
-[`expo-local-authentication`](https://github.com/expo/expo/tree/main/packages/expo-local-authentication)
-— FaceID/TouchID on iOS, the Fingerprint/Biometric API on Android — usable from **every**
+[`expo-local-authentication`](https://github.com/expo/expo/tree/main/packages/expo-local-authentication):
+FaceID/TouchID on iOS, the Fingerprint/Biometric API on Android - usable from **every**
 adapter, React, Vue, Svelte, Solid, and Angular, not just React. Unlike this repo's other Expo wrapper
 ([`@symbiote-native/sensors`](../sensors), an `EventEmitter` + live-subscription surface),
 every function here is a one-shot async call with no per-instance state, so there is no hook/
-composable/service to wrap — the React, Vue, Svelte, Solid, and Angular entry points are plain
+composable/service to wrap - the React, Vue, Svelte, Solid, and Angular entry points are plain
 re-exports of the same `core`.
 
 ## Install
@@ -23,44 +23,44 @@ npx @symbiote-native/cli new my-app --local-auth
 npx @symbiote-native/cli add --local-auth
 ```
 
-Either way: installs `@symbiote-native/local-auth` and wires the native autolinking automatically — see
+Either way: installs `@symbiote-native/local-auth` and wires the native autolinking automatically - see
 [`@symbiote-native/cli`](../cli).
 
 <details>
-<summary>Manual install (no CLI — installing and wiring native autolinking by hand)</summary>
+<summary>Manual install (no CLI - installing and wiring native autolinking by hand)</summary>
 
 ```bash
 npm install @symbiote-native/local-auth
 ```
 
 `expo-local-authentication` and `expo-modules-core` come along as regular dependencies, pinned
-to exact versions — never install either yourself, and never add the `expo` meta-package to
+to exact versions - never install either yourself, and never add the `expo` meta-package to
 your project (it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
 
 ## Required one-time step: native autolinking wiring
 
 Unlike a plain RN native module, `expo-local-authentication`'s native code is discovered by
-`expo-modules-autolinking`, not RN's own `react-native.config.cjs` mechanism — this needs wiring
+`expo-modules-autolinking`, not RN's own `react-native.config.cjs` mechanism - this needs wiring
 into the native host app **once**, covering this package and every other
 `expo-modules-core` package with zero further changes:
 
 | Platform | Touches                                                                                                                                             |
 | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| iOS      | `ios/Podfile` — add `use_expo_modules!`                                                                                                             |
-| iOS      | `AppDelegate.swift` — Expo's runtime-bootstrap hook                                                                                                 |
-| Android  | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects                                                               |
-| Android  | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
+| iOS      | `ios/Podfile` - add `use_expo_modules!`                                                                                                             |
+| iOS      | `AppDelegate.swift` - Expo's runtime-bootstrap hook                                                                                                 |
+| Android  | `settings.gradle` / `app/build.gradle` - resolve and include the Expo Gradle projects                                                               |
+| Android  | `MainApplication.kt` - Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
 
 Full mechanics live in the `symbiote-expo-native-module` project skill. Reference
 implementation: `examples/expo-react/ios/Podfile` and
 `examples/expo-react/android/app/src/main/java/com/canaryexpo/MainApplication.kt`.
 
-Two platform permission strings ship with the native module itself — nothing to reimplement,
+Two platform permission strings ship with the native module itself - nothing to reimplement,
 just add the strings your app's own Info.plist/manifest needs:
 
-- iOS — `NSFaceIDUsageDescription` in `Info.plist` (without it, iOS silently falls back to the
+- iOS - `NSFaceIDUsageDescription` in `Info.plist` (without it, iOS silently falls back to the
   device passcode instead of prompting FaceID).
-- Android — `USE_BIOMETRIC` in `AndroidManifest.xml`.
+- Android - `USE_BIOMETRIC` in `AndroidManifest.xml`.
 
 </details>
 
@@ -72,11 +72,11 @@ src/core/     hasHardwareAsync / isEnrolledAsync / getEnrolledLevelAsync /
               AuthenticationType, SecurityLevel, and the option/result/error types.
               native-module.ts resolves the native module via expo-modules-core's
               requireNativeModule.
-src/angular/  @symbiote-native/local-auth/angular — export * from '../core'
+src/angular/  @symbiote-native/local-auth/angular - export * from '../core'
 ```
 
 `./react`, `./vue`, `./svelte`, and `./solid` are `exports`-map aliases straight onto
-`src/core/` — no physical per-framework file, since there's nothing to subscribe to or clean up.
+`src/core/` - no physical per-framework file, since there's nothing to subscribe to or clean up.
 `./angular` stays a physical file/subpath since Angular ships through a separate `ngc`/AOT build
 (`build-ngc/`).
 
@@ -349,7 +349,7 @@ export class LocalAuthScreen {
 }
 ```
 
-There's no per-instance service to `inject()` in the Angular case — every function is a plain
+There's no per-instance service to `inject()` in the Angular case - every function is a plain
 free function off the core package, called straight from the constructor. The examples above are
 trimmed from the real canary demo screens, which exist for all six Expo canaries
 (`examples/expo-react/screens/LocalAuthScreen.tsx`,
@@ -360,7 +360,7 @@ trimmed from the real canary demo screens, which exist for all six Expo canaries
 
 ## API
 
-Free functions, no event stream, no per-instance state — upstream ships a handful of async
+Free functions, no event stream, no per-instance state - upstream ships a handful of async
 functions and two enums, not a subscribable sensor, so the React/Vue/Svelte/Solid/Angular entry
 points above are plain re-exports of `core` with nothing adapter-specific to add.
 
@@ -374,7 +374,7 @@ cancelAuthenticate(): Promise<void> // Android only
 ```
 
 Plus `AuthenticationType`, `SecurityLevel`, `ILocalAuthenticationOptions`,
-`ILocalAuthenticationResult`, `ILocalAuthenticationError`, `IBiometricsSecurityLevel` — ported
+`ILocalAuthenticationResult`, `ILocalAuthenticationError`, `IBiometricsSecurityLevel` - ported
 from upstream's `LocalAuthentication.types.ts`, renamed with this repo's `I`-prefix convention
 for exported types (`ts-js-best-practices`).
 
@@ -383,7 +383,7 @@ import {
   authenticateAsync,
   hasHardwareAsync,
 } from '@symbiote-native/local-auth';
-// or the framework-scoped entry points — identical surface, re-exported verbatim:
+// or the framework-scoped entry points - identical surface, re-exported verbatim:
 import { authenticateAsync } from '@symbiote-native/local-auth/react';
 import { authenticateAsync } from '@symbiote-native/local-auth/vue';
 import { authenticateAsync } from '@symbiote-native/local-auth/svelte';
@@ -397,7 +397,7 @@ import { authenticateAsync } from '@symbiote-native/local-auth/angular';
   pattern, or password set.** A real symptom on a fresh emulator or factory-reset device:
   `authenticateAsync` resolves `{ success: false, error: 'not_enrolled', warning:
 'KeyguardManager#isDeviceSecure() returned false' }`. This is **not** a missing app
-  permission — the manifest permission this package needs is an ordinary build-time merge with
+  permission - the manifest permission this package needs is an ordinary build-time merge with
   no runtime prompt, so there's nothing for your app to request. The fix lives on the device:
   Settings → Security → Screen lock → set a PIN/pattern/password, then optionally enroll a
   fingerprint (Extended Controls → Fingerprint on an emulator) to exercise the biometric path
@@ -406,17 +406,26 @@ import { authenticateAsync } from '@symbiote-native/local-auth/angular';
   requires apps using FaceID to declare why (`Info.plist`); skip it and `authenticateAsync`
   still resolves, just via the passcode prompt instead of FaceID.
 
+## Common questions
+
+- **Face ID falls back to the passcode.** `NSFaceIDUsageDescription` is missing from Info.plist.
+- **Check before prompting?** `hasHardwareAsync` and `isEnrolledAsync` must both be true.
+- **Customize the prompt?** `promptMessage`, `cancelLabel`, `fallbackLabel`, `disableDeviceFallback`.
+
+Sources: [Expo docs: LocalAuthentication](https://docs.expo.dev/versions/latest/sdk/local-authentication/),
+[expo/expo#25055](https://github.com/expo/expo/issues/25055).
+
 ## Test it
 
-No Fabric/Descriptor angle at all — every function here is a pure async-function surface, never
+No Fabric/Descriptor angle at all - every function here is a pure async-function surface, never
 a view or per-instance state. Tests inject a fake native-module object in place of the real
 `requireNativeModule` resolution (`src/core/local-authentication.test.ts`,
-`src/core/types.test.ts`, `vitest`) — no `installFabric()`, no ViewConfig. Native rendering itself
+`src/core/types.test.ts`, `vitest`) - no `installFabric()`, no ViewConfig. Native rendering itself
 is verified on-device (see the parent [README](../../README.md) for the project's testing model).
 
 Native autolinking wiring is done in all six Expo canary apps
 (`examples/expo-react`, `examples/expo-vue-sfc`, `examples/expo-vue-tsx`, `examples/expo-svelte`,
-`examples/expo-solid`, `examples/expo-angular`) — iOS Podfile/`AppDelegate.swift` +
+`examples/expo-solid`, `examples/expo-angular`) - iOS Podfile/`AppDelegate.swift` +
 `NSFaceIDUsageDescription`, Android Gradle/`MainApplication.kt` + `USE_BIOMETRIC`, all six
 confirmed present. The one remaining gap: this package isn't yet demoed in the plain, non-Expo
 `examples/react`/`vue-sfc`/`vue-tsx`/`svelte`/`solid`/`angular` canaries, since an

@@ -1,11 +1,14 @@
 # @symbiote-native/audio
 
-A wrapper package for [SymbioteNative](../../README.md) that makes
-[`expo-audio`](https://github.com/expo/expo/tree/main/packages/expo-audio) usable from **every**
-adapter - React, Vue, Svelte, Solid, and Angular. `AudioPlayer`, `AudioRecorder`, `AudioPlaylist`,
-and `AudioStream` are JSI-backed `SharedObject` instances - per-instance native objects with real
-state and methods, not one-shot functions. Every upstream lifecycle-wrapper hook, including
-`useAudioStream`, is ported to every adapter (see "Hooks" below).
+Play a track, record the microphone, queue a playlist or read raw PCM samples, and keep playing when
+the app goes to the background. One API for every [SymbioteNative](../../README.md) adapter (React,
+Vue, Svelte, Solid and Angular).
+
+It wraps [`expo-audio`](https://github.com/expo/expo/tree/main/packages/expo-audio).
+`AudioPlayer`, `AudioRecorder`, `AudioPlaylist` and `AudioStream` are JSI-backed `SharedObject`
+instances: per-instance native objects with real state and methods, not one-shot functions. Every
+upstream lifecycle hook, including `useAudioStream`, is ported to every adapter (see "Hooks"
+below), so a player is created, replaced and released with its component.
 
 ## Install
 
@@ -21,49 +24,49 @@ npx @symbiote-native/cli new my-app --audio
 npx @symbiote-native/cli add --audio
 ```
 
-Either way: installs `@symbiote-native/audio`, wires the native autolinking automatically, and — since
-this package has an optional, policy-sensitive Android bundle — asks at the end whether to grant
+Either way: installs `@symbiote-native/audio`, wires the native autolinking automatically, and - since
+this package has an optional, policy-sensitive Android bundle - asks at the end whether to grant
 background recording too (see the note below the manual-install block). See
 [`@symbiote-native/cli`](../cli).
 
 <details>
-<summary>Manual install (no CLI — installing and wiring native autolinking by hand)</summary>
+<summary>Manual install (no CLI - installing and wiring native autolinking by hand)</summary>
 
 ```bash
 npm install @symbiote-native/audio
 ```
 
 `expo-audio` and `expo-modules-core` come along as regular dependencies, pinned to exact
-versions — never install either yourself, and never add the `expo` meta-package to your project
+versions - never install either yourself, and never add the `expo` meta-package to your project
 (it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
 
 ## Required one-time step: native autolinking wiring
 
-Same one-time step as every other `expo-modules-core` package this project ships — see
+Same one-time step as every other `expo-modules-core` package this project ships - see
 [`@symbiote-native/local-auth`'s README](../local-auth/README.md#required-one-time-step-native-autolinking-wiring)
 and the `symbiote-expo-native-module` project skill. Nothing package-specific beyond one Info.plist
 string:
 
-- iOS — `NSMicrophoneUsageDescription` in `Info.plist`, wired automatically by
+- iOS - `NSMicrophoneUsageDescription` in `Info.plist`, wired automatically by
   `@symbiote-native/expo-modules-link`'s aggregator (`native-link.json`'s `ios.infoPlistKeys`) the
-  next time it runs — override the default text by adding the key yourself first. Same aggregator
-  also adds `UIBackgroundModes: audio` (`ios.infoPlistArrayKeys`) — upstream's own `withAudio.ts`
+  next time it runs - override the default text by adding the key yourself first. Same aggregator
+  also adds `UIBackgroundModes: audio` (`ios.infoPlistArrayKeys`) - upstream's own `withAudio.ts`
   config plugin defaults `enableBackgroundPlayback` to `true`, and without this key iOS suspends
   playback the moment the app backgrounds.
-- Android — `RECORD_AUDIO` / `MODIFY_AUDIO_SETTINGS` already ship in `expo-audio`'s own
+- Android - `RECORD_AUDIO` / `MODIFY_AUDIO_SETTINGS` already ship in `expo-audio`'s own
   `AndroidManifest.xml` and merge automatically, same as every other autolinked permission.
   Background **playback** is wired the same way as iOS: `native-link.json`'s
   `android.manifestPermissions` adds `FOREGROUND_SERVICE`/`FOREGROUND_SERVICE_MEDIA_PLAYBACK`, and
   `android.manifestServices` declares `AudioControlsService` (`foregroundServiceType="mediaPlayback"`)
-  — matching upstream's own `withAudio.ts` config plugin, whose `enableBackgroundPlayback` defaults
+  - matching upstream's own `withAudio.ts` config plugin, whose `enableBackgroundPlayback` defaults
   to `true`. Background **recording** (`allowsBackgroundRecording: true`) is opt-in, matching
-  upstream's own `enableBackgroundRecording` default of `false` — requesting the microphone
+  upstream's own `enableBackgroundRecording` default of `false` - requesting the microphone
   foreground-service type is exactly the kind of thing that should be a deliberate app choice, not
   a package side effect (same reasoning as `@symbiote-native/location`'s background permission).
 
 </details>
 
-**Background recording — opt-in, asked for you.** `new --audio`/`add --audio` above already ask,
+**Background recording - opt-in, asked for you.** `new --audio`/`add --audio` above already ask,
 interactively, whether to grant it; say yes and `FOREGROUND_SERVICE_MICROPHONE`/
 `POST_NOTIFICATIONS` plus the `AudioRecordingService` (`foregroundServiceType="microphone"`)
 `<service>` land in your `AndroidManifest.xml` for you, along with the `allowsBackgroundRecording`
@@ -74,21 +77,21 @@ Run it any time after:
 npx @symbiote-native/cli grant audio
 ```
 
-Idempotent — safe to run again even if already granted.
+Idempotent - safe to run again even if already granted.
 
 ## Shape
 
 ```
 src/core/     AudioPlayer / AudioRecorder / AudioPlaylist / AudioStream classes (each a thin
               subclass of the native SharedObject, adding only the JS-side logic upstream's own
-              ExpoAudio.ts shims onto the prototype — source resolution on `replace()`, the
+              ExpoAudio.ts shims onto the prototype - source resolution on `replace()`, the
               Android arg-count fix for `setPlaybackRate()`, per-platform option processing for
               `prepareToRecordAsync()`), the createAudioPlayer / createAudioPlaylist /
               createAudioStream factories, the audio-session/permission/preload module functions,
               RecordingPresets, and the event-name constants `addListener` accepts.
               native-module.ts resolves the native module via expo-modules-core's
               requireNativeModule.
-src/angular/  @symbiote-native/audio/angular — export * from '../core'
+src/angular/  @symbiote-native/audio/angular - export * from '../core'
 ```
 
 `./react`, `./vue`, `./svelte`, and `./solid` are `exports`-map aliases straight onto
@@ -147,7 +150,7 @@ loop: 'all' })`. Real-time PCM streaming has both a bare factory (`createAudioSt
 `stream.addListener(AUDIO_STREAM_BUFFER, ...)` after `stream.start()`) and the full
 `useAudioStream(options)` hook on every adapter, see "Hooks" below.
 
-Identical import surface on every adapter — `@symbiote-native/audio/react`, `/vue`, `/svelte`,
+Identical import surface on every adapter - `@symbiote-native/audio/react`, `/vue`, `/svelte`,
 `/solid`, `/angular` all re-export the same classes and functions.
 
 ## API
@@ -213,10 +216,10 @@ TRACK_CHANGED, AUDIO_STREAM_BUFFER, AUDIO_STREAM_STATUS  // event names for .add
 
 Plus the full `I`-prefixed type surface ported from upstream's `Audio.types.ts` /
 `AudioModule.types.ts` / `AudioStream.types.ts` / `AudioConstants.ts`, re-exported from the
-barrel — see `src/core/types.ts`.
+barrel - see `src/core/types.ts`.
 
 `IAudioSource` accepts a URI string, a `require('./song.mp3')` module id, an `@symbiote-native/asset`
-`Asset` instance, or a `{ uri | assetId, headers?, name? }` object — matching upstream's full
+`Asset` instance, or a `{ uri | assetId, headers?, name? }` object - matching upstream's full
 `AudioSource` union now that `@symbiote-native/asset` ships. `createAudioPlayer`'s `downloadFirst`
 option is ported too: the player starts with no source and `replace()`s it once
 `Asset.downloadAsync()` resolves a local cache file, same as upstream's `useAudioPlayer`.
@@ -252,16 +255,39 @@ Every adapter shares the framework-agnostic diffing/subscription logic from `cor
 lifecycle primitive differs (React/Solid/Vue/Angular's own `createResourceHook`/
 `createEventValueHook`, Svelte's from `@symbiote-native/svelte/runes/*`).
 
+## Notes
+
+- **Silent mode on iOS.** Call `setAudioModeAsync({ playsInSilentMode: true })` or playback is
+  muted by the ring/silent switch.
+- **Release what you create by hand.** `createAudioPlayer` and the other factories leave cleanup to
+  you (`remove()`); the hooks do it automatically.
+- **Android background playback needs lock-screen controls.** Without `setActiveForLockScreen`,
+  Android stops background audio after about three minutes (an OS limit).
+
+## Common questions
+
+- **Silent on iPhone.** `setAudioModeAsync({ playsInSilentMode: true })`.
+- **Stops in the background.** `shouldPlayInBackground: true`; on Android also
+  `setActiveForLockScreen`, or the OS stops it after about three minutes.
+- **Recording permission error.** `requestRecordingPermissionsAsync()` first; background recording
+  is opt-in (`npx @symbiote-native/cli grant audio`).
+- **Change the track.** `player.replace(source)`; `useAudioPlayer` recreates on a changed source.
+- **Leaking players.** Factory-made players need `remove()`; the hooks do it for you.
+
+Sources: [Expo docs: Audio](https://docs.expo.dev/versions/latest/sdk/audio/),
+[expo/expo#24484](https://github.com/expo/expo/issues/24484),
+[expo/expo#43086](https://github.com/expo/expo/issues/43086).
+
 ## Scope exclusions
 
 - **Web-only surfaces** (`ExpoAudio.web.ts`, `AudioPlayer.web.ts`, `AudioStream.web.ts`,
-  `MediaSessionController.web.ts`) — this project targets iOS + Android only.
+  `MediaSessionController.web.ts`) - this project targets iOS + Android only.
 
 ## Test it
 
-No Fabric/Descriptor angle at all — every class here is a `SharedObject` with no visual
+No Fabric/Descriptor angle at all - every class here is a `SharedObject` with no visual
 component. Tests fake the native `AudioPlayer`/`AudioRecorder`/`AudioPlaylist`/`AudioStream`
 classes `expoAudio` exposes (real prototype methods, so the subclass `super.*()` calls in
 `audio-player.ts`/`audio-recorder.ts` resolve correctly) and the plain async module functions
 (`src/core/audio-classes.test.ts`, `src/core/audio-module.test.ts`, `src/core/
-resolve-source.test.ts`) — no `installFabric()`, no ViewConfig.
+resolve-source.test.ts`) - no `installFabric()`, no ViewConfig.

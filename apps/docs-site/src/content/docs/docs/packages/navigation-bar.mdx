@@ -1,0 +1,244 @@
+---
+title: Navigation bar
+description: Change the Android navigation bar's button style and visibility, imperatively or with a declarative component, on every SymbioteNative adapter.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+Make the Android navigation bar match your screen: light or dark buttons, hidden for an immersive
+view. `@symbiote-native/navigation-bar` wraps
+[`expo-navigation-bar`](https://github.com/expo/expo/tree/main/packages/expo-navigation-bar) so
+every SymbioteNative adapter can drive it, not just React. The imperative functions are shared by
+every adapter. The declarative `NavigationBar` component and the `useVisibility` binding are ported
+to all five, in each framework's own idiom.
+
+This is **Android only**: upstream ships no iOS implementation, so every function throws
+`UnavailabilityError` on iOS. Guard calls with a platform check.
+
+| OS platform | Support                  |
+| ----------- | ------------------------ |
+| iOS         | not applicable (throws)  |
+| Android     | live                     |
+
+| Framework adapter | Support |
+| ----------------- | ------- |
+| React             | live    |
+| Vue               | live    |
+| Angular           | live    |
+| Svelte            | live    |
+| Solid             | live    |
+
+## Installation
+
+```sh
+npm install @symbiote-native/navigation-bar
+```
+
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --navigation-bar` (or
+`add --navigation-bar` in an existing app) installs and wires this for you - see
+[`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
+
+`expo-navigation-bar` and `expo-modules-core` come along as regular dependencies, pinned to exact
+versions. Never install either yourself, and never add the `expo` meta-package to your project (it
+bundles its own Metro/Babel pipeline, which conflicts with this project's own).
+
+<Aside type="danger" title="Native setup is required before first use">
+  `expo-navigation-bar`'s native code is discovered by `expo-modules-autolinking`, a different
+  mechanism from the `react-native.config.cjs`/podspec autolinking every other SymbioteNative
+  wrapper uses. Follow [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers this package and
+  every other `expo-modules-core` package with zero further native changes.
+</Aside>
+
+No permission or manifest edit is needed.
+
+<Aside type="note" title="Setting the initial style before first paint">
+  Upstream's config plugin writes `android:windowLightNavigationBar` and
+  `android:enforceNavigationBarContrast` into `styles.xml` when you give it initial `style`,
+  `hidden` or `enforceContrast` props. This project runs no plugin, and the link manifest has no
+  style-resource field. If you need the bar styled before the first frame rather than after mount,
+  edit `styles.xml` by hand. Otherwise call `setStyle` or `setHidden`, or render `NavigationBar`.
+</Aside>
+
+## Usage
+
+Render `NavigationBar` to set the style and visibility for as long as a screen is mounted. The
+deepest mounted `NavigationBar` wins on shared fields, and unmounting the last one restores the
+defaults.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { NavigationBar, useVisibility } from '@symbiote-native/navigation-bar/react';
+
+    export default function Immersive() {
+      const visibility = useVisibility();
+
+      return (
+        <view>
+          <NavigationBar style="light" hidden />
+          <text>{visibility ?? 'loading'}</text>
+        </view>
+      );
+    }
+    ```
+
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { NavigationBar, useVisibility } from '@symbiote-native/navigation-bar/vue';
+
+    const visibility = useVisibility();
+    </script>
+
+    <template>
+      <view>
+        <NavigationBar style="light" :hidden="true" />
+        <text>{{ visibility ?? 'loading' }}</text>
+      </view>
+    </template>
+    ```
+
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component, inject } from '@angular/core';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
+    import {
+      NavigationBar,
+      NavigationBarVisibilityService,
+    } from '@symbiote-native/navigation-bar/angular';
+
+    @Component({
+      standalone: true,
+      imports: [SYMBIOTE_ELEMENTS, NavigationBar],
+      template: `
+        <view>
+          <navigation-bar [style]="'light'" [hidden]="true" />
+          <text>{{ visibility() ?? 'loading' }}</text>
+        </view>
+      `,
+    })
+    export class Immersive {
+      readonly visibility = inject(NavigationBarVisibilityService).visibility;
+    }
+    ```
+
+    The component's selector is `navigation-bar`. `visibility` is a signal.
+
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { NavigationBar, useVisibility } from '@symbiote-native/navigation-bar/svelte';
+
+      const visibility = useVisibility();
+    </script>
+
+    <view>
+      <NavigationBar style="light" hidden={true} />
+      <text>{visibility.current ?? 'loading'}</text>
+    </view>
+    ```
+
+    Svelte returns an object with a reactive `current`.
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { NavigationBar, createVisibility } from '@symbiote-native/navigation-bar/solid';
+
+    export function Immersive() {
+      const visibility = createVisibility();
+
+      return (
+        <view>
+          <NavigationBar style="light" hidden />
+          <text>{visibility() ?? 'loading'}</text>
+        </view>
+      );
+    }
+    ```
+
+    Solid reserves `use*` for consuming existing state, so the primitive is `createVisibility`.
+
+  </TabItem>
+</Tabs>
+
+### Imperative calls
+
+```ts
+import { addVisibilityListener, getVisibilityAsync, setHidden, setStyle } from '@symbiote-native/navigation-bar';
+
+setStyle('dark');
+setHidden(true);
+
+const visibility = await getVisibilityAsync();
+const subscription = addVisibilityListener(({ visibility }) => console.log(visibility));
+// later:
+subscription.remove();
+```
+
+## API
+
+### Functions
+
+| Signature                                        | Description                                                                                       |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| `setStyle(style): void`                          | Sets the button style. `'auto'` and `'inverted'` resolve against the current color scheme. Skips the native call when the resolved style is unchanged |
+| `setHidden(hidden): void`                        | Hides or shows the bar. Skips the native call when the value is unchanged                         |
+| `setVisibilityAsync(visibility): Promise<void>`  | Sets visibility to `'visible'` or `'hidden'`, calling native directly and bypassing `setHidden`'s dedupe |
+| `getVisibilityAsync(): Promise<INavigationBarVisibility>` | Reads the current visibility                                                             |
+| `addVisibilityListener(listener): EventSubscription` | Calls `listener` with `{ visibility, rawVisibility }` when visibility changes                 |
+
+### `NavigationBar` props
+
+| Prop     | Type                                             | Description                                                              |
+| -------- | ------------------------------------------------ | ------------------------------------------------------------------------ |
+| `style`  | `'auto' \| 'inverted' \| 'light' \| 'dark'`      | Button style. `'auto'` follows the color scheme. Defaults to `'auto'`    |
+| `hidden` | `boolean`                                        | Whether the bar is hidden                                                |
+
+### Visibility binding
+
+| Adapter | Entry point                                          | Returns                                         |
+| ------- | ---------------------------------------------------- | ----------------------------------------------- |
+| React   | `useVisibility()`                                    | `'visible'`, `'hidden'`, or `undefined` while loading |
+| Vue     | `useVisibility()`                                    | A ref of the same                               |
+| Svelte  | `useVisibility()`                                    | An object with a reactive `current`             |
+| Solid   | `createVisibility()`                                 | An accessor of the same                         |
+| Angular | `inject(NavigationBarVisibilityService).visibility`  | A signal of the same                            |
+
+## Notes
+
+- **Every function throws `UnavailabilityError` off Android.** This replaces upstream's own
+  `console.warn` and no-op fallback, matching how this repo's other platform-gated packages behave.
+- **Nested `NavigationBar` components merge by depth.** The deepest mounted one wins on shared
+  fields, so a modal can override its parent's style and the parent's value returns when the modal
+  unmounts.
+- **It can only be verified on an Android device or emulator.** The headless tests fake the native
+  module, so they prove the dedupe, the merge stack and each adapter's lifecycle.
+
+## Common questions
+
+- **`setBackgroundColorAsync` has no effect.** Reported on Expo Go and some device configurations;
+  test in a development build.
+- **"The current activity is no longer available".** A setter was called while no activity was
+  attached (app backgrounded or starting). Retry after the app is foregrounded.
+- **Passing a `PlatformColor` fails.** The native side expects a plain color int; pass a color string.
+- **Black bar with `inset-swipe`.** Reported on phones that hide the bottom bar by default.
+- **iOS.** There is no navigation bar there; the module is Android only.
+
+Sources: [expo/expo#36814](https://github.com/expo/expo/issues/36814),
+[expo/expo#33950](https://github.com/expo/expo/issues/33950),
+[expo/expo#18515](https://github.com/expo/expo/issues/18515),
+[expo/expo#36994](https://github.com/expo/expo/issues/36994).
+
+## How the wrapper works
+
+`expo-navigation-bar`'s JS is hand-ported into this package's `core/`, resolving the native module
+through `expo-modules-core` rather than the `expo` meta-package; the native resolution is
+Android-only and the base entry is an empty stub. The merge-stack logic lives once in
+`core/entries-stack.ts`; each adapter supplies only its own lifecycle glue over it. The native code
+is never vendored: `expo-modules-autolinking` resolves it from `node_modules` (see
+[the native setup guide](/docs/howtos/expo-native-module-setup/)).

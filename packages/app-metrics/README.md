@@ -1,11 +1,13 @@
 # @symbiote-native/app-metrics
 
-A wrapper package for [SymbioteNative](../../README.md) that makes
-[`expo-app-metrics`](https://github.com/expo/expo/tree/main/packages/expo-app-metrics)
-(app startup, frame rate, memory, network-request, crash, and session metrics) usable from
-**every** adapter's core surface, plus an `AppMetricsRoot` on all five adapters and an
-`AppMetricsErrorBoundary` on React, Vue, Solid, and Svelte, each wrapping that framework's own
-catch primitive.
+See how your app really performs on users' devices: how long it takes to start and become
+interactive, how it handles network requests, when it crashes. One API for every
+[SymbioteNative](../../README.md) adapter (React, Vue, Svelte, Solid and Angular).
+
+It wraps [`expo-app-metrics`](https://github.com/expo/expo/tree/main/packages/expo-app-metrics)
+(app startup, frame rate, memory, network-request, crash, and session metrics): the core surface on
+every adapter, plus an `AppMetricsRoot` on all five and an `AppMetricsErrorBoundary` on React, Vue,
+Solid, and Svelte, each wrapping that framework's own catch primitive.
 
 ## Scope decision (2026-09-28)
 
@@ -158,7 +160,18 @@ import { AppMetricsRoot, AppMetricsErrorBoundary } from '@symbiote-native/app-me
   properties on the native module (see the `symbiote-expo-native-module` skill's SharedObject
   section) - there is no JS logic to port beyond the re-export, same as
   `@symbiote-native/audio`'s `AudioPlaylist`.
-- **Known gap (2026-09-28): no canary demo screen in any of the 6 `examples/expo-*` apps.**
+- The canary `AppMetricsScreen` in the `examples/expo-*` apps exercises the root, the boundary and
+  the network observer.
+
+## Common questions
+
+- **What does it collect?** Startup (cold/warm launch, bundle load, time to first render), frame
+  rate, memory, sessions, and your own events.
+- **Where do the numbers go?** EAS Observe, or any OpenTelemetry-compatible backend.
+- **Time to interactive missing.** You must mark the app interactive yourself.
+
+Sources: [Expo docs: Introduction to EAS Observe](https://docs.expo.dev/eas/observe/introduction/),
+[Introducing Observe](https://expo.dev/blog/introducing-observe).
 
 ## Test it
 

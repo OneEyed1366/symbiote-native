@@ -238,6 +238,21 @@ Re-exported verbatim from `expo-modules-core`, never the `expo` meta-package:
 - **`getAdvertisingId` returns `null` on the iOS Simulator, regardless of any settings** — there is
   no real IDFA to read there. This is expected Apple Simulator behavior, not a bug in this wrapper.
 
+## Common questions
+
+- **The app crashes when I request permission.** `NSUserTrackingUsageDescription` is missing from
+  Info.plist. Add it before calling `requestTrackingPermissionsAsync`.
+- **The dialog never appears.** The call ran too early. Request only while the app state is
+  `active`, and guard against duplicate requests.
+- **App Store rejection under Guideline 5.1.2.** Generic text such as "Required for advertising" is
+  rejected. State a concrete user benefit.
+- **Android.** There is no prompt; the permission reads as granted.
+
+Sources: [Expo docs: TrackingTransparency](https://docs.expo.dev/versions/latest/sdk/tracking-transparency/),
+[expo/expo#13059](https://github.com/expo/expo/issues/13059),
+[Implement App Tracking Transparency with Expo](https://yosukep.medium.com/implement-app-tracking-transparency-with-expo-app-58cf77cb168d),
+[Why the ATT prompt never shows](https://rorklab.net/en/articles/rork-dev/rork-att-tracking-permission-not-showing-fix).
+
 ## How the wrapper works
 
 `@symbiote-native/tracking-transparency` ships zero React/Vue/Angular/Svelte/Solid logic in

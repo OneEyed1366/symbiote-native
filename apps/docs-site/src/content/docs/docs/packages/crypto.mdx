@@ -328,6 +328,21 @@ A string input is base64. `tagLength` is ignored on Apple, where the tag is alwa
   package's native-call path.
 </Aside>
 
+## Common questions
+
+- **`digestStringAsync` is `undefined` ("undefined is not an object").** The native module did not
+  load: rebuild the native app after installing and check the autolinking step.
+- **`randomUUID` returns a promise.** Reported intermittently after a native binary update; restart
+  the app and rebuild.
+- **Which hash algorithms?** SHA-256 and SHA-512 are the safe choices; SHA-1 is available but not
+  recommended for anything security-sensitive. Encodings are hex and base64.
+- **Digest returns `undefined` under Jest.** The native module is absent in tests; inject a fake.
+
+Sources: [Expo Crypto guide](https://codingeasypeasy.com/blog/expo-crypto-securely-implement-cryptographic-functions-in-your-react-native-apps/),
+[expo/expo#18215](https://github.com/expo/expo/issues/18215),
+[expo/expo#24021](https://github.com/expo/expo/issues/24021),
+[expo/expo#6512](https://github.com/expo/expo/issues/6512).
+
 ## How the wrapper works
 
 `@symbiote-native/crypto` ships zero React/Vue/Angular/Svelte/Solid logic in `expo-crypto` itself — its

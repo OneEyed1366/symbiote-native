@@ -1,12 +1,14 @@
 # @symbiote-native/app-integrity
 
-A wrapper package for [SymbioteNative](../../README.md) that makes
-[`@expo/app-integrity`](https://github.com/expo/expo/tree/main/packages/expo-app-integrity)
-(Apple's App Attest, Google Play Integrity, and Android hardware-attested key generation) usable
-from **every** adapter, React, Vue, Svelte, Solid, and Angular. Like
+Let your backend tell your real app on a real device apart from a modified app, a script or an
+emulator. One API for every [SymbioteNative](../../README.md) adapter (React, Vue, Svelte, Solid
+and Angular).
+
+It wraps [`@expo/app-integrity`](https://github.com/expo/expo/tree/main/packages/expo-app-integrity)
+(Apple's App Attest, Google Play Integrity, and Android hardware-attested key generation). Like
 [`@symbiote-native/application`](../application), everything here is a one-shot async call (or a
-plain sync constant) with no per-instance state, so there is no hook/composable/service to wrap:
-every adapter's entry point is a plain re-export of the same `core`.
+plain sync constant) with no per-instance state, so there is no hook, composable or service to
+wrap: every adapter entry point is a plain re-export of the same `core`.
 
 ## Install
 
@@ -56,6 +58,10 @@ implementation: `examples/expo-react/ios/Podfile` and
 
 No app-level permission strings are needed. App Attest, Play Integrity, and hardware attestation
 are all system services with no user-facing permission prompt.
+
+Each platform needs one setup step of its own: on iOS, add the **App Attest** capability in Xcode
+(Signing & Capabilities; the app needs a registered App ID); on Android, enable the Play Integrity
+API for your app and note your Google Cloud project number.
 
 </details>
 
@@ -117,8 +123,22 @@ import { generateKeyAsync } from '@symbiote-native/app-integrity/angular';
 - `generateHardwareAttestedKeyAsync`/`getAttestationCertificateChainAsync` target the Android
   Keystore directly (works on GrapheneOS and other secure Android distributions), independent of
   Play Integrity's `prepareIntegrityTokenProviderAsync`/`requestIntegrityCheckAsync` pair.
-- **Known gap (2026-09-28): no canary demo screen in any of the 6 `examples/expo-*` apps**, same
-  status as `@symbiote-native/asset`/`@symbiote-native/font`. Wiring one is a separate follow-up.
+- If the Android token provider is reused for too long, the next token request fails with
+  `ERR_APP_INTEGRITY_PROVIDER_INVALID`. Call `prepareIntegrityTokenProviderAsync` again and retry.
+- Verify on your server, never on the device: a check that runs only in the app can be bypassed by
+  the clients you are guarding against. The canary `AppIntegrityScreen` in the `examples/expo-*`
+  apps exercises every call.
+
+## Common questions
+
+- **`ERR_APP_INTEGRITY_PROVIDER_INVALID`.** The token provider expired; call
+  `prepareIntegrityTokenProviderAsync` again.
+- **Per-platform flow?** Android: Play Integrity Standard request (prepare once, token per action).
+  iOS: App Attest key per user per device, attested once.
+- **Enough alone?** No, verify the token on your server.
+
+Sources: [Expo docs: AppIntegrity](https://docs.expo.dev/versions/latest/sdk/app-integrity/),
+[Expo blog: Introducing Expo App Integrity](https://expo.dev/blog/expo-app-integrity).
 
 ## Test it
 

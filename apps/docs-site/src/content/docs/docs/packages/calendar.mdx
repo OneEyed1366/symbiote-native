@@ -1,0 +1,314 @@
+---
+title: Calendar
+description: Create and manage calendars, events, reminders and attendees, with permission hooks, on every SymbioteNative adapter.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+Add a meeting to the user's calendar, list what is on this week, set a reminder, or hand the user
+the system's own event dialog. `@symbiote-native/calendar` wraps
+[`expo-calendar`](https://github.com/expo/expo/tree/main/packages/expo-calendar) so every
+SymbioteNative adapter can reach the device calendar, not just React.
+
+Both of upstream's API surfaces are ported, matching its own layout: the modern class API
+(`ExpoCalendar`, `ExpoCalendarEvent`, `ExpoCalendarReminder`, `ExpoCalendarAttendee`; the default
+entry) and the legacy function-based API (the `/legacy` subpath). The classes and functions are
+shared by every adapter. The two permission hooks, `useCalendarPermissions` and
+`useRemindersPermissions`, are ported to all five in each framework's own idiom.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | live    |
+| Android     | live    |
+
+| Framework adapter | Support |
+| ----------------- | ------- |
+| React             | live    |
+| Vue               | live    |
+| Angular           | live    |
+| Svelte            | live    |
+| Solid             | live    |
+
+## Installation
+
+```sh
+npm install @symbiote-native/calendar
+```
+
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --calendar` (or
+`add --calendar` in an existing app) installs and wires this for you - see
+[`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
+
+`expo-calendar` and `expo-modules-core` come along as regular dependencies, pinned to exact
+versions. Never install either yourself, and never add the `expo` meta-package to your project (it
+bundles its own Metro/Babel pipeline, which conflicts with this project's own).
+
+<Aside type="danger" title="Native setup is required before first use">
+  `expo-calendar`'s native code is discovered by `expo-modules-autolinking`, a different mechanism
+  from the `react-native.config.cjs`/podspec autolinking every other SymbioteNative wrapper uses.
+  Follow [How to: wire up an Expo native module](/docs/howtos/expo-native-module-setup/) once per
+  app first; it covers this package and every other `expo-modules-core` package with zero further
+  native changes.
+</Aside>
+
+The package adds these to your native projects on install (nothing overwrites a value you set):
+
+| Platform | Added                                                                                       | Why                                                  |
+| -------- | ------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| iOS      | `NSCalendarsUsageDescription`, `NSCalendarsFullAccessUsageDescription`                      | Calendar permission prompt text. Reword to fit       |
+| iOS      | `NSRemindersUsageDescription`, `NSRemindersFullAccessUsageDescription`                      | Reminders permission prompt text. Reword to fit      |
+| Android  | `READ_CALENDAR`, `WRITE_CALENDAR`                                                           | Reading and editing calendars                        |
+
+<Aside type="caution" title="Write-only calendar access on iOS 17 is a manual step">
+  Upstream's `writeOnlyAccess` option swaps `NSCalendarsFullAccessUsageDescription` for
+  `NSCalendarsWriteOnlyAccessUsageDescription`. The link manifest cannot express that swap. If you
+  want write-only access, add `NSCalendarsWriteOnlyAccessUsageDescription` to your own `Info.plist`
+  and remove `NSCalendarsFullAccessUsageDescription`.
+</Aside>
+
+## Usage
+
+Ask for permission, then create an event. The classes work the same on every adapter:
+
+```ts
+import { ExpoCalendar, requestCalendarPermissions } from '@symbiote-native/calendar';
+
+const { granted } = await requestCalendarPermissions();
+if (granted) {
+  const calendar = await ExpoCalendar.get(calendarId);
+  const event = await calendar.createEvent({
+    title: 'Standup',
+    startDate: new Date(),
+    endDate: new Date(Date.now() + 30 * 60_000),
+  });
+  await event.update({ notes: 'Daily sync' });
+}
+```
+
+List events across calendars for a week:
+
+```ts
+import { getCalendars, listEvents } from '@symbiote-native/calendar';
+
+const calendars = await getCalendars();
+const events = await listEvents(calendars, new Date(), new Date(Date.now() + 7 * 24 * 3600_000));
+```
+
+### Show permission state
+
+To render the permission state, use the adapter's own binding. Each is shown for calendars;
+`useRemindersPermissions` has the same shape.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { useCalendarPermissions } from '@symbiote-native/calendar/react';
+
+    export default function CalendarGate() {
+      const [status, requestPermission] = useCalendarPermissions();
+
+      if (!status?.granted) {
+        return <button title="Allow calendar" onPress={() => requestPermission()} />;
+      }
+      return <text>Calendar allowed</text>;
+    }
+    ```
+
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { useCalendarPermissions } from '@symbiote-native/calendar/vue';
+
+    const [status, requestPermission] = useCalendarPermissions();
+    </script>
+
+    <template>
+      <text v-if="status?.granted">Calendar allowed</text>
+      <button v-else title="Allow calendar" @press="requestPermission()" />
+    </template>
+    ```
+
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component, inject } from '@angular/core';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
+    import { CalendarPermissionsService } from '@symbiote-native/calendar/angular';
+
+    @Component({
+      standalone: true,
+      imports: [SYMBIOTE_ELEMENTS],
+      template: `
+        @if (calendar()?.granted) {
+          <text>Calendar allowed</text>
+        } @else {
+          <button title="Allow calendar" (press)="request()" />
+        }
+      `,
+    })
+    export class CalendarGate {
+      private readonly service = inject(CalendarPermissionsService);
+      readonly calendar = this.service.connect();
+
+      request(): void {
+        void this.service.request();
+      }
+    }
+    ```
+
+    `connect()` returns a signal of the current status; `get()` and `request()` are imperative.
+
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { useCalendarPermissions } from '@symbiote-native/calendar/svelte';
+
+      const calendar = useCalendarPermissions();
+    </script>
+
+    {#if calendar.status?.granted}
+      <text>Calendar allowed</text>
+    {:else}
+      <button title="Allow calendar" onPress={() => calendar.requestPermission()} />
+    {/if}
+    ```
+
+    Svelte returns `{ status, requestPermission, getPermission }` instead of a tuple, matching this
+    repo's rune idiom.
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { useCalendarPermissions } from '@symbiote-native/calendar/solid';
+
+    export function CalendarGate() {
+      const [status, requestPermission] = useCalendarPermissions();
+
+      return status()?.granted ? (
+        <text>Calendar allowed</text>
+      ) : (
+        <button title="Allow calendar" onPress={() => requestPermission()} />
+      );
+    }
+    ```
+
+  </TabItem>
+</Tabs>
+
+### The legacy function API
+
+The pre-class API is kept at `/legacy` for code that already uses it:
+
+```ts
+import { createEventAsync, requestCalendarPermissionsAsync } from '@symbiote-native/calendar/legacy';
+
+await requestCalendarPermissionsAsync();
+const eventId = await createEventAsync(calendarId, {
+  title: 'Standup',
+  startDate: new Date(),
+  endDate: new Date(Date.now() + 30 * 60_000),
+});
+```
+
+## API
+
+### Module-level functions
+
+| Signature                                                | Description                                                                              |
+| -------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `getCalendars(entityType?): Promise<ExpoCalendar[]>`     | Lists calendars, optionally only those for events or reminders                           |
+| `createCalendar(details?): Promise<ExpoCalendar>`        | Creates a calendar                                                                       |
+| `listEvents(calendars, startDate, endDate): Promise<ExpoCalendarEvent[]>` | Lists events across several calendars (ids or objects) in a date range         |
+| `getDefaultCalendarSync(): ExpoCalendar`                 | iOS only. The default calendar. Throws `UnavailabilityError` on Android                  |
+| `presentPicker(): Promise<ExpoCalendar \| null>`         | iOS only. Opens the system calendar chooser                                              |
+| `getSourcesSync(): ISource[]`                            | iOS only. Lists the sources calendars belong to                                          |
+| `getCalendarPermissions()` / `requestCalendarPermissions(writeOnly?)` | Read or prompt for calendar access                                          |
+| `getRemindersPermissions()` / `requestRemindersPermissions()` | iOS only. Read or prompt for reminders access                                       |
+
+### Classes
+
+| Class                    | Members                                                                                          |
+| ------------------------ | ------------------------------------------------------------------------------------------------ |
+| `ExpoCalendar`           | `ExpoCalendar.get(id)`, then `createEvent`, `listEvents`, `addEventWithForm`, `update`, `delete`; on iOS also `createReminder`, `listReminders` |
+| `ExpoCalendarEvent`      | `ExpoCalendarEvent.get(id)`, then `update`, `delete`, `getOccurrenceSync`, `getAttendees`, `openInCalendar`, `editInCalendar`; on Android also `createAttendee` |
+| `ExpoCalendarReminder`   | iOS only. `ExpoCalendarReminder.get(id)`, then read and update a reminder                         |
+| `ExpoCalendarAttendee`   | Android only. Read and update an event attendee                                                  |
+
+Dates are `Date` objects; the wrapper converts them for the native call.
+
+### Platform availability
+
+| Member                                                                              | iOS | Android                              |
+| ----------------------------------------------------------------------------------- | --- | ------------------------------------ |
+| `ExpoCalendar` create, update, delete, `createEvent`, `listEvents`, `addEventWithForm` | yes | yes                              |
+| `getDefaultCalendarSync`, `presentPicker`, `getSourcesSync`                         | yes | no                                   |
+| `calendar.createReminder`, `listReminders`                                          | yes | no                                   |
+| `event.createAttendee`                                                              | no  | yes                                  |
+| `event.getOccurrenceSync`, `getAttendees`, `update`, `delete`                       | yes | yes                                  |
+| `ExpoCalendarReminder` (whole class)                                                | yes | no (a no-op class)                   |
+| `ExpoCalendarAttendee` (whole class)                                                | no (a no-op class) | yes                   |
+| Reminders permissions functions                                                     | yes | no                                   |
+
+An iOS-only or Android-only member throws `UnavailabilityError` on the other platform, or is absent
+from the native object. Check before calling if the call site must run on both.
+
+### Permission hooks
+
+| Adapter | `useCalendarPermissions` / `useRemindersPermissions`                    |
+| ------- | ----------------------------------------------------------------------- |
+| React   | `[status, requestPermission, getPermission]`                            |
+| Vue     | `[status, requestPermission, getPermission]`, with `status` a ref       |
+| Solid   | `[status, requestPermission, getPermission]`, with `status` an accessor |
+| Svelte  | `{ status, requestPermission, getPermission }`                          |
+| Angular | `CalendarPermissionsService` / `RemindersPermissionsService`            |
+
+## Notes
+
+- **Request permission first.** Reads and writes fail without it. Reminders have their own
+  permission on iOS and do not exist on Android.
+- **Check availability before calling a platform-only member.** The table above shows what throws
+  where.
+- **The legacy `requestPermissionsAsync` is the deprecated alias upstream ships.** It warns and
+  calls `requestCalendarPermissionsAsync`.
+- **Nothing from the public surface is left out.** Both the modern and the legacy surface are
+  ported.
+- **Calendars can only be verified on a device or simulator.** The headless tests fake the native
+  module.
+
+## Common questions
+
+**`getCalendars()` or `createEvent` fails or returns nothing.** Request calendar permission first
+with `requestCalendarPermissions()` and check `granted`. On Android that means `READ_CALENDAR` and
+`WRITE_CALENDAR`, which this package adds for you.
+
+**The system event dialog does not appear on iOS and there is no error.** On iOS the native code
+checks permission before showing the system dialog, so without it nothing opens. Ask for permission
+before calling `addEventWithForm` or presenting the picker.
+
+**How do I get the default calendar?** `getDefaultCalendarSync()` exists on iOS only; Android has no
+single system default. On Android, list calendars with `getCalendars()` and pick one (often the one
+the user owns), or let the user choose.
+
+**Reminders do not work on Android.** Reminders are an iOS feature in this API. `ExpoCalendarReminder`
+and the reminders permission functions are iOS only.
+
+**I only need to add an event, not read the calendar.** On iOS 17 and later you can request
+write-only access (`requestCalendarPermissions(true)`). The linker cannot swap the Info.plist string
+for you; see the write-only note near Install.
+
+Sources: [Expo docs: Calendar](https://docs.expo.dev/versions/v56.0.0/sdk/calendar-legacy/),
+[expo/expo#36001 system calendar dialog requires permission on iOS](https://github.com/expo/expo/issues/36001),
+[expo/expo#4991 getCalendarsAsync error on Android](https://github.com/expo/expo/issues/4991),
+[expo/expo#48186 getDefaultCalendarSync and getCalendars requiring full access](https://github.com/expo/expo/pull/48186).
+
+## How the wrapper works
+
+`expo-calendar`'s JS is hand-ported into this package: `core/` for the modern class API, `legacy/`
+for the function API. Every class extends its native shared object and overrides only what upstream
+overrides (date stringification, a platform guard, upgrading a returned native instance in place,
+since Android's Kotlin throws on direct construction). `./react`, `./vue`, `./svelte` and `./solid`
+alias `core/` plus their own permission hooks. The native code is never vendored:
+`expo-modules-autolinking` resolves it from `node_modules` (see
+[the native setup guide](/docs/howtos/expo-native-module-setup/)).

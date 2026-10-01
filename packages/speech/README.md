@@ -1,10 +1,13 @@
 # @symbiote-native/speech
 
-A wrapper package for [SymbioteNative](../../README.md) that makes
-[`expo-speech`](https://github.com/expo/expo/tree/main/packages/expo-speech) - text-to-speech -
-usable from **every** adapter, React, Vue, Svelte, Solid, and Angular, not just React. Built the
-same way as [`@symbiote-native/print`](../print): an `expo-modules-core`-based wrapper (see the
-`symbiote-expo-native-module` project skill for the full mechanism).
+Read text aloud with the device's text-to-speech engine, with a choice of voice, language, pitch and
+rate. One API for every [SymbioteNative](../../README.md) adapter (React, Vue, Svelte, Solid and
+Angular).
+
+It wraps [`expo-speech`](https://github.com/expo/expo/tree/main/packages/expo-speech) the same way
+[`@symbiote-native/print`](../print) wraps its upstream: `expo-modules-core` is a direct
+dependency and the upstream JS is hand-ported into `core/`. See the `symbiote-expo-native-module`
+project skill for the full mechanism.
 
 ## Install
 
@@ -91,11 +94,31 @@ if (await isSpeakingAsync()) {
 
 ## Notes
 
+- **No sound in iOS silent mode.** On a physical iPhone `speak` is silent while the device is in
+  silent mode, so it can look like the call did nothing.
+- **`speak` queues, it does not interrupt.** Call `stop()` first to replace what is being said.
+- **Android rejects text longer than `maxSpeechInputLength`.** Split long text into sentences and
+  queue them.
 - **Web-only fields dropped.** Upstream's `Speech.types.ts` also carries `WebVoice`,
   `SpeechEventCallback` (a raw DOM `SpeechSynthesisEvent` callback shape), `_voiceIndex`, and
   `onMark`/`onPause`/`onResume` - all reachable only through `expo-speech`'s separate web
   implementation. This package only wraps the apple/android native modules (`expo-speech`'s own
   `expo-module.config.json` lists no `"web"` platform either), so none of it applies here.
+
+## Common questions
+
+- **No sound on iOS.** Check silent mode first (a physical iPhone is silent then).
+- **`voice` ignored, short voice list.** Pass an `identifier` from `getAvailableVoicesAsync()`
+  exactly; the voices installed differ by device and iOS version.
+- **Non-English speech wrong on Android.** Set `language` to a BCP 47 code and install that voice in
+  the device's text-to-speech settings.
+- **`onDone` missing after pause/resume.** Pause reports `onStopped`; track state yourself.
+- **Long text rejected.** Android limits input to `maxSpeechInputLength`; queue sentences.
+
+Sources: [Expo docs: Speech](https://docs.expo.dev/versions/latest/sdk/speech/),
+[expo/expo#10827](https://github.com/expo/expo/issues/10827),
+[expo/expo#12654](https://github.com/expo/expo/issues/12654),
+[expo/expo#7260](https://github.com/expo/expo/issues/7260).
 
 ## Test it
 

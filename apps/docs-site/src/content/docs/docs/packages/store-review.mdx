@@ -212,6 +212,25 @@ subscription.
 - **Both stores enforce a quota**, which is why upstream's guidance is to trigger the prompt after
   real engagement rather than from a button.
 
+## Common questions
+
+- **The prompt never shows on TestFlight.** Apple suppresses it there by design; test a release
+  build outside TestFlight.
+- **`isAvailableAsync` is `false`.** Simulators and older OS versions report it. It is only a
+  capability check: the store decides whether a prompt appears.
+- **How often can I ask?** iOS caps the system prompt at about three a year, so do not wire it to a
+  button. Ask after a positive moment.
+- **It resolves but nothing appears.** The user may have In-App Ratings and Reviews turned off in
+  the store settings.
+- **Rejects with `E_NO_SCENE`.** iOS needs a foreground-active window scene.
+- **Android emulator.** Reported not to work; test on a device with Play services.
+
+Sources: [expo/expo#38163](https://github.com/expo/expo/issues/38163),
+[expo/expo#35497](https://github.com/expo/expo/issues/35497),
+[expo/expo#28080](https://github.com/expo/expo/issues/28080),
+[expo/expo#31091](https://github.com/expo/expo/issues/31091),
+[Expo Store Review guide](https://www.codingeasypeasy.com/blog/expo-store-review-a-comprehensive-guide-to-in-app-ratings-and-reviews-on-ios-and-android).
+
 ## How the wrapper works
 
 `@symbiote-native/store-review` ships zero React/Vue/Angular/Svelte/Solid logic in

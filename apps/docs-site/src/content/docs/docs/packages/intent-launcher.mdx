@@ -1,0 +1,226 @@
+---
+title: Intent launcher
+description: Launch Android intents, such as a system settings screen or another app, on every SymbioteNative adapter.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+Send the user to the right system screen: Wi-Fi settings when the network is off, your app's own
+permission page after a denied prompt, or straight into another app.
+`@symbiote-native/intent-launcher` wraps
+[`expo-intent-launcher`](https://github.com/expo/expo/tree/main/packages/expo-intent-launcher) so
+every SymbioteNative adapter can launch an Android intent and read another app's icon, not just
+React. Every export is a stateless free function, an enum or a plain type, so the React, Vue,
+Angular, Svelte, and Solid entry points are plain re-exports of the same `core`.
+
+This is **Android only**: upstream ships no iOS implementation, so every function throws
+`UnavailabilityError` on iOS. Guard calls with a platform check.
+
+| OS platform | Support                  |
+| ----------- | ------------------------ |
+| iOS         | not applicable (throws)  |
+| Android     | live                     |
+
+| Framework adapter | Support |
+| ----------------- | ------- |
+| React             | live    |
+| Vue               | live    |
+| Angular           | live    |
+| Svelte            | live    |
+| Solid             | live    |
+
+## Installation
+
+```sh
+npm install @symbiote-native/intent-launcher
+```
+
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --intent-launcher` (or
+`add --intent-launcher` in an existing app) installs and wires this for you - see
+[`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
+
+`expo-intent-launcher` and `expo-modules-core` come along as regular dependencies, pinned to exact
+versions. Never install either yourself, and never add the `expo` meta-package to your project (it
+bundles its own Metro/Babel pipeline, which conflicts with this project's own).
+
+<Aside type="danger" title="Native setup is required before first use">
+  `expo-intent-launcher`'s native code is discovered by `expo-modules-autolinking`, a different
+  mechanism from the `react-native.config.cjs`/podspec autolinking every other SymbioteNative
+  wrapper uses. Follow [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers this package and
+  every other `expo-modules-core` package with zero further native changes.
+</Aside>
+
+No runtime permission or manifest edit is needed to start an activity or read an icon.
+
+## Usage
+
+All five adapters re-export the same functions; there is no per-adapter hook, composable or
+service, since nothing here holds live state.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { ActivityAction, startActivityAsync } from '@symbiote-native/intent-launcher/react';
+
+    export default function OpenWifi() {
+      return (
+        <button
+          title="Wi-Fi settings"
+          onPress={() => startActivityAsync(ActivityAction.WIFI_SETTINGS)}
+        />
+      );
+    }
+    ```
+
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { ActivityAction, startActivityAsync } from '@symbiote-native/intent-launcher/vue';
+
+    function onPress() {
+      void startActivityAsync(ActivityAction.WIFI_SETTINGS);
+    }
+    </script>
+
+    <template>
+      <button title="Wi-Fi settings" @press="onPress" />
+    </template>
+    ```
+
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component } from '@angular/core';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
+    import { ActivityAction, startActivityAsync } from '@symbiote-native/intent-launcher/angular';
+
+    @Component({
+      standalone: true,
+      imports: [SYMBIOTE_ELEMENTS],
+      template: `<button title="Wi-Fi settings" (press)="onPress()" />`,
+    })
+    export class OpenWifi {
+      onPress(): void {
+        void startActivityAsync(ActivityAction.WIFI_SETTINGS);
+      }
+    }
+    ```
+
+    There is no service to `inject()`: every function is a plain export off the core package.
+
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { ActivityAction, startActivityAsync } from '@symbiote-native/intent-launcher/svelte';
+
+      function onPress(): void {
+        void startActivityAsync(ActivityAction.WIFI_SETTINGS);
+      }
+    </script>
+
+    <button title="Wi-Fi settings" onPress={onPress} />
+    ```
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { ActivityAction, startActivityAsync } from '@symbiote-native/intent-launcher/solid';
+
+    export function OpenWifi() {
+      return (
+        <button
+          title="Wi-Fi settings"
+          onPress={() => startActivityAsync(ActivityAction.WIFI_SETTINGS)}
+        />
+      );
+    }
+    ```
+
+  </TabItem>
+</Tabs>
+
+### Open another app and read its icon
+
+```ts
+import { getApplicationIconAsync, openApplication } from '@symbiote-native/intent-launcher';
+
+openApplication('com.google.android.gm');
+const icon = await getApplicationIconAsync('com.google.android.gm'); // a data:image/png;base64 URI
+```
+
+### Open your own app's settings page
+
+```ts
+await startActivityAsync(ActivityAction.APPLICATION_DETAILS_SETTINGS, {
+  data: 'package:com.example.myapp',
+});
+```
+
+## API
+
+### Functions
+
+| Signature                                                         | Description                                                                          |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `startActivityAsync(activityAction, params?): Promise<IIntentLauncherResult>` | Starts an activity and resolves once the user returns to this app. `activityAction` is an `ActivityAction` or any action string |
+| `openApplication(packageName): void`                              | Opens another app by package name. Fire-and-forget                                   |
+| `getApplicationIconAsync(packageName): Promise<string>`           | Resolves another app's icon as a `data:image/png;base64,...` URI                     |
+
+### `IIntentLauncherParams`
+
+| Field         | Type                                | Description                                                                  |
+| ------------- | ----------------------------------- | ---------------------------------------------------------------------------- |
+| `data`        | `string \| undefined`               | URI the intent operates on. Android requires a lowercase scheme              |
+| `type`        | `string \| undefined`               | MIME type of `data`. Omit to let Android infer it                            |
+| `category`    | `string \| undefined`               | More detail about the action (`Intent.addCategory`)                          |
+| `extra`       | `Record<string, unknown> \| undefined` | Key-value pairs passed with the intent. Keys need a package prefix        |
+| `flags`       | `number \| undefined`               | Bitmask of intent flags (`Intent.setFlags`)                                  |
+| `packageName` | `string \| undefined`               | Package of the component that should handle the intent                       |
+| `className`   | `string \| undefined`               | Class name of that component                                                 |
+
+### `IIntentLauncherResult` and enums
+
+| Name                       | Description                                                                          |
+| -------------------------- | ------------------------------------------------------------------------------------ |
+| `resultCode`               | A `ResultCode`: `Success` (-1), `Canceled` (0) or `FirstUser` (1, the first custom value) |
+| `data`                     | Optional data URI the activity returned                                              |
+| `extra`                    | Optional extras the activity returned                                                |
+| `ActivityAction`           | Constants for Android's own Settings actions, such as `WIFI_SETTINGS`                |
+
+## Notes
+
+- **Every function throws `UnavailabilityError` off Android.** Check `Platform.OS` before calling.
+- **`startActivityAsync` resolves when the user comes back.** The result code tells you whether they
+  finished or cancelled; do not assume the setting was changed.
+- **`extra` is typed `Record<string, unknown>`.** Upstream uses `any`; the value is forwarded
+  verbatim to the native module.
+- **It can only be verified on an Android device or emulator.** The headless tests fake the native
+  module, so they prove the argument validation and the `UnavailabilityError` branches.
+
+## Common questions
+
+- **The call rejects with `ActivityNotFoundException`.** No installed app handles the intent (for
+  example a file type nobody opens). Wrap the call in `try`/`catch` and show a fallback.
+- **`packageName` without `className` rejects.** The intent is then restricted to that package; if
+  the app cannot handle it, the promise rejects.
+- **Crash returning from a notification-settings intent.** Reported with `APP_NOTIFICATION_SETTINGS`
+  and an `extra` carrying the package name; test that flow on a device.
+- **`ERR_UNAVAILABLE`.** Reported with `enableDangerousExperimentalLeanBuilds`; Android only,
+  there is no iOS equivalent.
+
+Sources: [expo/expo#12078](https://github.com/expo/expo/pull/12078),
+[expo/expo#50511](https://github.com/expo/expo/pull/50511),
+[expo/expo#21876](https://github.com/expo/expo/issues/21876),
+[expo/expo#22995](https://github.com/expo/expo/issues/22995).
+
+## How the wrapper works
+
+`expo-intent-launcher`'s JS is hand-ported into this package's `core/`, resolving the native module
+through `expo-modules-core` rather than the `expo` meta-package; the native resolution is
+Android-only and the base entry is an empty stub. The five adapter entry points are plain
+re-exports of `core` (Angular stays a physical subpath for its separate `ngc`/AOT build). The
+native code is never vendored: `expo-modules-autolinking` resolves it from `node_modules` (see
+[the native setup guide](/docs/howtos/expo-native-module-setup/)).

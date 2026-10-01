@@ -1,31 +1,33 @@
 ---
 title: Location
-description: expo-location wrapped for every SymbioteNative adapter — foreground position, heading, geocoding, motion activity, background updates, and geofencing.
+description: Read position, heading and motion activity, geocode addresses, and run background updates and geofencing on every SymbioteNative adapter.
 ---
 
-import { Aside } from '@astrojs/starlight/components';
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 
+Find out where the user is, which way they face and whether they are walking, turn an address into
+coordinates and back, and keep tracking in the background or watch for entering a region.
 `@symbiote-native/location` wraps
 [`expo-location`](https://github.com/expo/expo/tree/main/packages/expo-location) so every
-SymbioteNative adapter can read foreground position, heading, and motion activity, geocode
-addresses, and run background location updates or geofencing — registered as tasks through
-[`@symbiote-native/task-manager`](/docs/packages/task-manager/).
+SymbioteNative adapter can reach it, not just React. Background updates and geofencing register as
+tasks through [`@symbiote-native/task-manager`](/docs/packages/task-manager/).
 
-Functions and streams live in a shared core. The three permission hooks are per-adapter, and
-Angular gets one `*PermissionsService` each.
+Functions and streams live in a shared core. The three permission hooks
+(`useForegroundPermissions`, `useBackgroundPermissions`, `useMotionActivityPermissions`) are
+per-adapter, and Angular gets one `*PermissionsService` each.
 
 | OS platform | Support |
 | ----------- | ------- |
-| iOS         | ✅ live |
-| Android     | ✅ live |
+| iOS         | live    |
+| Android     | live    |
 
 | Framework adapter | Support |
-| ------------------ | ------- |
-| React              | ✅ live |
-| Vue                | ✅ live |
-| Angular            | ✅ live |
-| Svelte             | ✅ live |
-| Solid              | ✅ live |
+| ----------------- | ------- |
+| React             | live    |
+| Vue               | live    |
+| Angular           | live    |
+| Svelte            | live    |
+| Solid             | live    |
 
 ## Installation
 
@@ -34,35 +36,49 @@ npm install @symbiote-native/location
 ```
 
 Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --location` (or
-`add --location` in an existing app) installs and wires this for you — see
+`add --location` in an existing app) installs and wires this for you, and asks whether to grant
+background location - see
 [`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
 
 `expo-location` and `expo-modules-core` come along as regular dependencies, pinned to exact
-versions — never install them yourself, and never add the `expo` meta-package to your project.
+versions. Never install either yourself, and never add the `expo` meta-package to your project (it
+bundles its own Metro/Babel pipeline, which conflicts with this project's own).
 
 <Aside type="danger" title="Native setup is required before first use">
-  Follow [How to: wire up an Expo native
-  module](/docs/howtos/expo-native-module-setup/) once per app first. Four
-  iOS `Info.plist` usage-description keys are wired automatically with
-  generic default text — override any of them by setting the same key
-  yourself. Android's two base permissions
-  (`ACCESS_COARSE_LOCATION`/`ACCESS_FINE_LOCATION`) ship in
-  `expo-location`'s own manifest and merge in automatically.
+  `expo-location`'s native code is discovered by `expo-modules-autolinking`, a different mechanism
+  from the `react-native.config.cjs`/podspec autolinking every other SymbioteNative wrapper uses.
+  Follow [How to: wire up an Expo native module](/docs/howtos/expo-native-module-setup/) once per
+  app first; it covers this package and every other `expo-modules-core` package with zero further
+  native changes.
 </Aside>
 
-<Aside type="caution" title="Background/motion Android permissions are opt-in">
-  `ACCESS_BACKGROUND_LOCATION`, `FOREGROUND_SERVICE`,
-  `FOREGROUND_SERVICE_LOCATION`, and `ACTIVITY_RECOGNITION` are **not** added
-  automatically — add them to your own `AndroidManifest.xml` if your app
-  calls `startLocationUpdatesAsync`, `startGeofencingAsync`, or the
-  motion-activity functions. Requesting background location triggers Play
-  Console policy review, so it stays a deliberate app choice rather than a
-  package side effect. `UIBackgroundModes: location` on iOS IS wired
-  automatically — without it, iOS silently stops delivering updates once the
-  app backgrounds.
-</Aside>
+What the package adds on install (nothing overwrites a value you set):
+
+| Platform | Added                                                                                   | Why                                                                |
+| -------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| iOS      | `NSLocationWhenInUseUsageDescription`, `NSLocationAlwaysAndWhenInUseUsageDescription`, `NSLocationAlwaysUsageDescription`, `NSMotionUsageDescription` | Permission prompt texts. Reword them to fit your app |
+| iOS      | `UIBackgroundModes: location`                                                           | Without it iOS stops delivering updates once the app backgrounds   |
+| Android  | `ACCESS_COARSE_LOCATION`, `ACCESS_FINE_LOCATION`                                        | Ship in `expo-location`'s own manifest and merge automatically     |
+
+### Background location is opt-in
+
+Android's background location permissions are a deliberate app choice: requesting
+`ACCESS_BACKGROUND_LOCATION` triggers Google Play policy review. The `new --location` and
+`add --location` commands ask whether to grant them. If you said no, or ran non-interactively, run
+it any time (it is safe to repeat):
+
+```sh
+npx @symbiote-native/cli grant location
+```
+
+That adds `ACCESS_BACKGROUND_LOCATION`, `FOREGROUND_SERVICE` and `FOREGROUND_SERVICE_LOCATION` to
+your `AndroidManifest.xml`. `ACTIVITY_RECOGNITION` (needed for motion activity) is still added by
+hand. Pass the `foregroundService` option to `startLocationUpdatesAsync` so Android can keep
+tracking while the app is backgrounded.
 
 ## Usage
+
+Ask for permission, then read the position once or watch it:
 
 ```ts
 import {
@@ -81,8 +97,114 @@ if (granted) {
 }
 ```
 
-Background updates and geofencing register a task defined at module scope, since native can
-relaunch the JS bundle headlessly to run it:
+### Show permission state
+
+To render the permission state, use the adapter's own binding. Each is shown for the foreground
+permission; the background and motion-activity hooks have the same shape.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { useForegroundPermissions } from '@symbiote-native/location/react';
+
+    export default function LocationGate() {
+      const [status, requestPermission] = useForegroundPermissions();
+
+      if (!status?.granted) {
+        return <button title="Allow location" onPress={() => requestPermission()} />;
+      }
+      return <text>Location allowed</text>;
+    }
+    ```
+
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { useForegroundPermissions } from '@symbiote-native/location/vue';
+
+    const [status, requestPermission] = useForegroundPermissions();
+    </script>
+
+    <template>
+      <text v-if="status?.granted">Location allowed</text>
+      <button v-else title="Allow location" @press="requestPermission()" />
+    </template>
+    ```
+
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component, inject } from '@angular/core';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
+    import { ForegroundPermissionsService } from '@symbiote-native/location/angular';
+
+    @Component({
+      standalone: true,
+      imports: [SYMBIOTE_ELEMENTS],
+      template: `
+        @if (location()?.granted) {
+          <text>Location allowed</text>
+        } @else {
+          <button title="Allow location" (press)="request()" />
+        }
+      `,
+    })
+    export class LocationGate {
+      private readonly service = inject(ForegroundPermissionsService);
+      readonly location = this.service.connect();
+
+      request(): void {
+        void this.service.request();
+      }
+    }
+    ```
+
+    `connect()` returns a signal of the current status; `get()` and `request()` are imperative.
+
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { useForegroundPermissions } from '@symbiote-native/location/svelte';
+
+      const location = useForegroundPermissions();
+    </script>
+
+    {#if location.status?.granted}
+      <text>Location allowed</text>
+    {:else}
+      <button title="Allow location" onPress={() => location.requestPermission()} />
+    {/if}
+    ```
+
+    Svelte returns `{ status, requestPermission, getPermission }` instead of a tuple, matching this
+    repo's rune idiom.
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { useForegroundPermissions } from '@symbiote-native/location/solid';
+
+    export function LocationGate() {
+      const [status, requestPermission] = useForegroundPermissions();
+
+      return status()?.granted ? (
+        <text>Location allowed</text>
+      ) : (
+        <button title="Allow location" onPress={() => requestPermission()} />
+      );
+    }
+    ```
+
+  </TabItem>
+</Tabs>
+
+### Background updates and geofencing
+
+These register a task defined with [`@symbiote-native/task-manager`](/docs/packages/task-manager/)'s
+`defineTask`. Define the task at module scope, since native can relaunch the JS bundle headlessly
+to run it:
 
 ```ts
 // index.ts, alongside AppRegistry.registerComponent
@@ -97,6 +219,8 @@ defineTask(SYNC_TASK, async ({ data, error }) => {
 });
 ```
 
+Then start it once the background permission is granted:
+
 ```ts
 import {
   requestBackgroundPermissionsAsync,
@@ -109,44 +233,124 @@ if (granted) {
 }
 ```
 
-Identical function surface on every adapter: `@symbiote-native/location/react`, `/vue`, `/svelte`,
-`/solid`, `/angular`. Permission hooks return the adapter's own reactive box; on Angular inject the
-matching service and call `connect()` for a signal.
-
 ## API
 
-```ts
-getProviderStatusAsync(): Promise<ILocationProviderStatus>
-enableNetworkProviderAsync(): Promise<void>                          // android
-getCurrentPositionAsync(options?): Promise<ILocationObject>
-getLastKnownPositionAsync(options?): Promise<ILocationObject | null>
-watchPositionAsync(options, callback, errorHandler?): Promise<ILocationSubscription>
-getHeadingAsync(): Promise<ILocationHeadingObject>
-watchHeadingAsync(callback, errorHandler?): Promise<ILocationSubscription>
-geocodeAsync(address: string): Promise<ILocationGeocodedLocation[]>
-reverseGeocodeAsync(location): Promise<ILocationGeocodedAddress[]>
-getForegroundPermissionsAsync() / requestForegroundPermissionsAsync(): Promise<ILocationPermissionResponse>
-useForegroundPermissions(options?)
-getBackgroundPermissionsAsync() / requestBackgroundPermissionsAsync(): Promise<PermissionResponse>
-useBackgroundPermissions(options?)
-hasServicesEnabledAsync(): Promise<boolean>
-getMotionActivityPermissionsAsync() / requestMotionActivityPermissionsAsync(): Promise<PermissionResponse>
-useMotionActivityPermissions(options?)
-installWebGeolocationPolyfill(): void
-getMotionActivityAsync(): Promise<IMotionActivityObject>
-watchMotionActivityAsync(callback, errorHandler?): Promise<ILocationSubscription>       // foreground only
-isBackgroundLocationAvailableAsync(): Promise<boolean>
-startLocationUpdatesAsync(taskName, options?) / stopLocationUpdatesAsync(taskName) / hasStartedLocationUpdatesAsync(taskName)
-startGeofencingAsync(taskName, regions) / stopGeofencingAsync(taskName) / hasStartedGeofencingAsync(taskName)
-```
+### Position and heading
 
-Plus the `Accuracy`/`ActivityType`/`GeofencingEventType`/`GeofencingRegionState` enums and the full
-`ILocation*`/`IMotionActivity*` type surface.
+| Signature                                                     | Description                                                                          |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `getCurrentPositionAsync(options?)`                           | Resolves the current position as an `ILocationObject`                                |
+| `getLastKnownPositionAsync(options?)`                         | Resolves the last known position, or `null`. Filter with `maxAge` and `requiredAccuracy` |
+| `watchPositionAsync(options, callback, errorHandler?)`        | Calls `callback` as the position changes. Resolves a subscription; call `remove()` to stop |
+| `getHeadingAsync()`                                           | Resolves the current compass heading                                                 |
+| `watchHeadingAsync(callback, errorHandler?)`                  | Calls `callback` as the heading changes. Resolves a subscription                     |
+| `hasServicesEnabledAsync()`                                   | Whether location services are turned on                                              |
+| `getProviderStatusAsync()`                                    | Resolves the state of the device's location providers                                |
+| `enableNetworkProviderAsync()`                                | Android only. Prompts the user to turn on network location                          |
+| `installWebGeolocationPolyfill()`                             | Makes `navigator.geolocation` call these functions, for libraries that expect it     |
+
+`ILocationOptions` takes `accuracy` (the `Accuracy` enum, `Lowest` to `BestForNavigation`),
+`distanceInterval` in meters, and on Android `timeInterval` in milliseconds and
+`mayShowUserSettingsDialog`.
+
+### Geocoding
+
+| Signature                              | Description                                              |
+| -------------------------------------- | -------------------------------------------------------- |
+| `geocodeAsync(address)`                | Resolves the coordinates matching an address string      |
+| `reverseGeocodeAsync(location)`        | Resolves the addresses matching coordinates              |
+
+### Permissions
+
+| Signature                                                                | Description                                                       |
+| ------------------------------------------------------------------------ | ----------------------------------------------------------------- |
+| `getForegroundPermissionsAsync()` / `requestForegroundPermissionsAsync()` | Read or prompt for while-using-the-app access                    |
+| `getBackgroundPermissionsAsync()` / `requestBackgroundPermissionsAsync()` | Read or prompt for always access. Ask for foreground first        |
+| `getMotionActivityPermissionsAsync()` / `requestMotionActivityPermissionsAsync()` | Read or prompt for motion activity                        |
+
+| Adapter | `useForegroundPermissions` / `useBackgroundPermissions` / `useMotionActivityPermissions` |
+| ------- | ---------------------------------------------------------------------------------------- |
+| React   | `[status, requestPermission, getPermission]`                                             |
+| Vue     | `[status, requestPermission, getPermission]`, with `status` a ref                        |
+| Solid   | `[status, requestPermission, getPermission]`, with `status` an accessor                  |
+| Svelte  | `{ status, requestPermission, getPermission }`                                           |
+| Angular | `ForegroundPermissionsService`, `BackgroundPermissionsService`, `MotionActivityPermissionsService` |
+
+### Motion activity
+
+| Signature                                          | Description                                                               |
+| -------------------------------------------------- | ------------------------------------------------------------------------- |
+| `getMotionActivityAsync()`                         | Resolves the current motion activity (walking, running, driving and so on) |
+| `watchMotionActivityAsync(callback, errorHandler?)` | Calls `callback` as the activity changes. Foreground only                |
+
+### Background updates and geofencing
+
+| Signature                                                                       | Description                                                  |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `isBackgroundLocationAvailableAsync()`                                          | Whether background location is available on this device      |
+| `startLocationUpdatesAsync(taskName, options?)`                                 | Starts delivering locations to a task                        |
+| `stopLocationUpdatesAsync(taskName)` / `hasStartedLocationUpdatesAsync(taskName)` | Stop updates, or check whether they are running            |
+| `startGeofencingAsync(taskName, regions)`                                       | Starts monitoring regions and delivers enter and exit events to a task |
+| `stopGeofencingAsync(taskName)` / `hasStartedGeofencingAsync(taskName)`         | Stop monitoring, or check whether it is running              |
+
+The package also exports the `Accuracy`, `ActivityType`, `GeofencingEventType` and
+`GeofencingRegionState` enums and the `ILocation*` and `IMotionActivity*` types.
 
 ## Notes
 
-- **Motion activity needs no location permission at all** — it reads the platform's own activity
-  recognition, gated only by its own `getMotionActivityPermissionsAsync`/
-  `requestMotionActivityPermissionsAsync`.
-- **`watchMotionActivityAsync` is foreground-only** — updates pause while the app is backgrounded
+- **Ask foreground first, then background.** Background permission is a separate, stricter prompt.
+  On iOS a user who picks Allow Once for while-using gets access for the current session only.
+- **Background tracking has hard limits.** It stops if the user terminates the app and resumes when
+  they reopen it. On Android a terminated app does not restart on a location or geofence event; on
+  iOS the system relaunches the app for a new geofence event. Removing the app from the recents list
+  behaves differently per device vendor.
+- **Motion activity needs no location permission.** It reads the platform's activity recognition,
+  gated only by `getMotionActivityPermissionsAsync` and `requestMotionActivityPermissionsAsync`.
+- **`watchMotionActivityAsync` is foreground only.** Updates pause while the app is backgrounded
   and resume when it returns.
+- **Emulators need a location set.** In the Android Emulator, enable Settings > Location > Use
+  location and turn off Improve Location Accuracy to feed GPS data. In the iOS Simulator, pick any
+  Features > Location option other than None.
+- **No Expo Go warning.** Upstream's one-time background-location warning for Expo Go is dropped:
+  this project never runs under Expo Go.
+
+## Common questions
+
+**`getCurrentPositionAsync` hangs on some Android devices.** This is a widely reported problem: the
+first fix may work and later calls never return, usually on devices with weak or slow location
+providers. Do not wait forever. Race the call against your own timer, fall back to
+`getLastKnownPositionAsync()`, and prefer `watchPositionAsync` when you need updates.
+
+**Location stops updating in the background after a few minutes on Android.** The system puts the
+device to sleep. Pass the `foregroundService` option to `startLocationUpdatesAsync`, so Android keeps
+the tracking alive with a visible notification.
+
+**Background permission is denied right after I ask.** Ask foreground permission first, then
+background. If the user chose Allow Once for while-using access, asking for background permission in
+the same session silently fails and reports denied. iOS cannot tell you whether the user chose
+Allow Once.
+
+**How accurate does it need to be?** Higher accuracy uses more battery. Use `Accuracy.Balanced` for
+most things, and `High` or `BestForNavigation` only while it is visibly needed.
+
+**How do I test location in an emulator?** Android: Settings > Location > Use location, and turn off
+Improve Location Accuracy to feed GPS data. iOS Simulator: Features > Location, any option but None.
+
+**Does background tracking survive the user killing the app?** No. It stops when the user
+terminates the app. On Android a terminated app does not restart for a location event; on iOS the
+system relaunches it for a geofence event.
+
+Sources: [Expo docs: Location](https://docs.expo.dev/versions/latest/sdk/location/),
+[expo/expo#33981 getCurrentPositionAsync and permissions delays on some Android devices](https://github.com/expo/expo/issues/33981),
+[expo/expo#39851 getCurrentPositionAsync hangs indefinitely](https://github.com/expo/expo/issues/39851),
+[expo/expo#26825 getCurrentPositionAsync never returns the location](https://github.com/expo/expo/issues/26825),
+[expo/expo#14076 location stops updating after 5 to 10 minutes on Android](https://github.com/expo/expo/issues/14076).
+
+## How the wrapper works
+
+`expo-location`'s JS is hand-ported into this package's `core/` (functions, the watch-subscription
+machinery shared by position, heading and motion watches, the geolocation polyfill), resolving the
+native module through `expo-modules-core` rather than the `expo` meta-package. Each adapter
+re-exports `core` plus its own permission hooks, bound to a shared `createPermissionHook` factory.
+The native code is never vendored: `expo-modules-autolinking` resolves it from `node_modules` (see
+[the native setup guide](/docs/howtos/expo-native-module-setup/)).

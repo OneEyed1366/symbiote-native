@@ -372,6 +372,18 @@ runes are lexically scoped to the file that declares them.
   at all — they read `UIDevice.current` straight through and resolve whatever it reports there. Gate
   on `isAvailableAsync()` rather than treating a `-1` level as a real reading.
 
+## Common questions
+
+- **The level reads `-1` (or the UI shows "-100%").** The level is unknown, typically on a
+  simulator or unsupported device. Check for `-1` before formatting and never treat it as low battery.
+- **How do I keep it live?** Read the initial level, then subscribe with the level listener and
+  remove the subscription on unmount.
+- **Low Power Mode?** Use the low power mode query and its listener to reduce background work.
+
+Sources: [Expo docs: Battery](https://docs.expo.dev/versions/latest/sdk/battery/),
+[Battery -100% bug report](https://github.com/karlgroves/bugrout/issues/202),
+[Expo Battery guide](https://codingeasypeasy.com/blog/expo-battery-monitor-battery-health-and-performance-in-your-react-native-apps/).
+
 ## How the wrapper works
 
 `@symbiote-native/battery` ships **zero React/Vue/Angular/Svelte/Solid logic in `expo-battery` itself** — that

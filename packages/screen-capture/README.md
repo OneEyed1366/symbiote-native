@@ -1,11 +1,13 @@
 # @symbiote-native/screen-capture
 
-A wrapper package for [SymbioteNative](../../README.md) that makes
-[`expo-screen-capture`](https://github.com/expo/expo/tree/main/packages/expo-screen-capture) -
-blocking or detecting screenshots/recordings and an iOS app-switcher privacy blur - usable from
-**every** adapter, React, Vue, Svelte, Solid, and Angular, not just React. Built the same way as
-[`@symbiote-native/print`](../print): an `expo-modules-core`-based wrapper (see the
-`symbiote-expo-native-module` project skill for the full mechanism).
+Keep a screen that shows sensitive or paid content out of screenshots and recordings, and find out
+when a screenshot is taken. One API for every [SymbioteNative](../../README.md) adapter (React,
+Vue, Svelte, Solid and Angular).
+
+It wraps [`expo-screen-capture`](https://github.com/expo/expo/tree/main/packages/expo-screen-capture)
+(including an iOS app-switcher privacy blur) the same way [`@symbiote-native/print`](../print)
+wraps its upstream: `expo-modules-core` is a direct dependency and the upstream JS is hand-ported
+into `core/`. See the `symbiote-expo-native-module` project skill for the full mechanism.
 
 ## Install
 
@@ -100,6 +102,30 @@ await allowScreenCaptureAsync();
 | `removeScreenshotListener`            | `(subscription: EventSubscription) => void`                  | Deprecated upstream; prefer `subscription.remove()`.          |
 | `getPermissionsAsync`                 | `() => Promise<PermissionResponse>`                           | Android-only concept; always granted on iOS.                  |
 | `requestPermissionsAsync`             | `() => Promise<PermissionResponse>`                           | Android-only concept; always granted on iOS.                  |
+
+## Notes
+
+- **Prevent and allow are counted by key.** Use a distinct `key` per caller so one screen leaving
+  does not unblock another.
+- **Screenshot callback on Android 13 and lower needs `READ_MEDIA_IMAGES`.** Android 14+ needs no
+  permission for blocking or the callback. Google Play restricts that permission to apps that need
+  broad photo access.
+- **Test on an emulator:** `adb shell input keyevent 120` triggers a screenshot on Android; the iOS
+  Simulator has Device > Trigger Screenshot.
+
+## Common questions
+
+- **What does a protected screen look like?** Blocked or black on Android; hidden behind a blank
+  layer on iOS. Test on a device.
+- **The prevent hook does nothing.** Check it runs on mount on a real device or emulator, and use a
+  distinct `key` per caller.
+- **The screenshot callback never fires.** Foreground only; Android 13 and lower need
+  `READ_MEDIA_IMAGES`.
+- **App switcher preview.** Call `enableAppSwitcherProtectionAsync()` on iOS.
+
+Sources: [Expo docs: ScreenCapture](https://docs.expo.dev/versions/latest/sdk/screen-capture/),
+[expo/expo#37874](https://github.com/expo/expo/pull/37874),
+[expo/expo#21416](https://github.com/expo/expo/issues/21416).
 
 ## Test it
 

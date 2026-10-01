@@ -1,14 +1,14 @@
 # @symbiote-native/application
 
 A wrapper package for [SymbioteNative](../../README.md) that makes
-[`expo-application`](https://github.com/expo/expo/tree/main/packages/expo-application)
-— native app version/build/name/ID, the Android ID, install-referrer and install/update-time
-lookups, and the iOS vendor ID / release type / push-notification-service environment — usable
+[`expo-application`](https://github.com/expo/expo/tree/main/packages/expo-application):
+native app version/build/name/ID, the Android ID, install-referrer and install/update-time
+lookups, and the iOS vendor ID / release type / push-notification-service environment - usable
 from **every** adapter, React, Vue, Svelte, Solid, and Angular. Like
 [`@symbiote-native/local-auth`](../local-auth) (and unlike `@symbiote-native/sensors`'s
 `EventEmitter` + live-subscription surface), everything here is either a plain constant resolved
 once at import time or a one-shot async call with no per-instance state, so there is no hook/
-composable/service to wrap — every adapter's entry point is a plain re-export of the same `core`.
+composable/service to wrap - every adapter's entry point is a plain re-export of the same `core`.
 
 ## Install
 
@@ -24,39 +24,39 @@ npx @symbiote-native/cli new my-app --application
 npx @symbiote-native/cli add --application
 ```
 
-Either way: installs `@symbiote-native/application` and wires the native autolinking automatically — see
+Either way: installs `@symbiote-native/application` and wires the native autolinking automatically - see
 [`@symbiote-native/cli`](../cli).
 
 <details>
-<summary>Manual install (no CLI — installing and wiring native autolinking by hand)</summary>
+<summary>Manual install (no CLI - installing and wiring native autolinking by hand)</summary>
 
 ```bash
 npm install @symbiote-native/application
 ```
 
 `expo-application` and `expo-modules-core` come along as regular dependencies, pinned to exact
-versions — never install either yourself, and never add the `expo` meta-package to your project
+versions - never install either yourself, and never add the `expo` meta-package to your project
 (it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
 
 ## Required one-time step: native autolinking wiring
 
 Unlike a plain RN native module, `expo-application`'s native code is discovered by
-`expo-modules-autolinking`, not RN's own `react-native.config.cjs` mechanism — this needs wiring
+`expo-modules-autolinking`, not RN's own `react-native.config.cjs` mechanism - this needs wiring
 into the native host app **once**, covering this package and every other `expo-modules-core`
 package with zero further changes:
 
 | Platform | Touches                                                                                                                                             |
 | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| iOS      | `ios/Podfile` — add `use_expo_modules!`                                                                                                             |
-| iOS      | `AppDelegate.swift` — Expo's runtime-bootstrap hook                                                                                                 |
-| Android  | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects                                                               |
-| Android  | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
+| iOS      | `ios/Podfile` - add `use_expo_modules!`                                                                                                             |
+| iOS      | `AppDelegate.swift` - Expo's runtime-bootstrap hook                                                                                                 |
+| Android  | `settings.gradle` / `app/build.gradle` - resolve and include the Expo Gradle projects                                                               |
+| Android  | `MainApplication.kt` - Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
 
 Full mechanics live in the `symbiote-expo-native-module` project skill. Reference
 implementation: `examples/expo-react/ios/Podfile` and
 `examples/expo-react/android/app/src/main/java/com/canaryexpo/MainApplication.kt`.
 
-No app-level permission strings are needed — every function here reads app/device metadata that
+No app-level permission strings are needed - every function here reads app/device metadata that
 carries no runtime or manifest permission.
 
 </details>
@@ -70,11 +70,11 @@ src/core/     nativeApplicationVersion / nativeBuildVersion / applicationName / 
               getInstallationTimeAsync, getLastUpdateTimeAsync, plus ApplicationReleaseType and
               PushNotificationServiceEnvironment. native-module.ts resolves the native module via
               expo-modules-core's requireNativeModule.
-src/angular/  @symbiote-native/application/angular — export * from '../core'
+src/angular/  @symbiote-native/application/angular - export * from '../core'
 ```
 
-`./react`, `./vue`, `./svelte`, and `./solid` are `exports`-map aliases straight onto `src/core/`
-— no physical per-framework file, since there's nothing to subscribe to or clean up. `./angular`
+`./react`, `./vue`, `./svelte`, and `./solid` are `exports`-map aliases straight onto `src/core/`:
+no physical per-framework file, since there's nothing to subscribe to or clean up. `./angular`
 stays a physical file/subpath since Angular ships through a separate `ngc`/AOT build (`build-ngc/`).
 
 ## Use it
@@ -245,9 +245,9 @@ function ApplicationScreen() {
 }
 ```
 
-There's no per-instance service to `inject()` in the Angular case — every function is a plain
+There's no per-instance service to `inject()` in the Angular case - every function is a plain
 free function off the core package, called straight from the constructor (or, on Solid, straight
-from the component body). All six examples mirror the real canary demo screens —
+from the component body). All six examples mirror the real canary demo screens:
 `examples/expo-react/screens/ApplicationScreen.tsx`,
 `examples/expo-vue-sfc/screens/ApplicationScreen.vue`,
 `examples/expo-vue-tsx/screens/ApplicationScreen.tsx`,
@@ -257,7 +257,7 @@ from the component body). All six examples mirror the real canary demo screens �
 
 ## API
 
-Plain constants plus one-shot async functions, no event stream, no per-instance state — upstream
+Plain constants plus one-shot async functions, no event stream, no per-instance state - upstream
 ships app/device metadata reads, not a subscribable resource, so the React/Vue/Angular entry
 points above are plain re-exports of `core` with nothing adapter-specific to add.
 
@@ -276,7 +276,7 @@ getInstallationTimeAsync(): Promise<Date>
 getLastUpdateTimeAsync(): Promise<Date> // android only
 ```
 
-Plus `ApplicationReleaseType` and `PushNotificationServiceEnvironment` — ported from upstream's
+Plus `ApplicationReleaseType` and `PushNotificationServiceEnvironment` - ported from upstream's
 `Application.types.ts`, renamed with this repo's `I`-prefix convention where applicable
 (`PushNotificationServiceEnvironment` stays a plain string-literal union, not a struct, so it
 carries no `I` prefix; `ts-js-best-practices`).
@@ -286,7 +286,7 @@ import {
   getInstallationTimeAsync,
   nativeApplicationVersion,
 } from '@symbiote-native/application';
-// or the framework-scoped entry points — identical surface, re-exported verbatim:
+// or the framework-scoped entry points - identical surface, re-exported verbatim:
 import { getInstallationTimeAsync } from '@symbiote-native/application/react';
 import { getInstallationTimeAsync } from '@symbiote-native/application/vue';
 import { getInstallationTimeAsync } from '@symbiote-native/application/angular';
@@ -294,21 +294,32 @@ import { getInstallationTimeAsync } from '@symbiote-native/application/angular';
 
 ## Notes
 
-- **Every async function throws `UnavailabilityError` when its native method is absent** —
+- **Every async function throws `UnavailabilityError` when its native method is absent**:
   e.g. calling an iOS-only function on Android, or vice versa. `getAndroidId()` is the one
   synchronous exception: it checks `Platform.OS` up front and throws immediately off Android,
   never touching the native module at all.
 - **`getInstallationTimeAsync`/`getLastUpdateTimeAsync` wrap a native epoch-ms number into a
-  `Date`** — the native side returns a plain number, not a serialized date string.
+  `Date`** - the native side returns a plain number, not a serialized date string.
 - The four constants (`nativeApplicationVersion`, `nativeBuildVersion`, `applicationName`,
-  `applicationId`) resolve once, eagerly, at import time — reading them repeatedly never
+  `applicationId`) resolve once, eagerly, at import time - reading them repeatedly never
   re-queries the native module.
+
+## Common questions
+
+- **Version to show?** `nativeApplicationVersion` (iOS `CFBundleShortVersionString`, Android version
+  name); the build number is separate.
+- **`getAndroidId` a device ID?** Unique per signing key, user and device; changes if either changes.
+- **iOS equivalent?** `getIosIdForVendorAsync` (IDFV), shared across one vendor's apps.
+- **Partial referrer URL.** `getInstallReferrerAsync` may not return a complete absolute URL.
+
+Sources: [Expo docs: Application](https://docs.expo.dev/versions/latest/sdk/application/),
+[expo/expo#6398](https://github.com/expo/expo/issues/6398).
 
 ## Test it
 
-No Fabric/Descriptor angle at all — every export here is a plain constant or a pure async-function
+No Fabric/Descriptor angle at all - every export here is a plain constant or a pure async-function
 surface, never a view or per-instance state. Tests inject a fake native-module object in place of
-the real `requireNativeModule` resolution (`src/core/application.test.ts`, `vitest`) — no
+the real `requireNativeModule` resolution (`src/core/application.test.ts`, `vitest`) - no
 `installFabric()`, no ViewConfig. Native rendering itself is verified on-device (see the parent
 [README](../../README.md) for the project's testing model).
 

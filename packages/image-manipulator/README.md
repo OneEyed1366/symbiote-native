@@ -1,11 +1,13 @@
 # @symbiote-native/image-manipulator
 
-A wrapper package for [SymbioteNative](../../README.md) that makes
-[`expo-image-manipulator`](https://github.com/expo/expo/tree/main/packages/expo-image-manipulator)
-— resizing, rotating, flipping and cropping images, rendering to a new file — usable from
-**every** adapter, React, Vue, Svelte, Solid, and Angular, not just React. Built the same way as
-[`@symbiote-native/print`](../print): an `expo-modules-core`-based wrapper (see the
-`symbiote-expo-native-module` project skill for the full mechanism).
+Shrink a photo before uploading it, rotate a scan, crop an avatar: build a chain of edits, render
+once, save to a new file. One API for every [SymbioteNative](../../README.md) adapter (React, Vue,
+Svelte, Solid and Angular).
+
+It wraps [`expo-image-manipulator`](https://github.com/expo/expo/tree/main/packages/expo-image-manipulator)
+the same way [`@symbiote-native/print`](../print) wraps its upstream: `expo-modules-core` is a
+direct dependency, never the `expo` meta-package, and the upstream JS is hand-ported into `core/`.
+The mechanics live in the `symbiote-expo-native-module` project skill.
 
 ## Install
 
@@ -22,28 +24,28 @@ npx @symbiote-native/cli add --image-manipulator
 ```
 
 Either way: installs `@symbiote-native/image-manipulator` and wires the native autolinking
-automatically — see [`@symbiote-native/cli`](../cli).
+automatically - see [`@symbiote-native/cli`](../cli).
 
 <details>
-<summary>Manual install (no CLI — installing and wiring native autolinking by hand)</summary>
+<summary>Manual install (no CLI - installing and wiring native autolinking by hand)</summary>
 
 ```bash
 npm install @symbiote-native/image-manipulator
 ```
 
-`expo-image-manipulator` and `expo-modules-core` come along as regular, pinned dependencies —
+`expo-image-manipulator` and `expo-modules-core` come along as regular, pinned dependencies -
 never install either yourself, and never add the `expo` meta-package to this project.
 
 ### Required one-time step: native autolinking wiring
 
-Same one-time app wiring every `expo-modules-core` package shares — see
+Same one-time app wiring every `expo-modules-core` package shares - see
 [`@symbiote-native/print`'s README](../print/README.md#required-one-time-step-native-autolinking-wiring)
 for the full table; nothing package-specific here.
 
 ### No permissions, no config plugin
 
 - **No runtime permission on either platform.** The module only ever touches a URI/file the
-  caller already has access to — no camera, no photo library.
+  caller already has access to - no camera, no photo library.
 - **No manifest edit.** `expo-image-manipulator`'s own `AndroidManifest.xml` declares nothing.
 - **No config plugin.** Upstream ships none.
 
@@ -80,13 +82,13 @@ context.resize({ width: 300 }).rotate(90);
 const image = await context.renderAsync();
 const { uri, width, height } = await image.saveAsync({ format: 'jpeg', compress: 0.8 });
 
-// Free the native memory once done — no lifecycle wrapper here (framework-agnostic core), each
+// Free the native memory once done - no lifecycle wrapper here (framework-agnostic core), each
 // adapter's own hook/composable/service is responsible for calling `.release()` on unmount.
 context.release();
 image.release();
 ```
 
-The deprecated, one-shot API (kept for parity — upstream still ships it too):
+The deprecated, one-shot API (kept for parity - upstream still ships it too):
 
 ```ts
 import { manipulateAsync, SaveFormat } from '@symbiote-native/image-manipulator';
@@ -103,7 +105,7 @@ const { uri } = await manipulateAsync(
 | Export            | Signature                                                                | Notes                                          |
 | ------------------ | ------------------------------------------------------------------------ | ----------------------------------------------- |
 | `manipulate`       | `(source: string \| IImageRef) => IImageManipulatorContext`              | Chainable `resize`/`rotate`/`flip`/`crop`/`reset`/`renderAsync`. |
-| `manipulateAsync`  | `(uri, actions?, saveOptions?) => Promise<IImageResult>`                  | @deprecated — replaced by `manipulate`.        |
+| `manipulateAsync`  | `(uri, actions?, saveOptions?) => Promise<IImageResult>`                  | @deprecated - replaced by `manipulate`.        |
 | `FlipType`         | `{ Vertical, Horizontal }`                                                | Enum for the `flip` action.                    |
 | `SaveFormat`       | `{ JPEG, PNG, WEBP }`                                                     | Enum for `ISaveOptions.format`.                |
 
@@ -121,11 +123,25 @@ and returns one, `injectX` shape matching `@symbiote-native/navigation`'s
 
 ## Notes
 
-- **`extent` action is not ported.** It's web-only in upstream — neither the iOS nor the Android
+- **Release what you create outside a component.** `manipulate()` and `renderAsync()` hold native
+  memory until `release()`. The adapter bindings release on unmount; the free function does not.
+- **`extent` action is not ported.** It's web-only in upstream - neither the iOS nor the Android
   native module registers an `extent` function (verified by reading both `ImageManipulatorModule`
   sources). Calling `.extent()` on a native context is a type error here, matching runtime reality.
 - **`ImageManipulator.Image` (the hidden native class property) is not exposed.** Upstream itself
-  marks it `@hidden` — only reachable indirectly via `context.renderAsync()`'s resolved `IImageRef`.
+  marks it `@hidden` - only reachable indirectly via `context.renderAsync()`'s resolved `IImageRef`.
+
+## Common questions
+
+- **Smaller upload.** Resize first (`resize({ width: 1080 })`), then
+  `saveAsync({ format: SaveFormat.JPEG, compress: 0.7 })`; `compress` is 0 to 1 and applies to JPEG
+  and WebP, PNG is lossless.
+- **Keep the aspect ratio.** Give only one of `width` and `height`.
+- **Memory growth.** `manipulate()` and `renderAsync()` hold native memory until `release()`.
+- **`manipulateAsync`.** Works but deprecated upstream; use `manipulate()`.
+
+Sources: [Expo docs: ImageManipulator](https://docs.expo.dev/versions/latest/sdk/imagemanipulator/),
+[expo/expo#2512](https://github.com/expo/expo/issues/2512).
 
 ## Test it
 
@@ -133,6 +149,6 @@ and returns one, `injectX` shape matching `@symbiote-native/navigation`'s
 pnpm vitest run packages/image-manipulator
 ```
 
-Upstream ships one test suite, `src/__tests__/validators-test.ts` — ported to
+Upstream ships one test suite, `src/__tests__/validators-test.ts` - ported to
 `validators.test.ts` (minus the `extent` cases, see above). `image-manipulator.test.ts` is net-new
 coverage of `manipulate`/`manipulateAsync` against a faked native module.

@@ -1,18 +1,18 @@
 # @symbiote-native/media-library
 
-A wrapper package for [SymbioteNative](../../README.md) that makes
-[`expo-media-library`](https://github.com/expo/expo/tree/main/packages/expo-media-library) usable
-from **every** adapter — React, Vue, Svelte, Solid, and Angular.
+Read, save and organize the device's photos and videos: query recent assets, save a file to the
+library, build albums, and react to library changes. One API for every
+[SymbioteNative](../../README.md) adapter (React, Vue, Svelte, Solid and Angular).
 
-**Both of upstream's surfaces are ported, matching upstream's own layout.** The default export is
-the modern, shared-object API — `Query`/`Asset`/`Album` classes built on JSI shared objects
-(`expo-modules-core`'s `SharedObject`), upstream's own default entry as of SDK 57. The legacy,
-function-based API is available at the `./legacy` subpath, reachable in the real upstream package
-as `expo-media-library/legacy`. See [Legacy API (`/legacy`)](#legacy-api-legacy) below.
+It wraps [`expo-media-library`](https://github.com/expo/expo/tree/main/packages/expo-media-library)
+and ports both of upstream's surfaces, matching upstream's own layout:
 
-Reads, saves, and organizes the device's photo/video library — assets, albums, permissions
-(including the granular Android 13+ and limited-access iOS/Android 14+ pickers), and
-library-change events.
+- **Default export:** the modern `Query` / `Asset` / `Album` classes, built on JSI shared objects
+  (`expo-modules-core`'s `SharedObject`). Upstream's default entry as of SDK 57.
+- **`./legacy` subpath:** the function-based API, reachable upstream as `expo-media-library/legacy`.
+  See [Legacy API (`/legacy`)](#legacy-api-legacy) below.
+
+Permissions include the granular Android 13+ ones and the limited-access picker (iOS, Android 14+).
 
 ## Install
 
@@ -29,34 +29,34 @@ npx @symbiote-native/cli add --media-library
 ```
 
 Either way: installs `@symbiote-native/media-library` and wires the native autolinking
-automatically — see [`@symbiote-native/cli`](../cli).
+automatically - see [`@symbiote-native/cli`](../cli).
 
 <details>
-<summary>Manual install (no CLI — installing and wiring native autolinking by hand)</summary>
+<summary>Manual install (no CLI - installing and wiring native autolinking by hand)</summary>
 
 ```bash
 npm install @symbiote-native/media-library
 ```
 
 `expo-media-library` and `expo-modules-core` come along as regular dependencies, pinned to exact
-versions — never install them yourself, and never add the `expo` meta-package to your project.
+versions - never install them yourself, and never add the `expo` meta-package to your project.
 
 ## Required one-time step: native autolinking wiring
 
-Same one-time step as every other `expo-modules-core` package this project ships — see
+Same one-time step as every other `expo-modules-core` package this project ships - see
 [`@symbiote-native/local-auth`'s README](../local-auth/README.md#required-one-time-step-native-autolinking-wiring)
 and the `symbiote-expo-native-module` project skill.
 
 `native-link.json` declares two iOS `Info.plist` usage-description keys
 (`NSPhotoLibraryUsageDescription`, `NSPhotoLibraryAddUsageDescription`) with generic default
-text — override either by setting the same key yourself before or after install
+text - override either by setting the same key yourself before or after install
 (`@symbiote-native/expo-modules-link`'s patcher is additive-only). It also sets
-`android:requestLegacyExternalStorage="true"` on your app's `<application>` tag — required by
+`android:requestLegacyExternalStorage="true"` on your app's `<application>` tag - required by
 upstream's own config plugin for scoped-storage compatibility on Android 10+.
 
 </details>
 
-**Android runtime permissions are NOT added automatically, by the CLI or otherwise** — add
+**Android runtime permissions are NOT added automatically, by the CLI or otherwise** - add
 whichever of these your app actually needs to your own `AndroidManifest.xml`, the same opt-in
 shape [`@symbiote-native/location`](../location) uses for background location:
 
@@ -72,7 +72,7 @@ shape [`@symbiote-native/location`](../location) uses for background location:
 ```
 
 `READ_MEDIA_IMAGES`/`READ_MEDIA_VIDEO`/`READ_MEDIA_AUDIO` are the granular Android 13+
-permissions — pass the matching subset as `requestPermissionsAsync(false, [...])`'s second
+permissions - pass the matching subset as `requestPermissionsAsync(false, [...])`'s second
 argument; omitting one here means Android silently refuses that grant regardless of what the app
 asks for at runtime.
 
@@ -80,17 +80,17 @@ asks for at runtime.
 
 ```
 src/next/     query.ts / asset.ts / album.ts (Query/Asset/Album shared-object classes) /
-              native-module.ts / types.ts — the default, shared-object surface. See "API" below.
+              native-module.ts / types.ts - the default, shared-object surface. See "API" below.
 src/core/     media-library.ts (every legacy function + the three useXPermissions hooks),
               native-module.ts, types.ts. See "Legacy API" below.
-src/angular/  @symbiote-native/media-library/angular — export * from '../next'
+src/angular/  @symbiote-native/media-library/angular - export * from '../next'
 ```
 
-`./react`, `./vue`, `./svelte`, and `./solid` are `exports`-map aliases straight onto `src/next/`
-— `Query`/`Asset`/`Album` carry no children/ref/render fields, so there is nothing to split per
+`./react`, `./vue`, `./svelte`, and `./solid` are `exports`-map aliases straight onto `src/next/`:
+`Query`/`Asset`/`Album` carry no children/ref/render fields, so there is nothing to split per
 framework. `./angular` stays a physical file/subpath since Angular ships through a separate
 `ngc`/AOT build (`build-ngc/`). `./legacy` is one subpath shared by every adapter, for the same
-reason — plain async functions have no framework-specific shape either.
+reason - plain async functions have no framework-specific shape either.
 
 ## Use it
 
@@ -100,6 +100,7 @@ import {
   Asset,
   Album,
   AssetField,
+  MediaType,
   requestPermissionsAsync,
 } from '@symbiote-native/media-library';
 
@@ -109,21 +110,21 @@ if (granted) {
   const album = await Album.create('My Album', [asset]);
 
   const recentPhotos = await new Query()
-    .eq(AssetField.MEDIA_TYPE, 'image' as never)
+    .eq(AssetField.MEDIA_TYPE, MediaType.IMAGE)
     .orderBy(AssetField.CREATION_TIME)
     .limit(20)
     .exe();
 }
 ```
 
-Identical import surface on every adapter — `@symbiote-native/media-library/react`, `/vue`,
+Identical import surface on every adapter - `@symbiote-native/media-library/react`, `/vue`,
 `/svelte`, `/solid`, `/angular` all re-export the same classes.
 
 ## API
 
 ### `Query`
 
-Builder pattern — every filter/sort method returns the same instance for chaining.
+Builder pattern - every filter/sort method returns the same instance for chaining.
 
 ```ts
 new Query()
@@ -195,19 +196,19 @@ upstream's default-entry types with this repo's `I`-prefix convention for export
 
 ### Errors
 
-No custom JS error-class hierarchy — every native exception surfaces as an ordinary thrown `Error`
+No custom JS error-class hierarchy - every native exception surfaces as an ordinary thrown `Error`
 or rejected `Promise`, same as every other native module wrapper in this repo.
 
 | Trigger                                                                                               | When                                                                                               |
 | ----------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| Calling an `Asset`/`Album` method on an ID that no longer exists on the device                        | Native `Exception` — "could not be found"                                                          |
-| `Asset.getMediaSubtypes()`/`.getLivePhotoVideoUri()`/`.getIsInCloud()`/`.getOrientation()` on Android | `UnavailabilityError` — thrown synchronously, iOS only                                             |
-| `Album.removeAssets()` on Android                                                                     | Native `Exception` — an Android asset belongs to one album; delete it or add it to another instead |
-| `getLocation()` on Android without `ACCESS_MEDIA_LOCATION`                                            | Rejects — needs that runtime permission                                                            |
+| Calling an `Asset`/`Album` method on an ID that no longer exists on the device                        | Native `Exception` - "could not be found"                                                          |
+| `Asset.getMediaSubtypes()`/`.getLivePhotoVideoUri()`/`.getIsInCloud()`/`.getOrientation()` on Android | `UnavailabilityError` - thrown synchronously, iOS only                                             |
+| `Album.removeAssets()` on Android                                                                     | Native `Exception` - an Android asset belongs to one album; delete it or add it to another instead |
+| `getLocation()` on Android without `ACCESS_MEDIA_LOCATION`                                            | Rejects - needs that runtime permission                                                            |
 
 ## Legacy API (`/legacy`)
 
-Upstream's original function-based surface — plain async functions over `expo-modules-core`
+Upstream's original function-based surface - plain async functions over `expo-modules-core`
 instead of JSI shared objects.
 
 ```ts
@@ -258,15 +259,31 @@ MediaType, SortBy                                                               
 Plus every `IMediaLibrary*` type, ported from upstream's `legacy/MediaLibrary.ts` with this
 repo's `I`-prefix convention for exported types (`ts-js-best-practices`).
 
-### Legacy notes
+## Common questions
 
-- **`sortBy`'s single-tuple form must be double-nested — an upstream quirk, ported verbatim.**
+- **`saveToLibraryAsync` missing or throws.** The root entry is the modern API: use
+  `Asset.create(uri)`, or import the old function from `/legacy`.
+- **Save a downloaded photo.** Download to the cache with `@symbiote-native/file-system`, then
+  `Asset.create(localUri)` (optionally with an `Album`).
+- **Android 13+: permission denied.** Add the granular manifest permissions and pass the matching
+  subset to `requestPermissionsAsync(false, ['photo'])`.
+- **iOS `uri` is `ph://`.** A Photos identifier: use `asset.getInfo()` for a local file URI.
+- **Wrong orientation on Android in `getAssetsAsync`.** Legacy: pass `resolveWithFullInfo: true`.
+- **Limited access.** `presentPermissionsPicker()` lets the user share more.
+
+Sources: [Expo docs: MediaLibrary (legacy)](https://docs.expo.dev/versions/latest/sdk/media-library-legacy/),
+[Expo guide: migrate to the new media library API](https://docs.expo.dev/guides/sdk-libraries-migration/media-library/),
+[expo/expo#50670](https://github.com/expo/expo/pull/50670).
+
+## Legacy API notes
+
+- **`sortBy`'s single-tuple form must be double-nested - an upstream quirk, ported verbatim.**
   `getAssetsAsync({ sortBy: [['creationTime', true]] })` sorts by one key ascending; the
   unnested `sortBy: ['creationTime', true]` is read as two independent (and here, invalid) sort
   keys, because upstream's own `arrayize()` helper passes any array through unchanged rather than
   distinguishing "one tuple" from "several keys". See `media-library.test.ts` and the
   `UPSTREAM-BUG` comment on `getAssetsAsync`.
-- **`getAssetContentUriAsync` is Android-only** — a plain `content://` URI, still useful even
+- **`getAssetContentUriAsync` is Android-only** - a plain `content://` URI, still useful even
   though the modern `Asset`/`Query` API above ports the shared-object surface it used to bridge to.
 - **`getMomentsAsync` and `setAssetFavoriteAsync` are iOS-only**; `getAssetContentUriAsync`,
   `migrateAlbumIfNeededAsync`, and `albumNeedsMigrationAsync` are Android-only or Android-R+-only.
@@ -278,7 +295,7 @@ repo's `I`-prefix convention for exported types (`ts-js-best-practices`).
 
 ## Test it
 
-No Fabric/Descriptor angle at all — every function here is a pure async-function surface plus one
+No Fabric/Descriptor angle at all - every function here is a pure async-function surface plus one
 native change-event listener, never a view or per-instance state. Tests inject a fake native-module
 object in place of the real `requireNativeModule` resolution and fire the wired listener directly
-(`src/core/media-library.test.ts`, `src/next/next.test.ts`) — no `installFabric()`, no ViewConfig.
+(`src/core/media-library.test.ts`, `src/next/next.test.ts`) - no `installFabric()`, no ViewConfig.

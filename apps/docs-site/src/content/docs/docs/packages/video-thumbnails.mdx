@@ -1,0 +1,258 @@
+---
+title: Video thumbnails
+description: Grab a still-frame image from a local or remote video on every SymbioteNative adapter.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+Show a preview image for a video without playing it: pick a moment, get a file.
+`@symbiote-native/video-thumbnails` wraps
+[`expo-video-thumbnails`](https://github.com/expo/expo/tree/main/packages/expo-video-thumbnails)
+so every SymbioteNative adapter can reach it, not just React. The single export is a free function
+with no per-instance state, so the React, Vue, Angular, Svelte, and Solid entry points are plain
+re-exports of the same `core`.
+
+<Aside type="caution" title="Deprecated upstream">
+  Expo deprecated `expo-video-thumbnails` in favor of `generateThumbnailsAsync` from `expo-video`,
+  and it receives no patches. It is ported here for parity with the rest of the Expo surface; plan a
+  move once an `expo-video` wrapper exists.
+</Aside>
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | live    |
+| Android     | live    |
+
+| Framework adapter | Support |
+| ----------------- | ------- |
+| React             | live    |
+| Vue               | live    |
+| Angular           | live    |
+| Svelte            | live    |
+| Solid             | live    |
+
+## Installation
+
+```sh
+npm install @symbiote-native/video-thumbnails
+```
+
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --video-thumbnails`
+(or `add --video-thumbnails` in an existing app) installs and wires this for you - see
+[`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
+
+`expo-video-thumbnails` and `expo-modules-core` come along as regular dependencies, pinned to exact
+versions. Never install either yourself, and never add the `expo` meta-package to your project (it
+bundles its own Metro/Babel pipeline, which conflicts with this project's own).
+
+<Aside type="danger" title="Native setup is required before first use">
+  `expo-video-thumbnails`'s native code is discovered by `expo-modules-autolinking`, a different
+  mechanism from the `react-native.config.cjs`/podspec autolinking every other SymbioteNative
+  wrapper uses. Follow [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers this package and
+  every other `expo-modules-core` package with zero further native changes.
+</Aside>
+
+No permission, manifest edit or config plugin is involved.
+
+## Usage
+
+All five adapters re-export the same function; there is no per-adapter hook, composable or
+service, since nothing here holds live state.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { useState } from 'react';
+    import { getThumbnailAsync } from '@symbiote-native/video-thumbnails/react';
+
+    export default function Preview({ video }: { video: string }) {
+      const [uri, setUri] = useState<string | null>(null);
+
+      async function onPress() {
+        const thumbnail = await getThumbnailAsync(video, { time: 2000 });
+        setUri(thumbnail.uri);
+      }
+
+      return (
+        <view>
+          {uri ? <image source={{ uri }} /> : null}
+          <button title="Make thumbnail" onPress={onPress} />
+        </view>
+      );
+    }
+    ```
+
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { ref } from 'vue';
+    import { getThumbnailAsync } from '@symbiote-native/video-thumbnails/vue';
+
+    const props = defineProps<{ video: string }>();
+    const uri = ref<string | null>(null);
+
+    async function onPress() {
+      const thumbnail = await getThumbnailAsync(props.video, { time: 2000 });
+      uri.value = thumbnail.uri;
+    }
+    </script>
+
+    <template>
+      <view>
+        <image v-if="uri" :source="{ uri }" />
+        <button title="Make thumbnail" @press="onPress" />
+      </view>
+    </template>
+    ```
+
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component, input, signal } from '@angular/core';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
+    import { getThumbnailAsync } from '@symbiote-native/video-thumbnails/angular';
+
+    @Component({
+      standalone: true,
+      imports: [SYMBIOTE_ELEMENTS],
+      template: `
+        <view>
+          @if (uri(); as source) {
+            <image [source]="{ uri: source }" />
+          }
+          <button title="Make thumbnail" (press)="onPress()" />
+        </view>
+      `,
+    })
+    export class Preview {
+      readonly video = input.required<string>();
+      readonly uri = signal<string | null>(null);
+
+      async onPress(): Promise<void> {
+        const thumbnail = await getThumbnailAsync(this.video(), { time: 2000 });
+        this.uri.set(thumbnail.uri);
+      }
+    }
+    ```
+
+    There is no service to `inject()`: the function is a plain export off the core package.
+
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { getThumbnailAsync } from '@symbiote-native/video-thumbnails/svelte';
+
+      let { video }: { video: string } = $props();
+      let uri = $state<string | null>(null);
+
+      async function onPress(): Promise<void> {
+        const thumbnail = await getThumbnailAsync(video, { time: 2000 });
+        uri = thumbnail.uri;
+      }
+    </script>
+
+    <view>
+      {#if uri}
+        <image source={{ uri }} />
+      {/if}
+      <button title="Make thumbnail" onPress={onPress} />
+    </view>
+    ```
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { createSignal } from 'solid-js';
+    import { getThumbnailAsync } from '@symbiote-native/video-thumbnails/solid';
+
+    export function Preview(props: { video: string }) {
+      const [uri, setUri] = createSignal<string | null>(null);
+
+      async function onPress() {
+        const thumbnail = await getThumbnailAsync(props.video, { time: 2000 });
+        setUri(thumbnail.uri);
+      }
+
+      return (
+        <view>
+          {uri() ? <image source={{ uri: uri() ?? undefined }} /> : null}
+          <button title="Make thumbnail" onPress={onPress} />
+        </view>
+      );
+    }
+    ```
+
+  </TabItem>
+</Tabs>
+
+For a remote video that needs authentication, pass `headers`:
+
+```ts
+const { uri } = await getThumbnailAsync('https://example.com/clip.mp4', {
+  time: 15000,
+  headers: { Authorization: `Bearer ${token}` },
+});
+```
+
+## API
+
+### `getThumbnailAsync(sourceFilename, options?)`
+
+| Signature                                                                              | Description                                                         |
+| -------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `getThumbnailAsync(sourceFilename: string, options?): Promise<IVideoThumbnailsResult>` | Grabs one frame from a local or remote video and saves it as an image |
+
+### `IVideoThumbnailsOptions`
+
+| Field     | Type                                  | Description                                                              |
+| --------- | ------------------------------------- | ------------------------------------------------------------------------ |
+| `time`    | `number \| undefined`                 | Milliseconds into the video to take the frame from                       |
+| `quality` | `number \| undefined`                 | Compression from 0 (smallest) to 1 (largest)                             |
+| `headers` | `Record<string, string> \| undefined` | Sent with the network request when `sourceFilename` is a remote URI      |
+
+### `IVideoThumbnailsResult`
+
+| Field    | Type     | Description                       |
+| -------- | -------- | --------------------------------- |
+| `uri`    | `string` | Location of the generated image   |
+| `width`  | `number` | Width of the image in pixels      |
+| `height` | `number` | Height of the image in pixels     |
+
+## Notes
+
+- **The package is deprecated upstream.** Expo points to `generateThumbnailsAsync` in `expo-video`
+  and ships no patches. This wrapper tracks the final upstream behavior.
+- **Generation can only be verified on a device or simulator.** The headless tests fake the native
+  module, so they prove option defaulting and argument forwarding, not frame extraction.
+
+## Common questions
+
+**Should I use this package in new code?** No. Upstream deprecated it in favor of
+`generateThumbnailsAsync` in `expo-video` and ships no patches. Use it only to keep existing code
+running.
+
+**It never resolves, or fails on some Android devices or file types.** This is the most reported
+problem upstream, mostly with certain codecs and `.mov` files on older Android versions. It is not
+something this wrapper can fix. Test with your real videos, and handle the rejection or a timeout.
+
+**Two thumbnails a fraction of a second apart look identical.** Frame lookup is not exact: nearby
+`time` values (within about a second) can return the same frame. Space the times further apart.
+
+**How do I get a thumbnail of a remote video?** Pass the URL, and `headers` if it needs
+authentication. Long downloads can be slow, so a local file is more reliable.
+
+Sources: [Expo docs: VideoThumbnails (deprecated)](https://docs.expo.dev/versions/latest/sdk/video-thumbnails/),
+[expo/expo#7832 getThumbnailAsync fails on Android](https://github.com/expo/expo/issues/7832),
+[expo/expo#19165 does not generate images on Android 12](https://github.com/expo/expo/issues/19165),
+[expo/expo#12429 could not generate thumbnail for a .mov on Android 7](https://github.com/expo/expo/issues/12429).
+
+## How the wrapper works
+
+`expo-video-thumbnails`'s JS is hand-ported into this package's `core/`, resolving the native
+module through `expo-modules-core` rather than the `expo` meta-package. The five adapter entry
+points are plain re-exports of `core` (Angular stays a physical subpath for its separate
+`ngc`/AOT build). The native code is never vendored: `expo-modules-autolinking` resolves it from
+`node_modules` (see [the native setup guide](/docs/howtos/expo-native-module-setup/)).

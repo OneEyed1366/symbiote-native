@@ -1,13 +1,14 @@
 # @symbiote-native/intent-launcher
 
-A wrapper package for [SymbioteNative](../../README.md) that makes
-[`expo-intent-launcher`](https://github.com/expo/expo/tree/main/packages/expo-intent-launcher)
-- launching an Android intent (a settings screen, another app) and reading another app's icon -
-usable from **every** adapter, React, Vue, Svelte, Solid, and Angular, not just React. **Android
-only**: upstream ships no iOS implementation at all, so every function throws
-`UnavailabilityError` off Android, matching upstream's own guard. Built the same way as
-[`@symbiote-native/print`](../print): an `expo-modules-core`-based wrapper (see the
-`symbiote-expo-native-module` project skill for the full mechanism).
+Send the user to the right system screen: Wi-Fi settings when the network is off, your app's own
+permission page after a denied prompt, or straight into another app. One API for every
+[SymbioteNative](../../README.md) adapter (React, Vue, Svelte, Solid and Angular).
+
+It wraps [`expo-intent-launcher`](https://github.com/expo/expo/tree/main/packages/expo-intent-launcher)
+(launching an Android intent and reading another app's icon). **Android only**: upstream ships no
+iOS implementation, so every function throws `UnavailabilityError` off Android, matching upstream's
+own guard. Built the same way as [`@symbiote-native/print`](../print): an `expo-modules-core`-based
+wrapper (see the `symbiote-expo-native-module` project skill for the full mechanism).
 
 ## Install
 
@@ -96,9 +97,23 @@ const icon = await getApplicationIconAsync('com.google.android.gm');
 
 ## Notes
 
+- **`startActivityAsync` resolves when the user comes back.** The result code says whether they
+  finished or cancelled; do not assume the setting changed.
 - **`extra`'s type is `Record<string, unknown>`**, not upstream's `Record<string, any>`, this
   repo bans `any` in application code. The field is forwarded verbatim to the native module, so
   narrowing it further would need a schema this package doesn't have a use for yet.
+
+## Common questions
+
+- **`ActivityNotFoundException`.** No app handles the intent; wrap the call in `try`/`catch`.
+- **`packageName` without `className`.** The intent is restricted to that package and rejects if it
+  cannot handle it.
+- **Crash returning from notification settings.** Reported with `APP_NOTIFICATION_SETTINGS` plus an `extra`.
+- **`ERR_UNAVAILABLE`.** Reported with `enableDangerousExperimentalLeanBuilds`.
+
+Sources: [expo/expo#12078](https://github.com/expo/expo/pull/12078),
+[expo/expo#50511](https://github.com/expo/expo/pull/50511),
+[expo/expo#22995](https://github.com/expo/expo/issues/22995).
 
 ## Test it
 

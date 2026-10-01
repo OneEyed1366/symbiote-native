@@ -1,0 +1,280 @@
+---
+title: Image manipulator
+description: Resize, rotate, flip and crop images and save them to a new file, on every SymbioteNative adapter.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+Shrink a photo before uploading it, rotate a scan, crop an avatar: build a chain of edits, render
+once, save to a new file. `@symbiote-native/image-manipulator` wraps
+[`expo-image-manipulator`](https://github.com/expo/expo/tree/main/packages/expo-image-manipulator)
+so every SymbioteNative adapter can reach it, not just React. The chainable `manipulate()` API is
+a framework-agnostic free function; `useImageManipulator` ships on all five adapters in each
+framework's own idiom and releases the native memory for you.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | live    |
+| Android     | live    |
+
+| Framework adapter | Support |
+| ----------------- | ------- |
+| React             | live    |
+| Vue               | live    |
+| Angular           | live    |
+| Svelte            | live    |
+| Solid             | live    |
+
+## Installation
+
+```sh
+npm install @symbiote-native/image-manipulator
+```
+
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --image-manipulator`
+(or `add --image-manipulator` in an existing app) installs and wires this for you - see
+[`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
+
+`expo-image-manipulator` and `expo-modules-core` come along as regular dependencies, pinned to
+exact versions. Never install either yourself, and never add the `expo` meta-package to your
+project (it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
+
+<Aside type="danger" title="Native setup is required before first use">
+  `expo-image-manipulator`'s native code is discovered by `expo-modules-autolinking`, a different
+  mechanism from the `react-native.config.cjs`/podspec autolinking every other SymbioteNative
+  wrapper uses. Follow [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers this package and
+  every other `expo-modules-core` package with zero further native changes.
+</Aside>
+
+No permission, manifest edit or config plugin is involved: the package edits files your app
+already has.
+
+## Usage
+
+Outside a component, `manipulate()` returns a context you chain edits on. Call `release()` when
+you are done to free the native memory:
+
+```ts
+import { manipulate } from '@symbiote-native/image-manipulator';
+
+const context = manipulate('file:///photo.jpg');
+context.resize({ width: 300 }).rotate(90);
+const image = await context.renderAsync();
+const { uri, width, height } = await image.saveAsync({ format: 'jpeg', compress: 0.8 });
+
+context.release();
+image.release();
+```
+
+Inside a component, use the adapter's binding so the context is recreated when the source changes
+and released on unmount:
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { useImageManipulator } from '@symbiote-native/image-manipulator/react';
+
+    export default function Thumbnail({ uri }: { uri: string }) {
+      const context = useImageManipulator(uri);
+
+      async function onPress() {
+        const image = await context.resize({ width: 300 }).renderAsync();
+        const saved = await image.saveAsync({ format: 'jpeg', compress: 0.8 });
+        console.log(saved.uri);
+      }
+
+      return <button title="Make thumbnail" onPress={onPress} />;
+    }
+    ```
+
+    React takes a plain value and re-invokes it on every render, exactly like upstream.
+
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { useImageManipulator } from '@symbiote-native/image-manipulator/vue';
+
+    const props = defineProps<{ uri: string }>();
+    const context = useImageManipulator(() => props.uri);
+
+    async function onPress() {
+      const image = await context.value.resize({ width: 300 }).renderAsync();
+      const saved = await image.saveAsync({ format: 'jpeg', compress: 0.8 });
+      console.log(saved.uri);
+    }
+    </script>
+
+    <template>
+      <button title="Make thumbnail" @press="onPress" />
+    </template>
+    ```
+
+    The source is reactive (a `Ref`, getter or plain value); changing it recreates the context and
+    releases the stale one.
+
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component, input } from '@angular/core';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
+    import { injectImageManipulator } from '@symbiote-native/image-manipulator/angular';
+
+    @Component({
+      standalone: true,
+      imports: [SYMBIOTE_ELEMENTS],
+      template: `<button title="Make thumbnail" (press)="onPress()" />`,
+    })
+    export class Thumbnail {
+      readonly uri = input.required<string>();
+      private readonly context = injectImageManipulator(() => this.uri());
+
+      async onPress(): Promise<void> {
+        const image = await this.context().resize({ width: 300 }).renderAsync();
+        const saved = await image.saveAsync({ format: 'jpeg', compress: 0.8 });
+        console.log(saved.uri);
+      }
+    }
+    ```
+
+    `injectImageManipulator(source)` takes a function reading a signal and returns a `Signal` of the
+    context, the same `inject*` shape as `@symbiote-native/navigation`.
+
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { useImageManipulator } from '@symbiote-native/image-manipulator/svelte';
+
+      let { uri }: { uri: string } = $props();
+      const manipulator = useImageManipulator(() => uri);
+
+      async function onPress(): Promise<void> {
+        const image = await manipulator.current.resize({ width: 300 }).renderAsync();
+        const saved = await image.saveAsync({ format: 'jpeg', compress: 0.8 });
+        console.log(saved.uri);
+      }
+    </script>
+
+    <button title="Make thumbnail" onPress={onPress} />
+    ```
+
+    The source is a getter, so a changed prop recreates the context.
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { useImageManipulator } from '@symbiote-native/image-manipulator/solid';
+
+    export function Thumbnail(props: { uri: string }) {
+      const context = useImageManipulator(() => props.uri);
+
+      async function onPress() {
+        const image = await context().resize({ width: 300 }).renderAsync();
+        const saved = await image.saveAsync({ format: 'jpeg', compress: 0.8 });
+        console.log(saved.uri);
+      }
+
+      return <button title="Make thumbnail" onPress={onPress} />;
+    }
+    ```
+
+    The source is an accessor and the result is an accessor: call it (`context()`).
+
+  </TabItem>
+</Tabs>
+
+### The deprecated one-shot API
+
+Upstream still ships `manipulateAsync`, so it is kept for parity. Prefer `manipulate()` in new code:
+
+```ts
+import { manipulateAsync, SaveFormat } from '@symbiote-native/image-manipulator';
+
+const { uri } = await manipulateAsync(
+  'file:///photo.jpg',
+  [{ resize: { width: 300 } }, { rotate: 90 }],
+  { format: SaveFormat.JPEG, compress: 0.8 },
+);
+```
+
+## API
+
+### Functions and enums
+
+| Signature                                                       | Description                                                                              |
+| --------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `manipulate(source): IImageManipulatorContext`                  | Starts a chain from a file URI or an `IImageRef`                                         |
+| `manipulateAsync(uri, actions?, saveOptions?): Promise<IImageResult>` | Deprecated one-shot form: apply a list of actions and save                         |
+| `FlipType`                                                      | `Vertical` and `Horizontal`, for the `flip` action                                       |
+| `SaveFormat`                                                    | `JPEG`, `PNG` and `WEBP`, for `ISaveOptions.format`                                      |
+
+### `IImageManipulatorContext`
+
+| Method                       | Description                                                                         |
+| ---------------------------- | ----------------------------------------------------------------------------------- |
+| `resize({ width?, height? })` | Resizes. Give only one of `width` and `height` to keep the aspect ratio             |
+| `rotate(degrees)`            | Rotates clockwise for positive degrees, counter-clockwise for negative              |
+| `flip(flipType)`             | Mirrors vertically or horizontally                                                  |
+| `crop({ originX, originY, width, height })` | Crops to a rectangle                                                |
+| `reset()`                    | Drops the queued edits and starts again from the source                             |
+| `renderAsync()`              | Applies the queued edits and resolves an `IImageRef`                                |
+| `release()`                  | Frees the native memory held by the context                                         |
+
+### `ISaveOptions` and `IImageResult`
+
+| Type           | Field      | Description                                                                |
+| -------------- | ---------- | -------------------------------------------------------------------------- |
+| `ISaveOptions` | `format`   | `SaveFormat` of the output. Defaults to `SaveFormat.JPEG`                  |
+| `ISaveOptions` | `compress` | Quality from 0 to 1; `1` means no compression. Defaults to `1`             |
+| `ISaveOptions` | `base64`   | Also return the image as a base64 string                                   |
+| `IImageResult` | `uri`      | Location of the saved file                                                 |
+| `IImageResult` | `width`    | Width in pixels                                                            |
+| `IImageResult` | `height`   | Height in pixels                                                           |
+| `IImageResult` | `base64`   | The image as base64. Present only when `base64` was requested              |
+
+## Notes
+
+- **Release what you create outside a component.** `manipulate()` and `renderAsync()` hold native
+  memory until `release()`. The adapter bindings do this for you on unmount; the free function does
+  not.
+- **`compress` only matters for lossy formats.** Quality applies to `jpeg` and `webp`; `png` is
+  lossless.
+- **`extent` is not ported.** It exists only on the web in upstream: neither native module
+  registers it, so calling `.extent()` is a type error here, matching runtime behavior.
+- **`ImageManipulator.Image` is not exposed.** Upstream marks it `@hidden`; the image is reachable
+  through `context.renderAsync()`.
+- **Editing can only be verified on a device or simulator.** The headless tests fake the native
+  module, so they prove the validators and the release rule, not pixel output.
+
+## Common questions
+
+**How do I make an upload smaller?** Resize first, then save with compression:
+`context.resize({ width: 1080 })`, then `saveAsync({ format: SaveFormat.JPEG, compress: 0.7 })`.
+`compress` goes from 0 (smallest) to 1 (no compression) and applies to JPEG and WebP; PNG is
+lossless.
+
+**How do I keep the aspect ratio when resizing?** Give only one of `width` and `height`.
+
+**JPEG, PNG or WebP?** JPEG is the default and the fastest, with some artifacts at low quality. PNG
+is lossless but slower and larger. WebP is usually smaller than JPEG at similar quality.
+
+**Why does my app leak memory after editing many images?** `manipulate()` and `renderAsync()` hold
+native memory until `release()`. Call it when done; the adapter hooks do it on unmount.
+
+**Is `manipulateAsync` still supported?** It works, but upstream deprecated it. Use `manipulate()`.
+
+**Can I get the result as base64?** Yes, pass `base64: true` in `saveAsync` options.
+
+Sources: [Expo docs: ImageManipulator](https://docs.expo.dev/versions/latest/sdk/imagemanipulator/),
+[expo/expo#2512 portrait images become landscape when resizing](https://github.com/expo/expo/issues/2512).
+
+## How the wrapper works
+
+`expo-image-manipulator`'s JS is hand-ported into this package's `core/`, resolving
+`ExpoImageManipulator` through `expo-modules-core` rather than the `expo` meta-package. The
+recreate-and-release rule lives once in `src/core/manipulator-context-controller.ts`; each adapter
+supplies only its own reactive lifecycle. The native code is never vendored:
+`expo-modules-autolinking` resolves it from `node_modules` (see
+[the native setup guide](/docs/howtos/expo-native-module-setup/)).

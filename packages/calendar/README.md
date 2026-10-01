@@ -1,11 +1,14 @@
 # @symbiote-native/calendar
 
-A wrapper package for [SymbioteNative](../../README.md) that makes
-[`expo-calendar`](https://github.com/expo/expo/tree/main/packages/expo-calendar) - calendar,
-event, reminder, and attendee CRUD, plus the OS-provided event dialogs - usable from **every**
-adapter, React, Vue, Svelte, Solid, and Angular, not just React. Built the same way as
-[`@symbiote-native/print`](../print): an `expo-modules-core`-based wrapper (see the
-`symbiote-expo-native-module` project skill for the full mechanism).
+Add a meeting to the user's calendar, list what is on this week, set a reminder, or hand the user
+the system's own event dialog. One API for every [SymbioteNative](../../README.md) adapter (React,
+Vue, Svelte, Solid and Angular).
+
+It wraps [`expo-calendar`](https://github.com/expo/expo/tree/main/packages/expo-calendar)
+(calendar, event, reminder and attendee CRUD, plus the OS event dialogs) the same way
+[`@symbiote-native/print`](../print) wraps its upstream: `expo-modules-core` is a direct
+dependency and the upstream JS is hand-ported into `core/`. See the `symbiote-expo-native-module`
+project skill for the full mechanism.
 
 **Both of upstream's API surfaces are ported, matching Expo's own layout exactly**: the modern
 `SharedObject`-class `ExpoCalendar`/`ExpoCalendarEvent`/`ExpoCalendarReminder`/
@@ -162,6 +165,22 @@ const eventId = await createEventAsync(calendarId, {
   endDate: new Date(Date.now() + 30 * 60_000),
 });
 ```
+
+## Common questions
+
+- **`getCalendars()` or `createEvent` fails or returns nothing.** Call `requestCalendarPermissions()`
+  first and check `granted` (Android: `READ_CALENDAR` and `WRITE_CALENDAR`, added for you).
+- **The system event dialog does not appear on iOS, no error.** iOS checks permission before showing
+  it: ask first, then call `addEventWithForm`.
+- **Default calendar.** `getDefaultCalendarSync()` is iOS only; on Android list calendars and pick.
+- **Reminders on Android.** iOS only.
+- **Write-only access.** `requestCalendarPermissions(true)` on iOS 17+; swap the Info.plist string by
+  hand (see Permissions above).
+
+Sources: [Expo docs: Calendar](https://docs.expo.dev/versions/v56.0.0/sdk/calendar-legacy/),
+[expo/expo#36001](https://github.com/expo/expo/issues/36001),
+[expo/expo#4991](https://github.com/expo/expo/issues/4991),
+[expo/expo#48186](https://github.com/expo/expo/pull/48186).
 
 ## Test it
 

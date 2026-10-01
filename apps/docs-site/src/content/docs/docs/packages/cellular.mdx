@@ -368,6 +368,18 @@ caller. Angular's auto-fetch is latched to at most one run per service instance,
   [network](/docs/packages/network/)'s `NetworkStateType` if what you actually need is the
   connection currently in use.
 
+## Common questions
+
+- **The carrier name is `null`.** It is `null` when the user never configured a carrier.
+- **Carrier fields read `--` or `65535` on iOS 16.4+.** Apple deprecated `CTCarrier` with no
+  replacement and returns placeholders; treat them as unknown.
+- **Deprecated properties.** `allowsVoip` and `carrier` are deprecated upstream; use the async
+  getters instead.
+
+Sources: [Expo docs: Cellular](https://docs.expo.dev/versions/v54.0.0/sdk/cellular/),
+[iOS 16 CTCarrier deprecation](https://developer.apple.com/forums/thread/714876),
+[PhoneNumberKit#628](https://github.com/marmelroy/PhoneNumberKit/issues/628).
+
 ## How the wrapper works
 
 `@symbiote-native/cellular` ships **zero React/Vue/Angular/Svelte/Solid logic in `expo-cellular` itself** — that

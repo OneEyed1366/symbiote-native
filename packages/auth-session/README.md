@@ -1,9 +1,12 @@
 # @symbiote-native/auth-session
 
-A wrapper package for [SymbioteNative](../../README.md) that makes
-[`expo-auth-session`](https://github.com/expo/expo/tree/main/packages/expo-auth-session) - a
-PKCE-based OAuth2/OpenID Connect flow over a browser tab - usable from **every** adapter, React,
-Vue, Svelte, Solid, and Angular, not just React.
+Add "Sign in with ..." through your identity provider's web page: the app opens a browser tab, the
+user signs in, the provider redirects back with a code, and you exchange it for a token. One API
+for every [SymbioteNative](../../README.md) adapter (React, Vue, Svelte, Solid and Angular).
+
+It ports [`expo-auth-session`](https://github.com/expo/expo/tree/main/packages/expo-auth-session),
+a PKCE-based OAuth2/OpenID Connect flow over a browser tab, with its hooks in each framework's own
+idiom.
 
 Unlike every other package in this catalog, `expo-auth-session` ships **no native code at all** -
 it is a pure-JS flow built entirely on other Expo JS APIs. So instead of wrapping
@@ -42,6 +45,21 @@ npm install @symbiote-native/auth-session
 ```
 
 </details>
+
+### Register a URL scheme for the redirect
+
+The provider redirects back through a custom URL scheme (for example `myapp://`), so the app has to
+own one: register it in your iOS and Android projects and rebuild. Without a scheme the sign-in
+still completes, but the result cannot reach your app and the user has to close the browser tab by
+hand, which reads as a cancelled event. Allow-list the same redirect URI at your provider.
+
+## Notes
+
+- **Never put secret keys in app code.** A client secret in a mobile app is not secret; keep it on
+  your server. PKCE exists so a public client needs none.
+- **Filter auth redirects out of your own link handlers.** An auth redirect is one more deep link;
+  put a recognizable marker in your own `redirectUri` so your `Linking` handler or router can
+  ignore it.
 
 ## What's not ported
 
@@ -120,6 +138,18 @@ if (result.type === 'success') {
   );
 }
 ```
+
+## Common questions
+
+- **Which redirect URI do I register?** Print `makeRedirectUri({ scheme })`: `my-scheme://redirect`
+  in a development build. Register exactly that string with the provider.
+- **`request` is `null`.** `useAuthRequest` loads it asynchronously; disable the button until it is set.
+- **PKCE?** On by default; pass `request.codeVerifier` as `extraParams` when exchanging the code.
+- **Redirect lost on iOS.** Check the scheme is registered in the native project.
+
+Sources: [Expo docs: AuthSession](https://docs.expo.dev/versions/latest/sdk/auth-session/),
+[Expo guide: authentication](https://docs.expo.dev/guides/authentication/),
+[expo/expo#10514](https://github.com/expo/expo/issues/10514).
 
 ## Test it
 

@@ -1,0 +1,323 @@
+---
+title: Age range
+description: Ask the platform for a user's age range with Apple's Declared Age Range and Google Play Age Signals, on every SymbioteNative adapter.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+Show age-appropriate content, or meet an age-assurance law, without collecting a birth date
+yourself: ask the platform. `@symbiote-native/age-range` wraps
+[`expo-age-range`](https://github.com/expo/expo/tree/main/packages/expo-age-range), which uses
+Apple's Declared Age Range framework (iOS 26 and later) and Google's Play Age Signals API
+(Android), so every SymbioteNative adapter can reach it, not just React. Everything here is a
+one-shot async call or a single synchronous setter with no per-instance state, so the React, Vue,
+Angular, Svelte, and Solid entry points are plain re-exports of the same `core`.
+
+<Aside type="caution" title="Alpha upstream">
+  Expo marks `expo-age-range` as alpha and expects frequent breaking changes. Test on a real
+  device: simulator runtimes may not behave as expected.
+</Aside>
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | live (iOS 26 and later for most calls) |
+| Android     | live    |
+
+| Framework adapter | Support |
+| ----------------- | ------- |
+| React             | live    |
+| Vue               | live    |
+| Angular           | live    |
+| Svelte            | live    |
+| Solid             | live    |
+
+## Installation
+
+```sh
+npm install @symbiote-native/age-range
+```
+
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --age-range` (or
+`add --age-range` in an existing app) installs and wires this for you - see
+[`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
+
+`expo-age-range` and `expo-modules-core` come along as regular dependencies, pinned to exact
+versions. Never install either yourself, and never add the `expo` meta-package to your project (it
+bundles its own Metro/Babel pipeline, which conflicts with this project's own).
+
+<Aside type="danger" title="Native setup is required before first use">
+  `expo-age-range`'s native code is discovered by `expo-modules-autolinking`, a different mechanism
+  from the `react-native.config.cjs`/podspec autolinking every other SymbioteNative wrapper uses.
+  Follow [How to: wire up an Expo native module](/docs/howtos/expo-native-module-setup/) once per
+  app first; it covers this package and every other `expo-modules-core` package with zero further
+  native changes.
+</Aside>
+
+No `Info.plist` string or Android manifest entry is needed: Apple's prompt and Google Play's
+consent screen are system UI.
+
+<Aside type="caution" title="iOS needs the Declared Age Range entitlement, added by hand">
+  Build with Xcode 26 or later and add the entitlement to your app's `.entitlements` file. The link
+  manifest does not generate it:
+
+```xml
+<key>com.apple.developer.declared-age-range</key>
+<true/>
+```
+
+</Aside>
+
+## Usage
+
+Check whether the user needs the age flow at all, then prompt only if they do. All five adapters
+re-export the same functions; there is no per-adapter hook, composable or service.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { useState } from 'react';
+    import {
+      isEligibleForAgeFeaturesAsync,
+      requestAgeRangeAsync,
+    } from '@symbiote-native/age-range/react';
+
+    export default function AgeGate() {
+      const [result, setResult] = useState<string | null>(null);
+
+      async function onPress() {
+        if ((await isEligibleForAgeFeaturesAsync()) === false) {
+          setResult('not required');
+          return;
+        }
+        const range = await requestAgeRangeAsync({ threshold1: 13, threshold2: 18 });
+        setResult(`${range.lowerBound ?? '?'} to ${range.upperBound ?? '?'}`);
+      }
+
+      return (
+        <view>
+          <text>{result ?? 'idle'}</text>
+          <button title="Check age range" onPress={onPress} />
+        </view>
+      );
+    }
+    ```
+
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { ref } from 'vue';
+    import {
+      isEligibleForAgeFeaturesAsync,
+      requestAgeRangeAsync,
+    } from '@symbiote-native/age-range/vue';
+
+    const result = ref<string | null>(null);
+
+    async function onPress() {
+      if ((await isEligibleForAgeFeaturesAsync()) === false) {
+        result.value = 'not required';
+        return;
+      }
+      const range = await requestAgeRangeAsync({ threshold1: 13, threshold2: 18 });
+      result.value = `${range.lowerBound ?? '?'} to ${range.upperBound ?? '?'}`;
+    }
+    </script>
+
+    <template>
+      <view>
+        <text>{{ result ?? 'idle' }}</text>
+        <button title="Check age range" @press="onPress" />
+      </view>
+    </template>
+    ```
+
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component, signal } from '@angular/core';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
+    import {
+      isEligibleForAgeFeaturesAsync,
+      requestAgeRangeAsync,
+    } from '@symbiote-native/age-range/angular';
+
+    @Component({
+      standalone: true,
+      imports: [SYMBIOTE_ELEMENTS],
+      template: `
+        <view>
+          <text>{{ result() ?? 'idle' }}</text>
+          <button title="Check age range" (press)="onPress()" />
+        </view>
+      `,
+    })
+    export class AgeGate {
+      readonly result = signal<string | null>(null);
+
+      async onPress(): Promise<void> {
+        if ((await isEligibleForAgeFeaturesAsync()) === false) {
+          this.result.set('not required');
+          return;
+        }
+        const range = await requestAgeRangeAsync({ threshold1: 13, threshold2: 18 });
+        this.result.set(`${range.lowerBound ?? '?'} to ${range.upperBound ?? '?'}`);
+      }
+    }
+    ```
+
+    There is no service to `inject()`: every function is a plain export off the core package.
+
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import {
+        isEligibleForAgeFeaturesAsync,
+        requestAgeRangeAsync,
+      } from '@symbiote-native/age-range/svelte';
+
+      let result = $state<string | null>(null);
+
+      async function onPress(): Promise<void> {
+        if ((await isEligibleForAgeFeaturesAsync()) === false) {
+          result = 'not required';
+          return;
+        }
+        const range = await requestAgeRangeAsync({ threshold1: 13, threshold2: 18 });
+        result = `${range.lowerBound ?? '?'} to ${range.upperBound ?? '?'}`;
+      }
+    </script>
+
+    <view>
+      <text>{result ?? 'idle'}</text>
+      <button title="Check age range" onPress={onPress} />
+    </view>
+    ```
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { createSignal } from 'solid-js';
+    import {
+      isEligibleForAgeFeaturesAsync,
+      requestAgeRangeAsync,
+    } from '@symbiote-native/age-range/solid';
+
+    export function AgeGate() {
+      const [result, setResult] = createSignal<string | null>(null);
+
+      async function onPress() {
+        if ((await isEligibleForAgeFeaturesAsync()) === false) {
+          setResult('not required');
+          return;
+        }
+        const range = await requestAgeRangeAsync({ threshold1: 13, threshold2: 18 });
+        setResult(`${range.lowerBound ?? '?'} to ${range.upperBound ?? '?'}`);
+      }
+
+      return (
+        <view>
+          <text>{result() ?? 'idle'}</text>
+          <button title="Check age range" onPress={onPress} />
+        </view>
+      );
+    }
+    ```
+
+  </TabItem>
+</Tabs>
+
+### Android needs a consent step first
+
+On Android, Play Age Signals requires a separate consent screen. `requestAgeSignalsAccessAsync`
+must resolve `'SHARED'` before `requestAgeRangeAsync` returns anything but `null` fields. On iOS the
+consent is part of `requestAgeRangeAsync` itself.
+
+```ts
+import { requestAgeRangeAsync, requestAgeSignalsAccessAsync } from '@symbiote-native/age-range';
+
+const status = await requestAgeSignalsAccessAsync(); // null on iOS
+if (status !== null && status !== 'SHARED') {
+  return; // the user did not share their age signals
+}
+const range = await requestAgeRangeAsync({ threshold1: 13, threshold2: 18 });
+```
+
+## API
+
+### Functions
+
+| Signature                                                                   | Description                                                                                      |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `requestAgeRangeAsync(options): Promise<IAgeRangeResponse>`                 | Prompts for, and resolves, the user's age range                                                  |
+| `isEligibleForAgeFeaturesAsync(): Promise<boolean \| null>`                 | Whether the user needs the age flow. `null` means the OS cannot answer, which is not the same as "not required" |
+| `getRequiredRegulatoryFeaturesAsync(): Promise<IAgeRangeRegulatoryFeature[] \| null>` | iOS 26.4 and later. The regulatory features that apply. `null` elsewhere              |
+| `showSignificantUpdateAcknowledgmentAsync(updateDescription): Promise<void>` | iOS 26.4 and later. Shows the acknowledgment for a significant app update. A no-op elsewhere    |
+| `requestAgeSignalsAccessAsync(): Promise<IAgeSignalsStatus \| null>`        | Android only. Asks the user to share age signals. `null` elsewhere                                |
+| `setFakeAgeSignals(fake): void`                                             | Android only. Feeds test data to the API, or `null` to go back to real signals. A no-op elsewhere |
+
+### `IAgeRangeRequest`
+
+| Field        | Type                  | Description                                                |
+| ------------ | --------------------- | ---------------------------------------------------------- |
+| `threshold1` | `number`              | The required minimum age for your app. iOS only            |
+| `threshold2` | `number \| undefined` | An optional second age boundary. iOS only                  |
+| `threshold3` | `number \| undefined` | An optional third age boundary. iOS only                   |
+
+### `IAgeRangeResponse`
+
+| Field                           | Type                                                       | Description                                                       |
+| ------------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------- |
+| `lowerBound`, `upperBound`      | `number \| null`                                           | The age range, with `null` for an open end                        |
+| `ageRangeDeclaration`           | `'selfDeclared' \| 'guardianDeclared' \| 'confirmed' \| null` | iOS only. How the range was declared                           |
+| `activeParentalControls`        | `string[] \| undefined`                                    | iOS only. Parental controls in effect                             |
+| `installId`                     | `string \| null \| undefined`                              | Android only. Identifier of this install                          |
+| `ageRangeSource`                | `'TIER_A' \| 'TIER_B' \| 'TIER_C' \| 'TIER_D' \| null`     | Android only. Where the age signal comes from                     |
+| `significantChangeStatus`       | `'APPROVED' \| 'PENDING' \| 'DECLINED' \| null`            | Android only. Parental approval of a significant change           |
+| `significantChangeApprovalDate` | `number \| null \| undefined`                              | Android only. When the change was approved                        |
+
+### Other types
+
+| Type                          | Values                                                                                              |
+| ----------------------------- | --------------------------------------------------------------------------------------------------- |
+| `IAgeSignalsStatus`           | `'SHARED'`, `'NOT_SHARED'`, `'VERIFICATION_REQUIRED'`                                               |
+| `IAgeRangeRegulatoryFeature`  | `'declaredAgeRangeRequired'`, `'significantAppChangeRequiresAdultNotification'`, `'significantAppChangeRequiresParentalConsent'` |
+| `IFakeAgeSignals`             | Either the fields above as test data, or `{ errorCode }` to simulate a Play Age Signals error       |
+
+## Notes
+
+- **Check eligibility before prompting.** Call `isEligibleForAgeFeaturesAsync` and
+  `getRequiredRegulatoryFeaturesAsync` first, and prompt with `requestAgeRangeAsync` only when the
+  result says the user needs it. Both resolve `null` where the OS cannot answer (iOS below 26.2 or
+  26.4, Android, web), and `null` means unknown.
+- **`setFakeAgeSignals` only works in a debuggable Android build.** The native side throws
+  otherwise, unless the argument is `null`.
+- **Test on a real device.** Simulators and emulators may not behave as expected.
+- **The platform call can only be verified on a device.** The headless tests fake the native
+  module.
+
+## Common questions
+
+- **iOS fails with `IOS_ENTITLEMENT_ERROR` (code 0).** The `com.apple.developer.declared-age-range`
+  entitlement is missing, or you run on the Simulator where the feature is unavailable.
+- **Which Xcode?** 26.0 or later.
+- **iOS build fails on `showSignificantUpdateAcknowledgment`.** Reported for `expo-age-range`
+  56.0.5 with an SDK older than 26.4; see the issue for the pin workaround.
+- **Android returns `API_NOT_AVAILABLE`, `PLAY_STORE_NOT_FOUND` or `NETWORK_ERROR`.** Play Age
+  Signals needs an up-to-date Play Store and Play Services, a network, and an app installed from
+  Google Play.
+- **Android reports no range.** It reports one only while the user consents to sharing it.
+
+Sources: [Expo docs: AgeRange](https://docs.expo.dev/versions/latest/sdk/age-range/),
+[expo/expo#46365](https://github.com/expo/expo/issues/46365),
+[AgeSignalsException](https://developer.android.com/google/play/age-signals/reference/com/google/android/play/agesignals/AgeSignalsException),
+[Play Age Signals release notes](https://developer.android.com/google/play/age-signals/release-notes).
+
+## How the wrapper works
+
+`expo-age-range`'s JS is hand-ported into this package's `core/`, resolving the native module
+through `expo-modules-core` rather than the `expo` meta-package. The five adapter entry points are
+plain re-exports of `core` (Angular stays a physical subpath for its separate `ngc`/AOT build). The
+native code is never vendored: `expo-modules-autolinking` resolves it from `node_modules` (see
+[the native setup guide](/docs/howtos/expo-native-module-setup/)).

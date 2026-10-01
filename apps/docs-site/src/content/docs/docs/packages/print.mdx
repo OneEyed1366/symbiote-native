@@ -1,0 +1,240 @@
+---
+title: Print
+description: Print HTML or a PDF through the system print UI, or render HTML to a PDF file, on every SymbioteNative adapter.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+Print an invoice, a ticket or any HTML or PDF, or turn HTML into a PDF file you can share.
+`@symbiote-native/print` wraps [`expo-print`](https://github.com/expo/expo/tree/main/packages/expo-print)
+(AirPrint on iOS, the print framework on Android) so every SymbioteNative adapter can reach it, not
+just React. Like [mail composer](/docs/packages/mail-composer/), every export is a free function
+with no per-instance state, so the React, Vue, Angular, Svelte, and Solid entry points are plain
+re-exports of the same `core`.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | live    |
+| Android     | live    |
+
+| Framework adapter | Support |
+| ----------------- | ------- |
+| React             | live    |
+| Vue               | live    |
+| Angular           | live    |
+| Svelte            | live    |
+| Solid             | live    |
+
+## Installation
+
+```sh
+npm install @symbiote-native/print
+```
+
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --print` (or
+`add --print` in an existing app) installs and wires this for you - see
+[`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
+
+`expo-print` and `expo-modules-core` come along as regular dependencies, pinned to exact versions.
+Never install either yourself, and never add the `expo` meta-package to your project (it bundles
+its own Metro/Babel pipeline, which conflicts with this project's own).
+
+<Aside type="danger" title="Native setup is required before first use">
+  `expo-print`'s native code is discovered by `expo-modules-autolinking`, a different mechanism
+  from the `react-native.config.cjs`/podspec autolinking every other SymbioteNative wrapper uses.
+  Follow [How to: wire up an Expo native module](/docs/howtos/expo-native-module-setup/) once per
+  app first; it covers this package and every other `expo-modules-core` package with zero further
+  native changes.
+</Aside>
+
+No runtime permission, manifest edit or `Info.plist` key is needed: the AirPrint sheet and
+Android's print framework are system UI the user drives directly.
+
+## Usage
+
+All five adapters re-export the same functions; there is no per-adapter hook, composable or
+service, since nothing here holds live state.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { printAsync } from '@symbiote-native/print/react';
+
+    export default function PrintInvoice() {
+      return (
+        <button
+          title="Print"
+          onPress={() => printAsync({ html: '<h1>Invoice #1234</h1>' })}
+        />
+      );
+    }
+    ```
+
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { printAsync } from '@symbiote-native/print/vue';
+
+    function onPrint() {
+      void printAsync({ html: '<h1>Invoice #1234</h1>' });
+    }
+    </script>
+
+    <template>
+      <button title="Print" @press="onPrint" />
+    </template>
+    ```
+
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component } from '@angular/core';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
+    import { printAsync } from '@symbiote-native/print/angular';
+
+    @Component({
+      standalone: true,
+      imports: [SYMBIOTE_ELEMENTS],
+      template: `<button title="Print" (press)="onPrint()" />`,
+    })
+    export class PrintInvoice {
+      onPrint(): void {
+        void printAsync({ html: '<h1>Invoice #1234</h1>' });
+      }
+    }
+    ```
+
+    There is no service to `inject()`: every function is a plain export off the core package.
+
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { printAsync } from '@symbiote-native/print/svelte';
+
+      function onPrint(): void {
+        void printAsync({ html: '<h1>Invoice #1234</h1>' });
+      }
+    </script>
+
+    <button title="Print" onPress={onPrint} />
+    ```
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { printAsync } from '@symbiote-native/print/solid';
+
+    export function PrintInvoice() {
+      return (
+        <button
+          title="Print"
+          onPress={() => printAsync({ html: '<h1>Invoice #1234</h1>' })}
+        />
+      );
+    }
+    ```
+
+  </TabItem>
+</Tabs>
+
+### Render HTML to a PDF file
+
+```ts
+import { printToFileAsync } from '@symbiote-native/print';
+
+const { uri, numberOfPages } = await printToFileAsync({ html: '<h1>Invoice #1234</h1>' });
+// uri is a file in the cache directory; hand it to the sharing package to send it on
+```
+
+Pair it with [sharing](/docs/packages/sharing/) to let the user save or send the PDF.
+
+### Choose a printer first (iOS only)
+
+```ts
+import { printAsync, selectPrinterAsync } from '@symbiote-native/print';
+
+const { url } = await selectPrinterAsync();
+await printAsync({ html: '<h1>Invoice #1234</h1>', printerUrl: url });
+```
+
+## API
+
+### Functions
+
+| Signature                                                | Description                                                                                         |
+| -------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `printAsync(options): Promise<void>`                     | Opens the print UI for an HTML string or a PDF. Takes exactly one of `uri` or `html`. One job at a time |
+| `selectPrinterAsync(): Promise<IPrinter>`                | Shows the iOS printer picker and resolves the chosen printer. Throws on Android                     |
+| `printToFileAsync(options?): Promise<IFilePrintResult>`  | Renders HTML to a PDF file in the cache directory                                                   |
+| `Orientation`                                            | Constants `portrait` and `landscape` for `IPrintOptions.orientation`                                |
+
+### `IPrintOptions`
+
+| Field                | Type                      | Description                                                                                     |
+| -------------------- | ------------------------- | ----------------------------------------------------------------------------------------------- |
+| `uri`                | `string \| undefined`     | A PDF to print: a remote or local URI, or a `data:application/pdf;base64,` URI                  |
+| `html`               | `string \| undefined`     | An HTML string to print. Use instead of `uri`                                                   |
+| `width`              | `number \| undefined`     | Page width in pixels. Defaults to 612 (US Letter at 72 PPI). Only with `html`                   |
+| `height`             | `number \| undefined`     | Page height in pixels. Defaults to 792 (US Letter at 72 PPI). Only with `html`                  |
+| `printerUrl`         | `string \| undefined`     | Printer URL from `selectPrinterAsync`. iOS only                                                 |
+| `useMarkupFormatter` | `boolean \| undefined`    | Render with the native text formatter instead of a web view. No images. iOS only                |
+| `markupFormatterIOS` | `string \| undefined`     | Deprecated upstream. Stands in for `html`/`uri` on iOS and warns on every call                  |
+| `orientation`        | `string \| undefined`     | `Orientation.portrait` or `Orientation.landscape`                                               |
+| `margins`            | `IPageMargins \| undefined` | Page margins as `{ top, right, bottom, left }`                                                |
+
+### `IFilePrintOptions` and `IFilePrintResult`
+
+| Type                | Field                | Description                                                              |
+| ------------------- | -------------------- | ------------------------------------------------------------------------ |
+| `IFilePrintOptions` | `html`               | HTML to render                                                           |
+| `IFilePrintOptions` | `useMarkupFormatter` | Use the native text formatter instead of a web view                      |
+| `IFilePrintOptions` | `width`, `height`    | Page size in pixels                                                      |
+| `IFilePrintOptions` | `margins`            | Page margins as `{ top, right, bottom, left }`                           |
+| `IFilePrintOptions` | `base64`             | Also return the PDF as a base64 string                                   |
+| `IFilePrintOptions` | `textZoom`           | Android only. Text zoom percent. Defaults to 100                         |
+| `IFilePrintResult`  | `uri`                | Location of the generated PDF                                            |
+| `IFilePrintResult`  | `numberOfPages`      | Page count of the generated PDF                                          |
+| `IFilePrintResult`  | `base64`             | The PDF as base64, without a `data:` prefix. Present only when requested |
+
+## Notes
+
+- **One print job at a time.** A second `printAsync` call while one is in flight rejects at once.
+  Upstream keeps the same guard as module-level state.
+- **`markupFormatterIOS` is deprecated.** Use `useMarkupFormatter` instead.
+- **Printing can only be verified on a device or simulator.** The headless tests fake the native
+  module, so they prove input validation and the in-flight guard, not the print UI.
+
+## Common questions
+
+**Images are missing from my printed page or PDF.** A local `file://` image can fail to render
+inside the HTML, and an image that appears in a development build can vanish in a release build.
+Embed the image as a base64 `data:` URI in the HTML, or use an `https://` URL the device can reach.
+
+**The PDF has an extra blank page at the end.** This is a known upstream quirk of HTML-to-PDF. Keep
+the content a little shorter than the page, and control margins with an `@page { margin: ... }` rule
+in your HTML.
+
+**How do I set the page size and margins?** Use the `width` and `height` options (pixels, default
+612 by 792, US Letter at 72 PPI) and the `margins` option, or an `@page` rule in the HTML.
+
+**How do I save or share the PDF?** `printToFileAsync` resolves a `uri`. Pass it to the
+[sharing](/docs/packages/sharing/) package to let the user save or send it.
+
+**Can I choose a printer?** On iOS, call `selectPrinterAsync()` and pass the `printerUrl` to
+`printAsync`. Android uses its own print UI.
+
+Sources: [Expo docs: Print](https://docs.expo.dev/versions/latest/sdk/print/),
+[expo/expo#6169 problem with printToFileAsync](https://github.com/expo/expo/issues/6169),
+[expo/expo#7435 HTML to PDF adds an extra blank page](https://github.com/expo/expo/issues/7435),
+[expo/expo#24011 image uri path differs between dev and deployed versions](https://github.com/expo/expo/issues/24011).
+
+## How the wrapper works
+
+`expo-print`'s JS is hand-ported into this package's `core/`, resolving `ExpoPrint` through
+`expo-modules-core` rather than the `expo` meta-package. Upstream ships no config plugin, so the
+whole `native-link.json` is the one Android module entry. The five adapter entry points are plain
+re-exports of `core` (Angular stays a physical subpath for its separate `ngc`/AOT build). The
+native code is never vendored: `expo-modules-autolinking` resolves it from `node_modules` (see
+[the native setup guide](/docs/howtos/expo-native-module-setup/)).

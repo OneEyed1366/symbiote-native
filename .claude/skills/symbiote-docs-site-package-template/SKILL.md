@@ -116,3 +116,20 @@ needs a better name or a code comment first.
         approximation",
 }
 ```
+
+## Lessons from the Tier-2 docs rewrite (2026-10)
+
+- **Diff before you edit.** Compare a page's claims against the package README and adapter source
+  first. `audio`, `notifications` and `location` pages were stale: "no hooks", "add background
+  permissions by hand" (the CLI `grant` command now does it).
+- **Example shape follows the package.** Pure-function packages get ONE shared example. Hook
+  packages get Tabs per adapter with the real return shape: React tuple or value, Vue ref, Solid
+  accessor (`create*` name), Svelte `{ current }`, Angular signal (`connect()` or `inject*`).
+- **Support tables use plain `live`.** The writing hook bans emoji and long dashes.
+- **Document manual native steps the linker does not generate** (iOS entitlements, capabilities,
+  Play Integrity setup) next to Install.
+- **Common questions section (2026-10).** Every Expo package page ends with `## Common questions`
+  (symptom in bold, cause and fix after it) plus one `Sources:` line of cited links. Sections map
+  to the Diataxis kinds: Usage = tutorial, Common questions = how-to, API = reference,
+  How the wrapper works = explanation. Answers must not assume the Expo manifest (not ported) or
+  an Expo config plugin (this project wires native steps by hand).
