@@ -1,4 +1,7 @@
-import { expoCryptoAes, type INativeAesEncryptOptions } from './native-module';
+import {
+  expoCryptoAes,
+  type INativeAesEncryptOptions,
+} from './aes-native-module';
 import type {
   IAesDecryptOptions,
   IAesEncryptOptions,
@@ -6,7 +9,7 @@ import type {
   IBase64DecryptOptions,
   IBinaryInput,
   IBytesDecryptOptions,
-} from './types';
+} from './aes-types';
 
 // Hermes global, absent from the ES2022 lib
 declare function btoa(data: string): string;

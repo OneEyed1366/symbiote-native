@@ -6,16 +6,15 @@
   import AppMetricsErrorBoundary from './AppMetricsErrorBoundary.svelte';
   import type { IAppMetricsRootProps } from './app-metrics-root-props';
 
-  let { errorBoundaryFallback, children: rootChildren }: IAppMetricsRootProps = $props();
+  let { errorBoundaryFallback, children: rootChildren }: IAppMetricsRootProps =
+    $props();
 
   onMount(() => markFirstRender());
 </script>
 
 {#if errorBoundaryFallback !== undefined}
   <AppMetricsErrorBoundary fallback={errorBoundaryFallback}>
-    {#snippet children()}
-      {@render rootChildren()}
-    {/snippet}
+    {@render rootChildren()}
   </AppMetricsErrorBoundary>
 {:else}
   {@render rootChildren()}

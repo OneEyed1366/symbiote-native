@@ -14,4 +14,4 @@ export {
   type IBytesDecryptOptions,
   type IGcmNonceParam,
   type IGcmTagByteLength,
-} from './types';
+} from './aes-types';

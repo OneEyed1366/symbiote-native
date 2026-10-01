@@ -20,11 +20,11 @@ const fake = vi.hoisted(() => {
   };
 });
 
-vi.mock('./native-module', () => ({ expoCryptoAes: fake.module }));
+vi.mock('./aes-native-module', () => ({ expoCryptoAes: fake.module }));
 
 const { AESEncryptionKey, AESSealedData, aesEncryptAsync, aesDecryptAsync } =
   await import('./aes');
-const { AESKeySize } = await import('./types');
+const { AESKeySize } = await import('./aes-types');
 
 const KEY = new AESEncryptionKey();
 const BYTES = new Uint8Array([1, 2, 3]);

@@ -7,7 +7,7 @@ import type {
   IBinaryInput,
   IGcmTagByteLength,
   AESKeySize,
-} from './types';
+} from './aes-types';
 
 type IEncoding = 'hex' | 'base64';
 
