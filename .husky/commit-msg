@@ -1,0 +1,4 @@
+# See pre-push: git exports an absolute GIT_DIR in a linked worktree, which breaks child git calls.
+unset GIT_DIR GIT_WORK_TREE
+
+node scripts/check-commit-changeset.mjs "$1"
