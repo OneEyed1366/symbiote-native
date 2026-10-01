@@ -133,3 +133,6 @@ needs a better name or a code comment first.
   to the Diataxis kinds: Usage = tutorial, Common questions = how-to, API = reference,
   How the wrapper works = explanation. Answers must not assume the Expo manifest (not ported) or
   an Expo config plugin (this project wires native steps by hand).
+- **No dates in package docs.** README and mdx text never carry a date or "as of" time, not in a
+  heading and not in a parenthesis ("Scope decision (2026-09-28)"). State the condition instead,
+  such as the version a limit holds for. A date goes stale and says nothing a reader can act on.

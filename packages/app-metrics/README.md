@@ -9,7 +9,7 @@ It wraps [`expo-app-metrics`](https://github.com/expo/expo/tree/main/packages/ex
 every adapter, plus an `AppMetricsRoot` on all five and an `AppMetricsErrorBoundary` on React, Vue,
 Solid, and Svelte, each wrapping that framework's own catch primitive.
 
-## Scope decision (2026-09-28)
+## Scope decision
 
 Unlike every other package in this catalog, `expo-app-metrics` ships real per-framework
 surface, not just a thin async-function wrapper. React, Vue, Solid, and Svelte each already have
@@ -25,7 +25,7 @@ subtree error boundary (`ErrorHandler.onViewError`), the same caught-vs-uncaught
 package already uses elsewhere. This repo pins `@angular/core` to `~22.0.8`
 (`pnpm-workspace.yaml`) because `@angular/compiler-cli` >=22.1.0 bundles its own
 `@babel/core@8` and its AOT linker asserts Babel 8, while this repo loads that linker INSIDE
-Metro's own Babel 7 pipeline - re-tried bumping to 22.2.0 for this package (2026-09-28),
+Metro's own Babel 7 pipeline - re-tried bumping to 22.2.0 for this package,
 reproduced the exact `assertVersion(8)` throw directly against the real installed Babel, no
 legacy Babel-7 linker build exists, reverted. `AppMetricsRoot` needed no version bump (it is a
 plain `<ng-content>` wrapper marking first render in `ngOnInit`) and ships on `./angular` now.
