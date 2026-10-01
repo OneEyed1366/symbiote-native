@@ -29,6 +29,8 @@ import {
   ɵprovideZonelessChangeDetectionInternal as provideZonelessChangeDetectionInternal,
   type ComponentRef,
   type EnvironmentInjector,
+  type EnvironmentProviders,
+  type Provider,
   type Type,
 } from '@angular/core';
 import { SymbioteRendererFactory } from '../renderer';
@@ -119,6 +121,15 @@ export interface IMountOptions {
   wrapperComponent?: Type<unknown>;
 }
 
+// App-level providers (`provideHttpClient()` and the like), set once at bootstrap
+let rootProviders: (Provider | EnvironmentProviders)[] = [];
+
+export function setRootProviders(
+  providers: (Provider | EnvironmentProviders)[],
+): void {
+  rootProviders = providers;
+}
+
 function applyInputs(
   cmpRef: ComponentRef<unknown>,
   initialProps: object | undefined,
@@ -189,6 +200,74 @@ function settleAngularDevMode(): void {
   enableProdMode();
 }
 
+// Kept apart from `mount` so the provider list reads as one block
+function createRootInjector(
+  surface: SymbioteSurface,
+  rendererFactory: SymbioteRendererFactory,
+): EnvironmentInjector {
+  return createEnvironmentInjector(
+    [
+      ...rootProviders,
+      { provide: RendererFactory2, useValue: rendererFactory },
+      // `resource()` resolves TransferState, which calls `doc.getElementById`
+      // a stub without it throws mid-construction and the whole screen renders nothing
+      {
+        provide: DOCUMENT,
+        useValue: {
+          head: surface,
+          body: surface,
+          getElementById: (): null => null,
+        },
+      },
+      // A null-parent injector is not root-scoped, so `providedIn: 'root'` tokens never resolve
+      { provide: INJECTOR_SCOPE, useValue: 'root' },
+      // Real microtask-batched scheduler plus a noop zone, so `appRef.tick()` drives the views
+      ...provideZonelessChangeDetectionInternal(),
+      // Angular's `tick()` looks up `ErrorHandler`, and a from-scratch injector has none (NG0201)
+      { provide: ErrorHandler, useClass: SymbioteErrorHandler },
+      ColorSchemeService,
+      WindowDimensionsService,
+    ],
+    rootInjectorParent(),
+  );
+}
+
+interface IRoots {
+  cmpRef: ComponentRef<unknown>;
+  rootRef: ComponentRef<unknown> | undefined;
+}
+
+function createRoots(
+  injector: EnvironmentInjector,
+  surface: SymbioteSurface,
+  rootComponent: Type<unknown>,
+  options: IMountOptions | undefined,
+): IRoots {
+  const { wrapperComponent, initialProps } = options ?? {};
+  // `hostElement` is the surface, content commits straight into it with no wrapper view
+  if (wrapperComponent === undefined) {
+    const cmpRef = createComponent<unknown>(rootComponent, {
+      environmentInjector: injector,
+      hostElement: asAngularHost(surface),
+    });
+    applyInputs(cmpRef, initialProps);
+    return { cmpRef, rootRef: undefined };
+  }
+  // The root gets its own host and reaches the wrapper as projected content
+  const rootHost = asAngularHost(createDetachedViewHost());
+  const rootRef = createComponent<unknown>(rootComponent, {
+    environmentInjector: injector,
+    hostElement: rootHost,
+  });
+  applyInputs(rootRef, initialProps);
+  const cmpRef = createComponent<unknown>(wrapperComponent, {
+    environmentInjector: injector,
+    hostElement: asAngularHost(surface),
+    projectableNodes: [[rootHost]],
+  });
+  return { cmpRef, rootRef };
+}
+
 export function mount(
   rootTag: IRootTag,
   rootComponent: Type<unknown>,
@@ -200,95 +279,15 @@ export function mount(
 
   const surface = createSurface(rootTag);
   const rendererFactory = new SymbioteRendererFactory(surface);
-  const injector = createEnvironmentInjector(
-    [
-      {
-        provide: RendererFactory2,
-        useValue: rendererFactory,
-      },
-      // `getElementById` is not decoration: `resource()` resolves TransferState, whose root
-      // factory runs `retrieveTransferredState(doc, appId)` ->
-      // `doc.getElementById(appId + '-state')` (core/src/transfer_state.ts:156) to pick up
-      // server-rendered state. A stub without it makes that a TypeError, and because the throw
-      // happens while the component is being constructed, the ENTIRE screen renders nothing —
-      // white body under a native header that navigation drew anyway, no error surfaced. The
-      // `optional: true` on the injector lookup does not help: the token resolves, its factory
-      // is what throws. Returning null is the honest client answer — there is no server here, so
-      // `script?.tagName` short-circuits and the caller gets `{}`.
-      {
-        provide: DOCUMENT,
-        useValue: {
-          head: surface,
-          body: surface,
-          getElementById: (): null => null,
-        },
-      },
-      // createEnvironmentInjector with a null parent scopes this injector to {'environment'}
-      // only (see EnvironmentNgModuleRefAdapter), so providedIn:'root' tokens — ApplicationRef
-      // included — never resolve (R3Injector.get walks up for a `scopes` containing 'root', and
-      // a null parent always dead-ends in NullInjector). platform-browser solves this the same
-      // way for real DOM apps via BROWSER_MODULE_PROVIDERS: hand { provide: INJECTOR_SCOPE,
-      // useValue: 'root' } to the app-level providers, which R3Injector's constructor reads to
-      // self-tag this.scopes with 'root'. Same trick here, no PlatformRef, no DOM.
-      { provide: INJECTOR_SCOPE, useValue: 'root' },
-      // Supplies the real ChangeDetectionSchedulerImpl (microtask-batched via
-      // ApplicationRef.afterTick) + NoopNgZone + ZONELESS_ENABLED: true — the exact bundle
-      // internalCreateApplication() uses. Replaces the old unconditional
-      // `rootView.detectChanges(); cmpView.detectChanges()` (force-ran both root views on every
-      // tick) with Angular's own tick(), which only enters a view something actually marked
-      // dirty. This does NOT stop the root's own template from re-running on a plain press or
-      // `markForCheck()` anywhere in the tree — `markViewDirty` unconditionally sets RefreshView
-      // on every ancestor up to the root; that's fundamental Angular zoneless behavior, not
-      // something this swap changes. A genuine child `@Component` boundary still protects a
-      // sibling branch from an unrelated press.
-      ...provideZonelessChangeDetectionInternal(),
-      // Angular's INTERNAL_APPLICATION_ERROR_HANDLER reports a tick() exception via
-      // `injector.get(ErrorHandler)`; a normal `bootstrapApplication` registers that token by
-      // default, but our from-scratch environment injector never did, so the lookup itself threw
-      // NG0201 and replaced the real error with "No provider found for ErrorHandler" — any async
-      // tick() exception crashed hard, uncaught, instead of being reported. The token still has to
-      // be provided for exactly that reason; what it resolves to is now SymbioteErrorHandler
-      // (see above), which reports through the engine instead of Angular's `console.error('ERROR',
-      // e)` and, like the default, returns rather than rethrows so the app keeps running.
-      { provide: ErrorHandler, useClass: SymbioteErrorHandler },
-      ColorSchemeService,
-      WindowDimensionsService,
-    ],
-    rootInjectorParent(),
+  const injector = createRootInjector(surface, rendererFactory);
+  const { cmpRef, rootRef } = createRoots(
+    injector,
+    surface,
+    rootComponent,
+    options,
   );
 
-  // hostElement = the surface: the component's template content commits straight into the
-  // surface with no wrapper view, the engine wrapping surface.children in its synthetic flex
-  // root — the Angular equivalent of Vue's `app.mount(surface)`.
-  let cmpRef: ComponentRef<unknown>;
-  let rootRef: ComponentRef<unknown> | undefined;
-  if (options?.wrapperComponent === undefined) {
-    cmpRef = createComponent<unknown>(rootComponent, {
-      environmentInjector: injector,
-      hostElement: asAngularHost(surface),
-    });
-    applyInputs(cmpRef, options?.initialProps);
-  } else {
-    // The root gets its own host node from the renderer (createComponent without a
-    // hostElement) but is not attached to the surface directly; it is handed to the
-    // wrapper as projectable content instead, so only the wrapper needs a real host.
-    const rootHost = asAngularHost(createDetachedViewHost());
-    rootRef = createComponent<unknown>(rootComponent, {
-      environmentInjector: injector,
-      hostElement: rootHost,
-    });
-    applyInputs(rootRef, options.initialProps);
-    cmpRef = createComponent<unknown>(options.wrapperComponent, {
-      environmentInjector: injector,
-      hostElement: asAngularHost(surface),
-      projectableNodes: [[rootHost]],
-    });
-  }
-
-  // Attach both root views to ApplicationRef so its own tick() (via the real
-  // ChangeDetectionSchedulerImpl provided above) drives them from here on — no manual
-  // ChangeDetectorRef juggling needed. markForCheck anywhere in the tree now notifies
-  // the real scheduler, which batches a microtask and calls appRef.tick() itself.
+  // `tick()` then drives both root views through the real scheduler
   const appRef = injector.get(ApplicationRef);
   appRef.attachView(cmpRef.hostView);
   if (rootRef !== undefined) {

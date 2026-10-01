@@ -17,6 +17,7 @@
 // template dependencies to importable names (NG3004, the same rule that put the element directives
 // back below). Retiring them means retiring them from those nine components first.
 
+import './finalization-registry';
 import './register';
 
 export {
