@@ -1,6 +1,5 @@
 import { defineComponent, onMounted, onUnmounted, ref } from 'vue';
 import type { Ref } from 'vue';
-import {} from '@symbiote-native/vue';
 import {
   hasAction,
   isAvailableAsync,
@@ -8,31 +7,33 @@ import {
 } from '@symbiote-native/store-review/vue';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
+import { Scenario } from '../components/Scenario';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
+
+function yesNoLabel(value: boolean | null): string {
+  if (value === null) {
+    return 'checking…';
+  }
+  return value ? 'Yes' : 'No';
+}
 
 function ValueRow(props: { label: string; value: string }) {
   return (
-    <view class="auth-capability-row">
-      <text class="auth-capability-label">{props.label}</text>
-      <text class="auth-value-text">{props.value}</text>
+    <view class="capability-row">
+      <text class="capability-label">{props.label}</text>
+      <text class="value-text">{props.value}</text>
     </view>
   );
 }
 
-/**
- * Store Review demo: @symbiote-native/store-review — no store URL is passed to requestReview()/
- * hasAction() here (this project has no expo-constants manifest to read one from, see the
- * package's own core/store-review.ts comment), so `hasAction()` reflects only the native flow's
- * own availability. Plain re-export, same for every adapter.
- */
 export const StoreReviewScreen = defineComponent(
   () => {
     const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.StoreReview];
-    const lineColor = LINE_COLOR[ROUTE_LINE_INFO[ROUTE_NAME.StoreReview].line];
+    const lineColor = LINE_COLOR[lineInfo.line];
 
     const isAvailable: Ref<boolean | null> = ref(null);
-    const canTakeAction: Ref<boolean | null> = ref(null);
-    const lastResult: Ref<string> = ref('idle');
+    const canRequestReview: Ref<boolean | null> = ref(null);
+    const lastResult = ref('idle');
 
     let isMounted = true;
     onUnmounted(() => {
@@ -40,17 +41,17 @@ export const StoreReviewScreen = defineComponent(
     });
 
     onMounted(() => {
-      isAvailableAsync().then(value => {
-        if (isMounted) isAvailable.value = value;
-      });
-      hasAction().then(value => {
-        if (isMounted) canTakeAction.value = value;
-      });
+      Promise.all([isAvailableAsync(), hasAction()]).then(
+        ([available, action]) => {
+          if (isMounted) {
+            isAvailable.value = available;
+            canRequestReview.value = action;
+          }
+        },
+      );
     });
 
-    // Neither store reports whether a prompt appeared — a suppressed dialog and a rejected call
-    // look identical unless the outcome is shown.
-    function handleRequestReview() {
+    const handleRequestReview = () => {
       lastResult.value = 'requesting…';
       requestReview()
         .then(() => {
@@ -59,7 +60,7 @@ export const StoreReviewScreen = defineComponent(
         .catch((error: Error) => {
           lastResult.value = `rejected: ${error.message}`;
         });
-    }
+    };
 
     return () => (
       <safe-area-view class="screen">
@@ -78,44 +79,50 @@ export const StoreReviewScreen = defineComponent(
             <view class="hero-copy">
               <text class="hero-title">Store Review</text>
               <text class="hero-body">
-                @symbiote-native/store-review — the native in-app App Store/Play
-                Store review prompt, with a store-URL fallback the caller
-                supplies explicitly.
+                Ask happy users for a store rating without leaving the app, with
+                the native App Store and Google Play review sheet.
               </text>
             </view>
           </view>
 
-          <view testID="store-review-card" class="auth-card">
-            <view class="auth-card-header">
-              <text class="auth-card-title">Capabilities</text>
+          <Scenario
+            testID="store-review-scenario"
+            title="Ask for a rating right after a good moment"
+            why="Reviews convert best after a success, such as a finished order or a completed level. The stores limit how often the sheet appears, so ask once at the right time."
+            steps={['Check that the native flow is available', 'Press Request Review', 'Read the last result']}
+            expect="The review sheet may appear, but the stores never say whether it did. The result only says the call finished, and Android shows it only for Play-installed builds."
+          />
+
+          <view testID="store-review-capability-card" class="feature-card">
+            <view class="feature-card-header">
+              <text class="feature-card-title">Capability</text>
             </view>
             <ValueRow
-              label="isAvailableAsync"
-              value={
-                isAvailable.value === null
-                  ? 'checking…'
-                  : isAvailable.value
-                    ? 'true'
-                    : 'false'
-              }
+              label="Native flow available"
+              value={yesNoLabel(isAvailable.value)}
             />
             <ValueRow
-              label="hasAction"
-              value={
-                canTakeAction.value === null
-                  ? 'checking…'
-                  : canTakeAction.value
-                    ? 'true'
-                    : 'false'
-              }
+              label="Can request review"
+              value={yesNoLabel(canRequestReview.value)}
             />
+          </view>
+
+          <view testID="store-review-action-card" class="feature-card">
+            <view class="feature-card-header">
+              <text class="feature-card-title">Request review</text>
+            </view>
             <ActionButton
               testID="store-review-request-button"
               title="Request Review"
               onPress={handleRequestReview}
               color={lineColor}
             />
-            <ValueRow label="Last result" value={lastResult.value} />
+            <view class="capability-row">
+              <text class="capability-label">Last result</text>
+              <text testID="store-review-result" class="value-text">
+                {lastResult.value}
+              </text>
+            </view>
             <text class="info-text">
               resolved means the call completed, not that a prompt appeared. On
               Android the Play dialog only shows for a build installed from

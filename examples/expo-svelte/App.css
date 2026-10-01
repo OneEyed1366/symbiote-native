@@ -1,27 +1,15 @@
-/* Symbiote canary app — static styles, compiled at build time by @symbiote-native/css-parser
-   into the same RN style objects StyleSheet.create used to produce (see the
-   symbiote-sfc-style-compiler skill). Referenced via `class` across every screen under ./screens
-   (and ./components/ActionButton.svelte) — a genuinely GLOBAL stylesheet. Imported once via a
-   plain `import './App.css'` in App.svelte's <script> (see the `symbiote-sfc-style-compiler`
-   skill's "standalone .css import" note) — the class-name registry it populates is shared by
-   every adapter file that renders a `class` prop, not scoped to App.svelte itself, so every
-   screen under ./screens resolves these classes without importing this file again. */
+/* Static styles for the Expo canary, compiled at build time by @symbiote-native/css-parser */
 
 :root {
-  /* app-wide surface/text tokens — same values already used ad hoc across this file; named here
-     so the navigation-demo classes below reference them instead of repeating hex literals. */
   --ink: #0b1622;
   --paper: #13243a;
   --mist: #41506a;
   --chalk: #cbd5e1;
   --chalk-bright: #ffffff;
+  --positive: #4fd1a5;
 
-  /* wayfinding line system — the Expo-package demo suite's signature. Each tour screen (MenuScreen's
-     rows) carries its own line color through a 2-letter badge, a matching hint tint, and (where a
-     screen's own native header/tab bar takes a tint) the OS chrome itself. Kept in sync by hand with
-     navigation-lines.ts's LINE_COLOR (CSS custom properties and that module are different runtimes
-     with no shared import path). */
-  --line-sensors: #f6ad55;
+  /* one color per package line, kept in sync by hand with LINE_COLOR in navigation-lines.ts */
+  --line-sensors: #f5a623;
   --line-local-auth: #ef4444;
   --line-haptics: #8b5cf6;
   --line-clipboard: #14b8a6;
@@ -38,24 +26,37 @@
   --line-keep-awake: #0ea5e9;
   --line-screen-orientation: #f43f5e;
   --line-localization: #10b981;
+  --line-location: #1d4ed8;
+  --line-media-library: #db2777;
+  --line-file-system: #134e4a;
   --line-tracking-transparency: #78716c;
   --line-secure-store: #a16207;
   --line-sharing: #d946ef;
   --line-web-browser: #0369a1;
   --line-sms: #65a30d;
-  --line-location: #1d4ed8;
-  --line-media-library: #db2777;
-  --line-file-system: #15803d;
-  --line-audio: #3aa824;
-  --line-notifications: #e236c6;
-  --line-background-tasks: #9fad1f;
-  --line-sqlite: #701a75;
-
-  /* Decoupled "good/live" state color — was borrowed from --line-structure back when the
-     navigation demo suite's Structure line still existed in this app; now its own token so
-     .sensor-status-badge-live/.auth-status-badge-yes/.auth-result-success don't depend on a line
-     token that no longer exists. */
-  --positive: #4fd1a5;
+  --line-audio: #3fc123;
+  --line-notifications: #e236c8;
+  --line-background-tasks: #8a78e2;
+  --line-sqlite: #a6af1d;
+  --line-mail-composer: #c2410c;
+  --line-print: #9d174d;
+  --line-speech: #0e7490;
+  --line-video-thumbnails: #6d28d9;
+  --line-document-picker: #15803d;
+  --line-image-picker: #be185d;
+  --line-image-manipulator: #b91c1c;
+  --line-blob: #0f766e;
+  --line-screen-capture: #7e22ce;
+  --line-contacts: #0891b2;
+  --line-calendar: #ca8a04;
+  --line-age-range: #ea580c;
+  --line-app-integrity: #4f46e5;
+  --line-intent-launcher: #16a34a;
+  --line-navigation-bar: #2563eb;
+  --line-font: #c026d3;
+  --line-asset: #0d9488;
+  --line-app-metrics: #e11d48;
+  --line-auth-session: #65a30d;
 }
 
 .info-text {
@@ -63,9 +64,6 @@
   font-size: 14px;
 }
 
-/* ActionButton — every demo screen's tappable action, replacing RN's stock unstyled <Button>.
-   borderColor/color stay dynamic (ActionButton's own `color` prop, one per call site — the
-   per-feature color-coding a class can't parametrize), everything else is the shared chrome. */
 .action-button {
   align-items: center;
   justify-content: center;
@@ -82,8 +80,6 @@
   font-weight: bold;
 }
 
-/* Hero card — the "you've arrived" intro every tour screen leads with, mirroring MenuScreen's
-   hero + the per-line badge language already used for its row/line-tag. */
 .hero-card {
   flex-direction: row;
   align-items: center;
@@ -118,7 +114,6 @@
   font-size: 13px;
 }
 
-/* App — retokenized onto the shared --ink/--paper/--mist/--chalk palette. */
 .screen {
   flex: 1;
   background-color: var(--ink);
@@ -132,7 +127,6 @@
   gap: 20px;
 }
 
-/* MenuScreen hero */
 .menu-hero {
   gap: 6px;
   padding-bottom: 8px;
@@ -152,7 +146,6 @@
   font-size: 14px;
 }
 
-/* line tag — the "you are here" pill each demo screen carries, matching its MenuScreen row */
 .line-tag {
   align-self: flex-start;
   padding-top: 4px;
@@ -212,6 +205,15 @@
 .line-tag-localization {
   background-color: var(--line-localization);
 }
+.line-tag-location {
+  background-color: var(--line-location);
+}
+.line-tag-media-library {
+  background-color: var(--line-media-library);
+}
+.line-tag-file-system {
+  background-color: var(--line-file-system);
+}
 .line-tag-tracking-transparency {
   background-color: var(--line-tracking-transparency);
 }
@@ -227,15 +229,6 @@
 .line-tag-sms {
   background-color: var(--line-sms);
 }
-.line-tag-location {
-  background-color: var(--line-location);
-}
-.line-tag-media-library {
-  background-color: var(--line-media-library);
-}
-.line-tag-file-system {
-  background-color: var(--line-file-system);
-}
 .line-tag-audio {
   background-color: var(--line-audio);
 }
@@ -248,6 +241,63 @@
 .line-tag-sqlite {
   background-color: var(--line-sqlite);
 }
+.line-tag-auth-session {
+  background-color: var(--line-auth-session);
+}
+.line-tag-app-metrics {
+  background-color: var(--line-app-metrics);
+}
+.line-tag-asset {
+  background-color: var(--line-asset);
+}
+.line-tag-font {
+  background-color: var(--line-font);
+}
+.line-tag-navigation-bar {
+  background-color: var(--line-navigation-bar);
+}
+.line-tag-intent-launcher {
+  background-color: var(--line-intent-launcher);
+}
+.line-tag-app-integrity {
+  background-color: var(--line-app-integrity);
+}
+.line-tag-age-range {
+  background-color: var(--line-age-range);
+}
+.line-tag-calendar {
+  background-color: var(--line-calendar);
+}
+.line-tag-contacts {
+  background-color: var(--line-contacts);
+}
+.line-tag-screen-capture {
+  background-color: var(--line-screen-capture);
+}
+.line-tag-blob {
+  background-color: var(--line-blob);
+}
+.line-tag-image-manipulator {
+  background-color: var(--line-image-manipulator);
+}
+.line-tag-image-picker {
+  background-color: var(--line-image-picker);
+}
+.line-tag-document-picker {
+  background-color: var(--line-document-picker);
+}
+.line-tag-video-thumbnails {
+  background-color: var(--line-video-thumbnails);
+}
+.line-tag-speech {
+  background-color: var(--line-speech);
+}
+.line-tag-print {
+  background-color: var(--line-print);
+}
+.line-tag-mail-composer {
+  background-color: var(--line-mail-composer);
+}
 .line-tag-text {
   color: var(--ink);
   font-size: 11px;
@@ -255,7 +305,6 @@
   letter-spacing: 1px;
 }
 
-/* MenuScreen rows */
 .menu-row {
   flex-direction: row;
   align-items: center;
@@ -332,6 +381,18 @@
   border-left-width: 3px;
   border-left-color: var(--line-localization);
 }
+.menu-row-location {
+  border-left-width: 3px;
+  border-left-color: var(--line-location);
+}
+.menu-row-media-library {
+  border-left-width: 3px;
+  border-left-color: var(--line-media-library);
+}
+.menu-row-file-system {
+  border-left-width: 3px;
+  border-left-color: var(--line-file-system);
+}
 .menu-row-tracking-transparency {
   border-left-width: 3px;
   border-left-color: var(--line-tracking-transparency);
@@ -352,18 +413,6 @@
   border-left-width: 3px;
   border-left-color: var(--line-sms);
 }
-.menu-row-location {
-  border-left-width: 3px;
-  border-left-color: var(--line-location);
-}
-.menu-row-media-library {
-  border-left-width: 3px;
-  border-left-color: var(--line-media-library);
-}
-.menu-row-file-system {
-  border-left-width: 3px;
-  border-left-color: var(--line-file-system);
-}
 .menu-row-audio {
   border-left-width: 3px;
   border-left-color: var(--line-audio);
@@ -379,6 +428,82 @@
 .menu-row-sqlite {
   border-left-width: 3px;
   border-left-color: var(--line-sqlite);
+}
+.menu-row-auth-session {
+  border-left-width: 3px;
+  border-left-color: var(--line-auth-session);
+}
+.menu-row-app-metrics {
+  border-left-width: 3px;
+  border-left-color: var(--line-app-metrics);
+}
+.menu-row-asset {
+  border-left-width: 3px;
+  border-left-color: var(--line-asset);
+}
+.menu-row-font {
+  border-left-width: 3px;
+  border-left-color: var(--line-font);
+}
+.menu-row-navigation-bar {
+  border-left-width: 3px;
+  border-left-color: var(--line-navigation-bar);
+}
+.menu-row-intent-launcher {
+  border-left-width: 3px;
+  border-left-color: var(--line-intent-launcher);
+}
+.menu-row-app-integrity {
+  border-left-width: 3px;
+  border-left-color: var(--line-app-integrity);
+}
+.menu-row-age-range {
+  border-left-width: 3px;
+  border-left-color: var(--line-age-range);
+}
+.menu-row-calendar {
+  border-left-width: 3px;
+  border-left-color: var(--line-calendar);
+}
+.menu-row-contacts {
+  border-left-width: 3px;
+  border-left-color: var(--line-contacts);
+}
+.menu-row-screen-capture {
+  border-left-width: 3px;
+  border-left-color: var(--line-screen-capture);
+}
+.menu-row-blob {
+  border-left-width: 3px;
+  border-left-color: var(--line-blob);
+}
+.menu-row-image-manipulator {
+  border-left-width: 3px;
+  border-left-color: var(--line-image-manipulator);
+}
+.menu-row-image-picker {
+  border-left-width: 3px;
+  border-left-color: var(--line-image-picker);
+}
+.menu-row-document-picker {
+  border-left-width: 3px;
+  border-left-color: var(--line-document-picker);
+}
+.menu-row-video-thumbnails {
+  border-left-width: 3px;
+  border-left-color: var(--line-video-thumbnails);
+}
+.menu-row-speech {
+  border-left-width: 3px;
+  border-left-color: var(--line-speech);
+}
+.menu-row-print {
+  border-left-width: 3px;
+  border-left-color: var(--line-print);
+}
+.menu-row-mail-composer {
+  border-left-width: 3px;
+  border-left-color: var(--line-mail-composer);
 }
 
 .menu-badge {
@@ -439,6 +564,15 @@
 .menu-badge-localization {
   background-color: var(--line-localization);
 }
+.menu-badge-location {
+  background-color: var(--line-location);
+}
+.menu-badge-media-library {
+  background-color: var(--line-media-library);
+}
+.menu-badge-file-system {
+  background-color: var(--line-file-system);
+}
 .menu-badge-tracking-transparency {
   background-color: var(--line-tracking-transparency);
 }
@@ -454,15 +588,6 @@
 .menu-badge-sms {
   background-color: var(--line-sms);
 }
-.menu-badge-location {
-  background-color: var(--line-location);
-}
-.menu-badge-media-library {
-  background-color: var(--line-media-library);
-}
-.menu-badge-file-system {
-  background-color: var(--line-file-system);
-}
 .menu-badge-audio {
   background-color: var(--line-audio);
 }
@@ -474,6 +599,63 @@
 }
 .menu-badge-sqlite {
   background-color: var(--line-sqlite);
+}
+.menu-badge-auth-session {
+  background-color: var(--line-auth-session);
+}
+.menu-badge-app-metrics {
+  background-color: var(--line-app-metrics);
+}
+.menu-badge-asset {
+  background-color: var(--line-asset);
+}
+.menu-badge-font {
+  background-color: var(--line-font);
+}
+.menu-badge-navigation-bar {
+  background-color: var(--line-navigation-bar);
+}
+.menu-badge-intent-launcher {
+  background-color: var(--line-intent-launcher);
+}
+.menu-badge-app-integrity {
+  background-color: var(--line-app-integrity);
+}
+.menu-badge-age-range {
+  background-color: var(--line-age-range);
+}
+.menu-badge-calendar {
+  background-color: var(--line-calendar);
+}
+.menu-badge-contacts {
+  background-color: var(--line-contacts);
+}
+.menu-badge-screen-capture {
+  background-color: var(--line-screen-capture);
+}
+.menu-badge-blob {
+  background-color: var(--line-blob);
+}
+.menu-badge-image-manipulator {
+  background-color: var(--line-image-manipulator);
+}
+.menu-badge-image-picker {
+  background-color: var(--line-image-picker);
+}
+.menu-badge-document-picker {
+  background-color: var(--line-document-picker);
+}
+.menu-badge-video-thumbnails {
+  background-color: var(--line-video-thumbnails);
+}
+.menu-badge-speech {
+  background-color: var(--line-speech);
+}
+.menu-badge-print {
+  background-color: var(--line-print);
+}
+.menu-badge-mail-composer {
+  background-color: var(--line-mail-composer);
 }
 .menu-badge-text {
   color: var(--ink);
@@ -545,6 +727,15 @@
 .menu-row-hint-localization {
   color: var(--line-localization);
 }
+.menu-row-hint-location {
+  color: var(--line-location);
+}
+.menu-row-hint-media-library {
+  color: var(--line-media-library);
+}
+.menu-row-hint-file-system {
+  color: var(--line-file-system);
+}
 .menu-row-hint-tracking-transparency {
   color: var(--line-tracking-transparency);
 }
@@ -560,15 +751,6 @@
 .menu-row-hint-sms {
   color: var(--line-sms);
 }
-.menu-row-hint-location {
-  color: var(--line-location);
-}
-.menu-row-hint-media-library {
-  color: var(--line-media-library);
-}
-.menu-row-hint-file-system {
-  color: var(--line-file-system);
-}
 .menu-row-hint-audio {
   color: var(--line-audio);
 }
@@ -581,9 +763,64 @@
 .menu-row-hint-sqlite {
   color: var(--line-sqlite);
 }
+.menu-row-hint-auth-session {
+  color: var(--line-auth-session);
+}
+.menu-row-hint-app-metrics {
+  color: var(--line-app-metrics);
+}
+.menu-row-hint-asset {
+  color: var(--line-asset);
+}
+.menu-row-hint-font {
+  color: var(--line-font);
+}
+.menu-row-hint-navigation-bar {
+  color: var(--line-navigation-bar);
+}
+.menu-row-hint-intent-launcher {
+  color: var(--line-intent-launcher);
+}
+.menu-row-hint-app-integrity {
+  color: var(--line-app-integrity);
+}
+.menu-row-hint-age-range {
+  color: var(--line-age-range);
+}
+.menu-row-hint-calendar {
+  color: var(--line-calendar);
+}
+.menu-row-hint-contacts {
+  color: var(--line-contacts);
+}
+.menu-row-hint-screen-capture {
+  color: var(--line-screen-capture);
+}
+.menu-row-hint-blob {
+  color: var(--line-blob);
+}
+.menu-row-hint-image-manipulator {
+  color: var(--line-image-manipulator);
+}
+.menu-row-hint-image-picker {
+  color: var(--line-image-picker);
+}
+.menu-row-hint-document-picker {
+  color: var(--line-document-picker);
+}
+.menu-row-hint-video-thumbnails {
+  color: var(--line-video-thumbnails);
+}
+.menu-row-hint-speech {
+  color: var(--line-speech);
+}
+.menu-row-hint-print {
+  color: var(--line-print);
+}
+.menu-row-hint-mail-composer {
+  color: var(--line-mail-composer);
+}
 
-/* SensorsScreen — one card per @symbiote-native/sensors hook, each rendering its own
-   checking/unavailable/waiting/live state distinctly (see the sensor-status-* badges below). */
 .sensor-card {
   gap: 10px;
   padding: 16px;
@@ -607,21 +844,15 @@
   padding-right: 10px;
   border-radius: 999px;
 }
-/* still resolving isAvailableAsync() */
 .sensor-status-badge-checking {
   background-color: var(--mist);
 }
-/* isAvailableAsync() resolved false — a real state, not an error (the iOS Simulator reports
-   this for every CoreMotion/CMPedometer-backed sensor, see the symbiote-expo-native-module
-   skill) */
 .sensor-status-badge-unavailable {
   background-color: #6b4a4a;
 }
-/* available, subscribed, no reading has arrived yet */
 .sensor-status-badge-waiting {
   background-color: var(--line-sensors);
 }
-/* at least one live reading rendered below */
 .sensor-status-badge-live {
   background-color: var(--positive);
 }
@@ -654,8 +885,6 @@
   font-weight: bold;
 }
 
-/* LocalAuthScreen — capabilities card + authenticate card. Reuses --positive for the "good"
-   states, same as .sensor-status-badge-live above. */
 .auth-card {
   gap: 10px;
   padding: 16px;
@@ -724,100 +953,74 @@
   font-weight: bold;
 }
 
-/* Shared row of compact side-by-side ActionButtons — HapticsScreen's feedback-family cards
-   (1 to 17 buttons each) and ClipboardScreen's URL get/set pair both wrap into this instead of
-   the one-per-row stack LocalAuthScreen uses for a single action. */
-.button-row {
+.location-permission-actions {
   flex-direction: row;
-  flex-wrap: wrap;
-  gap: 8px;
+  align-items: center;
+  gap: 10px;
 }
 
-/* HapticsScreen — one card per feedback family (impact/notification/selection/android), plus a
-   standing "last fired" readout since every action here is fire-and-forget. */
-.haptics-card {
+.feature-card {
   gap: 10px;
   padding: 16px;
   border-radius: 16px;
   background-color: var(--paper);
 }
-.haptics-card-title {
-  color: var(--chalk-bright);
-  font-size: 16px;
-  font-weight: bold;
-}
-.haptics-last-fired-card {
-  padding: 14px;
-  border-radius: 12px;
-  background-color: var(--paper);
-}
-.haptics-last-fired-label {
-  color: var(--mist);
-  font-size: 12px;
-  letter-spacing: 0.5px;
-}
-.haptics-last-fired-value {
-  color: var(--chalk-bright);
-  font-size: 14px;
-  font-weight: bold;
-}
-
-/* ClipboardScreen — value card (live string + hasStringAsync status) and, on iOS, a URL row. */
-.clipboard-card {
-  gap: 10px;
-  padding: 16px;
-  border-radius: 16px;
-  background-color: var(--paper);
-}
-.clipboard-card-title {
-  color: var(--chalk-bright);
-  font-size: 16px;
-  font-weight: bold;
-}
-.clipboard-value-box {
-  padding: 12px;
-  border-radius: 10px;
-  background-color: var(--ink);
-}
-.clipboard-value-text {
-  color: var(--chalk-bright);
-  font-size: 14px;
-  font-weight: bold;
-}
-.clipboard-capability-row {
+.feature-card-header {
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
 }
-.clipboard-capability-label {
+.feature-card-title {
+  color: var(--chalk-bright);
+  font-size: 16px;
+  font-weight: bold;
+}
+.capability-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.capability-label {
   color: var(--chalk);
   font-size: 14px;
+  flex-shrink: 0;
 }
-.clipboard-status-badge {
+.value-text {
+  color: var(--chalk-bright);
+  font-size: 13px;
+  font-weight: bold;
+  flex-shrink: 1;
+}
+.status-badge {
   padding-top: 4px;
   padding-bottom: 4px;
   padding-left: 10px;
   padding-right: 10px;
   border-radius: 999px;
 }
-.clipboard-status-badge-checking {
+.status-badge-checking {
   background-color: var(--mist);
 }
-.clipboard-status-badge-no {
+.status-badge-no {
   background-color: #6b4a4a;
 }
-.clipboard-status-badge-yes {
+.status-badge-yes {
   background-color: var(--positive);
 }
-.clipboard-status-text {
+.status-badge-text {
   color: var(--ink);
   font-size: 11px;
   font-weight: bold;
   letter-spacing: 0.5px;
 }
 
-/* Shared text input — ClipboardScreen's copy/URL fields, retokenized off DeepLinkingScreen's
-   own .text-input (examples/vue-sfc/App.css) onto this app's --ink/--mist/--chalk-bright tokens. */
+.button-row {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .text-input {
   height: 44px;
   border-radius: 10px;
@@ -826,730 +1029,61 @@
   padding-left: 14px;
   padding-right: 14px;
   color: var(--chalk-bright);
-  font-size: 15px;
-  background-color: var(--ink);
+  font-size: 16px;
+  background-color: var(--paper);
 }
 
-/* BatteryScreen — one live card (level/state/low-power mode, driven by the three composables)
-   plus a one-shot capabilities card, mirroring LocalAuthScreen's capabilities-card shape. */
-.battery-card {
+.scenario-card {
   gap: 10px;
   padding: 16px;
   border-radius: 16px;
   background-color: var(--paper);
 }
-.battery-card-title {
+.scenario-title {
   color: var(--chalk-bright);
-  font-size: 16px;
+  font-size: 17px;
   font-weight: bold;
 }
-.battery-row {
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-}
-.battery-row-label {
+.scenario-why {
   color: var(--chalk);
   font-size: 14px;
 }
-.battery-value-text {
-  color: var(--chalk-bright);
-  font-size: 13px;
-  font-weight: bold;
+.scenario-steps {
+  gap: 4px;
 }
-.battery-status-badge {
-  padding-top: 4px;
-  padding-bottom: 4px;
-  padding-left: 10px;
-  padding-right: 10px;
-  border-radius: 999px;
-}
-.battery-status-badge-checking {
-  background-color: var(--mist);
-}
-.battery-status-badge-no {
-  background-color: #6b4a4a;
-}
-.battery-status-badge-yes {
-  background-color: var(--positive);
-}
-.battery-status-text {
-  color: var(--ink);
-  font-size: 11px;
-  font-weight: bold;
-  letter-spacing: 0.5px;
-}
-
-/* BrightnessScreen — a live card (screen brightness + set-brightness buttons), an Android-only
-   system-brightness-mode card, and a permission card, mirroring BatteryScreen's card/row/
-   value-text/status-badge shape. */
-.brightness-card {
-  gap: 10px;
-  padding: 16px;
-  border-radius: 16px;
-  background-color: var(--paper);
-}
-.brightness-card-title {
-  color: var(--chalk-bright);
-  font-size: 16px;
-  font-weight: bold;
-}
-.brightness-row {
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-}
-.brightness-row-label {
+.scenario-step {
   color: var(--chalk);
-  font-size: 14px;
-}
-.brightness-value-text {
-  color: var(--chalk-bright);
   font-size: 13px;
-  font-weight: bold;
 }
-.brightness-status-badge {
-  padding-top: 4px;
-  padding-bottom: 4px;
-  padding-left: 10px;
-  padding-right: 10px;
-  border-radius: 999px;
-}
-.brightness-status-badge-checking {
-  background-color: var(--mist);
-}
-.brightness-status-badge-no {
-  background-color: #6b4a4a;
-}
-.brightness-status-badge-yes {
-  background-color: var(--positive);
-}
-.brightness-status-text {
-  color: var(--ink);
-  font-size: 11px;
-  font-weight: bold;
-  letter-spacing: 0.5px;
-}
-
-/* CellularScreen — a one-shot info card (generation + Android-only carrier/SIM fields) and a
-   permission card, mirroring BatteryScreen's card/row/value-text shape. Every field renders as
-   plain text (no boolean badge needed — allowsVoip already reduces to a Yes/No value-text). */
-.cellular-card {
-  gap: 10px;
-  padding: 16px;
-  border-radius: 16px;
-  background-color: var(--paper);
-}
-.cellular-card-title {
-  color: var(--chalk-bright);
-  font-size: 16px;
-  font-weight: bold;
-}
-.cellular-row {
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-}
-.cellular-row-label {
-  color: var(--chalk);
-  font-size: 14px;
-}
-.cellular-value-text {
-  color: var(--chalk-bright);
-  font-size: 13px;
-  font-weight: bold;
-}
-
-/* NetworkScreen — a live network-state card (useNetworkState()) and a one-shot device-info card
-   (IP address, airplane mode), mirroring BatteryScreen's card/row/value-text shape. */
-.network-card {
-  gap: 10px;
-  padding: 16px;
-  border-radius: 16px;
-  background-color: var(--paper);
-}
-.network-card-title {
-  color: var(--chalk-bright);
-  font-size: 16px;
-  font-weight: bold;
-}
-.network-row {
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-}
-.network-row-label {
-  color: var(--chalk);
-  font-size: 14px;
-}
-.network-value-text {
-  color: var(--chalk-bright);
-  font-size: 13px;
-  font-weight: bold;
-}
-
-/* DeviceScreen — an eager-constants card (brand/model/OS/memory) plus an actions card
-   (getDeviceTypeAsync/getUptimeAsync/isRootedExperimentalAsync), mirroring BatteryScreen's
-   card/row/value-text shape. */
-.device-card {
-  gap: 10px;
-  padding: 16px;
-  border-radius: 16px;
-  background-color: var(--paper);
-}
-.device-card-title {
-  color: var(--chalk-bright);
-  font-size: 16px;
-  font-weight: bold;
-}
-.device-row {
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-}
-.device-row-label {
-  color: var(--chalk);
-  font-size: 14px;
-}
-.device-value-text {
-  color: var(--chalk-bright);
-  font-size: 13px;
-  font-weight: bold;
-}
-
-/* ApplicationScreen — an eager-constants card (version/build/name/ID) plus an actions card
-   (getInstallationTimeAsync + the Android/iOS-gated action pair), mirroring BatteryScreen's
-   card/row/value-text shape. */
-.application-card {
-  gap: 10px;
-  padding: 16px;
-  border-radius: 16px;
-  background-color: var(--paper);
-}
-.application-card-title {
-  color: var(--chalk-bright);
-  font-size: 16px;
-  font-weight: bold;
-}
-.application-row {
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-}
-.application-row-label {
-  color: var(--chalk);
-  font-size: 14px;
-}
-.application-value-text {
-  color: var(--chalk-bright);
-  font-size: 13px;
-  font-weight: bold;
-}
-
-/* CryptoScreen — one action card per @symbiote-native/crypto function (randomUUID/
-   digestStringAsync/getRandomBytesAsync), each rendering its own result box below the button. */
-.crypto-card {
-  gap: 10px;
-  padding: 16px;
-  border-radius: 16px;
-  background-color: var(--paper);
-}
-.crypto-card-title {
-  color: var(--chalk-bright);
-  font-size: 16px;
-  font-weight: bold;
-}
-.crypto-result-box {
-  padding: 12px;
+.scenario-expect {
+  gap: 2px;
+  padding: 10px;
   border-radius: 10px;
   background-color: var(--ink);
 }
-.crypto-result-text {
-  color: var(--chalk-bright);
-  font-size: 13px;
+.scenario-expect-label {
+  color: var(--positive);
+  font-size: 12px;
   font-weight: bold;
 }
-
-/* WebCryptoScreen — @symbiote-native/standard-web-crypto's tour stop, mirroring CryptoScreen's
-   own action-card/result-box shape (random bytes render as a hex string, same "long value" case
-   CryptoScreen's stacked-box layout already handles) plus one status row for the polyfill check. */
-.web-crypto-card {
+.scenario-expect-text {
+  color: var(--chalk-bright);
+  font-size: 13px;
+}
+.explorer {
+  gap: 12px;
+}
+.console-bare {
   gap: 10px;
-  padding: 16px;
-  border-radius: 16px;
-  background-color: var(--paper);
 }
-.web-crypto-card-title {
-  color: var(--chalk-bright);
-  font-size: 16px;
-  font-weight: bold;
-}
-.web-crypto-row {
+.thumb-row {
   flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px;
 }
-.web-crypto-row-label {
-  color: var(--chalk);
-  font-size: 14px;
-}
-.web-crypto-value-text {
-  color: var(--chalk-bright);
-  font-size: 13px;
-  font-weight: bold;
-}
-.web-crypto-result-box {
-  padding: 12px;
-  border-radius: 10px;
+.thumb {
+  width: 88px;
+  height: 88px;
+  border-radius: 8px;
   background-color: var(--ink);
-}
-.web-crypto-result-text {
-  color: var(--chalk-bright);
-  font-size: 13px;
-  font-weight: bold;
-}
-
-/* SystemUiScreen — one live card (fetch-on-mount background color + set/reset buttons),
-   mirroring DeviceScreen's card/row/value-text shape. */
-.system-ui-card {
-  gap: 10px;
-  padding: 16px;
-  border-radius: 16px;
-  background-color: var(--paper);
-}
-.system-ui-card-title {
-  color: var(--chalk-bright);
-  font-size: 16px;
-  font-weight: bold;
-}
-.system-ui-row {
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-}
-.system-ui-row-label {
-  color: var(--chalk);
-  font-size: 14px;
-}
-.system-ui-value-text {
-  color: var(--chalk-bright);
-  font-size: 13px;
-  font-weight: bold;
-}
-
-/* StoreReviewScreen — a capabilities card (isAvailableAsync/hasAction), mirroring BatteryScreen's
-   capabilities-card/status-badge shape. */
-.store-review-card {
-  gap: 10px;
-  padding: 16px;
-  border-radius: 16px;
-  background-color: var(--paper);
-}
-.store-review-card-title {
-  color: var(--chalk-bright);
-  font-size: 16px;
-  font-weight: bold;
-}
-.store-review-row {
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-}
-.store-review-row-label {
-  color: var(--chalk);
-  font-size: 14px;
-}
-.store-review-value-text {
-  color: var(--chalk-bright);
-  font-size: 13px;
-  font-weight: bold;
-}
-.store-review-status-badge {
-  padding-top: 4px;
-  padding-bottom: 4px;
-  padding-left: 10px;
-  padding-right: 10px;
-  border-radius: 999px;
-}
-.store-review-status-badge-checking {
-  background-color: var(--mist);
-}
-.store-review-status-badge-no {
-  background-color: #6b4a4a;
-}
-.store-review-status-badge-yes {
-  background-color: var(--positive);
-}
-.store-review-status-text {
-  color: var(--ink);
-  font-size: 11px;
-  font-weight: bold;
-  letter-spacing: 0.5px;
-}
-
-/* KeepAwakeScreen — a toggle card (mount/unmount the useKeepAwake-holding child) plus a
-   capabilities row, mirroring BatteryScreen's card/row/status-badge shape. */
-.keep-awake-card {
-  gap: 10px;
-  padding: 16px;
-  border-radius: 16px;
-  background-color: var(--paper);
-}
-.keep-awake-card-title {
-  color: var(--chalk-bright);
-  font-size: 16px;
-  font-weight: bold;
-}
-.keep-awake-row {
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-}
-.keep-awake-row-label {
-  color: var(--chalk);
-  font-size: 14px;
-}
-.keep-awake-value-text {
-  color: var(--chalk-bright);
-  font-size: 13px;
-  font-weight: bold;
-}
-.keep-awake-status-badge {
-  padding-top: 4px;
-  padding-bottom: 4px;
-  padding-left: 10px;
-  padding-right: 10px;
-  border-radius: 999px;
-}
-.keep-awake-status-badge-checking {
-  background-color: var(--mist);
-}
-.keep-awake-status-badge-no {
-  background-color: #6b4a4a;
-}
-.keep-awake-status-badge-yes {
-  background-color: var(--positive);
-}
-.keep-awake-status-text {
-  color: var(--ink);
-  font-size: 11px;
-  font-weight: bold;
-  letter-spacing: 0.5px;
-}
-
-/* ScreenOrientationScreen — a live card (useScreenOrientation's orientation + orientationLock)
-   plus a lock/unlock actions card, mirroring DeviceScreen's card/row/value-text shape. */
-.screen-orientation-card {
-  gap: 10px;
-  padding: 16px;
-  border-radius: 16px;
-  background-color: var(--paper);
-}
-.screen-orientation-card-title {
-  color: var(--chalk-bright);
-  font-size: 16px;
-  font-weight: bold;
-}
-.screen-orientation-row {
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-}
-.screen-orientation-row-label {
-  color: var(--chalk);
-  font-size: 14px;
-}
-.screen-orientation-value-text {
-  color: var(--chalk-bright);
-  font-size: 13px;
-  font-weight: bold;
-}
-
-/* LocalizationScreen — two eager-constants cards (first locale, first calendar), mirroring
-   DeviceScreen's card/row/value-text shape. */
-.localization-card {
-  gap: 10px;
-  padding: 16px;
-  border-radius: 16px;
-  background-color: var(--paper);
-}
-.localization-card-title {
-  color: var(--chalk-bright);
-  font-size: 16px;
-  font-weight: bold;
-}
-.localization-row {
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-}
-.localization-row-label {
-  color: var(--chalk);
-  font-size: 14px;
-}
-.localization-value-text {
-  color: var(--chalk-bright);
-  font-size: 13px;
-  font-weight: bold;
-}
-
-/* TrackingTransparencyScreen — a permissions card (status/granted + get/request buttons) and an
-   advertising-ID result box, mirroring CryptoScreen's result-box for the (potentially long) ID
-   value plus BatteryScreen's status-badge shape for granted/denied. */
-.tracking-transparency-card {
-  gap: 10px;
-  padding: 16px;
-  border-radius: 16px;
-  background-color: var(--paper);
-}
-.tracking-transparency-card-title {
-  color: var(--chalk-bright);
-  font-size: 16px;
-  font-weight: bold;
-}
-.tracking-transparency-row {
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-}
-.tracking-transparency-row-label {
-  color: var(--chalk);
-  font-size: 14px;
-}
-.tracking-transparency-value-text {
-  color: var(--chalk-bright);
-  font-size: 13px;
-  font-weight: bold;
-}
-.tracking-transparency-status-badge {
-  padding-top: 4px;
-  padding-bottom: 4px;
-  padding-left: 10px;
-  padding-right: 10px;
-  border-radius: 999px;
-}
-.tracking-transparency-status-badge-checking {
-  background-color: var(--mist);
-}
-.tracking-transparency-status-badge-no {
-  background-color: #6b4a4a;
-}
-.tracking-transparency-status-badge-yes {
-  background-color: var(--positive);
-}
-.tracking-transparency-status-text {
-  color: var(--ink);
-  font-size: 11px;
-  font-weight: bold;
-  letter-spacing: 0.5px;
-}
-.tracking-transparency-result-box {
-  padding: 12px;
-  border-radius: 10px;
-  background-color: var(--ink);
-}
-.tracking-transparency-result-text {
-  color: var(--chalk-bright);
-  font-size: 13px;
-  font-weight: bold;
-}
-
-/* SecureStoreScreen — capabilities card, stored-value card, write/read/delete card. Same shape
-   as .auth-* above; kept its own family so the two screens can drift independently. */
-.secure-store-card {
-  gap: 10px;
-  padding: 16px;
-  border-radius: 16px;
-  background-color: var(--paper);
-}
-.secure-store-card-title {
-  color: var(--chalk-bright);
-  font-size: 16px;
-  font-weight: bold;
-}
-.secure-store-row {
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-.secure-store-row-label {
-  color: var(--chalk);
-  font-size: 14px;
-  flex-shrink: 1;
-}
-.secure-store-status-badge {
-  padding-top: 4px;
-  padding-bottom: 4px;
-  padding-left: 10px;
-  padding-right: 10px;
-  border-radius: 999px;
-}
-.secure-store-status-badge-checking {
-  background-color: var(--mist);
-}
-.secure-store-status-badge-no {
-  background-color: #6b4a4a;
-}
-.secure-store-status-badge-yes {
-  background-color: var(--positive);
-}
-.secure-store-status-text {
-  color: var(--ink);
-  font-size: 11px;
-  font-weight: bold;
-  letter-spacing: 0.5px;
-}
-.secure-store-value-text {
-  color: var(--chalk-bright);
-  font-size: 13px;
-  font-weight: bold;
-  flex-shrink: 1;
-}
-
-/* SharingScreen — capabilities card plus a file-URI/share card. Same shape as .secure-store-*
-   above; kept its own family so the screens can drift independently. */
-.sharing-card {
-  gap: 10px;
-  padding: 16px;
-  border-radius: 16px;
-  background-color: var(--paper);
-}
-.sharing-card-title {
-  color: var(--chalk-bright);
-  font-size: 16px;
-  font-weight: bold;
-}
-.sharing-row {
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-.sharing-row-label {
-  color: var(--chalk);
-  font-size: 14px;
-  flex-shrink: 1;
-}
-.sharing-status-badge {
-  padding-top: 4px;
-  padding-bottom: 4px;
-  padding-left: 10px;
-  padding-right: 10px;
-  border-radius: 999px;
-}
-.sharing-status-badge-checking {
-  background-color: var(--mist);
-}
-.sharing-status-badge-no {
-  background-color: #6b4a4a;
-}
-.sharing-status-badge-yes {
-  background-color: var(--positive);
-}
-.sharing-status-text {
-  color: var(--ink);
-  font-size: 11px;
-  font-weight: bold;
-  letter-spacing: 0.5px;
-}
-.sharing-value-text {
-  color: var(--chalk-bright);
-  font-size: 13px;
-  font-weight: bold;
-  flex-shrink: 1;
-}
-.sharing-note {
-  color: var(--mist);
-  font-size: 12px;
-}
-
-/* WebBrowserScreen — an open/dismiss card and an Android-only Custom Tabs service card. */
-.web-browser-card {
-  gap: 10px;
-  padding: 16px;
-  border-radius: 16px;
-  background-color: var(--paper);
-}
-.web-browser-card-title {
-  color: var(--chalk-bright);
-  font-size: 16px;
-  font-weight: bold;
-}
-.web-browser-row {
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-.web-browser-row-label {
-  color: var(--chalk);
-  font-size: 14px;
-  flex-shrink: 1;
-}
-.web-browser-value-text {
-  color: var(--chalk-bright);
-  font-size: 13px;
-  font-weight: bold;
-  flex-shrink: 1;
-}
-.web-browser-note {
-  color: var(--mist);
-  font-size: 12px;
-}
-
-/* SmsScreen — capabilities card plus a recipients/message composer card. */
-.sms-card {
-  gap: 10px;
-  padding: 16px;
-  border-radius: 16px;
-  background-color: var(--paper);
-}
-.sms-card-title {
-  color: var(--chalk-bright);
-  font-size: 16px;
-  font-weight: bold;
-}
-.sms-row {
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-.sms-row-label {
-  color: var(--chalk);
-  font-size: 14px;
-  flex-shrink: 1;
-}
-.sms-status-badge {
-  padding-top: 4px;
-  padding-bottom: 4px;
-  padding-left: 10px;
-  padding-right: 10px;
-  border-radius: 999px;
-}
-.sms-status-badge-checking {
-  background-color: var(--mist);
-}
-.sms-status-badge-no {
-  background-color: #6b4a4a;
-}
-.sms-status-badge-yes {
-  background-color: var(--positive);
-}
-.sms-status-text {
-  color: var(--ink);
-  font-size: 11px;
-  font-weight: bold;
-  letter-spacing: 0.5px;
-}
-.sms-value-text {
-  color: var(--chalk-bright);
-  font-size: 13px;
-  font-weight: bold;
-  flex-shrink: 1;
-}
-.sms-note {
-  color: var(--mist);
-  font-size: 12px;
 }

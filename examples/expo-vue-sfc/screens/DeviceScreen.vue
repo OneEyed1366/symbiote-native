@@ -1,13 +1,5 @@
-<!--
-  @symbiote-native/device tour stop — an eager-constants card (isDevice/brand/manufacturer/
-  modelName/deviceType/osName/osVersion/totalMemory/deviceName, all resolved once at import time,
-  no onMounted needed) plus an actions card for the three one-shot async/sync calls
-  (getDeviceTypeAsync/getUptimeAsync/isRootedExperimentalAsync). Vue SFC twin of
-  ../../react/screens/DeviceScreen.tsx.
--->
 <script setup lang="ts">
 import { ref } from 'vue';
-import {} from '@symbiote-native/vue';
 import {
   DeviceType,
   brand,
@@ -24,28 +16,32 @@ import {
   totalMemory,
 } from '@symbiote-native/device/vue';
 import ActionButton from '../components/ActionButton.vue';
+import Scenario from '../components/Scenario.vue';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
+import ValueRow from './ValueRow.vue';
 
 const BYTES_PER_UNIT = 1024;
-const MEMORY_UNITS = ['B', 'KB', 'MB', 'GB', 'TB'] as const;
-const DECIMAL_PLACES = 1;
+const SIZE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB'] as const;
+type ISizeUnit = (typeof SIZE_UNITS)[number];
 
-function formatMemorySize(bytes: number | null): string {
-  if (bytes === null) return 'unknown';
-  if (bytes === 0) return '0 B';
-  const unitIndex = Math.min(
-    Math.floor(Math.log(bytes) / Math.log(BYTES_PER_UNIT)),
-    MEMORY_UNITS.length - 1,
-  );
-  const value = bytes / BYTES_PER_UNIT ** unitIndex;
-  return `${value.toFixed(unitIndex === 0 ? 0 : DECIMAL_PLACES)} ${MEMORY_UNITS[unitIndex]}`;
+function formatBytes(bytes: number | null): string {
+  if (bytes === null) {
+    return 'unknown';
+  }
+  let value = bytes;
+  let unitIndex = 0;
+  while (value >= BYTES_PER_UNIT && unitIndex < SIZE_UNITS.length - 1) {
+    value /= BYTES_PER_UNIT;
+    unitIndex += 1;
+  }
+  const unit: ISizeUnit = SIZE_UNITS[unitIndex];
+  const precision = unitIndex === 0 ? 0 : 1;
+  return `${value.toFixed(precision)} ${unit}`;
 }
 
 function deviceTypeLabel(type: DeviceType | null): string {
   switch (type) {
-    case DeviceType.UNKNOWN:
-      return 'Unknown';
     case DeviceType.PHONE:
       return 'Phone';
     case DeviceType.TABLET:
@@ -55,159 +51,115 @@ function deviceTypeLabel(type: DeviceType | null): string {
     case DeviceType.TV:
       return 'TV';
     default:
-      return 'checking…';
+      return 'Unknown';
   }
 }
 
 const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Device];
 const lineColor = LINE_COLOR[lineInfo.line];
 
-const totalMemoryText = formatMemorySize(totalMemory);
-
-const deviceTypeResult = ref<string | null>(null);
-const uptimeResult = ref<number | null>(null);
-const isRootedResult = ref<boolean | null>(null);
+const asyncDeviceType = ref<string | null>(null);
+const uptime = ref<number | null>(null);
+const isRooted = ref<boolean | null>(null);
 
 function handleGetDeviceType(): void {
-  void getDeviceTypeAsync().then(type => {
-    deviceTypeResult.value = deviceTypeLabel(type);
+  void getDeviceTypeAsync().then(value => {
+    asyncDeviceType.value = deviceTypeLabel(value);
   });
 }
 
 function handleGetUptime(): void {
   void getUptimeAsync().then(value => {
-    uptimeResult.value = value;
+    uptime.value = value;
   });
 }
 
 function handleCheckRooted(): void {
   void isRootedExperimentalAsync().then(value => {
-    isRootedResult.value = value;
+    isRooted.value = value;
   });
 }
 </script>
 
 <template>
   <safe-area-view class="screen">
-    <scroll-view
-      testID="device-scroll"
-      class="screen"
-      content-container-style="scroll-content"
-    >
+    <scroll-view testID="device-scroll" class="screen" contentContainerStyle="scroll-content">
       <view :class="`line-tag line-tag-${lineInfo.line}`">
-        <text class="line-tag-text">
-          {{ `${lineInfo.code} · ${lineInfo.label}` }}
-        </text>
+        <text class="line-tag-text">{{ `${lineInfo.code} · ${lineInfo.label}` }}</text>
       </view>
       <view class="hero-card">
         <view class="hero-badge" :style="{ backgroundColor: lineColor }">
-          <text class="hero-badge-text">
-            {{ lineInfo.code }}
-          </text>
+          <text class="hero-badge-text">{{ lineInfo.code }}</text>
         </view>
         <view class="hero-copy">
-          <text class="hero-title"> Device </text>
+          <text class="hero-title">Device</text>
           <text class="hero-body">
-            @symbiote-native/device — physical device info: brand/model/OS
-            constants, memory, and best-effort root/jailbreak detection. A
-            Simulator/emulator reports `isDevice` as false and several fields as
-            unavailable.
+            Know what the app runs on: brand, model, OS version, memory, device type, uptime and
+            whether the phone is rooted or jailbroken. Use it to adapt layouts, log bug reports and
+            gate risky features.
           </text>
         </view>
       </view>
 
-      <view testID="device-info-card" class="device-card">
-        <text class="device-card-title"> Info </text>
-        <view class="device-row">
-          <text class="device-row-label"> Is device </text>
-          <text testID="device-is-device-value" class="device-value-text">
-            {{ isDevice ? 'Yes' : 'No (simulator/emulator)' }}
-          </text>
+      <Scenario
+        testID="device-scenario"
+        title="Attach device details to a bug report or adapt to a tablet"
+        why="Support tickets are far easier to solve with the model and OS version attached, and a tablet or a low-memory phone may need a different layout or lighter images."
+        :steps="[
+          'Read the constants card',
+          'Press the async checks for device type, uptime and root detection',
+        ]"
+        expect="Model, OS and memory match the phone in your hand. The simulator reports Is real device as No, and the root check returns false on a normal phone."
+      />
+
+      <view testID="device-constants-card" class="feature-card">
+        <view class="feature-card-header">
+          <text class="feature-card-title">Constants</text>
         </view>
-        <view class="device-row">
-          <text class="device-row-label"> Brand </text>
-          <text class="device-value-text">
-            {{ brand ?? 'unknown' }}
-          </text>
-        </view>
-        <view class="device-row">
-          <text class="device-row-label"> Manufacturer </text>
-          <text class="device-value-text">
-            {{ manufacturer ?? 'unknown' }}
-          </text>
-        </view>
-        <view class="device-row">
-          <text class="device-row-label"> Model name </text>
-          <text class="device-value-text">
-            {{ modelName ?? 'unknown' }}
-          </text>
-        </view>
-        <view class="device-row">
-          <text class="device-row-label"> Device type </text>
-          <text class="device-value-text">
-            {{ deviceTypeLabel(deviceType) }}
-          </text>
-        </view>
-        <view class="device-row">
-          <text class="device-row-label"> OS </text>
-          <text class="device-value-text">
-            {{ `${osName ?? 'unknown'} ${osVersion ?? ''}` }}
-          </text>
-        </view>
-        <view class="device-row">
-          <text class="device-row-label"> Total memory </text>
-          <text class="device-value-text">
-            {{ totalMemoryText }}
-          </text>
-        </view>
-        <view class="device-row">
-          <text class="device-row-label"> Device name </text>
-          <text testID="device-name-value" class="device-value-text">
-            {{ deviceName ?? 'unnamed device' }}
-          </text>
-        </view>
+        <ValueRow label="Is real device" :value="isDevice ? 'Yes' : 'No'" />
+        <ValueRow label="Brand" :value="brand ?? 'unknown'" />
+        <ValueRow label="Manufacturer" :value="manufacturer ?? 'unknown'" />
+        <ValueRow label="Model" :value="modelName ?? 'unknown'" />
+        <ValueRow label="Device type" :value="deviceTypeLabel(deviceType)" />
+        <ValueRow label="OS" :value="osName ?? 'unknown'" />
+        <ValueRow label="OS version" :value="osVersion ?? 'unknown'" />
+        <ValueRow label="Total memory" :value="formatBytes(totalMemory)" />
+        <ValueRow label="Device name" :value="deviceName ?? 'unknown'" />
       </view>
 
-      <view testID="device-actions-card" class="device-card">
-        <text class="device-card-title"> Actions </text>
-        <view class="button-row">
-          <ActionButton
-            testID="device-get-type-button"
-            title="Get Device Type"
-            :onPress="handleGetDeviceType"
-            :color="lineColor"
-          />
-          <ActionButton
-            testID="device-get-uptime-button"
-            title="Get Uptime"
-            :onPress="handleGetUptime"
-            :color="lineColor"
-          />
-          <ActionButton
-            testID="device-check-rooted-button"
-            title="Check Rooted"
-            :onPress="handleCheckRooted"
-            :color="lineColor"
-          />
+      <view testID="device-async-card" class="feature-card">
+        <view class="feature-card-header">
+          <text class="feature-card-title">Async checks</text>
         </view>
-        <view v-if="deviceTypeResult !== null" class="device-row">
-          <text class="device-row-label"> Device type result </text>
-          <text testID="device-type-result-value" class="device-value-text">
-            {{ deviceTypeResult }}
-          </text>
-        </view>
-        <view v-if="uptimeResult !== null" class="device-row">
-          <text class="device-row-label"> Uptime </text>
-          <text testID="device-uptime-result-value" class="device-value-text">
-            {{ `${uptimeResult}ms` }}
-          </text>
-        </view>
-        <view v-if="isRootedResult !== null" class="device-row">
-          <text class="device-row-label"> Rooted/jailbroken </text>
-          <text testID="device-rooted-result-value" class="device-value-text">
-            {{ isRootedResult ? 'true' : 'false' }}
-          </text>
-        </view>
+        <ActionButton
+          testID="device-type-button"
+          title="Get device type"
+          :onPress="handleGetDeviceType"
+          :color="lineColor"
+        />
+        <ValueRow
+          v-if="asyncDeviceType !== null"
+          label="Device type (async)"
+          :value="asyncDeviceType"
+        />
+        <ActionButton
+          testID="device-uptime-button"
+          title="Get uptime"
+          :onPress="handleGetUptime"
+          :color="lineColor"
+        />
+        <ValueRow v-if="uptime !== null" label="Uptime" :value="`${uptime}ms`" />
+        <ActionButton
+          testID="device-rooted-button"
+          title="Check rooted/jailbroken"
+          :onPress="handleCheckRooted"
+          :color="lineColor"
+        />
+        <ValueRow
+          v-if="isRooted !== null"
+          label="Rooted/jailbroken"
+          :value="isRooted ? 'true' : 'false'"
+        />
       </view>
     </scroll-view>
   </safe-area-view>

@@ -6,7 +6,11 @@
  */
 
 import { bootstrapApplication } from '@symbiote-native/angular/bootstrap';
+import { provideHttpClient, withFetch } from '@angular/common/http';
 import { AppComponent } from './build/angular/src/App';
 import { name as appName } from './app.json';
 
-bootstrapApplication(AppComponent, { appName });
+bootstrapApplication(AppComponent, {
+  appName,
+  providers: [provideHttpClient(withFetch())],
+});

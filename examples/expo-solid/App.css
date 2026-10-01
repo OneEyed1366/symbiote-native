@@ -1,24 +1,14 @@
-/* Symbiote Expo-modules-core canary — static styles, compiled at build time by
-   @symbiote-native/css-parser into the same RN style objects StyleSheet.create used to produce
-   (see the symbiote-sfc-style-compiler skill). Referenced via className. This app demos
-   Expo-SDK-ported packages only (Sensors, Local Auth, …) — the full @symbiote-native/react
-   primitive + navigation-feature tour lives in ../react, not here. */
+/* Static styles for the Expo canary, compiled at build time by @symbiote-native/css-parser */
 
 :root {
-  /* app-wide surface/text tokens */
   --ink: #0b1622;
   --paper: #13243a;
   --mist: #41506a;
   --chalk: #cbd5e1;
   --chalk-bright: #ffffff;
-  /* generic "good/live" indicator — reused by sensor-status-badge-live, auth-status-badge-yes,
-     auth-result-success; unrelated to any specific package's own line color. */
   --positive: #4fd1a5;
 
-  /* one "line" color per Expo-SDK-ported package this app demos, carried through MenuScreen's
-     row badges, each demo screen's own line tag, and the native header tint. Kept in sync by
-     hand with navigation-lines.ts's LINE_COLOR (CSS custom properties and that module are
-     different runtimes with no shared import path). */
+  /* one color per package line, kept in sync by hand with LINE_COLOR in navigation-lines.ts */
   --line-sensors: #f5a623;
   --line-local-auth: #ef4444;
   --line-haptics: #8b5cf6;
@@ -36,18 +26,37 @@
   --line-keep-awake: #0ea5e9;
   --line-screen-orientation: #f43f5e;
   --line-localization: #10b981;
+  --line-location: #1d4ed8;
+  --line-media-library: #db2777;
+  --line-file-system: #134e4a;
   --line-tracking-transparency: #78716c;
   --line-secure-store: #a16207;
   --line-sharing: #d946ef;
   --line-web-browser: #0369a1;
   --line-sms: #65a30d;
-  --line-location: #1d4ed8;
-  --line-media-library: #db2777;
-  --line-file-system: #0e7490;
-  --line-audio: #cb8c4d;
-  --line-notifications: #4daccb;
-  --line-background-tasks: #accb4d;
-  --line-sqlite: #3ee619;
+  --line-audio: #3fc123;
+  --line-notifications: #e236c8;
+  --line-background-tasks: #8a78e2;
+  --line-sqlite: #a6af1d;
+  --line-mail-composer: #c2410c;
+  --line-print: #9d174d;
+  --line-speech: #0e7490;
+  --line-video-thumbnails: #6d28d9;
+  --line-document-picker: #15803d;
+  --line-image-picker: #be185d;
+  --line-image-manipulator: #b91c1c;
+  --line-blob: #0f766e;
+  --line-screen-capture: #7e22ce;
+  --line-contacts: #0891b2;
+  --line-calendar: #ca8a04;
+  --line-age-range: #ea580c;
+  --line-app-integrity: #4f46e5;
+  --line-intent-launcher: #16a34a;
+  --line-navigation-bar: #2563eb;
+  --line-font: #c026d3;
+  --line-asset: #0d9488;
+  --line-app-metrics: #e11d48;
+  --line-auth-session: #65a30d;
 }
 
 .info-text {
@@ -55,9 +64,6 @@
   font-size: 14px;
 }
 
-/* ActionButton — every demo screen's tappable action, replacing RN's stock unstyled <Button>.
-   borderColor/color stay dynamic (ActionButton's own `color` prop, one per call site — the
-   per-feature color-coding a class can't parametrize), everything else is the shared chrome. */
 .action-button {
   align-items: center;
   justify-content: center;
@@ -74,7 +80,6 @@
   font-weight: bold;
 }
 
-/* Hero card — the "you've arrived" intro each demo screen leads with. */
 .hero-card {
   flex-direction: row;
   align-items: center;
@@ -141,7 +146,6 @@
   font-size: 14px;
 }
 
-/* line tag — the "you are here" pill each demo screen carries, matching its MenuScreen row */
 .line-tag {
   align-self: flex-start;
   padding-top: 4px;
@@ -201,6 +205,15 @@
 .line-tag-localization {
   background-color: var(--line-localization);
 }
+.line-tag-location {
+  background-color: var(--line-location);
+}
+.line-tag-media-library {
+  background-color: var(--line-media-library);
+}
+.line-tag-file-system {
+  background-color: var(--line-file-system);
+}
 .line-tag-tracking-transparency {
   background-color: var(--line-tracking-transparency);
 }
@@ -216,15 +229,6 @@
 .line-tag-sms {
   background-color: var(--line-sms);
 }
-.line-tag-location {
-  background-color: var(--line-location);
-}
-.line-tag-media-library {
-  background-color: var(--line-media-library);
-}
-.line-tag-file-system {
-  background-color: var(--line-file-system);
-}
 .line-tag-audio {
   background-color: var(--line-audio);
 }
@@ -236,6 +240,63 @@
 }
 .line-tag-sqlite {
   background-color: var(--line-sqlite);
+}
+.line-tag-auth-session {
+  background-color: var(--line-auth-session);
+}
+.line-tag-app-metrics {
+  background-color: var(--line-app-metrics);
+}
+.line-tag-asset {
+  background-color: var(--line-asset);
+}
+.line-tag-font {
+  background-color: var(--line-font);
+}
+.line-tag-navigation-bar {
+  background-color: var(--line-navigation-bar);
+}
+.line-tag-intent-launcher {
+  background-color: var(--line-intent-launcher);
+}
+.line-tag-app-integrity {
+  background-color: var(--line-app-integrity);
+}
+.line-tag-age-range {
+  background-color: var(--line-age-range);
+}
+.line-tag-calendar {
+  background-color: var(--line-calendar);
+}
+.line-tag-contacts {
+  background-color: var(--line-contacts);
+}
+.line-tag-screen-capture {
+  background-color: var(--line-screen-capture);
+}
+.line-tag-blob {
+  background-color: var(--line-blob);
+}
+.line-tag-image-manipulator {
+  background-color: var(--line-image-manipulator);
+}
+.line-tag-image-picker {
+  background-color: var(--line-image-picker);
+}
+.line-tag-document-picker {
+  background-color: var(--line-document-picker);
+}
+.line-tag-video-thumbnails {
+  background-color: var(--line-video-thumbnails);
+}
+.line-tag-speech {
+  background-color: var(--line-speech);
+}
+.line-tag-print {
+  background-color: var(--line-print);
+}
+.line-tag-mail-composer {
+  background-color: var(--line-mail-composer);
 }
 .line-tag-text {
   color: var(--ink);
@@ -320,6 +381,18 @@
   border-left-width: 3px;
   border-left-color: var(--line-localization);
 }
+.menu-row-location {
+  border-left-width: 3px;
+  border-left-color: var(--line-location);
+}
+.menu-row-media-library {
+  border-left-width: 3px;
+  border-left-color: var(--line-media-library);
+}
+.menu-row-file-system {
+  border-left-width: 3px;
+  border-left-color: var(--line-file-system);
+}
 .menu-row-tracking-transparency {
   border-left-width: 3px;
   border-left-color: var(--line-tracking-transparency);
@@ -340,18 +413,6 @@
   border-left-width: 3px;
   border-left-color: var(--line-sms);
 }
-.menu-row-location {
-  border-left-width: 3px;
-  border-left-color: var(--line-location);
-}
-.menu-row-media-library {
-  border-left-width: 3px;
-  border-left-color: var(--line-media-library);
-}
-.menu-row-file-system {
-  border-left-width: 3px;
-  border-left-color: var(--line-file-system);
-}
 .menu-row-audio {
   border-left-width: 3px;
   border-left-color: var(--line-audio);
@@ -367,6 +428,82 @@
 .menu-row-sqlite {
   border-left-width: 3px;
   border-left-color: var(--line-sqlite);
+}
+.menu-row-auth-session {
+  border-left-width: 3px;
+  border-left-color: var(--line-auth-session);
+}
+.menu-row-app-metrics {
+  border-left-width: 3px;
+  border-left-color: var(--line-app-metrics);
+}
+.menu-row-asset {
+  border-left-width: 3px;
+  border-left-color: var(--line-asset);
+}
+.menu-row-font {
+  border-left-width: 3px;
+  border-left-color: var(--line-font);
+}
+.menu-row-navigation-bar {
+  border-left-width: 3px;
+  border-left-color: var(--line-navigation-bar);
+}
+.menu-row-intent-launcher {
+  border-left-width: 3px;
+  border-left-color: var(--line-intent-launcher);
+}
+.menu-row-app-integrity {
+  border-left-width: 3px;
+  border-left-color: var(--line-app-integrity);
+}
+.menu-row-age-range {
+  border-left-width: 3px;
+  border-left-color: var(--line-age-range);
+}
+.menu-row-calendar {
+  border-left-width: 3px;
+  border-left-color: var(--line-calendar);
+}
+.menu-row-contacts {
+  border-left-width: 3px;
+  border-left-color: var(--line-contacts);
+}
+.menu-row-screen-capture {
+  border-left-width: 3px;
+  border-left-color: var(--line-screen-capture);
+}
+.menu-row-blob {
+  border-left-width: 3px;
+  border-left-color: var(--line-blob);
+}
+.menu-row-image-manipulator {
+  border-left-width: 3px;
+  border-left-color: var(--line-image-manipulator);
+}
+.menu-row-image-picker {
+  border-left-width: 3px;
+  border-left-color: var(--line-image-picker);
+}
+.menu-row-document-picker {
+  border-left-width: 3px;
+  border-left-color: var(--line-document-picker);
+}
+.menu-row-video-thumbnails {
+  border-left-width: 3px;
+  border-left-color: var(--line-video-thumbnails);
+}
+.menu-row-speech {
+  border-left-width: 3px;
+  border-left-color: var(--line-speech);
+}
+.menu-row-print {
+  border-left-width: 3px;
+  border-left-color: var(--line-print);
+}
+.menu-row-mail-composer {
+  border-left-width: 3px;
+  border-left-color: var(--line-mail-composer);
 }
 
 .menu-badge {
@@ -427,6 +564,15 @@
 .menu-badge-localization {
   background-color: var(--line-localization);
 }
+.menu-badge-location {
+  background-color: var(--line-location);
+}
+.menu-badge-media-library {
+  background-color: var(--line-media-library);
+}
+.menu-badge-file-system {
+  background-color: var(--line-file-system);
+}
 .menu-badge-tracking-transparency {
   background-color: var(--line-tracking-transparency);
 }
@@ -442,15 +588,6 @@
 .menu-badge-sms {
   background-color: var(--line-sms);
 }
-.menu-badge-location {
-  background-color: var(--line-location);
-}
-.menu-badge-media-library {
-  background-color: var(--line-media-library);
-}
-.menu-badge-file-system {
-  background-color: var(--line-file-system);
-}
 .menu-badge-audio {
   background-color: var(--line-audio);
 }
@@ -462,6 +599,63 @@
 }
 .menu-badge-sqlite {
   background-color: var(--line-sqlite);
+}
+.menu-badge-auth-session {
+  background-color: var(--line-auth-session);
+}
+.menu-badge-app-metrics {
+  background-color: var(--line-app-metrics);
+}
+.menu-badge-asset {
+  background-color: var(--line-asset);
+}
+.menu-badge-font {
+  background-color: var(--line-font);
+}
+.menu-badge-navigation-bar {
+  background-color: var(--line-navigation-bar);
+}
+.menu-badge-intent-launcher {
+  background-color: var(--line-intent-launcher);
+}
+.menu-badge-app-integrity {
+  background-color: var(--line-app-integrity);
+}
+.menu-badge-age-range {
+  background-color: var(--line-age-range);
+}
+.menu-badge-calendar {
+  background-color: var(--line-calendar);
+}
+.menu-badge-contacts {
+  background-color: var(--line-contacts);
+}
+.menu-badge-screen-capture {
+  background-color: var(--line-screen-capture);
+}
+.menu-badge-blob {
+  background-color: var(--line-blob);
+}
+.menu-badge-image-manipulator {
+  background-color: var(--line-image-manipulator);
+}
+.menu-badge-image-picker {
+  background-color: var(--line-image-picker);
+}
+.menu-badge-document-picker {
+  background-color: var(--line-document-picker);
+}
+.menu-badge-video-thumbnails {
+  background-color: var(--line-video-thumbnails);
+}
+.menu-badge-speech {
+  background-color: var(--line-speech);
+}
+.menu-badge-print {
+  background-color: var(--line-print);
+}
+.menu-badge-mail-composer {
+  background-color: var(--line-mail-composer);
 }
 .menu-badge-text {
   color: var(--ink);
@@ -533,6 +727,15 @@
 .menu-row-hint-localization {
   color: var(--line-localization);
 }
+.menu-row-hint-location {
+  color: var(--line-location);
+}
+.menu-row-hint-media-library {
+  color: var(--line-media-library);
+}
+.menu-row-hint-file-system {
+  color: var(--line-file-system);
+}
 .menu-row-hint-tracking-transparency {
   color: var(--line-tracking-transparency);
 }
@@ -548,15 +751,6 @@
 .menu-row-hint-sms {
   color: var(--line-sms);
 }
-.menu-row-hint-location {
-  color: var(--line-location);
-}
-.menu-row-hint-media-library {
-  color: var(--line-media-library);
-}
-.menu-row-hint-file-system {
-  color: var(--line-file-system);
-}
 .menu-row-hint-audio {
   color: var(--line-audio);
 }
@@ -569,9 +763,64 @@
 .menu-row-hint-sqlite {
   color: var(--line-sqlite);
 }
+.menu-row-hint-auth-session {
+  color: var(--line-auth-session);
+}
+.menu-row-hint-app-metrics {
+  color: var(--line-app-metrics);
+}
+.menu-row-hint-asset {
+  color: var(--line-asset);
+}
+.menu-row-hint-font {
+  color: var(--line-font);
+}
+.menu-row-hint-navigation-bar {
+  color: var(--line-navigation-bar);
+}
+.menu-row-hint-intent-launcher {
+  color: var(--line-intent-launcher);
+}
+.menu-row-hint-app-integrity {
+  color: var(--line-app-integrity);
+}
+.menu-row-hint-age-range {
+  color: var(--line-age-range);
+}
+.menu-row-hint-calendar {
+  color: var(--line-calendar);
+}
+.menu-row-hint-contacts {
+  color: var(--line-contacts);
+}
+.menu-row-hint-screen-capture {
+  color: var(--line-screen-capture);
+}
+.menu-row-hint-blob {
+  color: var(--line-blob);
+}
+.menu-row-hint-image-manipulator {
+  color: var(--line-image-manipulator);
+}
+.menu-row-hint-image-picker {
+  color: var(--line-image-picker);
+}
+.menu-row-hint-document-picker {
+  color: var(--line-document-picker);
+}
+.menu-row-hint-video-thumbnails {
+  color: var(--line-video-thumbnails);
+}
+.menu-row-hint-speech {
+  color: var(--line-speech);
+}
+.menu-row-hint-print {
+  color: var(--line-print);
+}
+.menu-row-hint-mail-composer {
+  color: var(--line-mail-composer);
+}
 
-/* SensorsScreen — one card per @symbiote-native/sensors hook, each rendering its own
-   checking/unavailable/waiting/live state distinctly (see the sensor-status-* badges below). */
 .sensor-card {
   gap: 10px;
   padding: 16px;
@@ -595,21 +844,15 @@
   padding-right: 10px;
   border-radius: 999px;
 }
-/* still resolving isAvailableAsync() */
 .sensor-status-badge-checking {
   background-color: var(--mist);
 }
-/* isAvailableAsync() resolved false — a real state, not an error (the iOS Simulator reports
-   this for every CoreMotion/CMPedometer-backed sensor, see the symbiote-expo-native-module
-   skill) */
 .sensor-status-badge-unavailable {
   background-color: #6b4a4a;
 }
-/* available, subscribed, no reading has arrived yet */
 .sensor-status-badge-waiting {
   background-color: var(--line-sensors);
 }
-/* at least one live reading rendered below */
 .sensor-status-badge-live {
   background-color: var(--positive);
 }
@@ -642,8 +885,6 @@
   font-weight: bold;
 }
 
-/* LocalAuthScreen — capabilities card (hardware/enrolled/level/supported types) + a live
-   authenticateAsync() card. Reuses .info-text (shared) and .action-button (ActionButton). */
 .auth-card {
   gap: 10px;
   padding: 16px;
@@ -712,9 +953,12 @@
   font-weight: bold;
 }
 
-/* Shared card/badge/row vocabulary for HapticsScreen, ClipboardScreen, and BatteryScreen — same
-   visual language as .auth-card/.auth-status-badge/.sensor-card above, kept package-agnostic
-   (rather than tripled per package) since all three new screens use it identically. */
+.location-permission-actions {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
 .feature-card {
   gap: 10px;
   padding: 16px;
@@ -771,15 +1015,12 @@
   letter-spacing: 0.5px;
 }
 
-/* HapticsScreen's button grids (impact/notification/android haptics) — action-button already
-   sizes to its own content, this just lets them wrap onto multiple lines. */
 .button-row {
   flex-direction: row;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-/* ClipboardScreen's copy-text and set-URL inputs. */
 .text-input {
   height: 44px;
   border-radius: 10px;
@@ -790,4 +1031,59 @@
   color: var(--chalk-bright);
   font-size: 16px;
   background-color: var(--paper);
+}
+
+.scenario-card {
+  gap: 10px;
+  padding: 16px;
+  border-radius: 16px;
+  background-color: var(--paper);
+}
+.scenario-title {
+  color: var(--chalk-bright);
+  font-size: 17px;
+  font-weight: bold;
+}
+.scenario-why {
+  color: var(--chalk);
+  font-size: 14px;
+}
+.scenario-steps {
+  gap: 4px;
+}
+.scenario-step {
+  color: var(--chalk);
+  font-size: 13px;
+}
+.scenario-expect {
+  gap: 2px;
+  padding: 10px;
+  border-radius: 10px;
+  background-color: var(--ink);
+}
+.scenario-expect-label {
+  color: var(--positive);
+  font-size: 12px;
+  font-weight: bold;
+}
+.scenario-expect-text {
+  color: var(--chalk-bright);
+  font-size: 13px;
+}
+.explorer {
+  gap: 12px;
+}
+.console-bare {
+  gap: 10px;
+}
+.thumb-row {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.thumb {
+  width: 88px;
+  height: 88px;
+  border-radius: 8px;
+  background-color: var(--ink);
 }

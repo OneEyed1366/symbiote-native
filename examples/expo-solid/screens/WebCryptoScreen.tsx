@@ -4,6 +4,7 @@ import webCrypto, {
 } from '@symbiote-native/standard-web-crypto';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
+import { Scenario } from '../components/Scenario';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
 const RANDOM_BYTE_COUNT = 16;
@@ -30,11 +31,6 @@ function ValueRow(props: { label: string; value: string }) {
   );
 }
 
-/**
- * @symbiote-native/standard-web-crypto canary demo: getRandomValues via the module's own
- * `webCrypto` instance, plus polyfillWebCrypto() installing that instance onto
- * globalThis.crypto (checked afterward - no ambient `crypto` exists until the polyfill runs).
- */
 export function WebCryptoScreen() {
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.StandardWebCrypto];
   const lineColor = LINE_COLOR[lineInfo.line];
@@ -70,12 +66,21 @@ export function WebCryptoScreen() {
           <view class="hero-copy">
             <text class="hero-title">Web Crypto</text>
             <text class="hero-body">
-              @symbiote-native/standard-web-crypto — a Web Crypto API
-              getRandomValues polyfill over @symbiote-native/crypto's native
-              random source, installable onto globalThis.crypto.
+              Make web libraries that expect crypto.getRandomValues, such as
+              uuid, nanoid or wallet libraries, work on React Native by
+              installing it on globalThis.crypto over the native random
+              source.
             </text>
           </view>
         </view>
+
+        <Scenario
+          testID="web-crypto-scenario"
+          title="Run a web library that needs crypto.getRandomValues"
+          why="Libraries like uuid and nanoid call the Web Crypto API and crash without it. One polyfill call at startup gives them secure random numbers from the native source."
+          steps={['Press Install polyfill', 'Check that globalThis.crypto is installed', 'Generate random bytes']}
+          expect="The installed row switches to Yes, and every press of the random bytes button shows 16 different values."
+        />
 
         <view testID="web-crypto-random-card" class="feature-card">
           <view class="feature-card-header">

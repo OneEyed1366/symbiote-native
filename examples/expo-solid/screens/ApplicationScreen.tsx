@@ -13,6 +13,7 @@ import {
 } from '@symbiote-native/application';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
+import { Scenario } from '../components/Scenario';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
 function ValueRow(props: { label: string; value: string }) {
@@ -24,11 +25,6 @@ function ValueRow(props: { label: string; value: string }) {
   );
 }
 
-/**
- * @symbiote-native/application canary demo: a constants card (version/build/name/ID - all
- * resolved eagerly at import time) plus platform-gated one-shot async calls: Android ID +
- * install referrer on Android, vendor ID + release type on iOS.
- */
 export function ApplicationScreen() {
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Application];
   const lineColor = LINE_COLOR[lineInfo.line];
@@ -84,12 +80,20 @@ export function ApplicationScreen() {
           <view class="hero-copy">
             <text class="hero-title">Application</text>
             <text class="hero-body">
-              @symbiote-native/application — native app version/build/name/ID
-              constants, plus install-time, Android ID/install-referrer, and iOS
-              vendor ID/release-type lookups.
+              Read what the app knows about itself: version, build number, name,
+              bundle id, install date and store metadata. Use it for the
+              About screen, support emails and crash reports.
             </text>
           </view>
         </view>
+
+        <Scenario
+          testID="application-scenario"
+          title="Show the exact app version in About and support emails"
+          why="Support needs to know precisely which build a user runs. The version and build number come from the native bundle, so they always match the installed binary."
+          steps={['Read the version, build and bundle id in the constants card', 'Press the lookup buttons for install time and device-specific ids']}
+          expect="The values match the installed build (check Settings, General, iPhone Storage on iOS). Lookups that do not exist on this platform show as unavailable."
+        />
 
         <view testID="application-constants-card" class="feature-card">
           <view class="feature-card-header">

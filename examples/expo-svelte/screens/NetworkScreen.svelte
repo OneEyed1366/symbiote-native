@@ -1,15 +1,11 @@
 <script lang="ts">
-  // @symbiote-native/network tour stop — a live network-state card driven by useNetworkState()
-  // (seeded via getNetworkStateAsync(), refreshed by addNetworkStateListener()) plus a one-shot card
-  // for the IP address and airplane-mode check. Toggle Wi-Fi/airplane mode on the device to see the
-  // live card update on its own. Svelte twin of examples/expo-vue-sfc/screens/NetworkScreen.vue.
-  import { ScrollView } from '@symbiote-native/svelte';
   import {
     NetworkStateType,
     getIpAddressAsync,
     isAirplaneModeEnabledAsync,
     useNetworkState,
   } from '@symbiote-native/network/svelte';
+  import Scenario from '../components/Scenario.svelte';
   import { ROUTE_NAME } from '../routes';
   import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
@@ -56,43 +52,39 @@
   let ipAddress = $state<string | null>(null);
   let isAirplaneMode = $state<boolean | null>(null);
 
-  // Re-fetch alongside every live network-state change, mirroring the React screen's
-  // useEffect(..., [networkState]) — a Wi-Fi/airplane-mode toggle should refresh both cards
-  // together, not just the live one. The bare read below is what registers that dependency; the
-  // two assignments are write-only and cannot re-trigger the effect.
+  // The bare read of `networkState.current` re-runs the lookups on every live state change
   $effect(() => {
     void networkState.current;
+    let isCurrent = true;
     void Promise.all([getIpAddressAsync(), isAirplaneModeEnabledAsync()]).then(
-      ([currentIp, isEnabled]) => {
-        ipAddress = currentIp;
-        isAirplaneMode = isEnabled;
+      ([ip, airplaneMode]) => {
+        if (isCurrent) {
+          ipAddress = ip;
+          isAirplaneMode = airplaneMode;
+        }
       },
     );
+    return () => {
+      isCurrent = false;
+    };
   });
-
-  const networkTypeText = $derived(networkTypeLabel(networkState.current.type));
-  const isConnectedText = $derived(
-    yesNoLabel(networkState.current.isConnected),
-  );
-  const isInternetReachableText = $derived(
-    yesNoLabel(networkState.current.isInternetReachable),
-  );
-  const ipAddressText = $derived(
-    ipAddress === null ? PENDING_LABEL : ipAddress,
-  );
-  const airplaneModeText = $derived(airplaneModeLabel(isAirplaneMode));
 </script>
 
+{#snippet infoRow(label: string, value: string)}
+  <view class="capability-row">
+    <text class="capability-label">{label}</text>
+    <text class="value-text">{value}</text>
+  </view>
+{/snippet}
+
 <safe-area-view class="screen">
-  <ScrollView
+  <scroll-view
     testID="network-scroll"
     class="screen"
     contentContainerStyle="scroll-content"
   >
     <view class={`line-tag line-tag-${lineInfo.line}`}>
-      <text class="line-tag-text">
-        {`${lineInfo.code} · ${lineInfo.label}`}
-      </text>
+      <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
     </view>
     <view class="hero-card">
       <view class="hero-badge" style={{ backgroundColor: lineColor }}>
@@ -101,47 +93,43 @@
       <view class="hero-copy">
         <text class="hero-title">Network</text>
         <text class="hero-body">
-          @symbiote-native/network — live network state via useNetworkState(),
-          plus the device's IP address and airplane-mode check. Toggle Wi-Fi or
-          airplane mode on the device to see the live card update on its own.
+          React to connectivity: the connection type, whether the internet is
+          reachable, the device IP address and airplane mode, updating live as
+          the network changes.
         </text>
       </view>
     </view>
-    <view testID="network-live-card" class="network-card">
-      <text class="network-card-title">Live network state</text>
-      <view class="network-row">
-        <text class="network-row-label">Type</text>
-        <text testID="network-type-value" class="network-value-text">
-          {networkTypeText}
-        </text>
+
+    <Scenario
+      testID="network-scenario"
+      title="Show an offline banner and queue work until the network is back"
+      why="Tell users when they are offline instead of letting requests fail silently, and retry uploads when the connection returns. Connected does not always mean the internet is reachable."
+      steps={[
+        'Turn Wi-Fi off, then airplane mode on',
+        'Watch the live card',
+        'Turn everything back on',
+      ]}
+      expect="Type, connected and internet reachable change within a moment each time, and airplane mode reads Yes while it is on."
+    />
+
+    <view testID="network-live-card" class="feature-card">
+      <view class="feature-card-header">
+        <text class="feature-card-title">Live network state</text>
       </view>
-      <view class="network-row">
-        <text class="network-row-label">Connected</text>
-        <text testID="network-connected-value" class="network-value-text">
-          {isConnectedText}
-        </text>
-      </view>
-      <view class="network-row">
-        <text class="network-row-label">Internet reachable</text>
-        <text testID="network-reachable-value" class="network-value-text">
-          {isInternetReachableText}
-        </text>
-      </view>
+      {@render infoRow('Type', networkTypeLabel(networkState.current.type))}
+      {@render infoRow('Connected', yesNoLabel(networkState.current.isConnected))}
+      {@render infoRow(
+        'Internet reachable',
+        yesNoLabel(networkState.current.isInternetReachable),
+      )}
     </view>
-    <view testID="network-info-card" class="network-card">
-      <text class="network-card-title">Device info</text>
-      <view class="network-row">
-        <text class="network-row-label">IP address</text>
-        <text testID="network-ip-value" class="network-value-text">
-          {ipAddressText}
-        </text>
+
+    <view testID="network-info-card" class="feature-card">
+      <view class="feature-card-header">
+        <text class="feature-card-title">Device info</text>
       </view>
-      <view class="network-row">
-        <text class="network-row-label">Airplane mode</text>
-        <text testID="network-airplane-value" class="network-value-text">
-          {airplaneModeText}
-        </text>
-      </view>
+      {@render infoRow('IP address', ipAddress === null ? PENDING_LABEL : ipAddress)}
+      {@render infoRow('Airplane mode', airplaneModeLabel(isAirplaneMode))}
     </view>
-  </ScrollView>
+  </scroll-view>
 </safe-area-view>

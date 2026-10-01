@@ -1,67 +1,46 @@
 <script lang="ts">
-  // @symbiote-native/keep-awake tour stop — useKeepAwake() has no on/off switch of its own: it
-  // activates inside its own $effect and deactivates in that effect's teardown. The Vue twin
-  // toggles a one-line holder component in and out of the tree to drive that; Svelte cannot
-  // declare a second component inside one file, so the equivalent here is a NESTED effect (see
-  // the toggle effect below). Svelte twin of examples/expo-vue-sfc/screens/KeepAwakeScreen.vue.
-  import { ScrollView } from '@symbiote-native/svelte';
+  import type { ISwitchChangeEvent } from '@symbiote-native/svelte';
   import {
     isAvailableAsync,
     useKeepAwake,
   } from '@symbiote-native/keep-awake/svelte';
-  import ActionButton from '../components/ActionButton.svelte';
+  import Scenario from '../components/Scenario.svelte';
   import { ROUTE_NAME } from '../routes';
   import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
-
-  type ICapabilityStatus = 'checking' | 'yes' | 'no';
-
-  const CAPABILITY_BADGE_TEXT: Record<ICapabilityStatus, string> = {
-    checking: 'CHECKING…',
-    yes: 'YES',
-    no: 'NO',
-  };
-
-  function toCapabilityStatus(value: boolean): ICapabilityStatus {
-    return value ? 'yes' : 'no';
-  }
 
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.KeepAwake];
   const lineColor = LINE_COLOR[lineInfo.line];
 
-  let isHeld = $state(false);
-  let isAvailable = $state<ICapabilityStatus>('checking');
+  let isKeepAwakeOn = $state(false);
+  let isAvailable = $state<boolean | null>(null);
 
   $effect(() => {
     void isAvailableAsync().then(value => {
-      isAvailable = toCapabilityStatus(value);
+      isAvailable = value;
     });
   });
 
-  // Nested effect: this one reads `isHeld`, so flipping the toggle re-runs it, and re-running an
-  // effect destroys every effect created inside it — including the one useKeepAwake() registers.
-  // That teardown is the same deactivate call unmounting Vue's holder component makes, so the
-  // lock is acquired and released on exactly the same edges as the Vue twin.
+  // `useKeepAwake` has no on/off param, it locks inside its own effect and unlocks in the teardown
+  // Re-running this effect on `isKeepAwakeOn` destroys the nested one, which releases the lock
   $effect(() => {
-    if (isHeld) {
+    if (isKeepAwakeOn) {
       useKeepAwake();
     }
   });
 
-  function handleToggle(): void {
-    isHeld = !isHeld;
-  }
+  const availableLabel = $derived(
+    isAvailable === null ? 'checking…' : isAvailable ? 'Yes' : 'No',
+  );
 </script>
 
 <safe-area-view class="screen">
-  <ScrollView
+  <scroll-view
     testID="keep-awake-scroll"
     class="screen"
     contentContainerStyle="scroll-content"
   >
     <view class={`line-tag line-tag-${lineInfo.line}`}>
-      <text class="line-tag-text">
-        {`${lineInfo.code} · ${lineInfo.label}`}
-      </text>
+      <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
     </view>
     <view class="hero-card">
       <view class="hero-badge" style={{ backgroundColor: lineColor }}>
@@ -70,35 +49,43 @@
       <view class="hero-copy">
         <text class="hero-title">Keep Awake</text>
         <text class="hero-body">
-          @symbiote-native/keep-awake — keeps the screen on for as long as a
-          component holding useKeepAwake() stays mounted.
+          Stop the screen from dimming and locking while a component is
+          mounted, for a recipe, a workout timer, a video or a boarding pass.
         </text>
       </view>
     </view>
-    <view testID="keep-awake-card" class="keep-awake-card">
-      <text class="keep-awake-card-title">Screen lock</text>
-      <view class="keep-awake-row">
-        <text class="keep-awake-row-label">Available</text>
-        <view
-          class={`keep-awake-status-badge keep-awake-status-badge-${isAvailable}`}
-        >
-          <text class="keep-awake-status-text">
-            {CAPABILITY_BADGE_TEXT[isAvailable]}
-          </text>
-        </view>
+
+    <Scenario
+      testID="keep-awake-scenario"
+      title="Keep the screen on while someone follows a recipe or a workout"
+      why="Hands that are busy cannot tap the screen to wake it. The lock lives exactly as long as the component that asked for it, so it cannot be left on by mistake."
+      steps={[
+        'Turn the switch on',
+        'Put the phone down and wait past the auto-lock time',
+        'Turn the switch off and wait again',
+      ]}
+      expect="With the switch on the screen stays lit, and with it off the phone dims and locks after its normal timeout."
+    />
+
+    <view testID="keep-awake-card" class="feature-card">
+      <view class="feature-card-header">
+        <text class="feature-card-title">Keep screen awake</text>
       </view>
-      <view class="keep-awake-row">
-        <text class="keep-awake-row-label">Held</text>
-        <text testID="keep-awake-held-value" class="keep-awake-value-text">
-          {isHeld ? 'true' : 'false'}
-        </text>
+      <view class="capability-row">
+        <text class="capability-label">Available</text>
+        <text class="value-text">{availableLabel}</text>
       </view>
-      <ActionButton
-        testID="keep-awake-toggle-button"
-        title={isHeld ? 'Release keep-awake' : 'Activate keep-awake'}
-        onPress={handleToggle}
-        color={lineColor}
-      />
+      <view testID="keep-awake-toggle-row" class="capability-row">
+        <text class="capability-label">Keep screen awake</text>
+        <switch
+          testID="keep-awake-switch"
+          value={isKeepAwakeOn}
+          onValueChange={(event: ISwitchChangeEvent) => {
+            isKeepAwakeOn = event.value;
+          }}
+          trackColor={{ true: lineColor }}
+        ></switch>
+      </view>
     </view>
-  </ScrollView>
+  </scroll-view>
 </safe-area-view>

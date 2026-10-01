@@ -11,6 +11,7 @@ import {
 } from '@symbiote-native/haptics';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
+import { Scenario } from '../components/Scenario';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
 const IMPACT_STYLES: readonly { label: string; style: ImpactFeedbackStyle }[] =
@@ -58,13 +59,6 @@ const ANDROID_HAPTICS: readonly { label: string; type: AndroidHaptics }[] = [
   { label: 'Text handle move', type: AndroidHaptics.Text_Handle_Move },
 ];
 
-/**
- * @symbiote-native/haptics canary demo: one card per API — impactAsync (five
- * ImpactFeedbackStyle values), notificationAsync (three NotificationFeedbackType values),
- * selectionAsync, and, Android-only, performAndroidHapticsAsync over every AndroidHaptics
- * value. All four calls are fire-and-forget (no result to await) — the "last fired" row exists
- * purely as visible confirmation that a tap actually reached the native module.
- */
 export function HapticsScreen() {
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Haptics];
   const lineColor = LINE_COLOR[lineInfo.line];
@@ -117,14 +111,20 @@ export function HapticsScreen() {
           <view className="hero-copy">
             <text className="hero-title">Haptics</text>
             <text className="hero-body">
-              @symbiote-native/haptics — impact/notification/selection vibration
-              feedback via iOS's Taptic Engine and Android's Vibrator API. A
-              simulator won't produce physical feedback; a real device is needed
-              to feel it.
+              Add a tactile feel to the app: taps, success and error buzzes and
+              selection ticks through iOS's Taptic Engine and Android's
+              vibrator. A simulator cannot vibrate, use a real device.
             </text>
           </view>
         </view>
 
+        <Scenario
+          testID="haptics-scenario"
+          title="Confirm a tap, a success or an error by feel"
+          why="A light tap on a button, a double buzz for success and a sharp one for an error make the app feel physical and let users act without looking."
+          steps={['Press the impact buttons from light to heavy', 'Press the notification buttons', 'Press selection while scrolling a picker-like list']}
+          expect="Each press vibrates differently on a real phone, and the last fired row names the call that reached the native module."
+        />
         <view testID="haptics-impact-card" className="feature-card">
           <view className="feature-card-header">
             <text className="feature-card-title">Impact</text>

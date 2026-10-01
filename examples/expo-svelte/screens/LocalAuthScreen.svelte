@@ -1,9 +1,5 @@
 <script lang="ts">
-  // @symbiote-native/local-auth tour stop — a capabilities card (hardware present, enrolled,
-  // enrolled security level, supported biometric types) followed by a live authenticateAsync()
-  // button. cancelAuthenticate() is Android-only upstream, so the Cancel button only renders
-  // there. Svelte twin of ../../expo-vue-sfc/screens/LocalAuthScreen.vue.
-  import { Platform, ScrollView } from '@symbiote-native/svelte';
+  import { Platform } from '@symbiote-native/svelte';
   import {
     AuthenticationType,
     SecurityLevel,
@@ -16,18 +12,20 @@
   } from '@symbiote-native/local-auth/svelte';
   import type { ILocalAuthenticationResult } from '@symbiote-native/local-auth/svelte';
   import ActionButton from '../components/ActionButton.svelte';
+  import Scenario from '../components/Scenario.svelte';
   import { ROUTE_NAME } from '../routes';
   import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
   type ICapabilityStatus = 'checking' | 'yes' | 'no';
 
+  const CAPABILITY_LABEL: Record<ICapabilityStatus, string> = {
+    checking: 'CHECKING…',
+    yes: 'YES',
+    no: 'NO',
+  };
+
   function toCapabilityStatus(value: boolean): ICapabilityStatus {
     return value ? 'yes' : 'no';
-  }
-
-  function capabilityStatusText(status: ICapabilityStatus): string {
-    if (status === 'checking') return 'CHECKING…';
-    return status === 'yes' ? 'YES' : 'NO';
   }
 
   function authenticationTypeLabel(type: AuthenticationType): string {
@@ -43,12 +41,8 @@
     }
   }
 
-  // SecurityLevel.BIOMETRIC is a computed enum member (a deprecated getter alias defined via
-  // Object.defineProperty, see packages/local-auth/src/core/types.ts) — TS gives each named member
-  // declared alongside it its own nominal literal type, so comparing `level` (typed `SecurityLevel`)
-  // directly against e.g. `SecurityLevel.BIOMETRIC_WEAK` trips "no overlap" (TS2367). Widening to a
-  // plain `number` first (enum members are always assignable to `number`) sidesteps the nominal
-  // narrowing entirely — same fix as the React and Vue ports' securityLevelLabel.
+  // `SecurityLevel.BIOMETRIC` is a getter alias, so each sibling member has its own nominal type
+  // Widening to `number` first avoids TS2367 "no overlap" on the comparisons below
   function securityLevelLabel(level: SecurityLevel): string {
     const numericLevel: number = level;
     if (numericLevel === SecurityLevel.NONE) {
@@ -63,8 +57,6 @@
     if (numericLevel === SecurityLevel.BIOMETRIC_STRONG) {
       return 'Biometric — strong';
     }
-    // Unreachable via getEnrolledLevelAsync() (never returns the deprecated BIOMETRIC alias
-    // itself) — only satisfies the function's string return type.
     return 'Biometric';
   }
 
@@ -78,8 +70,7 @@
   let authResult = $state<ILocalAuthenticationResult | null>(null);
   let isAuthenticating = $state(false);
 
-  // The mount-time capability probe. Every write lands in an async continuation, so the effect
-  // reads nothing reactive and runs exactly once — the Svelte equivalent of Vue's onMounted.
+  // Every write lands in an async continuation, so the effect reads nothing reactive and runs once
   $effect(() => {
     void hasHardwareAsync().then(value => {
       hasHardware = toCapabilityStatus(value);
@@ -105,16 +96,6 @@
     return supportedTypes.map(authenticationTypeLabel).join(', ');
   });
 
-  const authenticateButtonTitle = $derived(
-    isAuthenticating ? 'Authenticating…' : 'Authenticate',
-  );
-
-  const authResultClass = $derived(
-    authResult
-      ? `auth-result auth-result-${authResult.success ? 'success' : 'error'}`
-      : '',
-  );
-
   const authResultText = $derived.by((): string => {
     if (!authResult) return '';
     if (authResult.success) return 'Success';
@@ -137,16 +118,30 @@
   }
 </script>
 
+{#snippet capabilityRow(testID: string, label: string, status: ICapabilityStatus)}
+  <view {testID} class="auth-capability-row">
+    <text class="auth-capability-label">{label}</text>
+    <view class={`auth-status-badge auth-status-badge-${status}`}>
+      <text class="auth-status-text">{CAPABILITY_LABEL[status]}</text>
+    </view>
+  </view>
+{/snippet}
+
+{#snippet valueRow(label: string, value: string)}
+  <view class="auth-capability-row">
+    <text class="auth-capability-label">{label}</text>
+    <text class="auth-value-text">{value}</text>
+  </view>
+{/snippet}
+
 <safe-area-view class="screen">
-  <ScrollView
+  <scroll-view
     testID="local-auth-scroll"
     class="screen"
     contentContainerStyle="scroll-content"
   >
     <view class={`line-tag line-tag-${lineInfo.line}`}>
-      <text class="line-tag-text">
-        {`${lineInfo.code} · ${lineInfo.label}`}
-      </text>
+      <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
     </view>
     <view class="hero-card">
       <view class="hero-badge" style={{ backgroundColor: lineColor }}>
@@ -155,42 +150,36 @@
       <view class="hero-copy">
         <text class="hero-title">Local auth</text>
         <text class="hero-body">
-          @symbiote-native/local-auth — FaceID/TouchID on iOS, the
-          Fingerprint/Biometric API on Android. A simulator with no enrolled
-          biometrics reports "not enrolled"; a real device with
-          FaceID/TouchID/fingerprint set up is needed to see a live prompt.
+          Confirm it is really the user with Face ID, Touch ID or a fingerprint
+          before a sensitive action. A simulator without enrolled biometrics
+          reports not enrolled, use a real device with biometrics set up to see
+          the prompt.
         </text>
       </view>
     </view>
+
+    <Scenario
+      testID="local-auth-scenario"
+      title="Re-confirm the user before showing a balance or sending money"
+      why="Even on an unlocked phone, ask for a biometric check before opening a private section or approving a payment. The app only learns whether it succeeded, never the fingerprint or face."
+      steps={[
+        'Check that hardware is present and biometrics are enrolled',
+        'Press authenticate and approve with your face or finger',
+        'Press it again and cancel',
+      ]}
+      expect="Success shows a positive result. Cancelling shows the reason, such as user cancel, and the hardware and enrolled rows tell you why a prompt cannot appear."
+    />
+
     <view testID="local-auth-capabilities-card" class="auth-card">
       <view class="auth-card-header">
         <text class="auth-card-title">Capabilities</text>
       </view>
-      <view testID="local-auth-hardware" class="auth-capability-row">
-        <text class="auth-capability-label">Hardware present</text>
-        <view class={`auth-status-badge auth-status-badge-${hasHardware}`}>
-          <text class="auth-status-text">
-            {capabilityStatusText(hasHardware)}
-          </text>
-        </view>
-      </view>
-      <view testID="local-auth-enrolled" class="auth-capability-row">
-        <text class="auth-capability-label">Enrolled</text>
-        <view class={`auth-status-badge auth-status-badge-${isEnrolled}`}>
-          <text class="auth-status-text">
-            {capabilityStatusText(isEnrolled)}
-          </text>
-        </view>
-      </view>
-      <view class="auth-capability-row">
-        <text class="auth-capability-label">Enrolled level</text>
-        <text class="auth-value-text">{enrolledLevelText}</text>
-      </view>
-      <view class="auth-capability-row">
-        <text class="auth-capability-label">Supported types</text>
-        <text class="auth-value-text">{supportedTypesText}</text>
-      </view>
+      {@render capabilityRow('local-auth-hardware', 'Hardware present', hasHardware)}
+      {@render capabilityRow('local-auth-enrolled', 'Enrolled', isEnrolled)}
+      {@render valueRow('Enrolled level', enrolledLevelText)}
+      {@render valueRow('Supported types', supportedTypesText)}
     </view>
+
     <view testID="local-auth-authenticate-card" class="auth-card">
       <view class="auth-card-header">
         <text class="auth-card-title">Authenticate</text>
@@ -201,20 +190,26 @@
       </text>
       <ActionButton
         testID="local-auth-authenticate-button"
-        title={authenticateButtonTitle}
+        title={isAuthenticating ? 'Authenticating…' : 'Authenticate'}
         onPress={handleAuthenticate}
         color={lineColor}
-      />{#if Platform.OS === 'android'}<ActionButton
+      />
+      {#if Platform.OS === 'android'}
+        <ActionButton
           testID="local-auth-cancel-button"
           title="Cancel"
           onPress={handleCancel}
           color={lineColor}
-        />{/if}{#if authResult}<view
+        />
+      {/if}
+      {#if authResult}
+        <view
           testID="local-auth-result"
-          class={authResultClass}
+          class={`auth-result auth-result-${authResult.success ? 'success' : 'error'}`}
         >
           <text class="auth-result-text">{authResultText}</text>
-        </view>{/if}
+        </view>
+      {/if}
     </view>
-  </ScrollView>
+  </scroll-view>
 </safe-area-view>

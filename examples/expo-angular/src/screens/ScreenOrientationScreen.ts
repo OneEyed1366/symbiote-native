@@ -8,22 +8,35 @@ import {
   unlockAsync,
 } from '@symbiote-native/screen-orientation/angular';
 import { ActionButton } from '../components/ActionButton';
+import { Scenario } from '../components/Scenario';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
+import { ValueRow } from './ValueRow';
 
-/**
- * @symbiote-native/screen-orientation canary demo: a live `{ orientation, orientationLock }` card
- * driven by ScreenOrientationService.connect() (seeded via getOrientationAsync()/
- * getOrientationLockAsync(), refreshed by addOrientationChangeListener()), plus lock/unlock
- * buttons. Angular twin of ../../react/screens/ScreenOrientationScreen.tsx. Orientation/
- * OrientationLock are numeric TS enums, so `Orientation[value]`/`OrientationLock[value]` reads
- * back the member name via the compiler's own reverse mapping — no hand-written label switch
- * needed.
- */
+function orientationLabel(orientation: Orientation): string {
+  switch (orientation) {
+    case Orientation.PORTRAIT_UP:
+      return 'Portrait up';
+    case Orientation.PORTRAIT_DOWN:
+      return 'Portrait down';
+    case Orientation.LANDSCAPE_LEFT:
+      return 'Landscape left';
+    case Orientation.LANDSCAPE_RIGHT:
+      return 'Landscape right';
+    case Orientation.UNKNOWN:
+    default:
+      return 'Unknown';
+  }
+}
+
+function orientationLockLabel(orientationLock: OrientationLock): string {
+  return OrientationLock[orientationLock] ?? 'Unknown';
+}
+
 @Component({
   selector: 'ScreenOrientationScreen',
   standalone: true,
-  imports: [ActionButton, SYMBIOTE_ELEMENTS],
+  imports: [ActionButton, Scenario, SYMBIOTE_ELEMENTS, ValueRow],
   template: `
     <safe-area-view class="screen">
       <scroll-view
@@ -31,93 +44,97 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <view [class]="lineTagClass">
-          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        <view [class]="'line-tag line-tag-' + lineInfo.line">
+          <text class="line-tag-text"
+            >{{ lineInfo.code }} · {{ lineInfo.label }}</text
+          >
         </view>
         <view class="hero-card">
-          <view class="hero-badge" [style]="heroBadgeStyle">
-            <text class="hero-badge-text">{{ heroBadgeCode }}</text>
+          <view class="hero-badge" [style]="badgeStyle">
+            <text class="hero-badge-text">{{ lineInfo.code }}</text>
           </view>
           <view class="hero-copy">
             <text class="hero-title">Screen Orientation</text>
             <text class="hero-body">
-              @symbiote-native/screen-orientation — lock the screen to
-              portrait/landscape, or unlock it back to the system default, with
-              live orientation-change updates.
+              Control how the screen rotates: lock portrait or landscape for a
+              video, a game or a form, unlock it again, and follow the current
+              orientation live.
             </text>
           </view>
         </view>
 
-        <view testID="screen-orientation-live-card" class="capability-card">
-          <text class="capability-card-title">Live orientation</text>
-          <view class="capability-row">
-            <text class="capability-label">Orientation</text>
-            <text testID="screen-orientation-value" class="value-text">{{
-              orientationLabel()
-            }}</text>
+        <Scenario
+          testID="screen-orientation-scenario"
+          title="Lock landscape for a video player or a game"
+          why="Full-screen video and games need landscape no matter how the phone is held, while forms and feeds work best locked to portrait. Unlock hands control back to the user."
+          [steps]="scenarioSteps"
+          expect="The screen stays in the locked orientation however you hold the phone, and rotates freely again after Unlock. The state card shows both values."
+        />
+
+        <view testID="screen-orientation-state-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Current state</text>
           </view>
-          <view class="capability-row">
-            <text class="capability-label">Orientation lock</text>
-            <text testID="screen-orientation-lock-value" class="value-text">{{
-              orientationLockLabel()
-            }}</text>
-          </view>
+          <ValueRow
+            label="Orientation"
+            [value]="orientationText(screenOrientation().orientation)"
+          />
+          <ValueRow
+            label="Orientation lock"
+            [value]="lockText(screenOrientation().orientationLock)"
+          />
         </view>
 
-        <view testID="screen-orientation-actions-card" class="capability-card">
-          <text class="capability-card-title">Actions</text>
-          <view class="button-row">
-            <ActionButton
-              testID="screen-orientation-lock-portrait"
-              title="Lock portrait"
-              [color]="lineColor"
-              (press)="handleLockPortrait()"
-            ></ActionButton>
-            <ActionButton
-              testID="screen-orientation-lock-landscape"
-              title="Lock landscape"
-              [color]="lineColor"
-              (press)="handleLockLandscape()"
-            ></ActionButton>
-            <ActionButton
-              testID="screen-orientation-unlock"
-              title="Unlock"
-              [color]="lineColor"
-              (press)="handleUnlock()"
-            ></ActionButton>
+        <view testID="screen-orientation-actions-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Actions</text>
           </view>
+          <ActionButton
+            testID="screen-orientation-lock-portrait-button"
+            title="Lock portrait"
+            [color]="lineColor"
+            (press)="lockPortrait()"
+          />
+          <ActionButton
+            testID="screen-orientation-lock-landscape-button"
+            title="Lock landscape"
+            [color]="lineColor"
+            (press)="lockLandscape()"
+          />
+          <ActionButton
+            testID="screen-orientation-unlock-button"
+            title="Unlock"
+            [color]="lineColor"
+            (press)="unlock()"
+          />
         </view>
       </scroll-view>
     </safe-area-view>
   `,
 })
 export class ScreenOrientationScreen {
-  private readonly lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.ScreenOrientation];
-  readonly lineTagClass = `line-tag line-tag-${this.lineInfo.line}`;
-  readonly lineTagLabel = `${this.lineInfo.code} · ${this.lineInfo.label}`;
-  readonly heroBadgeCode = this.lineInfo.code;
-  readonly lineColor = LINE_COLOR[this.lineInfo.line];
-  readonly heroBadgeStyle = { backgroundColor: this.lineColor };
+  readonly lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.ScreenOrientation];
+  readonly lineColor = LINE_COLOR['screen-orientation'];
+  readonly badgeStyle = { backgroundColor: LINE_COLOR['screen-orientation'] };
+  readonly orientationText = orientationLabel;
+  readonly lockText = orientationLockLabel;
+  readonly scenarioSteps = [
+    'Press Lock landscape and turn the phone',
+    'Press Lock portrait',
+    'Press Unlock and turn the phone again',
+  ];
 
   readonly screenOrientation = inject(ScreenOrientationService).connect();
 
-  handleLockPortrait(): void {
+  lockPortrait(): void {
     void lockAsync(OrientationLock.PORTRAIT_UP);
   }
 
-  handleLockLandscape(): void {
-    void lockAsync(OrientationLock.LANDSCAPE);
+  lockLandscape(): void {
+    void lockAsync(OrientationLock.LANDSCAPE_LEFT);
   }
 
-  handleUnlock(): void {
+  unlock(): void {
     void unlockAsync();
-  }
-
-  orientationLabel(): string {
-    return Orientation[this.screenOrientation().orientation];
-  }
-
-  orientationLockLabel(): string {
-    return OrientationLock[this.screenOrientation().orientationLock];
   }
 }

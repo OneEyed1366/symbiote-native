@@ -35,6 +35,11 @@ const config = {
     // sourceExts + the ngc-outDir CSS-redirect resolveRequest — see
     // adapters/angular/metro-config.cjs for the full mechanism.
     ...withSymbioteAngularMetroConfig(defaultConfig, projectRoot).resolver,
+    // xcodebuild leaves transient module-cache lock files in expo-modules-jsi's .DerivedData,
+    // and the file watcher crashes on their readlink
+    blockList: [/\/\.DerivedData\/.*/],
+    // The seed database for `importDatabaseFromAssetAsync` is bundled as an asset
+    assetExts: [...defaultConfig.resolver.assetExts, 'db'],
   },
 };
 

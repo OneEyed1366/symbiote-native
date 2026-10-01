@@ -1,11 +1,8 @@
 import { ROUTE_NAME } from './routes';
 import type { IRouteName } from './routes';
 
-// This app demos Expo-modules-core-based package ports only (no @symbiote-native/navigation
-// feature tour — that lives in the pure examples/vue-tsx canary). One "line" per package, carried
-// through MenuScreen's row badges and each demo screen's own line tag. Kept in sync by hand with
-// App.css's `:root` `--line-*` tokens — CSS custom properties and this module are different
-// runtimes with no shared import path.
+// One "line" per package, carried through MenuScreen's row badges and each demo screen's own
+// line tag. Kept in sync by hand with the `--line-*` tokens in App.css
 export const NAV_LINE = {
   Sensors: 'sensors',
   LocalAuth: 'local-auth',
@@ -24,26 +21,43 @@ export const NAV_LINE = {
   KeepAwake: 'keep-awake',
   ScreenOrientation: 'screen-orientation',
   Localization: 'localization',
+  Location: 'location',
+  MediaLibrary: 'media-library',
+  FileSystem: 'file-system',
   TrackingTransparency: 'tracking-transparency',
   SecureStore: 'secure-store',
   Sharing: 'sharing',
   WebBrowser: 'web-browser',
   Sms: 'sms',
-  Location: 'location',
-  MediaLibrary: 'media-library',
-  FileSystem: 'file-system',
   Audio: 'audio',
   Notifications: 'notifications',
   BackgroundTasks: 'background-tasks',
   Sqlite: 'sqlite',
+  MailComposer: 'mail-composer',
+  Print: 'print',
+  Speech: 'speech',
+  VideoThumbnails: 'video-thumbnails',
+  DocumentPicker: 'document-picker',
+  ImagePicker: 'image-picker',
+  ImageManipulator: 'image-manipulator',
+  Blob: 'blob',
+  ScreenCapture: 'screen-capture',
+  Contacts: 'contacts',
+  Calendar: 'calendar',
+  AgeRange: 'age-range',
+  AppIntegrity: 'app-integrity',
+  IntentLauncher: 'intent-launcher',
+  NavigationBar: 'navigation-bar',
+  Font: 'font',
+  Asset: 'asset',
+  AppMetrics: 'app-metrics',
+  AuthSession: 'auth-session',
 } as const;
 
 export type INavLine = (typeof NAV_LINE)[keyof typeof NAV_LINE];
 
-// One color per @symbiote-native/* package demo. Most colors are shared across every expo-*
-// app for consistency; a few are called out below where the pick has to dodge a near neighbor.
 export const LINE_COLOR: Record<INavLine, string> = {
-  [NAV_LINE.Sensors]: '#f6ad55',
+  [NAV_LINE.Sensors]: '#f5a623',
   [NAV_LINE.LocalAuth]: '#ef4444',
   [NAV_LINE.Haptics]: '#8b5cf6',
   [NAV_LINE.Clipboard]: '#14b8a6',
@@ -54,48 +68,43 @@ export const LINE_COLOR: Record<INavLine, string> = {
   [NAV_LINE.Device]: '#64748b',
   [NAV_LINE.Application]: '#ec4899',
   [NAV_LINE.Crypto]: '#6366f1',
-  // Orange — @symbiote-native/standard-web-crypto. Its own tour stop, distinct from Crypto's indigo.
   [NAV_LINE.StandardWebCrypto]: '#f97316',
   [NAV_LINE.SystemUi]: '#a855f7',
   [NAV_LINE.StoreReview]: '#84cc16',
   [NAV_LINE.KeepAwake]: '#0ea5e9',
   [NAV_LINE.ScreenOrientation]: '#f43f5e',
   [NAV_LINE.Localization]: '#10b981',
-  [NAV_LINE.TrackingTransparency]: '#78716c',
-  // Bronze — @symbiote-native/secure-store. Reads as a vault next to LocalAuth's crimson,
-  // and stays clear of Brightness' gold and StandardWebCrypto's orange.
-  [NAV_LINE.SecureStore]: '#a16207',
-  // Fuchsia — @symbiote-native/sharing. Loud enough to read as "hand it off", and far from
-  // Application's pink on the menu's badge column.
-  [NAV_LINE.Sharing]: '#d946ef',
-  // Deep ocean blue — @symbiote-native/web-browser. Darker than Cellular's blue so the two
-  // browser/network rows don't blur together.
-  [NAV_LINE.WebBrowser]: '#0369a1',
-  // Olive — @symbiote-native/sms. Sits between StoreReview's lime and Battery's green without
-  // matching either.
-  [NAV_LINE.Sms]: '#65a30d',
-  // Royal blue — @symbiote-native/location. A map-pin blue distinct from Cellular's brighter
-  // blue and WebBrowser's sky-toned blue.
   [NAV_LINE.Location]: '#1d4ed8',
-  // Deep pink/magenta — @symbiote-native/media-library. Distinct from Application's pink
-  // (#ec4899) and Sharing's fuchsia (#d946ef).
   [NAV_LINE.MediaLibrary]: '#db2777',
-  // Dark teal — @symbiote-native/file-system. Distinct from Clipboard's lighter teal
-  // (#14b8a6) and MediaLibrary's magenta.
-  [NAV_LINE.FileSystem]: '#0f766e',
-  // Mustard — @symbiote-native/audio. Sits between Brightness' pure yellow (#facc15) and
-  // StoreReview's lime (#84cc16) without matching either.
-  [NAV_LINE.Audio]: '#a5991d',
-  // Emerald — @symbiote-native/notifications. Between StoreReview/Sms's olive-lime and
-  // Battery's green, distinct in hue from both.
-  [NAV_LINE.Notifications]: '#33a824',
-  // Orchid — @symbiote-native/task-manager + background-fetch + background-task, shown
-  // together on one screen. Between SystemUi's purple and Sharing's fuchsia.
-  [NAV_LINE.BackgroundTasks]: '#b955e7',
-  // Bright aqua/mint — @symbiote-native/sqlite. Measured against every other line color's real
-  // RGB distance (min ~107) and contrast against the dark ink background (~13.8:1) — the most
-  // distinct pick available in an already-dense 28-color palette.
-  [NAV_LINE.Sqlite]: '#55f6f6',
+  [NAV_LINE.FileSystem]: '#134e4a',
+  [NAV_LINE.TrackingTransparency]: '#78716c',
+  [NAV_LINE.SecureStore]: '#a16207',
+  [NAV_LINE.Sharing]: '#d946ef',
+  [NAV_LINE.WebBrowser]: '#0369a1',
+  [NAV_LINE.Sms]: '#65a30d',
+  [NAV_LINE.Audio]: '#3fc123',
+  [NAV_LINE.Notifications]: '#e236c8',
+  [NAV_LINE.BackgroundTasks]: '#8a78e2',
+  [NAV_LINE.Sqlite]: '#a6af1d',
+  [NAV_LINE.MailComposer]: '#c2410c',
+  [NAV_LINE.Print]: '#9d174d',
+  [NAV_LINE.Speech]: '#0e7490',
+  [NAV_LINE.VideoThumbnails]: '#6d28d9',
+  [NAV_LINE.DocumentPicker]: '#15803d',
+  [NAV_LINE.ImagePicker]: '#be185d',
+  [NAV_LINE.ImageManipulator]: '#b91c1c',
+  [NAV_LINE.Blob]: '#0f766e',
+  [NAV_LINE.ScreenCapture]: '#7e22ce',
+  [NAV_LINE.Contacts]: '#0891b2',
+  [NAV_LINE.Calendar]: '#ca8a04',
+  [NAV_LINE.AgeRange]: '#ea580c',
+  [NAV_LINE.AppIntegrity]: '#4f46e5',
+  [NAV_LINE.IntentLauncher]: '#16a34a',
+  [NAV_LINE.NavigationBar]: '#2563eb',
+  [NAV_LINE.Font]: '#c026d3',
+  [NAV_LINE.Asset]: '#0d9488',
+  [NAV_LINE.AppMetrics]: '#e11d48',
+  [NAV_LINE.AuthSession]: '#65a30d',
 };
 
 export type INavLineInfo = {
@@ -104,7 +113,7 @@ export type INavLineInfo = {
   label: string;
 };
 
-// Every route reachable from MenuScreen, minus Menu itself.
+// Every route reachable from MenuScreen, minus Menu itself
 export type ITourRouteName = Exclude<IRouteName, typeof ROUTE_NAME.Menu>;
 
 export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
@@ -193,6 +202,21 @@ export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
     code: 'LO',
     label: 'LOCALIZATION LINE',
   },
+  [ROUTE_NAME.Location]: {
+    line: NAV_LINE.Location,
+    code: 'LC',
+    label: 'LOCATION LINE',
+  },
+  [ROUTE_NAME.MediaLibrary]: {
+    line: NAV_LINE.MediaLibrary,
+    code: 'ML',
+    label: 'MEDIA LIBRARY LINE',
+  },
+  [ROUTE_NAME.FileSystem]: {
+    line: NAV_LINE.FileSystem,
+    code: 'FS',
+    label: 'FILE SYSTEM LINE',
+  },
   [ROUTE_NAME.TrackingTransparency]: {
     line: NAV_LINE.TrackingTransparency,
     code: 'TT',
@@ -214,26 +238,7 @@ export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
     label: 'WEB BROWSER LINE',
   },
   [ROUTE_NAME.Sms]: { line: NAV_LINE.Sms, code: 'SM', label: 'SMS LINE' },
-  [ROUTE_NAME.Location]: {
-    line: NAV_LINE.Location,
-    code: 'LC',
-    label: 'LOCATION LINE',
-  },
-  [ROUTE_NAME.MediaLibrary]: {
-    line: NAV_LINE.MediaLibrary,
-    code: 'ML',
-    label: 'MEDIA LIBRARY LINE',
-  },
-  [ROUTE_NAME.FileSystem]: {
-    line: NAV_LINE.FileSystem,
-    code: 'FS',
-    label: 'FILE SYSTEM LINE',
-  },
-  [ROUTE_NAME.Audio]: {
-    line: NAV_LINE.Audio,
-    code: 'AU',
-    label: 'AUDIO LINE',
-  },
+  [ROUTE_NAME.Audio]: { line: NAV_LINE.Audio, code: 'AU', label: 'AUDIO LINE' },
   [ROUTE_NAME.Notifications]: {
     line: NAV_LINE.Notifications,
     code: 'NT',
@@ -248,5 +253,84 @@ export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
     line: NAV_LINE.Sqlite,
     code: 'SQ',
     label: 'SQLITE LINE',
+  },
+  [ROUTE_NAME.MailComposer]: {
+    line: NAV_LINE.MailComposer,
+    code: 'MC',
+    label: 'MAIL COMPOSER LINE',
+  },
+  [ROUTE_NAME.Print]: { line: NAV_LINE.Print, code: 'PR', label: 'PRINT LINE' },
+  [ROUTE_NAME.Speech]: {
+    line: NAV_LINE.Speech,
+    code: 'SP',
+    label: 'SPEECH LINE',
+  },
+  [ROUTE_NAME.VideoThumbnails]: {
+    line: NAV_LINE.VideoThumbnails,
+    code: 'VT',
+    label: 'VIDEO THUMBNAILS LINE',
+  },
+  [ROUTE_NAME.DocumentPicker]: {
+    line: NAV_LINE.DocumentPicker,
+    code: 'DP',
+    label: 'DOCUMENT PICKER LINE',
+  },
+  [ROUTE_NAME.ImagePicker]: {
+    line: NAV_LINE.ImagePicker,
+    code: 'IP',
+    label: 'IMAGE PICKER LINE',
+  },
+  [ROUTE_NAME.ImageManipulator]: {
+    line: NAV_LINE.ImageManipulator,
+    code: 'IM',
+    label: 'IMAGE MANIPULATOR LINE',
+  },
+  [ROUTE_NAME.Blob]: { line: NAV_LINE.Blob, code: 'BL', label: 'BLOB LINE' },
+  [ROUTE_NAME.ScreenCapture]: {
+    line: NAV_LINE.ScreenCapture,
+    code: 'SC',
+    label: 'SCREEN CAPTURE LINE',
+  },
+  [ROUTE_NAME.Contacts]: {
+    line: NAV_LINE.Contacts,
+    code: 'CT',
+    label: 'CONTACTS LINE',
+  },
+  [ROUTE_NAME.Calendar]: {
+    line: NAV_LINE.Calendar,
+    code: 'CA',
+    label: 'CALENDAR LINE',
+  },
+  [ROUTE_NAME.AgeRange]: {
+    line: NAV_LINE.AgeRange,
+    code: 'AR',
+    label: 'AGE RANGE LINE',
+  },
+  [ROUTE_NAME.AppIntegrity]: {
+    line: NAV_LINE.AppIntegrity,
+    code: 'AI',
+    label: 'APP INTEGRITY LINE',
+  },
+  [ROUTE_NAME.IntentLauncher]: {
+    line: NAV_LINE.IntentLauncher,
+    code: 'IL',
+    label: 'INTENT LAUNCHER LINE',
+  },
+  [ROUTE_NAME.NavigationBar]: {
+    line: NAV_LINE.NavigationBar,
+    code: 'NB',
+    label: 'NAVIGATION BAR LINE',
+  },
+  [ROUTE_NAME.Font]: { line: NAV_LINE.Font, code: 'FN', label: 'FONT LINE' },
+  [ROUTE_NAME.Asset]: { line: NAV_LINE.Asset, code: 'AS', label: 'ASSET LINE' },
+  [ROUTE_NAME.AppMetrics]: {
+    line: NAV_LINE.AppMetrics,
+    code: 'AM',
+    label: 'APP METRICS LINE',
+  },
+  [ROUTE_NAME.AuthSession]: {
+    line: NAV_LINE.AuthSession,
+    code: 'AU',
+    label: 'AUTH SESSION LINE',
   },
 };

@@ -1,19 +1,11 @@
-<!--
-  @symbiote-native/standard-web-crypto tour stop — two independent actions: generate random bytes
-  via the polyfill's own `webCrypto.getRandomValues` (rendered as a hex string, same "long value"
-  case CryptoScreen's stacked result-box handles), and install the polyfill onto `globalThis.crypto`
-  then report whether it stuck. Vue SFC twin of ../../react/screens/WebCryptoScreen.tsx.
--->
 <script setup lang="ts">
 import { ref } from 'vue';
-import {} from '@symbiote-native/vue';
-import {
-  webCrypto,
-  polyfillWebCrypto,
-} from '@symbiote-native/standard-web-crypto/vue';
+import { polyfillWebCrypto, webCrypto } from '@symbiote-native/standard-web-crypto/vue';
 import ActionButton from '../components/ActionButton.vue';
+import Scenario from '../components/Scenario.vue';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
+import ValueRow from './ValueRow.vue';
 
 const RANDOM_BYTE_COUNT = 16;
 const HEX_RADIX = 16;
@@ -22,89 +14,90 @@ const HEX_PAD_LENGTH = 2;
 const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.StandardWebCrypto];
 const lineColor = LINE_COLOR[lineInfo.line];
 
-const randomBytesResult = ref<string | null>(null);
-const polyfillInstalledResult = ref<boolean | null>(null);
-
 function toHex(bytes: Uint8Array): string {
   return Array.from(bytes)
     .map(byte => byte.toString(HEX_RADIX).padStart(HEX_PAD_LENGTH, '0'))
-    .join('');
+    .join(' ');
 }
+
+// `globalThis.crypto` is not a typed global without the DOM lib, so it is read untyped
+function hasGlobalCrypto(): boolean {
+  return Reflect.get(globalThis, 'crypto') !== undefined;
+}
+
+const randomBytesHex = ref<string | null>(null);
+const isPolyfillInstalled = ref(hasGlobalCrypto());
 
 function handleGenerateRandomBytes(): void {
   const bytes = webCrypto.getRandomValues(new Uint8Array(RANDOM_BYTE_COUNT));
-  randomBytesResult.value = toHex(bytes);
+  randomBytesHex.value = toHex(bytes);
 }
 
 function handleInstallPolyfill(): void {
   polyfillWebCrypto();
-  polyfillInstalledResult.value = typeof globalThis.crypto !== 'undefined';
+  isPolyfillInstalled.value = hasGlobalCrypto();
 }
 </script>
 
 <template>
   <safe-area-view class="screen">
-    <scroll-view
-      testID="web-crypto-scroll"
-      class="screen"
-      content-container-style="scroll-content"
-    >
+    <scroll-view testID="web-crypto-scroll" class="screen" contentContainerStyle="scroll-content">
       <view :class="`line-tag line-tag-${lineInfo.line}`">
-        <text class="line-tag-text">
-          {{ `${lineInfo.code} · ${lineInfo.label}` }}
-        </text>
+        <text class="line-tag-text">{{ `${lineInfo.code} · ${lineInfo.label}` }}</text>
       </view>
       <view class="hero-card">
         <view class="hero-badge" :style="{ backgroundColor: lineColor }">
-          <text class="hero-badge-text">
-            {{ lineInfo.code }}
-          </text>
+          <text class="hero-badge-text">{{ lineInfo.code }}</text>
         </view>
         <view class="hero-copy">
-          <text class="hero-title"> Web Crypto </text>
+          <text class="hero-title">Web Crypto</text>
           <text class="hero-body">
-            @symbiote-native/standard-web-crypto — a Web Crypto API
-            `getRandomValues` polyfill built on @symbiote-native/crypto's native
+            Make web libraries that expect crypto.getRandomValues, such as uuid, nanoid or wallet
+            libraries, work on React Native by installing it on globalThis.crypto over the native
             random source.
           </text>
         </view>
       </view>
 
-      <view testID="web-crypto-random-bytes-card" class="web-crypto-card">
-        <text class="web-crypto-card-title"> Random bytes </text>
+      <Scenario
+        testID="web-crypto-scenario"
+        title="Run a web library that needs crypto.getRandomValues"
+        why="Libraries like uuid and nanoid call the Web Crypto API and crash without it. One polyfill call at startup gives them secure random numbers from the native source."
+        :steps="[
+          'Press Install polyfill',
+          'Check that globalThis.crypto is installed',
+          'Generate random bytes',
+        ]"
+        expect="The installed row switches to Yes, and every press of the random bytes button shows 16 different values."
+      />
+
+      <view testID="web-crypto-random-card" class="feature-card">
+        <view class="feature-card-header">
+          <text class="feature-card-title">Random bytes</text>
+        </view>
         <ActionButton
-          testID="web-crypto-generate-random-bytes-button"
+          testID="web-crypto-random-button"
           title="Generate 16 random bytes"
           :onPress="handleGenerateRandomBytes"
           :color="lineColor"
         />
-        <view v-if="randomBytesResult !== null" class="web-crypto-result-box">
-          <text
-            testID="web-crypto-random-bytes-result-value"
-            class="web-crypto-result-text"
-          >
-            {{ randomBytesResult }}
-          </text>
-        </view>
+        <ValueRow v-if="randomBytesHex" label="Bytes (hex)" :value="randomBytesHex" />
       </view>
 
-      <view testID="web-crypto-polyfill-card" class="web-crypto-card">
-        <text class="web-crypto-card-title"> Polyfill </text>
+      <view testID="web-crypto-polyfill-card" class="feature-card">
+        <view class="feature-card-header">
+          <text class="feature-card-title">Polyfill</text>
+        </view>
         <ActionButton
-          testID="web-crypto-install-polyfill-button"
+          testID="web-crypto-polyfill-button"
           title="Install polyfill"
           :onPress="handleInstallPolyfill"
           :color="lineColor"
         />
-        <view v-if="polyfillInstalledResult !== null" class="web-crypto-row">
-          <text class="web-crypto-row-label"> globalThis.crypto defined </text>
-          <text
-            testID="web-crypto-polyfill-result-value"
-            class="web-crypto-value-text"
-          >
-            {{ polyfillInstalledResult ? 'Yes' : 'No' }}
-          </text>
-        </view>
+        <ValueRow
+          label="globalThis.crypto installed"
+          :value="isPolyfillInstalled ? 'Yes' : 'No'"
+        />
       </view>
     </scroll-view>
   </safe-area-view>

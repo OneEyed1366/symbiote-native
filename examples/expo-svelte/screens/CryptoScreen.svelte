@@ -1,9 +1,4 @@
 <script lang="ts">
-  // @symbiote-native/crypto tour stop — three fire-and-inspect actions, each with its own result
-  // box: randomUUID() (sync), digestStringAsync(SHA256, ...) (async hex digest), and
-  // getRandomBytesAsync(16) (async byte array). Svelte twin of
-  // examples/expo-vue-sfc/screens/CryptoScreen.vue.
-  import { ScrollView } from '@symbiote-native/svelte';
   import {
     CryptoDigestAlgorithm,
     digestStringAsync,
@@ -11,49 +6,55 @@
     randomUUID,
   } from '@symbiote-native/crypto/svelte';
   import ActionButton from '../components/ActionButton.svelte';
+  import Scenario from '../components/Scenario.svelte';
   import { ROUTE_NAME } from '../routes';
   import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
-  const DIGEST_SAMPLE_TEXT = 'some fixed sample string';
+  const DIGEST_SAMPLE_STRING = 'some fixed sample string';
   const RANDOM_BYTE_COUNT = 16;
 
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Crypto];
   const lineColor = LINE_COLOR[lineInfo.line];
 
-  let uuidResult = $state<string | null>(null);
-  let digestResult = $state<string | null>(null);
-  let randomBytesResult = $state<string | null>(null);
+  let uuid = $state<string | null>(null);
+  let digest = $state<string | null>(null);
+  let randomBytes = $state<string | null>(null);
 
   function handleGenerateUuid(): void {
-    uuidResult = randomUUID();
+    uuid = randomUUID();
   }
 
-  function handleDigestSha256(): void {
+  function handleDigest(): void {
     void digestStringAsync(
       CryptoDigestAlgorithm.SHA256,
-      DIGEST_SAMPLE_TEXT,
+      DIGEST_SAMPLE_STRING,
     ).then(value => {
-      digestResult = value;
+      digest = value;
     });
   }
 
   function handleGetRandomBytes(): void {
     void getRandomBytesAsync(RANDOM_BYTE_COUNT).then(bytes => {
-      randomBytesResult = Array.from(bytes).join(', ');
+      randomBytes = Array.from(bytes).join(', ');
     });
   }
 </script>
 
+{#snippet valueRow(label: string, value: string)}
+  <view class="capability-row">
+    <text class="capability-label">{label}</text>
+    <text class="value-text">{value}</text>
+  </view>
+{/snippet}
+
 <safe-area-view class="screen">
-  <ScrollView
+  <scroll-view
     testID="crypto-scroll"
     class="screen"
     contentContainerStyle="scroll-content"
   >
     <view class={`line-tag line-tag-${lineInfo.line}`}>
-      <text class="line-tag-text">
-        {`${lineInfo.code} · ${lineInfo.label}`}
-      </text>
+      <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
     </view>
     <view class="hero-card">
       <view class="hero-badge" style={{ backgroundColor: lineColor }}>
@@ -62,55 +63,68 @@
       <view class="hero-copy">
         <text class="hero-title">Crypto</text>
         <text class="hero-body">
-          @symbiote-native/crypto — cryptographically secure random bytes,
-          randomUUID, and string digest hashing (SHA-1/256/384/512, MD2/4/5).
+          Generate secure random bytes and unique ids, and hash strings with SHA
+          or MD algorithms, using the platform's native cryptography instead of
+          JavaScript code.
         </text>
       </view>
     </view>
-    <view testID="crypto-uuid-card" class="crypto-card">
-      <text class="crypto-card-title">Random UUID</text>
+
+    <Scenario
+      testID="crypto-scenario"
+      title="Create unique ids, tokens and checksums"
+      why="Use a random UUID as an idempotency key, random bytes as a nonce or session secret, and a digest to verify that a file or a password input is unchanged."
+      steps={[
+        'Press the UUID button twice',
+        'Generate random bytes',
+        'Hash the same text twice with SHA-256',
+      ]}
+      expect="Every UUID and byte string differs, while the same text always gives the same SHA-256 digest. Known test vectors match the published values."
+    />
+
+    <view testID="crypto-uuid-card" class="feature-card">
+      <view class="feature-card-header">
+        <text class="feature-card-title">Random UUID</text>
+      </view>
       <ActionButton
-        testID="crypto-generate-uuid-button"
+        testID="crypto-uuid-button"
         title="Generate UUID"
         onPress={handleGenerateUuid}
         color={lineColor}
-      />{#if uuidResult !== null}<view class="crypto-result-box">
-          <text testID="crypto-uuid-result-value" class="crypto-result-text">
-            {uuidResult}
-          </text>
-        </view>{/if}
+      />
+      {#if uuid !== null}
+        {@render valueRow('UUID', uuid)}
+      {/if}
     </view>
-    <view testID="crypto-digest-card" class="crypto-card">
-      <text class="crypto-card-title">Digest</text>
-      <text class="info-text">
-        {`SHA-256 of "${DIGEST_SAMPLE_TEXT}"`}
-      </text>
+
+    <view testID="crypto-digest-card" class="feature-card">
+      <view class="feature-card-header">
+        <text class="feature-card-title">Digest</text>
+      </view>
       <ActionButton
-        testID="crypto-digest-sha256-button"
+        testID="crypto-digest-button"
         title="Digest SHA-256"
-        onPress={handleDigestSha256}
+        onPress={handleDigest}
         color={lineColor}
-      />{#if digestResult !== null}<view class="crypto-result-box">
-          <text testID="crypto-digest-result-value" class="crypto-result-text">
-            {digestResult}
-          </text>
-        </view>{/if}
+      />
+      {#if digest !== null}
+        {@render valueRow('SHA-256', digest)}
+      {/if}
     </view>
-    <view testID="crypto-random-bytes-card" class="crypto-card">
-      <text class="crypto-card-title">Random bytes</text>
+
+    <view testID="crypto-random-bytes-card" class="feature-card">
+      <view class="feature-card-header">
+        <text class="feature-card-title">Random bytes</text>
+      </view>
       <ActionButton
-        testID="crypto-get-random-bytes-button"
+        testID="crypto-random-bytes-button"
         title="Get 16 random bytes"
         onPress={handleGetRandomBytes}
         color={lineColor}
-      />{#if randomBytesResult !== null}<view class="crypto-result-box">
-          <text
-            testID="crypto-random-bytes-result-value"
-            class="crypto-result-text"
-          >
-            {randomBytesResult}
-          </text>
-        </view>{/if}
+      />
+      {#if randomBytes !== null}
+        {@render valueRow('Bytes', randomBytes)}
+      {/if}
     </view>
-  </ScrollView>
+  </scroll-view>
 </safe-area-view>

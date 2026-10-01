@@ -1,59 +1,45 @@
 <script lang="ts">
-  // `getAdvertisingId()` may return null: iOS Simulator, not yet authorized, or declined
-  import { ScrollView } from '@symbiote-native/svelte';
   import {
     getAdvertisingId,
     useTrackingPermissions,
   } from '@symbiote-native/tracking-transparency/svelte';
   import ActionButton from '../components/ActionButton.svelte';
+  import Scenario from '../components/Scenario.svelte';
   import { ROUTE_NAME } from '../routes';
   import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
-  type ICapabilityStatus = 'checking' | 'yes' | 'no';
+  const PENDING_LABEL = 'checking…';
 
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.TrackingTransparency];
   const lineColor = LINE_COLOR[lineInfo.line];
 
-  // The rune hands back a boxed object whose `status` is a getter — Svelte 5 reactivity is
-  // lexically scoped, so destructuring it here would freeze the value at its initial null.
+  // `status` is a getter on the boxed rune, destructuring would freeze it at the initial null
   const permissions = useTrackingPermissions();
-  let advertisingId = $state<string | null>(getAdvertisingId());
+  // Synchronous native read, `null` on Android and the iOS simulator
+  const advertisingId: string | null = getAdvertisingId();
 
-  const statusText = $derived(permissions.status?.status ?? 'checking…');
-  const grantedStatus: ICapabilityStatus = $derived.by(() => {
-    if (permissions.status === null) return 'checking';
-    return permissions.status.granted ? 'yes' : 'no';
+  const statusText = $derived(permissions.status?.status ?? PENDING_LABEL);
+  const grantedText = $derived.by(() => {
+    if (permissions.status === null) return PENDING_LABEL;
+    return permissions.status.granted ? 'Yes' : 'No';
   });
-
-  function toBadgeText(status: ICapabilityStatus): string {
-    return status === 'checking'
-      ? 'CHECKING…'
-      : status === 'yes'
-        ? 'YES'
-        : 'NO';
-  }
-
-  function handleGet(): void {
-    void permissions.getPermission();
-  }
-
-  function handleRequest(): void {
-    void permissions.requestPermission().then(() => {
-      advertisingId = getAdvertisingId();
-    });
-  }
 </script>
 
+{#snippet valueRow(label: string, value: string)}
+  <view class="capability-row">
+    <text class="capability-label">{label}</text>
+    <text class="value-text">{value}</text>
+  </view>
+{/snippet}
+
 <safe-area-view class="screen">
-  <ScrollView
+  <scroll-view
     testID="tracking-transparency-scroll"
     class="screen"
     contentContainerStyle="scroll-content"
   >
     <view class={`line-tag line-tag-${lineInfo.line}`}>
-      <text class="line-tag-text">
-        {`${lineInfo.code} · ${lineInfo.label}`}
-      </text>
+      <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
     </view>
     <view class="hero-card">
       <view class="hero-badge" style={{ backgroundColor: lineColor }}>
@@ -62,64 +48,56 @@
       <view class="hero-copy">
         <text class="hero-title">Tracking Transparency</text>
         <text class="hero-body">
-          @symbiote-native/tracking-transparency — App Tracking Transparency
-          permission status plus the advertising ID it gates. Android/web always
-          report granted.
+          Ask permission to track the user across apps before you use the
+          advertising id. iOS shows the App Tracking Transparency prompt,
+          Android always reports granted.
         </text>
       </view>
     </view>
+
+    <Scenario
+      testID="tracking-transparency-scenario"
+      title="Ask before using the advertising id"
+      why="Apple requires the tracking prompt before an app reads the advertising id for ads or attribution. Without consent the id is empty, so the app must work either way."
+      steps={[
+        'Press Get to read the current status',
+        'Press Request and answer the system prompt',
+        'Read the advertising id below',
+      ]}
+      expect="The status changes to granted or denied after your answer. The id shows a value only after consent on a real iOS device and is null elsewhere."
+    />
+
     <view
       testID="tracking-transparency-permission-card"
-      class="tracking-transparency-card"
+      class="feature-card"
     >
-      <text class="tracking-transparency-card-title">Permission</text>
-      <view class="tracking-transparency-row">
-        <text class="tracking-transparency-row-label">Status</text>
-        <text
-          testID="tracking-transparency-status-value"
-          class="tracking-transparency-value-text"
-        >
-          {statusText}
-        </text>
+      <view class="feature-card-header">
+        <text class="feature-card-title">Permission</text>
       </view>
-      <view class="tracking-transparency-row">
-        <text class="tracking-transparency-row-label">Granted</text>
-        <view
-          class={`tracking-transparency-status-badge tracking-transparency-status-badge-${grantedStatus}`}
-        >
-          <text class="tracking-transparency-status-text">
-            {toBadgeText(grantedStatus)}
-          </text>
-        </view>
-      </view>
-      <view class="button-row">
-        <ActionButton
-          testID="tracking-transparency-get-button"
-          title="Get"
-          onPress={handleGet}
-          color={lineColor}
-        />
-        <ActionButton
-          testID="tracking-transparency-request-button"
-          title="Request"
-          onPress={handleRequest}
-          color={lineColor}
-        />
-      </view>
+      {@render valueRow('Status', statusText)}
+      {@render valueRow('Granted', grantedText)}
+      <ActionButton
+        testID="tracking-transparency-get-button"
+        title="Get"
+        onPress={() => permissions.getPermission()}
+        color={lineColor}
+      />
+      <ActionButton
+        testID="tracking-transparency-request-button"
+        title="Request"
+        onPress={() => permissions.requestPermission()}
+        color={lineColor}
+      />
     </view>
+
     <view
       testID="tracking-transparency-advertising-id-card"
-      class="tracking-transparency-card"
+      class="feature-card"
     >
-      <text class="tracking-transparency-card-title">Advertising ID</text>
-      <view class="tracking-transparency-result-box">
-        <text
-          testID="tracking-transparency-advertising-id-value"
-          class="tracking-transparency-result-text"
-        >
-          {advertisingId ?? 'null'}
-        </text>
+      <view class="feature-card-header">
+        <text class="feature-card-title">Advertising ID</text>
       </view>
+      {@render valueRow('Advertising ID', advertisingId ?? 'null')}
     </view>
-  </ScrollView>
+  </scroll-view>
 </safe-area-view>

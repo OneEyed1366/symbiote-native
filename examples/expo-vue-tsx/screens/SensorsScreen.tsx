@@ -1,13 +1,5 @@
-import { computed, defineComponent, onMounted, ref } from 'vue';
-import type { ComputedRef, Ref } from 'vue';
-import {} from '@symbiote-native/vue';
-import {
-  useAccelerometer,
-  useDeviceMotion,
-  useGyroscope,
-  useMagnetometer,
-  usePedometer,
-} from '@symbiote-native/sensors/vue';
+import { computed, defineComponent, onMounted, onUnmounted, ref } from 'vue';
+import type { ComputedRef, Ref, VNodeChild } from 'vue';
 import {
   Accelerometer,
   DeviceMotion,
@@ -15,11 +7,28 @@ import {
   Magnetometer,
   isAvailableAsync as isPedometerAvailableAsync,
 } from '@symbiote-native/sensors';
+import {
+  useAccelerometer,
+  useDeviceMotion,
+  useGyroscope,
+  useMagnetometer,
+  usePedometer,
+} from '@symbiote-native/sensors/vue';
 import { ROUTE_NAME } from '../routes';
+import { Scenario } from '../components/Scenario';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
-type ISensorAvailability = 'checking' | 'unavailable' | 'available';
-type ISensorStatus = 'checking' | 'unavailable' | 'waiting' | 'live';
+// Pedometer has no shared singleton upstream, so it is wrapped in a stable module-level object
+const PEDOMETER_SENSOR = { isAvailableAsync: isPedometerAvailableAsync };
+
+const SENSOR_STATUS = {
+  checking: 'checking',
+  unavailable: 'unavailable',
+  waiting: 'waiting',
+  live: 'live',
+} as const;
+type ISensorStatus = (typeof SENSOR_STATUS)[keyof typeof SENSOR_STATUS];
+type ISensorAvailability = 'checking' | 'available' | 'unavailable';
 
 const SENSOR_STATUS_TEXT: Record<ISensorStatus, string> = {
   checking: 'CHECKING…',
@@ -28,119 +37,128 @@ const SENSOR_STATUS_TEXT: Record<ISensorStatus, string> = {
   live: 'LIVE',
 };
 
-// Resolves once per sensor on mount — kept separate from the live-measurement ref (useX()
-// composables from @symbiote-native/sensors/vue) so the screen can tell "not available on this
-// device" apart from "available, no reading yet": 'checking' means the isAvailableAsync() check
-// is still in flight.
-function useSensorAvailability(
-  checkAvailable: () => Promise<boolean>,
-): Ref<ISensorAvailability> {
+// A sensor can be unavailable (simulator) or available with no first reading yet,
+// the two must not render as one blank state
+function useSensorAvailability(sensor: {
+  isAvailableAsync: () => Promise<boolean>;
+}): Ref<ISensorAvailability> {
   const availability = ref<ISensorAvailability>('checking');
 
+  let isMounted = true;
+  onUnmounted(() => {
+    isMounted = false;
+  });
   onMounted(() => {
-    checkAvailable().then(available => {
-      availability.value = available ? 'available' : 'unavailable';
+    sensor.isAvailableAsync().then(isAvailable => {
+      if (isMounted) {
+        availability.value = isAvailable ? 'available' : 'unavailable';
+      }
     });
   });
 
   return availability;
 }
 
-function sensorStatus(
-  availability: Ref<ISensorAvailability>,
+function useSensorStatus(
+  sensor: { isAvailableAsync: () => Promise<boolean> },
   hasReading: () => boolean,
 ): ComputedRef<ISensorStatus> {
+  const availability = useSensorAvailability(sensor);
   return computed(() => {
-    if (availability.value === 'checking') return 'checking';
-    if (availability.value === 'unavailable') return 'unavailable';
-    return hasReading() ? 'live' : 'waiting';
+    if (availability.value === 'checking') {
+      return SENSOR_STATUS.checking;
+    }
+    if (availability.value === 'unavailable') {
+      return SENSOR_STATUS.unavailable;
+    }
+    return hasReading() ? SENSOR_STATUS.live : SENSOR_STATUS.waiting;
   });
 }
 
-function renderSensorBody(status: ISensorStatus, children: () => unknown) {
-  if (status === 'checking')
-    return <text class="info-text">checking availability…</text>;
-  if (status === 'unavailable')
-    return <text class="info-text">not available on this device</text>;
-  if (status === 'waiting')
-    return <text class="info-text">waiting for first reading…</text>;
-  return children();
-}
-
-function renderAxisRow(measurement: { x: number; y: number; z: number }) {
+function SensorStatusBadge(props: { status: ISensorStatus }) {
   return (
-    <view class="sensor-reading-row">
-      <view class="sensor-reading-chip">
-        <text class="sensor-reading-label">X</text>
-        <text class="sensor-reading-value">{measurement.x.toFixed(3)}</text>
-      </view>
-      <view class="sensor-reading-chip">
-        <text class="sensor-reading-label">Y</text>
-        <text class="sensor-reading-value">{measurement.y.toFixed(3)}</text>
-      </view>
-      <view class="sensor-reading-chip">
-        <text class="sensor-reading-label">Z</text>
-        <text class="sensor-reading-value">{measurement.z.toFixed(3)}</text>
-      </view>
+    <view class={`sensor-status-badge sensor-status-badge-${props.status}`}>
+      <text class="sensor-status-text">{SENSOR_STATUS_TEXT[props.status]}</text>
     </view>
   );
 }
 
-/**
- * Sensors demo: one card per @symbiote-native/sensors composable — Accelerometer, Gyroscope,
- * Magnetometer, DeviceMotion, Pedometer — each independently resolving isAvailableAsync() and
- * subscribing to live readings. iOS Simulator genuinely reports every CoreMotion/CMPedometer
- * sensor as unavailable (no real IMU/pedometer hardware) — that's expected, verify on a real
- * device to see live readings. Vue TSX twin of ../../react/screens/SensorsScreen.tsx — same
- * 4-state card (checking/unavailable/waiting/live) and X/Y/Z reading-chip layout, React being
- * this repo's "prove the pattern first" adapter for this package.
- */
+function SensorCard(
+  props: { testID: string; title: string; status: ISensorStatus },
+  { slots }: { slots: { default?: () => VNodeChild } },
+) {
+  return (
+    <view testID={props.testID} class="sensor-card">
+      <view class="sensor-card-header">
+        <text class="sensor-card-title">{props.title}</text>
+        <SensorStatusBadge status={props.status} />
+      </view>
+      {props.status === SENSOR_STATUS.checking && (
+        <text class="info-text">checking availability…</text>
+      )}
+      {props.status === SENSOR_STATUS.unavailable && (
+        <text class="info-text">not available on this device</text>
+      )}
+      {props.status === SENSOR_STATUS.waiting && (
+        <text class="info-text">waiting for first reading…</text>
+      )}
+      {props.status === SENSOR_STATUS.live && slots.default?.()}
+    </view>
+  );
+}
+
+function ReadingChip(props: { label: string; value: number }) {
+  return (
+    <view class="sensor-reading-chip">
+      <text class="sensor-reading-label">{props.label}</text>
+      <text class="sensor-reading-value">{props.value.toFixed(3)}</text>
+    </view>
+  );
+}
+
+function AxisReadingRow(props: {
+  measurement: { x: number; y: number; z: number };
+}) {
+  return (
+    <view class="sensor-reading-row">
+      <ReadingChip label="X" value={props.measurement.x} />
+      <ReadingChip label="Y" value={props.measurement.y} />
+      <ReadingChip label="Z" value={props.measurement.z} />
+    </view>
+  );
+}
+
 export const SensorsScreen = defineComponent(
   () => {
     const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Sensors];
 
     const accelerometer = useAccelerometer();
-    const accelerometerAvailability = useSensorAvailability(() =>
-      Accelerometer.isAvailableAsync(),
-    );
-    const accelerometerStatus = sensorStatus(
-      accelerometerAvailability,
+    const accelerometerStatus = useSensorStatus(
+      Accelerometer,
       () => accelerometer.value !== null,
     );
 
     const gyroscope = useGyroscope();
-    const gyroscopeAvailability = useSensorAvailability(() =>
-      Gyroscope.isAvailableAsync(),
-    );
-    const gyroscopeStatus = sensorStatus(
-      gyroscopeAvailability,
+    const gyroscopeStatus = useSensorStatus(
+      Gyroscope,
       () => gyroscope.value !== null,
     );
 
     const magnetometer = useMagnetometer();
-    const magnetometerAvailability = useSensorAvailability(() =>
-      Magnetometer.isAvailableAsync(),
-    );
-    const magnetometerStatus = sensorStatus(
-      magnetometerAvailability,
+    const magnetometerStatus = useSensorStatus(
+      Magnetometer,
       () => magnetometer.value !== null,
     );
 
     const deviceMotion = useDeviceMotion();
-    const deviceMotionAvailability = useSensorAvailability(() =>
-      DeviceMotion.isAvailableAsync(),
-    );
-    const deviceMotionStatus = sensorStatus(
-      deviceMotionAvailability,
+    const deviceMotionStatus = useSensorStatus(
+      DeviceMotion,
       () => deviceMotion.value !== null,
     );
 
     const pedometer = usePedometer();
-    const pedometerAvailability = useSensorAvailability(() =>
-      isPedometerAvailableAsync(),
-    );
-    const pedometerStatus = sensorStatus(
-      pedometerAvailability,
+    const pedometerStatus = useSensorStatus(
+      PEDOMETER_SENSOR,
       () => pedometer.value !== null,
     );
 
@@ -164,131 +182,90 @@ export const SensorsScreen = defineComponent(
             <view class="hero-copy">
               <text class="hero-title">Sensors</text>
               <text class="hero-body">
-                @symbiote-native/sensors — live readings from five
-                expo-sensors-backed hooks. A simulator reports every
-                CoreMotion/CMPedometer-backed sensor as unavailable; a real
-                device is needed to see live readings.
+                Read the phone's motion hardware live: accelerometer, gyroscope,
+                magnetometer, combined device motion and step counter. A
+                simulator reports every sensor as unavailable, use a real
+                device.
               </text>
             </view>
           </view>
 
-          <view class="sensor-card" testID="sensor-card-accelerometer">
-            <view class="sensor-card-header">
-              <text class="sensor-card-title">Accelerometer</text>
-              <view
-                class={`sensor-status-badge sensor-status-badge-${accelerometerStatus.value}`}
-              >
-                <text class="sensor-status-text">
-                  {SENSOR_STATUS_TEXT[accelerometerStatus.value]}
-                </text>
-              </view>
-            </view>
-            {renderSensorBody(
-              accelerometerStatus.value,
-              () => accelerometer.value && renderAxisRow(accelerometer.value),
-            )}
-          </view>
+          <Scenario
+            testID="sensors-scenario"
+            title="Detect a shake, a tilt, a compass heading or a step"
+            why="Games, level tools and fitness features read the motion sensors: tilt to steer, shake to undo, magnetometer for a compass and the pedometer for steps."
+            steps={['Tilt and shake the phone and watch the accelerometer', 'Rotate it and watch the gyroscope', 'Walk a few steps and watch the pedometer']}
+            expect="The numbers change live with each movement. A card that says unavailable means the device has no such sensor or the simulator cannot provide it."
+          />
 
-          <view class="sensor-card" testID="sensor-card-gyroscope">
-            <view class="sensor-card-header">
-              <text class="sensor-card-title">Gyroscope</text>
-              <view
-                class={`sensor-status-badge sensor-status-badge-${gyroscopeStatus.value}`}
-              >
-                <text class="sensor-status-text">
-                  {SENSOR_STATUS_TEXT[gyroscopeStatus.value]}
-                </text>
-              </view>
-            </view>
-            {renderSensorBody(
-              gyroscopeStatus.value,
-              () => gyroscope.value && renderAxisRow(gyroscope.value),
+          <SensorCard
+            testID="sensors-accelerometer"
+            title="Accelerometer"
+            status={accelerometerStatus.value}
+          >
+            {accelerometer.value && (
+              <AxisReadingRow measurement={accelerometer.value} />
             )}
-          </view>
+          </SensorCard>
 
-          <view class="sensor-card" testID="sensor-card-magnetometer">
-            <view class="sensor-card-header">
-              <text class="sensor-card-title">Magnetometer</text>
-              <view
-                class={`sensor-status-badge sensor-status-badge-${magnetometerStatus.value}`}
-              >
-                <text class="sensor-status-text">
-                  {SENSOR_STATUS_TEXT[magnetometerStatus.value]}
-                </text>
-              </view>
-            </view>
-            {renderSensorBody(
-              magnetometerStatus.value,
-              () => magnetometer.value && renderAxisRow(magnetometer.value),
+          <SensorCard
+            testID="sensors-gyroscope"
+            title="Gyroscope"
+            status={gyroscopeStatus.value}
+          >
+            {gyroscope.value && <AxisReadingRow measurement={gyroscope.value} />}
+          </SensorCard>
+
+          <SensorCard
+            testID="sensors-magnetometer"
+            title="Magnetometer"
+            status={magnetometerStatus.value}
+          >
+            {magnetometer.value && (
+              <AxisReadingRow measurement={magnetometer.value} />
             )}
-          </view>
+          </SensorCard>
 
-          <view class="sensor-card" testID="sensor-card-device-motion">
-            <view class="sensor-card-header">
-              <text class="sensor-card-title">Device motion</text>
-              <view
-                class={`sensor-status-badge sensor-status-badge-${deviceMotionStatus.value}`}
-              >
-                <text class="sensor-status-text">
-                  {SENSOR_STATUS_TEXT[deviceMotionStatus.value]}
-                </text>
-              </view>
-            </view>
-            {renderSensorBody(deviceMotionStatus.value, () => {
-              const motion = deviceMotion.value;
-              if (!motion) return null;
-              return [
-                <text class="info-text">{`interval: ${motion.interval.toFixed(1)}ms`}</text>,
-                motion.rotation && (
-                  <view class="sensor-reading-row">
-                    <view class="sensor-reading-chip">
-                      <text class="sensor-reading-label">ALPHA</text>
-                      <text class="sensor-reading-value">
-                        {motion.rotation.alpha.toFixed(3)}
-                      </text>
-                    </view>
-                    <view class="sensor-reading-chip">
-                      <text class="sensor-reading-label">BETA</text>
-                      <text class="sensor-reading-value">
-                        {motion.rotation.beta.toFixed(3)}
-                      </text>
-                    </view>
-                    <view class="sensor-reading-chip">
-                      <text class="sensor-reading-label">GAMMA</text>
-                      <text class="sensor-reading-value">
-                        {motion.rotation.gamma.toFixed(3)}
-                      </text>
-                    </view>
-                  </view>
-                ),
-              ];
-            })}
-          </view>
-
-          <view class="sensor-card" testID="sensor-card-pedometer">
-            <view class="sensor-card-header">
-              <text class="sensor-card-title">Pedometer</text>
-              <view
-                class={`sensor-status-badge sensor-status-badge-${pedometerStatus.value}`}
-              >
-                <text class="sensor-status-text">
-                  {SENSOR_STATUS_TEXT[pedometerStatus.value]}
-                </text>
-              </view>
-            </view>
-            {renderSensorBody(
-              pedometerStatus.value,
-              () =>
-                pedometer.value && (
-                  <text
-                    testID="sensors-pedometer-steps"
-                    class="sensor-reading-value"
-                  >
-                    {`${pedometer.value.steps} steps`}
-                  </text>
-                ),
+          <SensorCard
+            testID="sensors-device-motion"
+            title="Device motion"
+            status={deviceMotionStatus.value}
+          >
+            {deviceMotion.value && (
+              <text class="info-text">{`interval: ${deviceMotion.value.interval.toFixed(1)}ms`}</text>
             )}
-          </view>
+            {deviceMotion.value?.rotation && (
+              <view class="sensor-reading-row">
+                <ReadingChip
+                  label="ALPHA"
+                  value={deviceMotion.value.rotation.alpha}
+                />
+                <ReadingChip
+                  label="BETA"
+                  value={deviceMotion.value.rotation.beta}
+                />
+                <ReadingChip
+                  label="GAMMA"
+                  value={deviceMotion.value.rotation.gamma}
+                />
+              </view>
+            )}
+          </SensorCard>
+
+          <SensorCard
+            testID="sensors-pedometer"
+            title="Pedometer"
+            status={pedometerStatus.value}
+          >
+            {pedometer.value && (
+              <text
+                testID="sensors-pedometer-steps"
+                class="sensor-reading-value"
+              >
+                {`${pedometer.value.steps} steps`}
+              </text>
+            )}
+          </SensorCard>
         </scroll-view>
       </safe-area-view>
     );

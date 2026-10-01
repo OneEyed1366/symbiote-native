@@ -1,50 +1,50 @@
 import { defineComponent, onMounted, onUnmounted, ref } from 'vue';
-import type { Ref } from 'vue';
-import {} from '@symbiote-native/vue';
 import {
   getBackgroundColorAsync,
   setBackgroundColorAsync,
 } from '@symbiote-native/system-ui/vue';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
+import { Scenario } from '../components/Scenario';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
+
+const PRESET_RED = '#ef4444';
+const PRESET_BLUE = '#3b82f6';
 
 function ValueRow(props: { label: string; value: string }) {
   return (
-    <view class="auth-capability-row">
-      <text class="auth-capability-label">{props.label}</text>
-      <text class="auth-value-text">{props.value}</text>
+    <view class="capability-row">
+      <text class="capability-label">{props.label}</text>
+      <text class="value-text">{props.value}</text>
     </view>
   );
 }
 
-/**
- * System UI demo: @symbiote-native/system-ui — get/set the root view's background color. Plain
- * re-export, same for every adapter. Fetches the current color on mount and after every set.
- */
 export const SystemUiScreen = defineComponent(
   () => {
     const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.SystemUi];
-    const lineColor = LINE_COLOR[ROUTE_LINE_INFO[ROUTE_NAME.SystemUi].line];
+    const lineColor = LINE_COLOR[lineInfo.line];
 
-    const backgroundColor: Ref<string | null> = ref(null);
+    const backgroundColor = ref<string | null>(null);
 
     let isMounted = true;
     onUnmounted(() => {
       isMounted = false;
     });
 
-    function refreshBackgroundColor() {
-      getBackgroundColorAsync().then(value => {
-        if (isMounted) backgroundColor.value = value ? String(value) : null;
+    const refresh = () => {
+      getBackgroundColorAsync().then(color => {
+        if (isMounted) {
+          backgroundColor.value = color === null ? null : String(color);
+        }
       });
-    }
+    };
 
-    function handleSetColor(color: string | null) {
-      setBackgroundColorAsync(color).then(refreshBackgroundColor);
-    }
+    onMounted(refresh);
 
-    onMounted(refreshBackgroundColor);
+    const applyColor = (color: string | null) => {
+      setBackgroundColorAsync(color).then(refresh);
+    };
 
     return () => (
       <safe-area-view class="screen">
@@ -63,36 +63,45 @@ export const SystemUiScreen = defineComponent(
             <view class="hero-copy">
               <text class="hero-title">System UI</text>
               <text class="hero-body">
-                @symbiote-native/system-ui — reads and sets the root view's
-                background color, affecting the whole app.
+                Set the color of the window behind your app, so keyboard
+                animations, overscroll and screen transitions do not flash white
+                against a dark theme.
               </text>
             </view>
           </view>
 
-          <view testID="system-ui-card" class="auth-card">
-            <view class="auth-card-header">
-              <text class="auth-card-title">Background color</text>
+          <Scenario
+            testID="system-ui-scenario"
+            title="Match the window background to the app theme"
+            why="The root view shows through during overscroll, rotation and keyboard transitions. Setting it to the theme color removes the white flash in dark mode."
+            steps={['Press Red or Blue', 'Overscroll the list or rotate the phone', 'Press Reset']}
+            expect="The color row shows the new value and the color appears wherever the window shows through. Reset returns the default."
+          />
+
+          <view testID="system-ui-card" class="feature-card">
+            <view class="feature-card-header">
+              <text class="feature-card-title">Root view background</text>
             </view>
             <ValueRow
-              label="Current"
+              label="Current color"
               value={backgroundColor.value ?? 'not set'}
             />
             <ActionButton
               testID="system-ui-red-button"
               title="Red"
-              onPress={() => handleSetColor('#ef4444')}
+              onPress={() => applyColor(PRESET_RED)}
               color={lineColor}
             />
             <ActionButton
               testID="system-ui-blue-button"
               title="Blue"
-              onPress={() => handleSetColor('#3b82f6')}
+              onPress={() => applyColor(PRESET_BLUE)}
               color={lineColor}
             />
             <ActionButton
               testID="system-ui-reset-button"
               title="Reset"
-              onPress={() => handleSetColor(null)}
+              onPress={() => applyColor(null)}
               color={lineColor}
             />
           </view>

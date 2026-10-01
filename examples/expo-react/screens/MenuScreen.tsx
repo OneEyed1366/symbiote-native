@@ -155,6 +155,101 @@ const MENU_ITEMS: readonly IMenuItem[] = [
     route: ROUTE_NAME.Sqlite,
     hint: '@symbiote-native/sqlite — Provider-scoped database, tagged-template SQL, transactions, and a SQLite-backed key-value store',
   },
+  {
+    label: 'Mail Composer',
+    route: ROUTE_NAME.MailComposer,
+    hint: '@symbiote-native/mail-composer — system mail composer prefilled with recipients, subject, body and attachments; installed mail clients',
+  },
+  {
+    label: 'Print',
+    route: ROUTE_NAME.Print,
+    hint: '@symbiote-native/print — AirPrint / Android print framework for HTML or a file, printer picker, HTML to PDF',
+  },
+  {
+    label: 'Speech',
+    route: ROUTE_NAME.Speech,
+    hint: '@symbiote-native/speech — text-to-speech: voices, pitch/rate/volume, pause/resume, boundary events',
+  },
+  {
+    label: 'Video Thumbnails',
+    route: ROUTE_NAME.VideoThumbnails,
+    hint: '@symbiote-native/video-thumbnails — still-frame image from a local or remote video at a chosen time and quality',
+  },
+  {
+    label: 'Document Picker',
+    route: ROUTE_NAME.DocumentPicker,
+    hint: '@symbiote-native/document-picker — system document picker: MIME filters, multiple selection, cache copy',
+  },
+  {
+    label: 'Image Picker',
+    route: ROUTE_NAME.ImagePicker,
+    hint: '@symbiote-native/image-picker — photo library and camera picker, editing/crop, video presets, permissions',
+  },
+  {
+    label: 'Image Manipulator',
+    route: ROUTE_NAME.ImageManipulator,
+    hint: '@symbiote-native/image-manipulator — resize, rotate, flip, crop and save as JPEG/PNG/WEBP, chainable context and hook',
+  },
+  {
+    label: 'Blob',
+    route: ROUTE_NAME.Blob,
+    hint: '@symbiote-native/blob — native JSI-backed W3C Blob: slice, bytes, text, arrayBuffer, stream',
+  },
+  {
+    label: 'Screen Capture',
+    route: ROUTE_NAME.ScreenCapture,
+    hint: '@symbiote-native/screen-capture — block screenshots and recording, app-switcher blur, screenshot listener, permissions',
+  },
+  {
+    label: 'Contacts',
+    route: ROUTE_NAME.Contacts,
+    hint: '@symbiote-native/contacts — modern Contact/Group/Container API, iOS 18 access button, legacy function API',
+  },
+  {
+    label: 'Calendar',
+    route: ROUTE_NAME.Calendar,
+    hint: '@symbiote-native/calendar — modern ExpoCalendar/event/attendee/reminder classes, recurrence and alarms, legacy function API',
+  },
+  {
+    label: 'Age Range',
+    route: ROUTE_NAME.AgeRange,
+    hint: '@symbiote-native/age-range — Apple Declared Age Range and Google Play Age Signals, fake signals for testing',
+  },
+  {
+    label: 'App Integrity',
+    route: ROUTE_NAME.AppIntegrity,
+    hint: '@symbiote-native/app-integrity — App Attest, Play Integrity and Android hardware-attested keys',
+  },
+  {
+    label: 'Intent Launcher',
+    route: ROUTE_NAME.IntentLauncher,
+    hint: '@symbiote-native/intent-launcher — Android only: start any system activity or app with a full intent',
+  },
+  {
+    label: 'Navigation Bar',
+    route: ROUTE_NAME.NavigationBar,
+    hint: '@symbiote-native/navigation-bar — Android only: style and hide the system navigation bar, component, stack and listener',
+  },
+  {
+    label: 'Font',
+    route: ROUTE_NAME.Font,
+    hint: '@symbiote-native/font — runtime font loading from uri, FontResource or Asset, useFonts, glyphs to image',
+  },
+  {
+    label: 'Asset',
+    route: ROUTE_NAME.Asset,
+    hint: '@symbiote-native/asset — bundled modules, remote uris and metadata as Asset objects, downloads, useAssets',
+  },
+  {
+    label: 'App Metrics',
+    route: ROUTE_NAME.AppMetrics,
+    hint: '@symbiote-native/app-metrics — startup marks, sessions, log events, error reporting, boundary and network observer',
+  },
+  {
+    label: 'Auth Session',
+    route: ROUTE_NAME.AuthSession,
+    hint: '@symbiote-native/auth-session — OAuth 2 and OpenID Connect: discovery, AuthRequest with PKCE, token calls, Google and Facebook hooks',
+  },
 ];
 
 /**

@@ -1,110 +1,77 @@
-<!--
-  @symbiote-native/keep-awake tour stop — useKeepAwake() has no on/off switch of its own, it
-  activates on mount and deactivates on unmount, so a toggle mounting/unmounting a tiny child
-  component (KeepAwakeHolder, defined below) is what actually acquires/releases the lock. Vue SFC
-  twin of ../../react/screens/KeepAwakeScreen.tsx and the Vue-TSX twin
-  ../../expo-vue-tsx/screens/KeepAwakeScreen.tsx (same defineComponent-holder shape, ported to SFC).
--->
 <script setup lang="ts">
-import { defineComponent, onMounted, ref } from 'vue';
-import {} from '@symbiote-native/vue';
-import {
-  isAvailableAsync,
-  useKeepAwake,
-} from '@symbiote-native/keep-awake/vue';
-import ActionButton from '../components/ActionButton.vue';
+import { computed, onMounted, ref } from 'vue';
+import { isAvailableAsync } from '@symbiote-native/keep-awake/vue';
+import Scenario from '../components/Scenario.vue';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
-
-type ICapabilityStatus = 'checking' | 'yes' | 'no';
-
-function toCapabilityStatus(value: boolean): ICapabilityStatus {
-  return value ? 'yes' : 'no';
-}
-
-// Holds the keep-awake lock only while mounted — useKeepAwake() activates in onMounted and
-// deactivates in onUnmounted internally, so mounting/unmounting THIS component (via v-if below)
-// is what actually acquires/releases the lock.
-const KeepAwakeHolder = defineComponent(() => {
-  useKeepAwake();
-  return () => null;
-});
+import KeepAwakeHolder from './KeepAwakeHolder.vue';
 
 const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.KeepAwake];
 const lineColor = LINE_COLOR[lineInfo.line];
 
-const isHeld = ref<boolean>(false);
-const isAvailable = ref<ICapabilityStatus>('checking');
+const isKeepAwakeOn = ref(false);
+const isAvailable = ref<boolean | null>(null);
 
 onMounted(() => {
   void isAvailableAsync().then(value => {
-    isAvailable.value = toCapabilityStatus(value);
+    isAvailable.value = value;
   });
 });
 
-function handleToggle(): void {
-  isHeld.value = !isHeld.value;
-}
+const availableLabel = computed(() =>
+  isAvailable.value === null ? 'checking…' : isAvailable.value ? 'Yes' : 'No',
+);
 </script>
 
 <template>
   <safe-area-view class="screen">
-    <scroll-view
-      testID="keep-awake-scroll"
-      class="screen"
-      content-container-style="scroll-content"
-    >
+    <scroll-view testID="keep-awake-scroll" class="screen" contentContainerStyle="scroll-content">
       <view :class="`line-tag line-tag-${lineInfo.line}`">
-        <text class="line-tag-text">
-          {{ `${lineInfo.code} · ${lineInfo.label}` }}
-        </text>
+        <text class="line-tag-text">{{ `${lineInfo.code} · ${lineInfo.label}` }}</text>
       </view>
       <view class="hero-card">
         <view class="hero-badge" :style="{ backgroundColor: lineColor }">
-          <text class="hero-badge-text">
-            {{ lineInfo.code }}
-          </text>
+          <text class="hero-badge-text">{{ lineInfo.code }}</text>
         </view>
         <view class="hero-copy">
-          <text class="hero-title"> Keep Awake </text>
+          <text class="hero-title">Keep Awake</text>
           <text class="hero-body">
-            @symbiote-native/keep-awake — keeps the screen on for as long as a
-            component holding useKeepAwake() stays mounted.
+            Stop the screen from dimming and locking while a component is mounted, for a recipe, a
+            workout timer, a video or a boarding pass.
           </text>
         </view>
       </view>
 
-      <view testID="keep-awake-card" class="keep-awake-card">
-        <text class="keep-awake-card-title"> Screen lock </text>
-        <view class="keep-awake-row">
-          <text class="keep-awake-row-label"> Available </text>
-          <view
-            :class="`keep-awake-status-badge keep-awake-status-badge-${isAvailable}`"
-          >
-            <text class="keep-awake-status-text">
-              {{
-                isAvailable === 'checking'
-                  ? 'CHECKING…'
-                  : isAvailable === 'yes'
-                    ? 'YES'
-                    : 'NO'
-              }}
-            </text>
-          </view>
+      <Scenario
+        testID="keep-awake-scenario"
+        title="Keep the screen on while someone follows a recipe or a workout"
+        why="Hands that are busy cannot tap the screen to wake it. The lock lives exactly as long as the component that asked for it, so it cannot be left on by mistake."
+        :steps="[
+          'Turn the switch on',
+          'Put the phone down and wait past the auto-lock time',
+          'Turn the switch off and wait again',
+        ]"
+        expect="With the switch on the screen stays lit, and with it off the phone dims and locks after its normal timeout."
+      />
+
+      <view testID="keep-awake-card" class="feature-card">
+        <view class="feature-card-header">
+          <text class="feature-card-title">Keep screen awake</text>
         </view>
-        <view class="keep-awake-row">
-          <text class="keep-awake-row-label"> Held </text>
-          <text testID="keep-awake-held-value" class="keep-awake-value-text">
-            {{ isHeld ? 'true' : 'false' }}
-          </text>
+        <view class="capability-row">
+          <text class="capability-label">Available</text>
+          <text class="value-text">{{ availableLabel }}</text>
         </view>
-        <ActionButton
-          testID="keep-awake-toggle-button"
-          :title="isHeld ? 'Release keep-awake' : 'Activate keep-awake'"
-          :onPress="handleToggle"
-          :color="lineColor"
-        />
-        <KeepAwakeHolder v-if="isHeld" />
+        <view testID="keep-awake-toggle-row" class="capability-row">
+          <text class="capability-label">Keep screen awake</text>
+          <switch
+            testID="keep-awake-switch"
+            :value="isKeepAwakeOn"
+            :trackColor="{ true: lineColor }"
+            @valueChange="event => (isKeepAwakeOn = event.value)"
+          />
+        </view>
+        <KeepAwakeHolder v-if="isKeepAwakeOn" />
       </view>
     </scroll-view>
   </safe-area-view>

@@ -5,19 +5,17 @@ import {
   setBackgroundColorAsync,
 } from '@symbiote-native/system-ui/angular';
 import { ActionButton } from '../components/ActionButton';
+import { Scenario } from '../components/Scenario';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
-/**
- * @symbiote-native/system-ui canary demo: a live root-view background-color card, seeded via
- * getBackgroundColorAsync() and refreshed after every setBackgroundColorAsync() call. Every
- * function is a plain re-export off the core package — no service to inject(), same shape as
- * @symbiote-native/crypto's plain-function surface.
- */
+const PRESET_RED = '#ef4444';
+const PRESET_BLUE = '#3b82f6';
+
 @Component({
   selector: 'SystemUiScreen',
   standalone: true,
-  imports: [ActionButton, SYMBIOTE_ELEMENTS],
+  imports: [ActionButton, Scenario, SYMBIOTE_ELEMENTS],
   template: `
     <safe-area-view class="screen">
       <scroll-view
@@ -25,83 +23,88 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <view [class]="lineTagClass">
-          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        <view [class]="'line-tag line-tag-' + lineInfo.line">
+          <text class="line-tag-text"
+            >{{ lineInfo.code }} · {{ lineInfo.label }}</text
+          >
         </view>
         <view class="hero-card">
-          <view class="hero-badge" [style]="heroBadgeStyle">
-            <text class="hero-badge-text">{{ heroBadgeCode }}</text>
+          <view class="hero-badge" [style]="badgeStyle">
+            <text class="hero-badge-text">{{ lineInfo.code }}</text>
           </view>
           <view class="hero-copy">
             <text class="hero-title">System UI</text>
             <text class="hero-body">
-              @symbiote-native/system-ui — get/set the root view's background
-              color, the color painted behind the RN surface before any content
-              mounts.
+              Set the color of the window behind your app, so keyboard
+              animations, overscroll and screen transitions do not flash white
+              against a dark theme.
             </text>
           </view>
         </view>
 
-        <view testID="system-ui-background-card" class="capability-card">
-          <text class="capability-card-title">Root background color</text>
+        <Scenario
+          testID="system-ui-scenario"
+          title="Match the window background to the app theme"
+          why="The root view shows through during overscroll, rotation and keyboard transitions. Setting it to the theme color removes the white flash in dark mode."
+          [steps]="scenarioSteps"
+          expect="The color row shows the new value and the color appears wherever the window shows through. Reset returns the default."
+        />
+
+        <view testID="system-ui-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Root view background</text>
+          </view>
           <view class="capability-row">
             <text class="capability-label">Current color</text>
-            <text testID="system-ui-color-result" class="value-text">{{
-              colorLabel()
-            }}</text>
+            <text class="value-text">{{ backgroundColor() ?? 'not set' }}</text>
           </view>
-          <view class="button-row">
-            <ActionButton
-              testID="system-ui-set-red"
-              title="Red"
-              [color]="lineColor"
-              (press)="handleSetColor('#ef4444')"
-            ></ActionButton>
-            <ActionButton
-              testID="system-ui-set-blue"
-              title="Blue"
-              [color]="lineColor"
-              (press)="handleSetColor('#3b82f6')"
-            ></ActionButton>
-            <ActionButton
-              testID="system-ui-reset"
-              title="Reset"
-              [color]="lineColor"
-              (press)="handleSetColor(null)"
-            ></ActionButton>
-          </view>
+          <ActionButton
+            testID="system-ui-red-button"
+            title="Red"
+            [color]="lineColor"
+            (press)="applyColor(presetRed)"
+          />
+          <ActionButton
+            testID="system-ui-blue-button"
+            title="Blue"
+            [color]="lineColor"
+            (press)="applyColor(presetBlue)"
+          />
+          <ActionButton
+            testID="system-ui-reset-button"
+            title="Reset"
+            [color]="lineColor"
+            (press)="applyColor(null)"
+          />
         </view>
       </scroll-view>
     </safe-area-view>
   `,
 })
 export class SystemUiScreen {
-  private readonly lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.SystemUi];
-  readonly lineTagClass = `line-tag line-tag-${this.lineInfo.line}`;
-  readonly lineTagLabel = `${this.lineInfo.code} · ${this.lineInfo.label}`;
-  readonly heroBadgeCode = this.lineInfo.code;
-  readonly lineColor = LINE_COLOR[this.lineInfo.line];
-  readonly heroBadgeStyle = { backgroundColor: this.lineColor };
+  readonly lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.SystemUi];
+  readonly lineColor = LINE_COLOR['system-ui'];
+  readonly badgeStyle = { backgroundColor: LINE_COLOR['system-ui'] };
+  readonly presetRed = PRESET_RED;
+  readonly presetBlue = PRESET_BLUE;
+  readonly scenarioSteps = [
+    'Press Red or Blue',
+    'Overscroll the list or rotate the phone',
+    'Press Reset',
+  ];
 
-  readonly color = signal<string | null | 'checking'>('checking');
+  readonly backgroundColor = signal<string | null>(null);
 
   constructor() {
-    this.refreshColor();
+    void this.refresh();
   }
 
-  handleSetColor(color: string | null): void {
-    setBackgroundColorAsync(color).then(() => this.refreshColor());
+  private async refresh(): Promise<void> {
+    const color = await getBackgroundColorAsync();
+    this.backgroundColor.set(color === null ? null : String(color));
   }
 
-  colorLabel(): string {
-    const value = this.color();
-    if (value === 'checking') return 'checking…';
-    return value ?? 'not set';
-  }
-
-  private refreshColor(): void {
-    getBackgroundColorAsync().then(value => {
-      this.color.set(typeof value === 'string' ? value : null);
-    });
+  applyColor(color: string | null): void {
+    void setBackgroundColorAsync(color).then(() => this.refresh());
   }
 }

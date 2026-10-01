@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { Platform, SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import {
   BatteryLevelService,
@@ -8,16 +8,19 @@ import {
   isAvailableAsync,
   isBatteryOptimizationEnabledAsync,
 } from '@symbiote-native/battery/angular';
+import { Scenario } from '../components/Scenario';
+import { toCapabilityStatus } from '../components/capability-status';
+import type { ICapabilityStatus } from '../components/capability-status';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
+import { CapabilityRow } from './CapabilityRow';
+import { ValueRow } from './ValueRow';
 
-type ICapabilityStatus = 'checking' | 'yes' | 'no';
+const MIN_MEASURABLE_LEVEL = 0;
+const PERCENT_SCALE = 100;
+const ANDROID_OS = 'android';
 
-function toCapabilityStatus(value: boolean): ICapabilityStatus {
-  return value ? 'yes' : 'no';
-}
-
-function formatBatteryState(state: BatteryState): string {
+function batteryStateLabel(state: BatteryState): string {
   switch (state) {
     case BatteryState.CHARGING:
       return 'Charging';
@@ -26,24 +29,16 @@ function formatBatteryState(state: BatteryState): string {
     case BatteryState.UNPLUGGED:
       return 'Unplugged';
     case BatteryState.NOT_CHARGING:
-      return 'Not charging';
+      return 'Not charging (protecting battery)';
     default:
       return 'Unknown';
   }
 }
 
-/**
- * @symbiote-native/battery canary demo: a live-status card (battery level, charging state, low
- * power mode) backed by the three Angular services' connect() signals, plus a device-info card
- * with the one-shot isAvailableAsync()/isBatteryOptimizationEnabledAsync() checks. The iOS
- * Simulator reports the battery API as unavailable — expected, not a bug. Angular twin of
- * ../../react/screens/BatteryScreen.tsx, same three-service connect() shape as
- * @symbiote-native/sensors' per-sensor services.
- */
 @Component({
   selector: 'BatteryScreen',
   standalone: true,
-  imports: [SYMBIOTE_ELEMENTS],
+  imports: [CapabilityRow, Scenario, SYMBIOTE_ELEMENTS, ValueRow],
   template: `
     <safe-area-view class="screen">
       <scroll-view
@@ -51,62 +46,61 @@ function formatBatteryState(state: BatteryState): string {
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <view [class]="lineTagClass">
-          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        <view [class]="'line-tag line-tag-' + lineInfo.line">
+          <text class="line-tag-text"
+            >{{ lineInfo.code }} · {{ lineInfo.label }}</text
+          >
         </view>
         <view class="hero-card">
-          <view class="hero-badge" [style]="heroBadgeStyle">
-            <text class="hero-badge-text">{{ heroBadgeCode }}</text>
+          <view class="hero-badge" [style]="badgeStyle">
+            <text class="hero-badge-text">{{ lineInfo.code }}</text>
           </view>
           <view class="hero-copy">
             <text class="hero-title">Battery</text>
             <text class="hero-body">
-              @symbiote-native/battery — live battery level, charging state, and
-              Low Power/Power Saver mode. The iOS Simulator reports the battery
-              API as unavailable; a real device is needed to see live values.
+              React to the battery: level, charging state and low-power mode
+              update live through hooks, so the app can pause heavy work when
+              the battery is low. A simulator reports the API as unavailable,
+              use a real device.
             </text>
           </view>
         </view>
 
-        <view testID="battery-status-card" class="capability-card">
-          <text class="capability-card-title">Live status</text>
-          <view testID="battery-level" class="capability-row">
-            <text class="capability-label">Battery level</text>
-            <text class="value-text">{{ batteryLevelLabel() }}</text>
+        <Scenario
+          testID="battery-scenario"
+          title="Pause sync and animations when the battery is low"
+          why="Skip background uploads, heavy animations or video quality when the user is on low power or unplugged at low charge, and resume when they plug in."
+          [steps]="scenarioSteps"
+          expect="Level, charging state and low power mode change on screen within a moment, without reloading."
+        />
+
+        <view testID="battery-live-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Live status</text>
           </view>
-          <view testID="battery-state" class="capability-row">
-            <text class="capability-label">State</text>
-            <text class="value-text">{{ batteryStateLabel() }}</text>
-          </view>
-          <view testID="battery-low-power-mode" class="capability-row">
-            <text class="capability-label">Low power mode</text>
-            <view [class]="statusBadgeClass(lowPowerModeStatus())">
-              <text class="status-badge-text">{{
-                statusLabel(lowPowerModeStatus())
-              }}</text>
-            </view>
-          </view>
+          <ValueRow label="Battery level" [value]="batteryLevelText()" />
+          <ValueRow label="Battery state" [value]="batteryStateText()" />
+          <ValueRow
+            label="Low power mode"
+            [value]="lowPowerMode() ? 'On' : 'Off'"
+          />
         </view>
 
-        <view testID="battery-info-card" class="capability-card">
-          <text class="capability-card-title">Device info</text>
-          <view testID="battery-available" class="capability-row">
-            <text class="capability-label">Available</text>
-            <view [class]="statusBadgeClass(isAvailable())">
-              <text class="status-badge-text">{{
-                statusLabel(isAvailable())
-              }}</text>
-            </view>
+        <view testID="battery-capabilities-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Capabilities</text>
           </view>
-          @if (Platform.OS === 'android') {
-            <view testID="battery-optimization" class="capability-row">
-              <text class="capability-label">Battery optimization enabled</text>
-              <view [class]="statusBadgeClass(batteryOptimizationEnabled())">
-                <text class="status-badge-text">{{
-                  statusLabel(batteryOptimizationEnabled())
-                }}</text>
-              </view>
-            </view>
+          <CapabilityRow
+            testID="battery-available"
+            label="Available"
+            [status]="availabilityStatus()"
+          />
+          @if (isAndroid) {
+            <CapabilityRow
+              testID="battery-optimization"
+              label="Battery optimization enabled"
+              [status]="optimizationStatus()"
+            />
           }
         </view>
       </scroll-view>
@@ -114,55 +108,39 @@ function formatBatteryState(state: BatteryState): string {
   `,
 })
 export class BatteryScreen {
-  private readonly lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Battery];
-  readonly lineTagClass = `line-tag line-tag-${this.lineInfo.line}`;
-  readonly lineTagLabel = `${this.lineInfo.code} · ${this.lineInfo.label}`;
-  readonly heroBadgeCode = this.lineInfo.code;
-  readonly lineColor = LINE_COLOR[this.lineInfo.line];
-  readonly heroBadgeStyle = { backgroundColor: this.lineColor };
+  readonly lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Battery];
+  readonly badgeStyle = { backgroundColor: LINE_COLOR.battery };
+  readonly isAndroid = Platform.OS === ANDROID_OS;
+  readonly scenarioSteps = [
+    'Turn Low Power Mode on in the system settings',
+    'Plug the charger in and out',
+    'Watch the live status card',
+  ];
 
-  readonly Platform = Platform;
-
-  readonly batteryLevel = inject(BatteryLevelService).connect();
-  readonly batteryState = inject(BatteryStateService).connect();
+  private readonly batteryLevel = inject(BatteryLevelService).connect();
+  private readonly batteryState = inject(BatteryStateService).connect();
   readonly lowPowerMode = inject(LowPowerModeService).connect();
 
-  readonly isAvailable = signal<ICapabilityStatus>('checking');
-  readonly batteryOptimizationEnabled = signal<ICapabilityStatus>('checking');
+  readonly availabilityStatus = signal<ICapabilityStatus>('checking');
+  readonly optimizationStatus = signal<ICapabilityStatus>('checking');
+
+  readonly batteryLevelText = computed(() =>
+    this.batteryLevel() < MIN_MEASURABLE_LEVEL
+      ? 'unknown'
+      : `${Math.round(this.batteryLevel() * PERCENT_SCALE)}%`,
+  );
+  readonly batteryStateText = computed(() =>
+    batteryStateLabel(this.batteryState()),
+  );
 
   constructor() {
-    isAvailableAsync().then(value =>
-      this.isAvailable.set(toCapabilityStatus(value)),
-    );
-    if (Platform.OS === 'android') {
-      isBatteryOptimizationEnabledAsync().then(value =>
-        this.batteryOptimizationEnabled.set(toCapabilityStatus(value)),
-      );
+    void isAvailableAsync().then(isSupported => {
+      this.availabilityStatus.set(toCapabilityStatus(isSupported));
+    });
+    if (this.isAndroid) {
+      void isBatteryOptimizationEnabledAsync().then(isEnabled => {
+        this.optimizationStatus.set(toCapabilityStatus(isEnabled));
+      });
     }
-  }
-
-  batteryLevelLabel(): string {
-    const level = this.batteryLevel();
-    return level < 0 ? 'unknown' : `${Math.round(level * 100)}%`;
-  }
-
-  batteryStateLabel(): string {
-    return formatBatteryState(this.batteryState());
-  }
-
-  lowPowerModeStatus(): ICapabilityStatus {
-    return toCapabilityStatus(this.lowPowerMode());
-  }
-
-  statusBadgeClass(status: ICapabilityStatus): string {
-    return `status-badge status-badge-${status}`;
-  }
-
-  statusLabel(status: ICapabilityStatus): string {
-    return status === 'checking'
-      ? 'CHECKING…'
-      : status === 'yes'
-        ? 'YES'
-        : 'NO';
   }
 }

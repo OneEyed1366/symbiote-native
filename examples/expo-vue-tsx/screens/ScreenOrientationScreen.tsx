@@ -1,5 +1,4 @@
 import { defineComponent } from 'vue';
-import {} from '@symbiote-native/vue';
 import {
   Orientation,
   OrientationLock,
@@ -9,62 +8,55 @@ import {
 } from '@symbiote-native/screen-orientation/vue';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
+import { Scenario } from '../components/Scenario';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
-const ORIENTATION_LABEL: Record<Orientation, string> = {
-  [Orientation.UNKNOWN]: 'Unknown',
-  [Orientation.PORTRAIT_UP]: 'Portrait up',
-  [Orientation.PORTRAIT_DOWN]: 'Portrait down',
-  [Orientation.LANDSCAPE_LEFT]: 'Landscape left',
-  [Orientation.LANDSCAPE_RIGHT]: 'Landscape right',
-};
+function orientationLabel(orientation: Orientation): string {
+  switch (orientation) {
+    case Orientation.PORTRAIT_UP:
+      return 'Portrait up';
+    case Orientation.PORTRAIT_DOWN:
+      return 'Portrait down';
+    case Orientation.LANDSCAPE_LEFT:
+      return 'Landscape left';
+    case Orientation.LANDSCAPE_RIGHT:
+      return 'Landscape right';
+    case Orientation.UNKNOWN:
+    default:
+      return 'Unknown';
+  }
+}
 
-const ORIENTATION_LOCK_LABEL: Record<OrientationLock, string> = {
-  [OrientationLock.DEFAULT]: 'Default',
-  [OrientationLock.ALL]: 'All',
-  [OrientationLock.PORTRAIT]: 'Portrait',
-  [OrientationLock.PORTRAIT_UP]: 'Portrait up',
-  [OrientationLock.PORTRAIT_DOWN]: 'Portrait down',
-  [OrientationLock.LANDSCAPE]: 'Landscape',
-  [OrientationLock.LANDSCAPE_LEFT]: 'Landscape left',
-  [OrientationLock.LANDSCAPE_RIGHT]: 'Landscape right',
-  [OrientationLock.OTHER]: 'Other',
-  [OrientationLock.UNKNOWN]: 'Unknown',
-};
+function orientationLockLabel(orientationLock: OrientationLock): string {
+  return OrientationLock[orientationLock] ?? 'Unknown';
+}
 
 function ValueRow(props: { label: string; value: string }) {
   return (
-    <view class="auth-capability-row">
-      <text class="auth-capability-label">{props.label}</text>
-      <text class="auth-value-text">{props.value}</text>
+    <view class="capability-row">
+      <text class="capability-label">{props.label}</text>
+      <text class="value-text">{props.value}</text>
     </view>
   );
 }
 
-/**
- * Screen Orientation demo: @symbiote-native/screen-orientation/vue's useScreenOrientation
- * composable seeds current orientation/lock and subscribes to live changes; the three buttons
- * exercise the imperative lockAsync/unlockAsync core functions directly.
- */
 export const ScreenOrientationScreen = defineComponent(
   () => {
     const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.ScreenOrientation];
-    const lineColor =
-      LINE_COLOR[ROUTE_LINE_INFO[ROUTE_NAME.ScreenOrientation].line];
-
+    const lineColor = LINE_COLOR[lineInfo.line];
     const screenOrientation = useScreenOrientation();
 
-    function handleLockPortrait() {
+    const handleLockPortrait = () => {
       lockAsync(OrientationLock.PORTRAIT_UP);
-    }
+    };
 
-    function handleLockLandscape() {
-      lockAsync(OrientationLock.LANDSCAPE);
-    }
+    const handleLockLandscape = () => {
+      lockAsync(OrientationLock.LANDSCAPE_LEFT);
+    };
 
-    function handleUnlock() {
+    const handleUnlock = () => {
       unlockAsync();
-    }
+    };
 
     return () => (
       <safe-area-view class="screen">
@@ -83,31 +75,40 @@ export const ScreenOrientationScreen = defineComponent(
             <view class="hero-copy">
               <text class="hero-title">Screen Orientation</text>
               <text class="hero-body">
-                @symbiote-native/screen-orientation — live orientation state
-                plus lock/unlock controls.
+                Control how the screen rotates: lock portrait or landscape for a
+                video, a game or a form, unlock it again, and follow the current
+                orientation live.
               </text>
             </view>
           </view>
 
-          <view testID="screen-orientation-card" class="auth-card">
-            <view class="auth-card-header">
-              <text class="auth-card-title">Current state</text>
+          <Scenario
+            testID="screen-orientation-scenario"
+            title="Lock landscape for a video player or a game"
+            why="Full-screen video and games need landscape no matter how the phone is held, while forms and feeds work best locked to portrait. Unlock hands control back to the user."
+            steps={['Press Lock landscape and turn the phone', 'Press Lock portrait', 'Press Unlock and turn the phone again']}
+            expect="The screen stays in the locked orientation however you hold the phone, and rotates freely again after Unlock. The state card shows both values."
+          />
+
+          <view testID="screen-orientation-state-card" class="feature-card">
+            <view class="feature-card-header">
+              <text class="feature-card-title">Current state</text>
             </view>
             <ValueRow
               label="Orientation"
-              value={ORIENTATION_LABEL[screenOrientation.value.orientation]}
+              value={orientationLabel(screenOrientation.value.orientation)}
             />
             <ValueRow
               label="Orientation lock"
-              value={
-                ORIENTATION_LOCK_LABEL[screenOrientation.value.orientationLock]
-              }
+              value={orientationLockLabel(
+                screenOrientation.value.orientationLock,
+              )}
             />
           </view>
 
-          <view testID="screen-orientation-actions-card" class="auth-card">
-            <view class="auth-card-header">
-              <text class="auth-card-title">Lock controls</text>
+          <view testID="screen-orientation-actions-card" class="feature-card">
+            <view class="feature-card-header">
+              <text class="feature-card-title">Actions</text>
             </view>
             <ActionButton
               testID="screen-orientation-lock-portrait-button"

@@ -1,6 +1,5 @@
 import { defineComponent, onUnmounted, ref } from 'vue';
 import type { Ref } from 'vue';
-import {} from '@symbiote-native/vue';
 import {
   CryptoDigestAlgorithm,
   digestStringAsync,
@@ -8,6 +7,7 @@ import {
   randomUUID,
 } from '@symbiote-native/crypto/vue';
 import { ActionButton } from '../components/ActionButton';
+import { Scenario } from '../components/Scenario';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
@@ -16,22 +16,17 @@ const RANDOM_BYTE_COUNT = 16;
 
 function ValueRow(props: { label: string; value: string }) {
   return (
-    <view class="auth-capability-row">
-      <text class="auth-capability-label">{props.label}</text>
-      <text class="auth-value-text">{props.value}</text>
+    <view class="capability-row">
+      <text class="capability-label">{props.label}</text>
+      <text class="value-text">{props.value}</text>
     </view>
   );
 }
 
-/**
- * Crypto demo: @symbiote-native/crypto — three one-shot calls with no per-instance state: a UUID
- * generator, a SHA-256 digest over a fixed sample string, and a random-bytes fetch rendered as
- * comma-separated numbers. Vue TSX twin of ../../expo-react/screens/CryptoScreen.tsx.
- */
 export const CryptoScreen = defineComponent(
   () => {
     const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Crypto];
-    const lineColor = LINE_COLOR[ROUTE_LINE_INFO[ROUTE_NAME.Crypto].line];
+    const lineColor = LINE_COLOR[lineInfo.line];
 
     const uuid: Ref<string | null> = ref(null);
     const digest: Ref<string | null> = ref(null);
@@ -47,12 +42,11 @@ export const CryptoScreen = defineComponent(
     }
 
     function handleDigest() {
-      digestStringAsync(
-        CryptoDigestAlgorithm.SHA256,
-        DIGEST_SAMPLE_STRING,
-      ).then(value => {
-        if (isMounted) digest.value = value;
-      });
+      digestStringAsync(CryptoDigestAlgorithm.SHA256, DIGEST_SAMPLE_STRING).then(
+        value => {
+          if (isMounted) digest.value = value;
+        },
+      );
     }
 
     function handleGetRandomBytes() {
@@ -78,16 +72,24 @@ export const CryptoScreen = defineComponent(
             <view class="hero-copy">
               <text class="hero-title">Crypto</text>
               <text class="hero-body">
-                @symbiote-native/crypto — cryptographically secure random bytes,
-                randomUUID, and string digest hashing (SHA-1/256/384/512,
-                MD2/4/5), no per-instance state.
+                Generate secure random bytes and unique ids, and hash strings with
+                SHA or MD algorithms, using the platform's native cryptography
+                instead of JavaScript code.
               </text>
             </view>
           </view>
 
-          <view testID="crypto-actions-card" class="auth-card">
-            <view class="auth-card-header">
-              <text class="auth-card-title">Random + digest</text>
+          <Scenario
+            testID="crypto-scenario"
+            title="Create unique ids, tokens and checksums"
+            why="Use a random UUID as an idempotency key, random bytes as a nonce or session secret, and a digest to verify that a file or a password input is unchanged."
+            steps={['Press the UUID button twice', 'Generate random bytes', 'Hash the same text twice with SHA-256']}
+            expect="Every UUID and byte string differs, while the same text always gives the same SHA-256 digest. Known test vectors match the published values."
+          />
+
+          <view testID="crypto-uuid-card" class="feature-card">
+            <view class="feature-card-header">
+              <text class="feature-card-title">Random UUID</text>
             </view>
             <ActionButton
               testID="crypto-uuid-button"
@@ -95,27 +97,35 @@ export const CryptoScreen = defineComponent(
               onPress={handleGenerateUuid}
               color={lineColor}
             />
-            <ValueRow label="UUID" value={uuid.value ?? 'not generated yet'} />
+            {uuid.value !== null && <ValueRow label="UUID" value={uuid.value} />}
+          </view>
+
+          <view testID="crypto-digest-card" class="feature-card">
+            <view class="feature-card-header">
+              <text class="feature-card-title">Digest</text>
+            </view>
             <ActionButton
               testID="crypto-digest-button"
               title="Digest SHA-256"
               onPress={handleDigest}
               color={lineColor}
             />
-            <ValueRow
-              label="SHA-256 digest"
-              value={digest.value ?? 'not computed yet'}
-            />
+            {digest.value !== null && <ValueRow label="SHA-256" value={digest.value} />}
+          </view>
+
+          <view testID="crypto-random-bytes-card" class="feature-card">
+            <view class="feature-card-header">
+              <text class="feature-card-title">Random bytes</text>
+            </view>
             <ActionButton
               testID="crypto-random-bytes-button"
               title="Get 16 random bytes"
               onPress={handleGetRandomBytes}
               color={lineColor}
             />
-            <ValueRow
-              label="Random bytes"
-              value={randomBytes.value ?? 'not generated yet'}
-            />
+            {randomBytes.value !== null && (
+              <ValueRow label="Bytes" value={randomBytes.value} />
+            )}
           </view>
         </scroll-view>
       </safe-area-view>

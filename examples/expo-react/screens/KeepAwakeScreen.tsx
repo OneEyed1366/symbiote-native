@@ -4,6 +4,7 @@ import {
   useKeepAwake,
 } from '@symbiote-native/keep-awake/react';
 import { ROUTE_NAME } from '../routes';
+import { Scenario } from '../components/Scenario';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
 function ValueRow({ label, value }: { label: string; value: string }) {
@@ -23,11 +24,6 @@ function KeepAwakeHolder() {
   return null;
 }
 
-/**
- * @symbiote-native/keep-awake canary demo: a toggle whose "on" state mounts KeepAwakeHolder,
- * activating the keep-awake lock; toggling off unmounts it, deactivating the lock. Plus a
- * capability row for isAvailableAsync().
- */
 export function KeepAwakeScreen() {
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.KeepAwake];
   const lineColor = LINE_COLOR[lineInfo.line];
@@ -56,12 +52,20 @@ export function KeepAwakeScreen() {
           <view className="hero-copy">
             <text className="hero-title">Keep Awake</text>
             <text className="hero-body">
-              @symbiote-native/keep-awake — keeps the screen on for the lifetime
-              of a mounted component.
+              Stop the screen from dimming and locking while a component is
+              mounted, for a recipe, a workout timer, a video or a boarding
+              pass.
             </text>
           </view>
         </view>
 
+        <Scenario
+          testID="keep-awake-scenario"
+          title="Keep the screen on while someone follows a recipe or a workout"
+          why="Hands that are busy cannot tap the screen to wake it. The lock lives exactly as long as the component that asked for it, so it cannot be left on by mistake."
+          steps={['Turn the switch on', 'Put the phone down and wait past the auto-lock time', 'Turn the switch off and wait again']}
+          expect="With the switch on the screen stays lit, and with it off the phone dims and locks after its normal timeout."
+        />
         <view testID="keep-awake-card" className="feature-card">
           <view className="feature-card-header">
             <text className="feature-card-title">Keep screen awake</text>

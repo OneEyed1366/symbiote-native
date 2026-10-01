@@ -1,34 +1,29 @@
 import { defineComponent } from 'vue';
-import {} from '@symbiote-native/vue';
 import { useCalendars, useLocales } from '@symbiote-native/localization/vue';
+import { Scenario } from '../components/Scenario';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
 function ValueRow(props: { label: string; value: string }) {
   return (
-    <view class="auth-capability-row">
-      <text class="auth-capability-label">{props.label}</text>
-      <text class="auth-value-text">{props.value}</text>
+    <view class="capability-row">
+      <text class="capability-label">{props.label}</text>
+      <text class="value-text">{props.value}</text>
     </view>
   );
 }
 
-/**
- * Localization demo: @symbiote-native/localization/vue's useLocales/useCalendars composables —
- * both seed synchronously from the native module at setup and stay live via a change listener,
- * so the first locale/calendar is shown with no loading state needed.
- */
 export const LocalizationScreen = defineComponent(
   () => {
     const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Localization];
-    const lineColor = LINE_COLOR[ROUTE_LINE_INFO[ROUTE_NAME.Localization].line];
+    const lineColor = LINE_COLOR[lineInfo.line];
 
     const locales = useLocales();
     const calendars = useCalendars();
 
     return () => {
-      const locale = locales.value[0] ?? null;
-      const calendar = calendars.value[0] ?? null;
+      const locale = locales.value[0];
+      const calendar = calendars.value[0];
 
       return (
         <safe-area-view class="screen">
@@ -47,57 +42,53 @@ export const LocalizationScreen = defineComponent(
               <view class="hero-copy">
                 <text class="hero-title">Localization</text>
                 <text class="hero-body">
-                  @symbiote-native/localization — the user's preferred locales
-                  and calendars, live-updated on device settings changes.
+                  Speak the user's language and format: preferred locales, currency,
+                  text direction, calendar, 12 or 24 hour clock and time zone,
+                  updating as soon as the device settings change.
                 </text>
               </view>
             </view>
 
-            <view testID="localization-locale-card" class="auth-card">
-              <view class="auth-card-header">
-                <text class="auth-card-title">First locale</text>
+            <Scenario
+              testID="localization-scenario"
+              title="Format prices, dates and layout for the user's region"
+              why="Show the right currency, switch to right-to-left layout for Arabic or Hebrew and respect 24-hour clocks, without asking users to configure anything."
+              steps={['Read the locale and calendar cards', 'Open system settings and change the language or region', 'Come back to the app']}
+              expect="Language tag, currency, text direction and clock format update to the new settings without restarting the app."
+            />
+
+            <view testID="localization-locale-card" class="feature-card">
+              <view class="feature-card-header">
+                <text class="feature-card-title">Locale</text>
               </view>
-              <ValueRow
-                label="Language tag"
-                value={locale?.languageTag ?? 'unknown'}
-              />
+              <ValueRow label="Language tag" value={locale.languageTag} />
               <ValueRow
                 label="Currency code"
-                value={locale?.currencyCode ?? 'unknown'}
+                value={locale.currencyCode ?? 'unknown'}
               />
               <ValueRow
                 label="Currency symbol"
-                value={locale?.currencySymbol ?? 'unknown'}
+                value={locale.currencySymbol ?? 'unknown'}
               />
-              <ValueRow
-                label="Text direction"
-                value={locale?.textDirection ?? 'unknown'}
-              />
+              <ValueRow label="Text direction" value={locale.textDirection} />
             </view>
 
-            <view testID="localization-calendar-card" class="auth-card">
-              <view class="auth-card-header">
-                <text class="auth-card-title">First calendar</text>
+            <view testID="localization-calendar-card" class="feature-card">
+              <view class="feature-card-header">
+                <text class="feature-card-title">Calendar</text>
               </view>
+              <ValueRow label="Calendar" value={calendar.calendar ?? 'unknown'} />
               <ValueRow
-                label="Calendar"
-                value={calendar?.calendar ?? 'unknown'}
-              />
-              <ValueRow
-                label="Uses 24h clock"
+                label="Uses 24-hour clock"
                 value={
-                  calendar?.uses24hourClock === null ||
-                  calendar?.uses24hourClock === undefined
+                  calendar.uses24hourClock === null
                     ? 'unknown'
                     : calendar.uses24hourClock
-                      ? 'true'
-                      : 'false'
+                      ? 'Yes'
+                      : 'No'
                 }
               />
-              <ValueRow
-                label="Time zone"
-                value={calendar?.timeZone ?? 'unknown'}
-              />
+              <ValueRow label="Time zone" value={calendar.timeZone ?? 'unknown'} />
             </view>
           </scroll-view>
         </safe-area-view>

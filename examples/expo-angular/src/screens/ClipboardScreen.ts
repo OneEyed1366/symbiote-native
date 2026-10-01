@@ -1,4 +1,4 @@
-import { Component, Injector, effect, inject, signal } from '@angular/core';
+import { Component, DestroyRef, effect, inject, signal } from '@angular/core';
 import { Platform, SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import {
   ClipboardService,
@@ -10,28 +10,20 @@ import {
   setUrlAsync,
 } from '@symbiote-native/clipboard/angular';
 import { ActionButton } from '../components/ActionButton';
+import { Scenario } from '../components/Scenario';
+import { toCapabilityStatus } from '../components/capability-status';
+import type { ICapabilityStatus } from '../components/capability-status';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
+import { CapabilityRow } from './CapabilityRow';
+import { ValueRow } from './ValueRow';
 
-type ICapabilityStatus = 'checking' | 'yes' | 'no';
+const IOS_OS = 'ios';
 
-function toCapabilityStatus(value: boolean): ICapabilityStatus {
-  return value ? 'yes' : 'no';
-}
-
-/**
- * @symbiote-native/clipboard canary demo: the current clipboard string (seeded via
- * getStringAsync(), kept live through ClipboardService.connect()'s change signal), a copy-text
- * card, and — iOS only — the URL-specific get/set/has surface. ClipboardService.connect()'s
- * signal carries only the changed content TYPES (IClipboardEvent), never the string itself, so a
- * change is treated as a cue to refetch via getStringAsync() rather than a value to render
- * directly. Angular twin of ../../react/screens/ClipboardScreen.tsx — same seed+listener shape as
- * @symbiote-native/sensors' AccelerometerService.connect().
- */
 @Component({
   selector: 'ClipboardScreen',
   standalone: true,
-  imports: [ActionButton, SYMBIOTE_ELEMENTS],
+  imports: [ActionButton, CapabilityRow, Scenario, SYMBIOTE_ELEMENTS, ValueRow],
   template: `
     <safe-area-view class="screen">
       <scroll-view
@@ -39,98 +31,104 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <view [class]="lineTagClass">
-          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        <view [class]="'line-tag line-tag-' + lineInfo.line">
+          <text class="line-tag-text"
+            >{{ lineInfo.code }} · {{ lineInfo.label }}</text
+          >
         </view>
         <view class="hero-card">
-          <view class="hero-badge" [style]="heroBadgeStyle">
-            <text class="hero-badge-text">{{ heroBadgeCode }}</text>
+          <view class="hero-badge" [style]="badgeStyle">
+            <text class="hero-badge-text">{{ lineInfo.code }}</text>
           </view>
           <view class="hero-copy">
             <text class="hero-title">Clipboard</text>
             <text class="hero-body">
-              @symbiote-native/clipboard — read/write the system clipboard, with
-              a live change listener. On iOS 16+ a denied paste permission reads
-              as empty content, not an error.
+              Copy and paste from the app: write text or a link to the system
+              clipboard, read it back and follow changes live. Copy something in
+              another app to see the value below update on its own.
             </text>
           </view>
         </view>
 
-        <view testID="clipboard-value-card" class="capability-card">
-          <text class="capability-card-title">Clipboard content</text>
-          <view testID="clipboard-value" class="capability-row">
-            <text class="capability-label">Current value</text>
-            <text class="value-text">{{ clipboardValue() || '(empty)' }}</text>
+        <Scenario
+          testID="clipboard-scenario"
+          title="Copy a promo code or an invite link with one tap"
+          why="Copy buttons save users from selecting text by hand. Reading the clipboard lets the app offer to paste a code or a link the user just copied elsewhere."
+          [steps]="scenarioSteps"
+          expect="The pasted text matches what you copied. The value card updates by itself when the clipboard changes outside the app."
+        />
+
+        <view testID="clipboard-value-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Current value</text>
           </view>
-          <view testID="clipboard-has-string" class="capability-row">
-            <text class="capability-label">Has text</text>
-            <view [class]="statusBadgeClass(hasString())">
-              <text class="status-badge-text">{{
-                statusLabel(hasString())
-              }}</text>
-            </view>
-          </view>
+          <ValueRow
+            label="Clipboard text"
+            [value]="
+              clipboardText() === null
+                ? 'checking…'
+                : clipboardText() || '(empty)'
+            "
+          />
+          <CapabilityRow
+            testID="clipboard-has-string"
+            label="Has string"
+            [status]="hasString()"
+          />
         </view>
 
-        <view testID="clipboard-copy-card" class="capability-card">
-          <text class="capability-card-title">Copy text</text>
+        <view testID="clipboard-copy-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Copy text</text>
+          </view>
           <text-input
-            testID="clipboard-input"
-            class="text-input"
-            placeholder="Type text to copy"
+            testID="clipboard-copy-input"
             [value]="inputText()"
+            placeholder="Type something to copy"
+            placeholderTextColor="#41506a"
+            class="text-input"
             (valueChange)="inputText.set($event)"
-          ></text-input>
+          />
           <ActionButton
             testID="clipboard-copy-button"
             title="Copy text"
-            (press)="handleCopy()"
             [color]="lineColor"
-          ></ActionButton>
+            (press)="copy()"
+          />
         </view>
 
-        @if (Platform.OS === 'ios') {
-          <view testID="clipboard-url-card" class="capability-card">
-            <text class="capability-card-title">URL</text>
+        @if (isIos) {
+          <view testID="clipboard-url-card" class="feature-card">
+            <view class="feature-card-header">
+              <text class="feature-card-title">URL (iOS only)</text>
+            </view>
+            <ValueRow
+              label="Clipboard URL"
+              [value]="
+                clipboardUrl() === null
+                  ? 'checking…'
+                  : clipboardUrl() || '(none)'
+              "
+            />
+            <CapabilityRow
+              testID="clipboard-has-url"
+              label="Has URL"
+              [status]="hasUrl()"
+            />
             <text-input
               testID="clipboard-url-input"
+              [value]="urlText()"
+              placeholder="https://example.com"
+              placeholderTextColor="#41506a"
               class="text-input"
-              placeholder="https://…"
-              [value]="inputUrl()"
-              (valueChange)="inputUrl.set($event)"
-            ></text-input>
-            <view class="button-row">
-              <ActionButton
-                testID="clipboard-url-get-button"
-                title="Get URL"
-                (press)="handleGetUrl()"
-                [color]="lineColor"
-              ></ActionButton>
-              <ActionButton
-                testID="clipboard-url-set-button"
-                title="Set URL"
-                (press)="handleSetUrl()"
-                [color]="lineColor"
-              ></ActionButton>
-              <ActionButton
-                testID="clipboard-url-has-button"
-                title="Has URL"
-                (press)="handleHasUrl()"
-                [color]="lineColor"
-              ></ActionButton>
-            </view>
-            <view testID="clipboard-url-value" class="capability-row">
-              <text class="capability-label">URL value</text>
-              <text class="value-text">{{ urlValue() ?? '(none)' }}</text>
-            </view>
-            <view testID="clipboard-has-url" class="capability-row">
-              <text class="capability-label">Has URL</text>
-              <view [class]="statusBadgeClass(hasUrl())">
-                <text class="status-badge-text">{{
-                  statusLabel(hasUrl())
-                }}</text>
-              </view>
-            </view>
+              (valueChange)="urlText.set($event)"
+            />
+            <ActionButton
+              testID="clipboard-set-url-button"
+              title="Set URL"
+              [color]="lineColor"
+              (press)="setUrl()"
+            />
           </view>
         }
       </scroll-view>
@@ -138,79 +136,69 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
   `,
 })
 export class ClipboardScreen {
-  private readonly lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Clipboard];
-  readonly lineTagClass = `line-tag line-tag-${this.lineInfo.line}`;
-  readonly lineTagLabel = `${this.lineInfo.code} · ${this.lineInfo.label}`;
-  readonly heroBadgeCode = this.lineInfo.code;
-  readonly lineColor = LINE_COLOR[this.lineInfo.line];
-  readonly heroBadgeStyle = { backgroundColor: this.lineColor };
+  readonly lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Clipboard];
+  readonly lineColor = LINE_COLOR.clipboard;
+  readonly badgeStyle = { backgroundColor: LINE_COLOR.clipboard };
+  readonly isIos = Platform.OS === IOS_OS;
+  readonly scenarioSteps = [
+    'Write some text and press copy',
+    'Open another app and paste',
+    'Copy something in another app and come back',
+  ];
 
-  readonly Platform = Platform;
-
-  private readonly injector = inject(Injector);
-  private readonly clipboardEvent = inject(ClipboardService).connect();
-
-  readonly clipboardValue = signal('');
+  private readonly clipboardChange = inject(ClipboardService).connect();
+  readonly clipboardText = signal<string | null>(null);
   readonly hasString = signal<ICapabilityStatus>('checking');
-  readonly inputText = signal('');
-
-  readonly urlValue = signal<string | null>(null);
+  readonly clipboardUrl = signal<string | null>(null);
   readonly hasUrl = signal<ICapabilityStatus>('checking');
-  readonly inputUrl = signal('');
+  readonly inputText = signal('');
+  readonly urlText = signal('');
+
+  private isAlive = true;
 
   constructor() {
-    this.refreshClipboardValue();
-    if (Platform.OS === 'ios') {
-      this.refreshUrlValues();
-    }
-    effect(
-      () => {
-        if (this.clipboardEvent() !== null) {
-          this.refreshClipboardValue();
-        }
-      },
-      { injector: this.injector },
-    );
-  }
-
-  handleCopy(): void {
-    setStringAsync(this.inputText()).then(() => {
-      this.inputText.set('');
-      this.refreshClipboardValue();
+    inject(DestroyRef).onDestroy(() => {
+      this.isAlive = false;
+    });
+    effect(() => {
+      this.clipboardChange();
+      this.refreshText();
+      this.refreshUrl();
     });
   }
 
-  handleGetUrl(): void {
-    getUrlAsync().then(value => this.urlValue.set(value));
+  private refreshText(): void {
+    void Promise.all([getStringAsync(), hasStringAsync()]).then(
+      ([text, hasText]) => {
+        if (this.isAlive) {
+          this.clipboardText.set(text);
+          this.hasString.set(toCapabilityStatus(hasText));
+        }
+      },
+    );
   }
 
-  handleSetUrl(): void {
-    setUrlAsync(this.inputUrl()).then(() => this.refreshUrlValues());
+  private refreshUrl(): void {
+    if (!this.isIos) {
+      return;
+    }
+    void Promise.all([getUrlAsync(), hasUrlAsync()]).then(
+      ([url, hasUrlValue]) => {
+        if (this.isAlive) {
+          this.clipboardUrl.set(url);
+          this.hasUrl.set(toCapabilityStatus(hasUrlValue));
+        }
+      },
+    );
   }
 
-  handleHasUrl(): void {
-    hasUrlAsync().then(value => this.hasUrl.set(toCapabilityStatus(value)));
+  copy(): void {
+    void setStringAsync(this.inputText());
   }
 
-  statusBadgeClass(status: ICapabilityStatus): string {
-    return `status-badge status-badge-${status}`;
-  }
-
-  statusLabel(status: ICapabilityStatus): string {
-    return status === 'checking'
-      ? 'CHECKING…'
-      : status === 'yes'
-        ? 'YES'
-        : 'NO';
-  }
-
-  private refreshClipboardValue(): void {
-    getStringAsync().then(text => this.clipboardValue.set(text));
-    hasStringAsync().then(has => this.hasString.set(toCapabilityStatus(has)));
-  }
-
-  private refreshUrlValues(): void {
-    getUrlAsync().then(value => this.urlValue.set(value));
-    hasUrlAsync().then(value => this.hasUrl.set(toCapabilityStatus(value)));
+  setUrl(): void {
+    void setUrlAsync(this.urlText()).then(() =>
+      getUrlAsync().then(value => this.clipboardUrl.set(value)),
+    );
   }
 }

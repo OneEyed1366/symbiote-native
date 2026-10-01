@@ -16,25 +16,29 @@ import {
   totalMemory,
 } from '@symbiote-native/device/angular';
 import { ActionButton } from '../components/ActionButton';
+import { Scenario } from '../components/Scenario';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
+import { ValueRow } from './ValueRow';
 
 const BYTES_PER_UNIT = 1024;
-const MEMORY_SIZE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB'] as const;
+const SIZE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB'] as const;
+type ISizeUnit = (typeof SIZE_UNITS)[number];
+const UNKNOWN_LABEL = 'unknown';
 
 function formatBytes(bytes: number | null): string {
   if (bytes === null) {
-    return 'unknown';
+    return UNKNOWN_LABEL;
   }
-  if (bytes === 0) {
-    return '0 B';
+  let value = bytes;
+  let unitIndex = 0;
+  while (value >= BYTES_PER_UNIT && unitIndex < SIZE_UNITS.length - 1) {
+    value /= BYTES_PER_UNIT;
+    unitIndex += 1;
   }
-  const exponent = Math.min(
-    Math.floor(Math.log(bytes) / Math.log(BYTES_PER_UNIT)),
-    MEMORY_SIZE_UNITS.length - 1,
-  );
-  const value = bytes / Math.pow(BYTES_PER_UNIT, exponent);
-  return `${value.toFixed(exponent === 0 ? 0 : 2)} ${MEMORY_SIZE_UNITS[exponent]}`;
+  const unit: ISizeUnit = SIZE_UNITS[unitIndex];
+  const precision = unitIndex === 0 ? 0 : 1;
+  return `${value.toFixed(precision)} ${unit}`;
 }
 
 function deviceTypeLabel(type: DeviceType | null): string {
@@ -52,18 +56,10 @@ function deviceTypeLabel(type: DeviceType | null): string {
   }
 }
 
-/**
- * @symbiote-native/device canary demo: a device-info card of eagerly-resolved constants (brand,
- * model, OS, memory, …), followed by three buttons exercising the one-shot async functions
- * (getDeviceTypeAsync/getUptimeAsync/isRootedExperimentalAsync). Every constant/function is a
- * plain re-export off the core package — no service to inject(), same shape as
- * @symbiote-native/local-auth's plain-function surface. Angular twin of
- * ../../react/screens/DeviceScreen.tsx.
- */
 @Component({
   selector: 'DeviceScreen',
   standalone: true,
-  imports: [ActionButton, SYMBIOTE_ELEMENTS],
+  imports: [ActionButton, Scenario, SYMBIOTE_ELEMENTS, ValueRow],
   template: `
     <safe-area-view class="screen">
       <scroll-view
@@ -71,146 +67,121 @@ function deviceTypeLabel(type: DeviceType | null): string {
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <view [class]="lineTagClass">
-          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        <view [class]="'line-tag line-tag-' + lineInfo.line">
+          <text class="line-tag-text"
+            >{{ lineInfo.code }} · {{ lineInfo.label }}</text
+          >
         </view>
         <view class="hero-card">
-          <view class="hero-badge" [style]="heroBadgeStyle">
-            <text class="hero-badge-text">{{ heroBadgeCode }}</text>
+          <view class="hero-badge" [style]="badgeStyle">
+            <text class="hero-badge-text">{{ lineInfo.code }}</text>
           </view>
           <view class="hero-copy">
             <text class="hero-title">Device</text>
             <text class="hero-body">
-              @symbiote-native/device — brand/model/OS constants, total memory,
-              and best-effort root/jailbreak detection.
+              Know what the app runs on: brand, model, OS version, memory,
+              device type, uptime and whether the phone is rooted or jailbroken.
+              Use it to adapt layouts, log bug reports and gate risky features.
             </text>
           </view>
         </view>
 
-        <view testID="device-info-card" class="capability-card">
-          <text class="capability-card-title">Device info</text>
-          <view testID="device-is-device" class="capability-row">
-            <text class="capability-label">Is device</text>
-            <text class="value-text">{{ isDevice ? 'Yes' : 'No' }}</text>
+        <Scenario
+          testID="device-scenario"
+          title="Attach device details to a bug report or adapt to a tablet"
+          why="Support tickets are far easier to solve with the model and OS version attached, and a tablet or a low-memory phone may need a different layout or lighter images."
+          [steps]="scenarioSteps"
+          expect="Model, OS and memory match the phone in your hand. The simulator reports Is real device as No, and the root check returns false on a normal phone."
+        />
+
+        <view testID="device-constants-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Constants</text>
           </view>
-          <view class="capability-row">
-            <text class="capability-label">Brand</text>
-            <text class="value-text">{{ brand ?? 'unknown' }}</text>
-          </view>
-          <view class="capability-row">
-            <text class="capability-label">Manufacturer</text>
-            <text class="value-text">{{ manufacturer ?? 'unknown' }}</text>
-          </view>
-          <view class="capability-row">
-            <text class="capability-label">Model</text>
-            <text class="value-text">{{ modelName ?? 'unknown' }}</text>
-          </view>
-          <view class="capability-row">
-            <text class="capability-label">Device type</text>
-            <text class="value-text">{{ staticDeviceTypeLabel }}</text>
-          </view>
-          <view class="capability-row">
-            <text class="capability-label">OS</text>
-            <text class="value-text"
-              >{{ osName ?? 'unknown' }} {{ osVersion ?? '' }}</text
-            >
-          </view>
-          <view class="capability-row">
-            <text class="capability-label">Total memory</text>
-            <text class="value-text">{{ totalMemoryLabel }}</text>
-          </view>
-          <view class="capability-row">
-            <text class="capability-label">Device name</text>
-            <text class="value-text">{{ deviceName ?? 'unknown' }}</text>
-          </view>
+          <ValueRow label="Is real device" [value]="isDevice ? 'Yes' : 'No'" />
+          <ValueRow label="Brand" [value]="brand" />
+          <ValueRow label="Manufacturer" [value]="manufacturer" />
+          <ValueRow label="Model" [value]="modelName" />
+          <ValueRow label="Device type" [value]="deviceKind" />
+          <ValueRow label="OS" [value]="osLabel" />
+          <ValueRow label="OS version" [value]="osVersionLabel" />
+          <ValueRow label="Total memory" [value]="memory" />
+          <ValueRow label="Device name" [value]="name" />
         </view>
 
-        <view testID="device-checks-card" class="capability-card">
-          <text class="capability-card-title">Live checks</text>
+        <view testID="device-async-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Async checks</text>
+          </view>
           <ActionButton
-            testID="device-get-type-button"
+            testID="device-type-button"
             title="Get device type"
-            (press)="handleGetDeviceType()"
             [color]="lineColor"
-          ></ActionButton>
-          <text testID="device-type-result" class="value-text">{{
-            deviceTypeResultLabel()
-          }}</text>
-
+            (press)="getDeviceType()"
+          />
+          @if (asyncDeviceType(); as value) {
+            <ValueRow label="Device type (async)" [value]="value" />
+          }
           <ActionButton
-            testID="device-get-uptime-button"
+            testID="device-uptime-button"
             title="Get uptime"
-            (press)="handleGetUptime()"
             [color]="lineColor"
-          ></ActionButton>
-          <text testID="device-uptime-result" class="value-text">{{
-            uptimeResultLabel()
-          }}</text>
-
+            (press)="getUptime()"
+          />
+          @if (uptime() !== null) {
+            <ValueRow label="Uptime" [value]="uptime() + 'ms'" />
+          }
           <ActionButton
-            testID="device-check-rooted-button"
-            title="Check root/jailbreak"
-            (press)="handleCheckRooted()"
+            testID="device-rooted-button"
+            title="Check rooted/jailbroken"
             [color]="lineColor"
-          ></ActionButton>
-          <text testID="device-rooted-result" class="value-text">{{
-            isRootedResultLabel()
-          }}</text>
+            (press)="checkRooted()"
+          />
+          @if (isRooted() !== null) {
+            <ValueRow
+              label="Rooted/jailbroken"
+              [value]="isRooted() ? 'true' : 'false'"
+            />
+          }
         </view>
       </scroll-view>
     </safe-area-view>
   `,
 })
 export class DeviceScreen {
-  private readonly lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Device];
-  readonly lineTagClass = `line-tag line-tag-${this.lineInfo.line}`;
-  readonly lineTagLabel = `${this.lineInfo.code} · ${this.lineInfo.label}`;
-  readonly heroBadgeCode = this.lineInfo.code;
-  readonly lineColor = LINE_COLOR[this.lineInfo.line];
-  readonly heroBadgeStyle = { backgroundColor: this.lineColor };
+  readonly lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Device];
+  readonly lineColor = LINE_COLOR.device;
+  readonly badgeStyle = { backgroundColor: LINE_COLOR.device };
+  readonly scenarioSteps = [
+    'Read the constants card',
+    'Press the async checks for device type, uptime and root detection',
+  ];
 
   readonly isDevice = isDevice;
-  readonly brand = brand;
-  readonly manufacturer = manufacturer;
-  readonly modelName = modelName;
-  readonly osName = osName;
-  readonly osVersion = osVersion;
-  readonly deviceName = deviceName;
-  readonly staticDeviceTypeLabel = deviceTypeLabel(deviceType);
-  readonly totalMemoryLabel = formatBytes(totalMemory);
+  readonly brand = brand ?? UNKNOWN_LABEL;
+  readonly manufacturer = manufacturer ?? UNKNOWN_LABEL;
+  readonly modelName = modelName ?? UNKNOWN_LABEL;
+  readonly deviceKind = deviceTypeLabel(deviceType);
+  readonly osLabel = osName ?? UNKNOWN_LABEL;
+  readonly osVersionLabel = osVersion ?? UNKNOWN_LABEL;
+  readonly memory = formatBytes(totalMemory);
+  readonly name = deviceName ?? UNKNOWN_LABEL;
 
-  readonly deviceTypeResult = signal<DeviceType | null>(null);
-  readonly uptimeResult = signal<number | null>(null);
-  readonly isRootedResult = signal<boolean | null>(null);
+  readonly asyncDeviceType = signal<string | null>(null);
+  readonly uptime = signal<number | null>(null);
+  readonly isRooted = signal<boolean | null>(null);
 
-  handleGetDeviceType(): void {
-    getDeviceTypeAsync().then(value => this.deviceTypeResult.set(value));
+  getDeviceType(): void {
+    void getDeviceTypeAsync().then(value =>
+      this.asyncDeviceType.set(deviceTypeLabel(value)),
+    );
   }
 
-  handleGetUptime(): void {
-    getUptimeAsync().then(value => this.uptimeResult.set(value));
+  getUptime(): void {
+    void getUptimeAsync().then(value => this.uptime.set(value));
   }
 
-  handleCheckRooted(): void {
-    isRootedExperimentalAsync().then(value => this.isRootedResult.set(value));
-  }
-
-  // Plain methods rather than `@if (signal(); as x)` — DeviceType.UNKNOWN is 0 and a resolved
-  // uptime/rooted check can legitimately be 0/false, both falsy, so the template control-flow
-  // sugar would wrongly read a real result as "not checked yet" (same trap as
-  // ../screens/LocalAuthScreen.ts's enrolledLevelLabel()).
-  deviceTypeResultLabel(): string {
-    const type = this.deviceTypeResult();
-    return type === null ? 'not checked yet' : deviceTypeLabel(type);
-  }
-
-  uptimeResultLabel(): string {
-    const uptime = this.uptimeResult();
-    return uptime === null ? 'not checked yet' : `${uptime}ms`;
-  }
-
-  isRootedResultLabel(): string {
-    const isRooted = this.isRootedResult();
-    return isRooted === null ? 'not checked yet' : String(isRooted);
+  checkRooted(): void {
+    void isRootedExperimentalAsync().then(value => this.isRooted.set(value));
   }
 }

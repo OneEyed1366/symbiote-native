@@ -1,139 +1,30 @@
+import { Component, inject } from '@angular/core';
+import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import {
-  Component,
-  Injector,
-  Signal,
-  effect,
-  inject,
-  signal,
-} from '@angular/core';
-import { requireOptionalNativeModule } from 'expo-modules-core';
-import {
-  SYMBIOTE_ELEMENTS,
-  SymbioteHostPropsDirective,
-} from '@symbiote-native/angular';
+  Accelerometer,
+  DeviceMotion,
+  Gyroscope,
+  Magnetometer,
+  isAvailableAsync as isPedometerAvailableAsync,
+} from '@symbiote-native/sensors';
 import {
   AccelerometerService,
   DeviceMotionService,
   GyroscopeService,
   MagnetometerService,
   PedometerService,
-  isAvailableAsync as isPedometerAvailableAsync,
-  type IAccelerometerMeasurement,
-  type IDeviceMotionMeasurement,
-  type IGyroscopeMeasurement,
-  type IMagnetometerMeasurement,
-  type IPedometerResult,
 } from '@symbiote-native/sensors/angular';
+import { Scenario } from '../components/Scenario';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
+import { AxisReadingRow } from './AxisReadingRow';
+import { SensorCard } from './SensorCard';
+import { useSensorStatus } from './use-sensor-status';
 
-// packages/sensors/src/angular/index.ts re-exports each *Service.connect() signal plus, for
-// Pedometer only, the free isAvailableAsync() function — the DeviceSensor-based classes
-// (Accelerometer/Gyroscope/Magnetometer/DeviceMotion) don't expose their own isAvailableAsync()
-// through the Angular package barrel. So for those four, probe expo-modules-core's own
-// requireOptionalNativeModule() directly, by the same native module name the wrapper itself
-// resolves (packages/sensors/src/core/native/exponent-*.ts) — a real availability answer
-// without reaching for an unexported symbol.
-const NATIVE_MODULE_NAME = {
-  Accelerometer: 'ExponentAccelerometer',
-  Gyroscope: 'ExponentGyroscope',
-  Magnetometer: 'ExponentMagnetometer',
-  DeviceMotion: 'ExponentDeviceMotion',
-} as const;
-
-type INativeSensorProbe = {
-  isAvailableAsync?: () => Promise<boolean>;
-};
-
-function probeNativeAvailability(nativeModuleName: string): Promise<boolean> {
-  const nativeModule =
-    requireOptionalNativeModule<INativeSensorProbe>(nativeModuleName);
-  if (!nativeModule?.isAvailableAsync) {
-    return Promise.resolve(false);
-  }
-  return nativeModule.isAvailableAsync();
-}
-
-// 4 distinct render states, never collapsed into each other (frontend-ux-best-practices'
-// async-state rule) — "not available on this device" and "waiting for first reading" look
-// identical from the JS side (a subscription to an unavailable sensor never throws, it just
-// never fires) unless the availability check runs separately, which is exactly what this
-// status signal does. Angular twin of ../../react/screens/SensorsScreen.tsx's ISensorStatus —
-// same 4 states, same status-badge/reading-chip visual, React being this repo's "prove the
-// pattern first" adapter for this package.
-type ISensorCardStatus = 'checking' | 'unavailable' | 'waiting' | 'live';
-
-const SENSOR_STATUS_TEXT: Record<ISensorCardStatus, string> = {
-  checking: 'CHECKING…',
-  unavailable: 'UNAVAILABLE',
-  waiting: 'WAITING…',
-  live: 'LIVE',
-};
-
-function sensorCardStatus<Measurement>(
-  measurement: Signal<Measurement | null>,
-  checkAvailability: () => Promise<boolean>,
-  injector: Injector,
-): Signal<ISensorCardStatus> {
-  const status = signal<ISensorCardStatus>('checking');
-
-  checkAvailability().then(available => {
-    if (!available) {
-      status.set('unavailable');
-    } else if (status() === 'checking') {
-      status.set('waiting');
-    }
-  });
-
-  effect(
-    () => {
-      if (measurement() !== null && status() !== 'unavailable') {
-        status.set('live');
-      }
-    },
-    { injector },
-  );
-
-  return status.asReadonly();
-}
-
-// testID isn't a declared @Input() on View/Text (adapters/angular/src/primitives/shared.ts) — a
-// bound [testID] fails NG8002 under examples/angular/tsconfig.angular.json's strictTemplates:
-// true real ngc build, even though it works at runtime and under vitest's JIT compilation.
-// Precomputed once per card rather than allocated fresh in the template on every
-// change-detection pass.
-function sensorCardHostProps(id: string): Record<string, unknown> {
-  return { testID: `sensor-card-${id}` };
-}
-
-function sensorStatusHostProps(id: string): Record<string, unknown> {
-  return { testID: `sensor-status-${id}` };
-}
-
-type IAxisReading = { x: number; y: number; z: number };
-
-type IAxisSensorCard = {
-  id: string;
-  title: string;
-  status: Signal<ISensorCardStatus>;
-  reading: Signal<IAxisReading | null>;
-  cardHostProps: Record<string, unknown>;
-  statusHostProps: Record<string, unknown>;
-};
-
-/**
- * Sensors demo: one card per @symbiote-native/sensors sensor (Accelerometer, Gyroscope,
- * Magnetometer, DeviceMotion, Pedometer), each backed by its own Angular service's connect()
- * signal. iOS Simulator genuinely reports every CoreMotion/CMPedometer sensor as unavailable —
- * expected, not a bug (see packages/sensors/README.md's Notes section); a real device is
- * needed to see the "live" state. Angular twin of ../../react/screens/SensorsScreen.tsx — same
- * 4-state card (checking/unavailable/waiting/live) and X/Y/Z reading-chip layout, React being
- * this repo's "prove the pattern first" adapter for this package.
- */
 @Component({
   selector: 'SensorsScreen',
   standalone: true,
-  imports: [SYMBIOTE_ELEMENTS, SymbioteHostPropsDirective],
+  imports: [AxisReadingRow, Scenario, SensorCard, SYMBIOTE_ELEMENTS],
   template: `
     <safe-area-view class="screen">
       <scroll-view
@@ -141,241 +32,145 @@ type IAxisSensorCard = {
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <view [class]="lineTagClass">
-          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        <view [class]="'line-tag line-tag-' + lineInfo.line">
+          <text class="line-tag-text"
+            >{{ lineInfo.code }} · {{ lineInfo.label }}</text
+          >
         </view>
         <view class="hero-card">
-          <view class="hero-badge" [style]="heroBadgeStyle">
-            <text class="hero-badge-text">SN</text>
+          <view class="hero-badge" [style]="badgeStyle">
+            <text class="hero-badge-text">{{ lineInfo.code }}</text>
           </view>
           <view class="hero-copy">
             <text class="hero-title">Sensors</text>
             <text class="hero-body">
-              @symbiote-native/sensors — live readings from five
-              expo-sensors-backed hooks. A simulator reports every
-              CoreMotion/CMPedometer-backed sensor as unavailable; a real device
-              is needed to see live readings.
+              Read the phone's motion hardware live: accelerometer, gyroscope,
+              magnetometer, combined device motion and step counter. A simulator
+              reports every sensor as unavailable, use a real device.
             </text>
           </view>
         </view>
 
-        @for (card of axisCards; track card.id) {
-          <view [symbioteHostProps]="card.cardHostProps" class="sensor-card">
-            <view class="sensor-card-header">
-              <text class="sensor-card-title">{{ card.title }}</text>
-              <view
-                [symbioteHostProps]="card.statusHostProps"
-                [class]="statusBadgeClass(card.status())"
-              >
-                <text class="sensor-status-text">{{
-                  statusLabel(card.status())
-                }}</text>
+        <Scenario
+          testID="sensors-scenario"
+          title="Detect a shake, a tilt, a compass heading or a step"
+          why="Games, level tools and fitness features read the motion sensors: tilt to steer, shake to undo, magnetometer for a compass and the pedometer for steps."
+          [steps]="scenarioSteps"
+          expect="The numbers change live with each movement. A card that says unavailable means the device has no such sensor or the simulator cannot provide it."
+        />
+
+        <SensorCard
+          testID="sensors-accelerometer"
+          title="Accelerometer"
+          [status]="accelerometerStatus()"
+        >
+          @if (accelerometer(); as reading) {
+            <AxisReadingRow [measurement]="reading" />
+          }
+        </SensorCard>
+
+        <SensorCard
+          testID="sensors-gyroscope"
+          title="Gyroscope"
+          [status]="gyroscopeStatus()"
+        >
+          @if (gyroscope(); as reading) {
+            <AxisReadingRow [measurement]="reading" />
+          }
+        </SensorCard>
+
+        <SensorCard
+          testID="sensors-magnetometer"
+          title="Magnetometer"
+          [status]="magnetometerStatus()"
+        >
+          @if (magnetometer(); as reading) {
+            <AxisReadingRow [measurement]="reading" />
+          }
+        </SensorCard>
+
+        <SensorCard
+          testID="sensors-device-motion"
+          title="Device motion"
+          [status]="deviceMotionStatus()"
+        >
+          @if (deviceMotion(); as motion) {
+            <text class="info-text"
+              >interval: {{ motion.interval.toFixed(1) }}ms</text
+            >
+            @if (motion.rotation; as rotation) {
+              <view class="sensor-reading-row">
+                <view class="sensor-reading-chip">
+                  <text class="sensor-reading-label">ALPHA</text>
+                  <text class="sensor-reading-value">{{
+                    rotation.alpha.toFixed(3)
+                  }}</text>
+                </view>
+                <view class="sensor-reading-chip">
+                  <text class="sensor-reading-label">BETA</text>
+                  <text class="sensor-reading-value">{{
+                    rotation.beta.toFixed(3)
+                  }}</text>
+                </view>
+                <view class="sensor-reading-chip">
+                  <text class="sensor-reading-label">GAMMA</text>
+                  <text class="sensor-reading-value">{{
+                    rotation.gamma.toFixed(3)
+                  }}</text>
+                </view>
               </view>
-            </view>
-            @switch (card.status()) {
-              @case ('checking') {
-                <text class="info-text">checking availability…</text>
-              }
-              @case ('unavailable') {
-                <text class="info-text">not available on this device</text>
-              }
-              @case ('waiting') {
-                <text class="info-text">waiting for first reading…</text>
-              }
-              @case ('live') {
-                @if (card.reading(); as reading) {
-                  <view class="sensor-reading-row">
-                    <view class="sensor-reading-chip">
-                      <text class="sensor-reading-label">X</text>
-                      <text class="sensor-reading-value">{{
-                        reading.x.toFixed(3)
-                      }}</text>
-                    </view>
-                    <view class="sensor-reading-chip">
-                      <text class="sensor-reading-label">Y</text>
-                      <text class="sensor-reading-value">{{
-                        reading.y.toFixed(3)
-                      }}</text>
-                    </view>
-                    <view class="sensor-reading-chip">
-                      <text class="sensor-reading-label">Z</text>
-                      <text class="sensor-reading-value">{{
-                        reading.z.toFixed(3)
-                      }}</text>
-                    </view>
-                  </view>
-                }
-              }
-            }
-          </view>
-        }
-
-        <view testID="sensor-card-device-motion" class="sensor-card">
-          <view class="sensor-card-header">
-            <text class="sensor-card-title">Device motion</text>
-            <view
-              testID="sensor-status-device-motion"
-              [class]="statusBadgeClass(deviceMotionStatus())"
-            >
-              <text class="sensor-status-text">{{
-                statusLabel(deviceMotionStatus())
-              }}</text>
-            </view>
-          </view>
-          @switch (deviceMotionStatus()) {
-            @case ('checking') {
-              <text class="info-text">checking availability…</text>
-            }
-            @case ('unavailable') {
-              <text class="info-text">not available on this device</text>
-            }
-            @case ('waiting') {
-              <text class="info-text">waiting for first reading…</text>
-            }
-            @case ('live') {
-              @if (deviceMotion(); as motion) {
-                <text class="info-text">{{
-                  'interval: ' + motion.interval.toFixed(1) + 'ms'
-                }}</text>
-                @if (motion.rotation; as rotation) {
-                  <view class="sensor-reading-row">
-                    <view class="sensor-reading-chip">
-                      <text class="sensor-reading-label">ALPHA</text>
-                      <text class="sensor-reading-value">{{
-                        rotation.alpha.toFixed(3)
-                      }}</text>
-                    </view>
-                    <view class="sensor-reading-chip">
-                      <text class="sensor-reading-label">BETA</text>
-                      <text class="sensor-reading-value">{{
-                        rotation.beta.toFixed(3)
-                      }}</text>
-                    </view>
-                    <view class="sensor-reading-chip">
-                      <text class="sensor-reading-label">GAMMA</text>
-                      <text class="sensor-reading-value">{{
-                        rotation.gamma.toFixed(3)
-                      }}</text>
-                    </view>
-                  </view>
-                }
-              }
             }
           }
-        </view>
+        </SensorCard>
 
-        <view testID="sensor-card-pedometer" class="sensor-card">
-          <view class="sensor-card-header">
-            <text class="sensor-card-title">Pedometer</text>
-            <view
-              testID="sensor-status-pedometer"
-              [class]="statusBadgeClass(pedometerStatus())"
-            >
-              <text class="sensor-status-text">{{
-                statusLabel(pedometerStatus())
-              }}</text>
-            </view>
-          </view>
-          @switch (pedometerStatus()) {
-            @case ('checking') {
-              <text class="info-text">checking availability…</text>
-            }
-            @case ('unavailable') {
-              <text class="info-text">not available on this device</text>
-            }
-            @case ('waiting') {
-              <text class="info-text">waiting for first reading…</text>
-            }
-            @case ('live') {
-              @if (pedometer(); as steps) {
-                <text
-                  testID="sensors-pedometer-steps"
-                  class="sensor-reading-value"
-                >
-                  {{ steps.steps + ' steps' }}
-                </text>
-              }
-            }
+        <SensorCard
+          testID="sensors-pedometer"
+          title="Pedometer"
+          [status]="pedometerStatus()"
+        >
+          @if (pedometer(); as counter) {
+            <text testID="sensors-pedometer-steps" class="sensor-reading-value">
+              {{ counter.steps }} steps
+            </text>
           }
-        </view>
+        </SensorCard>
       </scroll-view>
     </safe-area-view>
   `,
 })
 export class SensorsScreen {
-  private readonly lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Sensors];
-  readonly lineTagClass = `line-tag line-tag-${this.lineInfo.line}`;
-  readonly lineTagLabel = `${this.lineInfo.code} · ${this.lineInfo.label}`;
-  readonly heroBadgeStyle = { backgroundColor: LINE_COLOR.sensors };
-
-  private readonly injector = inject(Injector);
-
-  private readonly accelerometer: Signal<IAccelerometerMeasurement | null> =
-    inject(AccelerometerService).connect();
-  private readonly gyroscope: Signal<IGyroscopeMeasurement | null> =
-    inject(GyroscopeService).connect();
-  private readonly magnetometer: Signal<IMagnetometerMeasurement | null> =
-    inject(MagnetometerService).connect();
-  readonly deviceMotion: Signal<IDeviceMotionMeasurement | null> =
-    inject(DeviceMotionService).connect();
-  readonly pedometer: Signal<IPedometerResult | null> =
-    inject(PedometerService).connect();
-
-  readonly deviceMotionStatus = sensorCardStatus(
-    this.deviceMotion,
-    () => probeNativeAvailability(NATIVE_MODULE_NAME.DeviceMotion),
-    this.injector,
-  );
-  readonly pedometerStatus = sensorCardStatus(
-    this.pedometer,
-    () => isPedometerAvailableAsync(),
-    this.injector,
-  );
-
-  readonly axisCards: IAxisSensorCard[] = [
-    {
-      id: 'accelerometer',
-      title: 'Accelerometer',
-      status: sensorCardStatus(
-        this.accelerometer,
-        () => probeNativeAvailability(NATIVE_MODULE_NAME.Accelerometer),
-        this.injector,
-      ),
-      reading: this.accelerometer,
-      cardHostProps: sensorCardHostProps('accelerometer'),
-      statusHostProps: sensorStatusHostProps('accelerometer'),
-    },
-    {
-      id: 'gyroscope',
-      title: 'Gyroscope',
-      status: sensorCardStatus(
-        this.gyroscope,
-        () => probeNativeAvailability(NATIVE_MODULE_NAME.Gyroscope),
-        this.injector,
-      ),
-      reading: this.gyroscope,
-      cardHostProps: sensorCardHostProps('gyroscope'),
-      statusHostProps: sensorStatusHostProps('gyroscope'),
-    },
-    {
-      id: 'magnetometer',
-      title: 'Magnetometer',
-      status: sensorCardStatus(
-        this.magnetometer,
-        () => probeNativeAvailability(NATIVE_MODULE_NAME.Magnetometer),
-        this.injector,
-      ),
-      reading: this.magnetometer,
-      cardHostProps: sensorCardHostProps('magnetometer'),
-      statusHostProps: sensorStatusHostProps('magnetometer'),
-    },
+  readonly lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Sensors];
+  readonly badgeStyle = { backgroundColor: LINE_COLOR.sensors };
+  readonly scenarioSteps = [
+    'Tilt and shake the phone and watch the accelerometer',
+    'Rotate it and watch the gyroscope',
+    'Walk a few steps and watch the pedometer',
   ];
 
-  statusBadgeClass(status: ISensorCardStatus): string {
-    return `sensor-status-badge sensor-status-badge-${status}`;
-  }
+  readonly accelerometer = inject(AccelerometerService).connect();
+  readonly gyroscope = inject(GyroscopeService).connect();
+  readonly magnetometer = inject(MagnetometerService).connect();
+  readonly deviceMotion = inject(DeviceMotionService).connect();
+  readonly pedometer = inject(PedometerService).connect();
 
-  statusLabel(status: ISensorCardStatus): string {
-    return SENSOR_STATUS_TEXT[status];
-  }
+  readonly accelerometerStatus = useSensorStatus(
+    () => Accelerometer.isAvailableAsync(),
+    () => this.accelerometer() !== null,
+  );
+  readonly gyroscopeStatus = useSensorStatus(
+    () => Gyroscope.isAvailableAsync(),
+    () => this.gyroscope() !== null,
+  );
+  readonly magnetometerStatus = useSensorStatus(
+    () => Magnetometer.isAvailableAsync(),
+    () => this.magnetometer() !== null,
+  );
+  readonly deviceMotionStatus = useSensorStatus(
+    () => DeviceMotion.isAvailableAsync(),
+    () => this.deviceMotion() !== null,
+  );
+  readonly pedometerStatus = useSensorStatus(
+    () => isPedometerAvailableAsync(),
+    () => this.pedometer() !== null,
+  );
 }

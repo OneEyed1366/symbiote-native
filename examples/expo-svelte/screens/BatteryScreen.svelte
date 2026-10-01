@@ -1,10 +1,5 @@
 <script lang="ts">
-  // @symbiote-native/battery tour stop — a live card driven by the three runes
-  // (useBatteryLevel/useBatteryState/useLowPowerMode) plus a one-shot capabilities card
-  // (isAvailableAsync, Android-only isBatteryOptimizationEnabledAsync). A Simulator with no
-  // physical battery reports the API as unavailable; a real device is needed for live readings.
-  // Svelte twin of examples/expo-vue-sfc/screens/BatteryScreen.vue.
-  import { Platform, ScrollView } from '@symbiote-native/svelte';
+  import { Platform } from '@symbiote-native/svelte';
   import {
     BatteryState,
     isAvailableAsync,
@@ -13,6 +8,7 @@
     useBatteryState,
     useLowPowerMode,
   } from '@symbiote-native/battery/svelte';
+  import Scenario from '../components/Scenario.svelte';
   import { ROUTE_NAME } from '../routes';
   import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
@@ -24,8 +20,7 @@
     no: 'NO',
   };
 
-  // core/battery.ts hands back a negative level (its -1 sentinel) on a host that cannot measure
-  // one at all, so anything below zero is "no reading", not a real percentage.
+  // `core/battery.ts` returns a negative level (its -1 sentinel) on a host that cannot measure one
   const MIN_MEASURABLE_LEVEL = 0;
   const PERCENT_SCALE = 100;
 
@@ -42,7 +37,7 @@
       case BatteryState.UNPLUGGED:
         return 'Unplugged';
       case BatteryState.NOT_CHARGING:
-        return 'Not charging (protected)';
+        return 'Not charging (protecting battery)';
       default:
         return 'Unknown';
     }
@@ -63,11 +58,8 @@
       ? 'unknown'
       : `${Math.round(batteryLevel.current * PERCENT_SCALE)}%`,
   );
-  const batteryStateText = $derived(batteryStateLabel(batteryState.current));
-  const lowPowerModeText = $derived(lowPowerMode.current ? 'ON' : 'OFF');
 
-  // Write-only over the two status variables, so the dependency set stays empty and this runs
-  // exactly once on mount — the twin of the Vue screen's onMounted.
+  // Write-only over the two status variables, so the dependency set stays empty and this runs once
   $effect(() => {
     void isAvailableAsync().then(isSupported => {
       availabilityStatus = toCapabilityStatus(isSupported);
@@ -80,16 +72,23 @@
   });
 </script>
 
+{#snippet capabilityRow(testID: string, label: string, status: ICapabilityStatus)}
+  <view {testID} class="capability-row">
+    <text class="capability-label">{label}</text>
+    <view class={`status-badge status-badge-${status}`}>
+      <text class="status-badge-text">{CAPABILITY_LABEL[status]}</text>
+    </view>
+  </view>
+{/snippet}
+
 <safe-area-view class="screen">
-  <ScrollView
+  <scroll-view
     testID="battery-scroll"
     class="screen"
     contentContainerStyle="scroll-content"
   >
     <view class={`line-tag line-tag-${lineInfo.line}`}>
-      <text class="line-tag-text">
-        {`${lineInfo.code} · ${lineInfo.label}`}
-      </text>
+      <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
     </view>
     <view class="hero-card">
       <view class="hero-badge" style={{ backgroundColor: lineColor }}>
@@ -98,56 +97,55 @@
       <view class="hero-copy">
         <text class="hero-title">Battery</text>
         <text class="hero-body">
-          @symbiote-native/battery — live battery level, charging state, and
-          low-power mode, over three Svelte runes. The iOS Simulator reports the
-          battery API as unavailable; a real device is needed to see live
-          readings.
+          React to the battery: level, charging state and low-power mode update
+          live through hooks, so the app can pause heavy work when the battery
+          is low. A simulator reports the API as unavailable, use a real device.
         </text>
       </view>
     </view>
-    <view testID="battery-live-card" class="battery-card">
-      <text class="battery-card-title">Live</text>
-      <view class="battery-row">
-        <text class="battery-row-label">Level</text>
-        <text testID="battery-level-value" class="battery-value-text">
-          {batteryLevelText}
-        </text>
+
+    <Scenario
+      testID="battery-scenario"
+      title="Pause sync and animations when the battery is low"
+      why="Skip background uploads, heavy animations or video quality when the user is on low power or unplugged at low charge, and resume when they plug in."
+      steps={[
+        'Turn Low Power Mode on in the system settings',
+        'Plug the charger in and out',
+        'Watch the live status card',
+      ]}
+      expect="Level, charging state and low power mode change on screen within a moment, without reloading."
+    />
+
+    <view testID="battery-live-card" class="feature-card">
+      <view class="feature-card-header">
+        <text class="feature-card-title">Live status</text>
       </view>
-      <view class="battery-row">
-        <text class="battery-row-label">State</text>
-        <text testID="battery-state-value" class="battery-value-text">
-          {batteryStateText}
-        </text>
+      <view class="capability-row">
+        <text class="capability-label">Battery level</text>
+        <text class="value-text">{batteryLevelText}</text>
       </view>
-      <view class="battery-row">
-        <text class="battery-row-label">Low power mode</text>
-        <text testID="battery-low-power-value" class="battery-value-text">
-          {lowPowerModeText}
-        </text>
+      <view class="capability-row">
+        <text class="capability-label">Battery state</text>
+        <text class="value-text">{batteryStateLabel(batteryState.current)}</text>
+      </view>
+      <view class="capability-row">
+        <text class="capability-label">Low power mode</text>
+        <text class="value-text">{lowPowerMode.current ? 'On' : 'Off'}</text>
       </view>
     </view>
-    <view testID="battery-capabilities-card" class="battery-card">
-      <text class="battery-card-title">Capabilities</text>
-      <view class="battery-row">
-        <text class="battery-row-label">Available</text>
-        <view
-          class={`battery-status-badge battery-status-badge-${availabilityStatus}`}
-        >
-          <text class="battery-status-text">
-            {CAPABILITY_LABEL[availabilityStatus]}
-          </text>
-        </view>
+
+    <view testID="battery-capabilities-card" class="feature-card">
+      <view class="feature-card-header">
+        <text class="feature-card-title">Capabilities</text>
       </view>
-      {#if Platform.OS === 'android'}<view class="battery-row">
-          <text class="battery-row-label">Battery optimization enabled</text>
-          <view
-            class={`battery-status-badge battery-status-badge-${optimizationStatus}`}
-          >
-            <text class="battery-status-text">
-              {CAPABILITY_LABEL[optimizationStatus]}
-            </text>
-          </view>
-        </view>{/if}
+      {@render capabilityRow('battery-available', 'Available', availabilityStatus)}
+      {#if Platform.OS === 'android'}
+        {@render capabilityRow(
+          'battery-optimization',
+          'Battery optimization enabled',
+          optimizationStatus,
+        )}
+      {/if}
     </view>
-  </ScrollView>
+  </scroll-view>
 </safe-area-view>

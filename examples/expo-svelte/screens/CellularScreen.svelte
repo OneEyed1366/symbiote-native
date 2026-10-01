@@ -1,10 +1,5 @@
 <script lang="ts">
-  // @symbiote-native/cellular tour stop — a one-shot info card (generation + carrier/SIM fields,
-  // every field except generation returns null on iOS/web upstream — Android-only in practice) plus
-  // a permission card driving usePermissions(). Most fields need a physical device with a SIM card;
-  // a simulator/emulator reports null/UNKNOWN for nearly everything. Svelte twin of
-  // examples/expo-vue-sfc/screens/CellularScreen.vue.
-  import { Platform, ScrollView } from '@symbiote-native/svelte';
+  import { Platform } from '@symbiote-native/svelte';
   import {
     CellularGeneration,
     allowsVoipAsync,
@@ -16,12 +11,12 @@
     usePermissions,
   } from '@symbiote-native/cellular/svelte';
   import ActionButton from '../components/ActionButton.svelte';
+  import Scenario from '../components/Scenario.svelte';
   import { ROUTE_NAME } from '../routes';
   import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
   const PENDING_LABEL = 'checking…';
-  // An empty string is a real answer from the native side ("the SIM reports no name"), distinct
-  // from null ("not read yet"), so it gets its own label instead of falling back to PENDING_LABEL.
+  // An empty string is a real answer from the SIM, distinct from null (not read yet)
   const EMPTY_LABEL = '(none)';
 
   function generationLabel(generation: CellularGeneration): string {
@@ -57,8 +52,7 @@
   let mobileNetworkCode = $state<string | null>(null);
   const permissions = usePermissions();
 
-  // Write-only over the state above, so the dependency set stays empty and this runs exactly once
-  // on mount — the twin of the Vue screen's onMounted.
+  // Write-only over the state above, so the dependency set stays empty and this runs once on mount
   $effect(() => {
     void Promise.all([
       getCellularGenerationAsync(),
@@ -79,29 +73,26 @@
     );
   });
 
-  const generationText = $derived(
-    generation === null ? PENDING_LABEL : generationLabel(generation),
-  );
-  const allowsVoipText = $derived(valueLabel(allowsVoip));
-  const isoCountryCodeText = $derived(valueLabel(isoCountryCode));
-  const carrierNameText = $derived(valueLabel(carrierName));
-  const mobileCountryCodeText = $derived(valueLabel(mobileCountryCode));
-  const mobileNetworkCodeText = $derived(valueLabel(mobileNetworkCode));
   const permissionLabel = $derived(
     permissions.status === null ? PENDING_LABEL : permissions.status.status,
   );
 </script>
 
+{#snippet infoRow(label: string, value: string)}
+  <view class="capability-row">
+    <text class="capability-label">{label}</text>
+    <text class="value-text">{value}</text>
+  </view>
+{/snippet}
+
 <safe-area-view class="screen">
-  <ScrollView
+  <scroll-view
     testID="cellular-scroll"
     class="screen"
     contentContainerStyle="scroll-content"
   >
     <view class={`line-tag line-tag-${lineInfo.line}`}>
-      <text class="line-tag-text">
-        {`${lineInfo.code} · ${lineInfo.label}`}
-      </text>
+      <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
     </view>
     <view class="hero-card">
       <view class="hero-badge" style={{ backgroundColor: lineColor }}>
@@ -110,49 +101,46 @@
       <view class="hero-copy">
         <text class="hero-title">Cellular</text>
         <text class="hero-body">
-          @symbiote-native/cellular — cellular generation and carrier/SIM info.
-          Every field except generation is Android-only upstream (iOS/web return
-          null); a physical device with an active SIM is needed for real values.
+          Find out about the mobile connection: network generation (2G to 5G),
+          carrier name, country code and whether VoIP is allowed. Only the
+          generation works on iOS, a physical device with a SIM is needed.
         </text>
       </view>
     </view>
-    <view testID="cellular-info-card" class="cellular-card">
-      <text class="cellular-card-title">Cellular info</text>
-      <view class="cellular-row">
-        <text class="cellular-row-label">Generation</text>
-        <text testID="cellular-generation-value" class="cellular-value-text">
-          {generationText}
-        </text>
+
+    <Scenario
+      testID="cellular-scenario"
+      title="Choose video quality from the mobile network generation"
+      why="On 3G, lower the stream quality or skip auto-downloads, on 5G allow them. The carrier and country help pick the right payment or support options."
+      steps={[
+        'Turn Wi-Fi off so the phone uses mobile data',
+        'Read the generation and carrier in the card',
+      ]}
+      expect="The generation shows 3G, 4G or 5G and the carrier name appears on Android. Fields the platform does not provide show as unavailable."
+    />
+
+    <view testID="cellular-info-card" class="feature-card">
+      <view class="feature-card-header">
+        <text class="feature-card-title">Cellular info</text>
       </view>
-      {#if Platform.OS === 'android'}<view class="cellular-row">
-          <text class="cellular-row-label">Allows VoIP</text>
-          <text class="cellular-value-text">{allowsVoipText}</text>
-        </view>
-        <view class="cellular-row">
-          <text class="cellular-row-label">ISO country code</text>
-          <text class="cellular-value-text">{isoCountryCodeText}</text>
-        </view>
-        <view class="cellular-row">
-          <text class="cellular-row-label">Carrier name</text>
-          <text class="cellular-value-text">{carrierNameText}</text>
-        </view>
-        <view class="cellular-row">
-          <text class="cellular-row-label">Mobile country code</text>
-          <text class="cellular-value-text">{mobileCountryCodeText}</text>
-        </view>
-        <view class="cellular-row">
-          <text class="cellular-row-label">Mobile network code</text>
-          <text class="cellular-value-text">{mobileNetworkCodeText}</text>
-        </view>{/if}
+      {@render infoRow(
+        'Generation',
+        generation === null ? PENDING_LABEL : generationLabel(generation),
+      )}
+      {#if Platform.OS === 'android'}
+        {@render infoRow('Allows VoIP', valueLabel(allowsVoip))}
+        {@render infoRow('ISO country code', valueLabel(isoCountryCode))}
+        {@render infoRow('Carrier name', valueLabel(carrierName))}
+        {@render infoRow('Mobile country code', valueLabel(mobileCountryCode))}
+        {@render infoRow('Mobile network code', valueLabel(mobileNetworkCode))}
+      {/if}
     </view>
-    <view testID="cellular-permission-card" class="cellular-card">
-      <text class="cellular-card-title">Permission</text>
-      <view class="cellular-row">
-        <text class="cellular-row-label">Phone-state permission status</text>
-        <text testID="cellular-permission-value" class="cellular-value-text">
-          {permissionLabel}
-        </text>
+
+    <view testID="cellular-permission-card" class="feature-card">
+      <view class="feature-card-header">
+        <text class="feature-card-title">Permission</text>
       </view>
+      {@render infoRow('Phone-state permission status', permissionLabel)}
       <ActionButton
         testID="cellular-request-permission"
         title="Request permission"
@@ -160,5 +148,5 @@
         color={lineColor}
       />
     </view>
-  </ScrollView>
+  </scroll-view>
 </safe-area-view>
