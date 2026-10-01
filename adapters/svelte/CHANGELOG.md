@@ -1,5 +1,14 @@
 # @symbiote-native/svelte
 
+## 3.0.5
+
+### Patch Changes
+
+- [`bb26a15`](https://github.com/OneEyed1366/symbiote-native/commit/bb26a15d87bf55ac43895b6ab4acd53fcd7436da) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Add the `getComputedStyle` and `CustomEvent` globals so `createEventDispatcher` works, and `parentElement`, `clientWidth`, `clientHeight`, `getBoundingClientRect` and `animate` on shim elements. `transition:` and `animate:flip` stay off for now: they render without animating.
+
+- Updated dependencies [[`cfbb0f7`](https://github.com/OneEyed1366/symbiote-native/commit/cfbb0f7dd8251fb74553f04e58f7e368f63289f5), [`cfbb0f7`](https://github.com/OneEyed1366/symbiote-native/commit/cfbb0f7dd8251fb74553f04e58f7e368f63289f5), [`cfbb0f7`](https://github.com/OneEyed1366/symbiote-native/commit/cfbb0f7dd8251fb74553f04e58f7e368f63289f5), [`cfbb0f7`](https://github.com/OneEyed1366/symbiote-native/commit/cfbb0f7dd8251fb74553f04e58f7e368f63289f5), [`cfbb0f7`](https://github.com/OneEyed1366/symbiote-native/commit/cfbb0f7dd8251fb74553f04e58f7e368f63289f5)]:
+  - @symbiote-native/components@3.1.3
+
 ## 3.0.4
 
 ### Patch Changes

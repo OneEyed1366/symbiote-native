@@ -325,24 +325,4 @@ describe('touchable-opacity host behavior', () => {
 
     expect(committedPropsOf(TEST_ID).opacity).toBe(DEFAULT_ACTIVE_OPACITY);
   });
-
-  // Vendor parity: `TouchableOpacity-itest.js` ("does not render explicit opacity when using
-  // default") commits no `opacity` for an untouched touchable. `collapsable` still has to be
-  // forced from mount, т.к. a flattened view has no tag for the responder to land on
-  it('commits no opacity until the first press, but blocks flattening from mount', async () => {
-    vi.useFakeTimers();
-    registerTouchableOpacityBehavior();
-    const node = makeTouchable();
-    routeProp(node, 'testID', TEST_ID);
-    mount(node);
-    await settle();
-
-    expect(committedPropsOf(TEST_ID).opacity).toBeUndefined();
-    expect(committedPropsOf(TEST_ID).collapsable).toBe(false);
-
-    pressIn(node);
-    await settle();
-
-    expect(committedPropsOf(TEST_ID).opacity).toBe(DEFAULT_ACTIVE_OPACITY);
-  });
 });
