@@ -157,7 +157,8 @@ jobs:
           registry-url: https://registry.npmjs.org
           cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
+      # `--ignore-scripts`: `changeset version` needs no build, and husky is not installed
+      - run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Open version-bump PR into master
         uses: changesets/action@v1
@@ -225,7 +226,9 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
+      # `--ignore-scripts`: the per-package `prepare` AOT-builds everything at install, then
+      # `prepublish-build` cleans and rebuilds it. Packing still runs each `prepack`
+      - run: pnpm install --frozen-lockfile --ignore-scripts
 
       - run: pnpm run prepublish-build
 
