@@ -84,6 +84,8 @@ jobs:
           createGithubReleases: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # the version commit consumes changesets, so the per-commit changeset gate must not run
+          HUSKY: '0'
 
       # changesets/action creates one GitHub Release per published package by
       # default (no built-in grouping option exists as of 2026 - see
@@ -167,6 +169,8 @@ jobs:
           createGithubReleases: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # the version commit consumes changesets, so the per-commit changeset gate must not run
+          HUSKY: '0'
 
   # Preview publish of every publishable package via pkg.pr.new — WITHOUT touching the real npm
   # registry at all. pkg.pr.new hosts its own npm-compatible per-commit URLs, so nothing here is
