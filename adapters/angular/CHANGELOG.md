@@ -1,5 +1,23 @@
 # @symbiote-native/angular
 
+## 3.2.0
+
+### Minor Changes
+
+- [#91](https://github.com/OneEyed1366/symbiote-native/pull/91) [`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Export the hook factories the Expo wrapper packages are built on: `createPermissionHook`, `createResourceHook` and `createEventValueHook` on React, Vue, Svelte and Solid, and `createResourceHook`, `createEventValueHook`, `PermissionsServiceBase` and `connectWatchedSignal` on Angular. The shared logic lives once in `@symbiote-native/engine` (`createPermissionApi`, `createResourceController` and friends). Angular also exports `AccessibilityInputsBase`, `NativeViewBase` and `anchorStyleProp`, which the slider now builds on, and splits its list components into smaller files without changing their API.
+
+- [#91](https://github.com/OneEyed1366/symbiote-native/pull/91) [`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - `bootstrapApplication` accepts a `providers` option for app-level providers such as `provideHttpClient()`. A `FinalizationRegistry` stand-in is installed when Hermes lacks one, which `@angular/core` 22.2 and later needs at module load.
+
+### Patch Changes
+
+- [#91](https://github.com/OneEyed1366/symbiote-native/pull/91) [`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - README: the documented native entry point was the low-level `mount`/`AppRegistry.registerRunnable` escape hatch, not the real zero-config `bootstrapApplication` this adapter actually ships (`bootstrap.ts`) and that `cli new` scaffolds — rewritten to lead with it, demoting the low-level path to "for anything the defaults don't cover", matching every other adapter's README shape. Also missing `import '@symbiote-native/angular'`, the bare side-effect import that registers host behaviors. Fixes the opening line and Parity section, both of which only named React and Vue, omitting Svelte and Solid entirely. Corrects the Node requirement (react-native 0.86 needs `>=22.13`, not `>=22.11`), adds the missing `@angular/forms` peer and the `@babel/plugin-transform-class-static-block` requirement, and leads Install with `npx @symbiote-native/cli new`.
+
+- [#91](https://github.com/OneEyed1366/symbiote-native/pull/91) [`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Add `ClipboardPasteButton` (iOS) and `ContactAccessButton` on every adapter. The Expo view-manager name and lazy view registration move into `@symbiote-native/engine` (`expoViewManagerName`, `tryRegisterNativeView`), and Angular gets `NativeViewBase` for native-view components plus `connectWatchedSignal` for signal-backed services.
+
+- Updated dependencies [[`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578), [`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578), [`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578), [`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578), [`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578), [`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578), [`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578), [`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578)]:
+  - @symbiote-native/components@3.1.4
+  - @symbiote-native/css-parser@0.5.3
+
 ## 3.1.3
 
 ### Patch Changes

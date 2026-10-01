@@ -1,5 +1,14 @@
 # @symbiote-native/splash-screen
 
+## 6.0.6
+
+### Patch Changes
+
+- [#91](https://github.com/OneEyed1366/symbiote-native/pull/91) [`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - README: Install now leads with `npx @symbiote-native/cli new`/`add` (split into separate "New app"/"Existing app" blocks to avoid an accidental double copy-paste), with the manual `npm install` + native-wiring steps collapsed into a `<details>` block for anyone not using the CLI. Every `--flag` was verified against `expo-package-layers.ts`, and each package's native-wiring claims (Info.plist keys, manifest permissions/services) were cross-checked against its own `native-link.json`.
+
+- Updated dependencies [[`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578), [`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578), [`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578), [`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578), [`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578), [`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578), [`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578)]:
+  - @symbiote-native/components@3.1.4
+
 ## 6.0.5
 
 ### Patch Changes

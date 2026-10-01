@@ -84,6 +84,8 @@ jobs:
           createGithubReleases: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # the version commit consumes changesets, so the per-commit changeset gate must not run
+          HUSKY: '0'
 
       # changesets/action creates one GitHub Release per published package by
       # default (no built-in grouping option exists as of 2026 - see
@@ -155,7 +157,8 @@ jobs:
           registry-url: https://registry.npmjs.org
           cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
+      # `--ignore-scripts`: `changeset version` needs no build, and husky is not installed
+      - run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Open version-bump PR into master
         uses: changesets/action@v1
@@ -167,6 +170,8 @@ jobs:
           createGithubReleases: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # the version commit consumes changesets, so the per-commit changeset gate must not run
+          HUSKY: '0'
 
   # Preview publish of every publishable package via pkg.pr.new — WITHOUT touching the real npm
   # registry at all. pkg.pr.new hosts its own npm-compatible per-commit URLs, so nothing here is
@@ -221,7 +226,9 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
+      # `--ignore-scripts`: the per-package `prepare` AOT-builds everything at install, then
+      # `prepublish-build` cleans and rebuilds it. Packing still runs each `prepack`
+      - run: pnpm install --frozen-lockfile --ignore-scripts
 
       - run: pnpm run prepublish-build
 

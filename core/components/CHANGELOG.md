@@ -1,5 +1,37 @@
 # @symbiote-native/components
 
+## 3.1.4
+
+### Patch Changes
+
+- [#91](https://github.com/OneEyed1366/symbiote-native/pull/91) [`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Export the hook factories the Expo wrapper packages are built on: `createPermissionHook`, `createResourceHook` and `createEventValueHook` on React, Vue, Svelte and Solid, and `createResourceHook`, `createEventValueHook`, `PermissionsServiceBase` and `connectWatchedSignal` on Angular. The shared logic lives once in `@symbiote-native/engine` (`createPermissionApi`, `createResourceController` and friends). Angular also exports `AccessibilityInputsBase`, `NativeViewBase` and `anchorStyleProp`, which the slider now builds on, and splits its list components into smaller files without changing their API.
+
+- [#91](https://github.com/OneEyed1366/symbiote-native/pull/91) [`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - TouchableWithoutFeedback builds its press-timing runtime on the first gesture instead of when it
+  adopts a child, so a list of them nobody touches stops paying for it: 383 bytes per item,
+  7 183 -> 6 800 KB per thousand.
+
+- [#91](https://github.com/OneEyed1366/symbiote-native/pull/91) [`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - README: the Usage example called `renderSwitch()`, a function that no longer exists — Switch's render function was retired when painting moved to a host behavior. Replaced with `renderModal()`/`modalReducer`/`createInitialModalState`, the real current three-layer reference component, and corrected the surrounding claim that Switch is the canonical example.
+
+- [#91](https://github.com/OneEyed1366/symbiote-native/pull/91) [`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - The press machine builds its gesture runtime on the first event instead of at mount, so a pressable
+  nobody touches pays for its dispatchers and nothing else. Every tag carrying the machine drops
+  ~1 KB per node: `button` 8 259 -> 7 259 KB / 1 000, `touchable-opacity` 7 992 -> 6 992,
+  `pressable` 3 561 -> 2 559, `text-input` 6 090 -> 5 168.
+
+- [#91](https://github.com/OneEyed1366/symbiote-native/pull/91) [`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - ScrollView, RefreshControl, Switch and TextInput answer their events through the shared dispatch
+  too, so no behavior installs a listener closure per node any more except where the name is
+  Fabric-gated. Per thousand items: scroll-view 3 878 -> 2 276 KB, refresh-control 5 906 -> 3 937,
+  text-input 3 824 -> 3 105, switch 2 461 -> 2 015.
+
+- [#91](https://github.com/OneEyed1366/symbiote-native/pull/91) [`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - TouchableOpacity and Button bind their animated opacity layer on the first press instead of at
+  mount. Mounting a thousand touchables drops from 65 ms / 25 MB to 27 ms / 8 MB, a button from
+  74 ms / 26 MB to 43 ms / 8 MB. An untouched touchable now commits no `opacity` key, matching
+  vendor (`TouchableOpacity-itest.js`); `collapsable: false` is still forced from mount.
+
+- [#91](https://github.com/OneEyed1366/symbiote-native/pull/91) [`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - A host behavior answers its events through one shared dispatch instead of installing a closure per
+  name, and TouchableOpacity builds its fade runtime on the first press rather than at attach. Per
+  thousand items: pressable 2 559 -> 1 263 KB, touchable-opacity 6 992 -> 3 584, button 7 259 ->
+  4 068, text-input 5 167 -> 3 824.
+
 ## 3.1.3
 
 ### Patch Changes

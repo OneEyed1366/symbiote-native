@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/auth-session",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "expo-auth-session ported for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, Svelte, Solid, and Angular adapters. PKCE-based OAuth2/OpenID Connect flow over @symbiote-native/web-browser, @symbiote-native/crypto, and @symbiote-native/application.",
   "license": "MIT",
   "keywords": [

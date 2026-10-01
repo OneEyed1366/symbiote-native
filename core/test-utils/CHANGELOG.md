@@ -1,5 +1,16 @@
 # @symbiote-native/test-utils
 
+## 0.4.6
+
+### Patch Changes
+
+- [#91](https://github.com/OneEyed1366/symbiote-native/pull/91) [`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - README: replaced every reference to the deleted `installFabric()` with the real `installRecordingFabric()`/`createRecordingHost()`/`propsOf()` API, removed a "Committed-payload assertions" section documenting functions (`normalizeCommitted`, `expectCommittedProps`) that never existed in source, and added the missing "Reading the live tree" (`createLiveTree`, `walkLive`/`findLive`, `serialize`, `outline`) and "Measuring the engine, not the app" (`censusLive`, `trackHostCrossings`) sections for APIs that shipped with no documentation.
+
+- [#91](https://github.com/OneEyed1366/symbiote-native/pull/91) [`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Recording host implements `getBoundingClientRect` and is split into per-concern helpers.
+
+- Updated dependencies [[`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578), [`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578), [`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578), [`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578), [`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578)]:
+  - @symbiote-native/engine@1.5.0
+
 ## 0.4.5
 
 ### Patch Changes

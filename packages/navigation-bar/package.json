@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/navigation-bar",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "expo-navigation-bar wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, Svelte, Solid, and Angular adapters. Sets the Android navigation bar's style and visibility. Android only.",
   "license": "MIT",
   "keywords": [

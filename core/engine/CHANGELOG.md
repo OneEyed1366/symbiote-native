@@ -1,5 +1,24 @@
 # @symbiote-native/engine
 
+## 1.5.0
+
+### Minor Changes
+
+- [#91](https://github.com/OneEyed1366/symbiote-native/pull/91) [`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Export the hook factories the Expo wrapper packages are built on: `createPermissionHook`, `createResourceHook` and `createEventValueHook` on React, Vue, Svelte and Solid, and `createResourceHook`, `createEventValueHook`, `PermissionsServiceBase` and `connectWatchedSignal` on Angular. The shared logic lives once in `@symbiote-native/engine` (`createPermissionApi`, `createResourceController` and friends). Angular also exports `AccessibilityInputsBase`, `NativeViewBase` and `anchorStyleProp`, which the slider now builds on, and splits its list components into smaller files without changing their API.
+
+- [#91](https://github.com/OneEyed1366/symbiote-native/pull/91) [`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Add `getBoundingClientRect(node, includeTransform)`: a synchronous layout read from the committed Fabric tree, `undefined` for an uncommitted node.
+
+- [#91](https://github.com/OneEyed1366/symbiote-native/pull/91) [`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - A host behavior answers its events through one shared dispatch instead of installing a closure per
+  name, and TouchableOpacity builds its fade runtime on the first press rather than at attach. Per
+  thousand items: pressable 2 559 -> 1 263 KB, touchable-opacity 6 992 -> 3 584, button 7 259 ->
+  4 068, text-input 5 167 -> 3 824.
+
+### Patch Changes
+
+- [#91](https://github.com/OneEyed1366/symbiote-native/pull/91) [`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - A node whose create op is still in the batch no longer forces a full drain to the host when a behavior marks its props dirty: the host has never heard of it, so the mark is a no-op. Per item, `touchable-without-feedback` 3 158 -> 1 386 B and `touchable-opacity` 3 271 -> 1 499 B; the other tags are unmoved.
+
+- [#91](https://github.com/OneEyed1366/symbiote-native/pull/91) [`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Add `ClipboardPasteButton` (iOS) and `ContactAccessButton` on every adapter. The Expo view-manager name and lazy view registration move into `@symbiote-native/engine` (`expoViewManagerName`, `tryRegisterNativeView`), and Angular gets `NativeViewBase` for native-view components plus `connectWatchedSignal` for signal-backed services.
+
 ## 1.4.0
 
 ### Minor Changes
