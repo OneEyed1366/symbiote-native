@@ -38,7 +38,7 @@ minimumReleaseAgeExclude:
   - '@symbiote-native/test-utils@0.1.5'
   - '@symbiote-native/splash-screen@0.1.3 || 2.0.0'
   - '@symbiote-native/navigation@1.0.0'
-  - expo-modules-core@57.0.5
+  - expo-modules-core@57.0.20
   - expo-modules-jsi@57.0.3
   - expo-sensors@57.0.2
   - expo-modules-autolinking@57.0.8
@@ -267,7 +267,7 @@ catalog:
   # line (expo-sensors 57.0.2 / expo-modules-core 57.0.5, verified against .vendors/expo at
   # origin/sdk-57).
   expo-sensors: 57.0.2
-  expo-modules-core: 57.0.5
+  expo-modules-core: 57.0.20
   # Same exact-pin reasoning as expo-sensors above: packages/local-auth depends on
   # expo-local-authentication only for its native ios/android folders (JS hand-ported into our
   # own core). Version verified against .vendors/expo at origin/sdk-57 — matches the version

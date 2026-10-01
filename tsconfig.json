@@ -50,6 +50,20 @@
     { "path": "packages/font" },
     { "path": "packages/age-range" },
     { "path": "packages/app-integrity" },
-    { "path": "packages/app-metrics" }
+    { "path": "packages/app-metrics" },
+    { "path": "packages/auth-session" },
+    { "path": "packages/blob" },
+    { "path": "packages/calendar" },
+    { "path": "packages/contacts" },
+    { "path": "packages/document-picker" },
+    { "path": "packages/image-manipulator" },
+    { "path": "packages/image-picker" },
+    { "path": "packages/intent-launcher" },
+    { "path": "packages/mail-composer" },
+    { "path": "packages/navigation-bar" },
+    { "path": "packages/print" },
+    { "path": "packages/screen-capture" },
+    { "path": "packages/speech" },
+    { "path": "packages/video-thumbnails" }
   ]
 }
