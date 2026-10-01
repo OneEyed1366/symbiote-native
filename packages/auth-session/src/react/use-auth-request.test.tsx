@@ -75,9 +75,7 @@ describe('useAuthRequest', () => {
     expect(request?.[0]).toBeNull();
 
     setDiscovery?.(DISCOVERY);
-    await tick();
-    await tick();
-    expect(request?.[0]?.clientId).toBe('client');
+    await vi.waitFor(() => expect(request?.[0]?.clientId).toBe('client'));
     expect(request?.[0]?.url).toContain('https://example.com/authorize');
   });
 
