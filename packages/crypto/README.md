@@ -1,12 +1,12 @@
 # @symbiote-native/crypto
 
 A wrapper package for [SymbioteNative](../../README.md) that makes
-[`expo-crypto`](https://github.com/expo/expo/tree/main/packages/expo-crypto) — cryptographically
-secure random bytes, `randomUUID`, and string/buffer digest hashing — usable from **every**
+[`expo-crypto`](https://github.com/expo/expo/tree/main/packages/expo-crypto) - cryptographically
+secure random bytes, `randomUUID`, and string/buffer digest hashing - usable from **every**
 adapter, React, Vue, Svelte, Solid, and Angular. Like `@symbiote-native/local-auth`, every
 function here is a plain sync/async call with no per-instance state or event stream, so there is
-no hook/composable/service to wrap — every adapter's entry point is a plain re-export of the same
-`core`. AES encryption (`expo-crypto`'s `aes/` subfolder) is out of scope for this pass.
+no hook/composable/service to wrap - every adapter's entry point is a plain re-export of the same
+`core`. AES-GCM encryption (`expo-crypto`'s `aes/` subfolder) is ported too.
 
 ## Install
 
@@ -22,39 +22,39 @@ npx @symbiote-native/cli new my-app --crypto
 npx @symbiote-native/cli add --crypto
 ```
 
-Either way: installs `@symbiote-native/crypto` and wires the native autolinking automatically — see
+Either way: installs `@symbiote-native/crypto` and wires the native autolinking automatically - see
 [`@symbiote-native/cli`](../cli).
 
 <details>
-<summary>Manual install (no CLI — installing and wiring native autolinking by hand)</summary>
+<summary>Manual install (no CLI - installing and wiring native autolinking by hand)</summary>
 
 ```bash
 npm install @symbiote-native/crypto
 ```
 
 `expo-crypto` and `expo-modules-core` come along as regular dependencies, pinned to exact
-versions — never install either yourself, and never add the `expo` meta-package to your project
+versions - never install either yourself, and never add the `expo` meta-package to your project
 (it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
 
 ## Required one-time step: native autolinking wiring
 
 Unlike a plain RN native module, `expo-crypto`'s native code is discovered by
-`expo-modules-autolinking`, not RN's own `react-native.config.cjs` mechanism — this needs wiring
+`expo-modules-autolinking`, not RN's own `react-native.config.cjs` mechanism - this needs wiring
 into the native host app **once**, covering this package and every other `expo-modules-core`
 package with zero further changes:
 
 | Platform | Touches                                                                                                                                             |
 | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| iOS      | `ios/Podfile` — add `use_expo_modules!`                                                                                                             |
-| iOS      | `AppDelegate.swift` — Expo's runtime-bootstrap hook                                                                                                 |
-| Android  | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects                                                               |
-| Android  | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
+| iOS      | `ios/Podfile` - add `use_expo_modules!`                                                                                                             |
+| iOS      | `AppDelegate.swift` - Expo's runtime-bootstrap hook                                                                                                 |
+| Android  | `settings.gradle` / `app/build.gradle` - resolve and include the Expo Gradle projects                                                               |
+| Android  | `MainApplication.kt` - Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
 
 Full mechanics live in the `symbiote-expo-native-module` project skill. Reference
 implementation: `examples/expo-react/ios/Podfile` and
 `examples/expo-react/android/app/src/main/java/com/canaryexpo/MainApplication.kt`.
 
-No platform permission strings are needed for this package — random-byte generation and
+No platform permission strings are needed for this package - random-byte generation and
 digest hashing touch no protected device capability.
 
 </details>
@@ -67,11 +67,11 @@ src/core/     getRandomBytes / getRandomBytesAsync / getRandomValues / randomUUI
               option/result types, and the CryptoError validation-error class.
               native-module.ts resolves the native module via expo-modules-core's
               requireNativeModule.
-src/angular/  @symbiote-native/crypto/angular — export * from '../core'
+src/angular/  @symbiote-native/crypto/angular - export * from '../core'
 ```
 
-`./react`, `./vue`, `./svelte`, and `./solid` are `exports`-map aliases straight onto `src/core/`
-— no physical per-framework file, since there's nothing to subscribe to or clean up. `./angular`
+`./react`, `./vue`, `./svelte`, and `./solid` are `exports`-map aliases straight onto `src/core/`:
+no physical per-framework file, since there's nothing to subscribe to or clean up. `./angular`
 stays a physical file/subpath since Angular ships through a separate `ngc`/AOT build (`build-ngc/`).
 
 ## Use it
@@ -245,9 +245,9 @@ export class CryptoScreen {
 }
 ```
 
-There's no per-instance service to `inject()` in the Angular case — every function is a plain
+There's no per-instance service to `inject()` in the Angular case - every function is a plain
 free function off the core package, called straight from the component body (or the constructor,
-on Angular). All six examples mirror the real canary demo screens —
+on Angular). All six examples mirror the real canary demo screens:
 `examples/expo-react/screens/CryptoScreen.tsx`, `examples/expo-vue-sfc/screens/CryptoScreen.vue`,
 `examples/expo-vue-tsx/screens/CryptoScreen.tsx`, `examples/expo-svelte/screens/CryptoScreen.svelte`,
 `examples/expo-solid/screens/CryptoScreen.tsx`, `examples/expo-angular/src/screens/CryptoScreen.ts`.
@@ -271,13 +271,39 @@ digest(algorithm: CryptoDigestAlgorithm, data: BufferSource): Promise<ArrayBuffe
 
 Plus `CryptoDigestAlgorithm` (`SHA1`/`SHA256`/`SHA384`/`SHA512`/`MD2`\*/`MD4`\*/`MD5`, \*iOS
 only), `CryptoEncoding` (`HEX`/`BASE64`), `ICryptoDigestOptions`, `IDigest`, `ITypedArray` (and its
-`IUintBasedTypedArray`/`IIntBasedTypedArray` halves), and the `CryptoError` validation-error class
-— ported from upstream's `Crypto.types.ts`/`Crypto.ts`, renamed with this repo's `I`-prefix
+`IUintBasedTypedArray`/`IIntBasedTypedArray` halves), and the `CryptoError` validation-error class,
+ported from upstream's `Crypto.types.ts`/`Crypto.ts`, renamed with this repo's `I`-prefix
 convention for exported types (`ts-js-best-practices`).
+
+### AES-GCM
+
+Ported from upstream's `aes/` subfolder onto a second native module, `ExpoCryptoAES`:
+
+```ts
+import {
+  AESEncryptionKey,
+  AESKeySize,
+  AESSealedData,
+  aesDecryptAsync,
+  aesEncryptAsync,
+} from '@symbiote-native/crypto';
+
+const key = await AESEncryptionKey.generate(AESKeySize.AES256);
+const sealed = await aesEncryptAsync(plaintextBase64, key);
+const plain = await aesDecryptAsync(sealed, key, { output: 'base64' });
+```
+
+`AESEncryptionKey` and `AESSealedData` extend the native classes: `generate`/`import`/`bytes`/
+`encoded` on the key, `fromParts`/`fromCombined` plus `iv`/`tag`/`ciphertext`/`combined` on the
+sealed data. A string input is base64. `ArrayBuffer` inputs become a `Uint8Array`, and binary
+`nonce.bytes`/`additionalData` go to native as base64, as upstream does. `tagLength` is ignored on
+Apple (always 16), and `AES192` is unsupported on web. Option and input types carry the
+`I`-prefix: `IAesEncryptOptions`, `IAesDecryptOptions`, `IAesSealedDataConfig`, `IBinaryInput`,
+`IGcmNonceParam`, `IGcmTagByteLength`.
 
 ```ts
 import { digestStringAsync, randomUUID } from '@symbiote-native/crypto';
-// or the framework-scoped entry points — identical surface, re-exported verbatim:
+// or the framework-scoped entry points - identical surface, re-exported verbatim:
 import { randomUUID } from '@symbiote-native/crypto/react';
 import { randomUUID } from '@symbiote-native/crypto/vue';
 import { randomUUID } from '@symbiote-native/crypto/svelte';
@@ -288,21 +314,32 @@ import { randomUUID } from '@symbiote-native/crypto/angular';
 ## Notes
 
 - `getRandomBytes`/`getRandomBytesAsync` validate `byteCount` is a number in `0`-`1024`
-  (inclusive), throwing a plain `TypeError` otherwise, and floor a fractional count — matching
+  (inclusive), throwing a plain `TypeError` otherwise, and floor a fractional count - matching
   upstream exactly. This port skips upstream's `__DEV__`/remote-debugger `Math.random` fallback:
   that's a React Native debugging-tool concern, not applicable to this package's native-call
   path.
 - `digestStringAsync` validates `algorithm`/`data`/`options.encoding` and throws `CryptoError` (a
-  `TypeError` subclass, `code: 'ERR_CRYPTO'`) on an invalid value — mirroring upstream's own
+  `TypeError` subclass, `code: 'ERR_CRYPTO'`) on an invalid value - mirroring upstream's own
   `CryptoError`.
 - `digest` prefers a native `digestAsync` when present; otherwise it allocates a fixed-size
   output buffer (sized via the `digestLengths` lookup table) and calls the sync native `digest`.
 
+## Common questions
+
+- **`digestStringAsync` is `undefined`.** The native module did not load: rebuild after install.
+- **`randomUUID` returns a promise.** Reported after a native binary update; restart and rebuild.
+- **Which algorithms?** Prefer SHA-256 / SHA-512; SHA-1 is not recommended for security use.
+- **`undefined` under Jest.** The native module is absent in tests; inject a fake.
+
+Sources: [expo/expo#18215](https://github.com/expo/expo/issues/18215),
+[expo/expo#24021](https://github.com/expo/expo/issues/24021),
+[expo/expo#6512](https://github.com/expo/expo/issues/6512).
+
 ## Test it
 
-No Fabric/Descriptor angle at all — every function here is a pure sync/async-function surface,
+No Fabric/Descriptor angle at all - every function here is a pure sync/async-function surface,
 never a view or per-instance state. Tests inject a fake native-module object in place of the
-real `requireNativeModule` resolution (`src/core/crypto.test.ts`, `vitest`) — no
+real `requireNativeModule` resolution (`src/core/crypto.test.ts`, `src/core/aes/aes.test.ts`, `vitest`) - no
 `installFabric()`, no ViewConfig. Native rendering itself is verified on-device (see the parent
 [README](../../README.md) for the project's testing model).
 

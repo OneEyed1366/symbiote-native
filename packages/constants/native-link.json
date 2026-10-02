@@ -1,0 +1,19 @@
+{
+  "android": {
+    "gradleProjectName": "expo-constants",
+    "modules": [
+      {
+        "importPath": "expo.modules.constants.ConstantsModule",
+        "className": "ConstantsModule",
+        "nativeName": "ExponentConstants"
+      }
+    ],
+    "services": [
+      {
+        "importPath": "expo.modules.constants.ConstantsService",
+        "className": "ConstantsService",
+        "gradleProjectName": "expo-constants"
+      }
+    ]
+  }
+}

@@ -100,11 +100,19 @@ Accepted side effect: the upstream package's `peerDependencies` typically list
 
 ## 3. JS is ported into our own `core`, never imported from upstream
 
-The real upstream JS (e.g. `expo-sensors`' `build/DeviceSensor.js`) does a hard
-`import ... from 'expo'` — if `expo` isn't installed (and per §1 it never is here), that
-import breaks Metro bundling the moment anything reaches it. So the wrapped package is a
-**dependency for its native folder only** — its JS entry point (`main`/`module` in its
-`package.json`) is never imported from our code.
+The real upstream JS (e.g. `expo-sensors`' `build/DeviceSensor.js`, `expo-calendar`'s
+`Calendar.ts`) does a hard `import ... from 'expo'`. Verified 2026-09-25 what that actually
+costs: the named values pulled in (`PermissionStatus`, `createPermissionHook`, etc) are just
+re-exports of `expo-modules-core`, `expo/src/Expo.ts` forwards them verbatim. The real blocker
+is `Expo.ts`'s own first line, `import './Expo.fx'`, an unconditional side-effecting module
+that runs the moment anything is imported from `'expo'` (Metro doesn't tree-shake unused
+exports, so the whole file body executes). `Expo.fx.tsx` overrides
+`AppRegistry.registerComponent('main', ...)` with a placeholder, eagerly loads `expo-asset` to
+monkey-patch RN's image-source resolution, and patches the global error handler, all of which
+fights our own bootstrap (`<native_core_is_untouched>`). So installing `expo` isn't a bundling
+failure, it's a silent runtime hijack. So the wrapped package is a **dependency for its native
+folder only**, its JS entry point (`main`/`module` in its `package.json`) is never imported
+from our code.
 
 Instead, hand-port the class hierarchy into `packages/<lib>/src/core/`, same spirit as
 `packages/splash-screen` porting `react-native-bootsplash`'s pure JS into `core/hide.ts` (see
@@ -248,6 +256,15 @@ reproduced directly in `examples/react/ios/Podfile` rather than worked around.
             until 2026-09-23, when it surfaced as a real `run-android` Gradle failure
             (\"Project with path ':expo-file-system' could not be found in project ':app'\")
             — proof the two-file fix instruction above wasn't explicit enough the first time.",
+    recurred: {
+      date: "2026-09-25", pkgs: ["expo-font", "expo-asset"],
+      scope: "all 6 examples/expo-*/{ios/Podfile,android/settings.gradle}",
+      missed_by: "4 prior 'full parity' passes (source diff, tests, README, CLI registration)
+                  — none touch app-level native config, which lives outside the wrapper package",
+      found_via: "user asked to re-check native-breaking internals, not the audits themselves",
+      lesson: "source/test/doc parity audits don't cover this trap — checking exclude lists is
+               its own required step whenever a package moves phantom -> real wrapper",
+    },
   },
   deployment_target_trap: {
     bug: "ExpoSensors.podspec pins s.platforms={:ios=>'16.4'}, above RN's
@@ -1170,6 +1187,101 @@ not yet implemented — this section is the map for whoever ports these next.
         to anything else in this list",
   ],
   skip: "expo-background-fetch (deprecated upstream, superseded by expo-background-task)",
+}
+```
+
+## 11. `createPermissionHook` from `expo-modules-core` is a REAL React hook — don't put it in `core/`
+
+```
+§11_permission_hook_leak := {
+  found: "2026-09-25, porting expo-image-picker",
+  claim: "expo-modules-core's createPermissionHook (PermissionsHook.ts) looks framework-agnostic
+          (it's exported from the same package as requireNativeModule) but its body calls
+          useState/useEffect/useCallback from 'react' directly — a real hook, not a wrapper",
+  bug: "3 already-shipped packages (media-library, location, tracking-transparency) re-export
+        their usePermissions from core/, reachable by every adapter including Vue/Svelte/Solid/
+        Angular — same dispatcher-null crash class as <third_party_rn_packages_are_react_only>",
+  fix_this_pass: "@symbiote-native/image-picker does NOT export useCameraPermissions/
+                  useMediaLibraryPermissions from core — only the plain async get/request
+                  functions ship there; calling code wraps its own adapter-local hook/composable",
+  not_fixed: "media-library/location/tracking-transparency still export the hook from core/ —
+              deliberately left alone this pass (out of scope, no user request to touch shipped
+              packages); flagging here so the next package touching any of them fixes it too",
+  rule: "before shipping ANY export whose implementation transitively imports 'react' inside
+         expo-modules-core (grep the resolved package's src/*.ts for `from 'react'`), treat it
+         as adapter-only per <third_party_rn_packages_are_react_only> — never assume 'ships from
+         expo-modules-core' means framework-agnostic",
+}
+```
+
+## 12. Not every package needs a hand-port - check for a real `'expo'` value import first
+
+```
+§12_reexport_vs_handport_criterion := {
+  found: "2026-09-25, questioning why every package gets hand-ported instead of re-exported",
+  claim_checked: "grepped every shipped-or-considered package's real (non-.web) entry files for
+                  \"from 'expo'\" at sdk-57",
+  zero_hits: [file-system, secure-store, sharing, web-browser, sms, task-manager, auth-session,
+              print, document-picker, mail-composer],
+  nonzero_hits: [sensors, media-library, audio, location, background-fetch, background-task,
+                 notifications, sqlite, calendar, contacts, screen-capture, image-picker]
+                 mostly for PermissionStatus/createPermissionHook/requireNativeModule, which
+                 expo/src/Expo.ts itself just re-exports from expo-modules-core, plus
+                 isRunningInExpoGo/useEvent which exist only in expo, not expo-modules-core,
+  rule: "before hand-porting a new package, read its real top-level entry (not .web.ts) for any
+         VALUE import from 'expo' (type-only is erased, harmless). Zero -> depend on the real
+         published expo-<pkg> directly (already a dep for native-folder discovery per §2) and
+         export * from it, aliasing types to our naming convention if needed - no hand-port, no
+         drift risk. Nonzero -> hand-port stays required, per §3's Expo.fx side-effect finding",
+  deferred_not_rejected: "a local package literally named expo (pnpm override) re-exporting only
+                          the trivial expo-modules-core values, no Expo.fx, would unblock
+                          re-export even for the nonzero-hit list. Deferred - not worth the
+                          resolution-override complexity yet; revisit if hand-port drift becomes
+                          a real maintenance cost",
+  backlog: "the zero_hits packages above are already hand-ported from before this finding -
+            retroactive conversion to re-export is optional cleanup, not yet done",
+}
+```
+
+## 13. A Svelte permission-hook factory can't cross a package boundary in tests
+
+```
+§13_svelte_rune_factory_boundary := {
+  found: "2026-09-28, porting useCalendarPermissions/useMediaLibraryPermissions to Svelte",
+  bug: "a `createPermissionHook(methods)` factory using $state/$effect, exported from
+        @symbiote-native/svelte and imported by name from a wrapper package, throws
+        `rune_outside_svelte` at test time",
+  cause: "`svelte-compile.test-helper.ts` only runs the real rune-desugaring compiler on files
+          reached via a RELATIVE `.svelte`-suffixed specifier walk from the compiled app source;
+          a bare package import (`@symbiote-native/svelte`) resolves to raw, undesugared source",
+  not_a_svelte_limit: "confirmed via vite-plugin-svelte docs - real bundlers (and Metro, same
+                       mechanism) compile .svelte.ts rune modules found in node_modules BY
+                       DEFAULT (dynamicCompileOptions exists specifically to EXCLUDE them) - this
+                       is a deliberate scope-limit of this repo's minimal test harness only",
+  fix: "keep the factory PACKAGE-LOCAL: `packages/<pkg>/src/svelte/create-permission-hook.svelte.ts`,
+        imported by sibling hooks via a relative specifier (`from './create-permission-hook.svelte'`) -
+        stays inside the harness's walk, gets desugared. Cross-package duplication of this one
+        small file is unavoidable and pre-approved in `.claude/reuse.json`
+        (`packages/*/src/svelte/create-permission-hook.svelte.ts`)",
+  rule: "any future Svelte rune-based helper meant to be shared across Expo-wrapper packages hits
+         this same wall - don't try the adapter-level export again without fixing the harness first",
+}
+```
+
+## 14. The local expo source checkout lags the pinned dependency - check versions before trusting "upstream has no X"
+
+```
+§14_stale_vendor := {
+  found: "2026-09-29, expo-audio: AudioStream/useAudioStream looked fabricated",
+  cause: "the shared local expo checkout sat at sdk-55 (55.x for every package) while
+          pnpm-workspace.yaml pins sdk-57 (57.x); 57.0.4 really ships AudioStream on iOS/Android/JS",
+  rule: "before any claim 'upstream has no X' / 'not in upstream': compare the checkout's
+         packages/<name>/package.json version with the catalog pin; the installed copy under
+         node_modules/.pnpm/<name>@<pin>*/node_modules/<name> is ground truth",
+  find_commit: "the commit for a pin is the one whose package.json holds that version
+                (`git log --all -S'\"version\": \"<pin>\"'`, take the parent when the hit is the bump
+                AWAY from it); read files with `git show <commit>:packages/<name>/<path>`",
+  note: "expo-modules-core 57.0.5 has no commit in the checkout - use node_modules",
 }
 ```
 

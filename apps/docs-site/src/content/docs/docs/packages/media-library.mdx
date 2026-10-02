@@ -5,13 +5,13 @@ description: expo-media-library wrapped for every SymbioteNative adapter — the
 
 import { Aside } from '@astrojs/starlight/components';
 
-`@symbiote-native/media-library` wraps
+Read, save and organize the device's photos and videos: query recent assets, save a file to the
+library, build albums, and react to library changes. `@symbiote-native/media-library` wraps
 [`expo-media-library`](https://github.com/expo/expo/tree/main/packages/expo-media-library) for
-every SymbioteNative adapter. Both of upstream's surfaces are ported: the default export is the
+every SymbioteNative adapter and ports both of upstream's surfaces: the default export is the
 modern `Query`/`Asset`/`Album` API built on JSI shared objects; the legacy function-based API lives
-at the `/legacy` subpath. Reads, saves, and organizes the device's photo/video library — assets,
-albums, permissions (including the granular Android 13+ and limited-access iOS/Android 14+
-pickers), and library-change events.
+at the `/legacy` subpath. Permissions include the granular Android 13+ ones and the limited-access
+picker (iOS, Android 14+).
 
 | OS platform | Support |
 | ----------- | ------- |
@@ -64,7 +64,14 @@ versions — never install them yourself, and never add the `expo` meta-package 
 ## Usage
 
 ```ts
-import { Query, Asset, Album, AssetField, requestPermissionsAsync } from '@symbiote-native/media-library';
+import {
+  Query,
+  Asset,
+  Album,
+  AssetField,
+  MediaType,
+  requestPermissionsAsync,
+} from '@symbiote-native/media-library';
 
 const { granted } = await requestPermissionsAsync(false, ['photo']);
 if (granted) {
@@ -72,7 +79,7 @@ if (granted) {
   const album = await Album.create('My Album', [asset]);
 
   const recentPhotos = await new Query()
-    .eq(AssetField.MEDIA_TYPE, 'image' as never)
+    .eq(AssetField.MEDIA_TYPE, MediaType.IMAGE)
     .orderBy(AssetField.CREATION_TIME)
     .limit(20)
     .exe();
@@ -213,7 +220,37 @@ MediaType, SortBy                                                               
 
 Plus the full `IMediaLibrary*` type surface.
 
-### Legacy notes
+## Common questions
+
+**`saveToLibraryAsync` is missing or throws.** The root entry is the modern class API. Save a file
+with `Asset.create(uri)`, which returns an `Asset`. If you still want the old function, import it
+from `@symbiote-native/media-library/legacy`.
+
+**I need to save a photo to the Gallery after downloading it.** Download it to the app's cache with
+the [file system](/docs/packages/file-system/) package, then `Asset.create(localUri)`. Pass an
+`Album` to file it under an album.
+
+**Android 13 and later: permission denied although I asked.** Add the granular manifest permissions
+you need (`READ_MEDIA_IMAGES`, `READ_MEDIA_VIDEO`, `READ_MEDIA_AUDIO`) and pass the matching subset to
+`requestPermissionsAsync(false, ['photo'])`. A permission missing from the manifest is silently
+refused whatever you ask at runtime.
+
+**On iOS the `uri` starts with `ph://` and I cannot read it as a file.** That is a Photos library
+identifier. Use `asset.getInfo()` (or `getAssetInfoAsync` in the legacy API) to get a local file URI.
+
+**Images show the wrong orientation on Android in `getAssetsAsync`.** In the legacy API, EXIF data is
+read only when you pass `resolveWithFullInfo: true`. The modern `Asset` API reads it with
+`getExif()`.
+
+**The user picked "limited access".** You then see only the photos they shared. Use
+`presentPermissionsPicker()` (Android 14+ and iOS) to let them choose more.
+
+Sources: [Expo docs: MediaLibrary (legacy)](https://docs.expo.dev/versions/latest/sdk/media-library-legacy/),
+[Expo guide: migrate to the new expo-media-library API](https://docs.expo.dev/guides/sdk-libraries-migration/media-library/),
+[expo/expo#50670 fix the screenshot save on SDK 57 by using Asset.create](https://github.com/expo/expo/pull/50670),
+[bluesky-social/social-app#11662 migrate Expo media library API](https://github.com/bluesky-social/social-app/pull/11662).
+
+## Legacy API notes
 
 - **`sortBy`'s single-tuple form must be double-nested.** `getAssetsAsync({ sortBy: [['creationTime', true]] })`
   sorts by one key ascending; the unnested `sortBy: ['creationTime', true]` reads as two

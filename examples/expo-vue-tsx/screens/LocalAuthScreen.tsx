@@ -13,6 +13,7 @@ import {
 } from '@symbiote-native/local-auth/vue';
 import type { ILocalAuthenticationResult } from '@symbiote-native/local-auth/vue';
 import { ActionButton } from '../components/ActionButton';
+import { Scenario } from '../components/Scenario';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
@@ -35,20 +36,38 @@ function authenticationTypeLabel(type: AuthenticationType): string {
   }
 }
 
-// SecurityLevel.BIOMETRIC is a computed enum member (a deprecated getter alias via
-// Object.defineProperty, see packages/local-auth/src/core/types.ts) — TS gives each named
-// member declared alongside it its own nominal literal type, so comparing `level` directly
-// against e.g. SecurityLevel.BIOMETRIC_WEAK trips "no overlap" (TS2367/TS2678). Widen to a
-// plain `number` first (enum members are always assignable to number) to sidestep it.
+// `SecurityLevel.BIOMETRIC` is a computed enum member, so comparing `level` to the named
+// members trips TS2367, widening to `number` first sidesteps the nominal narrowing
 function securityLevelLabel(level: SecurityLevel): string {
   const numericLevel: number = level;
-  if (numericLevel === SecurityLevel.NONE) return 'None';
-  if (numericLevel === SecurityLevel.SECRET)
+  if (numericLevel === SecurityLevel.NONE) {
+    return 'None';
+  }
+  if (numericLevel === SecurityLevel.SECRET) {
     return 'Secret (PIN / pattern / password)';
-  if (numericLevel === SecurityLevel.BIOMETRIC_WEAK) return 'Biometric — weak';
-  if (numericLevel === SecurityLevel.BIOMETRIC_STRONG)
+  }
+  if (numericLevel === SecurityLevel.BIOMETRIC_WEAK) {
+    return 'Biometric — weak';
+  }
+  if (numericLevel === SecurityLevel.BIOMETRIC_STRONG) {
     return 'Biometric — strong';
-  return 'Biometric'; // unreachable via getEnrolledLevelAsync(), satisfies return type only
+  }
+  // `getEnrolledLevelAsync` never returns the deprecated alias, this only satisfies the type
+  return 'Biometric';
+}
+
+function CapabilityBadge(props: { status: ICapabilityStatus }) {
+  const label =
+    props.status === 'checking'
+      ? 'CHECKING…'
+      : props.status === 'yes'
+        ? 'YES'
+        : 'NO';
+  return (
+    <view class={`auth-status-badge auth-status-badge-${props.status}`}>
+      <text class="auth-status-text">{label}</text>
+    </view>
+  );
 }
 
 function CapabilityRow(props: {
@@ -59,15 +78,7 @@ function CapabilityRow(props: {
   return (
     <view testID={props.testID} class="auth-capability-row">
       <text class="auth-capability-label">{props.label}</text>
-      <view class={`auth-status-badge auth-status-badge-${props.status}`}>
-        <text class="auth-status-text">
-          {props.status === 'checking'
-            ? 'CHECKING…'
-            : props.status === 'yes'
-              ? 'YES'
-              : 'NO'}
-        </text>
-      </view>
+      <CapabilityBadge status={props.status} />
     </view>
   );
 }
@@ -81,44 +92,42 @@ function ValueRow(props: { label: string; value: string }) {
   );
 }
 
-/**
- * Local auth demo: @symbiote-native/local-auth — FaceID/TouchID on iOS, the Fingerprint/Biometric
- * API on Android. On mount, resolves hardware/enrollment/security-level/supported-types in
- * parallel, each into its own ref; a fast unmount is guarded with an isMounted flag so none of
- * those resolutions writes into a torn-down component. Vue TSX twin of
- * ../../expo-react/screens/LocalAuthScreen.tsx.
- */
+// Kept apart so the screen body stays readable: the four one-shot capability lookups
+function useLocalAuthCapabilities() {
+  const hasHardware = ref<ICapabilityStatus>('checking');
+  const isEnrolled = ref<ICapabilityStatus>('checking');
+  const enrolledLevel: Ref<SecurityLevel | null> = ref(null);
+  const supportedTypes: Ref<AuthenticationType[] | null> = ref(null);
+  let isMounted = true;
+  onUnmounted(() => {
+    isMounted = false;
+  });
+  onMounted(() => {
+    hasHardwareAsync().then(value => {
+      if (isMounted) hasHardware.value = toCapabilityStatus(value);
+    });
+    isEnrolledAsync().then(value => {
+      if (isMounted) isEnrolled.value = toCapabilityStatus(value);
+    });
+    getEnrolledLevelAsync().then(value => {
+      if (isMounted) enrolledLevel.value = value;
+    });
+    supportedAuthenticationTypesAsync().then(value => {
+      if (isMounted) supportedTypes.value = value;
+    });
+  });
+  return { hasHardware, isEnrolled, enrolledLevel, supportedTypes };
+}
+
 export const LocalAuthScreen = defineComponent(
   () => {
     const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.LocalAuth];
-    const lineColor = LINE_COLOR[ROUTE_LINE_INFO[ROUTE_NAME.LocalAuth].line];
+    const lineColor = LINE_COLOR[lineInfo.line];
 
-    const hasHardware = ref<ICapabilityStatus>('checking');
-    const isEnrolled = ref<ICapabilityStatus>('checking');
-    const enrolledLevel: Ref<SecurityLevel | null> = ref(null);
-    const supportedTypes: Ref<AuthenticationType[] | null> = ref(null);
+    const { hasHardware, isEnrolled, enrolledLevel, supportedTypes } =
+      useLocalAuthCapabilities();
     const authResult: Ref<ILocalAuthenticationResult | null> = ref(null);
     const isAuthenticating = ref(false);
-
-    let isMounted = true;
-    onUnmounted(() => {
-      isMounted = false;
-    });
-
-    onMounted(() => {
-      hasHardwareAsync().then(value => {
-        if (isMounted) hasHardware.value = toCapabilityStatus(value);
-      });
-      isEnrolledAsync().then(value => {
-        if (isMounted) isEnrolled.value = toCapabilityStatus(value);
-      });
-      getEnrolledLevelAsync().then(value => {
-        if (isMounted) enrolledLevel.value = value;
-      });
-      supportedAuthenticationTypesAsync().then(value => {
-        if (isMounted) supportedTypes.value = value;
-      });
-    });
 
     const enrolledLevelLabel = computed(() =>
       enrolledLevel.value === null
@@ -160,14 +169,21 @@ export const LocalAuthScreen = defineComponent(
             <view class="hero-copy">
               <text class="hero-title">Local auth</text>
               <text class="hero-body">
-                @symbiote-native/local-auth — FaceID/TouchID on iOS, the
-                Fingerprint/Biometric API on Android. A simulator with no
-                enrolled biometrics reports "not enrolled"; a real device with
-                FaceID/TouchID/fingerprint set up is needed to see a live
-                prompt.
+                Confirm it is really the user with Face ID, Touch ID or a
+                fingerprint before a sensitive action. A simulator without
+                enrolled biometrics reports not enrolled, use a real device with
+                biometrics set up to see the prompt.
               </text>
             </view>
           </view>
+
+          <Scenario
+            testID="local-auth-scenario"
+            title="Re-confirm the user before showing a balance or sending money"
+            why="Even on an unlocked phone, ask for a biometric check before opening a private section or approving a payment. The app only learns whether it succeeded, never the fingerprint or face."
+            steps={['Check that hardware is present and biometrics are enrolled', 'Press authenticate and approve with your face or finger', 'Press it again and cancel']}
+            expect="Success shows a positive result. Cancelling shows the reason, such as user cancel, and the hardware and enrolled rows tell you why a prompt cannot appear."
+          />
 
           <view testID="local-auth-capabilities-card" class="auth-card">
             <view class="auth-card-header">
@@ -184,10 +200,7 @@ export const LocalAuthScreen = defineComponent(
               status={isEnrolled.value}
             />
             <ValueRow label="Enrolled level" value={enrolledLevelLabel.value} />
-            <ValueRow
-              label="Supported types"
-              value={supportedTypesLabel.value}
-            />
+            <ValueRow label="Supported types" value={supportedTypesLabel.value} />
           </view>
 
           <view testID="local-auth-authenticate-card" class="auth-card">
@@ -200,9 +213,7 @@ export const LocalAuthScreen = defineComponent(
             </text>
             <ActionButton
               testID="local-auth-authenticate-button"
-              title={
-                isAuthenticating.value ? 'Authenticating…' : 'Authenticate'
-              }
+              title={isAuthenticating.value ? 'Authenticating…' : 'Authenticate'}
               onPress={handleAuthenticate}
               color={lineColor}
             />
@@ -214,7 +225,7 @@ export const LocalAuthScreen = defineComponent(
                 color={lineColor}
               />
             )}
-            {authResult.value && (
+            {authResult.value !== null && (
               <view
                 testID="local-auth-result"
                 class={`auth-result auth-result-${authResult.value.success ? 'success' : 'error'}`}

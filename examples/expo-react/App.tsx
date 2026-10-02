@@ -41,6 +41,25 @@ import { AudioScreen } from './screens/AudioScreen';
 import { NotificationsScreen } from './screens/NotificationsScreen';
 import { BackgroundTasksScreen } from './screens/BackgroundTasksScreen';
 import { SqliteScreen } from './screens/SqliteScreen';
+import { MailComposerScreen } from './screens/MailComposerScreen';
+import { PrintScreen } from './screens/PrintScreen';
+import { SpeechScreen } from './screens/SpeechScreen';
+import { VideoThumbnailsScreen } from './screens/VideoThumbnailsScreen';
+import { DocumentPickerScreen } from './screens/DocumentPickerScreen';
+import { ImagePickerScreen } from './screens/ImagePickerScreen';
+import { ImageManipulatorScreen } from './screens/ImageManipulatorScreen';
+import { BlobScreen } from './screens/BlobScreen';
+import { ScreenCaptureScreen } from './screens/ScreenCaptureScreen';
+import { ContactsScreen } from './screens/ContactsScreen';
+import { CalendarScreen } from './screens/CalendarScreen';
+import { AgeRangeScreen } from './screens/AgeRangeScreen';
+import { AppIntegrityScreen } from './screens/AppIntegrityScreen';
+import { IntentLauncherScreen } from './screens/IntentLauncherScreen';
+import { NavigationBarScreen } from './screens/NavigationBarScreen';
+import { FontScreen } from './screens/FontScreen';
+import { AssetScreen } from './screens/AssetScreen';
+import { AppMetricsScreen } from './screens/AppMetricsScreen';
+import { AuthSessionScreen } from './screens/AuthSessionScreen';
 import { ROUTE_NAME } from './routes';
 import { LINE_COLOR } from './navigation-lines';
 import { hide } from '@symbiote-native/splash-screen/react';
@@ -435,6 +454,253 @@ function App() {
           title: 'SQLite',
           headerShown: true,
           headerTintColor: LINE_COLOR.sqlite,
+          headerTranslucent: true,
+          headerTitleColor: '#ffffff',
+          headerStyle: { backgroundColor: '#0b1622' },
+          headerUserInterfaceStyle: 'dark',
+        }}
+      />
+      <Stack.Screen
+        name={ROUTE_NAME.MailComposer}
+        component={MailComposerScreen}
+        options={{
+          title: 'Mail Composer',
+          headerShown: true,
+          headerTintColor: LINE_COLOR['mail-composer'],
+          headerTranslucent: true,
+          headerTitleColor: '#ffffff',
+          headerStyle: { backgroundColor: '#0b1622' },
+          headerUserInterfaceStyle: 'dark',
+        }}
+      />
+      <Stack.Screen
+        name={ROUTE_NAME.Print}
+        component={PrintScreen}
+        options={{
+          title: 'Print',
+          headerShown: true,
+          headerTintColor: LINE_COLOR.print,
+          headerTranslucent: true,
+          headerTitleColor: '#ffffff',
+          headerStyle: { backgroundColor: '#0b1622' },
+          headerUserInterfaceStyle: 'dark',
+        }}
+      />
+      <Stack.Screen
+        name={ROUTE_NAME.Speech}
+        component={SpeechScreen}
+        options={{
+          title: 'Speech',
+          headerShown: true,
+          headerTintColor: LINE_COLOR.speech,
+          headerTranslucent: true,
+          headerTitleColor: '#ffffff',
+          headerStyle: { backgroundColor: '#0b1622' },
+          headerUserInterfaceStyle: 'dark',
+        }}
+      />
+      <Stack.Screen
+        name={ROUTE_NAME.VideoThumbnails}
+        component={VideoThumbnailsScreen}
+        options={{
+          title: 'Video Thumbnails',
+          headerShown: true,
+          headerTintColor: LINE_COLOR['video-thumbnails'],
+          headerTranslucent: true,
+          headerTitleColor: '#ffffff',
+          headerStyle: { backgroundColor: '#0b1622' },
+          headerUserInterfaceStyle: 'dark',
+        }}
+      />
+      <Stack.Screen
+        name={ROUTE_NAME.DocumentPicker}
+        component={DocumentPickerScreen}
+        options={{
+          title: 'Document Picker',
+          headerShown: true,
+          headerTintColor: LINE_COLOR['document-picker'],
+          headerTranslucent: true,
+          headerTitleColor: '#ffffff',
+          headerStyle: { backgroundColor: '#0b1622' },
+          headerUserInterfaceStyle: 'dark',
+        }}
+      />
+      <Stack.Screen
+        name={ROUTE_NAME.ImagePicker}
+        component={ImagePickerScreen}
+        options={{
+          title: 'Image Picker',
+          headerShown: true,
+          headerTintColor: LINE_COLOR['image-picker'],
+          headerTranslucent: true,
+          headerTitleColor: '#ffffff',
+          headerStyle: { backgroundColor: '#0b1622' },
+          headerUserInterfaceStyle: 'dark',
+        }}
+      />
+      <Stack.Screen
+        name={ROUTE_NAME.ImageManipulator}
+        component={ImageManipulatorScreen}
+        options={{
+          title: 'Image Manipulator',
+          headerShown: true,
+          headerTintColor: LINE_COLOR['image-manipulator'],
+          headerTranslucent: true,
+          headerTitleColor: '#ffffff',
+          headerStyle: { backgroundColor: '#0b1622' },
+          headerUserInterfaceStyle: 'dark',
+        }}
+      />
+      <Stack.Screen
+        name={ROUTE_NAME.Blob}
+        component={BlobScreen}
+        options={{
+          title: 'Blob',
+          headerShown: true,
+          headerTintColor: LINE_COLOR.blob,
+          headerTranslucent: true,
+          headerTitleColor: '#ffffff',
+          headerStyle: { backgroundColor: '#0b1622' },
+          headerUserInterfaceStyle: 'dark',
+        }}
+      />
+      <Stack.Screen
+        name={ROUTE_NAME.ScreenCapture}
+        component={ScreenCaptureScreen}
+        options={{
+          title: 'Screen Capture',
+          headerShown: true,
+          headerTintColor: LINE_COLOR['screen-capture'],
+          headerTranslucent: true,
+          headerTitleColor: '#ffffff',
+          headerStyle: { backgroundColor: '#0b1622' },
+          headerUserInterfaceStyle: 'dark',
+        }}
+      />
+      <Stack.Screen
+        name={ROUTE_NAME.Contacts}
+        component={ContactsScreen}
+        options={{
+          title: 'Contacts',
+          headerShown: true,
+          headerTintColor: LINE_COLOR.contacts,
+          headerTranslucent: true,
+          headerTitleColor: '#ffffff',
+          headerStyle: { backgroundColor: '#0b1622' },
+          headerUserInterfaceStyle: 'dark',
+        }}
+      />
+      <Stack.Screen
+        name={ROUTE_NAME.Calendar}
+        component={CalendarScreen}
+        options={{
+          title: 'Calendar',
+          headerShown: true,
+          headerTintColor: LINE_COLOR.calendar,
+          headerTranslucent: true,
+          headerTitleColor: '#ffffff',
+          headerStyle: { backgroundColor: '#0b1622' },
+          headerUserInterfaceStyle: 'dark',
+        }}
+      />
+      <Stack.Screen
+        name={ROUTE_NAME.AgeRange}
+        component={AgeRangeScreen}
+        options={{
+          title: 'Age Range',
+          headerShown: true,
+          headerTintColor: LINE_COLOR['age-range'],
+          headerTranslucent: true,
+          headerTitleColor: '#ffffff',
+          headerStyle: { backgroundColor: '#0b1622' },
+          headerUserInterfaceStyle: 'dark',
+        }}
+      />
+      <Stack.Screen
+        name={ROUTE_NAME.AppIntegrity}
+        component={AppIntegrityScreen}
+        options={{
+          title: 'App Integrity',
+          headerShown: true,
+          headerTintColor: LINE_COLOR['app-integrity'],
+          headerTranslucent: true,
+          headerTitleColor: '#ffffff',
+          headerStyle: { backgroundColor: '#0b1622' },
+          headerUserInterfaceStyle: 'dark',
+        }}
+      />
+      <Stack.Screen
+        name={ROUTE_NAME.IntentLauncher}
+        component={IntentLauncherScreen}
+        options={{
+          title: 'Intent Launcher',
+          headerShown: true,
+          headerTintColor: LINE_COLOR['intent-launcher'],
+          headerTranslucent: true,
+          headerTitleColor: '#ffffff',
+          headerStyle: { backgroundColor: '#0b1622' },
+          headerUserInterfaceStyle: 'dark',
+        }}
+      />
+      <Stack.Screen
+        name={ROUTE_NAME.NavigationBar}
+        component={NavigationBarScreen}
+        options={{
+          title: 'Navigation Bar',
+          headerShown: true,
+          headerTintColor: LINE_COLOR['navigation-bar'],
+          headerTranslucent: true,
+          headerTitleColor: '#ffffff',
+          headerStyle: { backgroundColor: '#0b1622' },
+          headerUserInterfaceStyle: 'dark',
+        }}
+      />
+      <Stack.Screen
+        name={ROUTE_NAME.Font}
+        component={FontScreen}
+        options={{
+          title: 'Font',
+          headerShown: true,
+          headerTintColor: LINE_COLOR.font,
+          headerTranslucent: true,
+          headerTitleColor: '#ffffff',
+          headerStyle: { backgroundColor: '#0b1622' },
+          headerUserInterfaceStyle: 'dark',
+        }}
+      />
+      <Stack.Screen
+        name={ROUTE_NAME.Asset}
+        component={AssetScreen}
+        options={{
+          title: 'Asset',
+          headerShown: true,
+          headerTintColor: LINE_COLOR.asset,
+          headerTranslucent: true,
+          headerTitleColor: '#ffffff',
+          headerStyle: { backgroundColor: '#0b1622' },
+          headerUserInterfaceStyle: 'dark',
+        }}
+      />
+      <Stack.Screen
+        name={ROUTE_NAME.AppMetrics}
+        component={AppMetricsScreen}
+        options={{
+          title: 'App Metrics',
+          headerShown: true,
+          headerTintColor: LINE_COLOR['app-metrics'],
+          headerTranslucent: true,
+          headerTitleColor: '#ffffff',
+          headerStyle: { backgroundColor: '#0b1622' },
+          headerUserInterfaceStyle: 'dark',
+        }}
+      />
+      <Stack.Screen
+        name={ROUTE_NAME.AuthSession}
+        component={AuthSessionScreen}
+        options={{
+          title: 'Auth Session',
+          headerShown: true,
+          headerTintColor: LINE_COLOR['auth-session'],
           headerTranslucent: true,
           headerTitleColor: '#ffffff',
           headerStyle: { backgroundColor: '#0b1622' },

@@ -38,7 +38,7 @@ minimumReleaseAgeExclude:
   - '@symbiote-native/test-utils@0.1.5'
   - '@symbiote-native/splash-screen@0.1.3 || 2.0.0'
   - '@symbiote-native/navigation@1.0.0'
-  - expo-modules-core@57.0.5
+  - expo-modules-core@57.0.20
   - expo-modules-jsi@57.0.3
   - expo-sensors@57.0.2
   - expo-modules-autolinking@57.0.8
@@ -95,6 +95,8 @@ catalog:
   # All four must move in lock-step — compiler-cli peer-requires @angular/compiler at an EXACT
   # version. The unpin condition is RN shipping a Babel 8 preset, or moving the linker out of
   # Metro into a post-`ngc` pass run under Angular's own Babel 8 (see the angular-adapter skill).
+  # Re-tried 2026-09-28 for `@boundary`/`@error` (@symbiote-native/app-metrics's README) -
+  # `assertVersion(8)` still throws under the real `@babel/core@7.29.7`, no legacy linker exists
   '@angular/core': ~22.0.8
   '@angular/common': ~22.0.8
   '@angular/compiler': ~22.0.8
@@ -265,7 +267,7 @@ catalog:
   # line (expo-sensors 57.0.2 / expo-modules-core 57.0.5, verified against .vendors/expo at
   # origin/sdk-57).
   expo-sensors: 57.0.2
-  expo-modules-core: 57.0.5
+  expo-modules-core: 57.0.20
   # Same exact-pin reasoning as expo-sensors above: packages/local-auth depends on
   # expo-local-authentication only for its native ios/android folders (JS hand-ported into our
   # own core). Version verified against .vendors/expo at origin/sdk-57 — matches the version
@@ -327,6 +329,63 @@ catalog:
   expo-sharing: 57.0.8
   expo-web-browser: 57.0.2
   expo-sms: 57.0.1
+  # Same exact-pin reasoning: packages/mail-composer depends on expo-mail-composer ONLY for its
+  # native ios/android folders. Version verified against .vendors/expo at origin/sdk-57 (57.0.2)
+  # and matches the real npm-published `latest`, same expo-modules-core 57.0.5 peer/runtime line.
+  expo-mail-composer: 57.0.2
+  # Same exact-pin reasoning: packages/print depends on expo-print ONLY for its native
+  # ios/android folders. Version verified against .vendors/expo at origin/sdk-57 (57.0.2)
+  # and matches the real npm-published `latest`, same expo-modules-core 57.0.5 peer/runtime line.
+  expo-print: 57.0.2
+  # Same exact-pin reasoning: packages/document-picker depends on expo-document-picker ONLY for
+  # its native ios/android folders. Version verified against .vendors/expo at origin/sdk-57
+  # (57.0.2) and matches the real npm-published `latest`, same expo-modules-core 57.0.5
+  # peer/runtime line. The upstream config plugin (iCloud entitlements) is not carried over —
+  # see packages/document-picker/README.md.
+  expo-document-picker: 57.0.2
+  # Same exact-pin reasoning: packages/image-picker depends on expo-image-picker ONLY for its
+  # native ios/android folders. Version verified against .vendors/expo at origin/sdk-57
+  # (57.0.20) and matches the real npm-published `latest`, same expo-modules-core 57.0.5
+  # peer/runtime line.
+  expo-image-picker: 57.0.20
+  # Same exact-pin reasoning: packages/image-manipulator depends on expo-image-manipulator ONLY
+  # for its native ios/android folders. Version verified against .vendors/expo at origin/sdk-57
+  # (57.0.20) and matches the real npm-published `latest`, same expo-modules-core 57.0.5
+  # peer/runtime line. The `extent` action is web-only (no native impl on either platform) — not
+  # ported, see packages/image-manipulator/README.md.
+  expo-image-manipulator: 57.0.20
+  # Same exact-pin reasoning: packages/video-thumbnails depends on expo-video-thumbnails ONLY for
+  # its native ios/android folders. Version verified against .vendors/expo at origin/sdk-57
+  # (57.0.2) and npm-published `latest`, same expo-modules-core 57.0.5 peer/runtime line.
+  expo-video-thumbnails: 57.0.2
+  # Same exact-pin reasoning: packages/intent-launcher depends on expo-intent-launcher ONLY for
+  # its native android folder (Android-only package), version 57.0.1 matching the real
+  # npm-published `latest`, same expo-modules-core 57.0.5 peer/runtime line
+  expo-intent-launcher: 57.0.1
+  # Same exact-pin reasoning: packages/navigation-bar depends on expo-navigation-bar ONLY for
+  # its native android folder (Android-only package), version 57.0.2 matching the real
+  # npm-published `latest`, same expo-modules-core 57.0.5 peer/runtime line
+  expo-navigation-bar: 57.0.2
+  # Same exact-pin reasoning: packages/blob depends on expo-blob ONLY for its native
+  # ios/android folders. Version verified against .vendors/expo at origin/sdk-57 (57.0.2)
+  # and npm-published `latest`, same expo-modules-core 57.0.5 peer/runtime line.
+  expo-blob: 57.0.2
+  # Same exact-pin reasoning: packages/speech depends on expo-speech ONLY for its native
+  # ios/android folders. Version verified against .vendors/expo at origin/sdk-57 (57.0.3)
+  # and npm-published `latest`, same expo-modules-core 57.0.5 peer/runtime line.
+  expo-speech: 57.0.3
+  # Same exact-pin reasoning: packages/screen-capture depends on expo-screen-capture ONLY for
+  # its native ios/android folders. Version verified against .vendors/expo at origin/sdk-57
+  # (57.0.3) and npm-published `latest`, same expo-modules-core 57.0.5 peer/runtime line.
+  expo-screen-capture: 57.0.3
+  # Same exact-pin reasoning: packages/calendar depends on expo-calendar ONLY for its native
+  # ios/android folders. Version verified against .vendors/expo at origin/sdk-57 (57.0.5)
+  # and npm-published `latest`, same expo-modules-core 57.0.5 peer/runtime line.
+  expo-calendar: 57.0.5
+  # Same exact-pin reasoning: packages/contacts depends on expo-contacts ONLY for its native
+  # ios/android folders. Version verified against .vendors/expo at origin/sdk-57 (57.0.6)
+  # and npm-published `latest`, same expo-modules-core 57.0.5 peer/runtime line.
+  expo-contacts: 57.0.6
   # Same exact-pin reasoning, continuing tier-2: packages/task-manager depends on
   # expo-task-manager ONLY for its native ios/android folders (JS hand-ported into our own
   # core). Version verified against .vendors/expo at origin/sdk-57 (57.0.15) and matches the
@@ -397,6 +456,32 @@ catalog:
   # npm-published `latest`, same expo-modules-core 57.0.5 peer/runtime line. No unpublished-peer
   # trap like background-fetch/task — its own peerDependencies are all wildcard.
   expo-sqlite: 57.0.2
+  # Same exact-pin reasoning, continuing tier-2: packages/asset depends on expo-asset ONLY for
+  # its native ios/android folders (JS hand-ported into our own core, dropping the classic-
+  # updates/Expo-Go branches — see the package's own README). Version verified against
+  # .vendors/expo at origin/sdk-57 (57.0.18) and matches the real npm-published `latest`, same
+  # expo-modules-core 57.0.5 peer/runtime line.
+  expo-asset: 57.0.18
+  # react-native's own dependency (its asset registry) — pinned as a direct dependency of
+  # packages/asset for the same "explicit over transitive" reason as the invariant pin below.
+  '@react-native/assets-registry': 0.86.0
+  # Same exact-pin reasoning, continuing tier-2: packages/font depends on expo-font ONLY for
+  # its native ios/android folders (JS hand-ported into our own core, full FontSource parity via
+  # packages/asset). Version verified against .vendors/expo at origin/sdk-57 (57.0.4) and matches
+  # the real npm-published `latest`, same expo-modules-core 57.0.5 peer/runtime line.
+  expo-font: 57.0.4
+  # Same exact-pin reasoning: packages/age-range depends on expo-age-range ONLY for its native
+  # ios/android folders (JS hand-ported into our own core), version 57.0.5 matching the real
+  # npm-published `latest`, same expo-modules-core 57.0.5 peer/runtime line
+  expo-age-range: 57.0.5
+  # Same exact-pin reasoning: packages/app-integrity depends on @expo/app-integrity ONLY for its
+  # native folders, version 57.0.2 matching npm-published `latest`. Scoped, unlike the rest of
+  # this catalog - autolinking still derives Gradle project name `expo-app-integrity` from it
+  '@expo/app-integrity': 57.0.2
+  # Same exact-pin reasoning: packages/app-metrics depends on expo-app-metrics ONLY for its
+  # native folders, version 57.0.21 matching npm-published `latest`. Its own real dependency
+  # expo-updates-interface resolves transitively, no separate catalog entry needed for it
+  expo-app-metrics: 57.0.21
   # expo-sqlite's own real runtime dependency (its kv-store's write-serialization lock) —
   # pinned to match .vendors/expo's exact vendored version rather than a newer semver-compatible
   # release, same reasoning as unimodules-app-loader above.

@@ -11,6 +11,7 @@ import {
   useLowPowerMode,
 } from '@symbiote-native/battery/react';
 import { ROUTE_NAME } from '../routes';
+import { Scenario } from '../components/Scenario';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
 type ICapabilityStatus = 'checking' | 'yes' | 'no';
@@ -62,13 +63,6 @@ function batteryStateLabel(state: BatteryState): string {
   }
 }
 
-/**
- * @symbiote-native/battery canary demo: a live-status card driven by the three
- * subscription-backed hooks (useBatteryLevel, useBatteryState, useLowPowerMode) plus a
- * capabilities card for the two one-shot checks (isAvailableAsync — every platform,
- * isBatteryOptimizationEnabledAsync — Android only upstream). iOS Simulators report the battery
- * API as unavailable; a real device is needed to see live readings.
- */
 export function BatteryScreen() {
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Battery];
   const lineColor = LINE_COLOR[lineInfo.line];
@@ -120,14 +114,21 @@ export function BatteryScreen() {
           <view className="hero-copy">
             <text className="hero-title">Battery</text>
             <text className="hero-body">
-              @symbiote-native/battery — live battery level, charging state, and
-              low-power mode via three subscription-backed hooks. A simulator
-              reports the battery API as unavailable; a real device is needed to
-              see live readings.
+              React to the battery: level, charging state and low-power mode
+              update live through hooks, so the app can pause heavy work when
+              the battery is low. A simulator reports the API as unavailable,
+              use a real device.
             </text>
           </view>
         </view>
 
+        <Scenario
+          testID="battery-scenario"
+          title="Pause sync and animations when the battery is low"
+          why="Skip background uploads, heavy animations or video quality when the user is on low power or unplugged at low charge, and resume when they plug in."
+          steps={['Turn Low Power Mode on in the system settings', 'Plug the charger in and out', 'Watch the live status card']}
+          expect="Level, charging state and low power mode change on screen within a moment, without reloading."
+        />
         <view testID="battery-live-card" className="feature-card">
           <view className="feature-card-header">
             <text className="feature-card-title">Live status</text>

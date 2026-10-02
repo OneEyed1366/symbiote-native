@@ -8,4 +8,5 @@
 export { createBatteryLevel } from './primitives/create-battery-level';
 export { createBatteryState } from './primitives/create-battery-state';
 export { createLowPowerMode } from './primitives/create-low-power-mode';
+export { createPowerState } from './primitives/create-power-state';
 export * from '../core';

@@ -1,161 +1,122 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { isAvailableAsync, sendSMSAsync } from '@symbiote-native/sms';
+import type { ISmsAttachment } from '@symbiote-native/sms';
 import { ActionButton } from '../components/ActionButton';
+import { Explorer, Scenario } from '../components/Scenario';
+import { Card, Field, ResultRow, ScreenShell, ToggleRow, lineColorOf } from '../components/ScreenShell';
 import { ROUTE_NAME } from '../routes';
-import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
-type ICapabilityStatus = 'checking' | 'yes' | 'no';
+const color = lineColorOf(ROUTE_NAME.Sms);
 
-function toCapabilityStatus(value: boolean): ICapabilityStatus {
-  return value ? 'yes' : 'no';
+type IForm = {
+  recipients: string;
+  message: string;
+  isAttaching: boolean;
+  isSecondAttachment: boolean;
+  isArrayForm: boolean;
+  uri: string;
+  mimeType: string;
+  filename: string;
+};
+type ISetForm = (patch: Partial<IForm>) => void;
+
+function attachmentsOf(form: IForm): ISmsAttachment | ISmsAttachment[] | undefined {
+  if (!form.isAttaching) {
+    return undefined;
+  }
+  const first = { uri: form.uri, mimeType: form.mimeType, filename: form.filename };
+  if (!form.isSecondAttachment) {
+    return form.isArrayForm ? [first] : first;
+  }
+  return [first, { ...first, filename: `second-${form.filename}` }];
 }
 
-function CapabilityRow({
-  testID,
-  label,
-  status,
-}: {
-  testID: string;
-  label: string;
-  status: ICapabilityStatus;
-}) {
-  const text =
-    status === 'checking' ? 'CHECKING…' : status === 'yes' ? 'YES' : 'NO';
+function addressesOf(text: string): string[] {
+  return text
+    .split(',')
+    .map(address => address.trim())
+    .filter(address => address.length > 0);
+}
+
+function ComposeCard({ form, setForm }: { form: IForm; setForm: ISetForm }) {
   return (
-    <view testID={testID} className="capability-row">
-      <text className="capability-label">{label}</text>
-      <view className={`status-badge status-badge-${status}`}>
-        <text className="status-badge-text">{text}</text>
-      </view>
-    </view>
+    <>
+      <Field testID="sms-recipients-input" label="recipients, comma separated" value={form.recipients} onChange={recipients => setForm({ recipients })} placeholder="0123456789, 9876543210" />
+      <Field testID="sms-message-input" label="message" value={form.message} onChange={message => setForm({ message })} />
+    </>
   );
 }
 
-/**
- * @symbiote-native/sms canary demo: an isAvailableAsync capability row, recipient + message
- * inputs, and one sendSMSAsync round-trip whose 'sent' | 'cancelled' | 'unknown' result is
- * rendered back.
- *
- * Recipients are split on commas so the string | string[] overload of sendSMSAsync is exercised
- * from a single input.
- */
-export function SmsScreen() {
-  const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Sms];
-  const lineColor = LINE_COLOR[lineInfo.line];
+function AttachmentCard({ form, setForm }: { form: IForm; setForm: ISetForm }) {
+  return (
+    <Card testID="sms-attachment-card" title="attachments">
+      <ToggleRow testID="sms-attach-switch" label="attach a file" value={form.isAttaching} onChange={isAttaching => setForm({ isAttaching })} color={color} />
+      <ToggleRow testID="sms-array-switch" label="pass an array (single attachment)" value={form.isArrayForm} onChange={isArrayForm => setForm({ isArrayForm })} color={color} />
+      <ToggleRow testID="sms-second-switch" label="two attachments (Android keeps the first)" value={form.isSecondAttachment} onChange={isSecondAttachment => setForm({ isSecondAttachment })} color={color} />
+      <Field testID="sms-uri-input" label="uri (content uri)" value={form.uri} onChange={uri => setForm({ uri })} placeholder="content://..." />
+      <Field testID="sms-mime-input" label="mimeType" value={form.mimeType} onChange={mimeType => setForm({ mimeType })} />
+      <Field testID="sms-filename-input" label="filename" value={form.filename} onChange={filename => setForm({ filename })} />
+    </Card>
+  );
+}
 
-  const [isAvailable, setIsAvailable] = useState<ICapabilityStatus>('checking');
-  const [recipients, setRecipients] = useState('');
-  const [message, setMessage] = useState('Sent from the Symbiote canary');
+export function SmsScreen() {
+  const [availability, setAvailability] = useState('checking');
   const [lastResult, setLastResult] = useState('idle');
+  const [form, setFormState] = useState<IForm>({
+    recipients: '',
+    message: 'Sent from the Symbiote canary',
+    isAttaching: false,
+    isSecondAttachment: false,
+    isArrayForm: false,
+    uri: '',
+    mimeType: 'image/png',
+    filename: 'canary.png',
+  });
+  const setForm: ISetForm = patch => setFormState(previous => ({ ...previous, ...patch }));
 
   useEffect(() => {
-    let isMounted = true;
-    isAvailableAsync().then(available => {
-      if (isMounted) {
-        setIsAvailable(toCapabilityStatus(available));
-      }
-    });
-    return () => {
-      isMounted = false;
-    };
+    isAvailableAsync().then(available => setAvailability(available ? 'yes' : 'no'));
   }, []);
 
-  const handleSend = useCallback(() => {
-    const addresses = recipients
-      .split(',')
-      .map(address => address.trim())
-      .filter(address => address.length > 0);
+  const send = () => {
+    const addresses = addressesOf(form.recipients);
     if (addresses.length === 0) {
       setLastResult('no recipients');
       return;
     }
     setLastResult('composer open…');
-    sendSMSAsync(addresses, message)
+    const attachments = attachmentsOf(form);
+    sendSMSAsync(form.recipients.includes(',') ? addresses : addresses[0], form.message, attachments === undefined ? undefined : { attachments })
       .then(response => setLastResult(`result: ${response.result}`))
       .catch((error: Error) => setLastResult(`send failed: ${error.message}`));
-  }, [recipients, message]);
+  };
 
   return (
-    <safe-area-view className="screen">
-      <scroll-view
-        testID="sms-scroll"
-        className="screen"
-        contentContainerStyle="scroll-content"
+    <ScreenShell
+      route={ROUTE_NAME.Sms}
+      testID="sms-scroll"
+      title="SMS"
+      body="Open the system SMS composer with recipients, text and attachments already filled in. The user reviews and presses send, so the app needs no SMS permission and never sends by itself."
+    >
+      <Card testID="sms-capability-card" title="Can this device send SMS?">
+        <ResultRow testID="sms-available" label="Available" value={availability} />
+        <text className="info-text">NO is expected on the iOS simulator and on Android devices without telephony hardware.</text>
+      </Card>
+      <Scenario
+        testID="sms-send-card"
+        title="Invite a friend or text support with a prefilled message"
+        why="Share an invite code, send a delivery update or contact support by SMS. The composer opens ready to send, with one or many recipients."
+        steps={['Enter your own number in recipients', 'Press Open composer', 'Send or cancel in the composer']}
+        expect="The composer opens with the recipients and text. Last result says sent or cancelled on iOS, and always unknown on Android because it cannot report the outcome."
       >
-        <view className={`line-tag line-tag-${lineInfo.line}`}>
-          <text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
-        </view>
-        <view className="hero-card">
-          <view className="hero-badge" style={{ backgroundColor: lineColor }}>
-            <text className="hero-badge-text">{lineInfo.code}</text>
-          </view>
-          <view className="hero-copy">
-            <text className="hero-title">SMS</text>
-            <text className="hero-body">
-              @symbiote-native/sms — opens the system SMS composer prefilled
-              with recipients and a message. It never sends anything by itself;
-              the user does.
-            </text>
-          </view>
-        </view>
-
-        <view testID="sms-capability-card" className="feature-card">
-          <view className="feature-card-header">
-            <text className="feature-card-title">Capabilities</text>
-          </view>
-          <CapabilityRow
-            testID="sms-available"
-            label="Available"
-            status={isAvailable}
-          />
-          <text className="info-text">
-            NO is expected on the iOS simulator, which has no Messages app, and
-            on Android devices without telephony hardware. Only a real phone
-            reports YES.
-          </text>
-        </view>
-
-        <view testID="sms-compose-card" className="feature-card">
-          <view className="feature-card-header">
-            <text className="feature-card-title">Compose</text>
-          </view>
-          <text-input
-            testID="sms-recipients-input"
-            value={recipients}
-            onValueChange={event => setRecipients(event.text)}
-            placeholder="0123456789, 9876543210"
-            placeholderTextColor="#41506a"
-            autoCapitalize="none"
-            className="text-input"
-          />
-          <text-input
-            testID="sms-message-input"
-            value={message}
-            onValueChange={event => setMessage(event.text)}
-            placeholder="Message"
-            placeholderTextColor="#41506a"
-            className="text-input"
-          />
-          <ActionButton
-            testID="sms-send-button"
-            title="Open composer"
-            onPress={handleSend}
-            color={lineColor}
-          />
-          <view className="capability-row">
-            <text className="capability-label">Last result</text>
-            <text testID="sms-result" className="value-text">
-              {lastResult}
-            </text>
-          </view>
-          <text className="info-text">
-            Android always reports unknown — reading the real outcome needs
-            READ_SMS, which Google restricts to default-SMS-app publishers.
-            Treat it as the composer closed, not as a failure. iOS reports sent
-            or cancelled.
-          </text>
-        </view>
-      </scroll-view>
-    </safe-area-view>
+        <ComposeCard form={form} setForm={setForm} />
+        <ActionButton testID="sms-send-button" title="Open composer" onPress={send} color={color} />
+        <ResultRow testID="sms-result" label="Last result" value={lastResult} />
+      </Scenario>
+      <Explorer testID="sms-explorer" color={color}>
+        <AttachmentCard form={form} setForm={setForm} />
+      </Explorer>
+    </ScreenShell>
   );
 }

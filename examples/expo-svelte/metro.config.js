@@ -42,6 +42,11 @@ const config = {
     }),
   },
   resolver: {
+    // xcodebuild leaves transient module-cache lock files in expo-modules-jsi's .DerivedData,
+    // and the file watcher crashes on their readlink
+    blockList: [/\/\.DerivedData\/.*/],
+    // The seed database for `importDatabaseFromAssetAsync` is bundled as an asset
+    assetExts: [...defaultConfig.resolver.assetExts, 'db'],
     // Teach Metro that .svelte and every style extension are source files (the transformer
     // turns each into a module) — css/scss/sass/less/styl is the framework-agnostic standalone
     // stylesheet/CSS-Modules path, shared with the React/Vue/Angular examples (see

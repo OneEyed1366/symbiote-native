@@ -25,6 +25,7 @@ import {
   createPedometer,
 } from '@symbiote-native/sensors/solid';
 import { ROUTE_NAME } from '../routes';
+import { Scenario } from '../components/Scenario';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
 // Pedometer has no shared singleton upstream (see packages/sensors' core/pedometer.ts) - wrapped
@@ -140,17 +141,6 @@ function AxisReadingRow(props: {
   );
 }
 
-/**
- * @symbiote-native/sensors canary demo: one card per primitive - Accelerometer, Gyroscope,
- * Magnetometer, DeviceMotion, Pedometer - each rendering its own checking/unavailable/waiting/
- * live state distinctly (SensorCard above), never conflating "still checking" with "no reading
- * yet" or "not available on this device". The iOS Simulator genuinely reports every
- * CoreMotion/CMPedometer-backed sensor as unavailable - expected, not a wiring bug.
- *
- * DeviceMotion's nested `rotation` field is guarded at the field itself
- * (`deviceMotion()?.rotation && ...`), not just at the top-level `deviceMotion()` read - the
- * underlying native sensor can report its first event before `rotation` is populated.
- */
 export function SensorsScreen() {
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Sensors];
 
@@ -199,13 +189,21 @@ export function SensorsScreen() {
           <view class="hero-copy">
             <text class="hero-title">Sensors</text>
             <text class="hero-body">
-              @symbiote-native/sensors — live readings from five
-              expo-sensors-backed primitives. A simulator reports every
-              CoreMotion/CMPedometer-backed sensor as unavailable; a real device
-              is needed to see live readings.
+              Read the phone's motion hardware live: accelerometer, gyroscope,
+              magnetometer, combined device motion and step counter. A
+              simulator reports every sensor as unavailable, use a real
+              device.
             </text>
           </view>
         </view>
+
+        <Scenario
+          testID="sensors-scenario"
+          title="Detect a shake, a tilt, a compass heading or a step"
+          why="Games, level tools and fitness features read the motion sensors: tilt to steer, shake to undo, magnetometer for a compass and the pedometer for steps."
+          steps={['Tilt and shake the phone and watch the accelerometer', 'Rotate it and watch the gyroscope', 'Walk a few steps and watch the pedometer']}
+          expect="The numbers change live with each movement. A card that says unavailable means the device has no such sensor or the simulator cannot provide it."
+        />
 
         <SensorCard
           testID="sensors-accelerometer"

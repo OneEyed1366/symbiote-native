@@ -25,6 +25,11 @@ const config = {
       require.resolve('@symbiote-native/solid/metro-css-parser'),
   },
   resolver: {
+    // xcodebuild leaves transient module-cache lock files in expo-modules-jsi's .DerivedData,
+    // and the file watcher crashes on their readlink
+    blockList: [/\/\.DerivedData\/.*/],
+    // The seed database for `importDatabaseFromAssetAsync` is bundled as an asset
+    assetExts: [...defaultConfig.resolver.assetExts, 'db'],
     // Teach Metro that a style file is a source file (the transformer turns it into a module).
     // scss/sass/less/styl are optional SCSS/Sass/Less/Stylus preprocessor sources - see
     // core/css-parser/src/preprocessors.ts.

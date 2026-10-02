@@ -5,28 +5,30 @@ import {
   webCrypto,
 } from '@symbiote-native/standard-web-crypto/angular';
 import { ActionButton } from '../components/ActionButton';
+import { Scenario } from '../components/Scenario';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
+import { ValueRow } from './ValueRow';
 
 const RANDOM_BYTE_COUNT = 16;
+const HEX_RADIX = 16;
+const HEX_PAD_LENGTH = 2;
 
 function toHex(bytes: Uint8Array): string {
   return Array.from(bytes)
-    .map(byte => byte.toString(16).padStart(2, '0'))
+    .map(byte => byte.toString(HEX_RADIX).padStart(HEX_PAD_LENGTH, '0'))
     .join(' ');
 }
 
-/**
- * @symbiote-native/standard-web-crypto canary demo: a random-bytes button over the partial
- * W3C `crypto.getRandomValues` polyfill, plus a second button installing that polyfill onto
- * `globalThis.crypto` and reporting whether it's now defined. Every export is a plain re-export
- * off the core package — no service to inject(), same shape as @symbiote-native/crypto's plain
- * free-function surface.
- */
+// `globalThis.crypto` is not a typed global without the DOM lib, so it is read untyped
+function hasGlobalCrypto(): boolean {
+  return Reflect.get(globalThis, 'crypto') !== undefined;
+}
+
 @Component({
   selector: 'WebCryptoScreen',
   standalone: true,
-  imports: [ActionButton, SYMBIOTE_ELEMENTS],
+  imports: [ActionButton, Scenario, SYMBIOTE_ELEMENTS, ValueRow],
   template: `
     <safe-area-view class="screen">
       <scroll-view
@@ -34,83 +36,87 @@ function toHex(bytes: Uint8Array): string {
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <view [class]="lineTagClass">
-          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        <view [class]="'line-tag line-tag-' + lineInfo.line">
+          <text class="line-tag-text"
+            >{{ lineInfo.code }} · {{ lineInfo.label }}</text
+          >
         </view>
         <view class="hero-card">
-          <view class="hero-badge" [style]="heroBadgeStyle">
-            <text class="hero-badge-text">{{ heroBadgeCode }}</text>
+          <view class="hero-badge" [style]="badgeStyle">
+            <text class="hero-badge-text">{{ lineInfo.code }}</text>
           </view>
           <view class="hero-copy">
             <text class="hero-title">Web Crypto</text>
             <text class="hero-body">
-              @symbiote-native/standard-web-crypto — a partial W3C Web Crypto
-              polyfill exposing crypto.getRandomValues, backed by
-              @symbiote-native/crypto's native random source.
+              Make web libraries that expect crypto.getRandomValues, such as
+              uuid, nanoid or wallet libraries, work on React Native by
+              installing it on globalThis.crypto over the native random source.
             </text>
           </view>
         </view>
 
-        <view testID="web-crypto-random-bytes-card" class="capability-card">
-          <text class="capability-card-title">Random bytes</text>
+        <Scenario
+          testID="web-crypto-scenario"
+          title="Run a web library that needs crypto.getRandomValues"
+          why="Libraries like uuid and nanoid call the Web Crypto API and crash without it. One polyfill call at startup gives them secure random numbers from the native source."
+          [steps]="scenarioSteps"
+          expect="The installed row switches to Yes, and every press of the random bytes button shows 16 different values."
+        />
+
+        <view testID="web-crypto-random-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Random bytes</text>
+          </view>
           <ActionButton
-            testID="web-crypto-generate-button"
+            testID="web-crypto-random-button"
             title="Generate 16 random bytes"
-            (press)="handleGenerateRandomBytes()"
             [color]="lineColor"
-          ></ActionButton>
-          <text testID="web-crypto-random-bytes-result" class="value-text">{{
-            randomBytesLabel()
-          }}</text>
+            (press)="generateRandomBytes()"
+          />
+          @if (randomBytesHex(); as hex) {
+            <ValueRow label="Bytes (hex)" [value]="hex" />
+          }
         </view>
 
-        <view testID="web-crypto-polyfill-card" class="capability-card">
-          <text class="capability-card-title">Polyfill</text>
+        <view testID="web-crypto-polyfill-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Polyfill</text>
+          </view>
           <ActionButton
-            testID="web-crypto-install-polyfill-button"
+            testID="web-crypto-polyfill-button"
             title="Install polyfill"
-            (press)="handleInstallPolyfill()"
             [color]="lineColor"
-          ></ActionButton>
-          <text testID="web-crypto-polyfill-result" class="value-text">{{
-            polyfillLabel()
-          }}</text>
+            (press)="installPolyfill()"
+          />
+          <ValueRow
+            label="globalThis.crypto installed"
+            [value]="isPolyfillInstalled() ? 'Yes' : 'No'"
+          />
         </view>
       </scroll-view>
     </safe-area-view>
   `,
 })
 export class WebCryptoScreen {
-  private readonly lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.StandardWebCrypto];
-  readonly lineTagClass = `line-tag line-tag-${this.lineInfo.line}`;
-  readonly lineTagLabel = `${this.lineInfo.code} · ${this.lineInfo.label}`;
-  readonly heroBadgeCode = this.lineInfo.code;
-  readonly lineColor = LINE_COLOR[this.lineInfo.line];
-  readonly heroBadgeStyle = { backgroundColor: this.lineColor };
+  readonly lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.StandardWebCrypto];
+  readonly lineColor = LINE_COLOR['standard-web-crypto'];
+  readonly badgeStyle = { backgroundColor: LINE_COLOR['standard-web-crypto'] };
+  readonly scenarioSteps = [
+    'Press Install polyfill',
+    'Check that globalThis.crypto is installed',
+    'Generate random bytes',
+  ];
 
-  readonly randomBytes = signal<Uint8Array | null>(null);
-  readonly isPolyfillInstalled = signal<boolean | null>(null);
+  readonly randomBytesHex = signal<string | null>(null);
+  readonly isPolyfillInstalled = signal(hasGlobalCrypto());
 
-  handleGenerateRandomBytes(): void {
-    this.randomBytes.set(
-      webCrypto.getRandomValues(new Uint8Array(RANDOM_BYTE_COUNT)),
-    );
+  generateRandomBytes(): void {
+    const bytes = webCrypto.getRandomValues(new Uint8Array(RANDOM_BYTE_COUNT));
+    this.randomBytesHex.set(toHex(bytes));
   }
 
-  handleInstallPolyfill(): void {
+  installPolyfill(): void {
     polyfillWebCrypto();
-    this.isPolyfillInstalled.set(typeof globalThis.crypto !== 'undefined');
-  }
-
-  randomBytesLabel(): string {
-    const bytes = this.randomBytes();
-    return bytes === null ? 'not generated yet' : toHex(bytes);
-  }
-
-  polyfillLabel(): string {
-    const isInstalled = this.isPolyfillInstalled();
-    return isInstalled === null
-      ? 'not installed yet'
-      : `globalThis.crypto defined: ${isInstalled}`;
+    this.isPolyfillInstalled.set(hasGlobalCrypto());
   }
 }

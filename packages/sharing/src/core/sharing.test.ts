@@ -1,9 +1,27 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { INativeSharingModule } from './native-module';
+import type { IResolvedSharePayload, ISharePayload } from './types';
+
+const SHARED_TEXT: ISharePayload = {
+  value: 'hello',
+  shareType: 'text',
+  mimeType: 'text/plain',
+};
+const RESOLVED_TEXT: IResolvedSharePayload = {
+  ...SHARED_TEXT,
+  contentUri: null,
+  contentType: 'text',
+  contentMimeType: null,
+  originalName: null,
+  contentSize: null,
+};
 
 const FAKE_NATIVE_SHARING: INativeSharingModule = {
   shareAsync: vi.fn(async () => undefined),
+  getSharedPayloads: vi.fn(() => [SHARED_TEXT]),
+  getResolvedSharedPayloadsAsync: vi.fn(async () => [RESOLVED_TEXT]),
+  clearSharedPayloads: vi.fn(),
 };
 
 // The real ExpoSharing native module only exists on device — resolving it via
@@ -24,7 +42,13 @@ vi.mock('expo-modules-core', () => ({
   },
 }));
 
-const { isAvailableAsync, shareAsync } = await import('./sharing');
+const {
+  isAvailableAsync,
+  shareAsync,
+  getSharedPayloads,
+  getResolvedSharedPayloadsAsync,
+  clearSharedPayloads,
+} = await import('./sharing');
 
 const LOCAL_FILE_URL = 'file:///tmp/report.pdf';
 
@@ -32,6 +56,11 @@ afterEach(() => {
   vi.clearAllMocks();
   Reflect.deleteProperty(FAKE_NATIVE_SHARING, 'isAvailableAsync');
   FAKE_NATIVE_SHARING.shareAsync = vi.fn(async () => undefined);
+  FAKE_NATIVE_SHARING.getSharedPayloads = vi.fn(() => [SHARED_TEXT]);
+  FAKE_NATIVE_SHARING.getResolvedSharedPayloadsAsync = vi.fn(async () => [
+    RESOLVED_TEXT,
+  ]);
+  FAKE_NATIVE_SHARING.clearSharedPayloads = vi.fn();
 });
 
 // why: isAvailableAsync has no guard clause and never rejects — every scenario resolves a
@@ -129,6 +158,50 @@ describe('negative — shareAsync rejects before or instead of a native call', (
 
     await expect(shareAsync(LOCAL_FILE_URL)).rejects.toThrow(
       'shareAsync is not available on expo-sharing',
+    );
+  });
+});
+
+describe('positive - incoming share functions delegate to the native module', () => {
+  it('getSharedPayloads returns the raw payloads', () => {
+    expect(getSharedPayloads()).toEqual([SHARED_TEXT]);
+  });
+
+  it('getResolvedSharedPayloadsAsync returns the resolved payloads', async () => {
+    await expect(getResolvedSharedPayloadsAsync()).resolves.toEqual([
+      RESOLVED_TEXT,
+    ]);
+  });
+
+  it('clearSharedPayloads calls through once', () => {
+    clearSharedPayloads();
+
+    expect(FAKE_NATIVE_SHARING.clearSharedPayloads).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('negative - incoming share functions name themselves when the native method is absent', () => {
+  it('getSharedPayloads throws an UnavailabilityError', () => {
+    FAKE_NATIVE_SHARING.getSharedPayloads = undefined;
+
+    expect(() => getSharedPayloads()).toThrow(
+      'getSharedPayloads is not available on expo-sharing',
+    );
+  });
+
+  it('getResolvedSharedPayloadsAsync rejects with an UnavailabilityError', async () => {
+    FAKE_NATIVE_SHARING.getResolvedSharedPayloadsAsync = undefined;
+
+    await expect(getResolvedSharedPayloadsAsync()).rejects.toThrow(
+      'getResolvedSharedPayloadsAsync is not available on expo-sharing',
+    );
+  });
+
+  it('clearSharedPayloads throws an UnavailabilityError', () => {
+    FAKE_NATIVE_SHARING.clearSharedPayloads = undefined;
+
+    expect(() => clearSharedPayloads()).toThrow(
+      'clearSharedPayloads is not available on expo-sharing',
     );
   });
 });

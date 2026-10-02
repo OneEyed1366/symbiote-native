@@ -1,9 +1,3 @@
-<!--
-  @symbiote-native/web-browser tour stop — opens the in-app browser (SFSafariViewController on iOS,
-  a Custom Tab on Android) for a URL typed above, reports the result type it resolves with, and
-  exposes the Android-only Custom Tabs service trio behind a Platform guard. Vue SFC twin of
-  ../../expo-react/screens/WebBrowserScreen.tsx.
--->
 <script setup lang="ts">
 import { ref } from 'vue';
 import { Platform } from '@symbiote-native/vue';
@@ -11,24 +5,41 @@ import {
   coolDownAsync,
   dismissBrowser,
   getCustomTabsSupportingBrowsersAsync,
+  mayInitWithUrlAsync,
   openBrowserAsync,
   warmUpAsync,
-} from '@symbiote-native/web-browser/vue';
+} from '@symbiote-native/web-browser';
 import ActionButton from '../components/ActionButton.vue';
+import CallConsole from '../components/CallConsole.vue';
+import Explorer from '../components/Explorer.vue';
+import Field from '../components/Field.vue';
+import ResultRow from '../components/ResultRow.vue';
+import Scenario from '../components/Scenario.vue';
+import ScreenShell from '../components/ScreenShell.vue';
+import { lineColorOf } from '../components/line-color';
 import { ROUTE_NAME } from '../routes';
-import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
+import WebBrowserAuthCard from './WebBrowserAuthCard.vue';
+import WebBrowserOptionsCard from './WebBrowserOptionsCard.vue';
+import { INITIAL_OPTIONS, toOpenOptions } from './web-browser-options';
+import type { IOptionsForm, ISetOptions } from './web-browser-options';
 
-const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.WebBrowser];
-const lineColor = LINE_COLOR[lineInfo.line];
+const ROUTE = ROUTE_NAME.WebBrowser;
+const color = lineColorOf(ROUTE);
+const DEMO_URL = 'https://symbiote-native.dev';
+const IS_ANDROID = Platform.select({ android: true, default: false });
 
-const url = ref('https://symbiote-native.dev');
+const url = ref(DEMO_URL);
+const options = ref<IOptionsForm>(INITIAL_OPTIONS);
 const lastResult = ref('idle');
-const servicePackage = ref<string | null>(null);
-const supportingBrowsers = ref<string | null>(null);
+const servicePackage = ref<string | undefined>(undefined);
 
-function handleOpen(): void {
+const setOptions: ISetOptions = patch => {
+  options.value = { ...options.value, ...patch };
+};
+
+function open(): void {
   lastResult.value = 'opening…';
-  void openBrowserAsync(url.value)
+  openBrowserAsync(url.value, toOpenOptions(options.value))
     .then(result => {
       lastResult.value = `result: ${result.type}`;
     })
@@ -37,11 +48,8 @@ function handleOpen(): void {
     });
 }
 
-// iOS only — a Custom Tab cannot be closed programmatically, so this rejects on Android. It also
-// rejects on iOS with no browser presented, which is the state this screen is in whenever the
-// button is reachable; the rejection is the demo.
-function handleDismiss(): void {
-  void dismissBrowser()
+function dismiss(): void {
+  dismissBrowser()
     .then(result => {
       lastResult.value = `dismissed: ${result.type}`;
     })
@@ -50,153 +58,74 @@ function handleDismiss(): void {
     });
 }
 
-// getCustomTabsSupportingBrowsersAsync throws on iOS rather than resolving empty (its native stub
-// is registered without the Async suffix), so every call below stays behind the Android branch.
-function handleListBrowsers(): void {
-  supportingBrowsers.value = 'listing…';
-  void getCustomTabsSupportingBrowsersAsync()
-    .then(result => {
-      supportingBrowsers.value =
-        result.browserPackages.length === 0
-          ? '(no supporting browser installed)'
-          : result.browserPackages.join(', ');
-    })
-    .catch((error: Error) => {
-      supportingBrowsers.value = `failed: ${error.message}`;
-    });
-}
-
-function handleWarmUp(): void {
-  void warmUpAsync()
-    .then(result => {
-      servicePackage.value = result.servicePackage ?? '(none)';
-      lastResult.value = 'warmed up';
-    })
-    .catch((error: Error) => {
-      lastResult.value = `warm-up failed: ${error.message}`;
-    });
-}
-
-function handleCoolDown(): void {
-  void coolDownAsync()
-    .then(() => {
-      servicePackage.value = null;
-      lastResult.value = 'cooled down';
-    })
-    .catch((error: Error) => {
-      lastResult.value = `cool-down failed: ${error.message}`;
-    });
-}
+const customTabsCalls = [
+  {
+    label: 'getCustomTabsSupportingBrowsersAsync',
+    run: () => getCustomTabsSupportingBrowsersAsync(),
+  },
+  {
+    label: 'warmUpAsync',
+    run: async () => {
+      const result = await warmUpAsync();
+      servicePackage.value = result.servicePackage;
+      return result;
+    },
+  },
+  {
+    label: 'mayInitWithUrlAsync',
+    run: () => mayInitWithUrlAsync(url.value, servicePackage.value),
+  },
+  { label: 'coolDownAsync', run: () => coolDownAsync(servicePackage.value) },
+];
 </script>
 
 <template>
-  <safe-area-view class="screen">
-    <scroll-view
-      testID="web-browser-scroll"
-      class="screen"
-      content-container-style="scroll-content"
+  <ScreenShell
+    :route="ROUTE"
+    testID="web-browser-scroll"
+    title="Web Browser"
+    body="Show web content in an in-app browser that keeps the user inside your app, and run browser-based sign-in flows that return to the app with a result."
+  >
+    <Scenario
+      testID="web-browser-open-card"
+      title="Open a link or a help page without leaving the app"
+      why="Terms of service, help articles and links open in Safari View Controller or a Chrome Custom Tab on top of your app, with shared cookies and one tap to get back."
+      :steps="[
+        'Press Open (the sample URL is preset)',
+        'Close the browser with Done or the back button',
+        'Press Open again and use Dismiss from the app (iOS)',
+      ]"
+      expect="The page opens in the in-app browser. Last result says cancel when closed by the user and dismiss when closed by the app on iOS, and opened on Android as soon as the tab launches."
     >
-      <view :class="`line-tag line-tag-${lineInfo.line}`">
-        <text class="line-tag-text">
-          {{ `${lineInfo.code} · ${lineInfo.label}` }}
-        </text>
-      </view>
-      <view class="hero-card">
-        <view class="hero-badge" :style="{ backgroundColor: lineColor }">
-          <text class="hero-badge-text">
-            {{ lineInfo.code }}
-          </text>
-        </view>
-        <view class="hero-copy">
-          <text class="hero-title"> Web Browser </text>
-          <text class="hero-body">
-            @symbiote-native/web-browser — an in-app browser that keeps the user
-            inside the app, unlike Linking.openURL, plus the OAuth auth session
-            built on it.
-          </text>
-        </view>
-      </view>
+      <Field
+        testID="web-browser-url-input"
+        label="url"
+        :value="url"
+        :onChange="next => (url = next)"
+        placeholder="https://example.com"
+      />
+      <ActionButton testID="web-browser-open-button" title="Open" :onPress="open" :color="color" />
+      <ActionButton
+        testID="web-browser-dismiss-button"
+        title="Dismiss"
+        :onPress="dismiss"
+        :color="color"
+      />
+      <ResultRow testID="web-browser-result" label="Last result" :value="lastResult" />
+    </Scenario>
 
-      <view testID="web-browser-open-card" class="web-browser-card">
-        <text class="web-browser-card-title"> Open a page </text>
-        <text-input
-          v-model="url"
-          testID="web-browser-url-input"
-          placeholder="https://example.com"
-          placeholder-text-color="#41506a"
-          class="text-input"
-          auto-capitalize="none"
-          :auto-correct="false"
-        />
-        <ActionButton
-          testID="web-browser-open-button"
-          title="Open"
-          :onPress="handleOpen"
-          :color="lineColor"
-        />
-        <ActionButton
-          testID="web-browser-dismiss-button"
-          title="Dismiss"
-          :onPress="handleDismiss"
-          :color="lineColor"
-        />
-        <view class="web-browser-row">
-          <text class="web-browser-row-label"> Last result </text>
-          <text testID="web-browser-result" class="web-browser-value-text">
-            {{ lastResult }}
-          </text>
-        </view>
-        <text class="web-browser-note">
-          iOS resolves once the browser closes (cancel, or dismiss when closed
-          from code); Android resolves opened as soon as the Custom Tab launches
-          and never reports the close. Dismiss is iOS-only.
-        </text>
-      </view>
+    <WebBrowserAuthCard :url="url" :options="options" />
 
-      <view
-        v-if="Platform.OS === 'android'"
-        testID="web-browser-custom-tabs-card"
-        class="web-browser-card"
-      >
-        <text class="web-browser-card-title"> Custom Tabs service </text>
-        <ActionButton
-          testID="web-browser-list-browsers-button"
-          title="List supporting browsers"
-          :onPress="handleListBrowsers"
-          :color="lineColor"
-        />
-        <view class="web-browser-row">
-          <text class="web-browser-row-label"> Browsers </text>
-          <text testID="web-browser-browsers" class="web-browser-value-text">
-            {{ supportingBrowsers ?? '(not queried)' }}
-          </text>
-        </view>
-        <ActionButton
-          testID="web-browser-warm-up-button"
-          title="Warm up"
-          :onPress="handleWarmUp"
-          :color="lineColor"
-        />
-        <ActionButton
-          testID="web-browser-cool-down-button"
-          title="Cool down"
-          :onPress="handleCoolDown"
-          :color="lineColor"
-        />
-        <view class="web-browser-row">
-          <text class="web-browser-row-label"> Service package </text>
-          <text
-            testID="web-browser-service-package"
-            class="web-browser-value-text"
-          >
-            {{ servicePackage ?? '(not warmed up)' }}
-          </text>
-        </view>
-        <text class="web-browser-note">
-          Android only. Listing the browsers throws on iOS, so this whole card
-          is behind a Platform.OS check.
-        </text>
-      </view>
-    </scroll-view>
-  </safe-area-view>
+    <Explorer testID="web-browser-explorer" :color="color">
+      <WebBrowserOptionsCard :form="options" :setForm="setOptions" />
+      <CallConsole
+        v-if="IS_ANDROID"
+        prefix="web-browser-custom-tabs"
+        title="Custom Tabs service (Android)"
+        :color="color"
+        hint="Android only, the calls reject on iOS."
+        :calls="customTabsCalls"
+      />
+    </Explorer>
+  </ScreenShell>
 </template>

@@ -1,4 +1,9 @@
-// @symbiote-native/audio/angular: the Angular entry over the framework-agnostic core. Same
-// reasoning as the React/Vue entries — every export here is a plain class/function with no
-// framework-specific lifecycle to wrap, so this is a plain re-export.
 export * from '../core';
+export { injectAudioPlayer } from './inject-audio-player';
+export { injectAudioPlayerStatus } from './inject-audio-player-status';
+export { injectAudioSampleListener } from './inject-audio-sample-listener';
+export { injectAudioPlaylist } from './inject-audio-playlist';
+export { injectAudioPlaylistStatus } from './inject-audio-playlist-status';
+export { injectAudioRecorder } from './inject-audio-recorder';
+export { injectAudioRecorderState } from './inject-audio-recorder-state';
+export { injectAudioStream } from './inject-audio-stream';

@@ -1,12 +1,5 @@
-<!--
-  @symbiote-native/clipboard tour stop — a live value card (seeded via getStringAsync() on mount,
-  then refreshed on every useClipboard() change event — the event itself only carries the changed
-  content TYPES, not the string, see packages/clipboard/src/core/types.ts's IClipboardEvent), a
-  text input + setStringAsync "Copy text" card, a hasStringAsync() status row, and an iOS-only
-  URL get/set/has row. Vue SFC twin of ../../react/screens/ClipboardScreen.tsx.
--->
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue';
+import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { Platform } from '@symbiote-native/vue';
 import {
   getStringAsync,
@@ -18,131 +11,130 @@ import {
 } from '@symbiote-native/clipboard';
 import { useClipboard } from '@symbiote-native/clipboard/vue';
 import ActionButton from '../components/ActionButton.vue';
+import Scenario from '../components/Scenario.vue';
+import { toCapabilityStatus } from '../components/capability-status';
+import type { ICapabilityStatus } from '../components/capability-status';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
+import CapabilityRow from './CapabilityRow.vue';
+import ValueRow from './ValueRow.vue';
 
-type ICapabilityStatus = 'checking' | 'yes' | 'no';
-
-function toCapabilityStatus(value: boolean): ICapabilityStatus {
-  return value ? 'yes' : 'no';
-}
+const IOS_OS = 'ios';
+const isIosOs = Platform.OS === IOS_OS;
 
 const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Clipboard];
 const lineColor = LINE_COLOR[lineInfo.line];
 
-const clipboardText = ref('checking…');
-const hasString = ref<ICapabilityStatus>('checking');
-const inputText = ref('');
-
-function refreshClipboardString(): void {
-  void getStringAsync().then(value => {
-    clipboardText.value = value;
-  });
-  void hasStringAsync().then(value => {
-    hasString.value = toCapabilityStatus(value);
-  });
-}
-
-onMounted(refreshClipboardString);
-
-// useClipboard() fires on every clipboard change (own writes included) — each firing re-reads
-// the string, since the event payload itself carries no content.
 const clipboardChange = useClipboard();
-watch(clipboardChange, event => {
-  if (event) refreshClipboardString();
-});
-
-function handleCopy(): void {
-  void setStringAsync(inputText.value).then(refreshClipboardString);
-}
-
+const clipboardText = ref<string | null>(null);
+const hasString = ref<ICapabilityStatus>('checking');
 const clipboardUrl = ref<string | null>(null);
 const hasUrl = ref<ICapabilityStatus>('checking');
-const urlInput = ref('https://symbiotenative.dev');
+const inputText = ref('');
+const urlText = ref('');
 
-function refreshUrlStatus(): void {
-  void hasUrlAsync().then(value => {
-    hasUrl.value = toCapabilityStatus(value);
+let isMounted = true;
+
+function refreshText(): void {
+  void Promise.all([getStringAsync(), hasStringAsync()]).then(([text, hasText]) => {
+    if (isMounted) {
+      clipboardText.value = text;
+      hasString.value = toCapabilityStatus(hasText);
+    }
+  });
+}
+
+function refreshUrl(): void {
+  if (!isIosOs) {
+    return;
+  }
+  void Promise.all([getUrlAsync(), hasUrlAsync()]).then(([url, hasUrlValue]) => {
+    if (isMounted) {
+      clipboardUrl.value = url;
+      hasUrl.value = toCapabilityStatus(hasUrlValue);
+    }
   });
 }
 
 onMounted(() => {
-  if (Platform.OS === 'ios') {
-    refreshUrlStatus();
-  }
+  refreshText();
+  refreshUrl();
+});
+watch(clipboardChange, () => {
+  refreshText();
+  refreshUrl();
+});
+onUnmounted(() => {
+  isMounted = false;
 });
 
-function handleGetUrl(): void {
-  void getUrlAsync().then(value => {
-    clipboardUrl.value = value;
-  });
+function handleCopy(): void {
+  void setStringAsync(inputText.value);
 }
 
 function handleSetUrl(): void {
-  void setUrlAsync(urlInput.value).then(refreshUrlStatus);
+  void setUrlAsync(urlText.value).then(() =>
+    getUrlAsync().then(value => {
+      clipboardUrl.value = value;
+    }),
+  );
 }
 </script>
 
 <template>
   <safe-area-view class="screen">
-    <scroll-view
-      testID="clipboard-scroll"
-      class="screen"
-      content-container-style="scroll-content"
-    >
+    <scroll-view testID="clipboard-scroll" class="screen" contentContainerStyle="scroll-content">
       <view :class="`line-tag line-tag-${lineInfo.line}`">
-        <text class="line-tag-text">
-          {{ `${lineInfo.code} · ${lineInfo.label}` }}
-        </text>
+        <text class="line-tag-text">{{ `${lineInfo.code} · ${lineInfo.label}` }}</text>
       </view>
       <view class="hero-card">
         <view class="hero-badge" :style="{ backgroundColor: lineColor }">
-          <text class="hero-badge-text">
-            {{ lineInfo.code }}
-          </text>
+          <text class="hero-badge-text">{{ lineInfo.code }}</text>
         </view>
         <view class="hero-copy">
-          <text class="hero-title"> Clipboard </text>
+          <text class="hero-title">Clipboard</text>
           <text class="hero-body">
-            @symbiote-native/clipboard — read and write the system clipboard's
-            text and URL content, plus a live change-listener composable.
+            Copy and paste from the app: write text or a link to the system clipboard, read it back
+            and follow changes live. Copy something in another app to see the value below update on
+            its own.
           </text>
         </view>
       </view>
 
-      <view testID="clipboard-value-card" class="clipboard-card">
-        <text class="clipboard-card-title"> Current value </text>
-        <view class="clipboard-value-box">
-          <text testID="clipboard-current-text" class="clipboard-value-text">
-            {{ clipboardText || '(empty)' }}
-          </text>
+      <Scenario
+        testID="clipboard-scenario"
+        title="Copy a promo code or an invite link with one tap"
+        why="Copy buttons save users from selecting text by hand. Reading the clipboard lets the app offer to paste a code or a link the user just copied elsewhere."
+        :steps="[
+          'Write some text and press copy',
+          'Open another app and paste',
+          'Copy something in another app and come back',
+        ]"
+        expect="The pasted text matches what you copied. The value card updates by itself when the clipboard changes outside the app."
+      />
+
+      <view testID="clipboard-value-card" class="feature-card">
+        <view class="feature-card-header">
+          <text class="feature-card-title">Current value</text>
         </view>
-        <view class="clipboard-capability-row">
-          <text class="clipboard-capability-label"> Has text </text>
-          <view
-            :class="`clipboard-status-badge clipboard-status-badge-${hasString}`"
-          >
-            <text class="clipboard-status-text">
-              {{
-                hasString === 'checking'
-                  ? 'CHECKING…'
-                  : hasString === 'yes'
-                    ? 'YES'
-                    : 'NO'
-              }}
-            </text>
-          </view>
-        </view>
+        <ValueRow
+          label="Clipboard text"
+          :value="clipboardText === null ? 'checking…' : clipboardText || '(empty)'"
+        />
+        <CapabilityRow testID="clipboard-has-string" label="Has string" :status="hasString" />
       </view>
 
-      <view testID="clipboard-copy-card" class="clipboard-card">
-        <text class="clipboard-card-title"> Copy text </text>
+      <view testID="clipboard-copy-card" class="feature-card">
+        <view class="feature-card-header">
+          <text class="feature-card-title">Copy text</text>
+        </view>
         <text-input
-          v-model="inputText"
-          testID="clipboard-input"
-          placeholder="Type something to copy…"
-          placeholder-text-color="#41506a"
+          testID="clipboard-copy-input"
+          :value="inputText"
+          placeholder="Type something to copy"
+          placeholderTextColor="#41506a"
           class="text-input"
+          @valueChange="event => (inputText = event.text)"
         />
         <ActionButton
           testID="clipboard-copy-button"
@@ -152,52 +144,29 @@ function handleSetUrl(): void {
         />
       </view>
 
-      <view
-        v-if="Platform.OS === 'ios'"
-        testID="clipboard-url-card"
-        class="clipboard-card"
-      >
-        <text class="clipboard-card-title"> URL (iOS only) </text>
-        <text-input
-          v-model="urlInput"
-          testID="clipboard-url-input"
-          placeholder="https://…"
-          placeholder-text-color="#41506a"
-          class="text-input"
+      <view v-if="isIosOs" testID="clipboard-url-card" class="feature-card">
+        <view class="feature-card-header">
+          <text class="feature-card-title">URL (iOS only)</text>
+        </view>
+        <ValueRow
+          label="Clipboard URL"
+          :value="clipboardUrl === null ? 'checking…' : clipboardUrl || '(none)'"
         />
-        <view class="button-row">
-          <ActionButton
-            testID="clipboard-set-url-button"
-            title="Set URL"
-            :onPress="handleSetUrl"
-            :color="lineColor"
-          />
-          <ActionButton
-            testID="clipboard-get-url-button"
-            title="Get URL"
-            :onPress="handleGetUrl"
-            :color="lineColor"
-          />
-        </view>
-        <view class="clipboard-capability-row">
-          <text class="clipboard-capability-label"> Has URL </text>
-          <view
-            :class="`clipboard-status-badge clipboard-status-badge-${hasUrl}`"
-          >
-            <text class="clipboard-status-text">
-              {{
-                hasUrl === 'checking'
-                  ? 'CHECKING…'
-                  : hasUrl === 'yes'
-                    ? 'YES'
-                    : 'NO'
-              }}
-            </text>
-          </view>
-        </view>
-        <text testID="clipboard-url-value" class="clipboard-value-text">
-          {{ clipboardUrl ?? 'tap Get URL to read the clipboard' }}
-        </text>
+        <CapabilityRow testID="clipboard-has-url" label="Has URL" :status="hasUrl" />
+        <text-input
+          testID="clipboard-url-input"
+          :value="urlText"
+          placeholder="https://example.com"
+          placeholderTextColor="#41506a"
+          class="text-input"
+          @valueChange="event => (urlText = event.text)"
+        />
+        <ActionButton
+          testID="clipboard-set-url-button"
+          title="Set URL"
+          :onPress="handleSetUrl"
+          :color="lineColor"
+        />
       </view>
     </scroll-view>
   </safe-area-view>

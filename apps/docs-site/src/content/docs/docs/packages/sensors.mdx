@@ -334,6 +334,20 @@ mount-time value still applying synchronously before the first sample.
 `LightSensor` is Android-only — `expo-sensors` ships no iOS light-sensor implementation, so
 `isAvailableAsync()` always resolves `false` on iOS.
 
+## Common questions
+
+- **No data in the simulator or emulator.** Sensors need a physical device.
+- **iOS DeviceMotion or Pedometer fails.** `NSMotionUsageDescription` must be in Info.plist.
+- **Updates are capped at 200 Hz on Android 12+.** Add the `HIGH_SAMPLING_RATE_SENSORS` permission
+  to AndroidManifest.xml for a faster rate.
+- **How do I change the rate?** Call the sensor's `setUpdateInterval` with milliseconds.
+- **Permission calls.** Each sensor exposes `getPermissionsAsync` and `requestPermissionsAsync`.
+
+Sources: [Expo docs: Accelerometer](https://docs.expo.dev/versions/latest/sdk/accelerometer/),
+[Expo docs: DeviceMotion](https://docs.expo.dev/versions/latest/sdk/devicemotion/),
+[expo/expo#12501](https://github.com/expo/expo/pull/12501),
+[expo-sensors README](https://github.com/expo/expo/blob/main/packages/expo-sensors/README.md).
+
 ## How the wrapper works
 
 `@symbiote-native/sensors` ships **zero React/Vue/Angular/Svelte/Solid logic in `expo-sensors` itself** — that

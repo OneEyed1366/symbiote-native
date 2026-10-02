@@ -7,6 +7,7 @@ export {
   dismissBrowser,
   openAuthSessionAsync,
   dismissAuthSession,
+  maybeCompleteAuthSession,
 } from './web-browser';
 export { WebBrowserResultType, WebBrowserPresentationStyle } from './types';
 export type {
@@ -14,6 +15,8 @@ export type {
   IRedirectEvent,
   IServiceActionResult,
   IWebBrowserAuthSessionResult,
+  IWebBrowserCompleteAuthSessionOptions,
+  IWebBrowserCompleteAuthSessionResult,
   IWebBrowserCoolDownResult,
   IWebBrowserCustomTabsResults,
   IWebBrowserDismissResult,

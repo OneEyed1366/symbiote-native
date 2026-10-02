@@ -6,6 +6,11 @@
         "importPath": "expo.modules.crypto.CryptoModule",
         "className": "CryptoModule",
         "nativeName": "ExpoCrypto"
+      },
+      {
+        "importPath": "expo.modules.crypto.aes.AesCryptoModule",
+        "className": "AesCryptoModule",
+        "nativeName": "ExpoCryptoAES"
       }
     ]
   }

@@ -1,0 +1,250 @@
+---
+title: Screen capture
+description: Block screenshots and screen recording, detect screenshots, and blur the iOS app switcher on every SymbioteNative adapter.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+Keep a screen that shows sensitive or paid content out of screenshots and recordings, and find out
+when a screenshot is taken. `@symbiote-native/screen-capture` wraps
+[`expo-screen-capture`](https://github.com/expo/expo/tree/main/packages/expo-screen-capture) so
+every SymbioteNative adapter can reach it, not just React. This matters most on Android, where the
+media-projection API lets other apps capture or share the screen even from the background.
+
+The plain async functions are shared by every adapter. The lifecycle bindings
+(`usePreventScreenCapture`, `useScreenshotListener`, `usePermissions`) are ported to all five, in
+each framework's own idiom.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | live    |
+| Android     | live    |
+
+| Framework adapter | Support |
+| ----------------- | ------- |
+| React             | live    |
+| Vue               | live    |
+| Angular           | live    |
+| Svelte            | live    |
+| Solid             | live    |
+
+## Installation
+
+```sh
+npm install @symbiote-native/screen-capture
+```
+
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --screen-capture` (or
+`add --screen-capture` in an existing app) installs and wires this for you - see
+[`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
+
+`expo-screen-capture` and `expo-modules-core` come along as regular dependencies, pinned to exact
+versions. Never install either yourself, and never add the `expo` meta-package to your project (it
+bundles its own Metro/Babel pipeline, which conflicts with this project's own).
+
+<Aside type="danger" title="Native setup is required before first use">
+  `expo-screen-capture`'s native code is discovered by `expo-modules-autolinking`, a different
+  mechanism from the `react-native.config.cjs`/podspec autolinking every other SymbioteNative
+  wrapper uses. Follow [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers this package and
+  every other `expo-modules-core` package with zero further native changes.
+</Aside>
+
+<Aside type="caution" title="Screenshot callback on Android 13 and lower">
+  On Android 14 and later neither blocking capture nor the screenshot callback needs a permission.
+  On Android 13 and lower, the callback needs `READ_MEDIA_IMAGES` in your `AndroidManifest.xml`.
+  Google Play allows that permission only for apps that need broad access to photos, so weigh it
+  before adding it.
+</Aside>
+
+## Usage
+
+Prevent capture for as long as a screen is mounted, and react to screenshots:
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { useScreenshotListener, usePreventScreenCapture } from '@symbiote-native/screen-capture/react';
+
+    export default function SecretScreen() {
+      usePreventScreenCapture();
+      useScreenshotListener(() => console.log('screenshot taken'));
+
+      return <text>Sensitive content</text>;
+    }
+    ```
+
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { usePreventScreenCapture, useScreenshotListener } from '@symbiote-native/screen-capture/vue';
+
+    usePreventScreenCapture();
+    useScreenshotListener(() => console.log('screenshot taken'));
+    </script>
+
+    <template>
+      <text>Sensitive content</text>
+    </template>
+    ```
+
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component, inject } from '@angular/core';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
+    import {
+      PreventScreenCaptureService,
+      ScreenshotListenerService,
+    } from '@symbiote-native/screen-capture/angular';
+
+    @Component({
+      standalone: true,
+      imports: [SYMBIOTE_ELEMENTS],
+      template: `<text>Sensitive content</text>`,
+    })
+    export class SecretScreen {
+      constructor() {
+        inject(PreventScreenCaptureService).connect();
+        inject(ScreenshotListenerService).connect(() => console.log('screenshot taken'));
+      }
+    }
+    ```
+
+    `connect()` registers an effect tied to the component, so capture is allowed again and the
+    listener removed when the component is destroyed.
+
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import {
+        usePreventScreenCapture,
+        useScreenshotListener,
+      } from '@symbiote-native/screen-capture/svelte';
+
+      usePreventScreenCapture();
+      useScreenshotListener(() => console.log('screenshot taken'));
+    </script>
+
+    <text>Sensitive content</text>
+    ```
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import {
+      createPreventScreenCapture,
+      createScreenshotListener,
+    } from '@symbiote-native/screen-capture/solid';
+
+    export function SecretScreen() {
+      createPreventScreenCapture();
+      createScreenshotListener(() => console.log('screenshot taken'));
+
+      return <text>Sensitive content</text>;
+    }
+    ```
+
+    Solid reserves `use*` for consuming existing state, so the primitives are named `create*`.
+
+  </TabItem>
+</Tabs>
+
+### Without a component
+
+```ts
+import {
+  addScreenshotListener,
+  allowScreenCaptureAsync,
+  preventScreenCaptureAsync,
+} from '@symbiote-native/screen-capture';
+
+await preventScreenCaptureAsync();
+const subscription = addScreenshotListener(() => console.log('screenshot taken'));
+
+// later:
+subscription.remove();
+await allowScreenCaptureAsync();
+```
+
+### Testing it
+
+On the Android emulator, run `adb shell input keyevent 120` in a separate terminal to trigger a
+screenshot. In the iOS Simulator, use **Device** > **Trigger Screenshot** in the menu bar.
+
+## API
+
+### Functions
+
+| Signature                                              | Description                                                                                  |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| `isAvailableAsync(): Promise<boolean>`                 | Whether the native module implements the prevent and allow pair                              |
+| `preventScreenCaptureAsync(key?): Promise<void>`       | Blocks screenshots and recordings until a matching `allowScreenCaptureAsync`. Defaults the key to `'default'` |
+| `allowScreenCaptureAsync(key?): Promise<void>`         | Releases one key. Capture is allowed again once every active key is released                 |
+| `enableAppSwitcherProtectionAsync(blurIntensity?): Promise<void>` | Blurs the app in the iOS app switcher. Throws `UnavailabilityError` on Android    |
+| `disableAppSwitcherProtectionAsync(): Promise<void>`   | Removes the blur. Throws `UnavailabilityError` on Android                                    |
+| `addScreenshotListener(listener): EventSubscription`   | Calls `listener` when the user takes a screenshot while the app is in the foreground         |
+| `removeScreenshotListener(subscription): void`         | Deprecated upstream. Call `subscription.remove()` instead                                    |
+| `getPermissionsAsync(): Promise<PermissionResponse>`   | Reads the media permission. Android-only concept; always granted on iOS                      |
+| `requestPermissionsAsync(): Promise<PermissionResponse>` | Prompts for it. Android-only concept; always granted on iOS                                |
+
+### Lifecycle bindings
+
+| Adapter | Prevent while mounted                              | Listen for screenshots                          | Permissions                              |
+| ------- | -------------------------------------------------- | ----------------------------------------------- | ---------------------------------------- |
+| React   | `usePreventScreenCapture(key?)`                    | `useScreenshotListener(listener)`               | `usePermissions()`                       |
+| Vue     | `usePreventScreenCapture(key?)`                    | `useScreenshotListener(listener)`               | `usePermissions()`                       |
+| Svelte  | `usePreventScreenCapture(key?)`                    | `useScreenshotListener(listener)`               | `usePermissions()`                       |
+| Solid   | `createPreventScreenCapture(key?)`                 | `createScreenshotListener(listener)`            | `createPermissions()`                    |
+| Angular | `PreventScreenCaptureService.connect(key?)`        | `ScreenshotListenerService.connect(listener)`   | `PermissionsService`                     |
+
+React's `usePermissions()` returns `[status, requestPermission, getPermission, error]`; the
+failure of the mount-time fetch lands in the fourth slot.
+
+## Notes
+
+- **Prevent and allow are counted by key.** Two screens can each call `preventScreenCaptureAsync`
+  with their own key; capture is allowed again only after both release. Use a distinct `key` per
+  caller so one screen leaving does not unblock another.
+- **The app switcher blur is iOS only.** It hides the app preview when the user opens the app
+  switcher; both calls throw `UnavailabilityError` on Android.
+- **Screenshot detection needs the app in the foreground.** The listener does not fire for
+  screenshots taken while the app is backgrounded.
+- **It can only be verified on a device or simulator.** The headless tests fake the native
+  module, so they prove key counting, the app-switcher failure on Android and the permission
+  fallback on iOS.
+
+## Common questions
+
+**What does a protected screen look like in a screenshot?** On Android the capture is blocked or
+black. On iOS the protected content is hidden behind a blank layer rather than your UI. Test on a
+device to see exactly what your users and screen recorders get.
+
+**`usePreventScreenCapture` does nothing in my test.** Make sure the call runs on mount and the
+component is on screen, and that you test on a real device or emulator, not only in the headless
+tests. A different `key` per caller keeps one screen's cleanup from unblocking another.
+
+**The screenshot callback never fires.** It fires only while the app is in the foreground. On
+Android 13 and lower it also needs `READ_MEDIA_IMAGES`; on Android 14 and later no permission is
+needed.
+
+**How do I trigger a screenshot in an emulator?** Android: `adb shell input keyevent 120`. iOS
+Simulator: Device > Trigger Screenshot.
+
+**Does it hide the app preview in the app switcher?** Not by itself. On iOS call
+`enableAppSwitcherProtectionAsync()` for that.
+
+Sources: [Expo docs: ScreenCapture](https://docs.expo.dev/versions/latest/sdk/screen-capture/),
+[expo/expo#37874 implement screenshot prevention on iOS](https://github.com/expo/expo/pull/37874),
+[expo/expo#21416 docs wrongly say usePreventScreenCapture is not possible on iOS](https://github.com/expo/expo/issues/21416).
+
+## How the wrapper works
+
+`expo-screen-capture`'s JS is hand-ported into this package's `core/`, resolving
+`ExpoScreenCapture` through `expo-modules-core` rather than the `expo` meta-package. The async
+functions and a shared permissions runtime live once in `core/`; each adapter supplies only its own
+lifecycle primitive (effect, composable, rune, `onCleanup`, injectable service). The native code is
+never vendored: `expo-modules-autolinking` resolves it from `node_modules` (see
+[the native setup guide](/docs/howtos/expo-native-module-setup/)).

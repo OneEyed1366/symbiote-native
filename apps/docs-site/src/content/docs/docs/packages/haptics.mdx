@@ -331,6 +331,21 @@ Feedback effects driven directly by Android's haptics engine, via `performAndroi
   to request, but the permission does appear in your merged manifest even if you only ever call
   `performAndroidHapticsAsync`, which uses the haptics engine and needs no permission.
 
+## Common questions
+
+- **Nothing happens on the iOS Simulator.** It never fires haptics; test on a device.
+- **Nothing happens on a real iPhone.** The Taptic Engine is off in Low Power Mode, while the
+  camera or dictation is active, or when the user disabled system haptics.
+- **Works in the dev client, silent in a standalone Android build.** Reported upstream; check the
+  vibration permission in the final manifest and test a release build.
+- **Unsupported platforms.** Guard calls on platforms without haptics instead of assuming they work.
+
+Sources: [Expo docs: Haptics](https://docs.expo.dev/versions/latest/sdk/haptics/),
+[expo/expo#16218](https://github.com/expo/expo/issues/16218),
+[expo/expo#6375](https://github.com/expo/expo/issues/6375),
+[expo/expo#19141](https://github.com/expo/expo/issues/19141),
+[expo-haptics silent on production builds](https://rorklab.net/en/articles/rork-dev/rork-expo-haptics-no-reaction-production-build-fix).
+
 ## How the wrapper works
 
 `@symbiote-native/haptics` ships **zero React/Vue/Angular/Svelte/Solid logic in `expo-haptics` itself** — that

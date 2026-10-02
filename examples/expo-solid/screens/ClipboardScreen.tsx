@@ -11,6 +11,7 @@ import {
 import { createClipboard } from '@symbiote-native/clipboard/solid';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
+import { Scenario } from '../components/Scenario';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
 type ICapabilityStatus = 'checking' | 'yes' | 'no';
@@ -46,30 +47,10 @@ function CapabilityRow(props: {
   );
 }
 
-/**
- * @symbiote-native/clipboard canary demo: a value card (current clipboard string, seeded via
- * getStringAsync() on mount and refreshed on every createClipboard() change event) plus a
- * hasStringAsync() status row, a copy-text card driving setStringAsync, and, iOS-only, a URL
- * get/set/has row (getUrlAsync/setUrlAsync/hasUrlAsync - iOS-only upstream). Copy something
- * outside the app (another app, a share sheet) to see the value below update on its own.
- */
-export function ClipboardScreen() {
-  const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Clipboard];
-  const lineColor = LINE_COLOR[lineInfo.line];
-
-  const clipboardEvent = createClipboard();
+// `clipboardEvent` carries only content types, so the text is re-fetched on every change
+function createClipboardText(clipboardEvent: () => unknown) {
   const [clipboardText, setClipboardText] = createSignal<string | null>(null);
   const [hasString, setHasString] = createSignal<ICapabilityStatus>('checking');
-  const [inputText, setInputText] = createSignal('');
-
-  const [urlText, setUrlText] = createSignal('');
-  const [clipboardUrl, setClipboardUrl] = createSignal<string | null>(null);
-  const [hasUrl, setHasUrl] = createSignal<ICapabilityStatus>('checking');
-
-  // clipboardEvent only carries the changed content TYPES, not the string itself - re-fetch the
-  // actual value on mount (clipboardEvent starts null) and on every subsequent change event.
-  // createEffect (not a bare body call) because this must re-run every time the tracked
-  // clipboardEvent() signal changes, not just once at mount.
   createEffect(() => {
     clipboardEvent();
     let isCurrent = true;
@@ -85,7 +66,13 @@ export function ClipboardScreen() {
       isCurrent = false;
     };
   });
+  return { clipboardText, hasString };
+}
 
+// URL get/set/has exists on iOS only
+function createClipboardUrl(clipboardEvent: () => unknown) {
+  const [clipboardUrl, setClipboardUrl] = createSignal<string | null>(null);
+  const [hasUrl, setHasUrl] = createSignal<ICapabilityStatus>('checking');
   createEffect(() => {
     clipboardEvent();
     if (Platform.OS !== 'ios') {
@@ -99,13 +86,27 @@ export function ClipboardScreen() {
       }
     });
   });
+  const setUrl = (text: string) =>
+    setUrlAsync(text).then(() => getUrlAsync().then(setClipboardUrl));
+  return { clipboardUrl, hasUrl, setUrl };
+}
+
+export function ClipboardScreen() {
+  const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Clipboard];
+  const lineColor = LINE_COLOR[lineInfo.line];
+
+  const clipboardEvent = createClipboard();
+  const { clipboardText, hasString } = createClipboardText(clipboardEvent);
+  const { clipboardUrl, hasUrl, setUrl } = createClipboardUrl(clipboardEvent);
+  const [inputText, setInputText] = createSignal('');
+  const [urlText, setUrlText] = createSignal('');
 
   const handleCopy = () => {
     setStringAsync(inputText());
   };
 
   const handleSetUrl = () => {
-    setUrlAsync(urlText()).then(() => getUrlAsync().then(setClipboardUrl));
+    setUrl(urlText());
   };
 
   return (
@@ -125,13 +126,20 @@ export function ClipboardScreen() {
           <view class="hero-copy">
             <text class="hero-title">Clipboard</text>
             <text class="hero-body">
-              @symbiote-native/clipboard — read/write clipboard text and URLs,
-              plus a live change-event subscription via createClipboard(). Copy
-              something outside the app to see the value below update on its
-              own.
+              Copy and paste from the app: write text or a link to the system
+              clipboard, read it back and follow changes live. Copy something
+              in another app to see the value below update on its own.
             </text>
           </view>
         </view>
+
+        <Scenario
+          testID="clipboard-scenario"
+          title="Copy a promo code or an invite link with one tap"
+          why="Copy buttons save users from selecting text by hand. Reading the clipboard lets the app offer to paste a code or a link the user just copied elsewhere."
+          steps={['Write some text and press copy', 'Open another app and paste', 'Copy something in another app and come back']}
+          expect="The pasted text matches what you copied. The value card updates by itself when the clipboard changes outside the app."
+        />
 
         <view testID="clipboard-value-card" class="feature-card">
           <view class="feature-card-header">

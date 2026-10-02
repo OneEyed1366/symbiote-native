@@ -202,6 +202,16 @@ export type IServiceActionResult = {
   servicePackage?: string;
 };
 
+export type IWebBrowserCompleteAuthSessionOptions = {
+  /** Close the window without checking the redirect against the cached redirect URL */
+  skipRedirectCheck?: boolean;
+};
+
+export type IWebBrowserCompleteAuthSessionResult = {
+  type: 'success' | 'failed';
+  message: string;
+};
+
 export type IWebBrowserAuthSessionResult =
   IWebBrowserRedirectResult | IWebBrowserResult;
 export type IWebBrowserMayInitWithUrlResult = IServiceActionResult;

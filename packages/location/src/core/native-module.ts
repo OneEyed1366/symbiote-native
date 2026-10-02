@@ -21,6 +21,7 @@ export type INativeLocationModule = {
   ): EventSubscription;
   getProviderStatusAsync(): Promise<ILocationProviderStatus>;
   enableNetworkProviderAsync(): Promise<void>;
+  requestPermissionsAsync(): Promise<void>;
   getCurrentPositionAsync(options: ILocationOptions): Promise<ILocationObject>;
   getLastKnownPositionAsync(
     options: ILocationLastKnownOptions,

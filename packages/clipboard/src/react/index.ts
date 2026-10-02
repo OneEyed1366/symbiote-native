@@ -6,4 +6,5 @@
 // @symbiote-native/sensors' useAccelerometer.
 
 export { useClipboard } from './hooks/use-clipboard';
+export { ClipboardPasteButton } from './clipboard-paste-button';
 export * from '../core';

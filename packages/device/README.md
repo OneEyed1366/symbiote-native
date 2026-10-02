@@ -1,14 +1,14 @@
 # @symbiote-native/device
 
 A wrapper package for [SymbioteNative](../../README.md) that makes
-[`expo-device`](https://github.com/expo/expo/tree/main/packages/expo-device)
-— physical device information: brand/model/OS constants, uptime, max-memory,
-root/jailbreak detection, side-loading detection, and platform-feature queries — usable from
+[`expo-device`](https://github.com/expo/expo/tree/main/packages/expo-device):
+physical device information: brand/model/OS constants, uptime, max-memory,
+root/jailbreak detection, side-loading detection, and platform-feature queries - usable from
 **every** adapter, React, Vue, Svelte, Solid, and Angular, not just React. Like
 [`@symbiote-native/local-auth`](../local-auth) and unlike this repo's stateful Expo wrapper
 ([`@symbiote-native/sensors`](../sensors), an `EventEmitter` + live-subscription surface), every
 export here is either an eagerly-resolved constant or a one-shot async call with no per-instance
-state, so there is no hook/composable/service to wrap — the React, Vue, and Angular entry points
+state, so there is no hook/composable/service to wrap - the React, Vue, and Angular entry points
 are plain re-exports of the same `core`.
 
 ## Install
@@ -25,39 +25,39 @@ npx @symbiote-native/cli new my-app --device
 npx @symbiote-native/cli add --device
 ```
 
-Either way: installs `@symbiote-native/device` and wires the native autolinking automatically — see
+Either way: installs `@symbiote-native/device` and wires the native autolinking automatically - see
 [`@symbiote-native/cli`](../cli).
 
 <details>
-<summary>Manual install (no CLI — installing and wiring native autolinking by hand)</summary>
+<summary>Manual install (no CLI - installing and wiring native autolinking by hand)</summary>
 
 ```bash
 npm install @symbiote-native/device
 ```
 
 `expo-device` and `expo-modules-core` come along as regular dependencies, pinned to exact
-versions — never install either yourself, and never add the `expo` meta-package to your project
+versions - never install either yourself, and never add the `expo` meta-package to your project
 (it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
 
 ## Required one-time step: native autolinking wiring
 
 Unlike a plain RN native module, `expo-device`'s native code is discovered by
-`expo-modules-autolinking`, not RN's own `react-native.config.cjs` mechanism — this needs wiring
+`expo-modules-autolinking`, not RN's own `react-native.config.cjs` mechanism - this needs wiring
 into the native host app **once**, covering this package and every other `expo-modules-core`
 package with zero further changes:
 
 | Platform | Touches                                                                                                                                             |
 | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| iOS      | `ios/Podfile` — add `use_expo_modules!`                                                                                                             |
-| iOS      | `AppDelegate.swift` — Expo's runtime-bootstrap hook                                                                                                 |
-| Android  | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects                                                               |
-| Android  | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
+| iOS      | `ios/Podfile` - add `use_expo_modules!`                                                                                                             |
+| iOS      | `AppDelegate.swift` - Expo's runtime-bootstrap hook                                                                                                 |
+| Android  | `settings.gradle` / `app/build.gradle` - resolve and include the Expo Gradle projects                                                               |
+| Android  | `MainApplication.kt` - Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
 
 Full mechanics live in the `symbiote-expo-native-module` project skill. Reference
 implementation: `examples/expo-react/ios/Podfile` and
 `examples/expo-react/android/app/src/main/java/com/canaryexpo/MainApplication.kt`.
 
-`expo-device` needs no runtime permission on either platform — every constant and function here
+`expo-device` needs no runtime permission on either platform - every constant and function here
 reads plain system/build information, nothing gated by a permission prompt.
 
 </details>
@@ -73,11 +73,11 @@ src/core/     Eager constants (isDevice, brand, manufacturer, modelId, modelName
               isSideLoadingEnabledAsync / getPlatformFeaturesAsync / hasPlatformFeatureAsync,
               and the DeviceType enum. native-module.ts resolves the native module via
               expo-modules-core's requireNativeModule.
-src/angular/  @symbiote-native/device/angular — export * from '../core'
+src/angular/  @symbiote-native/device/angular - export * from '../core'
 ```
 
 `./react`, `./vue`, `./svelte`, and `./solid` are `exports`-map aliases straight onto
-`src/core/` — no physical per-framework file, since there's nothing to subscribe to or clean up.
+`src/core/` - no physical per-framework file, since there's nothing to subscribe to or clean up.
 `./angular` stays a physical file/subpath since Angular ships through a separate `ngc`/AOT build
 (`build-ngc/`).
 
@@ -201,7 +201,7 @@ onMounted(() => {
 ```
 
 ```tsx
-// Solid — a component body runs once, so the two async values need a signal; the eager
+// Solid - a component body runs once, so the two async values need a signal; the eager
 // constants (brand, modelName, ...) are plain reads with nothing to subscribe to.
 import { createSignal, onMount } from 'solid-js';
 import {
@@ -296,21 +296,21 @@ export class DeviceScreen {
 }
 ```
 
-There's no per-instance service to `inject()` in the Angular case — every constant/function is a
+There's no per-instance service to `inject()` in the Angular case - every constant/function is a
 plain export off the core package, read straight in the constructor or class-field initializer.
-These snippets mirror the real canary demo screens — `examples/expo-react/screens/DeviceScreen.tsx`,
+These snippets mirror the real canary demo screens - `examples/expo-react/screens/DeviceScreen.tsx`,
 `examples/expo-vue-sfc/screens/DeviceScreen.vue`, `examples/expo-vue-tsx/screens/DeviceScreen.tsx`,
 `examples/expo-svelte/screens/DeviceScreen.svelte`, `examples/expo-solid/screens/DeviceScreen.tsx`,
 `examples/expo-angular/src/screens/DeviceScreen.ts`.
 
 ## API
 
-Eagerly-resolved constants, plus a handful of one-shot async functions — no event stream, no
-per-instance state — so the React/Vue/Svelte/Solid/Angular entry points above are plain
+Eagerly-resolved constants, plus a handful of one-shot async functions - no event stream, no
+per-instance state - so the React/Vue/Svelte/Solid/Angular entry points above are plain
 re-exports of `core` with nothing adapter-specific to add.
 
 ```ts
-// Constants — resolved once, at import time, straight off the native module:
+// Constants - resolved once, at import time, straight off the native module:
 isDevice: boolean
 brand: string | null
 manufacturer: string | null
@@ -340,12 +340,12 @@ getPlatformFeaturesAsync(): Promise<string[]>        // Android only; [] elsewhe
 hasPlatformFeatureAsync(feature: string): Promise<boolean> // Android only; false elsewhere, never throws
 ```
 
-Plus `DeviceType` (`UNKNOWN`/`PHONE`/`TABLET`/`DESKTOP`/`TV`) — ported from upstream's
+Plus `DeviceType` (`UNKNOWN`/`PHONE`/`TABLET`/`DESKTOP`/`TV`) - ported from upstream's
 `Device.types.ts`.
 
 ```ts
 import { getDeviceTypeAsync, isDevice } from '@symbiote-native/device';
-// or the framework-scoped entry points — identical surface, re-exported verbatim:
+// or the framework-scoped entry points - identical surface, re-exported verbatim:
 import { getDeviceTypeAsync } from '@symbiote-native/device/react';
 import { getDeviceTypeAsync } from '@symbiote-native/device/vue';
 import { getDeviceTypeAsync } from '@symbiote-native/device/svelte';
@@ -357,26 +357,38 @@ import { getDeviceTypeAsync } from '@symbiote-native/device/angular';
 
 - **Every function except `getPlatformFeaturesAsync`/`hasPlatformFeatureAsync` throws an
   `UnavailabilityError` when the native method is missing.** Those two are the deliberate
-  exceptions — they resolve to `[]`/`false` instead, matching upstream, since a platform-feature
+  exceptions - they resolve to `[]`/`false` instead, matching upstream, since a platform-feature
   query on a platform with no such concept (iOS) is a normal "no" answer, not an error.
 - **`getMaxMemoryAsync`'s `-1` native sentinel means "no inherent limit"** and is normalized to
-  `Number.MAX_SAFE_INTEGER` before it reaches your code — you never see the raw `-1`.
-- **`isRootedExperimentalAsync` is a best-effort check, not a guarantee** — root/jailbreak
+  `Number.MAX_SAFE_INTEGER` before it reaches your code - you never see the raw `-1`.
+- **`isRootedExperimentalAsync` is a best-effort check, not a guarantee** - root/jailbreak
   detection bypasses exist on both platforms; a `false` result does not prove the device is
   unmodified.
 
+## Common questions
+
+- **`deviceName` is "iPhone" on iOS 16+.** Needs the `user-assigned-device-name` entitlement.
+- **`modelName` / `deviceName` is `null`.** Not determinable on that device.
+- **`isDevice` is `true` on the iOS Simulator.** Reported upstream; do not rely on it.
+- **`getDeviceTypeAsync` says `TABLET` on a phone.** Reported on some Android models.
+
+Sources: [Expo docs: Device](https://docs.expo.dev/versions/latest/sdk/device/),
+[expo/expo#19639](https://github.com/expo/expo/issues/19639),
+[expo/expo#19869](https://github.com/expo/expo/issues/19869),
+[expo/expo#11409](https://github.com/expo/expo/issues/11409).
+
 ## Test it
 
-No Fabric/Descriptor angle at all — every export here is a pure constant or async-function
+No Fabric/Descriptor angle at all - every export here is a pure constant or async-function
 surface, never a view or per-instance state. Tests inject a fake native-module object in place of
-the real `requireNativeModule` resolution (`src/core/device.test.ts`, `vitest`) — no
+the real `requireNativeModule` resolution (`src/core/device.test.ts`, `vitest`) - no
 `installFabric()`, no ViewConfig. Native rendering itself is verified on-device (see the parent
 [README](../../README.md) for the project's testing model).
 
 Native autolinking wiring for `expo-modules-core` packages is already done in all six Expo
 canary apps (`examples/expo-react`, `examples/expo-vue-sfc`, `examples/expo-vue-tsx`,
 `examples/expo-svelte`, `examples/expo-solid`, `examples/expo-angular`) via
-`@symbiote-native/local-auth`/`@symbiote-native/sensors` — this
+`@symbiote-native/local-auth`/`@symbiote-native/sensors` - this
 package reuses that same wiring with zero further app-side changes, since
 `expo-modules-autolinking` discovers any `expo-modules-core` package already present in
 `node_modules`. A dedicated `DeviceScreen` demo has not been wired into those canaries yet.

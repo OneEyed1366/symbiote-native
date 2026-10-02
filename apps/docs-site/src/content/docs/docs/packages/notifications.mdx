@@ -1,17 +1,19 @@
 ---
 title: Notifications
-description: expo-notifications wrapped for every SymbioteNative adapter — permissions, push tokens, scheduling, presentation, badges, Android channels, and background delivery.
+description: Schedule and present local notifications, receive push, and react to taps, with badges, channels and background delivery, on every SymbioteNative adapter.
 ---
 
-import { Aside } from '@astrojs/starlight/components';
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 
-`@symbiote-native/notifications` wraps
-[`expo-notifications`](https://github.com/expo/expo/tree/main/packages/expo-notifications) —
-permissions, device/Expo push tokens, scheduling, presentation, badges, Android channels, iOS/
-Android categories, and the background notification task hook — for every SymbioteNative adapter.
+Remind the user at the right moment, reach them with push when the app is closed, and know which
+notification they tapped. `@symbiote-native/notifications` wraps
+[`expo-notifications`](https://github.com/expo/expo/tree/main/packages/expo-notifications)
+(permissions, device and Expo push tokens, scheduling, presentation, badges, Android channels,
+iOS and Android categories, and the background notification task hook) for every SymbioteNative
+adapter.
 
-Every export is a plain async function or a module-level listener registration — no hook/
-composable/service to wrap, so every adapter's entry point is a plain re-export of the same core.
+Every core export is a plain async function or a module-level listener registration, shared by all
+adapters. One adapter-specific binding, `useLastNotificationResponse`, is ported to all five.
 
 | OS platform | Support |
 | ----------- | ------- |
@@ -96,8 +98,98 @@ if (granted) {
 }
 ```
 
-Identical import surface on every adapter — `@symbiote-native/notifications/react`, `/vue`,
+Identical import surface on every adapter: `@symbiote-native/notifications/react`, `/vue`,
 `/svelte`, `/solid`, `/angular` all re-export the same functions.
+
+### React to the tapped notification
+
+`useLastNotificationResponse` returns the notification the user last tapped, so a screen can open
+the right content, including when the tap launched the app. It is `undefined` until the first
+read, then the response, or `null` when there is none.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { useLastNotificationResponse } from '@symbiote-native/notifications/react';
+
+    export default function Inbox() {
+      const response = useLastNotificationResponse();
+
+      return <text>{response?.notification.request.content.title ?? 'no tap yet'}</text>;
+    }
+    ```
+
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { useLastNotificationResponse } from '@symbiote-native/notifications/vue';
+
+    const response = useLastNotificationResponse();
+    </script>
+
+    <template>
+      <text>{{ response?.notification.request.content.title ?? 'no tap yet' }}</text>
+    </template>
+    ```
+
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component, inject } from '@angular/core';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
+    import { LastNotificationResponseService } from '@symbiote-native/notifications/angular';
+
+    @Component({
+      standalone: true,
+      imports: [SYMBIOTE_ELEMENTS],
+      template: `<text>{{ response()?.notification.request.content.title ?? 'no tap yet' }}</text>`,
+    })
+    export class Inbox {
+      readonly response = inject(LastNotificationResponseService).connect();
+    }
+    ```
+
+    `connect()` returns a signal and registers its subscriptions against the component.
+
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { useLastNotificationResponse } from '@symbiote-native/notifications/svelte';
+
+      const last = useLastNotificationResponse();
+    </script>
+
+    <text>{last.current?.notification.request.content.title ?? 'no tap yet'}</text>
+    ```
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { createLastNotificationResponse } from '@symbiote-native/notifications/solid';
+
+    export function Inbox() {
+      const response = createLastNotificationResponse();
+
+      return <text>{response()?.notification.request.content.title ?? 'no tap yet'}</text>;
+    }
+    ```
+
+    Solid reserves `use*` for consuming existing state, so the primitive is `create*`.
+
+  </TabItem>
+</Tabs>
+
+### Get a push token
+
+```ts
+const { data: token } = await Notifications.getExpoPushTokenAsync({ projectId });
+```
+
+`projectId` is required. `applicationId` and the iOS push environment default from
+[`@symbiote-native/application`](/docs/packages/application/). Use `getDevicePushTokenAsync()` to
+get the raw APNs or FCM token instead.
 
 ## API
 
@@ -167,20 +259,39 @@ Plus the enums `IosAlertStyle`, `IosAllowsPreviews`, `IosAuthorizationStatus`,
 `BackgroundNotificationTaskResult`, `PermissionStatus`, and the full content/trigger/payload type
 surface.
 
-## What's not ported
+### Per-adapter binding
 
-- **No automatic push-token server-resync daemon.** `setAutoServerRegistrationEnabledAsync` is
-  here (used internally by `getExpoPushTokenAsync`), but not a permanent background retry loop —
-  call `getExpoPushTokenAsync()` again from your own `addPushTokenListener` callback for the same
-  effect.
-- **No `projectId`/`applicationId` auto-fill.** Pass both explicitly to `getExpoPushTokenAsync` —
-  [`@symbiote-native/application`](/docs/packages/application/)'s `applicationId` export covers
-  the second one.
-- **No `useLastNotificationResponse` hook.** Read the last response with
-  `getLastNotificationResponse()` and subscribe to changes with
-  `addNotificationResponseClearedListener`/`addNotificationResponseReceivedListener` directly.
+| Adapter | Entry point                                          | Returns                                   |
+| ------- | ---------------------------------------------------- | ----------------------------------------- |
+| React   | `useLastNotificationResponse()`                      | The last response, `null` or `undefined`  |
+| Vue     | `useLastNotificationResponse()`                      | A ref of the same                         |
+| Svelte  | `useLastNotificationResponse()`                      | An object with a reactive `current`       |
+| Solid   | `createLastNotificationResponse()`                   | An accessor of the same                   |
+| Angular | `inject(LastNotificationResponseService).connect()`  | A signal of the same                      |
+
+The response is deduplicated by notification identifier and kept in sync with
+`addNotificationResponseReceivedListener` and `addNotificationResponseClearedListener`.
+
+## Push tokens and server registration
+
+- **Token resync is explicit.** Upstream re-sends a rolled device token to Expo's push backend with
+  exponential backoff. Here that is `installPushTokenAutoRegistration()`. It is idempotent and is
+  installed by `setAutoServerRegistrationEnabledAsync(true)` (so also by `getExpoPushTokenAsync`).
+  Call it once at app startup too, so a token that rolled while the app was closed is re-sent. It is
+  explicit rather than a module-load side effect because Metro's `inlineRequires` skips a barrel
+  re-export that nothing names as a value.
+- **`projectId` must be passed.** Upstream reads it from `expo-constants`; this package has no
+  access to it.
+- **The deprecated `getLastNotificationResponseAsync` and `clearLastNotificationResponseAsync`** are
+  ported as thin wrappers over the synchronous forms, exactly like upstream.
 
 ## Notes
+
+- **Push does not work on emulators or simulators (see Common questions below).** Test remote push on a physical device. Local
+  notifications work everywhere.
+- **Android push is FCM.** It needs your own Firebase project (see the table above).
+- **`setBadgeCountAsync` takes no options here.** Upstream's web-only `badgin` option bag is not
+  ported; this project targets iOS and Android.
 
 <Aside type="caution" title="setNotificationHandler must respond within 3 seconds">
   A slow `handleNotification` implementation causes native to discard the
@@ -191,3 +302,34 @@ surface.
 - **Android channel/channel-group functions branch on platform at runtime** rather than shipping
   as separate iOS/Android builds — off Android they resolve to the documented no-op values
   (`[]`/`null`/void) without touching native.
+
+## Common questions
+
+**`getExpoPushTokenAsync` fails or I never get a token.** Pass your `projectId`, since this package
+cannot read it from the Expo config. On Android, create a notification channel first:
+`setNotificationChannelAsync` must run before `getDevicePushTokenAsync` or `getExpoPushTokenAsync`,
+because Android 13's permission prompt does not appear until a channel exists. Android also needs
+your FCM credentials and `google-services.json` (see the table above).
+
+**A notification arrives but nothing shows while the app is open.** Foreground notifications need a
+handler. Call `setNotificationHandler` with `shouldShowBanner` and `shouldShowList` set to `true`.
+
+**Pushes arrive silently or late on Android.** Check the notification channel: one created with low
+importance is silent. Create it with `importance: AndroidImportance.HIGH`, and send the push with
+`priority: 'high'`. Battery optimization can still delay normal-priority messages.
+
+**Push never arrives when the app is closed.** Confirm a token was registered on the server and, for
+Android, that the project has valid FCM V1 credentials. Test on a physical device: push does not
+work on emulators or simulators.
+
+**Which notification did the user tap?** Use `useLastNotificationResponse` (see above), or
+`addNotificationResponseReceivedListener`.
+
+**Do I need push to show a reminder?** No. Scheduled local notifications work with no Firebase or
+APNs setup.
+
+Sources: [Expo docs: Notifications](https://docs.expo.dev/versions/latest/sdk/notifications/),
+[Expo docs: push notifications setup](https://docs.expo.dev/push-notifications/push-notifications-setup/),
+[expo/expo#49638 response listener does not fire for a foreground tap on Android](https://github.com/expo/expo/issues/49638),
+[expo/expo#9745 FCM notifications not received in the foreground](https://github.com/expo/expo/issues/9745),
+[DEV: basics and caveats of expo-notifications](https://dev.to/marianapatcosta/basics-and-caveats-of-expo-notifications-23cd).

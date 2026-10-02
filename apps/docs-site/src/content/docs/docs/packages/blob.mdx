@@ -1,0 +1,142 @@
+---
+title: Blob
+description: A native, web-standard Blob for slicing and reading binary data on every SymbioteNative adapter.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Build, slice and read binary data with the same `Blob` you use in the browser. React Native's own
+`Blob` has gaps, notably in `slice()`; `@symbiote-native/blob` wraps
+[`expo-blob`](https://github.com/expo/expo/tree/main/packages/expo-blob), a JSI-backed `Blob`
+that follows the W3C File API, so every SymbioteNative adapter gets a complete one, not just React.
+`Blob` is a plain class with no framework lifecycle, so the React, Vue, Angular, Svelte, and Solid
+entry points are plain re-exports of the same `core`, and one example covers all of them.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | live    |
+| Android     | live    |
+
+| Framework adapter | Support |
+| ----------------- | ------- |
+| React             | live    |
+| Vue               | live    |
+| Angular           | live    |
+| Svelte            | live    |
+| Solid             | live    |
+
+## Installation
+
+```sh
+npm install @symbiote-native/blob
+```
+
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --blob` (or
+`add --blob` in an existing app) installs and wires this for you - see
+[`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
+
+`expo-blob` and `expo-modules-core` come along as regular dependencies, pinned to exact versions.
+Never install either yourself, and never add the `expo` meta-package to your project (it bundles
+its own Metro/Babel pipeline, which conflicts with this project's own).
+
+<Aside type="danger" title="Native setup is required before first use">
+  `expo-blob`'s native code is discovered by `expo-modules-autolinking`, a different mechanism from
+  the `react-native.config.cjs`/podspec autolinking every other SymbioteNative wrapper uses. Follow
+  [How to: wire up an Expo native module](/docs/howtos/expo-native-module-setup/) once per app
+  first; it covers this package and every other `expo-modules-core` package with zero further
+  native changes.
+</Aside>
+
+No permission, manifest edit or config plugin is involved.
+
+## Usage
+
+Import `Blob` from the package root, or from `/react`, `/vue`, `/angular`, `/svelte` or `/solid`:
+they all point at the same class.
+
+```ts
+import { Blob } from '@symbiote-native/blob';
+
+const blob = new Blob(['hello ', 'world'], { type: 'text/plain' });
+blob.size; // 11
+blob.type; // 'text/plain'
+
+const text = await blob.text(); // 'hello world'
+const bytes = await blob.bytes(); // Uint8Array
+const buffer = await blob.arrayBuffer(); // a fresh ArrayBuffer
+const hello = blob.slice(0, 5, 'text/plain'); // a new Blob
+```
+
+Mix strings, binary data and other blobs in one blob:
+
+```ts
+const mixed = new Blob(
+  ['Text content', new Uint8Array([65, 66, 67]), 'More text'],
+  { type: 'text/plain' },
+);
+```
+
+## API
+
+### `new Blob(blobParts?, options?)`
+
+| Parameter   | Type                  | Description                                                                     |
+| ----------- | --------------------- | ------------------------------------------------------------------------------- |
+| `blobParts` | `IBlobPart[]`         | Contents, concatenated in order. Each part is a `string`, `ArrayBuffer`, `ArrayBufferView` or `Blob` |
+| `options`   | `IBlobPropertyBag`    | `type` sets the MIME type of the blob                                           |
+
+### Instance members
+
+| Member                              | Description                                                                          |
+| ----------------------------------- | ------------------------------------------------------------------------------------ |
+| `size`                              | Size of the blob in bytes                                                            |
+| `type`                              | MIME type given at construction, or an empty string                                  |
+| `slice(start?, end?, contentType?)` | Returns a new `Blob` for the byte range, optionally with a different MIME type       |
+| `text(): Promise<string>`           | Reads the contents as UTF-8 text                                                     |
+| `bytes(): Promise<Uint8Array>`      | Reads the contents as bytes                                                          |
+| `arrayBuffer(): Promise<ArrayBuffer>` | Reads the contents into a fresh `ArrayBuffer`                                      |
+| `stream(): ReadableStream`          | Returns a stream of the contents. Needs a global `ReadableStream`; see Notes         |
+| `toString(): string`                | The standard `[object Blob]` string                                                  |
+
+## Notes
+
+- **`.stream()` needs a global `ReadableStream`.** Hermes and React Native ship no WHATWG Streams
+  implementation, so `new ReadableStream(...)` throws `ReferenceError` unless the app installs a
+  polyfill such as `web-streams-polyfill`. This is an environment prerequisite, not a porting gap.
+- **The package type-checks with the DOM lib.** Its `tsconfig.json` adds `"DOM"` to `lib` because
+  the API shape needs `ReadableStream` and `BlobPropertyBag`. This is scoped to the package.
+- **Prefer it over `react-native`'s `Blob` when you slice.** Upstream documents the built-in
+  `Blob`'s `slice()` and some Web API behavior as limited; this one follows the spec.
+- **It can only be verified on a device or simulator.** The headless tests fake the native module,
+  so they prove constructor validation, part concatenation and `slice`, not the native engine.
+
+## Common questions
+
+**Why not use the `Blob` that React Native already has?** React Native's `Blob` lacks `text()`,
+`bytes()`, `arrayBuffer()` and `stream()`, and has gaps in `slice()`. This one follows the File API,
+so code written for the web works unchanged.
+
+**`ReferenceError: ReadableStream is not defined` when I call `.stream()`.** Hermes ships no
+Streams implementation. Install a polyfill such as `web-streams-polyfill`, or read the data with
+`arrayBuffer()` or `bytes()` instead.
+
+**How do I upload a blob?** Pass it to `fetch` as the body, or append it to a `FormData`. Read it
+into memory with `arrayBuffer()` only when you need the bytes in JavaScript.
+
+**Does `.stream()` avoid loading the whole blob?** No. The current implementation loads the whole
+blob into memory before streaming it.
+
+**How do I read a file from disk as a blob?** Pick or write the file with the
+[file system](/docs/packages/file-system/) package, then read its bytes into a `Blob`.
+
+Sources: [Expo docs: Blob](https://docs.expo.dev/versions/latest/sdk/blob/),
+[expo/expo#33463 support FormData upload using blob](https://github.com/expo/expo/pull/33463),
+[expo-blob on npm](https://www.npmjs.com/package/expo-blob).
+
+## How the wrapper works
+
+`expo-blob`'s JS is hand-ported into this package's `core/`, resolving `ExpoBlob` through
+`expo-modules-core` rather than the `expo` meta-package. The five adapter entry points are plain
+re-exports of `core` (Angular stays a physical subpath for its separate `ngc`/AOT build). The
+native code is never vendored: `expo-modules-autolinking` resolves it from `node_modules` (see
+[the native setup guide](/docs/howtos/expo-native-module-setup/)).

@@ -1,5 +1,23 @@
 # @symbiote-native/cli
 
+## 0.3.0
+
+### Minor Changes
+
+- [#91](https://github.com/OneEyed1366/symbiote-native/pull/91) [`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Add `--audio`, `--background-fetch`, `--background-task`, `--file-system`, `--location`, `--media-library`, `--notifications`, `--sqlite`, and `--task-manager` layer flags to `new`/`add`, covering every currently-shipped `@symbiote-native/*` Expo-backed package.
+
+- [#91](https://github.com/OneEyed1366/symbiote-native/pull/91) [`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Add `--age-range`, `--app-integrity`, `--app-metrics`, `--constants`, `--intent-launcher` and `--navigation-bar` to `new` and `add`, installing the matching `@symbiote-native/*` package.
+
+- [#91](https://github.com/OneEyed1366/symbiote-native/pull/91) [`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - `new` now offers to `git init` the scaffolded app and prints the manual command if declined or if the target is already a git repo. Never commits on the developer's behalf — only the repository itself.
+
+- [#91](https://github.com/OneEyed1366/symbiote-native/pull/91) [`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Add `npx @symbiote-native/cli grant <id>` for opting into a package's policy-sensitive Android permission bundle (currently `audio`'s background recording and `location`'s background tracking) after declining the interactive prompt or running `new`/`add` non-interactively. Idempotent — safe to run again on an already-granted bundle.
+
+### Patch Changes
+
+- [#91](https://github.com/OneEyed1366/symbiote-native/pull/91) [`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - README: fixed a dead anchor link and a false premise — it pointed at the root README's "Try It In Your Own App" section, which no longer exists (the root Install section already leads with this package, so there's no manual-process gap left to close). Also drops a stale hardcoded layer/framework count in favor of pointing at `templates/layers` directly, so the claim can't go stale as layers are added.
+
+- [#91](https://github.com/OneEyed1366/symbiote-native/pull/91) [`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Scaffolded `ios`/`ios:release` scripts now run `pod install` before `react-native run-ios`, matching `run-android`'s implicit reinstall-everything behavior — a scaffolded app's first `ios` run no longer needs a separate manual `pod install`.
+
 ## 0.2.1
 
 ### Patch Changes

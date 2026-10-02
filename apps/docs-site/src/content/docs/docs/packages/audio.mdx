@@ -1,30 +1,33 @@
 ---
 title: Audio
-description: expo-audio wrapped for every SymbioteNative adapter — AudioPlayer, AudioRecorder, AudioPlaylist, and AudioStream as JSI-backed SharedObject instances.
+description: Play, record, queue and stream audio with players, recorders, playlists and lifecycle hooks on every SymbioteNative adapter.
 ---
 
-import { Aside } from '@astrojs/starlight/components';
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 
-`@symbiote-native/audio` wraps
-[`expo-audio`](https://github.com/expo/expo/tree/main/packages/expo-audio) for every SymbioteNative
-adapter. `AudioPlayer`, `AudioRecorder`, `AudioPlaylist`, and `AudioStream` are JSI-backed
-`SharedObject` instances — per-instance native objects with real state and methods, not one-shot
-functions — so there is no hook/composable/service wrapper here either: every adapter's entry
-point is a plain re-export of the same core, and each app's own lifecycle code decides when to
-create an instance and when to call `.remove()`/`.destroy()`.
+Play a track, record the microphone, queue a playlist or read raw PCM samples, and keep playing
+when the app goes to the background. `@symbiote-native/audio` wraps
+[`expo-audio`](https://github.com/expo/expo/tree/main/packages/expo-audio) so every SymbioteNative
+adapter can reach it, not just React.
+
+`AudioPlayer`, `AudioRecorder`, `AudioPlaylist` and `AudioStream` are JSI-backed native objects
+with real state and methods, not one-shot functions. Every upstream lifecycle hook is ported to
+every adapter (`useAudioPlayer` in React, Vue, Svelte and Solid; `injectAudioPlayer` in Angular),
+so the player is created, replaced and released with the component. The same classes and factory
+functions are also available for use outside a component.
 
 | OS platform | Support |
 | ----------- | ------- |
-| iOS         | ✅ live |
-| Android     | ✅ live |
+| iOS         | live    |
+| Android     | live    |
 
 | Framework adapter | Support |
-| ------------------ | ------- |
-| React              | ✅ live |
-| Vue                | ✅ live |
-| Angular            | ✅ live |
-| Svelte             | ✅ live |
-| Solid              | ✅ live |
+| ----------------- | ------- |
+| React             | live    |
+| Vue               | live    |
+| Angular           | live    |
+| Svelte            | live    |
+| Solid             | live    |
 
 ## Installation
 
@@ -33,34 +36,211 @@ npm install @symbiote-native/audio
 ```
 
 Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --audio` (or
-`add --audio` in an existing app) installs and wires this for you — see
+`add --audio` in an existing app) installs and wires this for you - see
 [`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
 
-`expo-audio` and `expo-modules-core` come along as regular dependencies, pinned to exact versions
-— never install either yourself, and never add the `expo` meta-package to your project.
+`expo-audio` and `expo-modules-core` come along as regular dependencies, pinned to exact versions.
+Never install either yourself, and never add the `expo` meta-package to your project (it bundles
+its own Metro/Babel pipeline, which conflicts with this project's own).
 
 <Aside type="danger" title="Native setup is required before first use">
-  Follow [How to: wire up an Expo native
-  module](/docs/howtos/expo-native-module-setup/) once per app first.
-  `NSMicrophoneUsageDescription` on iOS is wired automatically with a generic
-  default — override by adding the key yourself first. `UIBackgroundModes:
-  audio` is also wired automatically, since background playback defaults to
-  on; without it iOS suspends playback the moment the app backgrounds.
+  `expo-audio`'s native code is discovered by `expo-modules-autolinking`, a different mechanism
+  from the `react-native.config.cjs`/podspec autolinking every other SymbioteNative wrapper uses.
+  Follow [How to: wire up an Expo native module](/docs/howtos/expo-native-module-setup/) once per
+  app first; it covers this package and every other `expo-modules-core` package with zero further
+  native changes.
 </Aside>
 
-<Aside type="caution" title="Android recording permissions are not auto-wired">
-  `RECORD_AUDIO`/`MODIFY_AUDIO_SETTINGS` are out of the linker's
-  manifest-attribute scope — add them to your own `AndroidManifest.xml` if
-  you record audio. Background playback/recording also needs the
-  `AudioControlsService`/`AudioRecordingService` service declarations and
-  `FOREGROUND_SERVICE*` permissions from upstream's own config plugin — copy
-  them by hand.
-</Aside>
+What the package adds to your native projects on install (nothing overwrites a value you set):
+
+| Platform | Added                                                                              | Why                                                           |
+| -------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| iOS      | `NSMicrophoneUsageDescription`                                                     | The microphone prompt when recording. Reword the default text |
+| iOS      | `UIBackgroundModes: audio`                                                         | Without it iOS suspends playback when the app backgrounds     |
+| Android  | `RECORD_AUDIO`, `MODIFY_AUDIO_SETTINGS`                                            | Ship in `expo-audio`'s own manifest and merge automatically   |
+| Android  | `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_MEDIA_PLAYBACK`, `AudioControlsService`  | Background playback, matching upstream's default              |
+
+### Background recording is opt-in
+
+Background recording is a deliberate app choice, as upstream defaults it to off: it adds a
+microphone foreground service and a persistent notification, and costs battery. The `new --audio`
+and `add --audio` commands ask whether to grant it. If you said no, or ran non-interactively, run it
+any time (it is safe to repeat):
+
+```sh
+npx @symbiote-native/cli grant audio
+```
+
+That adds `FOREGROUND_SERVICE_MICROPHONE`, `POST_NOTIFICATIONS` and the `AudioRecordingService`
+to your `AndroidManifest.xml`. You still pass `allowsBackgroundRecording: true` in
+`setAudioModeAsync`.
 
 ## Usage
 
+Set the audio mode once, then create a player with the adapter's binding. It recreates the player
+when the source changes and releases the old one. `useAudioPlayerStatus` subscribes to playback
+updates and returns the current status.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from '@symbiote-native/audio/react';
+
+    void setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: false });
+
+    export default function Track() {
+      const player = useAudioPlayer('https://example.com/track.mp3');
+      const status = useAudioPlayerStatus(player);
+
+      return (
+        <view>
+          <text>{status.currentTime.toFixed(1)} / {status.duration.toFixed(1)}</text>
+          <button
+            title={status.playing ? 'Pause' : 'Play'}
+            onPress={() => (status.playing ? player.pause() : player.play())}
+          />
+        </view>
+      );
+    }
+    ```
+
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import {
+      setAudioModeAsync,
+      useAudioPlayer,
+      useAudioPlayerStatus,
+    } from '@symbiote-native/audio/vue';
+
+    void setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: false });
+
+    const player = useAudioPlayer('https://example.com/track.mp3');
+    const status = useAudioPlayerStatus(() => player.value);
+
+    function onPress() {
+      if (status.value.playing) player.value.pause();
+      else player.value.play();
+    }
+    </script>
+
+    <template>
+      <view>
+        <text>{{ status.currentTime.toFixed(1) }} / {{ status.duration.toFixed(1) }}</text>
+        <button :title="status.playing ? 'Pause' : 'Play'" @press="onPress" />
+      </view>
+    </template>
+    ```
+
+    The source and options accept a plain value, a `Ref` or a getter, and the hook returns a
+    `ComputedRef` of the player.
+
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component } from '@angular/core';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
+    import {
+      injectAudioPlayer,
+      injectAudioPlayerStatus,
+    } from '@symbiote-native/audio/angular';
+
+    @Component({
+      standalone: true,
+      imports: [SYMBIOTE_ELEMENTS],
+      template: `
+        <view>
+          <text>{{ status().currentTime.toFixed(1) }} / {{ status().duration.toFixed(1) }}</text>
+          <button [title]="status().playing ? 'Pause' : 'Play'" (press)="onPress()" />
+        </view>
+      `,
+    })
+    export class Track {
+      readonly player = injectAudioPlayer(() => 'https://example.com/track.mp3');
+      readonly status = injectAudioPlayerStatus(() => this.player());
+
+      onPress(): void {
+        if (this.status().playing) this.player().pause();
+        else this.player().play();
+      }
+    }
+    ```
+
+    Call the `inject*` functions in a field initializer (an injection context). They take
+    functions that read signals, and return signals.
+
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import {
+        setAudioModeAsync,
+        useAudioPlayer,
+        useAudioPlayerStatus,
+      } from '@symbiote-native/audio/svelte';
+
+      void setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: false });
+
+      const player = useAudioPlayer(() => 'https://example.com/track.mp3');
+      const status = useAudioPlayerStatus(() => player.current);
+      const current = $derived(status.current);
+    </script>
+
+    <view>
+      <text>{current.currentTime.toFixed(1)} / {current.duration.toFixed(1)}</text>
+      <button
+        title={current.playing ? 'Pause' : 'Play'}
+        onPress={() => (current.playing ? player.current.pause() : player.current.play())}
+      />
+    </view>
+    ```
+
+    Svelte hooks take getters and return `{ current }` objects.
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import {
+      setAudioModeAsync,
+      useAudioPlayer,
+      useAudioPlayerStatus,
+    } from '@symbiote-native/audio/solid';
+
+    void setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: false });
+
+    export function Track() {
+      const player = useAudioPlayer(() => 'https://example.com/track.mp3');
+      const status = useAudioPlayerStatus(player);
+
+      return (
+        <view>
+          <text>{status().currentTime.toFixed(1)} / {status().duration.toFixed(1)}</text>
+          <button
+            title={status().playing ? 'Pause' : 'Play'}
+            onPress={() => (status().playing ? player().pause() : player().play())}
+          />
+        </view>
+      );
+    }
+    ```
+
+    Solid hooks take accessors and return accessors: call them (`player()`, `status()`).
+
+  </TabItem>
+</Tabs>
+
+### Outside a component
+
+Use the factories when the player outlives a component. You own the cleanup: call `remove()` when
+you are done, or the native player leaks.
+
 ```ts
-import { createAudioPlayer, PLAYBACK_STATUS_UPDATE, setAudioModeAsync } from '@symbiote-native/audio';
+import {
+  createAudioPlayer,
+  PLAYBACK_STATUS_UPDATE,
+  setAudioModeAsync,
+} from '@symbiote-native/audio';
 
 await setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: false });
 
@@ -71,12 +251,12 @@ const subscription = player.addListener(PLAYBACK_STATUS_UPDATE, status => {
   console.log(status.currentTime, status.duration, status.playing);
 });
 
-// later, e.g. on unmount:
+// later:
 subscription.remove();
 player.remove();
 ```
 
-Recording:
+### Record the microphone
 
 ```ts
 import {
@@ -93,89 +273,140 @@ const recorder = new AudioRecorder(RecordingPresets.HIGH_QUALITY);
 await recorder.prepareToRecordAsync();
 recorder.record();
 recorder.addListener(RECORDING_STATUS_UPDATE, status => console.log(status));
-// … later
+
+// later:
 await recorder.stop();
+console.log(recorder.uri);
 ```
 
-Playlist and real-time PCM streaming follow the same `create*` + `addListener` shape:
-`createAudioPlaylist({ sources: [...], loop: 'all' })` and `createAudioStream()`. Subscribe to the
-stream with `stream.addListener(AUDIO_STREAM_BUFFER, ...)` after `stream.start()`.
+Inside a component, `useAudioRecorder(options, statusListener?)` creates and releases the recorder
+for you, and `useAudioRecorderState(recorder, interval?)` polls its state.
 
-Identical import surface on every adapter — `@symbiote-native/audio/react`, `/vue`, `/svelte`,
-`/solid`, `/angular` all re-export the same classes and functions.
+### Playlists and PCM streams
+
+```ts
+const playlist = createAudioPlaylist({ sources: ['a.mp3', 'b.mp3'], loop: 'all' });
+
+const stream = createAudioStream({ sampleRate: 16000, channels: 1 });
+stream.addListener(AUDIO_STREAM_BUFFER, buffer => console.log(buffer));
+await stream.start();
+```
 
 ## API
 
-```ts
-class AudioPlayer extends SharedObject {
-  id: string; playing: boolean; muted: boolean; loop: boolean; paused: boolean; isLoaded: boolean;
-  isAudioSamplingSupported: boolean; isBuffering: boolean; currentTime: number; duration: number;
-  volume: number; playbackRate: number; shouldCorrectPitch: boolean; currentStatus: IAudioStatus;
-  play(): void; pause(): void; replace(source: IAudioSource): void;
-  seekTo(seconds, toleranceMillisBefore?, toleranceMillisAfter?): Promise<void>;
-  setPlaybackRate(rate, pitchCorrectionQuality?): void;
-  setAudioSamplingEnabled(enabled: boolean): void;
-  setActiveForLockScreen(active, metadata?, options?): void;
-  updateLockScreenMetadata(metadata: IAudioMetadata): void;
-  clearLockScreenControls(): void;
-  remove(): void;
-}
-createAudioPlayer(source?: IAudioSource, options?: IAudioPlayerOptions): AudioPlayer
+### Classes and factories
 
-class AudioRecorder extends SharedObject {
-  id: string; currentTime: number; isRecording: boolean; uri: string | null;
-  record(options?): void; stop(): Promise<void>; pause(): void;
-  getAvailableInputs(): IRecordingInput[]; getCurrentInput(): Promise<IRecordingInput>;
-  setInput(inputUid: string): void; getStatus(): IRecorderState;
-  prepareToRecordAsync(options?): Promise<void>;
-}
+| Signature                                                  | Description                                                                              |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `createAudioPlayer(source?, options?): AudioPlayer`        | Creates a player. Call `remove()` when done                                              |
+| `new AudioRecorder(options)` / `AudioRecorder`             | Records the microphone. `prepareToRecordAsync()`, `record()`, `pause()`, `stop()`        |
+| `createAudioPlaylist(options?): AudioPlaylist`             | Creates a queue with `next`, `previous`, `skipTo`, `add`, `insert`, `remove`, `clear`, `loop` |
+| `createAudioStream(options?): AudioStream`                 | Creates a real-time PCM stream. `start()` then listen for buffers; `stop()`              |
 
-class AudioPlaylist extends SharedObject {
-  id: string; readonly currentIndex: number; readonly trackCount: number;
-  readonly sources: IAudioSourceInfo[]; playing: boolean; muted: boolean; isLoaded: boolean;
-  isBuffering: boolean; currentTime: number; duration: number; volume: number; playbackRate: number;
-  loop: IAudioPlaylistLoopMode; currentStatus: IAudioPlaylistStatus;
-  play(): void; pause(): void; next(): void; previous(): void; skipTo(index: number): void;
-  seekTo(seconds: number): Promise<void>; add(source: IAudioSource): void;
-  insert(source: IAudioSource, index: number): void; remove(index: number): void;
-  clear(): void; destroy(): void;
-}
-createAudioPlaylist(options?: IAudioPlaylistOptions): AudioPlaylist
+### `AudioPlayer` essentials
 
-class AudioStream extends SharedObject {
-  id: string; readonly sampleRate: number; readonly channels: number; readonly isStreaming: boolean;
-  start(): Promise<void>; stop(): void;
-}
-createAudioStream(options?: IAudioStreamOptions): AudioStream
+| Member                                       | Description                                                                   |
+| -------------------------------------------- | ----------------------------------------------------------------------------- |
+| `play()`, `pause()`                          | Start and pause playback                                                      |
+| `seekTo(seconds, before?, after?)`           | Jump to a position, with optional tolerance in milliseconds                   |
+| `replace(source)`                            | Swap the audio source                                                         |
+| `volume`, `muted`, `loop`, `playbackRate`    | Read and write playback settings                                              |
+| `setPlaybackRate(rate, quality?)`            | Set speed, optionally with a pitch-correction quality                         |
+| `currentTime`, `duration`, `playing`, `isLoaded`, `isBuffering` | Current state                                              |
+| `setActiveForLockScreen(active, metadata?, options?)` | Show lock-screen and notification controls                           |
+| `updateLockScreenMetadata(metadata)`         | Update the title, artist or artwork shown there                               |
+| `clearLockScreenControls()`                  | Remove the lock-screen controls                                               |
+| `remove()`                                   | Release the native player                                                     |
 
-setIsAudioActiveAsync(active: boolean): Promise<void>
-setAudioModeAsync(mode: Partial<IAudioMode>): Promise<void>
-requestRecordingPermissionsAsync(): Promise<PermissionResponse>
-requestNotificationPermissionsAsync(): Promise<PermissionResponse>  // android only, throws elsewhere
-getRecordingPermissionsAsync(): Promise<PermissionResponse>
-preload(source: IAudioSource, options?: IPreloadOptions): Promise<void>
-clearPreloadedSource(source: IAudioSource): Promise<void>
-clearAllPreloadedSources(): Promise<void>
-getPreloadedSources(): Promise<string[]>
+### Module functions
 
-RecordingPresets: { HIGH_QUALITY: IRecordingOptions; LOW_QUALITY: IRecordingOptions }
-IOSOutputFormat, AudioQuality  // enums
+| Signature                                          | Description                                                                   |
+| -------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `setAudioModeAsync(mode)`                          | Configure silent mode, background playback, interruption and mixing behavior  |
+| `setIsAudioActiveAsync(active)`                    | Activate or deactivate the audio session                                      |
+| `requestRecordingPermissionsAsync()`               | Prompt for the microphone permission                                          |
+| `getRecordingPermissionsAsync()`                   | Read the microphone permission without prompting                              |
+| `requestNotificationPermissionsAsync()`            | Android only. Prompt for notifications; throws on iOS                         |
+| `preload(source, options?)`                        | Buffer a source before it is played                                           |
+| `clearPreloadedSource(source)`                     | Drop one preloaded source                                                     |
+| `clearAllPreloadedSources()`                       | Drop every preloaded source                                                   |
+| `getPreloadedSources()`                            | List the preloaded source URIs                                                |
+| `RecordingPresets`                                 | `HIGH_QUALITY` and `LOW_QUALITY` option sets for `AudioRecorder`              |
 
-PLAYBACK_STATUS_UPDATE, AUDIO_SAMPLE_UPDATE, RECORDING_STATUS_UPDATE, PLAYLIST_STATUS_UPDATE,
-TRACK_CHANGED, AUDIO_STREAM_BUFFER, AUDIO_STREAM_STATUS  // event names for .addListener()
-```
+The event names for `addListener` are exported as constants: `PLAYBACK_STATUS_UPDATE`,
+`AUDIO_SAMPLE_UPDATE`, `RECORDING_STATUS_UPDATE`, `PLAYLIST_STATUS_UPDATE`, `TRACK_CHANGED`,
+`AUDIO_STREAM_BUFFER` and `AUDIO_STREAM_STATUS`.
 
-Plus the full `I`-prefixed type surface for sources, status, and options.
+`IAudioSource` accepts a URI string, a `require('./song.mp3')` module id, an
+[`@symbiote-native/asset`](/docs/packages/asset/) `Asset`, or an object with `uri` or `assetId`
+plus optional `headers` and `name`.
 
-## What's not ported
+### Lifecycle hooks
 
-- **No `useAudioPlayer`/`useAudioRecorder`/etc. React hooks.** `createAudioPlayer`/
-  `createAudioPlaylist`/`createAudioStream` are the framework-agnostic factories every hook would
-  wrap — build your own lifecycle wrapper around them for your framework of choice.
-- **The `Asset`-instance form of `AudioSource`, and the `downloadFirst` player option.** These need
-  `expo-asset`, which this project never depends on. The plain `number` form
-  (`require('./song.mp3')`) is supported — it resolves through React Native's own generic asset
-  resolution, no `expo-asset` needed.
-- **`interruptionModeAndroid`** — upstream marks it deprecated in favor of the cross-platform
-  `interruptionMode`.
-- **Web-only surfaces** — this project targets iOS + Android only.
+Every hook is available on all five adapters (Angular names each `injectX`).
+
+| Hook                                           | Description                                                                  |
+| ---------------------------------------------- | ---------------------------------------------------------------------------- |
+| `useAudioPlayer(source?, options?)`            | Creates a player, recreates it when source or options change, releases it    |
+| `useAudioPlayerStatus(player)`                 | Subscribes to playback updates and returns the current status                |
+| `useAudioSampleListener(player, listener)`     | Enables sampling and calls `listener` with each audio sample                 |
+| `useAudioPlaylist(options?)`                   | Same lifecycle as `useAudioPlayer`, for a playlist                           |
+| `useAudioPlaylistStatus(playlist)`             | Subscribes to playlist updates and returns the current status                |
+| `useAudioRecorder(options, statusListener?)`   | Creates and releases a recorder, with an optional status subscription        |
+| `useAudioRecorderState(recorder, interval?)`   | Polls the recorder state and updates only on a meaningful change             |
+| `useAudioStream(options)`                      | Creates a stream keyed on sample rate, channels and encoding, and subscribes |
+
+## Notes
+
+- **Silent mode on iOS.** Call `setAudioModeAsync({ playsInSilentMode: true })` or playback is
+  muted by the ring/silent switch.
+- **Release what you create by hand.** `createAudioPlayer` and the other factories leave cleanup to
+  you; the hooks do it automatically. A forgotten `remove()` leaks the native player.
+- **Android background playback needs lock-screen controls.** Without `setActiveForLockScreen`,
+  Android stops background audio after about three minutes (an OS limit). iOS continues once
+  `shouldPlayInBackground: true` is set.
+- **Audio stops when headphones disconnect.** That is upstream behavior on both platforms.
+- **`interruptionModeAndroid` is not ported.** Upstream deprecated it in favor of the
+  cross-platform `interruptionMode`.
+- **Web is not ported.** This project targets iOS and Android only.
+- **Playback and recording can only be verified on a device.** The headless tests fake the native
+  classes, so they prove the JS shims and the hook lifecycle.
+
+## Common questions
+
+**Playback is silent on iPhone.** Call `setAudioModeAsync({ playsInSilentMode: true })`, or the
+ring/silent switch mutes it.
+
+**Audio stops when the app goes to the background.** Set `shouldPlayInBackground: true` in
+`setAudioModeAsync`. The package already adds the iOS audio background mode and the Android
+playback service. On Android, also call `setActiveForLockScreen`, or the OS stops background audio
+after about three minutes.
+
+**Recording fails with a permission error.** Ask first with `requestRecordingPermissionsAsync()`
+and check `granted`. Background recording is a separate opt-in (`npx @symbiote-native/cli grant
+audio`).
+
+**How do I change the track without recreating the player?** Call `player.replace(source)`. With
+`useAudioPlayer`, a changed source recreates the player and releases the old one for you.
+
+**My app leaks audio players.** A player made with `createAudioPlayer` must be released with
+`remove()`. The hooks do it automatically.
+
+**How do I show progress?** Use `useAudioPlayerStatus(player)` (or `injectAudioPlayerStatus`) for
+`currentTime`, `duration` and `playing`.
+
+**Audio stopped when I unplugged headphones.** That is upstream behavior on both platforms.
+
+Sources: [Expo docs: Audio (expo-audio)](https://docs.expo.dev/versions/latest/sdk/audio/),
+[expo/expo#24484 iOS audio not continuing playback in the background](https://github.com/expo/expo/issues/24484),
+[expo/expo#43086 no way to route audio to the speaker on iOS](https://github.com/expo/expo/issues/43086).
+
+## How the wrapper works
+
+`expo-audio`'s JS is hand-ported into this package's `core/`: thin subclasses of the native
+`SharedObject` classes plus the factories, module functions and presets, resolving the native
+module through `expo-modules-core` rather than the `expo` meta-package. The recreate-and-release and
+event-subscription logic lives once in `core/` (for example `audio-player-controller.ts`); each
+adapter supplies only its own lifecycle primitive. The native code is never vendored:
+`expo-modules-autolinking` resolves it from `node_modules` (see
+[the native setup guide](/docs/howtos/expo-native-module-setup/)).

@@ -1,0 +1,357 @@
+---
+title: Auth session
+description: Sign users in with OAuth2 and OpenID Connect (PKCE) over a browser tab, with Google and Facebook helpers, on every SymbioteNative adapter.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+Add "Sign in with ..." to your app through your identity provider's web page: the app opens a
+browser tab, the user signs in, the provider redirects back with a code, and you exchange it for a
+token. `@symbiote-native/auth-session` ports
+[`expo-auth-session`](https://github.com/expo/expo/tree/main/packages/expo-auth-session) (a
+PKCE-based OAuth2 and OpenID Connect flow) to every SymbioteNative adapter, not just React, with
+the lifecycle hooks in each framework's own idiom.
+
+Unlike most Expo packages, `expo-auth-session` ships **no native code**: it is a pure-JS flow built
+on other Expo JS APIs. So this package ports its logic and depends on the packages that already
+cover its building blocks: [`@symbiote-native/web-browser`](/docs/packages/web-browser/) for the
+authorization tab, [`@symbiote-native/crypto`](/docs/packages/crypto/) for PKCE, and
+[`@symbiote-native/application`](/docs/packages/application/) for the default redirect scheme.
+There is no `expo-modules-core` dependency and no `native-link.json`.
+
+<Aside type="tip" title="Prefer your provider's own SDK when it has one">
+  `AuthSession` is a general-purpose OAuth and OpenID Connect client. Where your identity provider
+  ships a native SDK, that SDK handles provider-specific details better. Use this package for a
+  standards-based provider or when no SDK fits.
+</Aside>
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | live    |
+| Android     | live    |
+
+| Framework adapter | Support |
+| ----------------- | ------- |
+| React             | live    |
+| Vue               | live    |
+| Angular           | live    |
+| Svelte            | live    |
+| Solid             | live    |
+
+## Installation
+
+```sh
+npm install @symbiote-native/auth-session
+```
+
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --auth-session` (or
+`add --auth-session` in an existing app) installs and wires this for you - see
+[`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
+
+It pulls in `@symbiote-native/web-browser`, `@symbiote-native/crypto` and
+`@symbiote-native/application` as regular dependencies. Those packages' native autolinking wiring
+still applies: follow [How to: wire up an Expo native
+module](/docs/howtos/expo-native-module-setup/) once per app if you have not.
+
+### Register a URL scheme for the redirect
+
+The provider redirects back into your app through a custom URL scheme, so the app has to own one
+(for example `myapp://`). Register it in your iOS and Android projects, then rebuild. Without a
+scheme the sign-in still completes, but the result cannot get back to your app and the user has to
+close the browser tab by hand, which reads as a cancelled event. See the
+[navigation linking guide](/docs/navigation/linking/) and the login-flow section of
+[Web browser](/docs/packages/web-browser/).
+
+Allow-list the same redirect URI at your provider. That list is what stops another app from posing
+as yours.
+
+## Usage
+
+The hooks load the discovery document, build the request, and give you a `promptAsync` function.
+Each returns `[request, result, promptAsync]`, with `request` and `result` in the adapter's own
+reactive box: values in React, a `ShallowRef` in Vue, an accessor in Solid, `{ current }` in Svelte,
+a `Signal` in Angular. Arguments are plain values or refs in Vue and getters in Solid, Svelte and
+Angular.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import {
+      makeRedirectUri,
+      useAuthRequest,
+      useAutoDiscovery,
+    } from '@symbiote-native/auth-session/react';
+
+    export default function SignIn() {
+      const discovery = useAutoDiscovery('https://accounts.example.com');
+      const [request, result, promptAsync] = useAuthRequest(
+        {
+          clientId: 'my-client-id',
+          redirectUri: makeRedirectUri({ scheme: 'myapp' }),
+          scopes: ['openid', 'profile'],
+        },
+        discovery,
+      );
+
+      return (
+        <view>
+          <text>{result?.type ?? 'idle'}</text>
+          <button title="Sign in" disabled={!request} onPress={() => promptAsync()} />
+        </view>
+      );
+    }
+    ```
+
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import {
+      makeRedirectUri,
+      useAuthRequest,
+      useAutoDiscovery,
+    } from '@symbiote-native/auth-session/vue';
+
+    const discovery = useAutoDiscovery('https://accounts.example.com');
+    const [request, result, promptAsync] = useAuthRequest(
+      {
+        clientId: 'my-client-id',
+        redirectUri: makeRedirectUri({ scheme: 'myapp' }),
+        scopes: ['openid', 'profile'],
+      },
+      discovery,
+    );
+    </script>
+
+    <template>
+      <view>
+        <text>{{ result?.type ?? 'idle' }}</text>
+        <button title="Sign in" :disabled="!request" @press="promptAsync()" />
+      </view>
+    </template>
+    ```
+
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component } from '@angular/core';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
+    import {
+      injectAuthRequest,
+      injectAutoDiscovery,
+      makeRedirectUri,
+    } from '@symbiote-native/auth-session/angular';
+
+    @Component({
+      standalone: true,
+      imports: [SYMBIOTE_ELEMENTS],
+      template: `
+        <view>
+          <text>{{ result()?.type ?? 'idle' }}</text>
+          <button title="Sign in" [disabled]="!request()" (press)="promptAsync()" />
+        </view>
+      `,
+    })
+    export class SignIn {
+      private readonly discovery = injectAutoDiscovery(() => 'https://accounts.example.com');
+      private readonly hook = injectAuthRequest(
+        () => ({
+          clientId: 'my-client-id',
+          redirectUri: makeRedirectUri({ scheme: 'myapp' }),
+          scopes: ['openid', 'profile'],
+        }),
+        () => this.discovery(),
+      );
+
+      readonly request = this.hook[0];
+      readonly result = this.hook[1];
+      readonly promptAsync = this.hook[2];
+    }
+    ```
+
+    Call the `inject*` functions in a field initializer (an injection context). They take
+    functions that read signals, and return signals.
+
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import {
+        makeRedirectUri,
+        useAuthRequest,
+        useAutoDiscovery,
+      } from '@symbiote-native/auth-session/svelte';
+
+      const discovery = useAutoDiscovery(() => 'https://accounts.example.com');
+      const [request, result, promptAsync] = useAuthRequest(
+        () => ({
+          clientId: 'my-client-id',
+          redirectUri: makeRedirectUri({ scheme: 'myapp' }),
+          scopes: ['openid', 'profile'],
+        }),
+        () => discovery.current,
+      );
+    </script>
+
+    <view>
+      <text>{result.current?.type ?? 'idle'}</text>
+      <button title="Sign in" disabled={!request.current} onPress={() => promptAsync()} />
+    </view>
+    ```
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import {
+      makeRedirectUri,
+      useAuthRequest,
+      useAutoDiscovery,
+    } from '@symbiote-native/auth-session/solid';
+
+    export function SignIn() {
+      const discovery = useAutoDiscovery(() => 'https://accounts.example.com');
+      const [request, result, promptAsync] = useAuthRequest(
+        () => ({
+          clientId: 'my-client-id',
+          redirectUri: makeRedirectUri({ scheme: 'myapp' }),
+          scopes: ['openid', 'profile'],
+        }),
+        discovery,
+      );
+
+      return (
+        <view>
+          <text>{result()?.type ?? 'idle'}</text>
+          <button title="Sign in" disabled={!request()} onPress={() => promptAsync()} />
+        </view>
+      );
+    }
+    ```
+
+    Call the accessors: `request()`, `result()`.
+
+  </TabItem>
+</Tabs>
+
+When `result.type` is `'success'`, exchange `result.params.code` for a token (see below).
+
+### Without a hook: the plain classes
+
+The same flow, step by step, works anywhere:
+
+```ts
+import { AuthRequest, exchangeCodeAsync, makeRedirectUri } from '@symbiote-native/auth-session';
+
+const discovery = {
+  authorizationEndpoint: 'https://example.com/oauth/authorize',
+  tokenEndpoint: 'https://example.com/oauth/token',
+};
+
+const request = new AuthRequest({
+  clientId: 'my-client-id',
+  redirectUri: makeRedirectUri({ scheme: 'myapp' }),
+  scopes: ['openid', 'profile'],
+});
+
+const result = await request.promptAsync(discovery);
+if (result.type === 'success') {
+  const token = await exchangeCodeAsync(
+    { clientId: 'my-client-id', code: result.params.code, redirectUri: request.redirectUri },
+    discovery,
+  );
+}
+```
+
+### Google and Facebook
+
+`useGoogleAuthRequest`, `useGoogleIdTokenAuthRequest` and `useFacebookAuthRequest` (and the
+`inject*` forms on Angular) preconfigure the endpoints for those providers. The Google hook
+exchanges the code for a token itself when the code flow is used; the id token is then in
+`result.params.id_token`. Off the web, `useGoogleIdTokenAuthRequest` follows the default code flow,
+as upstream does.
+
+## API
+
+### Hooks
+
+| Hook (React, Vue, Solid, Svelte)                          | Angular                       | Description                                                                     |
+| --------------------------------------------------------- | ----------------------------- | ------------------------------------------------------------------------------- |
+| `useAutoDiscovery(issuer)`                                | `injectAutoDiscovery`         | Fetches the provider's discovery document from its issuer URL                   |
+| `useLoadedAuthRequest(config, discovery, RequestClass)`   | `injectLoadedAuthRequest`     | Builds a request object once the discovery document has loaded                  |
+| `useAuthRequestResult(request, discovery, options?)`      | `injectAuthRequestResult`     | Provides `promptAsync` and the latest result for a request                      |
+| `useAuthRequest(config, discovery)`                       | `injectAuthRequest`           | The combined form: `[request, result, promptAsync]`                             |
+| `useGoogleAuthRequest` / `useGoogleIdTokenAuthRequest`    | `injectGoogleAuthRequest` / `injectGoogleIdTokenAuthRequest` | Google code flow and id-token flow          |
+| `useFacebookAuthRequest`                                  | `injectFacebookAuthRequest`   | Facebook sign-in                                                                |
+
+### Core exports
+
+| Signature                                            | Description                                                                              |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `makeRedirectUri(options?): string`                  | Builds the redirect URI. Pass `native` (a full URI, used off the web) or `scheme`. Throws if neither is given |
+| `AuthRequest`                                        | A PKCE authorization request. `promptAsync(discovery)` opens the tab and resolves the result; `makeAuthUrlAsync(discovery)` builds the URL; `parseReturnUrl(url)` parses a redirect; `redirectUri` holds the redirect |
+| `exchangeCodeAsync(config, discovery)`               | Exchanges an authorization code for tokens                                               |
+| `refreshAsync(config, discovery)`                    | Exchanges a refresh token for new tokens                                                 |
+| `revokeAsync(config, discovery)`                     | Revokes a token                                                                          |
+| `fetchUserInfoAsync(config, discovery)`              | Fetches the user info from the provider's userinfo endpoint                              |
+| `TokenResponse`                                      | The parsed token response, with `TokenResponse.isTokenFresh(token)` and `token.shouldRefresh()` |
+| `AccessTokenRequest`, `RefreshTokenRequest`, `RevokeTokenRequest` | The token endpoint request classes behind the functions above              |
+| `fetchDiscoveryAsync(issuer)`, `resolveDiscoveryAsync(issuerOrDiscovery)` | Fetch a discovery document, or resolve an issuer-or-document value   |
+| `loadAsync(config, issuerOrDiscovery)`               | Loads an `AuthRequest` for a config and an issuer or discovery document                 |
+| `dismiss()`                                          | Closes the browser tab                                                                   |
+| `AuthError`, `ResponseError`, `TokenError`           | Error classes for authorization, response and token failures                             |
+| `ResponseType`, `Prompt`, `CodeChallengeMethod`, `GrantType`, `TokenTypeHint` | Enums for request and token options                                    |
+
+### `makeRedirectUri` options
+
+| Option            | Type                      | Description                                                                |
+| ----------------- | ------------------------- | -------------------------------------------------------------------------- |
+| `native`          | `string \| undefined`     | A full redirect URI, used as-is on non-web platforms. Use it for production builds |
+| `scheme`          | `string \| undefined`     | The URL scheme to build the URI from, such as `myapp`                      |
+| `path`            | `string \| undefined`     | A path appended after the scheme                                           |
+| `queryParams`     | `Record<string, string>`  | Query parameters added to the URI. Values that are `null` are left out     |
+| `isTripleSlashed` | `boolean \| undefined`    | Use `scheme:///path` instead of `scheme://path`                            |
+| `preferLocalhost` | `boolean \| undefined`    | Replace an IPv4 address host with `localhost`                              |
+
+## Notes
+
+- **`makeRedirectUri` never reads an app manifest.** Upstream infers a scheme from the Expo
+  manifest; this project has no manifest. Pass `native` or `scheme`, or it throws rather than
+  guessing.
+- **Never put secret keys in app code.** A client secret in a mobile app is not secret. Keep it on
+  your server, and expose an endpoint that makes the call for the client. PKCE exists so a public
+  client needs no secret.
+- **Filter `AuthSession` redirects out of your own link handlers.** An auth redirect is one more
+  deep link. Ignore URLs your own `Linking` handler or router sees that belong to the auth flow,
+  for example by putting a recognizable marker in your own `redirectUri`.
+- **The Expo Go and `auth.expo.io` proxy flow is not ported.** It rests on `expo-constants`'
+  app-manifest concept, which this bare, Metro-only project does not have.
+- **Upstream's `Request` base class is named `BaseRequest` internally.** This avoids shadowing the
+  global `Request` type used by `fetch`.
+- **Sign-in can only be verified on a device or simulator against a real provider.** The headless
+  tests cover the request, token, discovery, base64 and query-string logic.
+
+## Common questions
+
+- **Which redirect URI do I register with the provider?** Print `makeRedirectUri({ scheme })`. In a
+  development build it is `my-scheme://redirect`; Expo Go uses `exp://...`. Register exactly that string.
+- **Can I omit the scheme?** No. Upstream auto-detects it from `Constants.expoConfig`, which
+  `@symbiote-native/constants` does not provide, so always pass `scheme` explicitly.
+- **`request` is `null` and the button does nothing.** `useAuthRequest` loads the request
+  asynchronously; disable the button until `request` is set.
+- **PKCE?** On by default (`usePKCE`). Pass `request.codeVerifier` as `extraParams` when you
+  exchange the code for tokens.
+- **Redirect not returning to the app on iOS.** See the Spotify report in the sources and check the
+  scheme is registered in the native project.
+
+Sources: [Expo docs: AuthSession](https://docs.expo.dev/versions/latest/sdk/auth-session/),
+[Expo guide: authentication](https://docs.expo.dev/guides/authentication/),
+[expo/expo#10514](https://github.com/expo/expo/issues/10514),
+[Auth0 PKCE with AuthSession](https://jamesirish.io/blog/auth0-pkce-flow-using-expo-authsession).
+
+## How the wrapper works
+
+The upstream request, token and discovery logic is hand-ported into this package's `core/`
+(`AuthRequest`, the `TokenRequest` family, PKCE, base64, query params, the Google and Facebook
+providers, and the hook controllers shared through `createAuthRequestHooks`). Each adapter supplies
+only its lifecycle bindings for the hooks. Native pieces come from the packages it depends on, so
+there is nothing to autolink for this package itself.

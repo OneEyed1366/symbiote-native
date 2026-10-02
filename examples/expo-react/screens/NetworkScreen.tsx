@@ -6,6 +6,7 @@ import {
 } from '@symbiote-native/network';
 import { useNetworkState } from '@symbiote-native/network/react';
 import { ROUTE_NAME } from '../routes';
+import { Scenario } from '../components/Scenario';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
 function networkTypeLabel(type: NetworkStateType | undefined): string {
@@ -32,12 +33,6 @@ function networkTypeLabel(type: NetworkStateType | undefined): string {
   }
 }
 
-/**
- * @symbiote-native/network canary demo: a live network-state card driven by useNetworkState()
- * (seeded via getNetworkStateAsync(), refreshed by addNetworkStateListener()) plus a one-shot
- * card for the IP address and airplane-mode check. Toggle Wi-Fi/airplane mode on the device to
- * see the live card update on its own.
- */
 export function NetworkScreen() {
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Network];
   const lineColor = LINE_COLOR[lineInfo.line];
@@ -78,14 +73,20 @@ export function NetworkScreen() {
           <view className="hero-copy">
             <text className="hero-title">Network</text>
             <text className="hero-body">
-              @symbiote-native/network — live network state via
-              useNetworkState(), plus the device's IP address and airplane-mode
-              check. Toggle Wi-Fi or airplane mode on the device to see the live
-              card update on its own.
+              React to connectivity: the connection type, whether the internet
+              is reachable, the device IP address and airplane mode, updating
+              live as the network changes.
             </text>
           </view>
         </view>
 
+        <Scenario
+          testID="network-scenario"
+          title="Show an offline banner and queue work until the network is back"
+          why="Tell users when they are offline instead of letting requests fail silently, and retry uploads when the connection returns. Connected does not always mean the internet is reachable."
+          steps={['Turn Wi-Fi off, then airplane mode on', 'Watch the live card', 'Turn everything back on']}
+          expect="Type, connected and internet reachable change within a moment each time, and airplane mode reads Yes while it is on."
+        />
         <view testID="network-live-card" className="feature-card">
           <view className="feature-card-header">
             <text className="feature-card-title">Live network state</text>

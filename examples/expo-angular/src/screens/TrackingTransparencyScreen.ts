@@ -1,24 +1,21 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
 import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import {
-  PermissionsService,
+  TrackingPermissionsService,
   getAdvertisingId,
 } from '@symbiote-native/tracking-transparency/angular';
 import { ActionButton } from '../components/ActionButton';
+import { Scenario } from '../components/Scenario';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
+import { ValueRow } from './ValueRow';
 
-/**
- * @symbiote-native/tracking-transparency canary demo: a permission card driven by
- * PermissionsService (connect() auto-fetches once; get()/request() are imperative one-shot
- * methods), plus the synchronous getAdvertisingId() — null on the iOS Simulator, before
- * authorization, or when the user declined. Angular twin of
- * ../../react/screens/TrackingTransparencyScreen.tsx.
- */
+const PENDING_LABEL = 'checking…';
+
 @Component({
   selector: 'TrackingTransparencyScreen',
   standalone: true,
-  imports: [ActionButton, SYMBIOTE_ELEMENTS],
+  imports: [ActionButton, Scenario, SYMBIOTE_ELEMENTS, ValueRow],
   template: `
     <safe-area-view class="screen">
       <scroll-view
@@ -26,107 +23,98 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <view [class]="lineTagClass">
-          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        <view [class]="'line-tag line-tag-' + lineInfo.line">
+          <text class="line-tag-text"
+            >{{ lineInfo.code }} · {{ lineInfo.label }}</text
+          >
         </view>
         <view class="hero-card">
-          <view class="hero-badge" [style]="heroBadgeStyle">
-            <text class="hero-badge-text">{{ heroBadgeCode }}</text>
+          <view class="hero-badge" [style]="badgeStyle">
+            <text class="hero-badge-text">{{ lineInfo.code }}</text>
           </view>
           <view class="hero-copy">
             <text class="hero-title">Tracking Transparency</text>
             <text class="hero-body">
-              @symbiote-native/tracking-transparency — App Tracking Transparency
-              permission (iOS-only; Android/web always resolve granted) plus the
-              advertising ID.
+              Ask permission to track the user across apps before you use the
+              advertising id. iOS shows the App Tracking Transparency prompt,
+              Android always reports granted.
             </text>
           </view>
         </view>
 
+        <Scenario
+          testID="tracking-transparency-scenario"
+          title="Ask before using the advertising id"
+          why="Apple requires the tracking prompt before an app reads the advertising id for ads or attribution. Without consent the id is empty, so the app must work either way."
+          [steps]="scenarioSteps"
+          expect="The status changes to granted or denied after your answer. The id shows a value only after consent on a real iOS device and is null elsewhere."
+        />
+
         <view
           testID="tracking-transparency-permission-card"
-          class="capability-card"
+          class="feature-card"
         >
-          <text class="capability-card-title">Permission</text>
-          <view class="capability-row">
-            <text class="capability-label">Status</text>
-            <text testID="tracking-transparency-status" class="value-text">{{
-              statusLabel()
-            }}</text>
+          <view class="feature-card-header">
+            <text class="feature-card-title">Permission</text>
           </view>
-          <view class="capability-row">
-            <text class="capability-label">Granted</text>
-            <text testID="tracking-transparency-granted" class="value-text">{{
-              grantedLabel()
-            }}</text>
-          </view>
-          <view class="button-row">
-            <ActionButton
-              testID="tracking-transparency-get-button"
-              title="Get"
-              [color]="lineColor"
-              (press)="handleGet()"
-            ></ActionButton>
-            <ActionButton
-              testID="tracking-transparency-request-button"
-              title="Request"
-              [color]="lineColor"
-              (press)="handleRequest()"
-            ></ActionButton>
-          </view>
+          <ValueRow label="Status" [value]="statusText()" />
+          <ValueRow label="Granted" [value]="grantedText()" />
+          <ActionButton
+            testID="tracking-transparency-get-button"
+            title="Get"
+            [color]="lineColor"
+            (press)="getPermission()"
+          />
+          <ActionButton
+            testID="tracking-transparency-request-button"
+            title="Request"
+            [color]="lineColor"
+            (press)="requestPermission()"
+          />
         </view>
 
         <view
           testID="tracking-transparency-advertising-id-card"
-          class="capability-card"
+          class="feature-card"
         >
-          <text class="capability-card-title">Advertising ID</text>
-          <view class="capability-row">
-            <text class="capability-label">getAdvertisingId()</text>
-            <text
-              testID="tracking-transparency-advertising-id"
-              class="value-text"
-              >{{ advertisingIdLabel() }}</text
-            >
+          <view class="feature-card-header">
+            <text class="feature-card-title">Advertising ID</text>
           </view>
+          <ValueRow label="Advertising ID" [value]="advertisingId ?? 'null'" />
         </view>
       </scroll-view>
     </safe-area-view>
   `,
 })
 export class TrackingTransparencyScreen {
-  private readonly lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.TrackingTransparency];
-  readonly lineTagClass = `line-tag line-tag-${this.lineInfo.line}`;
-  readonly lineTagLabel = `${this.lineInfo.code} · ${this.lineInfo.label}`;
-  readonly heroBadgeCode = this.lineInfo.code;
-  readonly lineColor = LINE_COLOR[this.lineInfo.line];
-  readonly heroBadgeStyle = { backgroundColor: this.lineColor };
+  readonly lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.TrackingTransparency];
+  readonly lineColor = LINE_COLOR['tracking-transparency'];
+  readonly badgeStyle = {
+    backgroundColor: LINE_COLOR['tracking-transparency'],
+  };
+  readonly scenarioSteps = [
+    'Press Get to read the current status',
+    'Press Request and answer the system prompt',
+    'Read the advertising id below',
+  ];
 
-  private readonly permissionsService = inject(PermissionsService);
-  readonly status = this.permissionsService.connect();
+  private readonly permissions = inject(TrackingPermissionsService);
+  private readonly status = this.permissions.connect();
+  // Synchronous native read, `null` on Android and the iOS simulator
+  readonly advertisingId: string | null = getAdvertisingId();
 
-  readonly advertisingId = signal<string | null>(getAdvertisingId());
-
-  handleGet(): void {
-    void this.permissionsService.get();
-  }
-
-  handleRequest(): void {
-    this.permissionsService
-      .request()
-      .then(() => this.advertisingId.set(getAdvertisingId()));
-  }
-
-  statusLabel(): string {
-    return this.status()?.status ?? 'checking…';
-  }
-
-  grantedLabel(): string {
+  readonly statusText = computed(() => this.status()?.status ?? PENDING_LABEL);
+  readonly grantedText = computed(() => {
     const status = this.status();
-    return status === null ? 'checking…' : String(status.granted);
+    if (status === null) return PENDING_LABEL;
+    return status.granted ? 'Yes' : 'No';
+  });
+
+  getPermission(): void {
+    void this.permissions.get();
   }
 
-  advertisingIdLabel(): string {
-    return this.advertisingId() ?? 'not available';
+  requestPermission(): void {
+    void this.permissions.request();
   }
 }

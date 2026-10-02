@@ -1,0 +1,242 @@
+---
+title: Font
+description: Load custom fonts at runtime by fontFamily on every SymbioteNative adapter, plus renderToImageAsync for text-to-image.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+Use a custom font without touching the native projects: give a name and a font file, wait for the
+load, then reference the name in `fontFamily`. `@symbiote-native/font` wraps
+[`expo-font`](https://github.com/expo/expo/tree/main/packages/expo-font) so every SymbioteNative
+adapter can do it, not just React. A font source is a `require()` module id, a URI, or an
+[`@symbiote-native/asset`](/docs/packages/asset/) `Asset`. `renderToImageAsync` (text to image)
+comes with it on iOS and Android.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | live    |
+| Android     | live    |
+
+| Framework adapter | Support |
+| ----------------- | ------- |
+| React             | live    |
+| Vue               | live    |
+| Angular           | live    |
+| Svelte            | live    |
+| Solid             | live    |
+
+## Installation
+
+```sh
+npm install @symbiote-native/font
+```
+
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --font` (or
+`add --font` in an existing app) installs and wires this for you - see
+[`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
+
+`expo-font` and `expo-modules-core` come along as regular dependencies, pinned to exact versions.
+Never install either yourself, and never add the `expo` meta-package to your project (it bundles
+its own Metro/Babel pipeline, which conflicts with this project's own).
+
+<Aside type="danger" title="Native setup is required before first use">
+  `expo-font`'s native code is discovered by `expo-modules-autolinking`, a different mechanism from
+  the `react-native.config.cjs`/podspec autolinking every other SymbioteNative wrapper uses. Follow
+  [How to: wire up an Expo native module](/docs/howtos/expo-native-module-setup/) once per app
+  first; it covers this package and every other `expo-modules-core` package with zero further
+  native changes.
+</Aside>
+
+## Usage
+
+Each adapter has a thin lifecycle wrapper over the same `core` functions: it seeds its state
+synchronously from `isFontMapLoaded`, calls `loadAsync` once on mount, and never reloads when the
+font map changes. Render nothing (or a placeholder) until `loaded` is true, so no text paints in
+a fallback font first.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { useFonts } from '@symbiote-native/font/react';
+
+    export default function App() {
+      const [loaded, error] = useFonts({
+        'Inter-Regular': require('./assets/fonts/Inter-Regular.ttf'),
+      });
+
+      if (!loaded) return null;
+      return <text style={{ fontFamily: 'Inter-Regular' }}>Hello</text>;
+    }
+    ```
+
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { useFonts } from '@symbiote-native/font/vue';
+
+    const { loaded, error } = useFonts({
+      'Inter-Regular': require('./assets/fonts/Inter-Regular.ttf'),
+    });
+    </script>
+
+    <template>
+      <text v-if="loaded" style="font-family: Inter-Regular">Hello</text>
+    </template>
+    ```
+
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component, inject } from '@angular/core';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
+    import { FontsService } from '@symbiote-native/font/angular';
+
+    @Component({
+      standalone: true,
+      imports: [SYMBIOTE_ELEMENTS],
+      template: `@if (fonts.loaded()) {
+        <text style="font-family: Inter-Regular">Hello</text>
+      }`,
+    })
+    export class App {
+      readonly fonts = inject(FontsService).connect({
+        'Inter-Regular': require('./assets/fonts/Inter-Regular.ttf'),
+      });
+    }
+    ```
+
+    `connect()` returns a pair of signals (`loaded` and `error`).
+
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { useFonts } from '@symbiote-native/font/svelte';
+
+      const fonts = useFonts({
+        'Inter-Regular': require('./assets/fonts/Inter-Regular.ttf'),
+      });
+    </script>
+
+    {#if fonts.loaded}
+      <text style="font-family: Inter-Regular">Hello</text>
+    {/if}
+    ```
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { createFonts } from '@symbiote-native/font/solid';
+
+    export function App() {
+      const fonts = createFonts({
+        'Inter-Regular': require('./assets/fonts/Inter-Regular.ttf'),
+      });
+
+      return fonts.loaded() ? (
+        <text style={{ 'font-family': 'Inter-Regular' }}>Hello</text>
+      ) : null;
+    }
+    ```
+
+    Solid reserves `use*` for consuming existing state, so the primitive is `createFonts`. Call the
+    accessor (`fonts.loaded()`): a Solid component body runs once.
+
+  </TabItem>
+</Tabs>
+
+Outside a component, call `loadAsync` directly, for example at startup before the first render:
+
+```ts
+import { loadAsync } from '@symbiote-native/font';
+
+await loadAsync({ 'Inter-Regular': require('./assets/fonts/Inter-Regular.ttf') });
+```
+
+## API
+
+### Functions
+
+| Signature                                                               | Description                                                                                                         |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `isLoaded(fontFamily): boolean`                                         | Whether the font family has finished loading                                                                        |
+| `getLoadedFonts(): string[]`                                            | Every font family loaded so far                                                                                     |
+| `isLoading(fontFamily): boolean`                                        | Whether the font family is loading right now                                                                        |
+| `isFontMapLoaded(map): boolean`                                         | Whether every family in a font map (or the one family named by a string) is already loaded                          |
+| `loadAsync(fontFamilyOrFontMap, source?): Promise<void>`                | Loads one family (`name`, `source`) or a whole map of `name -> source`                                              |
+| `unloadAsync(fontFamilyOrFontMap, options?): Promise<void>`             | Always throws `UnavailabilityError` on iOS and Android. See Notes                                                   |
+| `unloadAllAsync(): Promise<void>`                                       | Always throws `UnavailabilityError` on iOS and Android. See Notes                                                   |
+| `renderToImageAsync(glyphs, options?): Promise<IRenderToImageResult>`   | Renders a string with a loaded font to an image file and resolves its `uri`, `width` and `height`                   |
+
+### `useFonts` / `createFonts` / `FontsService`
+
+| Adapter | Entry point                         | Description                                                          |
+| ------- | ----------------------------------- | -------------------------------------------------------------------- |
+| React   | `useFonts(map)`                     | Returns `[loaded: boolean, error: Error \| null]`                    |
+| Vue     | `useFonts(map)`                     | Returns `{ loaded, error }` as refs                                  |
+| Svelte  | `useFonts(map)`                     | Returns an object with reactive `loaded` and `error`                 |
+| Solid   | `createFonts(map)`                  | Returns `{ loaded(), error() }` as accessors                         |
+| Angular | `inject(FontsService).connect(map)` | Returns `{ loaded, error }` as signals                               |
+
+Every entry point takes the same argument: `Record<string, FontSource>`, a map from the
+`fontFamily` name you will use in styles to the font file.
+
+## Notes
+
+- **The `fontFamily` in a style must match the map key exactly.** `'Inter-Regular'` in the map and
+  `fontFamily: 'Inter'` in the style silently falls back to the system font.
+- **`unloadAsync` and `unloadAllAsync` always throw on iOS and Android.** They are exported for API
+  parity, but the native font loader has no unload method on either platform (only on web). This
+  matches upstream exactly.
+- **Keep the splash screen up while fonts load.** Hold it with
+  [`@symbiote-native/splash-screen`](/docs/packages/splash-screen/) until `loaded` is true to avoid
+  a flash of unstyled text.
+- **Web and server rendering are not ported.** This repo has no web or SSR render target for any
+  adapter, so `isLoaded`'s web fallback and the server pre-render pass are dropped.
+- **`expo-font`'s config plugin is not ported.** To bundle a static font into the native project,
+  use the plain React Native route (`android/app/src/main/assets/fonts/`; on iOS, Xcode's "Copy
+  Bundle Resources" plus `UIAppFonts` in `Info.plist`), or call `loadAsync` with a local `file://`
+  URI at startup.
+
+## Common questions
+
+**My custom font does not show; the text uses the system font.** In order of likelihood: the
+`fontFamily` in the style is not the exact key you loaded; you rendered before `loaded` was true;
+the font file failed to load (check `error`, and `getLoadedFonts()` to see what is loaded).
+
+**How do I get bold or italic?** Load each weight or style as its own family
+(`'Inter-Bold': require('./Inter-Bold.ttf')`) and set `fontFamily: 'Inter-Bold'`. Do not rely on
+`fontWeight` to pick a file for a custom family.
+
+**A font bundled into the native project works on Android but not iOS.** For a font added through
+Xcode (`UIAppFonts`), iOS finds it by the font's own name (its full or PostScript name), not the
+file name. That differs from runtime loading, where the name is whatever key you gave `loadAsync`.
+
+**Can I unload a font?** No. `unloadAsync` throws on iOS and Android because the native font loader
+has no unload.
+
+**How do I avoid the flash of the wrong font at startup?** Hold the splash screen until `loaded`
+is true (see the splash screen package), or return `null` until then.
+
+Sources: [expo/expo#33673 expo-font does not display custom fonts on Android](https://github.com/expo/expo/issues/33673),
+[expo/expo#22074 custom font is not loading correctly on Android](https://github.com/expo/expo/issues/22074),
+[DEV: why was my app not displaying custom fonts on iOS](https://dev.to/aymericmartinache/the-mystery-of-fonts-on-ios-why-was-my-app-not-displaying-custom-fonts-3h8j).
+
+## How the wrapper works
+
+`expo-font`'s JS is hand-ported into this package's `core/`, resolving `ExpoFontLoader` and
+`ExpoFontUtils` through `expo-modules-core` rather than the `expo` meta-package:
+
+```
+packages/font/src/
+|-- core/     # font.ts, font-loader.ts, font-utils.ts, memory.ts (the loaded-fonts cache)
+|-- react/    # hooks/        useFonts
+|-- vue/      # composables/  useFonts
+|-- svelte/   # runes/        useFonts
+|-- solid/    # primitives/   createFonts
+`-- angular/  # services/     FontsService
+```
+
+Each adapter file is lifecycle only. The native code is never vendored: `expo-modules-autolinking`
+resolves it from `node_modules` (see [the native setup guide](/docs/howtos/expo-native-module-setup/)).

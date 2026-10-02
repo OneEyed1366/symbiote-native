@@ -30,3 +30,4 @@ export {
 } from './descriptor-to-svelte';
 export type { IDescriptorChildrenMount } from './descriptor-to-svelte';
 export type { ShimElement } from './dom-shim';
+export { hostProps } from './host-props';

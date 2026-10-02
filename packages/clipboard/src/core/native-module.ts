@@ -35,6 +35,8 @@ export type INativeClipboardModule = {
   getImageAsync?(options: IGetImageOptions): Promise<IClipboardImage | null>;
   setImageAsync?(base64Image: string): Promise<void>;
   hasImageAsync?(): Promise<boolean>;
+  // iOS 16+ only, absent elsewhere
+  isPasteButtonAvailable?: boolean;
 };
 
 export const expoClipboard = requireNativeModule<INativeClipboardModule>(

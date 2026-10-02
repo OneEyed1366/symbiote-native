@@ -5,10 +5,10 @@ description: expo-secure-store wrapped for every SymbioteNative adapter — encr
 
 import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 
-`@symbiote-native/secure-store` wraps
-[`expo-secure-store`](https://github.com/expo/expo/tree/main/packages/expo-secure-store) —
-encrypted key/value storage in the iOS Keychain and the Android Keystore, optionally gated behind
-the device's own biometrics — so every SymbioteNative adapter can reach it, not just React. Like
+Store tokens and other small secrets encrypted on the device, optionally behind the user's
+fingerprint, face or passcode. `@symbiote-native/secure-store` wraps
+[`expo-secure-store`](https://github.com/expo/expo/tree/main/packages/expo-secure-store) (iOS
+Keychain, Android Keystore) so every SymbioteNative adapter can reach it, not just React. Like
 [store review](/docs/packages/store-review/) and [local auth](/docs/packages/local-auth/), every
 export is a free function with no per-instance state, so there is no hook/composable/service to
 wrap — the React, Vue, Angular, Svelte, and Solid entry points are plain re-exports of the same
@@ -305,9 +305,35 @@ native module declares none of them, so they read `undefined` there.
 - **`requireAuthentication` does not combine with a shared `keychainService`.** The full behavior
   needs a freshly generated key, so reusing a service that already holds non-authenticated entries
   gives partial behavior. Upstream documents the same limitation.
+- **Keep values small.** Expo does not enforce a limit, but the platform can reject large
+  payloads: historically iOS refused values above about 2048 bytes, and some Android devices fail
+  near 4072 characters. The limit applies to the stringified value. Store a token or a key here,
+  not a document, and handle the rejection from `setItemAsync`.
+- **iOS Keychain entries can outlive an uninstall.** A reinstalled app may still read the previous
+  install's values. If that matters, keep a first-run marker elsewhere and clear the store when it
+  is missing.
+- **A missing key reads `null`, not an error.** `JSON.parse(null)` returns `null` too, so guard
+  with `?? 'null'` or an explicit check before using the result.
 - **The synchronous pair blocks the JavaScript thread.** With `requireAuthentication` on, the app
   stays unresponsive until the user authenticates — prefer the async functions unless you
   genuinely need a value during a synchronous render path.
+
+## Common questions
+
+- **Is there a size limit?** Historically iOS refused values over about 2048 bytes. Expo does not
+  enforce it, so handle the native error and keep large blobs in the file system, storing only a key here.
+- **I reinstalled the app and the old token is still there.** The iOS Keychain survives uninstall
+  for the same bundle ID. Clear it on first launch, or use the `THIS_DEVICE_ONLY` accessibility variants.
+- **`getItemAsync` returns `null`.** Either no entry exists or the key was invalidated (for example
+  biometrics changed with `requireAuthentication`). Treat `null` as "sign in again".
+- **When does the biometric prompt show?** On iOS only when reading or updating an existing value,
+  not when creating one.
+- **Is it encrypted on Android?** Values live in SharedPreferences, encrypted with the Android Keystore.
+
+Sources: [Expo docs: SecureStore](https://docs.expo.dev/versions/latest/sdk/securestore/),
+[expo/expo#4084](https://github.com/expo/expo/pull/4084),
+[Expo SecureStore: Tokens, Limits, and the Uninstall Trap](https://www.shipnative.dev/blog/expo-secure-store),
+[Does Expo SecureStore actually encrypt your data on Android?](https://ptkd.com/journal/expo-securestore-vs-asyncstorage-security).
 
 ## How the wrapper works
 

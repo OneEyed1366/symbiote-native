@@ -1,16 +1,17 @@
 ---
 title: Background task
-description: expo-background-task wrapped for every SymbioteNative adapter — BGTaskScheduler/WorkManager-backed background execution registered through @symbiote-native/task-manager.
+description: Run deferrable work in the background on the OS's own schedule (BGTaskScheduler, WorkManager) on every SymbioteNative adapter.
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
+Sync, clean up or upload while the app is closed, when the OS decides the moment is right.
 `@symbiote-native/background-task` wraps
 [`expo-background-task`](https://github.com/expo/expo/tree/main/packages/expo-background-task) so
 every SymbioteNative adapter can register a task that runs in the background on the OS's own
-schedule — `BGTaskScheduler` on iOS, `WorkManager` on Android. It is the modern replacement for
+schedule: `BGTaskScheduler` on iOS, `WorkManager` on Android. It is the modern replacement for
 [`@symbiote-native/background-fetch`](/docs/packages/background-fetch/). It does not define what
-the task does — define it first with
+the task does: define it first with
 [`@symbiote-native/task-manager`](/docs/packages/task-manager/)'s `defineTask`, then register it
 here.
 
@@ -103,22 +104,51 @@ Identical import surface on every adapter — `@symbiote-native/background-task/
 
 ## API
 
-```ts
-getStatusAsync(): Promise<BackgroundTaskStatus>
-registerTaskAsync(taskName: string, options?: IBackgroundTaskOptions): Promise<void>
-unregisterTaskAsync(taskName: string): Promise<void>
-triggerTaskWorkerForTestingAsync(): Promise<boolean>
-addExpirationListener(listener: () => void): { remove: () => void }
-```
+### Functions
 
-Plus `BackgroundTaskStatus`, `BackgroundTaskResult`, and `IBackgroundTaskOptions`.
+| Signature                                                     | Description                                                                          |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `registerTaskAsync(taskName, options?): Promise<void>`        | Registers a defined task. Throws if the task is not defined; skips if already registered |
+| `unregisterTaskAsync(taskName): Promise<void>`                | Stops executions of the task                                                         |
+| `getStatusAsync(): Promise<BackgroundTaskStatus>`             | Whether background tasks are available on this device                                |
+| `addExpirationListener(listener): { remove }`                 | iOS only. Calls `listener` when the system interrupts a running task before it finishes |
+| `triggerTaskWorkerForTestingAsync(): Promise<boolean>`        | Runs the task worker now, for testing. Resolves `false` outside a dev build          |
+
+### `IBackgroundTaskOptions`
+
+| Field             | Type                  | Description                                                                                       |
+| ----------------- | --------------------- | ------------------------------------------------------------------------------------------------- |
+| `minimumInterval` | `number \| undefined` | Inexact interval in minutes between runs. Defaults to 12 hours; the minimum is 15 minutes. The OS treats it as a minimum delay only, and on iOS a short interval is often ignored |
+
+### Enums
+
+| Enum                   | Values                                                                                           |
+| ---------------------- | ------------------------------------------------------------------------------------------------ |
+| `BackgroundTaskResult` | What the task executor returns: `Success` or `Failed`                                            |
+| `BackgroundTaskStatus` | `Restricted` (unavailable, for example on an iOS Simulator) or `Available`                       |
 
 ## Notes
 
 - **`registerTaskAsync` requires the task to already be defined** — it throws if the task named
   isn't defined yet with `@symbiote-native/task-manager`'s `defineTask`.
+- **The iOS Simulator cannot run it.** It has no `BGTaskScheduler` support, so the status reads
+  `Restricted` and registration is skipped. Test on a device.
 - **`registerTaskAsync` is a no-op, twice over.** It skips silently (one-time console warning)
   when the status reads `Restricted`, and it skips again, quietly, when the task is already
   registered.
 - **`triggerTaskWorkerForTestingAsync` only runs in a dev build** — it always resolves `false` in
   production.
+
+## Common questions
+
+- **Nothing runs on the iOS Simulator.** Background tasks need a physical device.
+- **`triggerTaskWorkerForTestingAsync` does nothing on iOS.** `BGTaskSchedulerPermittedIdentifiers`
+  must contain `com.expo.modules.backgroundtask.processing` in Info.plist; rebuild after adding it.
+- **`minimumInterval`.** A hint only; the OS decides when to run.
+- **Status ignores the Background App Refresh setting on iOS.** Reported upstream: the status call
+  may not read the real permission, so do not rely on it alone.
+
+Sources: [Expo docs: BackgroundTask](https://docs.expo.dev/versions/latest/sdk/background-task/),
+[expo/expo#40440](https://github.com/expo/expo/issues/40440),
+[expo/expo#48786](https://github.com/expo/expo/issues/48786),
+[expo/expo#35350](https://github.com/expo/expo/pull/35350).

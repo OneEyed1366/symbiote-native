@@ -1,5 +1,13 @@
 # @symbiote-native/expo-modules-link
 
+## 0.6.0
+
+### Minor Changes
+
+- [#91](https://github.com/OneEyed1366/symbiote-native/pull/91) [`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Add `android.services` to the `native-link.json` schema, for a native `Service` a package needs registered in `AppContext`'s `ServicesRegistry` (distinct from `manifestServices`' `<service>` manifest element). Generates `ExpoModulesProvider.getServices()`, adds the required `expo.modules.kotlin.services.Service` import, and includes each service's own Gradle subproject in `build.gradle` even when it belongs to a different package than the one declaring it.
+
+- [#91](https://github.com/OneEyed1366/symbiote-native/pull/91) [`ad8c99a`](https://github.com/OneEyed1366/symbiote-native/commit/ad8c99aeb15001c513391eeed3c7270fc0ee7578) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Add `ios.infoPlistArrayKeys` to the `native-link.json` schema for array-valued Info.plist keys (`UIBackgroundModes`, `BGTaskSchedulerPermittedIdentifiers`) that `infoPlistKeys` couldn't express, plus `android.manifestPermissions` and `android.manifestServices` for Android `<uses-permission>`/`<service>` entries. All three merge additively across packages with no duplication. Wired for `background-task`, `background-fetch`, `task-manager`, `location`, and `audio`.
+
 ## 0.5.1
 
 ### Patch Changes

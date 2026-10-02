@@ -1,16 +1,17 @@
 ---
 title: Task manager
-description: expo-task-manager wrapped for every SymbioteNative adapter — the low-level primitive background location, geofencing, background fetch/task, and push notifications register tasks through.
+description: Define the code the OS runs when it wakes your app in the background, on every SymbioteNative adapter.
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-`@symbiote-native/task-manager` wraps
+Run your code when the OS wakes the app in the background: a location update, a geofence event, a
+periodic sync, a silent push. `@symbiote-native/task-manager` wraps
 [`expo-task-manager`](https://github.com/expo/expo/tree/main/packages/expo-task-manager) so every
-SymbioteNative adapter can define and inspect background tasks. It does not itself schedule
-anything — it defines tasks, tracks which are registered, dispatches native's task-execute event
-to the matching executor, and acks completion. Starting a task running (periodic scheduling,
-geofence triggers, push delivery) is each consumer package's own job:
+SymbioteNative adapter can define and inspect those tasks. It does not itself schedule anything: it
+defines tasks, tracks which are registered, dispatches native's task-execute event to the matching
+executor, and acks completion. Starting a task running (periodic scheduling, geofence triggers,
+push delivery) is each consumer package's own job:
 [`@symbiote-native/location`](/docs/packages/location/),
 [`@symbiote-native/background-fetch`](/docs/packages/background-fetch/),
 [`@symbiote-native/background-task`](/docs/packages/background-task/), and
@@ -104,16 +105,30 @@ Identical import surface on every adapter — `@symbiote-native/task-manager/rea
 
 ## API
 
-```ts
-defineTask<TData>(taskName: string, taskExecutor: ITaskManagerTaskExecutor<TData>): void
-isTaskDefined(taskName: string): boolean
-isTaskRegisteredAsync(taskName: string): Promise<boolean>
-getTaskOptionsAsync<TOptions>(taskName: string): Promise<TOptions>
-getRegisteredTasksAsync<TOptions>(): Promise<ITaskManagerTask<TOptions>[]>
-unregisterTaskAsync(taskName: string): Promise<void>
-unregisterAllTasksAsync(): Promise<void>
-isAvailableAsync(): Promise<boolean>
-```
+### Functions
+
+| Signature                                                | Description                                                                          |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `defineTask(taskName, taskExecutor): void`               | Defines the code that runs for a task. Call it at module scope                       |
+| `isTaskDefined(taskName): boolean`                       | Whether a task with this name is defined in the current bundle                       |
+| `isTaskRegisteredAsync(taskName): Promise<boolean>`      | Whether a consumer has registered the task with native                               |
+| `getTaskOptionsAsync(taskName): Promise<TOptions>`       | The options the task was registered with                                             |
+| `getRegisteredTasksAsync(): Promise<ITaskManagerTask[]>` | Every registered task, with its name, type and options                               |
+| `unregisterTaskAsync(taskName): Promise<void>`           | Stops delivery for one task                                                          |
+| `unregisterAllTasksAsync(): Promise<void>`               | Stops delivery for every task                                                        |
+| `isAvailableAsync(): Promise<boolean>`                   | Whether the task manager can be used at all                                          |
+
+### What the executor receives
+
+`taskExecutor` is called with an `ITaskManagerTaskBody`:
+
+| Field                    | Type                          | Description                                                                 |
+| ------------------------ | ----------------------------- | --------------------------------------------------------------------------- |
+| `data`                   | `TData`                       | The payload. Its shape depends on the consumer (locations, a geofence event) |
+| `error`                  | `ITaskManagerError \| null`   | The failure (`code`, `message`) if the task failed, otherwise `null`        |
+| `executionInfo.taskName` | `string`                      | Name of the task that ran                                                   |
+| `executionInfo.eventId`  | `string`                      | Unique ID of this task event                                                |
+| `executionInfo.appState` | `'active' \| 'background' \| 'inactive' \| undefined` | App state when the task ran. iOS only             |
 
 There is no free `registerTaskAsync` here — registration is always driven by the consumer package
 that needs the task, never by task-manager itself.
@@ -134,3 +149,34 @@ that needs the task, never by task-manager itself.
 - **A task executor that throws still acks native.** The failure is logged, but the completion ack
   always fires, so a bug in one task's executor can't leave the OS believing the task never
   completed.
+
+## Common questions
+
+**My task never runs.** First check `defineTask` runs at the top of the bundle, outside any
+component, before anything registers the task. Registering a task that is not defined throws. Then
+check that a consumer package actually registered it: `defineTask` alone schedules nothing.
+
+**It stops when I swipe the app away.** Background work is stopped when the user kills the app,
+though the platforms differ. On iOS swiping the app out of the switcher terminates it. On Android,
+removing it from recents does not always stop it, and the result varies by device vendor.
+
+**It works for 5 to 10 minutes on Android, then stops.** Doze mode puts the device to sleep. For
+continuous tracking, use a foreground service (for example the `foregroundService` option of
+location updates) rather than relying on a periodic wake-up.
+
+**It works in a debug build but not in release.** Registration or delivery can differ in release
+builds on Android. Test the release build early, and watch for a task that was renamed or removed:
+a dangling registration is cleaned up the next time native fires it.
+
+**Does it run on a simulator?** Background execution is only reliable on physical devices, and the
+iOS Simulator does not support the iOS background task scheduler.
+
+**How do I debug a task?** Log at the top of the executor and inside the `error` branch, and call
+`getRegisteredTasksAsync()` to see what native has registered.
+
+Sources: [Expo docs: BackgroundTask](https://docs.expo.dev/versions/latest/sdk/background-task/),
+[Expo docs: BackgroundFetch](https://docs.expo.dev/versions/latest/sdk/background-fetch/),
+[expo/expo#9570 Expo keeps stopping when the app is killed during background location](https://github.com/expo/expo/issues/9570),
+[expo/expo#3535 background geolocation task disappears when the app is killed on Android](https://github.com/expo/expo/issues/3535),
+[expo/expo#14076 task does not fire after 5 to 10 minutes on Android](https://github.com/expo/expo/issues/14076),
+[expo/expo#26717 task is not defined, define it before registering](https://github.com/expo/expo/issues/26717).

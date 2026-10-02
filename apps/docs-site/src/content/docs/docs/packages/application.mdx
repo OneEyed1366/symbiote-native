@@ -290,6 +290,22 @@ A plain string-literal union, not a struct — carries no `I` prefix (`ts-js-bes
   serialized date string.
 </Aside>
 
+## Common questions
+
+- **Which version string do I show the user?** `nativeApplicationVersion`: on iOS the
+  `CFBundleShortVersionString`, on Android the version name from your config. The build number is a
+  separate field.
+- **Is `getAndroidId` a device ID?** It is `Settings.Secure.ANDROID_ID`: unique per app-signing
+  key, user and device, so it changes if the signing key or user changes.
+- **What is the iOS equivalent?** `getIosIdForVendorAsync` (IDFV), shared by all apps of one vendor
+  and reset when the last of them is uninstalled.
+- **`getInstallReferrerAsync` returns a partial URL.** The referrer from the Play Store is not
+  always a complete absolute URL; parse it as a query string.
+
+Sources: [Expo docs: Application](https://docs.expo.dev/versions/latest/sdk/application/),
+[expo/expo#6398](https://github.com/expo/expo/issues/6398),
+[Expo Application deep dive](https://www.codingeasypeasy.com/blog/expo-application-deep-dive-into-package-version-and-build-number-management-in-react-native).
+
 ## How the wrapper works
 
 `@symbiote-native/application` ships zero React/Vue/Angular/Svelte/Solid logic in `expo-application` itself —

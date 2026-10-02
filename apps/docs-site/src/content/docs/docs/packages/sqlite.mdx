@@ -237,6 +237,25 @@ hierarchy.
 | `ERR_INTERNAL_SQLITE_ERROR` (code) / raw SQLite message | SQLite itself rejected the statement — malformed SQL, constraint violation, etc. |
 | `Unsupported operations` | An operation the current build (e.g. a non-libSQL build calling `syncLibSQL()`) doesn't support |
 
+## Common questions
+
+- **"Error code 5: database is locked".** Two connections to the same file competed for a write
+  lock. Open the database once (share the handle through the provider) and do not open it again
+  per request. Reported with several parallel opens racing before the first resolved.
+- **Concurrent reads return wrong rows.** Reported upstream: one prepared statement shared by
+  concurrent reads can corrupt each other's result sets. Prepare a statement per call or serialize.
+- **How do I ship a pre-populated database?** Use `assetSource` on `openDatabaseAsync`; it is async
+  only, `openDatabaseSync` throws when given one.
+- **Can I turn on WAL?** Yes: run `PRAGMA journal_mode = WAL` right after opening, as the upstream
+  CRUD examples do.
+- **SQLCipher or extensions.** Native build settings that this project does not wire; see below.
+
+Sources: [Expo docs: SQLite](https://docs.expo.dev/versions/latest/sdk/sqlite/),
+[expo/expo#49786](https://github.com/expo/expo/issues/49786),
+[expo/expo#33754](https://github.com/expo/expo/issues/33754),
+[expo/expo#10881](https://github.com/expo/expo/issues/10881),
+[Drizzle: database is locked with ExpoSQLite](https://www.answeroverflow.com/m/1326460627560173588).
+
 ## Deliberately out of scope
 
 - **The `assetSource` bundled-database-file option** — needs `expo-asset`, which this project

@@ -1,7 +1,7 @@
 # @symbiote-native/battery
 
 Port of [`expo-battery`](https://docs.expo.dev/versions/latest/sdk/battery/) for
-[SymbioteNative](../../README.md) — battery level and state, low-power-mode detection, reachable
+[SymbioteNative](../../README.md) - battery level and state, low-power-mode detection, reachable
 from every adapter (React, Vue, Svelte, Solid, Angular), not just React.
 
 Built the same way as [`@symbiote-native/local-auth`](../local-auth) and
@@ -24,74 +24,74 @@ npx @symbiote-native/cli new my-app --battery
 npx @symbiote-native/cli add --battery
 ```
 
-Either way: installs `@symbiote-native/battery` and wires the native autolinking automatically — see
+Either way: installs `@symbiote-native/battery` and wires the native autolinking automatically - see
 [`@symbiote-native/cli`](../cli).
 
 <details>
-<summary>Manual install (no CLI — installing and wiring native autolinking by hand)</summary>
+<summary>Manual install (no CLI - installing and wiring native autolinking by hand)</summary>
 
 ```bash
 npm install @symbiote-native/battery
 ```
 
 Depends on `expo-battery` and `expo-modules-core` directly (regular dependencies, pinned to exact
-versions — never a caret range, since this package's `core/` is hand-ported against one specific
+versions - never a caret range, since this package's `core/` is hand-ported against one specific
 native API shape and a newer resolve could silently drift the two apart). Never install
-`expo-battery` yourself, and never add the `expo` package to this project — it bundles its own
+`expo-battery` yourself, and never add the `expo` package to this project - it bundles its own
 Metro/Babel pipeline that conflicts with this project's own.
 
 ### Required one-time step: native autolinking wiring
 
 Unlike a plain RN native module, `expo-battery`'s native code is discovered by
-`expo-modules-autolinking`, not RN's own `react-native.config.cjs` mechanism — this needs wiring
+`expo-modules-autolinking`, not RN's own `react-native.config.cjs` mechanism - this needs wiring
 into the native host app **once**, covering this package and every other `expo-modules-core`
 package (`@symbiote-native/sensors`, `@symbiote-native/local-auth`) with zero further changes:
 
 | Platform | Touches                                                                                                                                             |
 | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| iOS      | `ios/Podfile` — add `use_expo_modules!`                                                                                                             |
-| iOS      | `AppDelegate.swift` — Expo's runtime-bootstrap hook                                                                                                 |
-| Android  | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects                                                               |
-| Android  | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
+| iOS      | `ios/Podfile` - add `use_expo_modules!`                                                                                                             |
+| iOS      | `AppDelegate.swift` - Expo's runtime-bootstrap hook                                                                                                 |
+| Android  | `settings.gradle` / `app/build.gradle` - resolve and include the Expo Gradle projects                                                               |
+| Android  | `MainApplication.kt` - Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
 
-Full mechanics — the Podfile pieces that normally ship inside the `expo` package, the `expo`
-peer-dependency exclusion list — live in the `symbiote-expo-native-module` skill. Reference
+Full mechanics - the Podfile pieces that normally ship inside the `expo` package, the `expo`
+peer-dependency exclusion list - live in the `symbiote-expo-native-module` skill. Reference
 implementation: `examples/expo-react/ios/Podfile` and
 `examples/expo-react/android/app/src/main/java/com/canaryexpo/MainApplication.kt`.
 
 </details>
 
-No platform permission string is needed for battery's basic surface —
+No platform permission string is needed for battery's basic surface:
 `isBatteryOptimizationEnabledAsync` reads an Android-only system state with no runtime permission
 prompt either.
 
 ## Shape
 
 ```
-src/core/               Battery.ts — one-shot get*Async functions + addListener subscriptions.
+src/core/               Battery.ts - one-shot get*Async functions + addListener subscriptions.
                         native-module.ts resolves the native module through expo-modules-core's
-                        requireNativeModule. types.ts — BatteryState enum, PowerState,
+                        requireNativeModule. types.ts - BatteryState enum, PowerState,
                         *Event shapes, hand-ported from Battery.types.ts.
-src/react/hooks/        @symbiote-native/battery/react   — useBatteryLevel, useBatteryState,
-                        useLowPowerMode
-src/vue/composables/    @symbiote-native/battery/vue     — same three names, Vue lifecycle
-src/svelte/runes/       @symbiote-native/battery/svelte  — same three names, read as `.current`
-src/solid/primitives/   @symbiote-native/battery/solid   — createBatteryLevel, createBatteryState,
-                        createLowPowerMode (each returns an Accessor)
-src/angular/services/   @symbiote-native/battery/angular — BatteryLevelService, BatteryStateService,
-                        LowPowerModeService (`.connect()` returns a Signal)
+src/react/hooks/        @symbiote-native/battery/react   - useBatteryLevel, useBatteryState,
+                        useLowPowerMode, usePowerState
+src/vue/composables/    @symbiote-native/battery/vue     - same four names, Vue lifecycle
+src/svelte/runes/       @symbiote-native/battery/svelte  - same four names, read as `.current`
+src/solid/primitives/   @symbiote-native/battery/solid   - createBatteryLevel, createBatteryState,
+                        createLowPowerMode, createPowerState (each returns an Accessor)
+src/angular/services/   @symbiote-native/battery/angular - BatteryLevelService, BatteryStateService,
+                        LowPowerModeService, PowerStateService (`.connect()` returns a Signal)
 ```
 
 Each adapter's hook/composable/rune/primitive/service is a thin lifecycle wrapper (seed from the
 one-shot `get*Async` call, subscribe to the matching listener, unsubscribe on unmount/cleanup)
-over the same `core` functions — the subscription and fallback logic is written once and shared
+over the same `core` functions - the subscription and fallback logic is written once and shared
 by every adapter. Solid's naming differs on purpose: `create*`, not `use*`, which Solid reserves
 for consuming something that already exists.
 
 ## Use it
 
 ```tsx
-// React — examples/expo-react/screens/BatteryScreen.tsx
+// React - examples/expo-react/screens/BatteryScreen.tsx
 import {
   useBatteryLevel,
   useBatteryState,
@@ -120,7 +120,7 @@ function BatteryScreen() {
 ```
 
 ```vue
-<!-- Vue — examples/expo-vue-sfc/screens/BatteryScreen.vue -->
+<!-- Vue - examples/expo-vue-sfc/screens/BatteryScreen.vue -->
 <script setup lang="ts">
 import { computed } from 'vue';
 import {
@@ -146,7 +146,7 @@ const batteryLevelText = computed(() =>
 ```
 
 ```svelte
-<!-- Svelte — examples/expo-svelte/screens/BatteryScreen.svelte. Each rune returns a boxed
+<!-- Svelte - examples/expo-svelte/screens/BatteryScreen.svelte. Each rune returns a boxed
      getter object, read as `.current`, since a bare `$state` doesn't survive being handed out
      of a plain function. -->
 <script lang="ts">
@@ -176,7 +176,7 @@ const batteryLevelText = computed(() =>
 ```
 
 ```tsx
-// Solid — an accessor per value; call it to read, so a component body that runs once still
+// Solid - an accessor per value; call it to read, so a component body that runs once still
 // re-renders the leaf that reads it.
 import {
   createBatteryLevel,
@@ -207,7 +207,7 @@ function BatteryScreen() {
 ```
 
 ```ts
-// Angular — examples/expo-angular/src/screens/BatteryScreen.ts
+// Angular - examples/expo-angular/src/screens/BatteryScreen.ts
 import { Component, inject } from '@angular/core';
 import {
   BatteryLevelService,
@@ -230,7 +230,7 @@ export class BatteryScreen {
 
 Each of the demo screens above also renders a one-shot capabilities card
 (`isAvailableAsync()`, and Android-only `isBatteryOptimizationEnabledAsync()`) resolved directly
-from `@symbiote-native/battery`'s core entry point — see the linked files for the full version.
+from `@symbiote-native/battery`'s core entry point - see the linked files for the full version.
 The iOS Simulator reports the battery API as unavailable (`isAvailableAsync()` resolves `false`)
 since simulators have no real battery hardware; a physical device is needed to see live readings.
 
@@ -238,9 +238,9 @@ since simulators have no real battery hardware; a physical device is needed to s
 
 A mix of stateless async functions and three listener-based subscriptions
 (`addBatteryLevelListener`/`addBatteryStateListener`/`addLowPowerModeListener`), each with its
-own adapter-level lifecycle hook — one hook/composable/service per listener, matching upstream's
-own `useBatteryLevel`/`useBatteryState`/`useLowPowerMode` being three separate hooks, not one
-combined hook.
+own adapter-level lifecycle hook, matching upstream's `useBatteryLevel`/`useBatteryState`/
+`useLowPowerMode`. `usePowerState` merges all three into one `PowerState` value; the seed and
+merge logic is `watchPowerState` in core, so every adapter only holds the state.
 
 ```ts
 isAvailableAsync(): Promise<boolean>                          // battery API availability on this device
@@ -255,7 +255,7 @@ addLowPowerModeListener(listener): EventSubscription           // fires when low
 ```
 
 Plus `BatteryState` (enum), `PowerState`, `BatteryLevelEvent`, `BatteryStateEvent`,
-`PowerModeEvent` — ported from upstream's `Battery.types.ts`.
+`PowerModeEvent` - ported from upstream's `Battery.types.ts`.
 
 ```ts
 import {
@@ -269,42 +269,57 @@ import {
   useBatteryLevel,
   useBatteryState,
   useLowPowerMode,
+  usePowerState,
 } from '@symbiote-native/battery/react';
 import {
   useBatteryLevel,
   useBatteryState,
   useLowPowerMode,
+  usePowerState,
 } from '@symbiote-native/battery/vue';
 import {
   useBatteryLevel,
   useBatteryState,
   useLowPowerMode,
+  usePowerState,
 } from '@symbiote-native/battery/svelte';
 import {
   createBatteryLevel,
   createBatteryState,
   createLowPowerMode,
+  createPowerState,
 } from '@symbiote-native/battery/solid';
 import {
   BatteryLevelService,
   BatteryStateService,
   LowPowerModeService,
+  PowerStateService,
 } from '@symbiote-native/battery/angular';
 ```
 
 Each hook/composable/service seeds its initial value from the matching one-shot
 `get*Async`/`is*Async` call, then subscribes to the matching listener for updates, and
-unsubscribes on unmount — mirroring upstream's own `useBatteryLevel`/`useBatteryState`/
+unsubscribes on unmount - mirroring upstream's own `useBatteryLevel`/`useBatteryState`/
 `useLowPowerMode`.
+
+## Common questions
+
+- **Level reads `-1`.** Unknown level (simulator, unsupported device): check for `-1` before
+  formatting and do not treat it as low battery.
+- **Live updates?** Read the initial level, then subscribe to the listener and clean up on unmount.
+- **Low Power Mode?** Use the low power mode query and listener to reduce background work.
+
+Sources: [Expo docs: Battery](https://docs.expo.dev/versions/latest/sdk/battery/),
+[Battery -100% bug report](https://github.com/karlgroves/bugrout/issues/202).
 
 ## Test it
 
-No Fabric/Descriptor angle at all — battery is a pure async-function + `EventEmitter` listener
+No Fabric/Descriptor angle at all - battery is a pure async-function + `EventEmitter` listener
 surface, never a view. Tests inject a fake native-module object in place of the real
 `requireNativeModule` resolution (`src/core/battery.test.ts`,
 `src/{react,vue,svelte,solid,angular}/**/*.test.{ts,tsx}`, `vitest`), the same pattern
-`@symbiote-native/sensors` and `@symbiote-native/local-auth` use — no `installFabric()`, no
-ViewConfig. Native rendering itself is verified on-device — see the parent
+`@symbiote-native/sensors` and `@symbiote-native/local-auth` use - no `installFabric()`, no
+ViewConfig. Native rendering itself is verified on-device - see the parent
 [README](../../README.md).
 
 The Android/iOS native wiring is done across all six `examples/expo-*` canary apps

@@ -278,6 +278,21 @@ Plus the `ExpoKeepAwakeTag` constant (the shared default tag string, `'ExpoKeepA
   equivalent, just not identical string values across adapters.
 </Aside>
 
+## Common questions
+
+- **I use two tags and the screen sleeps after releasing one (Android).** Reported upstream: on
+  Android releasing one tag can let the device sleep while another is still active, unlike iOS.
+  Prefer a single tag per screen.
+- **The screen still turns off.** On Android it sets `FLAG_KEEP_SCREEN_ON`, which system power
+  saving can override. Test a release build too, since some reports are dev-only.
+- **It conflicts with another library.** Another library clearing the same window flag can undo it.
+
+Sources: [Expo docs: KeepAwake](https://docs.expo.dev/versions/latest/sdk/keep-awake/),
+[expo/expo#6031](https://github.com/expo/expo/issues/6031),
+[expo/expo#6324](https://github.com/expo/expo/issues/6324),
+[expo/expo#24007](https://github.com/expo/expo/issues/24007),
+[expo/expo#4885](https://github.com/expo/expo/issues/4885).
+
 ## How the wrapper works
 
 `@symbiote-native/keep-awake` ships zero React/Vue/Angular/Svelte/Solid logic in `expo-keep-awake` itself —

@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/clipboard",
-  "version": "3.0.2",
+  "version": "3.0.3",
   "description": "expo-clipboard wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, Svelte, Solid, and Angular adapters. Reads and writes clipboard text, URLs, and images, plus a clipboard-change listener.",
   "license": "MIT",
   "repository": {
@@ -68,10 +68,7 @@
         "types": "./build/react/index.d.ts",
         "default": "./build/react/index.js"
       },
-      "./svelte": {
-        "types": "./build/svelte/index.d.ts",
-        "default": "./build/svelte/index.js"
-      },
+      "./svelte": "./src/svelte/index.ts",
       "./solid": {
         "types": "./build/solid/index.d.ts",
         "default": "./build/solid/index.js"
@@ -91,6 +88,7 @@
     "format": "prettier --write \"src/**/*.{ts,tsx}\""
   },
   "dependencies": {
+    "@symbiote-native/components": "workspace:*",
     "expo-clipboard": "catalog:",
     "expo-modules-core": "catalog:"
   },

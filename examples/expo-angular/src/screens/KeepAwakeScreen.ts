@@ -1,39 +1,15 @@
-import { Component, Injector, effect, inject, signal } from '@angular/core';
+import { Component, computed, signal } from '@angular/core';
 import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
-import {
-  KeepAwakeService,
-  deactivateKeepAwake,
-  isAvailableAsync,
-} from '@symbiote-native/keep-awake/angular';
-import { ActionButton } from '../components/ActionButton';
+import { isAvailableAsync } from '@symbiote-native/keep-awake/angular';
+import { Scenario } from '../components/Scenario';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
+import { KeepAwakeHolder } from './KeepAwakeHolder';
 
-type ICapabilityStatus = 'checking' | 'yes' | 'no';
-
-function toCapabilityStatus(value: boolean): ICapabilityStatus {
-  return value ? 'yes' : 'no';
-}
-
-const KEEP_AWAKE_DEMO_TAG = 'keep-awake-screen-demo';
-
-/**
- * @symbiote-native/keep-awake canary demo: an isAvailableAsync() capability row plus a toggle
- * driving KeepAwakeService's own connect()/teardown pattern. Every other screen's *Service calls
- * connect() once from a field initializer, active for the component's whole lifetime — a fit for
- * a live data stream, but keep-awake's connect() is a pure side effect with no signal to expose,
- * so there's nothing to gate on a field initializer alone. This screen instead re-derives the
- * exact `effect(onCleanup => …)` shape KeepAwakeService.connect() uses, keyed off a local toggle
- * signal: flipping it on calls the service's connect() (mirroring the field-initializer call every
- * other screen makes), flipping it off runs onCleanup — deactivateKeepAwake() — before the effect
- * re-runs. Toggling on again re-engages via a fresh connect() call, which is harmless (the native
- * tag-based activation is idempotent, and any prior teardown effect deactivating a second time on
- * unmount is a no-op).
- */
 @Component({
   selector: 'KeepAwakeScreen',
   standalone: true,
-  imports: [ActionButton, SYMBIOTE_ELEMENTS],
+  imports: [KeepAwakeHolder, Scenario, SYMBIOTE_ELEMENTS],
   template: `
     <safe-area-view class="screen">
       <scroll-view
@@ -41,107 +17,78 @@ const KEEP_AWAKE_DEMO_TAG = 'keep-awake-screen-demo';
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <view [class]="lineTagClass">
-          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        <view [class]="'line-tag line-tag-' + lineInfo.line">
+          <text class="line-tag-text"
+            >{{ lineInfo.code }} · {{ lineInfo.label }}</text
+          >
         </view>
         <view class="hero-card">
-          <view class="hero-badge" [style]="heroBadgeStyle">
-            <text class="hero-badge-text">{{ heroBadgeCode }}</text>
+          <view class="hero-badge" [style]="badgeStyle">
+            <text class="hero-badge-text">{{ lineInfo.code }}</text>
           </view>
           <view class="hero-copy">
             <text class="hero-title">Keep Awake</text>
             <text class="hero-body">
-              @symbiote-native/keep-awake — keeps the screen on for as long as a
-              tagged activation stays engaged.
+              Stop the screen from dimming and locking while a component is
+              mounted, for a recipe, a workout timer, a video or a boarding
+              pass.
             </text>
           </view>
         </view>
 
-        <view testID="keep-awake-capability-card" class="capability-card">
-          <text class="capability-card-title">Capabilities</text>
-          <view testID="keep-awake-is-available" class="capability-row">
-            <text class="capability-label">isAvailableAsync()</text>
-            <view [class]="statusBadgeClass(isAvailable())">
-              <text class="status-badge-text">{{
-                statusLabel(isAvailable())
-              }}</text>
-            </view>
-          </view>
-        </view>
+        <Scenario
+          testID="keep-awake-scenario"
+          title="Keep the screen on while someone follows a recipe or a workout"
+          why="Hands that are busy cannot tap the screen to wake it. The lock lives exactly as long as the component that asked for it, so it cannot be left on by mistake."
+          [steps]="scenarioSteps"
+          expect="With the switch on the screen stays lit, and with it off the phone dims and locks after its normal timeout."
+        />
 
-        <view testID="keep-awake-toggle-card" class="capability-card">
-          <text class="capability-card-title">Keep screen awake</text>
-          <view testID="keep-awake-engaged" class="capability-row">
-            <text class="capability-label">Engaged</text>
-            <view [class]="statusBadgeClass(engagedStatus())">
-              <text class="status-badge-text">{{
-                statusLabel(engagedStatus())
-              }}</text>
-            </view>
+        <view testID="keep-awake-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Keep screen awake</text>
           </view>
-          <ActionButton
-            testID="keep-awake-toggle-button"
-            [title]="toggleTitle()"
-            (press)="toggleKeepAwake()"
-            [color]="lineColor"
-          ></ActionButton>
+          <view class="capability-row">
+            <text class="capability-label">Available</text>
+            <text class="value-text">{{ availableLabel() }}</text>
+          </view>
+          <view testID="keep-awake-toggle-row" class="capability-row">
+            <text class="capability-label">Keep screen awake</text>
+            <switch
+              testID="keep-awake-switch"
+              [value]="isKeepAwakeOn()"
+              [trackColor]="trackColor"
+              (valueChange)="isKeepAwakeOn.set($event)"
+            />
+          </view>
+          @if (isKeepAwakeOn()) {
+            <KeepAwakeHolder />
+          }
         </view>
       </scroll-view>
     </safe-area-view>
   `,
 })
 export class KeepAwakeScreen {
-  private readonly lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.KeepAwake];
-  readonly lineTagClass = `line-tag line-tag-${this.lineInfo.line}`;
-  readonly lineTagLabel = `${this.lineInfo.code} · ${this.lineInfo.label}`;
-  readonly heroBadgeCode = this.lineInfo.code;
-  readonly lineColor = LINE_COLOR[this.lineInfo.line];
-  readonly heroBadgeStyle = { backgroundColor: this.lineColor };
+  readonly lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.KeepAwake];
+  readonly badgeStyle = { backgroundColor: LINE_COLOR['keep-awake'] };
+  readonly trackColor = { true: LINE_COLOR['keep-awake'] };
+  readonly scenarioSteps = [
+    'Turn the switch on',
+    'Put the phone down and wait past the auto-lock time',
+    'Turn the switch off and wait again',
+  ];
 
-  private readonly injector = inject(Injector);
-  private readonly keepAwakeService = inject(KeepAwakeService);
+  readonly isKeepAwakeOn = signal(false);
+  private readonly isAvailable = signal<boolean | null>(null);
 
-  readonly isAvailable = signal<ICapabilityStatus>('checking');
-  readonly isEngaged = signal(false);
+  readonly availableLabel = computed(() => {
+    const isAvailable = this.isAvailable();
+    if (isAvailable === null) return 'checking…';
+    return isAvailable ? 'Yes' : 'No';
+  });
 
   constructor() {
-    isAvailableAsync().then(value =>
-      this.isAvailable.set(toCapabilityStatus(value)),
-    );
-
-    effect(
-      onCleanup => {
-        if (!this.isEngaged()) {
-          return;
-        }
-        this.keepAwakeService.connect(KEEP_AWAKE_DEMO_TAG);
-        onCleanup(() => deactivateKeepAwake(KEEP_AWAKE_DEMO_TAG));
-      },
-      { injector: this.injector },
-    );
-  }
-
-  toggleKeepAwake(): void {
-    this.isEngaged.update(value => !value);
-  }
-
-  toggleTitle(): string {
-    return this.isEngaged() ? 'Disengage' : 'Engage';
-  }
-
-  engagedStatus(): ICapabilityStatus {
-    return this.isEngaged() ? 'yes' : 'no';
-  }
-
-  statusBadgeClass(status: ICapabilityStatus): string {
-    return `status-badge status-badge-${status}`;
-  }
-
-  statusLabel(status: ICapabilityStatus): string {
-    return status === 'checking'
-      ? 'CHECKING…'
-      : status === 'yes'
-        ? 'YES'
-        : 'NO';
+    void isAvailableAsync().then(value => this.isAvailable.set(value));
   }
 }

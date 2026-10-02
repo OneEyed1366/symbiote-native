@@ -332,6 +332,20 @@ Resolved once, eagerly, at import time, straight off the native module:
   upstream's own behavior.
 </Aside>
 
+## Common questions
+
+- **`deviceName` is just "iPhone" on iOS 16+.** iOS 16 returns only the model unless the app holds
+  the `com.apple.developer.device-information.user-assigned-device-name` entitlement.
+- **`modelName` or `deviceName` is `null`.** Both can be `null` when the value cannot be determined.
+- **`isDevice` is `true` on the iOS Simulator.** Reported upstream; do not rely on it to detect one.
+- **`getDeviceTypeAsync` says `TABLET` on a phone.** Reported on some Android models.
+
+Sources: [Expo docs: Device](https://docs.expo.dev/versions/latest/sdk/device/),
+[expo/expo#19639](https://github.com/expo/expo/issues/19639),
+[expo/expo#19869](https://github.com/expo/expo/issues/19869),
+[expo/expo#11409](https://github.com/expo/expo/issues/11409),
+[expo/expo#12007](https://github.com/expo/expo/issues/12007).
+
 ## How the wrapper works
 
 `@symbiote-native/device` ships zero React/Vue/Angular/Svelte/Solid logic in `expo-device` itself — its

@@ -244,6 +244,7 @@ export {
   NativeEventEmitter,
   setDeviceEventSource,
 } from './native-events';
+export type { IEventValueSource } from './event-value-source';
 export type {
   IEventSubscription,
   IEventEmitterModule,
@@ -520,3 +521,20 @@ export { setBehaviorListener, markPropsDirty, setNodeDispatch } from './node';
 // one shared `IEventDispatch` rather than a closure in `node.listeners`
 export { hasListenerFor, listenerFor } from './node';
 export type { IEventDispatch } from './node';
+export {
+  createPermissionApi,
+  resolveInitialPermission,
+  fetchInitialPermission,
+  splitWriteOnlyPermissionOptions,
+} from './permission-hook-runtime';
+export type { IWriteOnlyPermissionOptions } from './permission-hook-runtime';
+export { expoViewManagerName, tryRegisterNativeView } from './expo-native-view';
+export { createResourceController } from './resource-controller';
+export type { IResourceController } from './resource-controller';
+export type {
+  IPermissionHookBehavior,
+  IPermissionHookMethods,
+  IPermissionHookOptions,
+  IPermissionApi,
+  IPermissionHookResult,
+} from './permission-hook-runtime';

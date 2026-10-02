@@ -26,7 +26,8 @@
 // variable (not read through the resource accessor) so `onCleanup` never has to read a possibly
 // -errored resource, which would itself throw during teardown.
 //
-// assetSource is deliberately NOT ported: it needs expo-asset, out of scope (see the README).
+// assetSource reaches openDatabaseAsync via the options prop, forwarded below — not a separate
+// prop here.
 // useSuspense is deliberately NOT offered: Solid's own <Suspense> already composes with a plain
 // createResource-backed component with zero extra code (any ancestor <Suspense> defers on this
 // resource for free), so there is no second, opt-in code path to build the way React needs one —

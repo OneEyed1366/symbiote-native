@@ -301,6 +301,9 @@ export type {
 // React lifecycle over those core device-state modules.
 export { useWindowDimensions } from './hooks/use-window-dimensions';
 export { useColorScheme } from './hooks/use-color-scheme';
+export { createPermissionHook } from './hooks/create-permission-hook';
+export { createResourceHook } from './hooks/create-resource-hook';
+export { createEventValueHook } from './hooks/create-event-value-hook';
 
 export { AccessibilityInfo } from './modules/accessibility-info';
 export type {

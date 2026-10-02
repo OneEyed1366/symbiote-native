@@ -1,0 +1,20 @@
+export const howtosSidebar = {
+  label: 'How-tos',
+  collapsed: true,
+  items: [
+    { label: 'Overview', slug: 'docs/howtos' },
+    { label: 'Style a component', slug: 'docs/howtos/styling' },
+    { label: 'Animate a value', slug: 'docs/howtos/animations' },
+    { label: 'Handle press/change events', slug: 'docs/howtos/events' },
+    { label: 'Two-way bind a value', slug: 'docs/howtos/two-way-binding' },
+    { label: 'Share content across surfaces', slug: 'docs/howtos/portals-and-tunnels' },
+    { label: 'Write platform-specific code', slug: 'docs/howtos/platform-code' },
+    { label: 'Wrap a third-party native view', slug: 'docs/howtos/third-party-views' },
+    { label: 'Wire up an Expo native module', slug: 'docs/howtos/expo-native-module-setup' },
+    { label: 'Add a native splash screen', slug: 'docs/howtos/splash-screen' },
+    { label: 'Turn on diagnostic logging', slug: 'docs/howtos/debugging' },
+    { label: 'Refs and attachments in Svelte', slug: 'docs/howtos/svelte-refs-and-attachments' },
+    { label: 'Catch render errors (Svelte)', slug: 'docs/howtos/error-boundaries' },
+    { label: 'Reactivity in Solid', slug: 'docs/howtos/solid-reactivity' },
+  ],
+};

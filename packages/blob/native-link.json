@@ -1,0 +1,12 @@
+{
+  "android": {
+    "gradleProjectName": "expo-blob",
+    "modules": [
+      {
+        "importPath": "expo.modules.blob.BlobModule",
+        "className": "BlobModule",
+        "nativeName": "ExpoBlob"
+      }
+    ]
+  }
+}

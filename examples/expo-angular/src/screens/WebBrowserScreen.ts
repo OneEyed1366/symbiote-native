@@ -1,5 +1,5 @@
 import { Component, signal } from '@angular/core';
-import { Platform, SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
+import { Platform } from '@symbiote-native/angular';
 import {
   coolDownAsync,
   dismissBrowser,
@@ -7,243 +7,144 @@ import {
   mayInitWithUrlAsync,
   openBrowserAsync,
   warmUpAsync,
-} from '@symbiote-native/web-browser/angular';
+} from '@symbiote-native/web-browser';
 import { ActionButton } from '../components/ActionButton';
+import { CallConsole } from '../components/CallConsole';
+import { Explorer } from '../components/Explorer';
+import { Field } from '../components/Field';
+import { ResultRow } from '../components/ResultRow';
+import { Scenario } from '../components/Scenario';
+import { ScreenShell } from '../components/ScreenShell';
+import { lineColorOf } from '../components/line-color';
 import { ROUTE_NAME } from '../routes';
-import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
+import { WebBrowserAuthCard } from './WebBrowserAuthCard';
+import { WebBrowserOptionsCard } from './WebBrowserOptionsCard';
+import { INITIAL_OPTIONS, toOpenOptions } from './web-browser-options';
+import type { IOptionsForm } from './web-browser-options';
 
 const DEMO_URL = 'https://symbiote-native.dev';
 
-/**
- * @symbiote-native/web-browser canary demo: open a URL in the in-app browser and render the
- * result type it resolves with, plus the Android-only Custom Tabs service surface.
- *
- * The two platforms answer differently and both answers are shown as-is: iOS presents
- * SFSafariViewController and resolves only once it closes ('cancel', or 'dismiss' when
- * dismissBrowser closed it), Android launches a Custom Tab and resolves 'opened' immediately,
- * never reporting the close.
- */
 @Component({
   selector: 'WebBrowserScreen',
   standalone: true,
-  imports: [ActionButton, SYMBIOTE_ELEMENTS],
+  imports: [
+    ActionButton,
+    CallConsole,
+    Explorer,
+    Field,
+    ResultRow,
+    Scenario,
+    ScreenShell,
+    WebBrowserAuthCard,
+    WebBrowserOptionsCard,
+  ],
   template: `
-    <safe-area-view class="screen">
-      <scroll-view
-        testID="web-browser-scroll"
-        class="screen"
-        contentContainerStyle="scroll-content"
+    <ScreenShell
+      [route]="route"
+      testID="web-browser-scroll"
+      title="Web Browser"
+      body="Show web content in an in-app browser that keeps the user inside your app, and run browser-based sign-in flows that return to the app with a result."
+    >
+      <Scenario
+        testID="web-browser-open-card"
+        title="Open a link or a help page without leaving the app"
+        why="Terms of service, help articles and links open in Safari View Controller or a Chrome Custom Tab on top of your app, with shared cookies and one tap to get back."
+        [steps]="openSteps"
+        expect="The page opens in the in-app browser. Last result says cancel when closed by the user and dismiss when closed by the app on iOS, and opened on Android as soon as the tab launches."
       >
-        <view [class]="lineTagClass">
-          <text class="line-tag-text">{{ lineTagLabel }}</text>
-        </view>
-        <view class="hero-card">
-          <view class="hero-badge" [style]="heroBadgeStyle">
-            <text class="hero-badge-text">{{ heroBadgeCode }}</text>
-          </view>
-          <view class="hero-copy">
-            <text class="hero-title">Web Browser</text>
-            <text class="hero-body">
-              @symbiote-native/web-browser — an in-app browser
-              (SFSafariViewController on iOS, Custom Tabs on Android) that keeps
-              the user inside the app, unlike Linking.openURL.
-            </text>
-          </view>
-        </view>
+        <Field
+          testID="web-browser-url-input"
+          label="url"
+          [(value)]="url"
+          placeholder="https://example.com"
+        />
+        <ActionButton
+          testID="web-browser-open-button"
+          title="Open"
+          [color]="color"
+          (press)="open()"
+        />
+        <ActionButton
+          testID="web-browser-dismiss-button"
+          title="Dismiss"
+          [color]="color"
+          (press)="dismiss()"
+        />
+        <ResultRow
+          testID="web-browser-result"
+          label="Last result"
+          [value]="lastResult()"
+        />
+      </Scenario>
 
-        <view testID="web-browser-open-card" class="web-browser-card">
-          <text class="web-browser-card-title">Open a URL</text>
-          <text-input
-            testID="web-browser-url-input"
-            class="text-input"
-            placeholder="https://…"
-            placeholderTextColor="#41506a"
-            [value]="url()"
-            (valueChange)="url.set($event)"
-          ></text-input>
-          <ActionButton
-            testID="web-browser-open-button"
-            title="Open"
-            (press)="handleOpen()"
-            [color]="lineColor"
-          ></ActionButton>
-          @if (Platform.OS === 'ios') {
-            <ActionButton
-              testID="web-browser-dismiss-button"
-              title="Dismiss"
-              (press)="handleDismiss()"
-              [color]="lineColor"
-            ></ActionButton>
-            <text class="web-browser-note">
-              The presented browser covers the app, so Dismiss is only reachable
-              once the browser is already gone — it then reports that no browser
-              was presented.
-            </text>
-          } @else {
-            <text class="web-browser-note">
-              Android has no dismiss: a Custom Tab runs in its own task and
-              cannot be closed programmatically, so dismissBrowser throws off
-              iOS.
-            </text>
+      <WebBrowserAuthCard [url]="url()" [options]="options()" />
+
+      <Explorer testID="web-browser-explorer" [color]="color">
+        <ng-template>
+          <WebBrowserOptionsCard [(form)]="options" />
+          @if (isAndroid) {
+            <CallConsole
+              prefix="web-browser-custom-tabs"
+              title="Custom Tabs service (Android)"
+              [color]="color"
+              hint="Android only, the calls reject on iOS."
+              [calls]="customTabsCalls"
+            />
           }
-        </view>
-
-        <view testID="web-browser-result-card" class="web-browser-card">
-          <text class="web-browser-card-title">Last result</text>
-          <view class="web-browser-row">
-            <text class="web-browser-row-label">Open</text>
-            <text
-              testID="web-browser-open-result"
-              class="web-browser-value-text"
-            >
-              {{ openResult() }}
-            </text>
-          </view>
-          <view class="web-browser-row">
-            <text class="web-browser-row-label">Dismiss</text>
-            <text
-              testID="web-browser-dismiss-result"
-              class="web-browser-value-text"
-            >
-              {{ dismissResult() }}
-            </text>
-          </view>
-        </view>
-
-        @if (Platform.OS === 'android') {
-          <view testID="web-browser-service-card" class="web-browser-card">
-            <text class="web-browser-card-title">Custom Tabs service</text>
-            <text class="web-browser-note">
-              Android only. Warming the service up before a known URL makes the
-              tab open faster; cool it down when you are done.
-              getCustomTabsSupportingBrowsersAsync throws on iOS, which has no
-              such concept, so this whole card is behind the platform check.
-            </text>
-            <view class="button-row">
-              <ActionButton
-                testID="web-browser-warm-up-button"
-                title="Warm up"
-                (press)="handleWarmUp()"
-                [color]="lineColor"
-              ></ActionButton>
-              <ActionButton
-                testID="web-browser-may-init-button"
-                title="May init"
-                (press)="handleMayInit()"
-                [color]="lineColor"
-              ></ActionButton>
-              <ActionButton
-                testID="web-browser-cool-down-button"
-                title="Cool down"
-                (press)="handleCoolDown()"
-                [color]="lineColor"
-              ></ActionButton>
-              <ActionButton
-                testID="web-browser-browsers-button"
-                title="List browsers"
-                (press)="handleListBrowsers()"
-                [color]="lineColor"
-              ></ActionButton>
-            </view>
-            <view class="web-browser-row">
-              <text class="web-browser-row-label">Service package</text>
-              <text
-                testID="web-browser-service-package"
-                class="web-browser-value-text"
-              >
-                {{ servicePackage() }}
-              </text>
-            </view>
-            <view class="web-browser-row">
-              <text class="web-browser-row-label">Supporting browsers</text>
-              <text
-                testID="web-browser-browsers"
-                class="web-browser-value-text"
-              >
-                {{ browsers() }}
-              </text>
-            </view>
-          </view>
-        }
-      </scroll-view>
-    </safe-area-view>
+        </ng-template>
+      </Explorer>
+    </ScreenShell>
   `,
 })
 export class WebBrowserScreen {
-  private readonly lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.WebBrowser];
-  readonly lineTagClass = `line-tag line-tag-${this.lineInfo.line}`;
-  readonly lineTagLabel = `${this.lineInfo.code} · ${this.lineInfo.label}`;
-  readonly heroBadgeCode = this.lineInfo.code;
-  readonly lineColor = LINE_COLOR[this.lineInfo.line];
-  readonly heroBadgeStyle = { backgroundColor: this.lineColor };
-
-  readonly Platform = Platform;
+  readonly route = ROUTE_NAME.WebBrowser;
+  readonly color = lineColorOf(ROUTE_NAME.WebBrowser);
+  readonly isAndroid = Platform.select({ android: true, default: false });
+  readonly openSteps = [
+    'Press Open (the sample URL is preset)',
+    'Close the browser with Done or the back button',
+    'Press Open again and use Dismiss from the app (iOS)',
+  ];
 
   readonly url = signal(DEMO_URL);
-  readonly openResult = signal('idle');
-  readonly dismissResult = signal('idle');
-  readonly servicePackage = signal('(not warmed up)');
-  readonly browsers = signal('(not queried)');
+  readonly options = signal<IOptionsForm>(INITIAL_OPTIONS);
+  readonly lastResult = signal('idle');
+  private readonly servicePackage = signal<string | undefined>(undefined);
 
-  handleOpen(): void {
-    this.openResult.set('opening…');
-    openBrowserAsync(this.url())
-      .then(result => this.openResult.set(result.type))
-      .catch((error: Error) => this.openResult.set(`failed: ${error.message}`));
+  readonly customTabsCalls = [
+    {
+      label: 'getCustomTabsSupportingBrowsersAsync',
+      run: () => getCustomTabsSupportingBrowsersAsync(),
+    },
+    {
+      label: 'warmUpAsync',
+      run: async () => {
+        const result = await warmUpAsync();
+        this.servicePackage.set(result.servicePackage);
+        return result;
+      },
+    },
+    {
+      label: 'mayInitWithUrlAsync',
+      run: () => mayInitWithUrlAsync(this.url(), this.servicePackage()),
+    },
+    { label: 'coolDownAsync', run: () => coolDownAsync(this.servicePackage()) },
+  ];
+
+  open(): void {
+    this.lastResult.set('opening…');
+    openBrowserAsync(this.url(), toOpenOptions(this.options()))
+      .then(result => this.lastResult.set(`result: ${result.type}`))
+      .catch((error: Error) =>
+        this.lastResult.set(`open failed: ${error.message}`),
+      );
   }
 
-  handleDismiss(): void {
+  dismiss(): void {
     dismissBrowser()
-      .then(result => this.dismissResult.set(result.type))
+      .then(result => this.lastResult.set(`dismissed: ${result.type}`))
       .catch((error: Error) =>
-        this.dismissResult.set(`failed: ${error.message}`),
+        this.lastResult.set(`dismiss failed: ${error.message}`),
       );
-  }
-
-  handleWarmUp(): void {
-    warmUpAsync()
-      .then(result =>
-        this.servicePackage.set(
-          result.servicePackage ?? '(no service package)',
-        ),
-      )
-      .catch((error: Error) =>
-        this.servicePackage.set(`failed: ${error.message}`),
-      );
-  }
-
-  // Hints the warmed-up service at the URL about to be opened; the package it reports back is the
-  // one warmUpAsync picked, which is why that button comes first.
-  handleMayInit(): void {
-    mayInitWithUrlAsync(this.url())
-      .then(result =>
-        this.servicePackage.set(
-          result.servicePackage ?? '(no service package)',
-        ),
-      )
-      .catch((error: Error) =>
-        this.servicePackage.set(`failed: ${error.message}`),
-      );
-  }
-
-  handleCoolDown(): void {
-    coolDownAsync()
-      .then(() => this.servicePackage.set('(cooled down)'))
-      .catch((error: Error) =>
-        this.servicePackage.set(`failed: ${error.message}`),
-      );
-  }
-
-  handleListBrowsers(): void {
-    this.browsers.set('querying…');
-    getCustomTabsSupportingBrowsersAsync()
-      .then(result =>
-        this.browsers.set(
-          result.browserPackages.length === 0
-            ? '(none installed)'
-            : result.browserPackages.join(', '),
-        ),
-      )
-      .catch((error: Error) => this.browsers.set(`failed: ${error.message}`));
   }
 }

@@ -20,7 +20,7 @@
 // local `node_modules/react-reconciler` (+ `node_modules/@types/react-reconciler`) symlink this
 // task added by hand, mirroring exactly what pnpm's own hoisted linker does for `adapters/react`
 // — see the task's final report for why `package.json` itself was left untouched.
-import { act, Component, createContext, type ReactNode } from 'react';
+import { act, Component, createContext, Suspense, type ReactNode } from 'react';
 import createReconciler from 'react-reconciler';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SQLiteProvider, useSQLiteContext } from './sqlite-context';
@@ -448,15 +448,8 @@ describe('<SQLiteProvider useSuspense>', () => {
   });
 });
 
-// Cases below are ported from expo-sqlite's hooks-test.ios.tsx (.vendors/expo @ origin/sdk-57)
-// — coverage not already exercised above. The Suspense-fallback and error-boundary-with-Suspense
-// cases are skipped: this file's harness config disables commit suspension
-// (`maySuspendCommit: () => false`, `startSuspendingCommit`/`suspendInstance` are no-ops — see
-// the harness header), so `<SQLiteProviderSuspense>`'s `use()` call cannot be driven to a real
-// pending state through it; exercising that path needs the full renderer this file's own header
-// says was deliberately not linked in. `deepEqual` is not ported either — it is an unexported
-// implementation detail of `propsAreEqual` below, not part of the public surface, and its
-// behavior is what the dedup test below observes from the outside.
+// Ported from expo-sqlite's hooks-test.ios.tsx; `deepEqual` is unexported, so the dedup test
+// below observes it from the outside
 describe('<SQLiteProvider> re-render dedup', () => {
   it('does not re-open the database for a structurally-equal props object, but does for a real change', () => {
     const harness = createHarness();
@@ -524,6 +517,54 @@ describe('<SQLiteProvider> onInit', () => {
       undefined,
     );
     expect(onInit).not.toHaveBeenCalled();
+    harness.unmount();
+  });
+});
+
+describe('<SQLiteProvider useSuspense> Suspense integration', () => {
+  it('shows the Suspense fallback until the database is ready', async () => {
+    const pending = deferred<IFakeDb>();
+    openDatabaseAsyncMock.mockReturnValueOnce(pending.promise);
+    const db = fakeDatabase();
+    let fallbackRenders = 0;
+    const renders: SQLiteDatabase[] = [];
+    const harness = createHarness();
+
+    harness.mount(
+      <Suspense fallback={<Marker onRender={() => fallbackRenders++} />}>
+        <SQLiteProvider databaseName="suspense-ready.db" useSuspense>
+          <Consumer onRender={value => renders.push(value)} />
+        </SQLiteProvider>
+      </Suspense>,
+    );
+
+    expect(fallbackRenders).toBeGreaterThan(0);
+    expect(renders).toEqual([]);
+    pending.resolve(db);
+    await flush(pending.promise);
+    expect(renders).toEqual([db]);
+    harness.unmount();
+  });
+
+  it('throws an open failure to the nearest error boundary', async () => {
+    const pending = deferred<IFakeDb>();
+    openDatabaseAsyncMock.mockReturnValueOnce(pending.promise);
+    const caught: Error[] = [];
+    const harness = createHarness();
+
+    harness.mount(
+      <Boundary onCatch={error => caught.push(error)}>
+        <Suspense fallback={null}>
+          <SQLiteProvider databaseName="suspense-failed.db" useSuspense>
+            {null}
+          </SQLiteProvider>
+        </Suspense>
+      </Boundary>,
+    );
+    pending.reject(new Error('disk full'));
+    await flush(pending.promise);
+
+    expect(caught.map(error => error.message)).toEqual(['disk full']);
     harness.unmount();
   });
 });

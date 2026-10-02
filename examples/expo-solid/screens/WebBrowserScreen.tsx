@@ -1,4 +1,4 @@
-import { createSignal } from 'solid-js';
+import { Show, createSignal } from 'solid-js';
 import { Platform } from '@symbiote-native/solid';
 import {
   coolDownAsync,
@@ -9,214 +9,103 @@ import {
   warmUpAsync,
 } from '@symbiote-native/web-browser';
 import { ActionButton } from '../components/ActionButton';
+import { CallConsole } from '../components/CallConsole';
+import { Explorer, Scenario } from '../components/Scenario';
+import {
+  Field,
+  ResultRow,
+  ScreenShell,
+  lineColorOf,
+} from '../components/ScreenShell';
 import { ROUTE_NAME } from '../routes';
-import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
+import {
+  AuthSessionCard,
+  INITIAL_OPTIONS,
+  OptionsCard,
+  toOpenOptions,
+} from './web-browser-extras';
+import type { IOptionsForm, ISetOptions } from './web-browser-extras';
 
+const ROUTE = ROUTE_NAME.WebBrowser;
+const color = lineColorOf(ROUTE);
 const DEMO_URL = 'https://symbiote-native.dev';
+const IS_ANDROID = Platform.select({ android: true, default: false });
 
-const isAndroid = Platform.OS === 'android';
-
-function describeList(items: readonly string[]): string {
-  return items.length === 0 ? '(none)' : items.join(', ');
-}
-
-/**
- * @symbiote-native/web-browser canary demo: open a url in the in-app browser
- * (SFSafariViewController / Chrome Custom Tabs), read back the result type, and, on Android
- * only, the Custom Tabs service surface.
- *
- * The two platforms resolve differently: iOS waits for the browser to close and reports
- * 'cancel'/'dismiss', Android resolves 'opened' the moment the tab launches and never reports the
- * close.
- */
-export function WebBrowserScreen() {
-  const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.WebBrowser];
-  const lineColor = LINE_COLOR[lineInfo.line];
-
-  const [url, setUrl] = createSignal(DEMO_URL);
+function OpenCard(props: { url: string; setUrl: (value: string) => void; options: IOptionsForm }) {
   const [lastResult, setLastResult] = createSignal('idle');
-  const [servicePackage, setServicePackage] = createSignal<string | undefined>(
-    undefined,
-  );
-  const [customTabsSummary, setCustomTabsSummary] = createSignal('not queried');
-
-  const handleOpen = () => {
+  const open = () => {
     setLastResult('opening…');
-    openBrowserAsync(url(), {
-      toolbarColor: '#0b1622',
-      enableBarCollapsing: true,
-    })
+    openBrowserAsync(props.url, toOpenOptions(props.options))
       .then(result => setLastResult(`result: ${result.type}`))
       .catch((error: Error) => setLastResult(`open failed: ${error.message}`));
   };
-
-  // iOS only - a Custom Tab cannot be closed programmatically, so this rejects on Android.
-  const handleDismiss = () => {
+  const dismiss = () =>
     dismissBrowser()
       .then(result => setLastResult(`dismissed: ${result.type}`))
-      .catch((error: Error) =>
-        setLastResult(`dismiss failed: ${error.message}`),
-      );
-  };
-
-  const handleWarmUp = () => {
-    warmUpAsync()
-      .then(result => {
-        setServicePackage(result.servicePackage);
-        setLastResult(
-          `warmed up: ${result.servicePackage ?? '(no service package)'}`,
-        );
-      })
-      .catch((error: Error) =>
-        setLastResult(`warm-up failed: ${error.message}`),
-      );
-  };
-
-  const handleMayInit = () => {
-    mayInitWithUrlAsync(url(), servicePackage())
-      .then(result =>
-        setLastResult(
-          `may-init: ${result.servicePackage ?? '(no service package)'}`,
-        ),
-      )
-      .catch((error: Error) =>
-        setLastResult(`may-init failed: ${error.message}`),
-      );
-  };
-
-  const handleCoolDown = () => {
-    coolDownAsync(servicePackage())
-      .then(result =>
-        setLastResult(
-          `cooled down: ${result.servicePackage ?? '(no service package)'}`,
-        ),
-      )
-      .catch((error: Error) =>
-        setLastResult(`cool-down failed: ${error.message}`),
-      );
-  };
-
-  const handleQueryBrowsers = () => {
-    setCustomTabsSummary('querying…');
-    getCustomTabsSupportingBrowsersAsync()
-      .then(result => {
-        setCustomTabsSummary(
-          `default: ${result.defaultBrowserPackage ?? '(none)'} · browsers: ${describeList(
-            result.browserPackages,
-          )} · services: ${describeList(result.servicePackages)}`,
-        );
-      })
-      .catch((error: Error) =>
-        setCustomTabsSummary(`query failed: ${error.message}`),
-      );
-  };
+      .catch((error: Error) => setLastResult(`dismiss failed: ${error.message}`));
 
   return (
-    <safe-area-view class="screen">
-      <scroll-view
-        testID="web-browser-scroll"
-        class="screen"
-        contentContainerStyle="scroll-content"
-      >
-        <view class={`line-tag line-tag-${lineInfo.line}`}>
-          <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
-        </view>
-        <view class="hero-card">
-          <view class="hero-badge" style={{ backgroundColor: lineColor }}>
-            <text class="hero-badge-text">{lineInfo.code}</text>
-          </view>
-          <view class="hero-copy">
-            <text class="hero-title">Web Browser</text>
-            <text class="hero-body">
-              @symbiote-native/web-browser — an in-app browser that keeps the
-              user inside the app, unlike Linking.openURL, plus the OAuth auth
-              session.
-            </text>
-          </view>
-        </view>
+    <Scenario
+      testID="web-browser-open-card"
+      title="Open a link or a help page without leaving the app"
+      why="Terms of service, help articles and links open in Safari View Controller or a Chrome Custom Tab on top of your app, with shared cookies and one tap to get back."
+      steps={['Press Open (the sample URL is preset)', 'Close the browser with Done or the back button', 'Press Open again and use Dismiss from the app (iOS)']}
+      expect="The page opens in the in-app browser. Last result says cancel when closed by the user and dismiss when closed by the app on iOS, and opened on Android as soon as the tab launches."
+    >
+      <Field testID="web-browser-url-input" label="url" value={props.url} onChange={props.setUrl} placeholder="https://example.com" />
+      <ActionButton testID="web-browser-open-button" title="Open" onPress={open} color={color} />
+      <ActionButton testID="web-browser-dismiss-button" title="Dismiss" onPress={dismiss} color={color} />
+      <ResultRow testID="web-browser-result" label="Last result" value={lastResult()} />
+    </Scenario>
+  );
+}
 
-        <view testID="web-browser-open-card" class="feature-card">
-          <view class="feature-card-header">
-            <text class="feature-card-title">Open a url</text>
-          </view>
-          <text-input
-            testID="web-browser-url-input"
-            value={url()}
-            onValueChange={event => setUrl(event.text)}
-            placeholder="https://example.com"
-            placeholderTextColor="#41506a"
-            autoCapitalize="none"
-            class="text-input"
-          />
-          <ActionButton
-            testID="web-browser-open-button"
-            title="Open"
-            onPress={handleOpen}
-            color={lineColor}
-          />
-          <ActionButton
-            testID="web-browser-dismiss-button"
-            title="Dismiss"
-            onPress={handleDismiss}
-            color={lineColor}
-          />
-          <text class="info-text">
-            iOS resolves once the browser closes (cancel, or dismiss when closed
-            by dismissBrowser); Android resolves opened as soon as the Custom
-            Tab launches. Dismiss is iOS-only and rejects on Android.
-          </text>
-          <view class="capability-row">
-            <text class="capability-label">Last result</text>
-            <text testID="web-browser-result" class="value-text">
-              {lastResult()}
-            </text>
-          </view>
-        </view>
+function CustomTabsCalls(props: { url: string }) {
+  const [servicePackage, setServicePackage] = createSignal<string | undefined>(undefined);
+  return (
+    <CallConsole
+      prefix="web-browser-custom-tabs"
+      title="Custom Tabs service (Android)"
+      color={color}
+      hint="Android only, the calls reject on iOS."
+      calls={[
+        { label: 'getCustomTabsSupportingBrowsersAsync', run: () => getCustomTabsSupportingBrowsersAsync() },
+        {
+          label: 'warmUpAsync',
+          run: async () => {
+            const result = await warmUpAsync();
+            setServicePackage(result.servicePackage);
+            return result;
+          },
+        },
+        { label: 'mayInitWithUrlAsync', run: () => mayInitWithUrlAsync(props.url, servicePackage()) },
+        { label: 'coolDownAsync', run: () => coolDownAsync(servicePackage()) },
+      ]}
+    />
+  );
+}
 
-        {isAndroid ? (
-          <view testID="web-browser-custom-tabs-card" class="feature-card">
-            <view class="feature-card-header">
-              <text class="feature-card-title">Custom Tabs service</text>
-            </view>
-            <text class="info-text">
-              Android only. getCustomTabsSupportingBrowsersAsync throws on iOS —
-              its native stub is registered without the Async suffix, so the
-              availability check fires before the not-Android branch — so this
-              whole card is gated on Platform.OS.
-            </text>
-            <ActionButton
-              testID="web-browser-query-browsers-button"
-              title="List supporting browsers"
-              onPress={handleQueryBrowsers}
-              color={lineColor}
-            />
-            <view class="capability-row">
-              <text class="capability-label">Browsers</text>
-              <text testID="web-browser-custom-tabs" class="value-text">
-                {customTabsSummary()}
-              </text>
-            </view>
-            <ActionButton
-              testID="web-browser-warm-up-button"
-              title="Warm up"
-              onPress={handleWarmUp}
-              color={lineColor}
-            />
-            <ActionButton
-              testID="web-browser-may-init-button"
-              title="May init with url"
-              onPress={handleMayInit}
-              color={lineColor}
-            />
-            <ActionButton
-              testID="web-browser-cool-down-button"
-              title="Cool down"
-              onPress={handleCoolDown}
-              color={lineColor}
-            />
-          </view>
-        ) : null}
-      </scroll-view>
-    </safe-area-view>
+export function WebBrowserScreen() {
+  const [url, setUrl] = createSignal(DEMO_URL);
+  const [options, setOptionsState] = createSignal<IOptionsForm>(INITIAL_OPTIONS);
+  const setOptions: ISetOptions = patch =>
+    setOptionsState(previous => ({ ...previous, ...patch }));
+
+  return (
+    <ScreenShell
+      route={ROUTE}
+      testID="web-browser-scroll"
+      title="Web Browser"
+      body="Show web content in an in-app browser that keeps the user inside your app, and run browser-based sign-in flows that return to the app with a result."
+    >
+      <OpenCard url={url()} setUrl={setUrl} options={options()} />
+      <AuthSessionCard url={url()} options={options()} />
+      <Explorer testID="web-browser-explorer" color={color}>
+        <OptionsCard form={options()} setForm={setOptions} />
+        <Show when={IS_ANDROID}>
+          <CustomTabsCalls url={url()} />
+        </Show>
+      </Explorer>
+    </ScreenShell>
   );
 }

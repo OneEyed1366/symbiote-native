@@ -1,17 +1,17 @@
 ---
 title: Web browser
-description: expo-web-browser wrapped for every SymbioteNative adapter — an in-app browser and the OAuth auth-session flow.
+description: Open links in an in-app browser and run OAuth login flows on every SymbioteNative adapter.
 ---
 
 import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 
+Open a link in an in-app browser, or run an OAuth login in one and get the redirect back.
 `@symbiote-native/web-browser` wraps
-[`expo-web-browser`](https://github.com/expo/expo/tree/main/packages/expo-web-browser) — an in-app
-browser (`SFSafariViewController` on iOS, Chrome Custom Tabs on Android) plus the OAuth
-auth-session flow — so every SymbioteNative adapter can reach it, not just React. Like
-[secure store](/docs/packages/secure-store/) and [local auth](/docs/packages/local-auth/), every
-export is a free function with no per-instance state, so there is no hook/composable/service to
-wrap — the React, Vue, Angular, Svelte, and Solid entry points are plain re-exports of the same
+[`expo-web-browser`](https://github.com/expo/expo/tree/main/packages/expo-web-browser)
+(`SFSafariViewController` on iOS, Chrome Custom Tabs on Android) so every SymbioteNative adapter
+can reach it, not just React. Like [secure store](/docs/packages/secure-store/) and
+[local auth](/docs/packages/local-auth/), every export is a free function with no per-instance
+state, so the React, Vue, Angular, Svelte, and Solid entry points are plain re-exports of the same
 `core`.
 
 | OS platform | Support |
@@ -374,6 +374,9 @@ reads only these two.
 
 ## Notes
 
+- **Pick the call by purpose.** Use `openBrowserAsync` to show a page (a privacy policy, docs). Use
+  `openAuthSessionAsync` for login: since iOS 11 `SFSafariViewController` no longer shares cookies
+  with Safari, so the auth session is the one that sees the user's signed-in state.
 - **`getCustomTabsSupportingBrowsersAsync` throws on iOS rather than resolving empty.** iOS's
   native module registers its no-op stub as `getCustomTabsSupportingBrowsers`, without the `Async`
   suffix, so the availability check fires before the "not Android, return an empty result" branch
@@ -386,9 +389,40 @@ reads only these two.
 - **Colors are marshalled before the native call.** `toolbarColor`, `secondaryToolbarColor` and
   `controlsColor` are run through `processColor`, so any React Native color format works.
 
+## Common questions
+
+**Login returns `cancel` even though I signed in.** The redirect never reached the app. Check that
+the redirect URI uses your app's own URL scheme (`myapp://...`, not `https://...`), that the scheme
+is registered in the iOS and Android projects, and that it matches what the provider has
+allow-listed. On Android a missing or mismatched intent filter makes every attempt look cancelled,
+most visibly in release builds.
+
+**Why does `openBrowserAsync` resolve right away on Android?** Custom Tabs do not report closing,
+so the promise resolves at launch. If you need to know when the user comes back, use
+`openAuthSessionAsync`, which watches the app state and the incoming link for you.
+
+**What is the difference between `cancel` and `dismiss`?** `cancel` means the user closed the
+browser or came back without a redirect. `dismiss` means `dismissBrowser` closed it from your code.
+
+**How do I pass data back into the app?** Add a `Linking` listener before opening the browser,
+call `dismissBrowser` when it fires, then parse the redirect URL.
+
+**Should I use `openBrowserAsync` for sign-in?** No. Since iOS 11 `SFSafariViewController` does not
+share cookies with Safari, so use `openAuthSessionAsync` for login and `openBrowserAsync` only to
+show a page.
+
+Sources: [expo/expo#23781 auth session returns dismiss on redirect, Android only](https://github.com/expo/expo/issues/23781),
+[expo/expo#6289 openAuthSessionAsync returns dismiss after a successful login](https://github.com/expo/expo/issues/6289),
+[expo/expo#12044 dismiss on Android standalone app](https://github.com/expo/expo/issues/12044),
+[expo/expo#6679 dismiss before the browser opens](https://github.com/expo/expo/issues/6679).
+
 ## Not ported
 
-Three pieces of upstream are deliberately left out rather than silently dropped:
+`maybeCompleteAuthSession` is ported so shared code can call it at module scope: it closes the web
+popup of an auth session, so on iOS and Android it returns
+`{ type: 'failed', message: 'Not supported on this platform' }`.
+
+Two pieces of upstream are deliberately left out rather than silently dropped:
 
 - **The `experimentalLauncherActivity` config plugin.** Upstream's
   `plugin/src/withWebBrowserAndroid.ts` exists only for that opt-in flag: it writes a
@@ -396,10 +430,6 @@ Three pieces of upstream are deliberately left out rather than silently dropped:
   `AndroidManifest.xml`, as a workaround for a specific redirect edge case. It is opt-in upstream
   and unnecessary for anything on this page, so this package does not reproduce it. If you
   genuinely need that workaround, add the activity to your app by hand.
-- **`maybeCompleteAuthSession`.** Genuinely web-only — it closes the `window.open` popup the web
-  implementation creates. On a native platform upstream's own version can only ever return
-  `{ type: 'failed', message: 'Not supported on this platform' }`, so it is left out rather than
-  shipped as a function that can never succeed.
 - **The web-only open options `windowName` and `windowFeatures`**, for the same reason:
   SymbioteNative has no web target, so nothing could read them.
 

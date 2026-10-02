@@ -1,0 +1,40 @@
+{
+  "android": {
+    "gradleProjectName": "expo-mail-composer",
+    "modules": [
+      {
+        "importPath": "expo.modules.mailcomposer.MailComposerModule",
+        "className": "MailComposerModule",
+        "nativeName": "ExpoMailComposer"
+      }
+    ]
+  },
+  "ios": {
+    "infoPlistArrayKeys": {
+      "LSApplicationQueriesSchemes": [
+        "airmail",
+        "message",
+        "bluemail",
+        "canary",
+        "edisonmail",
+        "szn-email",
+        "fastmail",
+        "x-gmxmail-netid-v1",
+        "googlegmail",
+        "mailrumail",
+        "ms-outlook",
+        "protonmail",
+        "ctxmail",
+        "readdle-spark",
+        "superhuman",
+        "telekommail",
+        "tutanota",
+        "x-webdemail-netid-v1",
+        "ymail",
+        "yandexmail",
+        "appcenter-f45b4c0b-75c9-2d01-7ab6-41f6a6015be2",
+        "mymail-mailto"
+      ]
+    }
+  }
+}

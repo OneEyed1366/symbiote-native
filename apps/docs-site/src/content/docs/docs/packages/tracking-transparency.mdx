@@ -9,8 +9,8 @@ import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 [`expo-tracking-transparency`](https://github.com/expo/expo/tree/main/packages/expo-tracking-transparency)
 — the iOS App Tracking Transparency prompt, permission get/request, and the advertising-ID getter
 — so every SymbioteNative adapter can reach it, not just React. Its permission surface
-(`getTrackingPermissionsAsync`/`requestTrackingPermissionsAsync`) shares the same `usePermissions()`
-hook/composable/service shape as [brightness](/docs/packages/brightness/)'s own permission surface,
+(`getTrackingPermissionsAsync`/`requestTrackingPermissionsAsync`) shares the same `useTrackingPermissions()`
+hook/composable/service shape as [location](/docs/packages/location/)'s own permission surface,
 so switching between the two packages needs no relearning; `getAdvertisingId`/`isAvailable` are
 plain stateless free functions, same as [device](/docs/packages/device/).
 
@@ -73,16 +73,16 @@ project (it bundles its own Metro/Babel pipeline, which conflicts with this proj
 <Tabs syncKey="framework">
   <TabItem label="React">
     ```tsx
-    import { usePermissions } from '@symbiote-native/tracking-transparency/react';
+    import { useTrackingPermissions } from '@symbiote-native/tracking-transparency/react';
 
     export default function TrackingScreen() {
-      const [status, request, get, error] = usePermissions();
+      const [status, request] = useTrackingPermissions();
 
       return (
         <view>
-          <text>{error ? `check failed: ${error.message}` : (status?.status ?? 'checking…')}</text>
-          <pressable onPress={() => (error ? get() : request())}>
-            <text>{error ? 'Retry check' : 'Request tracking permission'}</text>
+          <text>{status?.status ?? 'checking...'}</text>
+          <pressable onPress={() => request()}>
+            <text>Request tracking permission</text>
           </pressable>
         </view>
       );
@@ -93,16 +93,16 @@ project (it bundles its own Metro/Babel pipeline, which conflicts with this proj
   <TabItem label="Vue">
     ```vue
     <script setup lang="ts">
-    import { usePermissions } from '@symbiote-native/tracking-transparency/vue';
+    import { useTrackingPermissions } from '@symbiote-native/tracking-transparency/vue';
 
-    const { status, error, request, get } = usePermissions();
+    const [status, request] = useTrackingPermissions();
     </script>
 
     <template>
       <view>
-        <text>{{ error ? `check failed: ${error.message}` : (status?.status ?? 'checking…') }}</text>
-        <pressable @press="error ? get() : request()">
-          <text>{{ error ? 'Retry check' : 'Request tracking permission' }}</text>
+        <text>{{ status?.status ?? 'checking...' }}</text>
+        <pressable @press="request()">
+          <text>Request tracking permission</text>
         </pressable>
       </view>
     </template>
@@ -113,7 +113,7 @@ project (it bundles its own Metro/Babel pipeline, which conflicts with this proj
     ```ts
     import { Component, inject } from '@angular/core';
     import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
-    import { PermissionsService } from '@symbiote-native/tracking-transparency/angular';
+    import { TrackingPermissionsService } from '@symbiote-native/tracking-transparency/angular';
 
     @Component({
       standalone: true,
@@ -128,7 +128,7 @@ project (it bundles its own Metro/Babel pipeline, which conflicts with this proj
       `,
     })
     export class TrackingScreen {
-      readonly permissions = inject(PermissionsService);
+      readonly permissions = inject(TrackingPermissionsService);
       readonly status = this.permissions.connect();
       readonly error = this.permissions.error;
     }
@@ -138,19 +138,15 @@ project (it bundles its own Metro/Babel pipeline, which conflicts with this proj
   <TabItem label="Svelte">
     ```svelte
     <script lang="ts">
-      import { usePermissions } from '@symbiote-native/tracking-transparency/svelte';
+      import { useTrackingPermissions } from '@symbiote-native/tracking-transparency/svelte';
 
-      const permissions = usePermissions();
+      const permissions = useTrackingPermissions();
     </script>
 
     <view>
-      <text>
-        {permissions.error
-          ? `check failed: ${permissions.error.message}`
-          : (permissions.status?.status ?? 'checking…')}
-      </text>
-      <pressable onPress={() => (permissions.error ? permissions.get() : permissions.request())}>
-        <text>{permissions.error ? 'Retry check' : 'Request tracking permission'}</text>
+      <text>{permissions.status?.status ?? 'checking...'}</text>
+      <pressable onPress={() => permissions.requestPermission()}>
+        <text>Request tracking permission</text>
       </pressable>
     </view>
     ```
@@ -158,16 +154,16 @@ project (it bundles its own Metro/Babel pipeline, which conflicts with this proj
   </TabItem>
   <TabItem label="Solid">
     ```tsx
-    import { createPermissions } from '@symbiote-native/tracking-transparency/solid';
+    import { useTrackingPermissions } from '@symbiote-native/tracking-transparency/solid';
 
     export default function TrackingScreen() {
-      const { status, error, request, get } = createPermissions();
+      const [status, request] = useTrackingPermissions();
 
       return (
         <view>
-          <text>{error() ? `check failed: ${error()?.message}` : (status()?.status ?? 'checking…')}</text>
-          <pressable onPress={() => (error() ? get() : request())}>
-            <text>{error() ? 'Retry check' : 'Request tracking permission'}</text>
+          <text>{status()?.status ?? 'checking...'}</text>
+          <pressable onPress={() => request()}>
+            <text>Request tracking permission</text>
           </pressable>
         </view>
       );
@@ -177,8 +173,8 @@ project (it bundles its own Metro/Babel pipeline, which conflicts with this proj
   </TabItem>
 </Tabs>
 
-`status` stays `null` both while the first fetch is in flight and after it fails, so `error` is what
-tells those two apart; `get()` re-runs the check without prompting the user.
+`get()` re-runs the check without prompting the user. On Angular the service keeps an `error`
+signal, so a failed first fetch reads apart from one still in flight; the hooks have no `error` slot.
 
 ### Advertising ID
 
@@ -202,41 +198,26 @@ const advertisingId = getAdvertisingId(); // null on the iOS Simulator, or befor
 | `requestTrackingPermissionsAsync(): Promise<PermissionResponse>` | Requests the user to authorize or deny access to app-related data usable for tracking, showing the real ATT prompt on iOS. Always resolves granted on Android and web                         |
 | `isAvailable(): boolean`                                         | Whether the tracking-transparency native module resolved at all                                                                                                                               |
 
-### `usePermissions()` / `createPermissions()`
+### `useTrackingPermissions(options?)`
 
-| React (`/react`) | Vue (`/vue`)     | Angular (`/angular`)           | Svelte (`/svelte`) | Solid (`/solid`)    | Signature | Returns                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| ---------------- | ---------------- | ------------------------------ | ------------------ | ------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `usePermissions` | `usePermissions` | `PermissionsService.connect()` | `usePermissions`   | `createPermissions` | `()`      | React: `[PermissionResponse \| null, request, get, Error \| null]` tuple. Vue: `{ status: Ref<PermissionResponse \| null>, error: Ref<Error \| null>, request, get }`. Angular: `Signal<PermissionResponse \| null>` from `connect()`, plus `error: Signal<Error \| null>` and `request()`/`get()` on the service. Svelte: `{ status, error, request, get }`, `status` and `error` getters over `PermissionResponse \| null` / `Error \| null`. Solid: `{ status, error, request, get }`, `status`/`error` are `Accessor<PermissionResponse \| null>` / `Accessor<Error \| null>` |
+Angular exposes `TrackingPermissionsService` instead: `connect()` returns a
+`Signal<PermissionResponse | null>`, plus `error`, `request()` and `get()` on the service.
 
-### Return value
+| Adapter | Returns                                                                                |
+| ------- | -------------------------------------------------------------------------------------- |
+| React   | `[status, request, get]` tuple, `status` a plain `PermissionResponse \| null`          |
+| Vue     | `[status, request, get]` tuple, `status` a `Ref<PermissionResponse \| null>`           |
+| Solid   | `[status, request, get]` tuple, `status` an `Accessor<PermissionResponse \| null>`     |
+| Svelte  | `{ status, requestPermission, getPermission }`, `status` a getter, never destructure it |
 
-| Field     | Type                                | Description                                                                                                                  |
-| --------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `status`  | `PermissionResponse \| null`        | The permission status last read, `null` until the first fetch resolves                                                       |
-| `error`   | `Error \| null`                     | Why the automatic fetch left `status` at `null`. Cleared by the next successful `get()`/`request()`                          |
-| `request` | `() => Promise<PermissionResponse>` | Asks the user for the permission, then updates `status` and clears `error`. Rejects to its caller when the native call fails |
-| `get`     | `() => Promise<PermissionResponse>` | Re-reads the current status without prompting. Same update and rejection behavior as `request`                               |
+| Option    | Default | Description                                                    |
+| --------- | ------- | -------------------------------------------------------------- |
+| `get`     | `true`  | Reads the current status on mount                              |
+| `request` | `false` | Asks the user on mount instead of only reading the status      |
 
-React hands those back positionally, as `[status, request, get, error]`, so existing two- and
-three-element destructuring keeps working. Vue wraps `status` and `error` in refs; Angular exposes
-`status` through `connect()` and `error` as a separate readonly signal on the service; Svelte
-returns both as getters, read as `permissions.status` / `permissions.error`; Solid returns both as
-accessors, `status()` / `error()` - the auto-fetch runs once, synchronously, inside the
-primitive's own body rather than a mount effect, since a Solid component body only runs once.
-
-Read together, the two fields separate the three states:
-
-| `status`             | `error` | Meaning                    |
-| -------------------- | ------- | -------------------------- |
-| `null`               | `null`  | Not fetched yet            |
-| `null`               | `Error` | The automatic fetch failed |
-| `PermissionResponse` | `null`  | Fetched                    |
-
-Every variant auto-fetches the current permission status once on mount/`connect()`, and updates
-again whenever `request`/`get` resolves. A failure in that automatic fetch lands in `error` instead
-of escaping as an unhandled rejection; `get()`/`request()` called by hand still reject to their
-caller. Angular's auto-fetch is latched to at most one run per service instance, so a later
-`connect()` never re-fetches: call `get()` to retry.
+`request` asks the user for the permission and updates `status`; `get` re-reads it without
+prompting. Both reject to their caller when the native call fails. Angular's auto-fetch is latched
+to at most one run per service instance, and a failure lands in `error`: call `get()` to retry.
 
 ### `PermissionResponse`
 
@@ -257,6 +238,21 @@ Re-exported verbatim from `expo-modules-core`, never the `expo` meta-package:
 - **`getAdvertisingId` returns `null` on the iOS Simulator, regardless of any settings** — there is
   no real IDFA to read there. This is expected Apple Simulator behavior, not a bug in this wrapper.
 
+## Common questions
+
+- **The app crashes when I request permission.** `NSUserTrackingUsageDescription` is missing from
+  Info.plist. Add it before calling `requestTrackingPermissionsAsync`.
+- **The dialog never appears.** The call ran too early. Request only while the app state is
+  `active`, and guard against duplicate requests.
+- **App Store rejection under Guideline 5.1.2.** Generic text such as "Required for advertising" is
+  rejected. State a concrete user benefit.
+- **Android.** There is no prompt; the permission reads as granted.
+
+Sources: [Expo docs: TrackingTransparency](https://docs.expo.dev/versions/latest/sdk/tracking-transparency/),
+[expo/expo#13059](https://github.com/expo/expo/issues/13059),
+[Implement App Tracking Transparency with Expo](https://yosukep.medium.com/implement-app-tracking-transparency-with-expo-app-58cf77cb168d),
+[Why the ATT prompt never shows](https://rorklab.net/en/articles/rork-dev/rork-att-tracking-permission-not-showing-fix).
+
 ## How the wrapper works
 
 `@symbiote-native/tracking-transparency` ships zero React/Vue/Angular/Svelte/Solid logic in
@@ -269,19 +265,17 @@ packages/tracking-transparency/src/
 ├── core/                 getAdvertisingId, get/requestTrackingPermissionsAsync, isAvailable;
 │                         native-module.ts resolves ExpoTrackingTransparency through
 │                         expo-modules-core's requireNativeModule.
-├── react/hooks/           @symbiote-native/tracking-transparency/react   — usePermissions
-├── vue/composables/       @symbiote-native/tracking-transparency/vue     — usePermissions (same name)
-├── angular/services/      @symbiote-native/tracking-transparency/angular — PermissionsService
-├── svelte/runes/          @symbiote-native/tracking-transparency/svelte  — usePermissions (same name)
-└── solid/primitives/      @symbiote-native/tracking-transparency/solid  — createPermissions
+|-- react/                 @symbiote-native/tracking-transparency/react: useTrackingPermissions
+|-- vue/                   @symbiote-native/tracking-transparency/vue: useTrackingPermissions
+|-- angular/               @symbiote-native/tracking-transparency/angular: TrackingPermissionsService
+|-- svelte/                @symbiote-native/tracking-transparency/svelte: useTrackingPermissions
+`-- solid/                 @symbiote-native/tracking-transparency/solid: useTrackingPermissions
 ```
 
-Only the permission surface gets a lifecycle hook — there's per-instance state to seed and
+Only the permission surface gets a lifecycle hook, there is per-instance state to seed and
 refresh; `getAdvertisingId`/`isAvailable` are stateless, re-exported verbatim by every adapter.
-Upstream's own `createPermissionHook`/`useTrackingPermissions` is **not** ported — that helper is
-React-only (built on `useState`/`useEffect`), and this repo's convention is for each adapter to
-hand-roll its own permission hook instead, exactly like
-[brightness](/docs/packages/brightness/#how-the-wrapper-works)/[cellular](/docs/packages/cellular/#usepermissions)
-already do. The native code itself is never vendored or copied — `expo-modules-autolinking`
+Upstream's `useTrackingPermissions` is ported to every adapter on the shared `createPermissionHook`
+factory (`PermissionsServiceBase` on Angular), the same shape as
+[location](/docs/packages/location/)'s permission hooks. The native code itself is never vendored or copied — `expo-modules-autolinking`
 resolves it straight out of `node_modules` (see [the native setup
 guide](/docs/howtos/expo-native-module-setup/)).

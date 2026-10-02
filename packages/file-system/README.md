@@ -1,16 +1,19 @@
 # @symbiote-native/file-system
 
-A wrapper package for [SymbioteNative](../../README.md) that makes
-[`expo-file-system`](https://github.com/expo/expo/tree/main/packages/expo-file-system) usable
-from **every** adapter — React, Vue, Svelte, Solid, and Angular.
+Read, write, copy, move and download files on the device. One API for every
+[SymbioteNative](../../README.md) adapter (React, Vue, Svelte, Solid and Angular).
 
-**Both of upstream's surfaces are ported, matching upstream's own layout.** The default export is
-the modern, shared-object API — `File`/`Directory`/`Paths` classes built on JSI shared objects
-(`expo-modules-core`'s `SharedObject`), upstream's own default entry as of SDK 54. The legacy,
-function-based API (read/write/copy/move/delete, directory listing, disk-space queries, resumable
-download/upload, Android Storage Access Framework) is available at the `./legacy` subpath,
-reachable in the real upstream package as `expo-file-system/legacy`. See
-[Legacy API (`/legacy`)](#legacy-api-legacy) below.
+It wraps [`expo-file-system`](https://github.com/expo/expo/tree/main/packages/expo-file-system) and
+ports both of upstream's surfaces, matching upstream's own layout:
+
+- **Default export:** the modern `File` / `Directory` / `Paths` classes, built on JSI shared objects
+  (`expo-modules-core`'s `SharedObject`). Upstream's default entry since SDK 54.
+- **`./legacy` subpath:** the function-based API (read/write/copy/move/delete, directory listing,
+  disk-space queries, resumable download/upload, Android Storage Access Framework), reachable
+  upstream as `expo-file-system/legacy`. See [Legacy API (`/legacy`)](#legacy-api-legacy) below.
+
+Which directory? `Paths.document` is for data the user expects to keep; `Paths.cache` is for
+anything you can re-create, and the OS may clear it when storage runs low.
 
 ## Install
 
@@ -26,33 +29,33 @@ npx @symbiote-native/cli new my-app --file-system
 npx @symbiote-native/cli add --file-system
 ```
 
-Either way: installs `@symbiote-native/file-system` and wires the native autolinking automatically — see
+Either way: installs `@symbiote-native/file-system` and wires the native autolinking automatically - see
 [`@symbiote-native/cli`](../cli).
 
 <details>
-<summary>Manual install (no CLI — installing and wiring native autolinking by hand)</summary>
+<summary>Manual install (no CLI - installing and wiring native autolinking by hand)</summary>
 
 ```bash
 npm install @symbiote-native/file-system
 ```
 
 `expo-file-system` and `expo-modules-core` come along as regular dependencies, pinned to exact
-versions — never install them yourself, and never add the `expo` meta-package to your project.
+versions - never install them yourself, and never add the `expo` meta-package to your project.
 
 ## Required one-time step: native autolinking wiring
 
-Same one-time step as every other `expo-modules-core` package this project ships — see
+Same one-time step as every other `expo-modules-core` package this project ships - see
 [`@symbiote-native/local-auth`'s README](../local-auth/README.md#required-one-time-step-native-autolinking-wiring)
 and the `symbiote-expo-native-module` project skill.
 
-`native-link.json` carries no `Info.plist` keys or `<application>` attributes — upstream's own
+`native-link.json` carries no `Info.plist` keys or `<application>` attributes - upstream's own
 config plugin only sets two OPT-IN keys (`LSSupportsOpeningDocumentsInPlace`,
 `UIFileSharingEnabled`), which an app adds itself only if it wants its Documents directory exposed
 to the Files app; nothing here needs either by default.
 
 </details>
 
-**Android runtime permissions are NOT added automatically, by the CLI or otherwise** — add
+**Android runtime permissions are NOT added automatically, by the CLI or otherwise** - add
 whichever of these your app actually needs to your own `AndroidManifest.xml`, the same opt-in
 shape [`@symbiote-native/media-library`](../media-library) uses:
 
@@ -65,25 +68,25 @@ shape [`@symbiote-native/media-library`](../media-library) uses:
 
 `Paths.document`/`Paths.cache` operations and `StorageAccessFramework` (which asks the user to pick
 a directory at runtime, and never touches the two `EXTERNAL_STORAGE` permissions) both work without
-any of these on modern Android — they matter only for direct legacy-path access outside the app
+any of these on modern Android - they matter only for direct legacy-path access outside the app
 sandbox.
 
 ## Shape
 
 ```
 src/next/     File.ts / Directory.ts / Paths.ts / network-tasks.ts (UploadTask/DownloadTask) /
-              watcher.ts (FileSystemWatcher) / path-utilities.ts / streams.ts / types.ts —
+              watcher.ts (FileSystemWatcher) / path-utilities.ts / streams.ts / types.ts -
               the default, shared-object surface. See "API" below.
 src/core/     file-system.ts (every legacy function + DownloadResumable/UploadTask +
               StorageAccessFramework), native-module.ts, types.ts. See "Legacy API" below.
-src/angular/  @symbiote-native/file-system/angular — export * from '../next'
+src/angular/  @symbiote-native/file-system/angular - export * from '../next'
 ```
 
-`./react`, `./vue`, `./svelte`, and `./solid` are `exports`-map aliases straight onto `src/next/`
-— every class here carries no children/ref/render fields, so there is nothing to split per
+`./react`, `./vue`, `./svelte`, and `./solid` are `exports`-map aliases straight onto `src/next/`:
+every class here carries no children/ref/render fields, so there is nothing to split per
 framework. `./angular` stays a physical file/subpath since Angular ships through a separate
 `ngc`/AOT build (`build-ngc/`). `./legacy` is one subpath shared by every adapter, for the same
-reason — plain async functions have no framework-specific shape either.
+reason - plain async functions have no framework-specific shape either.
 
 ## Use it
 
@@ -108,7 +111,7 @@ const downloaded = await File.downloadFileAsync(
 );
 ```
 
-Identical import surface on every adapter — `@symbiote-native/file-system/react`, `/vue`,
+Identical import surface on every adapter - `@symbiote-native/file-system/react`, `/vue`,
 `/svelte`, `/solid`, `/angular` all re-export the same classes.
 
 ## API
@@ -176,7 +179,7 @@ static fromSavable(savable): DownloadTask
 
 ### Errors
 
-No custom JS error-class hierarchy — every native exception surfaces as an ordinary thrown `Error`
+No custom JS error-class hierarchy - every native exception surfaces as an ordinary thrown `Error`
 or rejected `Promise`, same as every other native module wrapper in this repo.
 
 | Trigger                                                                             | When                                                                                                       |
@@ -185,15 +188,32 @@ or rejected `Promise`, same as every other native module wrapper in this repo.
 | Reading/writing through a stale or already-closed handle                            | `IFileSystemHandle` methods throw                                                                          |
 | `pickFileAsync`/`pickDirectoryAsync` cancelled by the user                          | Rejects with an `AbortError` (old-API overload) or resolves `{ canceled: true }` (options-object overload) |
 | `upload()`/`createUploadTask()`/`createDownloadTask()` aborted via `options.signal` | Rejects with an `AbortError`                                                                               |
-| `.copy()`/`.move()` onto an existing destination without `overwrite: true`          | Native `Exception` — destination already exists                                                            |
-| Any operation on a path outside the app sandbox without permission                  | Native `Exception` — permission/sandbox violation                                                          |
+| `.copy()`/`.move()` onto an existing destination without `overwrite: true`          | Native `Exception` - destination already exists                                                            |
+| Any operation on a path outside the app sandbox without permission                  | Native `Exception` - permission/sandbox violation                                                          |
+
+## Common questions
+
+- **Where does a download go, and why can't the user see it?** The app's private sandbox. For the
+  Gallery use [`@symbiote-native/media-library`](../media-library); to let the user keep or send it,
+  [`@symbiote-native/sharing`](../sharing); on Android, the legacy `StorageAccessFramework` lets the
+  user pick a folder.
+- **Permission denied outside the app's folders.** The classes work inside `Paths.document` and
+  `Paths.cache`. Anything else needs the Storage Access Framework (Android).
+- **Document or cache?** `Paths.document` for data to keep; `Paths.cache` for what you can
+  re-create. The OS may clear the cache, and you should delete what you no longer need.
+- **`file.create()` throws.** It throws if the file exists or you cannot create it; use
+  `file.write()` to replace contents.
+
+Sources: [Expo forums thread](https://forums.expo.dev/t/unable-to-download-file-in-expected-location/19632),
+[expo/expo#20298](https://github.com/expo/expo/issues/20298),
+[Expo docs: FileSystem (legacy)](https://docs.expo.dev/versions/latest/sdk/filesystem-legacy/).
 
 ## Legacy API (`/legacy`)
 
-Upstream's original function-based surface — plain async functions over `expo-modules-core`
+Upstream's original function-based surface - plain async functions over `expo-modules-core`
 instead of JSI shared objects. Same install, same autolinking step as above; the native module
 behind it is a **separate** registration (`ExponentFileSystem`, vs. the modern API's
-`FileSystem`) inside the same `expo-file-system` npm dependency — nothing extra to install.
+`FileSystem`) inside the same `expo-file-system` npm dependency - nothing extra to install.
 
 ```ts
 import {
@@ -251,12 +271,12 @@ repo's `I`-prefix convention for exported types (`ts-js-best-practices`).
 
 ### Legacy notes
 
-- **`StorageAccessFramework` is Android-only** — every function throws `UnavailabilityError` on iOS,
+- **`StorageAccessFramework` is Android-only** - every function throws `UnavailabilityError` on iOS,
   matching upstream (there is no SAF equivalent on iOS; use the ordinary `document`/`cacheDirectory`
   functions there instead).
-- **`getContentUriAsync` is Android-only** — on iOS it resolves to the input `fileUri` unchanged,
+- **`getContentUriAsync` is Android-only** - on iOS it resolves to the input `fileUri` unchanged,
   matching upstream's own platform branch, rather than throwing.
-- **Progress callbacks fire only while a task is subscribed** — `DownloadResumable`/`UploadTask`
+- **Progress callbacks fire only while a task is subscribed** - `DownloadResumable`/`UploadTask`
   add their native event listener only for the duration of the in-flight call
   (`downloadAsync`/`uploadAsync`/`resumeAsync`), removing it as soon as the promise settles, exactly
   as upstream does.

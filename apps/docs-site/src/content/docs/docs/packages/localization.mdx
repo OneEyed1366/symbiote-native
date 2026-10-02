@@ -257,6 +257,20 @@ Maps days of the week in the Gregorian calendar to their index as returned by `C
   "loading" state to represent.
 </Aside>
 
+## Common questions
+
+- **The locale changed in Settings but my app shows the old one.** On Android the user can change
+  it without restarting the app; read the locales again when the app returns to the foreground
+  (`AppState`). On iOS the result stays the same while the app runs.
+- **Does `getLocales()` ever come back empty?** No, it holds at least one entry, in the order the
+  user set in system settings.
+- **Do I need an in-app language picker?** Often not: recent iOS and Android let users set a
+  language per app. Upstream wires that through an Expo config plugin option, which is outside this project.
+
+Sources: [Expo docs: Localization](https://docs.expo.dev/versions/latest/sdk/localization/),
+[Expo guide: localization](https://github.com/expo/expo/blob/main/docs/pages/guides/localization.mdx),
+[React Native localization with Expo](https://better-i18n.com/en/blog/react-native-expo-localization/).
+
 ## How the wrapper works
 
 `@symbiote-native/localization` ships zero React/Vue/Angular/Svelte/Solid logic in `expo-localization` itself

@@ -1,144 +1,157 @@
 import { Component, signal } from '@angular/core';
-import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import {
   canUseBiometricAuthentication,
   deleteItemAsync,
   getItemAsync,
   isAvailableAsync,
   setItemAsync,
-} from '@symbiote-native/secure-store/angular';
+} from '@symbiote-native/secure-store';
+import type { ISecureStoreOptions } from '@symbiote-native/secure-store';
+import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import { ActionButton } from '../components/ActionButton';
+import { Card } from '../components/Card';
+import { Explorer } from '../components/Explorer';
+import { ResultRow } from '../components/ResultRow';
+import { Scenario } from '../components/Scenario';
+import { ScreenShell } from '../components/ScreenShell';
+import { toCapabilityStatus } from '../components/capability-status';
+import type { ICapabilityStatus } from '../components/capability-status';
+import { lineColorOf } from '../components/line-color';
 import { ROUTE_NAME } from '../routes';
-import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
+import { CapabilityRow } from './CapabilityRow';
+import { SecureStoreExtras } from './SecureStoreExtras';
 
 const DEMO_KEY = 'canary.secure-store.demo';
+const AUTH_OPTIONS: ISecureStoreOptions = {
+  requireAuthentication: true,
+  authenticationPrompt: 'Unlock to store the demo value',
+};
 
-type ICapabilityStatus = 'checking' | 'yes' | 'no';
-
-function toCapabilityStatus(value: boolean): ICapabilityStatus {
-  return value ? 'yes' : 'no';
-}
-
-/**
- * @symbiote-native/secure-store canary demo: a capability card (isAvailableAsync,
- * canUseBiometricAuthentication), a stored-value card, and a write/read/delete card driving one
- * demo key. Kill and relaunch the app to prove the value survives outside the JS heap. Every
- * function is a plain re-export off the core package — no service to inject(), same shape as
- * StoreReviewScreen's.
- */
 @Component({
   selector: 'SecureStoreScreen',
   standalone: true,
-  imports: [ActionButton, SYMBIOTE_ELEMENTS],
+  imports: [
+    ActionButton,
+    CapabilityRow,
+    Card,
+    Explorer,
+    ResultRow,
+    Scenario,
+    ScreenShell,
+    SecureStoreExtras,
+    SYMBIOTE_ELEMENTS,
+  ],
   template: `
-    <safe-area-view class="screen">
-      <scroll-view
-        testID="secure-store-scroll"
-        class="screen"
-        contentContainerStyle="scroll-content"
+    <ScreenShell
+      [route]="route"
+      testID="secure-store-scroll"
+      title="Secure Store"
+      body="Store small secrets, such as a sign-in token or a PIN, in the iOS Keychain and the Android Keystore. They survive app restarts, stay out of backups, and can require Face ID or a fingerprint to read."
+    >
+      <Card testID="secure-store-capability-card" title="Capabilities">
+        <CapabilityRow
+          testID="secure-store-available"
+          label="Available"
+          [status]="isAvailable()"
+        />
+        <CapabilityRow
+          testID="secure-store-biometrics"
+          label="Biometrics usable"
+          [status]="canUseBiometrics()"
+        />
+      </Card>
+
+      <Scenario
+        testID="secure-store-remember-scenario"
+        title="Keep a sign-in token across restarts"
+        why="A session token must survive closing the app but never be readable by other apps or by a backup. The Keychain and Keystore do that; AsyncStorage does not."
+        [steps]="rememberSteps"
+        expect="The same token comes back after the relaunch. The value below shows it, and Last result says ok."
       >
-        <view [class]="lineTagClass">
-          <text class="line-tag-text">{{ lineTagLabel }}</text>
-        </view>
-        <view class="hero-card">
-          <view class="hero-badge" [style]="heroBadgeStyle">
-            <text class="hero-badge-text">{{ heroBadgeCode }}</text>
-          </view>
-          <view class="hero-copy">
-            <text class="hero-title">Secure Store</text>
-            <text class="hero-body">
-              @symbiote-native/secure-store — encrypted key/value storage in the
-              iOS Keychain and the Android Keystore. Save a value, kill the app,
-              relaunch, and read it back.
-            </text>
-          </view>
-        </view>
+        <text-input
+          testID="secure-store-input"
+          [value]="inputText()"
+          placeholder="Fake token, e.g. eyJhbGciOi..."
+          placeholderTextColor="#41506a"
+          class="text-input"
+          (valueChange)="inputText.set($event)"
+        ></text-input>
+        <ActionButton
+          testID="secure-store-save-button"
+          title="Save"
+          [color]="color"
+          (press)="save(inputText())"
+        />
+        <ActionButton
+          testID="secure-store-read-button"
+          title="Read"
+          [color]="color"
+          (press)="read()"
+        />
+        <ResultRow
+          testID="secure-store-value"
+          [label]="demoKey"
+          [value]="storedValue() ?? '(no entry)'"
+        />
+        <ResultRow
+          testID="secure-store-result"
+          label="Last result"
+          [value]="lastResult()"
+        />
+      </Scenario>
 
-        <view testID="secure-store-capability-card" class="secure-store-card">
-          <text class="secure-store-card-title">Capabilities</text>
-          <view testID="secure-store-available" class="secure-store-row">
-            <text class="secure-store-row-label">Available</text>
-            <view [class]="statusBadgeClass(isAvailable())">
-              <text class="secure-store-status-text">{{
-                statusLabel(isAvailable())
-              }}</text>
-            </view>
-          </view>
-          <view testID="secure-store-biometrics" class="secure-store-row">
-            <text class="secure-store-row-label">Biometrics usable</text>
-            <view [class]="statusBadgeClass(canUseBiometrics())">
-              <text class="secure-store-status-text">{{
-                statusLabel(canUseBiometrics())
-              }}</text>
-            </view>
-          </view>
-        </view>
+      <Scenario
+        testID="secure-store-biometrics-scenario"
+        title="Lock a secret behind Face ID or a fingerprint"
+        why="For something like a payment PIN, even an unlocked phone in someone else's hands should not reveal it."
+        [steps]="biometricsSteps"
+        expect="Saving and reading both ask for biometrics. Cancelling the prompt shows a failure in Last result and the value stays hidden."
+      >
+        <ActionButton
+          testID="secure-store-save-auth-button"
+          title="Save behind biometrics"
+          [color]="color"
+          (press)="save(inputText(), authOptions, 'saved (authenticated)')"
+        />
+      </Scenario>
 
-        <view testID="secure-store-value-card" class="secure-store-card">
-          <text class="secure-store-card-title">Stored value</text>
-          <view class="secure-store-row">
-            <text class="secure-store-row-label">{{ demoKey }}</text>
-            <text testID="secure-store-value" class="secure-store-value-text">{{
-              valueLabel()
-            }}</text>
-          </view>
-          <view class="secure-store-row">
-            <text class="secure-store-row-label">Last result</text>
-            <text
-              testID="secure-store-result"
-              class="secure-store-value-text"
-              >{{ lastResult() }}</text
-            >
-          </view>
-        </view>
+      <Scenario
+        testID="secure-store-signout-scenario"
+        title="Wipe the secret on sign-out"
+        why="After signing out, the token must be gone, not just forgotten by the UI."
+        [steps]="signoutSteps"
+        expect="Read reports no entry, and the value shows (no entry)."
+      >
+        <ActionButton
+          testID="secure-store-delete-button"
+          title="Delete"
+          [color]="color"
+          (press)="remove()"
+        />
+      </Scenario>
 
-        <view testID="secure-store-write-card" class="secure-store-card">
-          <text class="secure-store-card-title">Write, read, delete</text>
-          <text-input
-            testID="secure-store-input"
-            [value]="inputText()"
-            (valueChange)="inputText.set($event)"
-            placeholder="Value to store"
-            placeholderTextColor="#41506a"
-            class="text-input"
-          ></text-input>
-          <ActionButton
-            testID="secure-store-save-button"
-            title="Save"
-            (press)="handleSave()"
-            [color]="lineColor"
-          ></ActionButton>
-          <ActionButton
-            testID="secure-store-save-auth-button"
-            title="Save behind biometrics"
-            (press)="handleSaveAuthenticated()"
-            [color]="lineColor"
-          ></ActionButton>
-          <ActionButton
-            testID="secure-store-read-button"
-            title="Read"
-            (press)="handleRead()"
-            [color]="lineColor"
-          ></ActionButton>
-          <ActionButton
-            testID="secure-store-delete-button"
-            title="Delete"
-            (press)="handleDelete()"
-            [color]="lineColor"
-          ></ActionButton>
-        </view>
-      </scroll-view>
-    </safe-area-view>
+      <Explorer testID="secure-store-explorer" [color]="color">
+        <ng-template><SecureStoreExtras /></ng-template>
+      </Explorer>
+    </ScreenShell>
   `,
 })
 export class SecureStoreScreen {
-  private readonly lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.SecureStore];
-  readonly lineTagClass = `line-tag line-tag-${this.lineInfo.line}`;
-  readonly lineTagLabel = `${this.lineInfo.code} · ${this.lineInfo.label}`;
-  readonly heroBadgeCode = this.lineInfo.code;
-  readonly lineColor = LINE_COLOR[this.lineInfo.line];
-  readonly heroBadgeStyle = { backgroundColor: this.lineColor };
+  readonly route = ROUTE_NAME.SecureStore;
+  readonly color = lineColorOf(ROUTE_NAME.SecureStore);
   readonly demoKey = DEMO_KEY;
+  readonly authOptions = AUTH_OPTIONS;
+  readonly rememberSteps = [
+    'Type a fake token below and press Save',
+    'Force-quit the app and open it again',
+    'Press Read',
+  ];
+  readonly biometricsSteps = [
+    'Type a value and press Save behind biometrics',
+    'Approve the system prompt',
+    'Press Read above and approve again',
+  ];
+  readonly signoutSteps = ['Press Delete', 'Press Read above'];
 
   readonly isAvailable = signal<ICapabilityStatus>('checking');
   readonly canUseBiometrics = signal<ICapabilityStatus>('checking');
@@ -147,73 +160,43 @@ export class SecureStoreScreen {
   readonly lastResult = signal('idle');
 
   constructor() {
-    isAvailableAsync().then(available => {
+    void isAvailableAsync().then(available => {
       this.isAvailable.set(toCapabilityStatus(available));
-      // canUseBiometricAuthentication throws when the native module is missing entirely, so it
-      // only runs once availability has come back positive.
+      // Throws when the native module is missing, so it only runs once availability is positive
       this.canUseBiometrics.set(
         available ? toCapabilityStatus(canUseBiometricAuthentication()) : 'no',
       );
     });
   }
 
-  handleRead(): void {
-    this.readBack('read').catch((error: Error) =>
-      this.lastResult.set(`read failed: ${error.message}`),
-    );
-  }
-
-  handleSave(): void {
-    setItemAsync(DEMO_KEY, this.inputText())
-      .then(() => this.readBack('saved'))
-      .catch((error: Error) =>
-        this.lastResult.set(`save failed: ${error.message}`),
-      );
-  }
-
-  // Android prompts on every operation, iOS only when reading or updating an entry that already
-  // exists — so the write below may pass silently and the read after it raise the prompt.
-  handleSaveAuthenticated(): void {
-    setItemAsync(DEMO_KEY, this.inputText(), {
-      requireAuthentication: true,
-      authenticationPrompt: 'Unlock to store the demo value',
-    })
-      .then(() => this.readBack('saved (authenticated)'))
-      .catch((error: Error) =>
-        this.lastResult.set(`authenticated save failed: ${error.message}`),
-      );
-  }
-
-  handleDelete(): void {
-    deleteItemAsync(DEMO_KEY)
-      .then(() => {
-        this.storedValue.set(null);
-        this.lastResult.set('deleted');
-      })
-      .catch((error: Error) =>
-        this.lastResult.set(`delete failed: ${error.message}`),
-      );
-  }
-
-  valueLabel(): string {
-    return this.storedValue() ?? '(no entry)';
-  }
-
-  statusBadgeClass(status: ICapabilityStatus): string {
-    return `secure-store-status-badge secure-store-status-badge-${status}`;
-  }
-
-  statusLabel(status: ICapabilityStatus): string {
-    return status === 'checking'
-      ? 'CHECKING…'
-      : status === 'yes'
-        ? 'YES'
-        : 'NO';
-  }
-
   private async readBack(label: string): Promise<void> {
     const value = await getItemAsync(DEMO_KEY);
     this.storedValue.set(value);
     this.lastResult.set(value === null ? `${label}: no entry` : `${label}: ok`);
+  }
+
+  private run(label: string, action: () => Promise<void>): void {
+    action().catch((error: Error) => {
+      this.lastResult.set(`${label} failed: ${error.message}`);
+    });
+  }
+
+  read(): void {
+    this.run('read', () => this.readBack('read'));
+  }
+
+  save(text: string, options: ISecureStoreOptions = {}, label = 'saved'): void {
+    this.run(label, async () => {
+      await setItemAsync(DEMO_KEY, text, options);
+      await this.readBack(label);
+    });
+  }
+
+  remove(): void {
+    this.run('delete', async () => {
+      await deleteItemAsync(DEMO_KEY);
+      this.storedValue.set(null);
+      this.lastResult.set('deleted');
+    });
   }
 }

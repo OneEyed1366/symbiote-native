@@ -32,7 +32,6 @@ import {
   resolveAccessibilityProps,
   shouldRenderModal,
   type IAccessibilityProps,
-  type IAccessibilityStateValue,
   type IAriaProps,
   type IModalAnimationType,
   type IModalOrientation,
@@ -47,6 +46,7 @@ import {
   type ISymbioteEvent,
   type IViewStyle,
 } from '@symbiote-native/engine';
+import { AccessibilityEventsBase } from '../../accessibility-events';
 import {
   anchorHostStyle,
   ModalHost,
@@ -124,15 +124,13 @@ export type IAngularModalInputs = Omit<
     }
   `,
 })
-export class Modal implements IAngularModalInputs, OnInit, OnChanges, DoCheck {
+export class Modal
+  extends AccessibilityEventsBase
+  implements IAngularModalInputs, OnInit, OnChanges, DoCheck
+{
   @Output() readonly show = new EventEmitter<void>();
   @Output() readonly dismiss = new EventEmitter<void>();
   @Output() readonly requestClose = new EventEmitter<void>();
-  @Output() readonly orientationChange = new EventEmitter<ISymbioteEvent>();
-  @Output() readonly accessibilityAction = new EventEmitter<ISymbioteEvent>();
-  @Output() readonly accessibilityTap = new EventEmitter<ISymbioteEvent>();
-  @Output() readonly magicTap = new EventEmitter<ISymbioteEvent>();
-  @Output() readonly accessibilityEscape = new EventEmitter<ISymbioteEvent>();
   @Input() visible?: boolean;
   @Input() transparent?: boolean;
   @Input() backdropColor?: string;
@@ -145,41 +143,7 @@ export class Modal implements IAngularModalInputs, OnInit, OnChanges, DoCheck {
   @Input() allowSwipeDismissal?: boolean;
   @Input() style?: IStyleProp<IViewStyle>;
   @Input() testID?: string;
-  @Input() accessible?: boolean;
-  @Input() accessibilityLabel?: string;
-  @Input() accessibilityHint?: string;
-  @Input() accessibilityRole?: IAccessibilityProps['accessibilityRole'];
-  @Input() accessibilityState?: IAccessibilityStateValue;
-  @Input() accessibilityValue?: IAccessibilityProps['accessibilityValue'];
-  @Input() accessibilityActions?: IAccessibilityProps['accessibilityActions'];
-  @Input() accessibilityLabelledBy?: string | string[];
-  @Input()
-  importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
-  @Input()
-  accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
-  @Input() screenReaderFocusable?: boolean;
-  @Input() accessibilityViewIsModal?: boolean;
-  @Input() accessibilityElementsHidden?: boolean;
-  @Input() accessibilityIgnoresInvertColors?: boolean;
-  @Input() accessibilityLanguage?: string;
-  @Input() accessibilityRespondsToUserInteraction?: boolean;
-  @Input() accessibilityShowsLargeContentViewer?: boolean;
-  @Input() accessibilityLargeContentTitle?: string;
-  @Input() role?: IAriaProps['role'];
-  @Input('aria-label') ariaLabel?: string;
-  @Input('aria-labelledby') ariaLabelledBy?: string;
-  @Input('aria-live') ariaLive?: IAriaProps['aria-live'];
-  @Input('aria-hidden') ariaHidden?: boolean;
-  @Input('aria-busy') ariaBusy?: boolean;
-  @Input('aria-checked') ariaChecked?: boolean | 'mixed';
-  @Input('aria-disabled') ariaDisabled?: boolean;
-  @Input('aria-expanded') ariaExpanded?: boolean;
-  @Input('aria-selected') ariaSelected?: boolean;
-  @Input('aria-modal') ariaModal?: boolean;
-  @Input('aria-valuemax') ariaValueMax?: number;
-  @Input('aria-valuemin') ariaValueMin?: number;
-  @Input('aria-valuenow') ariaValueNow?: number;
-  @Input('aria-valuetext') ariaValueText?: string;
+  @Output() readonly orientationChange = new EventEmitter<ISymbioteEvent>();
 
   // The iOS keep-alive (state/modal.ts): after visible→hidden the node stays until the native
   // onDismiss (`handleDismiss`) drops it.
@@ -323,43 +287,6 @@ export class Modal implements IAngularModalInputs, OnInit, OnChanges, DoCheck {
   private accessibilityInputs(): IAccessibilityProps &
     IAriaProps &
     Record<string, unknown> {
-    return {
-      testID: this.testID,
-      accessible: this.accessible,
-      accessibilityLabel: this.accessibilityLabel,
-      accessibilityHint: this.accessibilityHint,
-      accessibilityRole: this.accessibilityRole,
-      accessibilityState: this.accessibilityState,
-      accessibilityValue: this.accessibilityValue,
-      accessibilityActions: this.accessibilityActions,
-      accessibilityLabelledBy: this.accessibilityLabelledBy,
-      importantForAccessibility: this.importantForAccessibility,
-      accessibilityLiveRegion: this.accessibilityLiveRegion,
-      screenReaderFocusable: this.screenReaderFocusable,
-      accessibilityViewIsModal: this.accessibilityViewIsModal,
-      accessibilityElementsHidden: this.accessibilityElementsHidden,
-      accessibilityIgnoresInvertColors: this.accessibilityIgnoresInvertColors,
-      accessibilityLanguage: this.accessibilityLanguage,
-      accessibilityRespondsToUserInteraction:
-        this.accessibilityRespondsToUserInteraction,
-      accessibilityShowsLargeContentViewer:
-        this.accessibilityShowsLargeContentViewer,
-      accessibilityLargeContentTitle: this.accessibilityLargeContentTitle,
-      role: this.role,
-      'aria-label': this.ariaLabel,
-      'aria-labelledby': this.ariaLabelledBy,
-      'aria-live': this.ariaLive,
-      'aria-hidden': this.ariaHidden,
-      'aria-busy': this.ariaBusy,
-      'aria-checked': this.ariaChecked,
-      'aria-disabled': this.ariaDisabled,
-      'aria-expanded': this.ariaExpanded,
-      'aria-selected': this.ariaSelected,
-      'aria-modal': this.ariaModal,
-      'aria-valuemax': this.ariaValueMax,
-      'aria-valuemin': this.ariaValueMin,
-      'aria-valuenow': this.ariaValueNow,
-      'aria-valuetext': this.ariaValueText,
-    };
+    return { testID: this.testID, ...this.accessibilityInputProps() };
   }
 }

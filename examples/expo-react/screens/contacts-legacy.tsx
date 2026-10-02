@@ -1,0 +1,234 @@
+import { useState } from 'react';
+import {
+  ContactTypes,
+  Fields,
+  SortTypes,
+  addContactAsync,
+  addContactsChangeListener,
+  addExistingContactToGroupAsync,
+  addExistingGroupToContainerAsync,
+  createGroupAsync,
+  getContactByIdAsync,
+  getContactsAsync,
+  getContainersAsync,
+  getDefaultContainerIdAsync,
+  getGroupsAsync,
+  getPagedContactsAsync,
+  getPermissionsAsync,
+  hasContactsAsync,
+  isAvailableAsync,
+  presentAccessPickerAsync,
+  presentContactPickerAsync,
+  presentFormAsync,
+  removeContactAsync,
+  removeContactFromGroupAsync,
+  removeGroupAsync,
+  requestPermissionsAsync,
+  shareContactAsync,
+  updateContactAsync,
+  updateGroupNameAsync,
+  writeContactToFileAsync,
+} from '@symbiote-native/contacts/legacy';
+import { CallConsole } from '../components/CallConsole';
+import { Card, Field, lineColorOf } from '../components/ScreenShell';
+import { ROUTE_NAME } from '../routes';
+
+const color = lineColorOf(ROUTE_NAME.Contacts);
+const QUERY_FIELDS = [Fields.Name, Fields.PhoneNumbers, Fields.Emails];
+
+function need(text: string, label: string): string {
+  if (text.trim() === '') {
+    throw new Error(`fill the ${label} field first`);
+  }
+  return text.trim();
+}
+
+type IIds = { contactId: string; groupId: string; containerId: string };
+type ISetIds = (patch: Partial<IIds>) => void;
+
+function IdsCard({ ids, setIds }: { ids: IIds; setIds: ISetIds }) {
+  return (
+    <Card testID="contacts-legacy-ids-card" title="Legacy ids">
+      <Field
+        testID="contacts-legacy-contact-input"
+        label="contact id"
+        value={ids.contactId}
+        onChange={contactId => setIds({ contactId })}
+      />
+      <Field
+        testID="contacts-legacy-group-input"
+        label="group id"
+        value={ids.groupId}
+        onChange={groupId => setIds({ groupId })}
+      />
+      <Field
+        testID="contacts-legacy-container-input"
+        label="container id"
+        value={ids.containerId}
+        onChange={containerId => setIds({ containerId })}
+      />
+    </Card>
+  );
+}
+
+function ContactCalls({ ids, setIds }: { ids: IIds; setIds: ISetIds }) {
+  const contact = () => need(ids.contactId, 'contact id');
+  return (
+    <CallConsole
+      prefix="contacts-legacy-contacts"
+      title="Legacy contacts"
+      color={color}
+      calls={[
+        { label: 'isAvailableAsync', run: () => isAvailableAsync() },
+        { label: 'hasContactsAsync', run: () => hasContactsAsync() },
+        {
+          label: 'getContactsAsync',
+          run: async () => {
+            const page = await getContactsAsync({
+              pageSize: 10,
+              fields: QUERY_FIELDS,
+              sort: SortTypes.FirstName,
+            });
+            setIds({ contactId: page.data[0]?.id ?? ids.contactId });
+            return page;
+          },
+        },
+        {
+          label: 'getPagedContactsAsync',
+          run: () => getPagedContactsAsync({ pageSize: 3, pageOffset: 0 }),
+        },
+        {
+          label: 'getContactByIdAsync',
+          run: () => getContactByIdAsync(contact(), QUERY_FIELDS),
+        },
+        {
+          label: 'addContactAsync',
+          run: async () => {
+            const id = await addContactAsync(
+              {
+                contactType: ContactTypes.Person,
+                name: 'Legacy Demo',
+                firstName: 'Legacy',
+                lastName: 'Demo',
+              },
+              ids.containerId.trim() === '' ? undefined : ids.containerId.trim(),
+            );
+            setIds({ contactId: id });
+            return id;
+          },
+        },
+        {
+          label: 'updateContactAsync',
+          run: () => updateContactAsync({ id: contact(), note: 'updated by the canary' }),
+        },
+        { label: 'removeContactAsync', run: () => removeContactAsync(contact()) },
+        { label: 'presentFormAsync', run: () => presentFormAsync(contact()) },
+        {
+          label: 'presentContactPickerAsync',
+          run: async () => {
+            const picked = await presentContactPickerAsync();
+            setIds({ contactId: picked?.id ?? ids.contactId });
+            return picked;
+          },
+        },
+        { label: 'presentAccessPickerAsync', run: () => presentAccessPickerAsync() },
+        {
+          label: 'writeContactToFileAsync',
+          run: () => writeContactToFileAsync({ id: contact() }),
+        },
+        {
+          label: 'shareContactAsync',
+          run: () => shareContactAsync(contact(), 'Shared from the canary'),
+        },
+      ]}
+    />
+  );
+}
+
+function GroupCalls({ ids, setIds }: { ids: IIds; setIds: ISetIds }) {
+  const group = () => need(ids.groupId, 'group id');
+  return (
+    <CallConsole
+      prefix="contacts-legacy-groups"
+      title="Legacy groups and containers"
+      color={color}
+      calls={[
+        {
+          label: 'getDefaultContainerIdAsync',
+          run: async () => {
+            const id = await getDefaultContainerIdAsync();
+            setIds({ containerId: id });
+            return id;
+          },
+        },
+        { label: 'getContainersAsync', run: () => getContainersAsync({}) },
+        {
+          label: 'createGroupAsync',
+          run: async () => {
+            const id = await createGroupAsync('Legacy Group');
+            setIds({ groupId: id });
+            return id;
+          },
+        },
+        { label: 'getGroupsAsync', run: () => getGroupsAsync({}) },
+        {
+          label: 'updateGroupNameAsync',
+          run: () => updateGroupNameAsync('Renamed Legacy Group', group()),
+        },
+        { label: 'removeGroupAsync', run: () => removeGroupAsync(group()) },
+        {
+          label: 'addExistingContactToGroupAsync',
+          run: () => addExistingContactToGroupAsync(need(ids.contactId, 'contact id'), group()),
+        },
+        {
+          label: 'removeContactFromGroupAsync',
+          run: () => removeContactFromGroupAsync(need(ids.contactId, 'contact id'), group()),
+        },
+        {
+          label: 'addExistingGroupToContainerAsync',
+          run: () => addExistingGroupToContainerAsync(group(), need(ids.containerId, 'container id')),
+        },
+      ]}
+    />
+  );
+}
+
+function PermissionCalls() {
+  return (
+    <CallConsole
+      prefix="contacts-legacy-permissions"
+      title="Legacy permissions and listener"
+      color={color}
+      calls={[
+        { label: 'getPermissionsAsync', run: () => getPermissionsAsync() },
+        { label: 'requestPermissionsAsync', run: () => requestPermissionsAsync() },
+        {
+          label: 'addContactsChangeListener',
+          run: async () => {
+            const subscription = addContactsChangeListener(() => undefined);
+            subscription.remove();
+            return 'subscribed and removed';
+          },
+        },
+      ]}
+    />
+  );
+}
+
+export function LegacyCards() {
+  const [ids, setIdsState] = useState<IIds>({
+    contactId: '',
+    groupId: '',
+    containerId: '',
+  });
+  const setIds: ISetIds = patch =>
+    setIdsState(previous => ({ ...previous, ...patch }));
+  return (
+    <>
+      <IdsCard ids={ids} setIds={setIds} />
+      <ContactCalls ids={ids} setIds={setIds} />
+      <GroupCalls ids={ids} setIds={setIds} />
+      <PermissionCalls />
+    </>
+  );
+}

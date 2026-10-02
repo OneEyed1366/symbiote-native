@@ -1,22 +1,20 @@
-import { Component, inject } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
 import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import {
   CalendarsService,
   LocalesService,
 } from '@symbiote-native/localization/angular';
+import { Scenario } from '../components/Scenario';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
+import { ValueRow } from './ValueRow';
 
-/**
- * @symbiote-native/localization canary demo: the device's first reported locale and first
- * reported calendar, each driven by its own service (LocalesService/CalendarsService — two
- * separate services, matching upstream's own useLocales/useCalendars being two separate hooks).
- * Angular twin of ../../react/screens/LocalizationScreen.tsx.
- */
+const UNKNOWN_TEXT = 'unknown';
+
 @Component({
   selector: 'LocalizationScreen',
   standalone: true,
-  imports: [SYMBIOTE_ELEMENTS],
+  imports: [Scenario, SYMBIOTE_ELEMENTS, ValueRow],
   template: `
     <safe-area-view class="screen">
       <scroll-view
@@ -24,114 +22,97 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <view [class]="lineTagClass">
-          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        <view [class]="'line-tag line-tag-' + lineInfo.line">
+          <text class="line-tag-text"
+            >{{ lineInfo.code }} · {{ lineInfo.label }}</text
+          >
         </view>
         <view class="hero-card">
-          <view class="hero-badge" [style]="heroBadgeStyle">
-            <text class="hero-badge-text">{{ heroBadgeCode }}</text>
+          <view class="hero-badge" [style]="badgeStyle">
+            <text class="hero-badge-text">{{ lineInfo.code }}</text>
           </view>
           <view class="hero-copy">
             <text class="hero-title">Localization</text>
             <text class="hero-body">
-              @symbiote-native/localization — the device's locales and
-              calendars, live-updated when the user changes their
-              language/region settings.
+              Speak the user's language and format: preferred locales, currency,
+              text direction, calendar, 12 or 24 hour clock and time zone,
+              updating as soon as the device settings change.
             </text>
           </view>
         </view>
 
-        <view testID="localization-locale-card" class="capability-card">
-          <text class="capability-card-title">First locale</text>
-          <view class="capability-row">
-            <text class="capability-label">Language tag</text>
-            <text testID="localization-language-tag" class="value-text">{{
-              languageTagLabel()
-            }}</text>
+        <Scenario
+          testID="localization-scenario"
+          title="Format prices, dates and layout for the user's region"
+          why="Show the right currency, switch to right-to-left layout for Arabic or Hebrew and respect 24-hour clocks, without asking users to configure anything."
+          [steps]="scenarioSteps"
+          expect="Language tag, currency, text direction and clock format update to the new settings without restarting the app."
+        />
+
+        <view testID="localization-locale-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Locale</text>
           </view>
-          <view class="capability-row">
-            <text class="capability-label">Currency code</text>
-            <text testID="localization-currency-code" class="value-text">{{
-              currencyCodeLabel()
-            }}</text>
-          </view>
-          <view class="capability-row">
-            <text class="capability-label">Currency symbol</text>
-            <text testID="localization-currency-symbol" class="value-text">{{
-              currencySymbolLabel()
-            }}</text>
-          </view>
-          <view class="capability-row">
-            <text class="capability-label">Text direction</text>
-            <text testID="localization-text-direction" class="value-text">{{
-              textDirectionLabel()
-            }}</text>
-          </view>
+          <ValueRow
+            label="Language tag"
+            [value]="locale()?.languageTag ?? unknownText"
+          />
+          <ValueRow
+            label="Currency code"
+            [value]="locale()?.currencyCode ?? unknownText"
+          />
+          <ValueRow
+            label="Currency symbol"
+            [value]="locale()?.currencySymbol ?? unknownText"
+          />
+          <ValueRow
+            label="Text direction"
+            [value]="locale()?.textDirection ?? unknownText"
+          />
         </view>
 
-        <view testID="localization-calendar-card" class="capability-card">
-          <text class="capability-card-title">First calendar</text>
-          <view class="capability-row">
-            <text class="capability-label">Calendar</text>
-            <text testID="localization-calendar" class="value-text">{{
-              calendarLabel()
-            }}</text>
+        <view testID="localization-calendar-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Calendar</text>
           </view>
-          <view class="capability-row">
-            <text class="capability-label">24-hour clock</text>
-            <text testID="localization-24-hour-clock" class="value-text">{{
-              uses24HourClockLabel()
-            }}</text>
-          </view>
-          <view class="capability-row">
-            <text class="capability-label">Time zone</text>
-            <text testID="localization-time-zone" class="value-text">{{
-              timeZoneLabel()
-            }}</text>
-          </view>
+          <ValueRow
+            label="Calendar"
+            [value]="calendar()?.calendar ?? unknownText"
+          />
+          <ValueRow
+            label="Uses 24-hour clock"
+            [value]="uses24hourClockText()"
+          />
+          <ValueRow
+            label="Time zone"
+            [value]="calendar()?.timeZone ?? unknownText"
+          />
         </view>
       </scroll-view>
     </safe-area-view>
   `,
 })
 export class LocalizationScreen {
-  private readonly lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Localization];
-  readonly lineTagClass = `line-tag line-tag-${this.lineInfo.line}`;
-  readonly lineTagLabel = `${this.lineInfo.code} · ${this.lineInfo.label}`;
-  readonly heroBadgeCode = this.lineInfo.code;
-  readonly lineColor = LINE_COLOR[this.lineInfo.line];
-  readonly heroBadgeStyle = { backgroundColor: this.lineColor };
+  readonly lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Localization];
+  readonly badgeStyle = { backgroundColor: LINE_COLOR.localization };
+  readonly unknownText = UNKNOWN_TEXT;
+  readonly scenarioSteps = [
+    'Read the locale and calendar cards',
+    'Open system settings and change the language or region',
+    'Come back to the app',
+  ];
 
-  readonly locales = inject(LocalesService).connect();
-  readonly calendars = inject(CalendarsService).connect();
+  private readonly locales = inject(LocalesService).connect();
+  private readonly calendars = inject(CalendarsService).connect();
 
-  languageTagLabel(): string {
-    return this.locales()[0]?.languageTag ?? 'no locale reported';
-  }
+  readonly locale = computed(() => this.locales()[0] ?? null);
+  readonly calendar = computed(() => this.calendars()[0] ?? null);
 
-  currencyCodeLabel(): string {
-    return this.locales()[0]?.currencyCode ?? 'unknown';
-  }
-
-  currencySymbolLabel(): string {
-    return this.locales()[0]?.currencySymbol ?? 'unknown';
-  }
-
-  textDirectionLabel(): string {
-    return this.locales()[0]?.textDirection ?? 'unknown';
-  }
-
-  calendarLabel(): string {
-    return this.calendars()[0]?.calendar ?? 'no calendar reported';
-  }
-
-  uses24HourClockLabel(): string {
-    const calendar = this.calendars()[0];
-    if (!calendar || calendar.uses24hourClock === null) return 'unknown';
-    return calendar.uses24hourClock ? 'Yes' : 'No';
-  }
-
-  timeZoneLabel(): string {
-    return this.calendars()[0]?.timeZone ?? 'unknown';
-  }
+  readonly uses24hourClockText = computed(() => {
+    const value = this.calendar()?.uses24hourClock;
+    if (value === null || value === undefined) {
+      return UNKNOWN_TEXT;
+    }
+    return value ? 'Yes' : 'No';
+  });
 }

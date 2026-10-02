@@ -6,6 +6,7 @@ import {
 } from '@symbiote-native/store-review';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
+import { Scenario } from '../components/Scenario';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
 function ValueRow({ label, value }: { label: string; value: string }) {
@@ -17,13 +18,6 @@ function ValueRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-/**
- * @symbiote-native/store-review canary demo: capability card (isAvailableAsync/hasAction,
- * resolved on mount, no store-URL options supplied) plus a button firing requestReview().
- *
- * Neither store reports whether a dialog appeared, so without the result row a suppressed
- * prompt and a rejected call are the same blank screen.
- */
 export function StoreReviewScreen() {
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.StoreReview];
   const lineColor = LINE_COLOR[lineInfo.line];
@@ -73,12 +67,19 @@ export function StoreReviewScreen() {
           <view className="hero-copy">
             <text className="hero-title">Store Review</text>
             <text className="hero-body">
-              @symbiote-native/store-review — prompts the platform's native
-              in-app review flow.
+              Ask happy users for a store rating without leaving the app, with
+              the native App Store and Google Play review sheet.
             </text>
           </view>
         </view>
 
+        <Scenario
+          testID="store-review-scenario"
+          title="Ask for a rating right after a good moment"
+          why="Reviews convert best after a success, such as a finished order or a completed level. The stores limit how often the sheet appears, so ask once at the right time."
+          steps={['Check that the native flow is available', 'Press Request Review', 'Read the last result']}
+          expect="The review sheet may appear, but the stores never say whether it did. The result only says the call finished, and Android shows it only for Play-installed builds."
+        />
         <view testID="store-review-capability-card" className="feature-card">
           <view className="feature-card-header">
             <text className="feature-card-title">Capability</text>

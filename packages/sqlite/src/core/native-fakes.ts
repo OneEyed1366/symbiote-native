@@ -36,6 +36,10 @@ process.once('exit', () => {
   rmSync(TEMP_DIR, { recursive: true, force: true });
 });
 
+// better-sqlite3 blocks the event loop while it waits on a lock, so the default 5 s wait would
+// freeze a lock-contention test instead of letting it observe `database is locked`
+const BUSY_TIMEOUT_MS = 10;
+
 type IBoundValues = Record<string, unknown>;
 type IRunResult = {
   lastInsertRowId: number;
@@ -246,27 +250,20 @@ export class FakeNativeDatabase {
     serializedData?: Uint8Array,
   ) {
     if (serializedData != null) {
-      // deserializeDatabaseAsync/Sync's path — better-sqlite3's Database constructor opens
-      // directly from a serialized Buffer as a private in-memory db, matching
-      // sqlite3_deserialize()'s semantics (the real native module's own contract, per the
-      // deserializeDatabaseAsync doc comment this fake stands in for).
+      // Deserialize path: better-sqlite3 opens a serialized Buffer as a private in-memory db
       this.db = new Database(Buffer.from(serializedData));
       FakeNativeDatabase.instanceCount++;
       return;
     }
-    // A real file under TEMP_DIR, keyed by the resolved database PATH, rather than a bare
-    // `:memory:` — real expo-sqlite databases are files, so two `NativeDatabase` instances
-    // opened with `useNewConnection: true` (SQLiteDatabase's `withExclusiveTransactionAsync`)
-    // see the SAME tables, and each still closes independently. A bare `:memory:` gives each
-    // `new Database(...)` call its own private, empty store, breaking that path with `SqliteError:
-    // no such table`; `databasePath === ':memory:'` (only reached via `deserializeDatabaseAsync`,
-    // not exercised by this package's tests) gets its own throwaway file instead, since there is
-    // no path to key sharing on.
+    // A file keyed by path, so a second connection (`useNewConnection`) sees the same tables
+    // `:memory:` has no path to share on, so it gets a throwaway file
     const fileName =
       databasePath === ':memory:'
         ? `anon-${Math.random()}.sqlite`
         : `${encodeURIComponent(databasePath)}.sqlite`;
-    this.db = new Database(join(TEMP_DIR, fileName));
+    this.db = new Database(join(TEMP_DIR, fileName), {
+      timeout: BUSY_TIMEOUT_MS,
+    });
     FakeNativeDatabase.instanceCount++;
   }
 
@@ -352,6 +349,13 @@ export const FAKE_EXPO_SQLITE = {
     async (_path: string): Promise<void> => {},
   ),
   ensureDatabasePathExistsSync: vi.fn((_path: string): void => {}),
+  importAssetDatabaseAsync: vi.fn(
+    async (
+      _databasePath: string,
+      _assetDatabasePath: string,
+      _forceOverwrite: boolean,
+    ): Promise<void> => {},
+  ),
   deleteDatabaseAsync: vi.fn(async (_path: string): Promise<void> => {}),
   deleteDatabaseSync: vi.fn((_path: string): void => {}),
   backupDatabaseAsync: vi.fn(async (): Promise<void> => {

@@ -78,6 +78,7 @@ const {
   dismissBrowser,
   openAuthSessionAsync,
   dismissAuthSession,
+  maybeCompleteAuthSession,
 } = await import('./web-browser');
 
 function emitAppState(state: string): void {
@@ -533,5 +534,32 @@ describe('dismissAuthSession', () => {
 
       FAKE_NATIVE_WEB_BROWSER.dismissBrowser = native;
     });
+  });
+});
+
+describe('maybeCompleteAuthSession', () => {
+  it('reports failed where the native module has no such method', () => {
+    expect(maybeCompleteAuthSession()).toEqual({
+      type: 'failed',
+      message: 'Not supported on this platform',
+    });
+  });
+
+  it('delegates to the native module when it has one', () => {
+    const native = vi.fn(() => ({
+      type: 'success' as const,
+      message: 'closed',
+    }));
+    Object.assign(FAKE_NATIVE_WEB_BROWSER, {
+      maybeCompleteAuthSession: native,
+    });
+
+    expect(maybeCompleteAuthSession({ skipRedirectCheck: true })).toEqual({
+      type: 'success',
+      message: 'closed',
+    });
+    expect(native).toHaveBeenCalledWith({ skipRedirectCheck: true });
+
+    Reflect.deleteProperty(FAKE_NATIVE_WEB_BROWSER, 'maybeCompleteAuthSession');
   });
 });

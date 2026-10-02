@@ -1,39 +1,40 @@
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { Component, computed, input, output } from '@angular/core';
 import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
+import type { IPressState } from '@symbiote-native/components';
 
-// Drop-in for RN's stock <Button>, `press` as a real Angular @Output() (Angular's own idiom, see
-// angular-adapter-events) instead of React's onPress prop — a bordered pill tinted by `color`,
-// twin of ../../react/components/ActionButton.tsx.
+// Drop-in for RN's stock <Button>: a bare Button renders as unstyled tinted text on iOS, so a
+// bordered pill tinted by `color` replaces it
 @Component({
   selector: 'ActionButton',
   standalone: true,
   imports: [SYMBIOTE_ELEMENTS],
   template: `
     <pressable
-      [testID]="testID"
+      [testID]="testID()"
       (press)="press.emit()"
       class="action-button"
-      [style]="buttonStyle"
+      [styleProp]="buttonStyle()"
     >
-      <text class="action-button-text" [style]="textStyle">{{ title }}</text>
+      <text class="action-button-text" [style]="textStyle()">{{
+        title()
+      }}</text>
     </pressable>
   `,
 })
 export class ActionButton {
-  @Input({ required: true }) title!: string;
-  @Input({ required: true }) color!: string;
-  @Input() testID?: string;
-  @Output() readonly press = new EventEmitter<void>();
+  readonly title = input.required<string>();
+  readonly color = input.required<string>();
+  readonly testID = input<string>();
+  readonly press = output<void>();
 
-  get buttonStyle(): (state: { pressed: boolean }) => Record<string, unknown> {
-    const color = this.color;
-    return ({ pressed }) => ({
+  // The pressed look is a style FUNCTION of press state; the engine resolves it on the bare tag
+  readonly buttonStyle = computed(() => {
+    const color = this.color();
+    return ({ pressed }: IPressState) => ({
       borderColor: color,
       opacity: pressed ? 0.6 : 1,
     });
-  }
+  });
 
-  get textStyle(): Record<string, unknown> {
-    return { color: this.color };
-  }
+  readonly textStyle = computed(() => ({ color: this.color() }));
 }
