@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/document-picker",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "expo-document-picker wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, Svelte, Solid, and Angular adapters. Opens the system UI for picking a document from any provider installed on the device.",
   "license": "MIT",
   "keywords": [

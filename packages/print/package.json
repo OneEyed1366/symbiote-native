@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/print",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "expo-print wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, Svelte, Solid, and Angular adapters. Prints a PDF/HTML document (AirPrint on iOS, the print framework on Android) or renders HTML to a PDF file.",
   "license": "MIT",
   "keywords": [
