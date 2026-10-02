@@ -1,28 +1,15 @@
-/* Symbiote Angular Expo-modules-core canary — static styles, compiled at build time by
-   @symbiote-native/css-parser into the same RN style objects StyleSheet.create used to produce
-   (see the symbiote-sfc-style-compiler skill). Referenced via class, resolved at runtime through
-   the shared style registry every adapter's class/className/addClass path shares. This app demos
-   Expo-SDK-ported packages only (Sensors, Local Auth, …) — the full @symbiote-native/angular
-   primitive + navigation-feature tour lives in ../angular, not here. Plain (unscoped) file,
-   imported once at the app root (App.ts) — every screen under ./screens/ shares these classes
-   globally, no <style scoped>/CSS-module needed. */
+/* Static styles for the Expo canary, compiled at build time by @symbiote-native/css-parser */
 
 :root {
-  /* app-wide surface/text tokens */
   --ink: #0b1622;
   --paper: #13243a;
   --mist: #41506a;
   --chalk: #cbd5e1;
   --chalk-bright: #ffffff;
-  /* generic "good/live" indicator — reused by sensor-status-badge-live, auth-status-badge-yes,
-     auth-result-success; unrelated to any specific package's own line color. */
   --positive: #4fd1a5;
 
-  /* one "line" color per Expo-SDK-ported package this app demos, carried through MenuScreen's
-     row badges, each demo screen's own line tag, and the native header tint. Kept in sync by
-     hand with navigation-lines.ts's LINE_COLOR (CSS custom properties and that module are
-     different runtimes with no shared import path). */
-  --line-sensors: #ffb020;
+  /* one color per package line, kept in sync by hand with LINE_COLOR in navigation-lines.ts */
+  --line-sensors: #f5a623;
   --line-local-auth: #ef4444;
   --line-haptics: #8b5cf6;
   --line-clipboard: #14b8a6;
@@ -39,18 +26,37 @@
   --line-keep-awake: #0ea5e9;
   --line-screen-orientation: #f43f5e;
   --line-localization: #10b981;
+  --line-location: #1d4ed8;
+  --line-media-library: #db2777;
+  --line-file-system: #134e4a;
   --line-tracking-transparency: #78716c;
   --line-secure-store: #a16207;
   --line-sharing: #d946ef;
   --line-web-browser: #0369a1;
   --line-sms: #65a30d;
-  --line-location: #1d4ed8;
-  --line-media-library: #db2777;
-  --line-file-system: #9a3412;
-  --line-audio: #34b02a;
-  --line-notifications: #dd3cc4;
-  --line-background-tasks: #495adf;
-  --line-sqlite: #bbc91d;
+  --line-audio: #3fc123;
+  --line-notifications: #e236c8;
+  --line-background-tasks: #8a78e2;
+  --line-sqlite: #a6af1d;
+  --line-mail-composer: #c2410c;
+  --line-print: #9d174d;
+  --line-speech: #0e7490;
+  --line-video-thumbnails: #6d28d9;
+  --line-document-picker: #15803d;
+  --line-image-picker: #be185d;
+  --line-image-manipulator: #b91c1c;
+  --line-blob: #0f766e;
+  --line-screen-capture: #7e22ce;
+  --line-contacts: #0891b2;
+  --line-calendar: #ca8a04;
+  --line-age-range: #ea580c;
+  --line-app-integrity: #4f46e5;
+  --line-intent-launcher: #16a34a;
+  --line-navigation-bar: #2563eb;
+  --line-font: #c026d3;
+  --line-asset: #0d9488;
+  --line-app-metrics: #e11d48;
+  --line-auth-session: #65a30d;
 }
 
 .info-text {
@@ -58,9 +64,6 @@
   font-size: 14px;
 }
 
-/* ActionButton — every demo screen's tappable action, replacing RN's stock unstyled <Button>.
-   borderColor/color stay dynamic (ActionButton's own `color` prop, one per call site — the
-   per-feature color-coding a class can't parametrize), everything else is the shared chrome. */
 .action-button {
   align-items: center;
   justify-content: center;
@@ -77,7 +80,6 @@
   font-weight: bold;
 }
 
-/* Hero card — the "you've arrived" intro each demo screen leads with. */
 .hero-card {
   flex-direction: row;
   align-items: center;
@@ -144,7 +146,6 @@
   font-size: 14px;
 }
 
-/* line tag — the "you are here" pill each demo screen carries, matching its MenuScreen row */
 .line-tag {
   align-self: flex-start;
   padding-top: 4px;
@@ -204,6 +205,15 @@
 .line-tag-localization {
   background-color: var(--line-localization);
 }
+.line-tag-location {
+  background-color: var(--line-location);
+}
+.line-tag-media-library {
+  background-color: var(--line-media-library);
+}
+.line-tag-file-system {
+  background-color: var(--line-file-system);
+}
 .line-tag-tracking-transparency {
   background-color: var(--line-tracking-transparency);
 }
@@ -219,15 +229,6 @@
 .line-tag-sms {
   background-color: var(--line-sms);
 }
-.line-tag-location {
-  background-color: var(--line-location);
-}
-.line-tag-media-library {
-  background-color: var(--line-media-library);
-}
-.line-tag-file-system {
-  background-color: var(--line-file-system);
-}
 .line-tag-audio {
   background-color: var(--line-audio);
 }
@@ -239,6 +240,63 @@
 }
 .line-tag-sqlite {
   background-color: var(--line-sqlite);
+}
+.line-tag-auth-session {
+  background-color: var(--line-auth-session);
+}
+.line-tag-app-metrics {
+  background-color: var(--line-app-metrics);
+}
+.line-tag-asset {
+  background-color: var(--line-asset);
+}
+.line-tag-font {
+  background-color: var(--line-font);
+}
+.line-tag-navigation-bar {
+  background-color: var(--line-navigation-bar);
+}
+.line-tag-intent-launcher {
+  background-color: var(--line-intent-launcher);
+}
+.line-tag-app-integrity {
+  background-color: var(--line-app-integrity);
+}
+.line-tag-age-range {
+  background-color: var(--line-age-range);
+}
+.line-tag-calendar {
+  background-color: var(--line-calendar);
+}
+.line-tag-contacts {
+  background-color: var(--line-contacts);
+}
+.line-tag-screen-capture {
+  background-color: var(--line-screen-capture);
+}
+.line-tag-blob {
+  background-color: var(--line-blob);
+}
+.line-tag-image-manipulator {
+  background-color: var(--line-image-manipulator);
+}
+.line-tag-image-picker {
+  background-color: var(--line-image-picker);
+}
+.line-tag-document-picker {
+  background-color: var(--line-document-picker);
+}
+.line-tag-video-thumbnails {
+  background-color: var(--line-video-thumbnails);
+}
+.line-tag-speech {
+  background-color: var(--line-speech);
+}
+.line-tag-print {
+  background-color: var(--line-print);
+}
+.line-tag-mail-composer {
+  background-color: var(--line-mail-composer);
 }
 .line-tag-text {
   color: var(--ink);
@@ -323,6 +381,18 @@
   border-left-width: 3px;
   border-left-color: var(--line-localization);
 }
+.menu-row-location {
+  border-left-width: 3px;
+  border-left-color: var(--line-location);
+}
+.menu-row-media-library {
+  border-left-width: 3px;
+  border-left-color: var(--line-media-library);
+}
+.menu-row-file-system {
+  border-left-width: 3px;
+  border-left-color: var(--line-file-system);
+}
 .menu-row-tracking-transparency {
   border-left-width: 3px;
   border-left-color: var(--line-tracking-transparency);
@@ -343,18 +413,6 @@
   border-left-width: 3px;
   border-left-color: var(--line-sms);
 }
-.menu-row-location {
-  border-left-width: 3px;
-  border-left-color: var(--line-location);
-}
-.menu-row-media-library {
-  border-left-width: 3px;
-  border-left-color: var(--line-media-library);
-}
-.menu-row-file-system {
-  border-left-width: 3px;
-  border-left-color: var(--line-file-system);
-}
 .menu-row-audio {
   border-left-width: 3px;
   border-left-color: var(--line-audio);
@@ -370,6 +428,82 @@
 .menu-row-sqlite {
   border-left-width: 3px;
   border-left-color: var(--line-sqlite);
+}
+.menu-row-auth-session {
+  border-left-width: 3px;
+  border-left-color: var(--line-auth-session);
+}
+.menu-row-app-metrics {
+  border-left-width: 3px;
+  border-left-color: var(--line-app-metrics);
+}
+.menu-row-asset {
+  border-left-width: 3px;
+  border-left-color: var(--line-asset);
+}
+.menu-row-font {
+  border-left-width: 3px;
+  border-left-color: var(--line-font);
+}
+.menu-row-navigation-bar {
+  border-left-width: 3px;
+  border-left-color: var(--line-navigation-bar);
+}
+.menu-row-intent-launcher {
+  border-left-width: 3px;
+  border-left-color: var(--line-intent-launcher);
+}
+.menu-row-app-integrity {
+  border-left-width: 3px;
+  border-left-color: var(--line-app-integrity);
+}
+.menu-row-age-range {
+  border-left-width: 3px;
+  border-left-color: var(--line-age-range);
+}
+.menu-row-calendar {
+  border-left-width: 3px;
+  border-left-color: var(--line-calendar);
+}
+.menu-row-contacts {
+  border-left-width: 3px;
+  border-left-color: var(--line-contacts);
+}
+.menu-row-screen-capture {
+  border-left-width: 3px;
+  border-left-color: var(--line-screen-capture);
+}
+.menu-row-blob {
+  border-left-width: 3px;
+  border-left-color: var(--line-blob);
+}
+.menu-row-image-manipulator {
+  border-left-width: 3px;
+  border-left-color: var(--line-image-manipulator);
+}
+.menu-row-image-picker {
+  border-left-width: 3px;
+  border-left-color: var(--line-image-picker);
+}
+.menu-row-document-picker {
+  border-left-width: 3px;
+  border-left-color: var(--line-document-picker);
+}
+.menu-row-video-thumbnails {
+  border-left-width: 3px;
+  border-left-color: var(--line-video-thumbnails);
+}
+.menu-row-speech {
+  border-left-width: 3px;
+  border-left-color: var(--line-speech);
+}
+.menu-row-print {
+  border-left-width: 3px;
+  border-left-color: var(--line-print);
+}
+.menu-row-mail-composer {
+  border-left-width: 3px;
+  border-left-color: var(--line-mail-composer);
 }
 
 .menu-badge {
@@ -430,6 +564,15 @@
 .menu-badge-localization {
   background-color: var(--line-localization);
 }
+.menu-badge-location {
+  background-color: var(--line-location);
+}
+.menu-badge-media-library {
+  background-color: var(--line-media-library);
+}
+.menu-badge-file-system {
+  background-color: var(--line-file-system);
+}
 .menu-badge-tracking-transparency {
   background-color: var(--line-tracking-transparency);
 }
@@ -445,15 +588,6 @@
 .menu-badge-sms {
   background-color: var(--line-sms);
 }
-.menu-badge-location {
-  background-color: var(--line-location);
-}
-.menu-badge-media-library {
-  background-color: var(--line-media-library);
-}
-.menu-badge-file-system {
-  background-color: var(--line-file-system);
-}
 .menu-badge-audio {
   background-color: var(--line-audio);
 }
@@ -465,6 +599,63 @@
 }
 .menu-badge-sqlite {
   background-color: var(--line-sqlite);
+}
+.menu-badge-auth-session {
+  background-color: var(--line-auth-session);
+}
+.menu-badge-app-metrics {
+  background-color: var(--line-app-metrics);
+}
+.menu-badge-asset {
+  background-color: var(--line-asset);
+}
+.menu-badge-font {
+  background-color: var(--line-font);
+}
+.menu-badge-navigation-bar {
+  background-color: var(--line-navigation-bar);
+}
+.menu-badge-intent-launcher {
+  background-color: var(--line-intent-launcher);
+}
+.menu-badge-app-integrity {
+  background-color: var(--line-app-integrity);
+}
+.menu-badge-age-range {
+  background-color: var(--line-age-range);
+}
+.menu-badge-calendar {
+  background-color: var(--line-calendar);
+}
+.menu-badge-contacts {
+  background-color: var(--line-contacts);
+}
+.menu-badge-screen-capture {
+  background-color: var(--line-screen-capture);
+}
+.menu-badge-blob {
+  background-color: var(--line-blob);
+}
+.menu-badge-image-manipulator {
+  background-color: var(--line-image-manipulator);
+}
+.menu-badge-image-picker {
+  background-color: var(--line-image-picker);
+}
+.menu-badge-document-picker {
+  background-color: var(--line-document-picker);
+}
+.menu-badge-video-thumbnails {
+  background-color: var(--line-video-thumbnails);
+}
+.menu-badge-speech {
+  background-color: var(--line-speech);
+}
+.menu-badge-print {
+  background-color: var(--line-print);
+}
+.menu-badge-mail-composer {
+  background-color: var(--line-mail-composer);
 }
 .menu-badge-text {
   color: var(--ink);
@@ -536,6 +727,15 @@
 .menu-row-hint-localization {
   color: var(--line-localization);
 }
+.menu-row-hint-location {
+  color: var(--line-location);
+}
+.menu-row-hint-media-library {
+  color: var(--line-media-library);
+}
+.menu-row-hint-file-system {
+  color: var(--line-file-system);
+}
 .menu-row-hint-tracking-transparency {
   color: var(--line-tracking-transparency);
 }
@@ -551,15 +751,6 @@
 .menu-row-hint-sms {
   color: var(--line-sms);
 }
-.menu-row-hint-location {
-  color: var(--line-location);
-}
-.menu-row-hint-media-library {
-  color: var(--line-media-library);
-}
-.menu-row-hint-file-system {
-  color: var(--line-file-system);
-}
 .menu-row-hint-audio {
   color: var(--line-audio);
 }
@@ -572,9 +763,64 @@
 .menu-row-hint-sqlite {
   color: var(--line-sqlite);
 }
+.menu-row-hint-auth-session {
+  color: var(--line-auth-session);
+}
+.menu-row-hint-app-metrics {
+  color: var(--line-app-metrics);
+}
+.menu-row-hint-asset {
+  color: var(--line-asset);
+}
+.menu-row-hint-font {
+  color: var(--line-font);
+}
+.menu-row-hint-navigation-bar {
+  color: var(--line-navigation-bar);
+}
+.menu-row-hint-intent-launcher {
+  color: var(--line-intent-launcher);
+}
+.menu-row-hint-app-integrity {
+  color: var(--line-app-integrity);
+}
+.menu-row-hint-age-range {
+  color: var(--line-age-range);
+}
+.menu-row-hint-calendar {
+  color: var(--line-calendar);
+}
+.menu-row-hint-contacts {
+  color: var(--line-contacts);
+}
+.menu-row-hint-screen-capture {
+  color: var(--line-screen-capture);
+}
+.menu-row-hint-blob {
+  color: var(--line-blob);
+}
+.menu-row-hint-image-manipulator {
+  color: var(--line-image-manipulator);
+}
+.menu-row-hint-image-picker {
+  color: var(--line-image-picker);
+}
+.menu-row-hint-document-picker {
+  color: var(--line-document-picker);
+}
+.menu-row-hint-video-thumbnails {
+  color: var(--line-video-thumbnails);
+}
+.menu-row-hint-speech {
+  color: var(--line-speech);
+}
+.menu-row-hint-print {
+  color: var(--line-print);
+}
+.menu-row-hint-mail-composer {
+  color: var(--line-mail-composer);
+}
 
-/* SensorsScreen — one card per @symbiote-native/sensors hook, each rendering its own
-   checking/unavailable/waiting/live state distinctly (see the sensor-status-* badges below). */
 .sensor-card {
   gap: 10px;
   padding: 16px;
@@ -598,21 +844,15 @@
   padding-right: 10px;
   border-radius: 999px;
 }
-/* still resolving isAvailableAsync() */
 .sensor-status-badge-checking {
   background-color: var(--mist);
 }
-/* isAvailableAsync() resolved false — a real state, not an error (the iOS Simulator reports
-   this for every CoreMotion/CMPedometer-backed sensor, see the symbiote-expo-native-module
-   skill) */
 .sensor-status-badge-unavailable {
   background-color: #6b4a4a;
 }
-/* available, subscribed, no reading has arrived yet */
 .sensor-status-badge-waiting {
   background-color: var(--line-sensors);
 }
-/* at least one live reading rendered below */
 .sensor-status-badge-live {
   background-color: var(--positive);
 }
@@ -645,7 +885,6 @@
   font-weight: bold;
 }
 
-/* LocalAuthScreen — capabilities card + authenticate card. */
 .auth-card {
   gap: 10px;
   padding: 16px;
@@ -714,16 +953,24 @@
   font-weight: bold;
 }
 
-/* Generic capability-card family — shared by HapticsScreen/ClipboardScreen/BatteryScreen, whose
-   status-badge/value-row layout is identical to .auth-card's but used by three screens at once
-   (unlike .auth-card/.sensor-card, each owned by a single screen). */
-.capability-card {
+.location-permission-actions {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+.feature-card {
   gap: 10px;
   padding: 16px;
   border-radius: 16px;
   background-color: var(--paper);
 }
-.capability-card-title {
+.feature-card-header {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+.feature-card-title {
   color: var(--chalk-bright);
   font-size: 16px;
   font-weight: bold;
@@ -738,6 +985,12 @@
   color: var(--chalk);
   font-size: 14px;
   flex-shrink: 0;
+}
+.value-text {
+  color: var(--chalk-bright);
+  font-size: 13px;
+  font-weight: bold;
+  flex-shrink: 1;
 }
 .status-badge {
   padding-top: 4px;
@@ -761,226 +1014,76 @@
   font-weight: bold;
   letter-spacing: 0.5px;
 }
-.value-text {
-  color: var(--chalk-bright);
-  font-size: 13px;
-  font-weight: bold;
-  flex-shrink: 1;
-}
 
-/* HapticsScreen's grouped ActionButtons (impact/notification/Android-effect rows) — wraps onto
-   multiple lines rather than a single unbounded row. */
 .button-row {
   flex-direction: row;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-/* ClipboardScreen's copy-text / URL inputs. */
 .text-input {
+  height: 44px;
+  border-radius: 10px;
   border-width: 1px;
   border-color: var(--mist);
-  border-radius: 10px;
+  padding-left: 14px;
+  padding-right: 14px;
+  color: var(--chalk-bright);
+  font-size: 16px;
+  background-color: var(--paper);
+}
+
+.scenario-card {
+  gap: 10px;
+  padding: 16px;
+  border-radius: 16px;
+  background-color: var(--paper);
+}
+.scenario-title {
+  color: var(--chalk-bright);
+  font-size: 17px;
+  font-weight: bold;
+}
+.scenario-why {
+  color: var(--chalk);
+  font-size: 14px;
+}
+.scenario-steps {
+  gap: 4px;
+}
+.scenario-step {
+  color: var(--chalk);
+  font-size: 13px;
+}
+.scenario-expect {
+  gap: 2px;
   padding: 10px;
-  color: var(--chalk-bright);
-  font-size: 14px;
+  border-radius: 10px;
+  background-color: var(--ink);
 }
-
-/* SecureStoreScreen — capabilities card, stored-value card, write/read/delete card. Same shape
-   as .auth-* above; kept its own family so the two screens can drift independently. */
-.secure-store-card {
-  gap: 10px;
-  padding: 16px;
-  border-radius: 16px;
-  background-color: var(--paper);
-}
-.secure-store-card-title {
-  color: var(--chalk-bright);
-  font-size: 16px;
-  font-weight: bold;
-}
-.secure-store-row {
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-.secure-store-row-label {
-  color: var(--chalk);
-  font-size: 14px;
-  flex-shrink: 1;
-}
-.secure-store-status-badge {
-  padding-top: 4px;
-  padding-bottom: 4px;
-  padding-left: 10px;
-  padding-right: 10px;
-  border-radius: 999px;
-}
-.secure-store-status-badge-checking {
-  background-color: var(--mist);
-}
-.secure-store-status-badge-no {
-  background-color: #6b4a4a;
-}
-.secure-store-status-badge-yes {
-  background-color: var(--positive);
-}
-.secure-store-status-text {
-  color: var(--ink);
-  font-size: 11px;
-  font-weight: bold;
-  letter-spacing: 0.5px;
-}
-.secure-store-value-text {
-  color: var(--chalk-bright);
-  font-size: 13px;
-  font-weight: bold;
-  flex-shrink: 1;
-}
-
-/* SharingScreen — capability card, share card, last-result card. */
-.sharing-card {
-  gap: 10px;
-  padding: 16px;
-  border-radius: 16px;
-  background-color: var(--paper);
-}
-.sharing-card-title {
-  color: var(--chalk-bright);
-  font-size: 16px;
-  font-weight: bold;
-}
-.sharing-row {
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-.sharing-row-label {
-  color: var(--chalk);
-  font-size: 14px;
-  flex-shrink: 1;
-}
-.sharing-status-badge {
-  padding-top: 4px;
-  padding-bottom: 4px;
-  padding-left: 10px;
-  padding-right: 10px;
-  border-radius: 999px;
-}
-.sharing-status-badge-checking {
-  background-color: var(--mist);
-}
-.sharing-status-badge-no {
-  background-color: #6b4a4a;
-}
-.sharing-status-badge-yes {
-  background-color: var(--positive);
-}
-.sharing-status-text {
-  color: var(--ink);
-  font-size: 11px;
-  font-weight: bold;
-  letter-spacing: 0.5px;
-}
-.sharing-value-text {
-  color: var(--chalk-bright);
-  font-size: 13px;
-  font-weight: bold;
-  flex-shrink: 1;
-}
-.sharing-note {
-  color: var(--mist);
+.scenario-expect-label {
+  color: var(--positive);
   font-size: 12px;
-}
-
-/* WebBrowserScreen — open/dismiss card, the Android-only Custom Tabs service card, result card. */
-.web-browser-card {
-  gap: 10px;
-  padding: 16px;
-  border-radius: 16px;
-  background-color: var(--paper);
-}
-.web-browser-card-title {
-  color: var(--chalk-bright);
-  font-size: 16px;
   font-weight: bold;
 }
-.web-browser-row {
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-.web-browser-row-label {
-  color: var(--chalk);
-  font-size: 14px;
-  flex-shrink: 1;
-}
-.web-browser-value-text {
+.scenario-expect-text {
   color: var(--chalk-bright);
   font-size: 13px;
-  font-weight: bold;
-  flex-shrink: 1;
 }
-.web-browser-note {
-  color: var(--mist);
-  font-size: 12px;
-}
-
-/* SmsScreen — capability card, composer card, result card. */
-.sms-card {
-  gap: 10px;
-  padding: 16px;
-  border-radius: 16px;
-  background-color: var(--paper);
-}
-.sms-card-title {
-  color: var(--chalk-bright);
-  font-size: 16px;
-  font-weight: bold;
-}
-.sms-row {
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
+.explorer {
   gap: 12px;
 }
-.sms-row-label {
-  color: var(--chalk);
-  font-size: 14px;
-  flex-shrink: 1;
+.console-bare {
+  gap: 10px;
 }
-.sms-status-badge {
-  padding-top: 4px;
-  padding-bottom: 4px;
-  padding-left: 10px;
-  padding-right: 10px;
-  border-radius: 999px;
+.thumb-row {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 6px;
 }
-.sms-status-badge-checking {
-  background-color: var(--mist);
-}
-.sms-status-badge-no {
-  background-color: #6b4a4a;
-}
-.sms-status-badge-yes {
-  background-color: var(--positive);
-}
-.sms-status-text {
-  color: var(--ink);
-  font-size: 11px;
-  font-weight: bold;
-  letter-spacing: 0.5px;
-}
-.sms-value-text {
-  color: var(--chalk-bright);
-  font-size: 13px;
-  font-weight: bold;
-  flex-shrink: 1;
-}
-.sms-note {
-  color: var(--mist);
-  font-size: 12px;
+.thumb {
+  width: 88px;
+  height: 88px;
+  border-radius: 8px;
+  background-color: var(--ink);
 }

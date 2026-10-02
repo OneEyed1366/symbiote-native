@@ -1,0 +1,12 @@
+{
+  "android": {
+    "gradleProjectName": "expo-app-metrics",
+    "modules": [
+      {
+        "importPath": "expo.modules.appmetrics.AppMetricsModule",
+        "className": "AppMetricsModule",
+        "nativeName": "ExpoAppMetrics"
+      }
+    ]
+  }
+}

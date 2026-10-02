@@ -1,0 +1,12 @@
+{
+  "android": {
+    "gradleProjectName": "expo-intent-launcher",
+    "modules": [
+      {
+        "importPath": "expo.modules.intentlauncher.IntentLauncherModule",
+        "className": "IntentLauncherModule",
+        "nativeName": "ExpoIntentLauncher"
+      }
+    ]
+  }
+}

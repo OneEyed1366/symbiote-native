@@ -12,36 +12,56 @@ import type { ISymbioteExpoLinkOptionalBundle } from '@symbiote-native/expo-modu
 // derives a multiselect option per entry, and add-layers.ts's generic dependency-only branch
 // already handles any id in here with no per-package code.
 export type IExpoPackageLayerName =
+  | 'age-range'
+  | 'app-integrity'
+  | 'app-metrics'
   | 'application'
+  | 'asset'
   | 'audio'
+  | 'auth-session'
   | 'background-fetch'
   | 'background-task'
   | 'battery'
+  | 'blob'
   | 'brightness'
+  | 'calendar'
   | 'cellular'
   | 'clipboard'
+  | 'constants'
+  | 'contacts'
   | 'crypto'
   | 'device'
+  | 'document-picker'
   | 'file-system'
+  | 'font'
   | 'haptics'
+  | 'image-manipulator'
+  | 'image-picker'
+  | 'intent-launcher'
   | 'keep-awake'
   | 'local-auth'
   | 'localization'
   | 'location'
+  | 'mail-composer'
   | 'media-library'
+  | 'navigation-bar'
   | 'network'
   | 'notifications'
+  | 'print'
+  | 'screen-capture'
   | 'screen-orientation'
   | 'secure-store'
   | 'sensors'
   | 'sharing'
   | 'sms'
+  | 'speech'
   | 'sqlite'
   | 'standard-web-crypto'
   | 'store-review'
   | 'system-ui'
   | 'task-manager'
   | 'tracking-transparency'
+  | 'video-thumbnails'
   | 'web-browser';
 
 export type IExpoPackageLayer = {
@@ -60,10 +80,26 @@ export type IExpoPackageLayer = {
 
 export const EXPO_PACKAGE_LAYERS: readonly IExpoPackageLayer[] = [
   {
+    id: 'age-range',
+    label: 'Age range',
+    symbiotePackage: '@symbiote-native/age-range',
+  },
+  {
+    id: 'app-integrity',
+    label: 'App integrity',
+    symbiotePackage: '@symbiote-native/app-integrity',
+  },
+  {
+    id: 'app-metrics',
+    label: 'App metrics',
+    symbiotePackage: '@symbiote-native/app-metrics',
+  },
+  {
     id: 'application',
     label: 'Application info',
     symbiotePackage: '@symbiote-native/application',
   },
+  { id: 'asset', label: 'Asset', symbiotePackage: '@symbiote-native/asset' },
   {
     id: 'audio',
     label: 'Audio',
@@ -90,6 +126,11 @@ export const EXPO_PACKAGE_LAYERS: readonly IExpoPackageLayer[] = [
     ],
   },
   {
+    id: 'auth-session',
+    label: 'Auth session (OAuth2/OIDC)',
+    symbiotePackage: '@symbiote-native/auth-session',
+  },
+  {
     id: 'background-fetch',
     label: 'Background fetch',
     symbiotePackage: '@symbiote-native/background-fetch',
@@ -105,9 +146,19 @@ export const EXPO_PACKAGE_LAYERS: readonly IExpoPackageLayer[] = [
     symbiotePackage: '@symbiote-native/battery',
   },
   {
+    id: 'blob',
+    label: 'Blob',
+    symbiotePackage: '@symbiote-native/blob',
+  },
+  {
     id: 'brightness',
     label: 'Brightness',
     symbiotePackage: '@symbiote-native/brightness',
+  },
+  {
+    id: 'calendar',
+    label: 'Calendar',
+    symbiotePackage: '@symbiote-native/calendar',
   },
   {
     id: 'cellular',
@@ -119,6 +170,16 @@ export const EXPO_PACKAGE_LAYERS: readonly IExpoPackageLayer[] = [
     label: 'Clipboard',
     symbiotePackage: '@symbiote-native/clipboard',
   },
+  {
+    id: 'constants',
+    label: 'Constants',
+    symbiotePackage: '@symbiote-native/constants',
+  },
+  {
+    id: 'contacts',
+    label: 'Contacts',
+    symbiotePackage: '@symbiote-native/contacts',
+  },
   { id: 'crypto', label: 'Crypto', symbiotePackage: '@symbiote-native/crypto' },
   {
     id: 'device',
@@ -126,14 +187,35 @@ export const EXPO_PACKAGE_LAYERS: readonly IExpoPackageLayer[] = [
     symbiotePackage: '@symbiote-native/device',
   },
   {
+    id: 'document-picker',
+    label: 'Document picker',
+    symbiotePackage: '@symbiote-native/document-picker',
+  },
+  {
     id: 'file-system',
     label: 'File system',
     symbiotePackage: '@symbiote-native/file-system',
   },
+  { id: 'font', label: 'Font', symbiotePackage: '@symbiote-native/font' },
   {
     id: 'haptics',
     label: 'Haptics',
     symbiotePackage: '@symbiote-native/haptics',
+  },
+  {
+    id: 'image-manipulator',
+    label: 'Image manipulator',
+    symbiotePackage: '@symbiote-native/image-manipulator',
+  },
+  {
+    id: 'image-picker',
+    label: 'Image picker',
+    symbiotePackage: '@symbiote-native/image-picker',
+  },
+  {
+    id: 'intent-launcher',
+    label: 'Intent launcher',
+    symbiotePackage: '@symbiote-native/intent-launcher',
   },
   {
     id: 'keep-awake',
@@ -171,9 +253,19 @@ export const EXPO_PACKAGE_LAYERS: readonly IExpoPackageLayer[] = [
     ],
   },
   {
+    id: 'mail-composer',
+    label: 'Mail composer',
+    symbiotePackage: '@symbiote-native/mail-composer',
+  },
+  {
     id: 'media-library',
     label: 'Media library',
     symbiotePackage: '@symbiote-native/media-library',
+  },
+  {
+    id: 'navigation-bar',
+    label: 'Navigation bar',
+    symbiotePackage: '@symbiote-native/navigation-bar',
   },
   {
     id: 'network',
@@ -184,6 +276,16 @@ export const EXPO_PACKAGE_LAYERS: readonly IExpoPackageLayer[] = [
     id: 'notifications',
     label: 'Notifications',
     symbiotePackage: '@symbiote-native/notifications',
+  },
+  {
+    id: 'print',
+    label: 'Print',
+    symbiotePackage: '@symbiote-native/print',
+  },
+  {
+    id: 'screen-capture',
+    label: 'Screen capture',
+    symbiotePackage: '@symbiote-native/screen-capture',
   },
   {
     id: 'screen-orientation',
@@ -206,6 +308,7 @@ export const EXPO_PACKAGE_LAYERS: readonly IExpoPackageLayer[] = [
     symbiotePackage: '@symbiote-native/sharing',
   },
   { id: 'sms', label: 'SMS', symbiotePackage: '@symbiote-native/sms' },
+  { id: 'speech', label: 'Speech', symbiotePackage: '@symbiote-native/speech' },
   { id: 'sqlite', label: 'SQLite', symbiotePackage: '@symbiote-native/sqlite' },
   {
     id: 'standard-web-crypto',
@@ -231,6 +334,11 @@ export const EXPO_PACKAGE_LAYERS: readonly IExpoPackageLayer[] = [
     id: 'tracking-transparency',
     label: 'Tracking transparency',
     symbiotePackage: '@symbiote-native/tracking-transparency',
+  },
+  {
+    id: 'video-thumbnails',
+    label: 'Video thumbnails',
+    symbiotePackage: '@symbiote-native/video-thumbnails',
   },
   {
     id: 'web-browser',

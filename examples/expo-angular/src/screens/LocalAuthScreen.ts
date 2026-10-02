@@ -1,4 +1,4 @@
-import { Component, signal } from '@angular/core';
+import { Component, computed, signal } from '@angular/core';
 import { Platform, SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import {
   AuthenticationType,
@@ -12,14 +12,16 @@ import {
 } from '@symbiote-native/local-auth/angular';
 import type { ILocalAuthenticationResult } from '@symbiote-native/local-auth/angular';
 import { ActionButton } from '../components/ActionButton';
+import { Scenario } from '../components/Scenario';
+import { toCapabilityStatus } from '../components/capability-status';
+import type { ICapabilityStatus } from '../components/capability-status';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
+import { AuthCapabilityRow } from './AuthCapabilityRow';
+import { AuthValueRow } from './AuthValueRow';
 
-type ICapabilityStatus = 'checking' | 'yes' | 'no';
-
-function toCapabilityStatus(value: boolean): ICapabilityStatus {
-  return value ? 'yes' : 'no';
-}
+const ANDROID_OS = 'android';
+const PENDING_LABEL = 'checking…';
 
 function authenticationTypeLabel(type: AuthenticationType): string {
   switch (type) {
@@ -34,12 +36,8 @@ function authenticationTypeLabel(type: AuthenticationType): string {
   }
 }
 
-// SecurityLevel.BIOMETRIC is a computed enum member (a deprecated getter alias defined via
-// Object.defineProperty, see packages/local-auth/src/core/types.ts) — TS gives each named member
-// declared alongside it its own nominal literal type, so comparing `level` (typed `SecurityLevel`)
-// directly against e.g. `SecurityLevel.BIOMETRIC_WEAK` trips "no overlap" (TS2367). Widening to a
-// plain `number` first (enum members are always assignable to `number`) sidesteps the nominal
-// narrowing entirely — same fix as ../react/screens/LocalAuthScreen.tsx's twin helper.
+// `SecurityLevel.BIOMETRIC` is a getter alias, so each sibling member has its own nominal type
+// Widening to `number` first avoids TS2367 "no overlap" on the comparisons below
 function securityLevelLabel(level: SecurityLevel): string {
   const numericLevel: number = level;
   if (numericLevel === SecurityLevel.NONE) {
@@ -54,23 +52,19 @@ function securityLevelLabel(level: SecurityLevel): string {
   if (numericLevel === SecurityLevel.BIOMETRIC_STRONG) {
     return 'Biometric — strong';
   }
-  // Unreachable via getEnrolledLevelAsync() (never returns the deprecated BIOMETRIC alias
-  // itself) — only satisfies the function's string return type.
   return 'Biometric';
 }
 
-/**
- * @symbiote-native/local-auth canary demo: a capabilities card (hardware present, enrolled,
- * enrolled security level, supported biometric types) followed by a live authenticateAsync()
- * button. cancelAuthenticate() is Android-only upstream — the Cancel button only renders there.
- * Angular twin of ../../react/screens/LocalAuthScreen.tsx — same 4 capability signals + result
- * state, populated at constructor time (no per-instance service to inject, unlike SensorsScreen's
- * Angular services — these are plain async functions off the core package).
- */
 @Component({
   selector: 'LocalAuthScreen',
   standalone: true,
-  imports: [ActionButton, SYMBIOTE_ELEMENTS],
+  imports: [
+    ActionButton,
+    AuthCapabilityRow,
+    AuthValueRow,
+    Scenario,
+    SYMBIOTE_ELEMENTS,
+  ],
   template: `
     <safe-area-view class="screen">
       <scroll-view
@@ -78,58 +72,53 @@ function securityLevelLabel(level: SecurityLevel): string {
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <view [class]="lineTagClass">
-          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        <view [class]="'line-tag line-tag-' + lineInfo.line">
+          <text class="line-tag-text"
+            >{{ lineInfo.code }} · {{ lineInfo.label }}</text
+          >
         </view>
         <view class="hero-card">
-          <view class="hero-badge" [style]="heroBadgeStyle">
-            <text class="hero-badge-text">{{ heroBadgeCode }}</text>
+          <view class="hero-badge" [style]="badgeStyle">
+            <text class="hero-badge-text">{{ lineInfo.code }}</text>
           </view>
           <view class="hero-copy">
             <text class="hero-title">Local auth</text>
             <text class="hero-body">
-              @symbiote-native/local-auth — FaceID/TouchID on iOS, the
-              Fingerprint/Biometric API on Android. A simulator with no enrolled
-              biometrics reports "not enrolled"; a real device with
-              FaceID/TouchID/fingerprint set up is needed to see a live prompt.
+              Confirm it is really the user with Face ID, Touch ID or a
+              fingerprint before a sensitive action. A simulator without
+              enrolled biometrics reports not enrolled, use a real device with
+              biometrics set up to see the prompt.
             </text>
           </view>
         </view>
+
+        <Scenario
+          testID="local-auth-scenario"
+          title="Re-confirm the user before showing a balance or sending money"
+          why="Even on an unlocked phone, ask for a biometric check before opening a private section or approving a payment. The app only learns whether it succeeded, never the fingerprint or face."
+          [steps]="scenarioSteps"
+          expect="Success shows a positive result. Cancelling shows the reason, such as user cancel, and the hardware and enrolled rows tell you why a prompt cannot appear."
+        />
 
         <view testID="local-auth-capabilities-card" class="auth-card">
           <view class="auth-card-header">
             <text class="auth-card-title">Capabilities</text>
           </view>
-          <view testID="local-auth-hardware" class="auth-capability-row">
-            <text class="auth-capability-label">Hardware present</text>
-            <view [class]="statusBadgeClass(hasHardware())">
-              <text class="auth-status-text">{{
-                statusLabel(hasHardware())
-              }}</text>
-            </view>
-          </view>
-          <view testID="local-auth-enrolled" class="auth-capability-row">
-            <text class="auth-capability-label">Enrolled</text>
-            <view [class]="statusBadgeClass(isEnrolled())">
-              <text class="auth-status-text">{{
-                statusLabel(isEnrolled())
-              }}</text>
-            </view>
-          </view>
-          <view class="auth-capability-row">
-            <text class="auth-capability-label">Enrolled level</text>
-            <text class="auth-value-text">{{ enrolledLevelLabel() }}</text>
-          </view>
-          <view class="auth-capability-row">
-            <text class="auth-capability-label">Supported types</text>
-            @if (supportedTypes(); as types) {
-              <text class="auth-value-text">{{
-                supportedTypesLabelOf(types)
-              }}</text>
-            } @else {
-              <text class="auth-value-text">checking…</text>
-            }
-          </view>
+          <AuthCapabilityRow
+            testID="local-auth-hardware"
+            label="Hardware present"
+            [status]="hasHardware()"
+          />
+          <AuthCapabilityRow
+            testID="local-auth-enrolled"
+            label="Enrolled"
+            [status]="isEnrolled()"
+          />
+          <AuthValueRow label="Enrolled level" [value]="enrolledLevelText()" />
+          <AuthValueRow
+            label="Supported types"
+            [value]="supportedTypesText()"
+          />
         </view>
 
         <view testID="local-auth-authenticate-card" class="auth-card">
@@ -143,16 +132,16 @@ function securityLevelLabel(level: SecurityLevel): string {
           <ActionButton
             testID="local-auth-authenticate-button"
             [title]="isAuthenticating() ? 'Authenticating…' : 'Authenticate'"
-            (press)="handleAuthenticate()"
             [color]="lineColor"
-          ></ActionButton>
-          @if (Platform.OS === 'android') {
+            (press)="authenticate()"
+          />
+          @if (isAndroid) {
             <ActionButton
               testID="local-auth-cancel-button"
               title="Cancel"
-              (press)="handleCancel()"
               [color]="lineColor"
-            ></ActionButton>
+              (press)="cancel()"
+            />
           }
           @if (authResult(); as result) {
             <view
@@ -162,15 +151,7 @@ function securityLevelLabel(level: SecurityLevel): string {
                 (result.success ? 'success' : 'error')
               "
             >
-              <text class="auth-result-text">
-                {{
-                  result.success
-                    ? 'Success'
-                    : 'Failed: ' +
-                      result.error +
-                      (result.warning ? ' (' + result.warning + ')' : '')
-                }}
-              </text>
+              <text class="auth-result-text">{{ authResultText() }}</text>
             </view>
           }
         </view>
@@ -179,71 +160,64 @@ function securityLevelLabel(level: SecurityLevel): string {
   `,
 })
 export class LocalAuthScreen {
-  private readonly lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.LocalAuth];
-  readonly lineTagClass = `line-tag line-tag-${this.lineInfo.line}`;
-  readonly lineTagLabel = `${this.lineInfo.code} · ${this.lineInfo.label}`;
-  readonly heroBadgeCode = this.lineInfo.code;
-  readonly lineColor = LINE_COLOR[this.lineInfo.line];
-  readonly heroBadgeStyle = { backgroundColor: this.lineColor };
-
-  readonly Platform = Platform;
+  readonly lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.LocalAuth];
+  readonly lineColor = LINE_COLOR['local-auth'];
+  readonly badgeStyle = { backgroundColor: LINE_COLOR['local-auth'] };
+  readonly isAndroid = Platform.OS === ANDROID_OS;
+  readonly cancel = cancelAuthenticate;
+  readonly scenarioSteps = [
+    'Check that hardware is present and biometrics are enrolled',
+    'Press authenticate and approve with your face or finger',
+    'Press it again and cancel',
+  ];
 
   readonly hasHardware = signal<ICapabilityStatus>('checking');
   readonly isEnrolled = signal<ICapabilityStatus>('checking');
-  readonly enrolledLevel = signal<SecurityLevel | null>(null);
-  readonly supportedTypes = signal<AuthenticationType[] | null>(null);
+  private readonly enrolledLevel = signal<SecurityLevel | null>(null);
+  private readonly supportedTypes = signal<AuthenticationType[] | null>(null);
   readonly authResult = signal<ILocalAuthenticationResult | null>(null);
   readonly isAuthenticating = signal(false);
 
+  readonly enrolledLevelText = computed(() => {
+    const level = this.enrolledLevel();
+    return level === null ? PENDING_LABEL : securityLevelLabel(level);
+  });
+
+  readonly supportedTypesText = computed((): string => {
+    const types = this.supportedTypes();
+    if (types === null) return PENDING_LABEL;
+    if (types.length === 0) return 'none';
+    return types.map(authenticationTypeLabel).join(', ');
+  });
+
+  readonly authResultText = computed((): string => {
+    const result = this.authResult();
+    if (!result) return '';
+    if (result.success) return 'Success';
+    const warningSuffix = result.warning ? ` (${result.warning})` : '';
+    return `Failed: ${result.error}${warningSuffix}`;
+  });
+
   constructor() {
-    hasHardwareAsync().then(value =>
+    void hasHardwareAsync().then(value =>
       this.hasHardware.set(toCapabilityStatus(value)),
     );
-    isEnrolledAsync().then(value =>
+    void isEnrolledAsync().then(value =>
       this.isEnrolled.set(toCapabilityStatus(value)),
     );
-    getEnrolledLevelAsync().then(value => this.enrolledLevel.set(value));
-    supportedAuthenticationTypesAsync().then(value =>
+    void getEnrolledLevelAsync().then(value => this.enrolledLevel.set(value));
+    void supportedAuthenticationTypesAsync().then(value =>
       this.supportedTypes.set(value),
     );
   }
 
-  handleAuthenticate(): void {
+  authenticate(): void {
     this.isAuthenticating.set(true);
-    authenticateAsync({ promptMessage: 'Confirm it is you' }).then(result => {
-      this.authResult.set(result);
-      this.isAuthenticating.set(false);
-    });
-  }
-
-  handleCancel(): void {
-    cancelAuthenticate();
-  }
-
-  // A plain method rather than a template `@if (enrolledLevel(); as level)` — SecurityLevel.NONE
-  // is 0, which JS/Angular's control-flow syntax treats as falsy, so that pattern would wrongly
-  // fall through to "checking…" for a real resolved "None" result. Explicit `=== null` sidesteps
-  // the numeric-zero trap entirely.
-  enrolledLevelLabel(): string {
-    const level = this.enrolledLevel();
-    return level === null ? 'checking…' : securityLevelLabel(level);
-  }
-
-  supportedTypesLabelOf(types: AuthenticationType[]): string {
-    return types.length === 0
-      ? 'none'
-      : types.map(authenticationTypeLabel).join(', ');
-  }
-
-  statusBadgeClass(status: ICapabilityStatus): string {
-    return `auth-status-badge auth-status-badge-${status}`;
-  }
-
-  statusLabel(status: ICapabilityStatus): string {
-    return status === 'checking'
-      ? 'CHECKING…'
-      : status === 'yes'
-        ? 'YES'
-        : 'NO';
+    void authenticateAsync({ promptMessage: 'Confirm it is you' }).then(
+      result => {
+        this.authResult.set(result);
+        this.isAuthenticating.set(false);
+      },
+    );
   }
 }

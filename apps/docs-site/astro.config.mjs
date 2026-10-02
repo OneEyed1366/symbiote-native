@@ -1,10 +1,10 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 import starlightLlmsTxt from 'starlight-llms-txt';
+import { howtosSidebar } from './sidebar-howtos.mjs';
+import { packagesSidebar } from './sidebar-packages.mjs';
 
 const base = '/';
-
-const byLabel = (a, b) => a.label.localeCompare(b.label, 'en', { sensitivity: 'base' });
 
 export default defineConfig({
   site: 'https://docs.symbiote-native.dev',
@@ -297,56 +297,7 @@ export default defineConfig({
             { label: 'Events', slug: 'docs/learn/events' },
           ],
         },
-        {
-          label: 'How-tos',
-          collapsed: true,
-          items: [
-            { label: 'Overview', slug: 'docs/howtos' },
-            { label: 'Style a component', slug: 'docs/howtos/styling' },
-            { label: 'Animate a value', slug: 'docs/howtos/animations' },
-            { label: 'Handle press/change events', slug: 'docs/howtos/events' },
-            {
-              label: 'Two-way bind a value',
-              slug: 'docs/howtos/two-way-binding',
-            },
-            {
-              label: 'Share content across surfaces',
-              slug: 'docs/howtos/portals-and-tunnels',
-            },
-            {
-              label: 'Write platform-specific code',
-              slug: 'docs/howtos/platform-code',
-            },
-            {
-              label: 'Wrap a third-party native view',
-              slug: 'docs/howtos/third-party-views',
-            },
-            {
-              label: 'Wire up an Expo native module',
-              slug: 'docs/howtos/expo-native-module-setup',
-            },
-            {
-              label: 'Add a native splash screen',
-              slug: 'docs/howtos/splash-screen',
-            },
-            {
-              label: 'Turn on diagnostic logging',
-              slug: 'docs/howtos/debugging',
-            },
-            {
-              label: 'Refs and attachments in Svelte',
-              slug: 'docs/howtos/svelte-refs-and-attachments',
-            },
-            {
-              label: 'Catch render errors (Svelte)',
-              slug: 'docs/howtos/error-boundaries',
-            },
-            {
-              label: 'Reactivity in Solid',
-              slug: 'docs/howtos/solid-reactivity',
-            },
-          ],
-        },
+        howtosSidebar,
         {
           label: 'Navigation',
           collapsed: true,
@@ -389,58 +340,7 @@ export default defineConfig({
             { label: 'Core', slug: 'docs/api/core' },
           ],
         },
-        {
-          label: 'Packages',
-          collapsed: true,
-          items: [
-            {
-              label: 'Bare',
-              items: [
-                { label: 'Android host shims', slug: 'docs/packages/android' },
-                { label: 'CSS parser', slug: 'docs/packages/css-parser' },
-                { label: 'Slider', slug: 'docs/packages/slider' },
-                { label: 'Splash screen', slug: 'docs/packages/splash-screen' },
-                { label: 'Test utils', slug: 'docs/packages/test-utils' },
-              ].sort(byLabel),
-            },
-            {
-              label: 'Expo',
-              items: [
-                { label: 'Application', slug: 'docs/packages/application' },
-                { label: 'Audio', slug: 'docs/packages/audio' },
-                { label: 'Background fetch', slug: 'docs/packages/background-fetch' },
-                { label: 'Background task', slug: 'docs/packages/background-task' },
-                { label: 'Battery', slug: 'docs/packages/battery' },
-                { label: 'Brightness', slug: 'docs/packages/brightness' },
-                { label: 'Cellular', slug: 'docs/packages/cellular' },
-                { label: 'Clipboard', slug: 'docs/packages/clipboard' },
-                { label: 'Crypto', slug: 'docs/packages/crypto' },
-                { label: 'Device', slug: 'docs/packages/device' },
-                { label: 'File system', slug: 'docs/packages/file-system' },
-                { label: 'Haptics', slug: 'docs/packages/haptics' },
-                { label: 'Keep awake', slug: 'docs/packages/keep-awake' },
-                { label: 'Local auth', slug: 'docs/packages/local-auth' },
-                { label: 'Localization', slug: 'docs/packages/localization' },
-                { label: 'Location', slug: 'docs/packages/location' },
-                { label: 'Media library', slug: 'docs/packages/media-library' },
-                { label: 'Network', slug: 'docs/packages/network' },
-                { label: 'Notifications', slug: 'docs/packages/notifications' },
-                { label: 'Screen orientation', slug: 'docs/packages/screen-orientation' },
-                { label: 'Secure store', slug: 'docs/packages/secure-store' },
-                { label: 'Sensors', slug: 'docs/packages/sensors' },
-                { label: 'Sharing', slug: 'docs/packages/sharing' },
-                { label: 'SMS', slug: 'docs/packages/sms' },
-                { label: 'SQLite', slug: 'docs/packages/sqlite' },
-                { label: 'Standard web crypto', slug: 'docs/packages/standard-web-crypto' },
-                { label: 'Store review', slug: 'docs/packages/store-review' },
-                { label: 'System UI', slug: 'docs/packages/system-ui' },
-                { label: 'Task manager', slug: 'docs/packages/task-manager' },
-                { label: 'Tracking transparency', slug: 'docs/packages/tracking-transparency' },
-                { label: 'Web browser', slug: 'docs/packages/web-browser' },
-              ].sort(byLabel),
-            },
-          ],
-        },
+        packagesSidebar,
         {
           label: 'Project',
           collapsed: true,

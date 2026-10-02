@@ -1,0 +1,181 @@
+---
+title: App integrity
+description: Prove to your server that a request comes from your real app on a genuine device, with App Attest, Play Integrity and hardware attestation, on every SymbioteNative adapter.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Let your backend tell your real app on a real device apart from a modified app, a script or an
+emulator. `@symbiote-native/app-integrity` wraps
+[`@expo/app-integrity`](https://github.com/expo/expo/tree/main/packages/expo-app-integrity), which
+uses Apple's App Attest on iOS and Google's Play Integrity on Android, plus Android
+hardware-attested keys, so every SymbioteNative adapter can reach it, not just React. The package
+produces the client-side artifacts; **your server verifies them**.
+
+Everything here is a one-shot async call or a plain constant with no per-instance state, so the
+React, Vue, Angular, Svelte, and Solid entry points are plain re-exports of the same `core`, and one
+example covers all of them.
+
+<Aside type="caution" title="Alpha upstream">
+  Expo marks `@expo/app-integrity` as alpha and expects frequent breaking changes.
+</Aside>
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | live (App Attest) |
+| Android     | live (Play Integrity, hardware attestation) |
+
+| Framework adapter | Support |
+| ----------------- | ------- |
+| React             | live    |
+| Vue               | live    |
+| Angular           | live    |
+| Svelte            | live    |
+| Solid             | live    |
+
+## Installation
+
+```sh
+npm install @symbiote-native/app-integrity
+```
+
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --app-integrity` (or
+`add --app-integrity` in an existing app) installs and wires this for you - see
+[`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
+
+`@expo/app-integrity` and `expo-modules-core` come along as regular dependencies, pinned to exact
+versions. Never install either yourself, and never add the `expo` meta-package to your project (it
+bundles its own Metro/Babel pipeline, which conflicts with this project's own).
+
+<Aside type="danger" title="Native setup is required before first use">
+  `@expo/app-integrity`'s native code is discovered by `expo-modules-autolinking`, a different
+  mechanism from the `react-native.config.cjs`/podspec autolinking every other SymbioteNative
+  wrapper uses. Follow [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers this package and
+  every other `expo-modules-core` package with zero further native changes.
+</Aside>
+
+No permission string is needed: App Attest, Play Integrity and hardware attestation are system
+services with no prompt. Each platform does need one setup step of its own:
+
+| Platform | Setup                                                                                                                              |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| iOS      | In Xcode, Signing & Capabilities, add the **App Attest** capability. Xcode adds the entitlement. The app needs a registered App ID |
+| Android  | Enable the Play Integrity API for your app and note your Google Cloud project number (see Google's Play Integrity setup guide)     |
+
+## Usage
+
+### iOS: App Attest
+
+Check support, create a key, have Apple attest it once, then sign each request with an assertion.
+Send the attestation and each assertion to your server for verification.
+
+```ts
+import {
+  attestKeyAsync,
+  generateAssertionAsync,
+  generateKeyAsync,
+  isSupported,
+} from '@symbiote-native/app-integrity';
+
+if (isSupported) {
+  const keyId = await generateKeyAsync();
+  const attestation = await attestKeyAsync(keyId, challengeFromServer);
+  // send keyId and attestation to your server, once
+
+  const assertion = await generateAssertionAsync(keyId, requestHash);
+  // send the assertion with the request you want to protect
+}
+```
+
+Not every device supports App Attest. When `isSupported` is `false`, skip the flow gracefully and
+continue with your normal server access.
+
+### Android: Play Integrity
+
+Prepare the token provider once, for example at launch. Then request a token whenever a server call
+needs proof, and send the result to your server for decryption and verification.
+
+```ts
+import {
+  prepareIntegrityTokenProviderAsync,
+  requestIntegrityCheckAsync,
+} from '@symbiote-native/app-integrity';
+
+await prepareIntegrityTokenProviderAsync(cloudProjectNumber);
+
+const token = await requestIntegrityCheckAsync(requestHash);
+// send token to your server
+```
+
+`requestHash` is a hash unique to the user action being verified. Call `requestIntegrityCheckAsync`
+as many times as you like, with a different hash per action.
+
+### Android: hardware-attested keys
+
+For a key generated and attested in the Android Keystore itself (this works on GrapheneOS and other
+secure distributions, independent of Play Integrity):
+
+```ts
+import {
+  generateHardwareAttestedKeyAsync,
+  getAttestationCertificateChainAsync,
+  isHardwareAttestationSupportedAsync,
+} from '@symbiote-native/app-integrity';
+
+if (await isHardwareAttestationSupportedAsync()) {
+  await generateHardwareAttestedKeyAsync('my-key', challengeFromServer);
+  const chain = await getAttestationCertificateChainAsync('my-key');
+  // send chain to your server
+}
+```
+
+## API
+
+| Signature                                                                     | Platform | Description                                                                                 |
+| ----------------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------- |
+| `isSupported: boolean`                                                        | both     | iOS: whether App Attest is supported. Always `true` on other platforms                      |
+| `generateKeyAsync(): Promise<string>`                                         | iOS      | Creates an App Attest key and resolves its id                                               |
+| `attestKeyAsync(keyId, challenge): Promise<string>`                           | iOS      | Has Apple attest the key once. Resolves the attestation to send to your server              |
+| `generateAssertionAsync(keyId, challenge): Promise<string>`                   | iOS      | Signs a request hash with the attested key. Resolves the assertion                          |
+| `prepareIntegrityTokenProviderAsync(cloudProjectNumber): Promise<void>`       | Android  | Prepares the Play Integrity token provider. Call it once before requesting tokens           |
+| `requestIntegrityCheckAsync(requestHash): Promise<string>`                    | Android  | Requests an integrity token bound to the request hash                                       |
+| `isHardwareAttestationSupportedAsync(): Promise<boolean>`                     | Android  | Whether hardware-backed key attestation is available. Resolves `false` elsewhere            |
+| `generateHardwareAttestedKeyAsync(keyAlias, challenge): Promise<void>`        | Android  | Generates a Keystore key with a hardware attestation for the challenge                      |
+| `getAttestationCertificateChainAsync(keyAlias): Promise<string[]>`            | Android  | Resolves the key's attestation certificate chain                                            |
+
+## Notes
+
+- **A wrong-platform call throws.** Every function throws `UnavailabilityError` on the other
+  platform, except `isHardwareAttestationSupportedAsync`, which resolves `false`, matching
+  upstream.
+- **Verify on your server, never on the device.** This package only produces the client-side
+  artifacts. A check that runs only in the app can be bypassed by exactly the clients you are
+  guarding against.
+- **Handle an expired Android token provider.** If the provider is reused for too long, the next
+  token request fails with `ERR_APP_INTEGRITY_PROVIDER_INVALID`. Call
+  `prepareIntegrityTokenProviderAsync` again and retry.
+- **The App Attest flow has three steps.** Generate a key, attest it once, then generate an
+  assertion per protected request. Do not attest on every request.
+- **It can only be verified on a device.** The headless tests fake the native module; emulators
+  and simulators cannot produce genuine attestations.
+
+## Common questions
+
+- **`ERR_APP_INTEGRITY_PROVIDER_INVALID` on Android.** The token provider expired. Call
+  `prepareIntegrityTokenProviderAsync` again and retry the token request.
+- **How does the flow differ per platform?** Android uses the Play Integrity Standard request:
+  prepare a provider once, then request a token per sensitive action. iOS uses App Attest: one
+  hardware-backed key per user per device, attested once, then used to assert requests.
+- **Is the check enough on its own?** No. The token or assertion must be verified on your server.
+
+Sources: [Expo docs: AppIntegrity](https://docs.expo.dev/versions/latest/sdk/app-integrity/),
+[Expo blog: Introducing Expo App Integrity](https://expo.dev/blog/expo-app-integrity).
+
+## How the wrapper works
+
+`@expo/app-integrity`'s JS is hand-ported into this package's `core/`, resolving `ExpoAppIntegrity`
+through `expo-modules-core` rather than the `expo` meta-package. The five adapter entry points are
+plain re-exports of `core` (Angular stays a physical subpath for its separate `ngc`/AOT build). The
+native code is never vendored: `expo-modules-autolinking` resolves it from `node_modules` (see
+[the native setup guide](/docs/howtos/expo-native-module-setup/)).

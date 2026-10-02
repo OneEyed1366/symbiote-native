@@ -32,6 +32,12 @@ export type INativeSQLiteModule = {
   >;
   ensureDatabasePathExistsAsync(databasePath: string): Promise<void>;
   ensureDatabasePathExistsSync(databasePath: string): void;
+  /** Copies `assetDatabasePath` (a downloaded `Asset.localUri`) to `databasePath`. */
+  importAssetDatabaseAsync(
+    databasePath: string,
+    assetDatabasePath: string,
+    forceOverwrite: boolean,
+  ): Promise<void>;
   deleteDatabaseAsync(databasePath: string): Promise<void>;
   deleteDatabaseSync(databasePath: string): void;
   backupDatabaseAsync(

@@ -7,23 +7,18 @@ import {
   randomUUID,
 } from '@symbiote-native/crypto/angular';
 import { ActionButton } from '../components/ActionButton';
+import { Scenario } from '../components/Scenario';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
+import { ValueRow } from './ValueRow';
 
 const DIGEST_SAMPLE_STRING = 'some fixed sample string';
 const RANDOM_BYTE_COUNT = 16;
 
-/**
- * @symbiote-native/crypto canary demo: three buttons over the package's sync/async surface —
- * randomUUID(), digestStringAsync(SHA256, …), and getRandomBytesAsync(). Every function is a
- * plain free function off the core package — no service to inject(), same shape as
- * @symbiote-native/local-auth's plain-function surface. Angular twin of
- * ../../react/screens/CryptoScreen.tsx.
- */
 @Component({
   selector: 'CryptoScreen',
   standalone: true,
-  imports: [ActionButton, SYMBIOTE_ELEMENTS],
+  imports: [ActionButton, Scenario, SYMBIOTE_ELEMENTS, ValueRow],
   template: `
     <safe-area-view class="screen">
       <scroll-view
@@ -31,103 +26,106 @@ const RANDOM_BYTE_COUNT = 16;
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <view [class]="lineTagClass">
-          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        <view [class]="'line-tag line-tag-' + lineInfo.line">
+          <text class="line-tag-text"
+            >{{ lineInfo.code }} · {{ lineInfo.label }}</text
+          >
         </view>
         <view class="hero-card">
-          <view class="hero-badge" [style]="heroBadgeStyle">
-            <text class="hero-badge-text">{{ heroBadgeCode }}</text>
+          <view class="hero-badge" [style]="badgeStyle">
+            <text class="hero-badge-text">{{ lineInfo.code }}</text>
           </view>
           <view class="hero-copy">
             <text class="hero-title">Crypto</text>
             <text class="hero-body">
-              @symbiote-native/crypto — cryptographically secure random bytes,
-              randomUUID, and string digest hashing (SHA-1/256/384/512,
-              MD2/4/5).
+              Generate secure random bytes and unique ids, and hash strings with
+              SHA or MD algorithms, using the platform's native cryptography
+              instead of JavaScript code.
             </text>
           </view>
         </view>
 
-        <view testID="crypto-uuid-card" class="capability-card">
-          <text class="capability-card-title">Random UUID</text>
+        <Scenario
+          testID="crypto-scenario"
+          title="Create unique ids, tokens and checksums"
+          why="Use a random UUID as an idempotency key, random bytes as a nonce or session secret, and a digest to verify that a file or a password input is unchanged."
+          [steps]="scenarioSteps"
+          expect="Every UUID and byte string differs, while the same text always gives the same SHA-256 digest. Known test vectors match the published values."
+        />
+
+        <view testID="crypto-uuid-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Random UUID</text>
+          </view>
           <ActionButton
-            testID="crypto-generate-uuid-button"
+            testID="crypto-uuid-button"
             title="Generate UUID"
-            (press)="handleGenerateUuid()"
             [color]="lineColor"
-          ></ActionButton>
-          <text testID="crypto-uuid-result" class="value-text">{{
-            uuidLabel()
-          }}</text>
+            (press)="uuid.set(newUuid())"
+          />
+          @if (uuid(); as value) {
+            <ValueRow label="UUID" [value]="value" />
+          }
         </view>
 
-        <view testID="crypto-digest-card" class="capability-card">
-          <text class="capability-card-title">Digest</text>
+        <view testID="crypto-digest-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Digest</text>
+          </view>
           <ActionButton
-            testID="crypto-digest-sha256-button"
+            testID="crypto-digest-button"
             title="Digest SHA-256"
-            (press)="handleDigestSha256()"
             [color]="lineColor"
-          ></ActionButton>
-          <text testID="crypto-digest-result" class="value-text">{{
-            digestLabel()
-          }}</text>
+            (press)="digestSample()"
+          />
+          @if (digest(); as value) {
+            <ValueRow label="SHA-256" [value]="value" />
+          }
         </view>
 
-        <view testID="crypto-random-bytes-card" class="capability-card">
-          <text class="capability-card-title">Random bytes</text>
+        <view testID="crypto-random-bytes-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Random bytes</text>
+          </view>
           <ActionButton
             testID="crypto-random-bytes-button"
             title="Get 16 random bytes"
-            (press)="handleGetRandomBytes()"
             [color]="lineColor"
-          ></ActionButton>
-          <text testID="crypto-random-bytes-result" class="value-text">{{
-            randomBytesLabel()
-          }}</text>
+            (press)="getRandomBytes()"
+          />
+          @if (randomBytes(); as value) {
+            <ValueRow label="Bytes" [value]="value" />
+          }
         </view>
       </scroll-view>
     </safe-area-view>
   `,
 })
 export class CryptoScreen {
-  private readonly lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Crypto];
-  readonly lineTagClass = `line-tag line-tag-${this.lineInfo.line}`;
-  readonly lineTagLabel = `${this.lineInfo.code} · ${this.lineInfo.label}`;
-  readonly heroBadgeCode = this.lineInfo.code;
-  readonly lineColor = LINE_COLOR[this.lineInfo.line];
-  readonly heroBadgeStyle = { backgroundColor: this.lineColor };
+  readonly lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Crypto];
+  readonly lineColor = LINE_COLOR.crypto;
+  readonly badgeStyle = { backgroundColor: LINE_COLOR.crypto };
+  readonly newUuid = randomUUID;
+  readonly scenarioSteps = [
+    'Press the UUID button twice',
+    'Generate random bytes',
+    'Hash the same text twice with SHA-256',
+  ];
 
   readonly uuid = signal<string | null>(null);
   readonly digest = signal<string | null>(null);
-  readonly randomBytes = signal<Uint8Array | null>(null);
+  readonly randomBytes = signal<string | null>(null);
 
-  handleGenerateUuid(): void {
-    this.uuid.set(randomUUID());
+  digestSample(): void {
+    void digestStringAsync(
+      CryptoDigestAlgorithm.SHA256,
+      DIGEST_SAMPLE_STRING,
+    ).then(value => this.digest.set(value));
   }
 
-  handleDigestSha256(): void {
-    digestStringAsync(CryptoDigestAlgorithm.SHA256, DIGEST_SAMPLE_STRING).then(
-      value => this.digest.set(value),
+  getRandomBytes(): void {
+    void getRandomBytesAsync(RANDOM_BYTE_COUNT).then(bytes =>
+      this.randomBytes.set(Array.from(bytes).join(', ')),
     );
-  }
-
-  handleGetRandomBytes(): void {
-    getRandomBytesAsync(RANDOM_BYTE_COUNT).then(value =>
-      this.randomBytes.set(value),
-    );
-  }
-
-  uuidLabel(): string {
-    return this.uuid() ?? 'not generated yet';
-  }
-
-  digestLabel(): string {
-    return this.digest() ?? 'not digested yet';
-  }
-
-  randomBytesLabel(): string {
-    const bytes = this.randomBytes();
-    return bytes === null ? 'not generated yet' : Array.from(bytes).join(', ');
   }
 }

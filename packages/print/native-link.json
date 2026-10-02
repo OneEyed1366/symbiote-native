@@ -1,0 +1,12 @@
+{
+  "android": {
+    "gradleProjectName": "expo-print",
+    "modules": [
+      {
+        "importPath": "expo.modules.print.PrintModule",
+        "className": "PrintModule",
+        "nativeName": "ExpoPrint"
+      }
+    ]
+  }
+}

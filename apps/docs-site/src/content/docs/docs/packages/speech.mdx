@@ -1,0 +1,302 @@
+---
+title: Speech
+description: Read text aloud with the device's text-to-speech engine on every SymbioteNative adapter.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+Read a message, a hint or an article aloud, with a choice of voice, language, pitch and rate.
+`@symbiote-native/speech` wraps [`expo-speech`](https://github.com/expo/expo/tree/main/packages/expo-speech)
+so every SymbioteNative adapter can reach it, not just React. Every export is a stateless function
+or constant, so the React, Vue, Angular, Svelte, and Solid entry points are plain re-exports of the
+same `core`.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | live    |
+| Android     | live    |
+
+| Framework adapter | Support |
+| ----------------- | ------- |
+| React             | live    |
+| Vue               | live    |
+| Angular           | live    |
+| Svelte            | live    |
+| Solid             | live    |
+
+## Installation
+
+```sh
+npm install @symbiote-native/speech
+```
+
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --speech` (or
+`add --speech` in an existing app) installs and wires this for you - see
+[`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
+
+`expo-speech` and `expo-modules-core` come along as regular dependencies, pinned to exact versions.
+Never install either yourself, and never add the `expo` meta-package to your project (it bundles
+its own Metro/Babel pipeline, which conflicts with this project's own).
+
+<Aside type="danger" title="Native setup is required before first use">
+  `expo-speech`'s native code is discovered by `expo-modules-autolinking`, a different mechanism
+  from the `react-native.config.cjs`/podspec autolinking every other SymbioteNative wrapper uses.
+  Follow [How to: wire up an Expo native module](/docs/howtos/expo-native-module-setup/) once per
+  app first; it covers this package and every other `expo-modules-core` package with zero further
+  native changes.
+</Aside>
+
+No permission, manifest edit or config plugin is involved.
+
+<Aside type="note" title="Silent mode on iOS">
+  On a physical iPhone, `speak` produces no sound while the device is in silent mode. Turn silent
+  mode off when testing, or the call appears to do nothing.
+</Aside>
+
+## Usage
+
+All five adapters re-export the same functions; there is no per-adapter hook, composable or
+service, since nothing here holds live state. `speak` returns at once and reports progress through
+the `onStart`, `onDone`, `onStopped` and `onError` callbacks in its options.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { useState } from 'react';
+    import { speak, stop } from '@symbiote-native/speech/react';
+
+    export default function ReadAloud({ text }: { text: string }) {
+      const [speaking, setSpeaking] = useState(false);
+
+      function onPress() {
+        if (speaking) {
+          void stop();
+          return;
+        }
+        speak(text, {
+          language: 'en-US',
+          onStart: () => setSpeaking(true),
+          onDone: () => setSpeaking(false),
+          onStopped: () => setSpeaking(false),
+        });
+      }
+
+      return <button title={speaking ? 'Stop' : 'Read aloud'} onPress={onPress} />;
+    }
+    ```
+
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { ref } from 'vue';
+    import { speak, stop } from '@symbiote-native/speech/vue';
+
+    const props = defineProps<{ text: string }>();
+    const speaking = ref(false);
+
+    function onPress() {
+      if (speaking.value) {
+        void stop();
+        return;
+      }
+      speak(props.text, {
+        language: 'en-US',
+        onStart: () => (speaking.value = true),
+        onDone: () => (speaking.value = false),
+        onStopped: () => (speaking.value = false),
+      });
+    }
+    </script>
+
+    <template>
+      <button :title="speaking ? 'Stop' : 'Read aloud'" @press="onPress" />
+    </template>
+    ```
+
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component, input, signal } from '@angular/core';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
+    import { speak, stop } from '@symbiote-native/speech/angular';
+
+    @Component({
+      standalone: true,
+      imports: [SYMBIOTE_ELEMENTS],
+      template: `<button [title]="speaking() ? 'Stop' : 'Read aloud'" (press)="onPress()" />`,
+    })
+    export class ReadAloud {
+      readonly text = input.required<string>();
+      readonly speaking = signal(false);
+
+      onPress(): void {
+        if (this.speaking()) {
+          void stop();
+          return;
+        }
+        speak(this.text(), {
+          language: 'en-US',
+          onStart: () => this.speaking.set(true),
+          onDone: () => this.speaking.set(false),
+          onStopped: () => this.speaking.set(false),
+        });
+      }
+    }
+    ```
+
+    There is no service to `inject()`: every function is a plain export off the core package.
+
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { speak, stop } from '@symbiote-native/speech/svelte';
+
+      let { text }: { text: string } = $props();
+      let speaking = $state(false);
+
+      function onPress(): void {
+        if (speaking) {
+          void stop();
+          return;
+        }
+        speak(text, {
+          language: 'en-US',
+          onStart: () => (speaking = true),
+          onDone: () => (speaking = false),
+          onStopped: () => (speaking = false),
+        });
+      }
+    </script>
+
+    <button title={speaking ? 'Stop' : 'Read aloud'} onPress={onPress} />
+    ```
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { createSignal } from 'solid-js';
+    import { speak, stop } from '@symbiote-native/speech/solid';
+
+    export function ReadAloud(props: { text: string }) {
+      const [speaking, setSpeaking] = createSignal(false);
+
+      function onPress() {
+        if (speaking()) {
+          void stop();
+          return;
+        }
+        speak(props.text, {
+          language: 'en-US',
+          onStart: () => setSpeaking(true),
+          onDone: () => setSpeaking(false),
+          onStopped: () => setSpeaking(false),
+        });
+      }
+
+      return <button title={speaking() ? 'Stop' : 'Read aloud'} onPress={onPress} />;
+    }
+    ```
+
+  </TabItem>
+</Tabs>
+
+### Pick a voice
+
+```ts
+import { getAvailableVoicesAsync, speak, VoiceQuality } from '@symbiote-native/speech';
+
+const voices = await getAvailableVoicesAsync();
+const enhanced = voices.find(
+  v => v.language === 'en-US' && v.quality === VoiceQuality.Enhanced,
+);
+speak('Hello world', { voice: enhanced?.identifier });
+```
+
+## API
+
+### Functions and constants
+
+| Signature                                      | Description                                                                           |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `speak(text, options?): void`                  | Speaks the text. If something is already speaking, the new utterance is queued        |
+| `stop(): Promise<void>`                        | Interrupts the current utterance and clears the whole queue                           |
+| `pause(): Promise<void>`                       | Pauses speaking. iOS only; throws `UnavailabilityError` on Android                    |
+| `resume(): Promise<void>`                      | Resumes after `pause`. iOS only; throws `UnavailabilityError` on Android              |
+| `isSpeakingAsync(): Promise<boolean>`          | Whether the engine is speaking. `true` while paused too                               |
+| `getAvailableVoicesAsync(): Promise<IVoice[]>` | Lists the voices installed on the device. Throws `UnavailabilityError` if unsupported |
+| `maxSpeechInputLength: number`                 | Longest text one `speak` call accepts. `Number.MAX_VALUE` on iOS                      |
+| `VoiceQuality`                                 | `Default` and `Enhanced`, the values of `IVoice.quality`                              |
+
+### `ISpeechOptions`
+
+| Field                        | Type                                | Description                                                                  |
+| ---------------------------- | ----------------------------------- | ---------------------------------------------------------------------------- |
+| `language`                   | `string \| undefined`               | IETF BCP 47 language code, such as `en-US`                                   |
+| `voice`                      | `string \| undefined`               | Identifier of a voice from `getAvailableVoicesAsync`                         |
+| `pitch`                      | `number \| undefined`               | Pitch multiplier. `1.0` is normal                                            |
+| `rate`                       | `number \| undefined`               | Speed multiplier. `1.0` is normal                                            |
+| `volume`                     | `number \| undefined`               | From `0.0` (muted) to `1.0` (maximum). Defaults to `1.0`                     |
+| `useApplicationAudioSession` | `boolean \| undefined`              | iOS only. `false` lets the system manage a separate audio session for speech |
+| `onStart`                    | `(() => void) \| undefined`         | Called when speaking begins                                                  |
+| `onDone`                     | `(() => void) \| undefined`         | Called when the utterance finishes                                           |
+| `onStopped`                  | `(() => void) \| undefined`         | Called when speaking is cut off by `stop()`                                  |
+| `onError`                    | `((error: Error) => void) \| undefined` | Called when speaking fails                                               |
+| `onBoundary`                 | `((event: INativeBoundaryEvent) => void) \| null \| undefined` | Called at word boundaries with `charIndex` and `charLength` |
+
+### `IVoice`
+
+| Field        | Type           | Description                                       |
+| ------------ | -------------- | ------------------------------------------------- |
+| `identifier` | `string`       | Pass this as `ISpeechOptions.voice`               |
+| `name`       | `string`       | Display name of the voice                         |
+| `quality`    | `VoiceQuality` | `Default` or `Enhanced`                           |
+| `language`   | `string`       | The voice's language as an IETF BCP 47 code       |
+
+## Notes
+
+- **`speak` queues, it does not interrupt.** To replace what is being said, call `stop()` first.
+- **Long text can exceed the limit.** Android rejects text longer than `maxSpeechInputLength`;
+  split a long article into sentences and queue them.
+- **`pause` and `resume` are iOS only.** Guard them with a platform check, or catch the
+  `UnavailabilityError`.
+- **Web-only fields are dropped.** Upstream's `WebVoice`, `SpeechEventCallback`, `_voiceIndex` and
+  `onMark`/`onPause`/`onResume` belong to its separate web implementation; this package wraps only
+  the iOS and Android native modules.
+- **Sound can only be verified on a device.** The headless tests fake the native module, so they
+  prove the callback registry, event routing and the `UnavailabilityError` branches.
+
+## Common questions
+
+**There is no sound on iOS.** First check that the device is not in silent mode: on a physical
+iPhone `speak` is silent then. If other audio in your app changes the audio session, that can also
+quiet speech.
+
+**The `voice` I picked is ignored, or the voice list is short.** Take the voice `identifier` from
+`getAvailableVoicesAsync()` and pass exactly that. Newer iOS versions can return fewer or older
+voices than you expect, and the system voices installed differ by device.
+
+**Speech in a non-English language sounds wrong or does not play on Android.** Set `language` to a
+BCP 47 code (`de-DE`) and make sure the device has that voice installed in its text-to-speech
+settings.
+
+**`onDone` never fires after I `pause()` and `resume()`.** Pausing reports `onStopped`, and the
+completion callback is not guaranteed afterwards on iOS. Track state yourself if you pause.
+
+**My text is cut off or rejected.** Android rejects text longer than `maxSpeechInputLength`. Split
+long text into sentences and queue them.
+
+Sources: [Expo docs: Speech](https://docs.expo.dev/versions/latest/sdk/speech/),
+[expo/expo#10827 playsInSilentModeIOS does not influence Speech.speak](https://github.com/expo/expo/issues/10827),
+[expo/expo#24243 events like onDone do not fire on iOS](https://github.com/expo/expo/issues/24243),
+[expo/expo#12654 pause emits stopped and resume never emits done](https://github.com/expo/expo/issues/12654),
+[expo/expo#7260 Speech.speak not working for non-English on Android](https://github.com/expo/expo/issues/7260).
+
+## How the wrapper works
+
+`expo-speech`'s JS is hand-ported into this package's `core/`, resolving `ExpoSpeech` through
+`expo-modules-core` rather than the `expo` meta-package. The five adapter entry points are plain
+re-exports of `core` (Angular stays a physical subpath for its separate `ngc`/AOT build). The
+native code is never vendored: `expo-modules-autolinking` resolves it from `node_modules` (see
+[the native setup guide](/docs/howtos/expo-native-module-setup/)).

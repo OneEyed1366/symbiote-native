@@ -110,6 +110,9 @@ export type { ITunnel, ITunnelInProps } from './create-tunnel';
 // the subscription logic; these add only the Solid lifecycle (signal + onCleanup).
 export { createColorScheme } from './primitives/create-color-scheme';
 export { createWindowDimensions } from './primitives/create-window-dimensions';
+export { createPermissionHook } from './primitives/create-permission-hook';
+export { createResourceHook } from './primitives/create-resource-hook';
+export { createEventValueHook } from './primitives/create-event-value-hook';
 
 export { Animated, createAnimatedComponent } from './modules/animated';
 export type { IAnimatedComponentProps } from './modules/animated';

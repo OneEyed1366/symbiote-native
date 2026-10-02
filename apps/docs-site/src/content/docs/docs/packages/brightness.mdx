@@ -429,6 +429,23 @@ caller. Angular's auto-fetch is latched to at most one run per service instance,
   `getBrightnessAsync` reports the _system_ brightness until your first `setBrightnessAsync` call
   installs one.
 
+## Common questions
+
+- **My brightness change disappears on iOS.** `setBrightnessAsync` persists only until the device
+  locks, then the user's setting returns.
+- **On Android it only works while my app is open.** The value applies to the current activity and
+  overrides the system brightness while the app is in the foreground. Call
+  `restoreSystemBrightnessAsync` to go back to the system value.
+- **How do I change the system brightness on Android?** `setSystemBrightnessAsync` (experimental)
+  needs the `WRITE_SETTINGS` permission, granted by the user in system settings.
+- **Permission result is empty after granting `WRITE_SETTINGS`.** Reported upstream; re-query the
+  permission after returning from settings.
+- **Brightness 0 on Android.** Fixed in upstream 55.0.5 by mapping `[0, 1]` onto Android's `[1, 255]`.
+
+Sources: [Expo docs: Brightness](https://docs.expo.dev/versions/latest/sdk/brightness/),
+[expo/expo#18967](https://github.com/expo/expo/issues/18967),
+[expo-brightness changelog](https://github.com/expo/expo/blob/sdk-57/packages/expo-brightness/CHANGELOG.md).
+
 ## How the wrapper works
 
 `@symbiote-native/brightness` ships **zero React/Vue/Angular/Svelte/Solid logic in `expo-brightness` itself** —

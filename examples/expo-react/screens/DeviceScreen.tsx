@@ -16,6 +16,7 @@ import {
 } from '@symbiote-native/device';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
+import { Scenario } from '../components/Scenario';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
 const BYTES_PER_UNIT = 1024;
@@ -60,11 +61,6 @@ function ValueRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-/**
- * @symbiote-native/device canary demo: a live-constants card (brand/model/OS/memory — all
- * resolved eagerly at import time, no async wait) plus a card for the three one-shot async
- * checks (getDeviceTypeAsync, getUptimeAsync, isRootedExperimentalAsync).
- */
 export function DeviceScreen() {
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Device];
   const lineColor = LINE_COLOR[lineInfo.line];
@@ -104,13 +100,21 @@ export function DeviceScreen() {
           <view className="hero-copy">
             <text className="hero-title">Device</text>
             <text className="hero-body">
-              @symbiote-native/device — brand/model/OS constants resolved
-              eagerly at import time, plus one-shot async checks for device
-              type, uptime, and root/jailbreak detection.
+              Know what the app runs on: brand, model, OS version, memory,
+              device type, uptime and whether the phone is rooted or
+              jailbroken. Use it to adapt layouts, log bug reports and gate
+              risky features.
             </text>
           </view>
         </view>
 
+        <Scenario
+          testID="device-scenario"
+          title="Attach device details to a bug report or adapt to a tablet"
+          why="Support tickets are far easier to solve with the model and OS version attached, and a tablet or a low-memory phone may need a different layout or lighter images."
+          steps={['Read the constants card', 'Press the async checks for device type, uptime and root detection']}
+          expect="Model, OS and memory match the phone in your hand. The simulator reports Is real device as No, and the root check returns false on a normal phone."
+        />
         <view testID="device-constants-card" className="feature-card">
           <view className="feature-card-header">
             <text className="feature-card-title">Constants</text>

@@ -1,7 +1,7 @@
 # @symbiote-native/network
 
 Port of [`expo-network`](https://docs.expo.dev/versions/latest/sdk/network/) for
-[SymbioteNative](../../README.md) — network connection state (type/connected/internet-reachable)
+[SymbioteNative](../../README.md) - network connection state (type/connected/internet-reachable)
 with a change listener, device IP address, and airplane-mode detection, reachable from every
 adapter (React, Vue, Svelte, Solid, Angular), not just React.
 
@@ -25,43 +25,43 @@ npx @symbiote-native/cli new my-app --network
 npx @symbiote-native/cli add --network
 ```
 
-Either way: installs `@symbiote-native/network` and wires the native autolinking automatically —
+Either way: installs `@symbiote-native/network` and wires the native autolinking automatically,
 see [`@symbiote-native/cli`](../cli).
 
 <details>
-<summary>Manual install (no CLI — installing and wiring native autolinking by hand)</summary>
+<summary>Manual install (no CLI - installing and wiring native autolinking by hand)</summary>
 
 ```bash
 npm install @symbiote-native/network
 ```
 
 Depends on `expo-network` and `expo-modules-core` directly (regular dependencies, pinned to exact
-versions — never a caret range, since this package's `core/` is hand-ported against one specific
+versions - never a caret range, since this package's `core/` is hand-ported against one specific
 native API shape and a newer resolve could silently drift the two apart). Never install
-`expo-network` yourself, and never add the `expo` package to this project — it bundles its own
+`expo-network` yourself, and never add the `expo` package to this project - it bundles its own
 Metro/Babel pipeline that conflicts with this project's own.
 
 ### Required one-time step: native autolinking wiring
 
 Unlike a plain RN native module, `expo-network`'s native code is discovered by
-`expo-modules-autolinking`, not RN's own `react-native.config.cjs` mechanism — this needs wiring
+`expo-modules-autolinking`, not RN's own `react-native.config.cjs` mechanism - this needs wiring
 into the native host app **once**, covering this package and every other `expo-modules-core`
 package (`@symbiote-native/battery`, `@symbiote-native/sensors`, `@symbiote-native/local-auth`)
 with zero further changes:
 
 | Platform | Touches                                                                                                                                             |
 | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| iOS      | `ios/Podfile` — add `use_expo_modules!`                                                                                                             |
-| iOS      | `AppDelegate.swift` — Expo's runtime-bootstrap hook                                                                                                 |
-| Android  | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects                                                               |
-| Android  | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
+| iOS      | `ios/Podfile` - add `use_expo_modules!`                                                                                                             |
+| iOS      | `AppDelegate.swift` - Expo's runtime-bootstrap hook                                                                                                 |
+| Android  | `settings.gradle` / `app/build.gradle` - resolve and include the Expo Gradle projects                                                               |
+| Android  | `MainApplication.kt` - Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
 
-Full mechanics — the Podfile pieces that normally ship inside the `expo` package, the `expo`
-peer-dependency exclusion list — live in the `symbiote-expo-native-module` skill. Reference
+Full mechanics - the Podfile pieces that normally ship inside the `expo` package, the `expo`
+peer-dependency exclusion list - live in the `symbiote-expo-native-module` skill. Reference
 implementation: `examples/expo-react/ios/Podfile` and
 `examples/expo-react/android/app/src/main/java/com/canaryexpo/MainApplication.kt`.
 
-No platform permission string is needed for network's surface — connection state, IP address, and
+No platform permission string is needed for network's surface - connection state, IP address, and
 airplane-mode detection all read system state with no runtime permission prompt on either
 platform.
 
@@ -70,28 +70,28 @@ platform.
 ## Shape
 
 ```
-src/core/               network.ts — get*Async functions + addNetworkStateListener subscription.
+src/core/               network.ts - get*Async functions + addNetworkStateListener subscription.
                         native-module.ts resolves the native module through expo-modules-core's
-                        requireNativeModule. types.ts — NetworkStateType enum, NetworkState,
+                        requireNativeModule. types.ts - NetworkStateType enum, NetworkState,
                         NetworkStateEvent, hand-ported from Network.types.ts.
-src/react/hooks/        @symbiote-native/network/react   — useNetworkState
-src/vue/composables/    @symbiote-native/network/vue     — useNetworkState (same name)
-src/svelte/runes/       @symbiote-native/network/svelte  — useNetworkState (same name)
-src/solid/primitives/   @symbiote-native/network/solid   — createNetworkState (returns an
+src/react/hooks/        @symbiote-native/network/react   - useNetworkState
+src/vue/composables/    @symbiote-native/network/vue     - useNetworkState (same name)
+src/svelte/runes/       @symbiote-native/network/svelte  - useNetworkState (same name)
+src/solid/primitives/   @symbiote-native/network/solid   - createNetworkState (returns an
                         Accessor; Solid reserves `use*` for consuming existing state)
-src/angular/services/   @symbiote-native/network/angular — NetworkStateService (`.connect()`
+src/angular/services/   @symbiote-native/network/angular - NetworkStateService (`.connect()`
                         returns a Signal)
 ```
 
 Each adapter's hook/composable/rune/primitive/service is a thin lifecycle wrapper (seed from the
 one-shot `getNetworkStateAsync()` call, subscribe to `addNetworkStateListener`, unsubscribe on
-unmount) over the same `core` functions — the subscription logic is written once and shared by all
+unmount) over the same `core` functions - the subscription logic is written once and shared by all
 of them.
 
 ## Use it
 
 ```tsx
-// React — examples/expo-react/screens/NetworkScreen.tsx
+// React - examples/expo-react/screens/NetworkScreen.tsx
 import { useEffect, useState } from 'react';
 import {
   getIpAddressAsync,
@@ -128,7 +128,7 @@ function NetworkScreen() {
 ```
 
 ```vue
-<!-- Vue — examples/expo-vue-sfc/screens/NetworkScreen.vue -->
+<!-- Vue - examples/expo-vue-sfc/screens/NetworkScreen.vue -->
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import {
@@ -195,7 +195,7 @@ watch(
 ```
 
 ```ts
-// Angular — examples/expo-angular/src/screens/NetworkScreen.ts
+// Angular - examples/expo-angular/src/screens/NetworkScreen.ts
 import { Component, effect, inject, signal } from '@angular/core';
 import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import {
@@ -227,7 +227,7 @@ export class NetworkScreen {
 ```
 
 ```tsx
-// Solid — the accessor is CALLED; a Solid component body runs once, so a snapshot would freeze.
+// Solid - the accessor is CALLED; a Solid component body runs once, so a snapshot would freeze.
 import { createSignal, onMount } from 'solid-js';
 import {
   getIpAddressAsync,
@@ -269,7 +269,7 @@ function NetworkScreen() {
 
 Each of the demo screens above also re-fetches the IP address and airplane-mode card
 whenever the live network state changes (toggling Wi-Fi/airplane mode on the device updates both
-cards together) — see the linked files for the full version, including the connection-type label
+cards together) - see the linked files for the full version, including the connection-type label
 switch and the layout around it.
 
 ## API
@@ -285,7 +285,7 @@ addNetworkStateListener(listener): EventSubscription     // fires whenever the n
 ```
 
 Plus `NetworkStateType` (enum: `NONE`/`UNKNOWN`/`CELLULAR`/`WIFI`/`BLUETOOTH`/`ETHERNET`/`WIMAX`/
-`VPN`/`OTHER`), `NetworkState`, `NetworkStateEvent` — ported from upstream's `Network.types.ts`.
+`VPN`/`OTHER`), `NetworkState`, `NetworkStateEvent` - ported from upstream's `Network.types.ts`.
 
 ```ts
 import {
@@ -304,18 +304,30 @@ import { NetworkStateService } from '@symbiote-native/network/angular';
 
 `useNetworkState` (Solid: `createNetworkState`) seeds its initial value from a one-shot
 `getNetworkStateAsync()` call, then subscribes to `addNetworkStateListener` for updates, and
-unsubscribes on unmount — mirroring upstream's own `useNetworkState`. The Solid primitive returns
+unsubscribes on unmount - mirroring upstream's own `useNetworkState`. The Solid primitive returns
 an `Accessor<NetworkState>` and subscribes from its body rather than an effect, so nothing can slip
 between the seed and the subscription.
 
+## Common questions
+
+- **Wi-Fi without internet.** `isConnected` only says a network exists; use `isInternetReachable`.
+- **`ERR_NETWORK_NO_ACCESS_NETWORKINFO` on Android.** Catch the rejection and treat it as offline.
+- **Hook stuck offline after the app was frozen (Android).** Events can arrive out of order; call
+  `getNetworkStateAsync` on foreground.
+- **Always `NONE` after an SDK update.** Reported upstream; check the network-state permission.
+
+Sources: [expo/expo#14527](https://github.com/expo/expo/issues/14527),
+[expo/expo#47846](https://github.com/expo/expo/issues/47846),
+[expo/expo#33070](https://github.com/expo/expo/issues/33070).
+
 ## Test it
 
-No Fabric/Descriptor angle at all — network is a pure async-function + `EventEmitter` listener
+No Fabric/Descriptor angle at all - network is a pure async-function + `EventEmitter` listener
 surface, never a view. Tests inject a fake native-module object in place of the real
 `requireNativeModule` resolution (`src/core/network.test.ts`,
 `src/{react,vue,svelte,solid,angular}/**/*.test.{ts,tsx}`, `vitest`), the same pattern
-`@symbiote-native/battery`/`@symbiote-native/sensors`/`@symbiote-native/local-auth` use — no
-`installFabric()`, no ViewConfig. Native rendering itself is verified on-device — see the parent
+`@symbiote-native/battery`/`@symbiote-native/sensors`/`@symbiote-native/local-auth` use - no
+`installFabric()`, no ViewConfig. Native rendering itself is verified on-device - see the parent
 [README](../../README.md).
 
 The Android/iOS native wiring is done across all six `examples/expo-*` canary apps

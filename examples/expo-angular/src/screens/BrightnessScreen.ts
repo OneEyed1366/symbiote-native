@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { Platform, SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import {
   BrightnessMode,
@@ -12,16 +12,28 @@ import {
   setSystemBrightnessModeAsync,
 } from '@symbiote-native/brightness/angular';
 import { ActionButton } from '../components/ActionButton';
+import { Scenario } from '../components/Scenario';
+import { toCapabilityStatus } from '../components/capability-status';
+import type { ICapabilityStatus } from '../components/capability-status';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
+import { CapabilityRow } from './CapabilityRow';
+import { ValueRow } from './ValueRow';
 
-type ICapabilityStatus = 'checking' | 'yes' | 'no';
+type IBrightnessStep = { label: string; value: number };
 
-function toCapabilityStatus(value: boolean): ICapabilityStatus {
-  return value ? 'yes' : 'no';
-}
+const PENDING_LABEL = 'checking…';
+const PERCENT_SCALE = 100;
+const ANDROID_OS = 'android';
 
-function formatBrightnessMode(mode: BrightnessMode): string {
+const BRIGHTNESS_STEPS: readonly IBrightnessStep[] = [
+  { label: '25%', value: 0.25 },
+  { label: '50%', value: 0.5 },
+  { label: '75%', value: 0.75 },
+  { label: '100%', value: 1 },
+];
+
+function brightnessModeLabel(mode: BrightnessMode): string {
   switch (mode) {
     case BrightnessMode.AUTOMATIC:
       return 'Automatic';
@@ -32,27 +44,10 @@ function formatBrightnessMode(mode: BrightnessMode): string {
   }
 }
 
-const BRIGHTNESS_STEPS: readonly { label: string; value: number }[] = [
-  { label: '25%', value: 0.25 },
-  { label: '50%', value: 0.5 },
-  { label: '75%', value: 0.75 },
-  { label: '100%', value: 1 },
-];
-
-/**
- * @symbiote-native/brightness canary demo: a live brightness card (seeded via
- * getBrightnessAsync(), refreshed by addBrightnessListener() — iOS-only upstream, so on Android
- * the value only changes via the buttons below), a set-brightness action row, an Android-only
- * system-brightness-mode card, and a permission card driving PermissionsService. Angular twin of
- * ../../react/screens/BrightnessScreen.tsx. No Angular service wraps the one-off brightness
- * listener (unlike battery's three services) — wired directly here via signal(), mirroring
- * BatteryScreen's constructor pattern; the subscription stays live for the component's lifetime
- * (no screen in this app implements OnDestroy to unsubscribe one, same as upstream Expo demos).
- */
 @Component({
   selector: 'BrightnessScreen',
   standalone: true,
-  imports: [ActionButton, SYMBIOTE_ELEMENTS],
+  imports: [ActionButton, CapabilityRow, Scenario, SYMBIOTE_ELEMENTS, ValueRow],
   template: `
     <safe-area-view class="screen">
       <scroll-view
@@ -60,179 +55,180 @@ const BRIGHTNESS_STEPS: readonly { label: string; value: number }[] = [
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <view [class]="lineTagClass">
-          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        <view [class]="'line-tag line-tag-' + lineInfo.line">
+          <text class="line-tag-text"
+            >{{ lineInfo.code }} · {{ lineInfo.label }}</text
+          >
         </view>
         <view class="hero-card">
-          <view class="hero-badge" [style]="heroBadgeStyle">
-            <text class="hero-badge-text">{{ heroBadgeCode }}</text>
+          <view class="hero-badge" [style]="badgeStyle">
+            <text class="hero-badge-text">{{ lineInfo.code }}</text>
           </view>
           <view class="hero-copy">
             <text class="hero-title">Brightness</text>
             <text class="hero-body">
-              @symbiote-native/brightness — screen brightness get/set, Android
-              system-brightness mode, and an iOS-only live listener. Requires
-              SYSTEM_BRIGHTNESS permission on Android before setting the
-              system-wide value.
+              Read and change the screen brightness from the app, for example to
+              make a QR code or a boarding pass easy to scan. Android can also
+              change the system-wide value after the user grants the write
+              settings permission.
             </text>
           </view>
         </view>
 
-        <view testID="brightness-live-card" class="capability-card">
-          <text class="capability-card-title">Live brightness</text>
-          <view class="capability-row">
-            <text class="capability-label">Screen brightness</text>
-            <text class="value-text">{{ brightnessLabel() }}</text>
+        <Scenario
+          testID="brightness-scenario"
+          title="Brighten the screen to show a QR code or a ticket"
+          why="Scanners read a bright screen much better. Raise the brightness while the code is on screen and restore the user's level afterwards."
+          [steps]="scenarioSteps"
+          expect="The screen visibly brightens or dims, and the live card shows the new value. Restoring returns to the system setting."
+        />
+
+        <view testID="brightness-live-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Live brightness</text>
           </view>
+          <ValueRow label="Screen brightness" [value]="brightnessLabel()" />
           <view class="button-row">
-            @for (step of brightnessSteps; track step.label) {
+            @for (step of steps; track step.label) {
               <ActionButton
                 [testID]="'brightness-set-' + step.label"
                 [title]="step.label"
                 [color]="lineColor"
-                (press)="handleSetBrightness(step.value)"
-              ></ActionButton>
+                (press)="setBrightness(step.value)"
+              />
             }
           </view>
         </view>
 
-        @if (Platform.OS === 'android') {
-          <view testID="brightness-system-card" class="capability-card">
-            <text class="capability-card-title"
-              >System brightness (Android only)</text
-            >
-            <view class="capability-row">
-              <text class="capability-label">Mode</text>
-              <text class="value-text">{{ systemModeLabel() }}</text>
+        @if (isAndroid) {
+          <view testID="brightness-system-card" class="feature-card">
+            <view class="feature-card-header">
+              <text class="feature-card-title"
+                >System brightness (Android only)</text
+              >
             </view>
-            <view testID="brightness-using-system" class="capability-row">
-              <text class="capability-label">Using system value</text>
-              <view [class]="statusBadgeClass(isUsingSystem())">
-                <text class="status-badge-text">{{
-                  statusLabel(isUsingSystem())
-                }}</text>
-              </view>
-            </view>
+            <ValueRow label="Mode" [value]="systemModeLabel()" />
+            <CapabilityRow
+              testID="brightness-using-system"
+              label="Using system value"
+              [status]="systemUsageStatus()"
+            />
             <view class="button-row">
               <ActionButton
                 testID="brightness-mode-automatic"
                 title="Automatic"
                 [color]="lineColor"
-                (press)="handleSetSystemMode(BrightnessMode.AUTOMATIC)"
-              ></ActionButton>
+                (press)="setSystemMode(modes.AUTOMATIC)"
+              />
               <ActionButton
                 testID="brightness-mode-manual"
                 title="Manual"
                 [color]="lineColor"
-                (press)="handleSetSystemMode(BrightnessMode.MANUAL)"
-              ></ActionButton>
+                (press)="setSystemMode(modes.MANUAL)"
+              />
               <ActionButton
                 testID="brightness-restore-system"
                 title="Restore system"
                 [color]="lineColor"
-                (press)="handleRestoreSystem()"
-              ></ActionButton>
+                (press)="restoreSystem()"
+              />
             </view>
           </view>
         }
 
-        <view testID="brightness-permission-card" class="capability-card">
-          <text class="capability-card-title">Permission</text>
-          <view class="capability-row">
-            <text class="capability-label">SYSTEM_BRIGHTNESS status</text>
-            <text class="value-text">{{ permissionLabel() }}</text>
+        <view testID="brightness-permission-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Permission</text>
           </view>
+          <ValueRow
+            label="SYSTEM_BRIGHTNESS status"
+            [value]="permissionLabel()"
+          />
           <ActionButton
             testID="brightness-request-permission"
             title="Request permission"
             [color]="lineColor"
             (press)="requestPermission()"
-          ></ActionButton>
+          />
         </view>
       </scroll-view>
     </safe-area-view>
   `,
 })
 export class BrightnessScreen {
-  private readonly lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Brightness];
-  readonly lineTagClass = `line-tag line-tag-${this.lineInfo.line}`;
-  readonly lineTagLabel = `${this.lineInfo.code} · ${this.lineInfo.label}`;
-  readonly heroBadgeCode = this.lineInfo.code;
-  readonly lineColor = LINE_COLOR[this.lineInfo.line];
-  readonly heroBadgeStyle = { backgroundColor: this.lineColor };
+  readonly lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Brightness];
+  readonly lineColor = LINE_COLOR.brightness;
+  readonly badgeStyle = { backgroundColor: LINE_COLOR.brightness };
+  readonly isAndroid = Platform.OS === ANDROID_OS;
+  readonly steps = BRIGHTNESS_STEPS;
+  readonly modes = BrightnessMode;
+  readonly scenarioSteps = [
+    'Note the current brightness in the live card',
+    'Set a new value with the controls',
+    'Restore the system value',
+  ];
 
-  readonly Platform = Platform;
-  readonly BrightnessMode = BrightnessMode;
-  readonly brightnessSteps = BRIGHTNESS_STEPS;
+  private readonly permissions = inject(PermissionsService);
+  private readonly permissionStatus = this.permissions.connect();
 
-  private readonly permissionsService = inject(PermissionsService);
-  readonly permissionStatus = this.permissionsService.connect();
+  private readonly brightness = signal<number | null>(null);
+  private readonly systemMode = signal<BrightnessMode>(BrightnessMode.UNKNOWN);
+  readonly systemUsageStatus = signal<ICapabilityStatus>('checking');
 
-  readonly brightness = signal<number | null>(null);
-  readonly systemMode = signal<BrightnessMode>(BrightnessMode.UNKNOWN);
-  readonly isUsingSystem = signal<ICapabilityStatus>('checking');
+  readonly brightnessLabel = computed(() => {
+    const value = this.brightness();
+    return value === null
+      ? PENDING_LABEL
+      : `${Math.round(value * PERCENT_SCALE)}%`;
+  });
+  readonly systemModeLabel = computed(() =>
+    brightnessModeLabel(this.systemMode()),
+  );
+  readonly permissionLabel = computed(() => {
+    const status = this.permissionStatus();
+    return status === null ? PENDING_LABEL : status.status;
+  });
 
   constructor() {
-    getBrightnessAsync().then(value => this.brightness.set(value));
-    addBrightnessListener(event => this.brightness.set(event.brightness));
-
-    if (Platform.OS === 'android') {
-      getSystemBrightnessModeAsync().then(mode => this.systemMode.set(mode));
-      isUsingSystemBrightnessAsync().then(value =>
-        this.isUsingSystem.set(toCapabilityStatus(value)),
-      );
+    void getBrightnessAsync().then(value => this.brightness.set(value));
+    const subscription = addBrightnessListener(event =>
+      this.brightness.set(event.brightness),
+    );
+    inject(DestroyRef).onDestroy(() => subscription.remove());
+    if (this.isAndroid) {
+      void Promise.all([
+        getSystemBrightnessModeAsync(),
+        isUsingSystemBrightnessAsync(),
+      ]).then(([mode, isUsingSystem]) => {
+        this.systemMode.set(mode);
+        this.systemUsageStatus.set(toCapabilityStatus(isUsingSystem));
+      });
     }
   }
 
-  brightnessLabel(): string {
-    const value = this.brightness();
-    return value === null ? 'checking…' : `${Math.round(value * 100)}%`;
-  }
-
-  systemModeLabel(): string {
-    return formatBrightnessMode(this.systemMode());
-  }
-
-  permissionLabel(): string {
-    const status = this.permissionStatus();
-    return status === null ? 'checking…' : status.status;
-  }
-
-  handleSetBrightness(value: number): void {
-    setBrightnessAsync(value).then(() =>
-      getBrightnessAsync().then(result => this.brightness.set(result)),
+  setBrightness(value: number): void {
+    void setBrightnessAsync(value).then(() =>
+      getBrightnessAsync().then(current => this.brightness.set(current)),
     );
   }
 
-  handleSetSystemMode(mode: BrightnessMode): void {
-    setSystemBrightnessModeAsync(mode).then(() =>
-      getSystemBrightnessModeAsync().then(result =>
-        this.systemMode.set(result),
+  setSystemMode(mode: BrightnessMode): void {
+    void setSystemBrightnessModeAsync(mode).then(() =>
+      getSystemBrightnessModeAsync().then(current =>
+        this.systemMode.set(current),
       ),
     );
   }
 
-  handleRestoreSystem(): void {
-    restoreSystemBrightnessAsync().then(() =>
-      isUsingSystemBrightnessAsync().then(value =>
-        this.isUsingSystem.set(toCapabilityStatus(value)),
+  restoreSystem(): void {
+    void restoreSystemBrightnessAsync().then(() =>
+      isUsingSystemBrightnessAsync().then(isUsingSystem =>
+        this.systemUsageStatus.set(toCapabilityStatus(isUsingSystem)),
       ),
     );
   }
 
   requestPermission(): void {
-    void this.permissionsService.request();
-  }
-
-  statusBadgeClass(status: ICapabilityStatus): string {
-    return `status-badge status-badge-${status}`;
-  }
-
-  statusLabel(status: ICapabilityStatus): string {
-    return status === 'checking'
-      ? 'CHECKING…'
-      : status === 'yes'
-        ? 'YES'
-        : 'NO';
+    void this.permissions.request();
   }
 }

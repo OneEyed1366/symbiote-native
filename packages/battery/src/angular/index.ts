@@ -5,4 +5,5 @@
 export { BatteryLevelService } from './services/battery-level.service';
 export { BatteryStateService } from './services/battery-state.service';
 export { LowPowerModeService } from './services/low-power-mode.service';
+export { PowerStateService } from './services/power-state.service';
 export * from '../core';

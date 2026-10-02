@@ -7,6 +7,7 @@ import {
 } from '@symbiote-native/crypto';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
+import { Scenario } from '../components/Scenario';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
 const DIGEST_SAMPLE_STRING = 'some fixed sample string';
@@ -21,11 +22,6 @@ function ValueRow(props: { label: string; value: string }) {
   );
 }
 
-/**
- * @symbiote-native/crypto canary demo: three one-shot calls covering the package's whole
- * surface - randomUUID (sync), digestStringAsync (async, SHA-256 of a fixed sample string), and
- * getRandomBytesAsync (async, a fixed-length random buffer).
- */
 export function CryptoScreen() {
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Crypto];
   const lineColor = LINE_COLOR[lineInfo.line];
@@ -67,12 +63,20 @@ export function CryptoScreen() {
           <view class="hero-copy">
             <text class="hero-title">Crypto</text>
             <text class="hero-body">
-              @symbiote-native/crypto — cryptographically secure random bytes,
-              randomUUID, and string digest hashing (SHA-1/256/384/512,
-              MD2/4/5).
+              Generate secure random bytes and unique ids, and hash strings with
+              SHA or MD algorithms, using the platform's native cryptography
+              instead of JavaScript code.
             </text>
           </view>
         </view>
+
+        <Scenario
+          testID="crypto-scenario"
+          title="Create unique ids, tokens and checksums"
+          why="Use a random UUID as an idempotency key, random bytes as a nonce or session secret, and a digest to verify that a file or a password input is unchanged."
+          steps={['Press the UUID button twice', 'Generate random bytes', 'Hash the same text twice with SHA-256']}
+          expect="Every UUID and byte string differs, while the same text always gives the same SHA-256 digest. Known test vectors match the published values."
+        />
 
         <view testID="crypto-uuid-card" class="feature-card">
           <view class="feature-card-header">

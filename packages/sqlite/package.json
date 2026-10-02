@@ -100,7 +100,8 @@
   "dependencies": {
     "expo-sqlite": "catalog:",
     "expo-modules-core": "catalog:",
-    "await-lock": "catalog:"
+    "await-lock": "catalog:",
+    "@symbiote-native/asset": "workspace:*"
   },
   "peerDependencies": {
     "react-native": ">=0.86",

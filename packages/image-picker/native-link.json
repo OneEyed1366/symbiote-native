@@ -1,0 +1,20 @@
+{
+  "android": {
+    "gradleProjectName": "expo-image-picker",
+    "modules": [
+      {
+        "importPath": "expo.modules.imagepicker.ImagePickerModule",
+        "className": "ImagePickerModule",
+        "nativeName": "ExponentImagePicker"
+      }
+    ],
+    "manifestPermissions": ["android.permission.RECORD_AUDIO"]
+  },
+  "ios": {
+    "infoPlistKeys": {
+      "NSPhotoLibraryUsageDescription": "This app uses the photo library to let you pick images and videos.",
+      "NSCameraUsageDescription": "This app uses the camera to let you take a photo or video.",
+      "NSMicrophoneUsageDescription": "This app uses the microphone to record audio for videos."
+    }
+  }
+}

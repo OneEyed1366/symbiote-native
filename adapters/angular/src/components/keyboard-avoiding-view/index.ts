@@ -36,7 +36,6 @@ import {
   resolveKeyboardAvoidingLayout,
   DEFAULT_VERTICAL_OFFSET,
   type IAccessibilityProps,
-  type IAccessibilityStateValue,
   type IAriaProps,
   type IKeyboardAvoidingBehavior,
   type IKeyboardAvoidingLayout,
@@ -52,6 +51,7 @@ import {
   type ISymbioteEvent,
   type IViewStyle,
 } from '@symbiote-native/engine';
+import { AccessibilityEventsBase } from '../../accessibility-events';
 import {
   anchorHostStyle,
   SymbioteHostPropsDirective,
@@ -117,6 +117,7 @@ export type IAngularKeyboardAvoidingViewInputs = Omit<
   `,
 })
 export class KeyboardAvoidingView
+  extends AccessibilityEventsBase
   implements IAngularKeyboardAvoidingViewInputs, OnInit, OnDestroy
 {
   @Input() behavior?: IKeyboardAvoidingBehavior;
@@ -129,47 +130,8 @@ export class KeyboardAvoidingView
   // (see the class's `handleLayout`) — the engine's bubble() treats ANCHOR_HOST_COMPONENTS as
   // transparent to listener lookup, so there is no double-fire.
   @Output() readonly layout = new EventEmitter<ISymbioteEvent>();
-  @Output() readonly accessibilityAction = new EventEmitter<ISymbioteEvent>();
-  @Output() readonly accessibilityTap = new EventEmitter<ISymbioteEvent>();
-  @Output() readonly magicTap = new EventEmitter<ISymbioteEvent>();
-  @Output() readonly accessibilityEscape = new EventEmitter<ISymbioteEvent>();
   @Input() testID?: string;
   @Input() nativeID?: string;
-  @Input() accessible?: boolean;
-  @Input() accessibilityLabel?: string;
-  @Input() accessibilityHint?: string;
-  @Input() accessibilityRole?: IAccessibilityProps['accessibilityRole'];
-  @Input() accessibilityState?: IAccessibilityStateValue;
-  @Input() accessibilityValue?: IAccessibilityProps['accessibilityValue'];
-  @Input() accessibilityActions?: IAccessibilityProps['accessibilityActions'];
-  @Input() accessibilityLabelledBy?: string | string[];
-  @Input()
-  importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
-  @Input()
-  accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
-  @Input() screenReaderFocusable?: boolean;
-  @Input() accessibilityViewIsModal?: boolean;
-  @Input() accessibilityElementsHidden?: boolean;
-  @Input() accessibilityIgnoresInvertColors?: boolean;
-  @Input() accessibilityLanguage?: string;
-  @Input() accessibilityRespondsToUserInteraction?: boolean;
-  @Input() accessibilityShowsLargeContentViewer?: boolean;
-  @Input() accessibilityLargeContentTitle?: string;
-  @Input() role?: IAriaProps['role'];
-  @Input('aria-label') ariaLabel?: string;
-  @Input('aria-labelledby') ariaLabelledBy?: string;
-  @Input('aria-live') ariaLive?: IAriaProps['aria-live'];
-  @Input('aria-hidden') ariaHidden?: boolean;
-  @Input('aria-busy') ariaBusy?: boolean;
-  @Input('aria-checked') ariaChecked?: boolean | 'mixed';
-  @Input('aria-disabled') ariaDisabled?: boolean;
-  @Input('aria-expanded') ariaExpanded?: boolean;
-  @Input('aria-selected') ariaSelected?: boolean;
-  @Input('aria-modal') ariaModal?: boolean;
-  @Input('aria-valuemax') ariaValueMax?: number;
-  @Input('aria-valuemin') ariaValueMin?: number;
-  @Input('aria-valuenow') ariaValueNow?: number;
-  @Input('aria-valuetext') ariaValueText?: string;
 
   // How far the view must move so it no longer overlaps the keyboard. A plain field, not reactive:
   // OnPush + zoneless means a keyboard event mutates it and pulls the view via markForCheck.
@@ -325,44 +287,8 @@ export class KeyboardAvoidingView
     return emitter.observed ? event => this.emit(emitter, event) : undefined;
   }
 
-  // Fold the web aria-*/role aliases into the canonical accessibility* props once per render, so the
-  // host node never sees an aria-* key (native ignores them) — the shared transform every adapter runs.
+  // Folds the aria-*/role aliases into the canonical accessibility* props, native ignores aria-*
   get folded(): Partial<IAngularKeyboardAvoidingViewProps> {
-    return resolveAccessibilityProps({
-      accessibilityLabel: this.accessibilityLabel,
-      accessibilityHint: this.accessibilityHint,
-      accessibilityRole: this.accessibilityRole,
-      accessibilityState: this.accessibilityState,
-      accessibilityValue: this.accessibilityValue,
-      accessibilityActions: this.accessibilityActions,
-      accessibilityLabelledBy: this.accessibilityLabelledBy,
-      importantForAccessibility: this.importantForAccessibility,
-      accessibilityLiveRegion: this.accessibilityLiveRegion,
-      screenReaderFocusable: this.screenReaderFocusable,
-      accessibilityViewIsModal: this.accessibilityViewIsModal,
-      accessibilityElementsHidden: this.accessibilityElementsHidden,
-      accessibilityIgnoresInvertColors: this.accessibilityIgnoresInvertColors,
-      accessibilityLanguage: this.accessibilityLanguage,
-      accessibilityRespondsToUserInteraction:
-        this.accessibilityRespondsToUserInteraction,
-      accessibilityShowsLargeContentViewer:
-        this.accessibilityShowsLargeContentViewer,
-      accessibilityLargeContentTitle: this.accessibilityLargeContentTitle,
-      role: this.role,
-      'aria-label': this.ariaLabel,
-      'aria-labelledby': this.ariaLabelledBy,
-      'aria-live': this.ariaLive,
-      'aria-hidden': this.ariaHidden,
-      'aria-busy': this.ariaBusy,
-      'aria-checked': this.ariaChecked,
-      'aria-disabled': this.ariaDisabled,
-      'aria-expanded': this.ariaExpanded,
-      'aria-selected': this.ariaSelected,
-      'aria-modal': this.ariaModal,
-      'aria-valuemax': this.ariaValueMax,
-      'aria-valuemin': this.ariaValueMin,
-      'aria-valuenow': this.ariaValueNow,
-      'aria-valuetext': this.ariaValueText,
-    });
+    return resolveAccessibilityProps(this.accessibilityInputProps());
   }
 }

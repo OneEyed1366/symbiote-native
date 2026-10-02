@@ -5,6 +5,7 @@ import {
 } from '@symbiote-native/system-ui';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
+import { Scenario } from '../components/Scenario';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
 const PRESET_RED = '#ef4444';
@@ -19,11 +20,6 @@ function ValueRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-/**
- * @symbiote-native/system-ui canary demo: reads the root view's background color on mount, then
- * a preset-color card that calls setBackgroundColorAsync and re-fetches the value afterward so
- * the displayed row always reflects what the native module actually reports.
- */
 export function SystemUiScreen() {
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.SystemUi];
   const lineColor = LINE_COLOR[lineInfo.line];
@@ -66,12 +62,20 @@ export function SystemUiScreen() {
           <view className="hero-copy">
             <text className="hero-title">System UI</text>
             <text className="hero-body">
-              @symbiote-native/system-ui — get/set the root view's background
-              color.
+              Set the color of the window behind your app, so keyboard
+              animations, overscroll and screen transitions do not flash white
+              against a dark theme.
             </text>
           </view>
         </view>
 
+        <Scenario
+          testID="system-ui-scenario"
+          title="Match the window background to the app theme"
+          why="The root view shows through during overscroll, rotation and keyboard transitions. Setting it to the theme color removes the white flash in dark mode."
+          steps={['Press Red or Blue', 'Overscroll the list or rotate the phone', 'Press Reset']}
+          expect="The color row shows the new value and the color appears wherever the window shows through. Reset returns the default."
+        />
         <view testID="system-ui-card" className="feature-card">
           <view className="feature-card-header">
             <text className="feature-card-title">Root view background</text>

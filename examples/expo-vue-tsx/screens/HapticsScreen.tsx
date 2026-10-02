@@ -10,98 +10,84 @@ import {
   selectionAsync,
 } from '@symbiote-native/haptics';
 import { ActionButton } from '../components/ActionButton';
+import { Scenario } from '../components/Scenario';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
-const IMPACT_STYLES: readonly ImpactFeedbackStyle[] = [
-  ImpactFeedbackStyle.Light,
-  ImpactFeedbackStyle.Medium,
-  ImpactFeedbackStyle.Heavy,
-  ImpactFeedbackStyle.Rigid,
-  ImpactFeedbackStyle.Soft,
+const IMPACT_STYLES: readonly { label: string; style: ImpactFeedbackStyle }[] =
+  [
+    { label: 'Light', style: ImpactFeedbackStyle.Light },
+    { label: 'Medium', style: ImpactFeedbackStyle.Medium },
+    { label: 'Heavy', style: ImpactFeedbackStyle.Heavy },
+    { label: 'Rigid', style: ImpactFeedbackStyle.Rigid },
+    { label: 'Soft', style: ImpactFeedbackStyle.Soft },
+  ];
+
+const NOTIFICATION_TYPES: readonly {
+  label: string;
+  type: NotificationFeedbackType;
+}[] = [
+  { label: 'Success', type: NotificationFeedbackType.Success },
+  { label: 'Warning', type: NotificationFeedbackType.Warning },
+  { label: 'Error', type: NotificationFeedbackType.Error },
 ];
 
-const NOTIFICATION_TYPES: readonly NotificationFeedbackType[] = [
-  NotificationFeedbackType.Success,
-  NotificationFeedbackType.Warning,
-  NotificationFeedbackType.Error,
+// Every `AndroidHaptics` member, `performAndroidHapticsAsync` does nothing on iOS
+// so the whole card renders on Android only
+const ANDROID_HAPTICS: readonly { label: string; type: AndroidHaptics }[] = [
+  { label: 'Confirm', type: AndroidHaptics.Confirm },
+  { label: 'Reject', type: AndroidHaptics.Reject },
+  { label: 'Gesture start', type: AndroidHaptics.Gesture_Start },
+  { label: 'Gesture end', type: AndroidHaptics.Gesture_End },
+  { label: 'Toggle on', type: AndroidHaptics.Toggle_On },
+  { label: 'Toggle off', type: AndroidHaptics.Toggle_Off },
+  { label: 'Clock tick', type: AndroidHaptics.Clock_Tick },
+  { label: 'Context click', type: AndroidHaptics.Context_Click },
+  { label: 'Drag start', type: AndroidHaptics.Drag_Start },
+  { label: 'Keyboard tap', type: AndroidHaptics.Keyboard_Tap },
+  { label: 'Keyboard press', type: AndroidHaptics.Keyboard_Press },
+  { label: 'Keyboard release', type: AndroidHaptics.Keyboard_Release },
+  { label: 'Long press', type: AndroidHaptics.Long_Press },
+  { label: 'Virtual key', type: AndroidHaptics.Virtual_Key },
+  { label: 'Virtual key release', type: AndroidHaptics.Virtual_Key_Release },
+  { label: 'No haptics', type: AndroidHaptics.No_Haptics },
+  { label: 'Segment tick', type: AndroidHaptics.Segment_Tick },
+  {
+    label: 'Segment frequent tick',
+    type: AndroidHaptics.Segment_Frequent_Tick,
+  },
+  { label: 'Text handle move', type: AndroidHaptics.Text_Handle_Move },
 ];
 
-const ANDROID_HAPTICS: readonly AndroidHaptics[] =
-  Object.values(AndroidHaptics);
-
-function impactLabel(style: ImpactFeedbackStyle): string {
-  switch (style) {
-    case ImpactFeedbackStyle.Light:
-      return 'Light';
-    case ImpactFeedbackStyle.Medium:
-      return 'Medium';
-    case ImpactFeedbackStyle.Heavy:
-      return 'Heavy';
-    case ImpactFeedbackStyle.Rigid:
-      return 'Rigid';
-    case ImpactFeedbackStyle.Soft:
-      return 'Soft';
-    default:
-      return style;
-  }
-}
-
-function notificationLabel(type: NotificationFeedbackType): string {
-  switch (type) {
-    case NotificationFeedbackType.Success:
-      return 'Success';
-    case NotificationFeedbackType.Warning:
-      return 'Warning';
-    case NotificationFeedbackType.Error:
-      return 'Error';
-    default:
-      return type;
-  }
-}
-
-// AndroidHaptics values are already hyphenated words ('gesture-start') — split + title-case
-// each word rather than hand-writing a label per member (17 of them).
-function androidHapticsLabel(value: AndroidHaptics): string {
-  return value
-    .split('-')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
-}
-
-/**
- * Haptics demo: @symbiote-native/haptics — every impact/notification/selection style fires
- * fire-and-forget on tap, plus the Android-only performAndroidHapticsAsync surface over
- * AndroidHaptics. No capability check exists upstream (unlike local-auth/battery) — a haptics
- * call is either a no-op or genuinely felt, so the only feedback this screen renders is which
- * call fired last. A physical device is needed to feel it; the Simulator has no haptics hardware.
- */
 export const HapticsScreen = defineComponent(
   () => {
     const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Haptics];
-    const lineColor = LINE_COLOR[ROUTE_LINE_INFO[ROUTE_NAME.Haptics].line];
+    const lineColor = LINE_COLOR[lineInfo.line];
 
     const lastFired = ref<string | null>(null);
 
-    function handleImpact(style: ImpactFeedbackStyle) {
-      lastFired.value = `Impact — ${impactLabel(style)}`;
+    const handleImpact = (style: ImpactFeedbackStyle, label: string) => {
       impactAsync(style);
-    }
+      lastFired.value = `impactAsync(${label})`;
+    };
 
-    function handleNotification(type: NotificationFeedbackType) {
-      lastFired.value = `Notification — ${notificationLabel(type)}`;
+    const handleNotification = (
+      type: NotificationFeedbackType,
+      label: string,
+    ) => {
       notificationAsync(type);
-    }
+      lastFired.value = `notificationAsync(${label})`;
+    };
 
-    function handleSelection() {
-      lastFired.value = 'Selection';
+    const handleSelection = () => {
       selectionAsync();
-    }
+      lastFired.value = 'selectionAsync()';
+    };
 
-    function handleAndroidHaptics(type: AndroidHaptics) {
-      lastFired.value = `Android — ${androidHapticsLabel(type)}`;
+    const handleAndroidHaptic = (type: AndroidHaptics, label: string) => {
       performAndroidHapticsAsync(type);
-    }
+      lastFired.value = `performAndroidHapticsAsync(${label})`;
+    };
 
     return () => (
       <safe-area-view class="screen">
@@ -120,47 +106,58 @@ export const HapticsScreen = defineComponent(
             <view class="hero-copy">
               <text class="hero-title">Haptics</text>
               <text class="hero-body">
-                @symbiote-native/haptics — impact, notification, and selection
-                feedback via iOS's Taptic Engine and Android's Vibrator API.
-                Every button fires immediately; a physical device is needed to
-                feel it, the Simulator has no haptics hardware.
+                Add a tactile feel to the app: taps, success and error buzzes and
+                selection ticks through iOS's Taptic Engine and Android's
+                vibrator. A simulator cannot vibrate, use a real device.
               </text>
             </view>
           </view>
 
-          <view testID="haptics-impact-card" class="auth-card">
-            <view class="auth-card-header">
-              <text class="auth-card-title">Impact</text>
+          <Scenario
+            testID="haptics-scenario"
+            title="Confirm a tap, a success or an error by feel"
+            why="A light tap on a button, a double buzz for success and a sharp one for an error make the app feel physical and let users act without looking."
+            steps={['Press the impact buttons from light to heavy', 'Press the notification buttons', 'Press selection while scrolling a picker-like list']}
+            expect="Each press vibrates differently on a real phone, and the last fired row names the call that reached the native module."
+          />
+
+          <view testID="haptics-impact-card" class="feature-card">
+            <view class="feature-card-header">
+              <text class="feature-card-title">Impact</text>
             </view>
-            {IMPACT_STYLES.map(style => (
-              <ActionButton
-                key={style}
-                testID={`haptics-impact-${style}`}
-                title={impactLabel(style)}
-                onPress={() => handleImpact(style)}
-                color={lineColor}
-              />
-            ))}
+            <view class="button-row">
+              {IMPACT_STYLES.map(({ label, style }) => (
+                <ActionButton
+                  key={label}
+                  testID={`haptics-impact-${label.toLowerCase()}`}
+                  title={label}
+                  onPress={() => handleImpact(style, label)}
+                  color={lineColor}
+                />
+              ))}
+            </view>
           </view>
 
-          <view testID="haptics-notification-card" class="auth-card">
-            <view class="auth-card-header">
-              <text class="auth-card-title">Notification</text>
+          <view testID="haptics-notification-card" class="feature-card">
+            <view class="feature-card-header">
+              <text class="feature-card-title">Notification</text>
             </view>
-            {NOTIFICATION_TYPES.map(type => (
-              <ActionButton
-                key={type}
-                testID={`haptics-notification-${type}`}
-                title={notificationLabel(type)}
-                onPress={() => handleNotification(type)}
-                color={lineColor}
-              />
-            ))}
+            <view class="button-row">
+              {NOTIFICATION_TYPES.map(({ label, type }) => (
+                <ActionButton
+                  key={label}
+                  testID={`haptics-notification-${label.toLowerCase()}`}
+                  title={label}
+                  onPress={() => handleNotification(type, label)}
+                  color={lineColor}
+                />
+              ))}
+            </view>
           </view>
 
-          <view testID="haptics-selection-card" class="auth-card">
-            <view class="auth-card-header">
-              <text class="auth-card-title">Selection</text>
+          <view testID="haptics-selection-card" class="feature-card">
+            <view class="feature-card-header">
+              <text class="feature-card-title">Selection</text>
             </view>
             <ActionButton
               testID="haptics-selection-button"
@@ -171,25 +168,31 @@ export const HapticsScreen = defineComponent(
           </view>
 
           {Platform.OS === 'android' && (
-            <view testID="haptics-android-card" class="auth-card">
-              <view class="auth-card-header">
-                <text class="auth-card-title">Android haptics engine</text>
+            <view testID="haptics-android-card" class="feature-card">
+              <view class="feature-card-header">
+                <text class="feature-card-title">Android haptics</text>
               </view>
-              {ANDROID_HAPTICS.map(type => (
-                <ActionButton
-                  key={type}
-                  testID={`haptics-android-${type}`}
-                  title={androidHapticsLabel(type)}
-                  onPress={() => handleAndroidHaptics(type)}
-                  color={lineColor}
-                />
-              ))}
+              <text class="info-text">
+                performAndroidHapticsAsync() drives the device haptics engine
+                directly — Android only.
+              </text>
+              <view class="button-row">
+                {ANDROID_HAPTICS.map(({ label, type }) => (
+                  <ActionButton
+                    key={type}
+                    testID={`haptics-android-${type}`}
+                    title={label}
+                    onPress={() => handleAndroidHaptic(type, label)}
+                    color={lineColor}
+                  />
+                ))}
+              </view>
             </view>
           )}
 
-          {lastFired.value && (
-            <view testID="haptics-last-fired" class="auth-card">
-              <text class="auth-value-text">{`Last fired: ${lastFired.value}`}</text>
+          {lastFired.value !== null && (
+            <view testID="haptics-last-fired" class="feature-card">
+              <text class="value-text">{`Last fired: ${lastFired.value}`}</text>
             </view>
           )}
         </scroll-view>

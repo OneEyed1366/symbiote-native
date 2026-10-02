@@ -12,6 +12,7 @@ import {
 import { createPermissions } from '@symbiote-native/cellular/solid';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
+import { Scenario } from '../components/Scenario';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
 function generationLabel(generation: CellularGeneration): string {
@@ -36,12 +37,6 @@ function valueLabel(value: string | boolean | null): string {
   return value || '(none)';
 }
 
-/**
- * @symbiote-native/cellular canary demo: a one-shot info card (generation + carrier/SIM fields,
- * every field except generation returns null on iOS/web upstream - Android-only in practice)
- * plus a permission card driving createPermissions(). Most fields need a physical device with a
- * SIM card; a simulator/emulator reports null/UNKNOWN for nearly everything.
- */
 export function CellularScreen() {
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Cellular];
   const lineColor = LINE_COLOR[lineInfo.line];
@@ -102,13 +97,21 @@ export function CellularScreen() {
           <view class="hero-copy">
             <text class="hero-title">Cellular</text>
             <text class="hero-body">
-              @symbiote-native/cellular — cellular generation and carrier/SIM
-              info. Every field except generation is Android-only upstream
-              (iOS/web return null); a physical device with an active SIM is
-              needed for real values.
+              Find out about the mobile connection: network generation (2G to
+              5G), carrier name, country code and whether VoIP is allowed. Only
+              the generation works on iOS, a physical device with a SIM is
+              needed.
             </text>
           </view>
         </view>
+
+        <Scenario
+          testID="cellular-scenario"
+          title="Choose video quality from the mobile network generation"
+          why="On 3G, lower the stream quality or skip auto-downloads, on 5G allow them. The carrier and country help pick the right payment or support options."
+          steps={['Turn Wi-Fi off so the phone uses mobile data', 'Read the generation and carrier in the card']}
+          expect="The generation shows 3G, 4G or 5G and the carrier name appears on Android. Fields the platform does not provide show as unavailable."
+        />
 
         <view testID="cellular-info-card" class="feature-card">
           <view class="feature-card-header">

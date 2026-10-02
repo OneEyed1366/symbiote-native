@@ -48,6 +48,25 @@
   --line-notifications: #e236c8;
   --line-background-tasks: #8a78e2;
   --line-sqlite: #a6af1d;
+  --line-mail-composer: #c2410c;
+  --line-print: #9d174d;
+  --line-speech: #0e7490;
+  --line-video-thumbnails: #6d28d9;
+  --line-document-picker: #15803d;
+  --line-image-picker: #be185d;
+  --line-image-manipulator: #b91c1c;
+  --line-blob: #0f766e;
+  --line-screen-capture: #7e22ce;
+  --line-contacts: #0891b2;
+  --line-calendar: #ca8a04;
+  --line-age-range: #ea580c;
+  --line-app-integrity: #4f46e5;
+  --line-intent-launcher: #16a34a;
+  --line-navigation-bar: #2563eb;
+  --line-font: #c026d3;
+  --line-asset: #0d9488;
+  --line-app-metrics: #e11d48;
+  --line-auth-session: #65a30d;
 }
 
 .info-text {
@@ -237,6 +256,63 @@
 .line-tag-sqlite {
   background-color: var(--line-sqlite);
 }
+.line-tag-auth-session {
+  background-color: var(--line-auth-session);
+}
+.line-tag-app-metrics {
+  background-color: var(--line-app-metrics);
+}
+.line-tag-asset {
+  background-color: var(--line-asset);
+}
+.line-tag-font {
+  background-color: var(--line-font);
+}
+.line-tag-navigation-bar {
+  background-color: var(--line-navigation-bar);
+}
+.line-tag-intent-launcher {
+  background-color: var(--line-intent-launcher);
+}
+.line-tag-app-integrity {
+  background-color: var(--line-app-integrity);
+}
+.line-tag-age-range {
+  background-color: var(--line-age-range);
+}
+.line-tag-calendar {
+  background-color: var(--line-calendar);
+}
+.line-tag-contacts {
+  background-color: var(--line-contacts);
+}
+.line-tag-screen-capture {
+  background-color: var(--line-screen-capture);
+}
+.line-tag-blob {
+  background-color: var(--line-blob);
+}
+.line-tag-image-manipulator {
+  background-color: var(--line-image-manipulator);
+}
+.line-tag-image-picker {
+  background-color: var(--line-image-picker);
+}
+.line-tag-document-picker {
+  background-color: var(--line-document-picker);
+}
+.line-tag-video-thumbnails {
+  background-color: var(--line-video-thumbnails);
+}
+.line-tag-speech {
+  background-color: var(--line-speech);
+}
+.line-tag-print {
+  background-color: var(--line-print);
+}
+.line-tag-mail-composer {
+  background-color: var(--line-mail-composer);
+}
 .line-tag-text {
   color: var(--ink);
   font-size: 11px;
@@ -368,6 +444,82 @@
   border-left-width: 3px;
   border-left-color: var(--line-sqlite);
 }
+.menu-row-auth-session {
+  border-left-width: 3px;
+  border-left-color: var(--line-auth-session);
+}
+.menu-row-app-metrics {
+  border-left-width: 3px;
+  border-left-color: var(--line-app-metrics);
+}
+.menu-row-asset {
+  border-left-width: 3px;
+  border-left-color: var(--line-asset);
+}
+.menu-row-font {
+  border-left-width: 3px;
+  border-left-color: var(--line-font);
+}
+.menu-row-navigation-bar {
+  border-left-width: 3px;
+  border-left-color: var(--line-navigation-bar);
+}
+.menu-row-intent-launcher {
+  border-left-width: 3px;
+  border-left-color: var(--line-intent-launcher);
+}
+.menu-row-app-integrity {
+  border-left-width: 3px;
+  border-left-color: var(--line-app-integrity);
+}
+.menu-row-age-range {
+  border-left-width: 3px;
+  border-left-color: var(--line-age-range);
+}
+.menu-row-calendar {
+  border-left-width: 3px;
+  border-left-color: var(--line-calendar);
+}
+.menu-row-contacts {
+  border-left-width: 3px;
+  border-left-color: var(--line-contacts);
+}
+.menu-row-screen-capture {
+  border-left-width: 3px;
+  border-left-color: var(--line-screen-capture);
+}
+.menu-row-blob {
+  border-left-width: 3px;
+  border-left-color: var(--line-blob);
+}
+.menu-row-image-manipulator {
+  border-left-width: 3px;
+  border-left-color: var(--line-image-manipulator);
+}
+.menu-row-image-picker {
+  border-left-width: 3px;
+  border-left-color: var(--line-image-picker);
+}
+.menu-row-document-picker {
+  border-left-width: 3px;
+  border-left-color: var(--line-document-picker);
+}
+.menu-row-video-thumbnails {
+  border-left-width: 3px;
+  border-left-color: var(--line-video-thumbnails);
+}
+.menu-row-speech {
+  border-left-width: 3px;
+  border-left-color: var(--line-speech);
+}
+.menu-row-print {
+  border-left-width: 3px;
+  border-left-color: var(--line-print);
+}
+.menu-row-mail-composer {
+  border-left-width: 3px;
+  border-left-color: var(--line-mail-composer);
+}
 
 .menu-badge {
   width: 34px;
@@ -462,6 +614,63 @@
 }
 .menu-badge-sqlite {
   background-color: var(--line-sqlite);
+}
+.menu-badge-auth-session {
+  background-color: var(--line-auth-session);
+}
+.menu-badge-app-metrics {
+  background-color: var(--line-app-metrics);
+}
+.menu-badge-asset {
+  background-color: var(--line-asset);
+}
+.menu-badge-font {
+  background-color: var(--line-font);
+}
+.menu-badge-navigation-bar {
+  background-color: var(--line-navigation-bar);
+}
+.menu-badge-intent-launcher {
+  background-color: var(--line-intent-launcher);
+}
+.menu-badge-app-integrity {
+  background-color: var(--line-app-integrity);
+}
+.menu-badge-age-range {
+  background-color: var(--line-age-range);
+}
+.menu-badge-calendar {
+  background-color: var(--line-calendar);
+}
+.menu-badge-contacts {
+  background-color: var(--line-contacts);
+}
+.menu-badge-screen-capture {
+  background-color: var(--line-screen-capture);
+}
+.menu-badge-blob {
+  background-color: var(--line-blob);
+}
+.menu-badge-image-manipulator {
+  background-color: var(--line-image-manipulator);
+}
+.menu-badge-image-picker {
+  background-color: var(--line-image-picker);
+}
+.menu-badge-document-picker {
+  background-color: var(--line-document-picker);
+}
+.menu-badge-video-thumbnails {
+  background-color: var(--line-video-thumbnails);
+}
+.menu-badge-speech {
+  background-color: var(--line-speech);
+}
+.menu-badge-print {
+  background-color: var(--line-print);
+}
+.menu-badge-mail-composer {
+  background-color: var(--line-mail-composer);
 }
 .menu-badge-text {
   color: var(--ink);
@@ -568,6 +777,63 @@
 }
 .menu-row-hint-sqlite {
   color: var(--line-sqlite);
+}
+.menu-row-hint-auth-session {
+  color: var(--line-auth-session);
+}
+.menu-row-hint-app-metrics {
+  color: var(--line-app-metrics);
+}
+.menu-row-hint-asset {
+  color: var(--line-asset);
+}
+.menu-row-hint-font {
+  color: var(--line-font);
+}
+.menu-row-hint-navigation-bar {
+  color: var(--line-navigation-bar);
+}
+.menu-row-hint-intent-launcher {
+  color: var(--line-intent-launcher);
+}
+.menu-row-hint-app-integrity {
+  color: var(--line-app-integrity);
+}
+.menu-row-hint-age-range {
+  color: var(--line-age-range);
+}
+.menu-row-hint-calendar {
+  color: var(--line-calendar);
+}
+.menu-row-hint-contacts {
+  color: var(--line-contacts);
+}
+.menu-row-hint-screen-capture {
+  color: var(--line-screen-capture);
+}
+.menu-row-hint-blob {
+  color: var(--line-blob);
+}
+.menu-row-hint-image-manipulator {
+  color: var(--line-image-manipulator);
+}
+.menu-row-hint-image-picker {
+  color: var(--line-image-picker);
+}
+.menu-row-hint-document-picker {
+  color: var(--line-document-picker);
+}
+.menu-row-hint-video-thumbnails {
+  color: var(--line-video-thumbnails);
+}
+.menu-row-hint-speech {
+  color: var(--line-speech);
+}
+.menu-row-hint-print {
+  color: var(--line-print);
+}
+.menu-row-hint-mail-composer {
+  color: var(--line-mail-composer);
 }
 
 /* SensorsScreen — one card per @symbiote-native/sensors hook, each rendering its own
@@ -799,4 +1065,60 @@
   color: var(--chalk-bright);
   font-size: 16px;
   background-color: var(--paper);
+}
+
+/* Scenario — one user task: title, why, steps to do on the device, expected outcome */
+.scenario-card {
+  gap: 10px;
+  padding: 16px;
+  border-radius: 16px;
+  background-color: var(--paper);
+}
+.scenario-title {
+  color: var(--chalk-bright);
+  font-size: 17px;
+  font-weight: bold;
+}
+.scenario-why {
+  color: var(--chalk);
+  font-size: 14px;
+}
+.scenario-steps {
+  gap: 4px;
+}
+.scenario-step {
+  color: var(--chalk);
+  font-size: 13px;
+}
+.scenario-expect {
+  gap: 2px;
+  padding: 10px;
+  border-radius: 10px;
+  background-color: var(--ink);
+}
+.scenario-expect-label {
+  color: var(--positive);
+  font-size: 12px;
+  font-weight: bold;
+}
+.scenario-expect-text {
+  color: var(--chalk-bright);
+  font-size: 13px;
+}
+.explorer {
+  gap: 12px;
+}
+.console-bare {
+  gap: 10px;
+}
+.thumb-row {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.thumb {
+  width: 88px;
+  height: 88px;
+  border-radius: 8px;
+  background-color: var(--ink);
 }

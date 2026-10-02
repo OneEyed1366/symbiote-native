@@ -18,6 +18,15 @@
 	<string>$(PRODUCT_NAME)</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>canaryexpo</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleShortVersionString</key>
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleSignature</key>
@@ -36,7 +45,7 @@
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string></string>
 	<key>NSMotionUsageDescription</key>
-	<string>Used to read motion sensor data on the Sensors demo screen.</string>
+	<string>CanaryExpo uses motion data to demo the sensors package.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>CanaryExpo uses Face ID to demo @symbiote-native/local-auth.</string>
 	<key>NSUserTrackingUsageDescription</key>
@@ -85,5 +94,42 @@
 	</array>
 	<key>UIUserInterfaceStyle</key>
 	<string>Light</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>This app uses your calendars to read and manage events.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>This app uses your calendars to read and manage events.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>This app uses the camera to let you take a photo or video.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>This app uses your contacts to read and manage your address book.</string>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>This app uses your reminders to read and manage tasks.</string>
+	<key>NSRemindersUsageDescription</key>
+	<string>This app uses your reminders to read and manage tasks.</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>airmail</string>
+		<string>message</string>
+		<string>bluemail</string>
+		<string>canary</string>
+		<string>edisonmail</string>
+		<string>szn-email</string>
+		<string>fastmail</string>
+		<string>x-gmxmail-netid-v1</string>
+		<string>googlegmail</string>
+		<string>mailrumail</string>
+		<string>ms-outlook</string>
+		<string>protonmail</string>
+		<string>ctxmail</string>
+		<string>readdle-spark</string>
+		<string>superhuman</string>
+		<string>telekommail</string>
+		<string>tutanota</string>
+		<string>x-webdemail-netid-v1</string>
+		<string>ymail</string>
+		<string>yandexmail</string>
+		<string>appcenter-f45b4c0b-75c9-2d01-7ab6-41f6a6015be2</string>
+		<string>mymail-mailto</string>
+	</array>
 </dict>
 </plist>

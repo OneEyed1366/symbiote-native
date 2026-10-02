@@ -217,6 +217,20 @@ native module — passing any other `ArrayBufferView` (a `DataView`, `Uint8Clamp
 `Float32Array`, …) throws a `TypeError`, the same way upstream's own `getRandomValues` rejects an
 unsupported view.
 
+## Common questions
+
+- **`crypto.getRandomValues is not a function` under Hermes.** Hermes ships no Web Crypto, so
+  libraries such as `uuid` and `nanoid` fail. Install this polyfill before anything imports them.
+- **Where do I import it?** In the entry file before React or your app; a late import loses the race.
+- **Is `crypto.subtle` or `randomUUID` there?** No. Only `getRandomValues` is polyfilled; use
+  `@symbiote-native/crypto` for `randomUUID` and digests.
+- **`uuid` v4 returns a promise.** See the `expo-crypto` report; restart and rebuild after a native update.
+
+Sources: [Expo docs: Crypto](https://docs.expo.dev/versions/latest/sdk/crypto/),
+[expo/expo#7209](https://github.com/expo/expo/issues/7209),
+[expo/expo#24021](https://github.com/expo/expo/issues/24021),
+[Fix crypto.getRandomValues with Hermes](https://medium.com/@manthankaslemk/how-to-fix-crypto-getrandomvalues-error-in-react-native-with-hermes-engine-8637cdf58e65).
+
 ## How the wrapper works
 
 `@symbiote-native/standard-web-crypto` ships **zero native code of its own** — the only Expo

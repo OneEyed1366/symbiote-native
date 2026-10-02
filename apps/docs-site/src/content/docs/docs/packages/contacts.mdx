@@ -1,0 +1,335 @@
+---
+title: Contacts
+description: Read, create and edit the device address book, with the iOS 18 ContactAccessButton, on every SymbioteNative adapter.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+Look up a person, add a contact, edit one in the system form, or let the user grant access to just
+the contacts you need. `@symbiote-native/contacts` wraps
+[`expo-contacts`](https://github.com/expo/expo/tree/main/packages/expo-contacts) so every
+SymbioteNative adapter can reach the device address book, not just React. On iOS, contacts also
+have a grouping system (containers and groups) you can read and edit.
+
+Both of upstream's API surfaces are ported, matching its own layout: the modern class API
+(`Contact`, `Group`, `Container`; the default entry) and the legacy function-based API (the
+`/legacy` subpath). The classes and functions are shared by every adapter; the one view,
+`ContactAccessButton`, is exported by every adapter in its own idiom.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | live    |
+| Android     | live    |
+
+| Framework adapter | Support |
+| ----------------- | ------- |
+| React             | live    |
+| Vue               | live    |
+| Angular           | live    |
+| Svelte            | live    |
+| Solid             | live    |
+
+## Installation
+
+```sh
+npm install @symbiote-native/contacts
+```
+
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --contacts` (or
+`add --contacts` in an existing app) installs and wires this for you - see
+[`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
+
+`expo-contacts` and `expo-modules-core` come along as regular dependencies, pinned to exact
+versions. Never install either yourself, and never add the `expo` meta-package to your project (it
+bundles its own Metro/Babel pipeline, which conflicts with this project's own).
+
+<Aside type="danger" title="Native setup is required before first use">
+  `expo-contacts`'s native code is discovered by `expo-modules-autolinking`, a different mechanism
+  from the `react-native.config.cjs`/podspec autolinking every other SymbioteNative wrapper uses.
+  Follow [How to: wire up an Expo native module](/docs/howtos/expo-native-module-setup/) once per
+  app first; it covers this package and every other `expo-modules-core` package with zero further
+  native changes.
+</Aside>
+
+The package adds these to your native projects on install (nothing overwrites a value you set):
+
+| Platform | Added                                      | Why                                                       |
+| -------- | ------------------------------------------ | --------------------------------------------------------- |
+| iOS      | `NSContactsUsageDescription`               | The permission prompt text. Reword it to fit your app     |
+| Android  | `READ_CONTACTS`, `WRITE_CONTACTS`          | Reading and editing the address book                      |
+
+## Usage
+
+Ask for permission first, then read or write. Everything below is identical on every adapter.
+
+```ts
+import { Contact, requestPermissionsAsync } from '@symbiote-native/contacts';
+
+const { granted } = await requestPermissionsAsync();
+if (granted) {
+  const contact = await Contact.create({ givenName: 'Jane', familyName: 'Doe' });
+  await contact.addEmail({ label: 'work', address: 'jane@example.com' });
+}
+```
+
+Search and page through contacts:
+
+```ts
+const matches = await Contact.getAll({ name: 'Jane', limit: 20 });
+const names = await Promise.all(matches.map(contact => contact.getFullName()));
+```
+
+Let the user pick or edit through the system UI instead of building your own:
+
+```ts
+const picked = await Contact.presentPicker(); // a Contact, or null if cancelled
+```
+
+Subscribe to address-book changes:
+
+```ts
+import { addContactsChangeListener } from '@symbiote-native/contacts';
+
+const subscription = addContactsChangeListener(() => refetch());
+// later:
+subscription.remove();
+```
+
+### The legacy function API
+
+The pre-class API is kept at `/legacy` for code that already uses it:
+
+```ts
+import { getContactsAsync, requestPermissionsAsync } from '@symbiote-native/contacts/legacy';
+
+await requestPermissionsAsync();
+const { data } = await getContactsAsync({ name: 'Jane' });
+```
+
+### `ContactAccessButton` (iOS 18+)
+
+On iOS 18, users can grant access to individual contacts instead of the whole address book. The
+`ContactAccessButton` is a native view that searches contacts you cannot see yet and lets the user
+share one with your app. It renders nothing on any other platform or iOS version, so check
+`ContactAccessButton.isAvailable()` before relying on it.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { ContactAccessButton } from '@symbiote-native/contacts/react';
+
+    export default function Suggest({ query }: { query: string }) {
+      return (
+        <ContactAccessButton
+          query={query}
+          caption="email"
+          ignoredEmails={['me@example.com']}
+          style={{ height: 52 }}
+        />
+      );
+    }
+    ```
+
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { ContactAccessButton } from '@symbiote-native/contacts/vue';
+
+    defineProps<{ query: string }>();
+    </script>
+
+    <template>
+      <ContactAccessButton
+        :query="query"
+        caption="email"
+        :ignoredEmails="['me@example.com']"
+        :style="{ height: 52 }"
+      />
+    </template>
+    ```
+
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component, input } from '@angular/core';
+    import { ContactAccessButton } from '@symbiote-native/contacts/angular';
+
+    @Component({
+      standalone: true,
+      imports: [ContactAccessButton],
+      template: `
+        <ContactAccessButton
+          [query]="query()"
+          caption="email"
+          [ignoredEmails]="ignored"
+          [style]="{ height: 52 }"
+        />
+      `,
+    })
+    export class Suggest {
+      readonly query = input.required<string>();
+      readonly ignored = ['me@example.com'];
+    }
+    ```
+
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { ContactAccessButton } from '@symbiote-native/contacts/svelte';
+
+      let { query }: { query: string } = $props();
+    </script>
+
+    <ContactAccessButton
+      {query}
+      caption="email"
+      ignoredEmails={['me@example.com']}
+      style={{ height: 52 }}
+    />
+    ```
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { ContactAccessButton } from '@symbiote-native/contacts/solid';
+
+    export function Suggest(props: { query: string }) {
+      return (
+        <ContactAccessButton
+          query={props.query}
+          caption="email"
+          ignoredEmails={['me@example.com']}
+          style={{ height: 52 }}
+        />
+      );
+    }
+    ```
+
+  </TabItem>
+</Tabs>
+
+## API
+
+### Permissions and events
+
+| Signature                                                     | Description                                                                              |
+| ------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `getPermissionsAsync(): Promise<ContactsPermissionResponse>`  | Reads the contacts permission without prompting                                          |
+| `requestPermissionsAsync(): Promise<ContactsPermissionResponse>` | Prompts for the contacts permission                                                   |
+| `addContactsChangeListener(listener): EventSubscription`      | Calls `listener` when the address book changes. Throws `UnavailabilityError` if unsupported |
+| `removeAllContactsChangeListeners(): void`                    | Drops every change listener                                                              |
+
+`ContactsPermissionResponse` adds `accessPrivileges` (`'all'`, `'limited'` or `'none'`) to the
+standard permission response. `'limited'` is iOS limited access: your app sees only the contacts the
+user shared.
+
+### `Contact` statics
+
+| Signature                                        | Description                                                              |
+| ------------------------------------------------ | ------------------------------------------------------------------------ |
+| `Contact.create(record): Promise<Contact>`       | Creates a contact from a `CreateContactRecord`                           |
+| `Contact.getAll(options?): Promise<Contact[]>`   | Lists contacts, filtered by `name`, paged by `limit` and `offset`        |
+| `Contact.getAllDetails(fields, options?)`        | Lists contacts with only the requested `ContactField` values loaded      |
+| `Contact.getCount(): Promise<number>`            | Number of contacts                                                       |
+| `Contact.hasAny(): Promise<boolean>`             | Whether there is at least one contact                                    |
+| `Contact.presentPicker(): Promise<Contact \| null>` | Opens the system contact picker                                       |
+| `Contact.presentCreateForm(options?)`            | Opens the system form to create a contact                                |
+| `Contact.presentAccessPicker()`                  | iOS 18+ only. Lets the user share more contacts with the app             |
+
+### `Contact` instance
+
+| Group of members                                                                  | Description                                                          |
+| --------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `getGivenName` / `setGivenName`, family, middle, prefix, suffix, phonetic names   | Read and write name parts. Setters resolve `true` on success         |
+| `getCompany`, `getDepartment`, `getJobTitle`, `getNote`, `getImage`, `getThumbnail` | Read and write the organization, note and image fields             |
+| `addEmail`, `getEmails`, `updateEmail`, `deleteEmail`                             | Manage email addresses. `add*` resolves the new entry's id           |
+| `addPhone`, `getPhones`, `updatePhone`, `deletePhone`                             | Manage phone numbers                                                 |
+| `addAddress`, `addDate`, `addRelation`, `addUrlAddress` and their get/update/delete | Manage postal addresses, dates, relations and URLs                 |
+| `getFullName()`, `editWithForm(options?)`                                         | Compose the display name, or edit through the system form            |
+| `patch(partial)`, `update(record)`, `delete()`                                    | Change several fields at once, replace the record, or remove it      |
+
+### `Group` and `Container` (iOS)
+
+| Signature                                                | Description                                                       |
+| -------------------------------------------------------- | ----------------------------------------------------------------- |
+| `Group.create(name, containerId?)`, `Group.getAll(containerId?)` | Create a group, or list groups                            |
+| `group.getName`, `setName`, `addContact`, `removeContact`, `getContacts`, `delete` | Manage a group and its members                  |
+| `Container.getAll()`, `Container.getDefault()`           | List containers (the accounts holding contacts), or get the default |
+| `container.getName`, `getType`, `getGroups`, `getContacts` | Inspect a container                                             |
+
+### Platform availability
+
+| Member                                                                                      | iOS      | Android                  |
+| ------------------------------------------------------------------------------------------- | -------- | ------------------------ |
+| `Contact` create, read, update, delete, static finders, field getters and setters           | yes      | yes                      |
+| `Contact.presentAccessPicker`                                                               | yes (18+) | no                      |
+| Maiden name, nickname, birthday, non-Gregorian birthday                                     | yes      | no                       |
+| Social profiles and IM addresses                                                            | yes      | no                       |
+| `getIsFavourite` / `setIsFavourite`, extra names                                            | no       | yes                      |
+| `Group` and `Container`                                                                     | yes      | no (throws `Not implemented`) |
+
+An unavailable member throws `UnavailabilityError` (function-shaped) or is simply absent (an
+optional class method) on the other platform. Check before calling if the call site must run on
+both.
+
+### `ContactAccessButton` props
+
+| Prop                  | Type                          | Description                                                          |
+| --------------------- | ----------------------------- | -------------------------------------------------------------------- |
+| `query`               | `string`                      | The text the button searches contacts for                            |
+| `caption`             | `'default' \| 'email' \| 'phone'` | What the button shows under the contact name                     |
+| `ignoredEmails`       | `string[]`                    | Emails to leave out of the suggestions                               |
+| `ignoredPhoneNumbers` | `string[]`                    | Phone numbers to leave out of the suggestions                        |
+| `tintColor`           | color                         | Accent color of the button                                           |
+| `backgroundColor`     | color                         | Background color of the button                                       |
+| `textColor`           | color                         | Text color of the button                                             |
+| `style`, `testID`, `nativeID`, `onLayout` | as on a view      | The usual view props, plus the accessibility, aria and responder props |
+
+## Notes
+
+- **Request permission before everything else.** Reads and writes fail without it. On iOS 18 a
+  `'limited'` `accessPrivileges` means a partial view of the address book.
+- **`Group` and `Container` are iOS only.** On Android they fall back to a stub that throws
+  `Not implemented`.
+- **`ContactAccessButton` needs iOS 18.** Elsewhere it renders nothing. It registers its native
+  view lazily at first render; verifying it needs a real iOS 18 device.
+- **The class API wraps native shared objects.** `Contact`, `Group` and `Container` extend the
+  native classes directly, so `instanceof` works and every method is the native one.
+- **Nothing from the public surface is left out.** Both the modern and the legacy surface are
+  ported.
+- **Contacts can only be verified on a device or simulator.** The headless tests fake the native
+  module.
+
+## Common questions
+
+**`getAll` returns nothing, or fewer contacts than the phone has.** Check the permission first. On
+iOS 18 an `accessPrivileges` of `'limited'` means the user shared only some contacts. Use
+`ContactAccessButton` or `Contact.presentAccessPicker()` to let them share more.
+
+**Loading all contacts is slow.** Do not load everything at once. Page with `limit` and `offset`,
+and use `Contact.getAllDetails(fields)` to load only the fields you display, such as name and phone.
+
+**A contact has no phone number or email in the list.** Those are separate calls on the contact:
+`getPhones()` and `getEmails()`. Fetch them when you need them rather than for every row.
+
+**Writing contacts fails on Android.** Check that `WRITE_CONTACTS` is granted and that the account
+you write to accepts edits. Request the permission with `requestPermissionsAsync()` before writing.
+
+**Should I build my own contact picker?** Usually not. `Contact.presentPicker()` and the iOS 18
+`ContactAccessButton` give users a system picker and need less permission.
+
+Sources: [Expo docs: Contacts](https://docs.expo.dev/versions/latest/sdk/contacts/),
+[expo/expo#386 getContactsAsync returns an empty array on Android 7](https://github.com/expo/expo/issues/386),
+[expo/expo#200 Android Contacts API does not return phone numbers](https://github.com/expo/expo/issues/200),
+[expo/expo#29224 getContactsAsync crash on iOS](https://github.com/expo/expo/issues/29224).
+
+## How the wrapper works
+
+`expo-contacts`'s JS is hand-ported into this package: `core/` for the modern class API, `legacy/`
+for the function API. `Contact`, `Group` and `Container` are named, `instanceof`-checkable
+subclasses of the native shared objects with no added logic. `./react`, `./vue`, `./svelte` and
+`./solid` alias `core/`; `ContactAccessButton` is the one adapter-specific export. The native code
+is never vendored: `expo-modules-autolinking` resolves it from `node_modules` (see
+[the native setup guide](/docs/howtos/expo-native-module-setup/)).

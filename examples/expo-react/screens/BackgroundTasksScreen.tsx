@@ -1,438 +1,167 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
+import * as BackgroundFetch from '@symbiote-native/background-fetch';
 import {
+  BackgroundFetchResult,
   BackgroundFetchStatus,
-  getStatusAsync as getFetchStatusAsync,
-  registerTaskAsync as registerFetchTaskAsync,
-  setMinimumIntervalAsync,
-  unregisterTaskAsync as unregisterFetchTaskAsync,
 } from '@symbiote-native/background-fetch';
+import * as BackgroundTask from '@symbiote-native/background-task';
 import {
+  BackgroundTaskResult,
   BackgroundTaskStatus,
-  getStatusAsync as getBackgroundTaskStatusAsync,
-  registerTaskAsync as registerBackgroundTaskAsync,
-  triggerTaskWorkerForTestingAsync,
-  unregisterTaskAsync as unregisterBackgroundTaskAsync,
 } from '@symbiote-native/background-task';
+import { dlog } from '@symbiote-native/engine';
+import { defineTask } from '@symbiote-native/task-manager';
+import { CallConsole } from '../components/CallConsole';
+import { Explorer, Scenario } from '../components/Scenario';
 import {
-  defineTask,
-  getRegisteredTasksAsync,
-  isTaskRegisteredAsync,
-  unregisterTaskAsync as unregisterManagedTaskAsync,
-} from '@symbiote-native/task-manager';
-import { ActionButton } from '../components/ActionButton';
+  Card,
+  Field,
+  ResultRow,
+  ScreenShell,
+  ToggleRow,
+  lineColorOf,
+} from '../components/ScreenShell';
 import { ROUTE_NAME } from '../routes';
-import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
+import { ExpirationCard, TaskManagerCalls } from './background-tasks-extras';
 
-const DEMO_TASK_NAME = 'symbiote-canary-background-sync';
-const FETCH_MINIMUM_INTERVAL_SECONDS = 900;
-const TASK_MINIMUM_INTERVAL_MINUTES = 15;
+const ROUTE = ROUTE_NAME.BackgroundTasks;
+const color = lineColorOf(ROUTE);
+const FETCH_TASK_NAME = 'symbiote-canary-background-fetch';
+const WORKER_TASK_NAME = 'symbiote-canary-background-task';
 
-// defineTask() must run at module top level — the app can be launched headlessly to run this
-// task, so it can't depend on BackgroundTasksScreen ever having mounted.
-defineTask(DEMO_TASK_NAME, async ({ data, error }) => {
+// Both run at module top level, the app can be launched headlessly to run them
+defineTask(FETCH_TASK_NAME, async ({ data, error }) => {
   if (error) {
-    console.error('symbiote-canary-background-sync failed:', error);
-    return;
+    console.error(`${FETCH_TASK_NAME} failed:`, error);
+    return BackgroundFetchResult.Failed;
   }
-  console.log('symbiote-canary-background-sync received:', data);
+  dlog(() => `${FETCH_TASK_NAME} received: ${JSON.stringify(data)}`);
+  return BackgroundFetchResult.NewData;
 });
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+defineTask(WORKER_TASK_NAME, async ({ data, error }) => {
+  if (error) {
+    console.error(`${WORKER_TASK_NAME} failed:`, error);
+    return BackgroundTaskResult.Failed;
+  }
+  dlog(() => `${WORKER_TASK_NAME} received: ${JSON.stringify(data)}`);
+  return BackgroundTaskResult.Success;
+});
+
+const FETCH_STATUS_LABEL: Record<BackgroundFetchStatus, string> = {
+  [BackgroundFetchStatus.Denied]: 'Denied',
+  [BackgroundFetchStatus.Restricted]: 'Restricted',
+  [BackgroundFetchStatus.Available]: 'Available',
+};
+
+const TASK_STATUS_LABEL: Record<BackgroundTaskStatus, string> = {
+  [BackgroundTaskStatus.Restricted]: 'Restricted (e.g. iOS Simulator)',
+  [BackgroundTaskStatus.Available]: 'Available',
+};
+
+function intervalOf(text: string): number | undefined {
+  const value = Number(text);
+  return text.trim() === '' || Number.isNaN(value) ? undefined : value;
 }
 
-type IAsyncResult<TValue> =
-  { status: 'success'; value: TValue } | { status: 'error'; message: string };
-
-function ResultBlock({
-  testID,
-  result,
-}: {
-  testID: string;
-  result: IAsyncResult<string> | null;
-}) {
-  if (!result) {
-    return null;
-  }
+function FetchCard() {
+  const [interval, setInterval] = useState('900');
+  const [stopOnTerminate, setStopOnTerminate] = useState(false);
+  const [startOnBoot, setStartOnBoot] = useState(true);
   return (
-    <view
-      testID={testID}
-      className={`auth-result auth-result-${result.status === 'success' ? 'success' : 'error'}`}
+    <>
+      <Card testID="background-fetch-card" title="background-fetch options (deprecated upstream)">
+        <Field testID="background-tasks-fetch-interval-input" label="minimumInterval (seconds)" value={interval} onChange={setInterval} />
+        <ToggleRow testID="background-tasks-stop-switch" label="stopOnTerminate (Android)" value={stopOnTerminate} onChange={setStopOnTerminate} color={color} />
+        <ToggleRow testID="background-tasks-boot-switch" label="startOnBoot (Android)" value={startOnBoot} onChange={setStartOnBoot} color={color} />
+      </Card>
+      <CallConsole
+        prefix="background-fetch"
+        title="background-fetch calls"
+        color={color}
+        calls={[
+          {
+            label: 'getStatusAsync',
+            run: async () => {
+              const status = await BackgroundFetch.getStatusAsync();
+              return status === null ? 'unavailable' : FETCH_STATUS_LABEL[status];
+            },
+          },
+          {
+            label: 'registerTaskAsync',
+            run: () =>
+              BackgroundFetch.registerTaskAsync(FETCH_TASK_NAME, {
+                minimumInterval: intervalOf(interval),
+                stopOnTerminate,
+                startOnBoot,
+              }),
+          },
+          { label: 'setMinimumIntervalAsync', run: () => BackgroundFetch.setMinimumIntervalAsync(intervalOf(interval) ?? 900) },
+          { label: 'unregisterTaskAsync', run: () => BackgroundFetch.unregisterTaskAsync(FETCH_TASK_NAME) },
+        ]}
+      />
+    </>
+  );
+}
+
+function WorkerCard() {
+  const [interval, setInterval] = useState('15');
+  const [lastTrigger, setLastTrigger] = useState('never');
+  return (
+    <Scenario
+      testID="background-task-card"
+      title="Sync data while the app is closed"
+      why="Refresh a feed, upload queued photos or clear a cache on the system's schedule. iOS BGTaskScheduler and Android WorkManager decide when it runs, so it is battery-friendly but not exact."
+      steps={['Press registerTaskAsync', 'In a debug build press triggerTaskWorkerForTestingAsync', 'Check the console log for the worker run']}
+      expect="Status reports the task system is available, the worker runs immediately on the test trigger and the last trigger time updates. In real use the OS runs it later on its own."
     >
-      <text className="auth-result-text">
-        {result.status === 'success'
-          ? result.value
-          : `Failed: ${result.message}`}
-      </text>
-    </view>
+      <Field testID="background-tasks-worker-interval-input" label="minimumInterval (minutes)" value={interval} onChange={setInterval} />
+      <ResultRow testID="background-tasks-trigger-result" label="last manual trigger" value={lastTrigger} />
+      <CallConsole
+        isBare
+        prefix="background-task"
+        title="background-task calls"
+        color={color}
+        hint="triggerTaskWorkerForTestingAsync runs the registered worker now, debug builds only."
+        calls={[
+          {
+            label: 'getStatusAsync',
+            run: async () => TASK_STATUS_LABEL[await BackgroundTask.getStatusAsync()],
+          },
+          {
+            label: 'registerTaskAsync',
+            run: () => BackgroundTask.registerTaskAsync(WORKER_TASK_NAME, { minimumInterval: intervalOf(interval) }),
+          },
+          { label: 'unregisterTaskAsync', run: () => BackgroundTask.unregisterTaskAsync(WORKER_TASK_NAME) },
+          {
+            label: 'triggerTaskWorkerForTestingAsync',
+            run: async () => {
+              const result = await BackgroundTask.triggerTaskWorkerForTestingAsync();
+              setLastTrigger(new Date().toISOString());
+              return result;
+            },
+          },
+        ]}
+      />
+    </Scenario>
   );
 }
 
-function fetchStatusLabel(status: BackgroundFetchStatus | null): string {
-  switch (status) {
-    case BackgroundFetchStatus.Available:
-      return 'Available';
-    case BackgroundFetchStatus.Denied:
-      return 'Denied';
-    case BackgroundFetchStatus.Restricted:
-      return 'Restricted';
-    default:
-      return 'Unknown';
-  }
-}
-
-function taskStatusLabel(status: BackgroundTaskStatus | null): string {
-  switch (status) {
-    case BackgroundTaskStatus.Available:
-      return 'Available';
-    case BackgroundTaskStatus.Restricted:
-      return 'Restricted (e.g. iOS Simulator)';
-    default:
-      return 'Unknown';
-  }
-}
-
-/**
- * @symbiote-native/task-manager + background-fetch + background-task canary demo, in three
- * sections against one shared demo task: task-manager's own registration introspection, the
- * deprecated-but-still-shipped periodic background-fetch API, and its modern BGTaskScheduler/
- * WorkManager-backed replacement. defineTask() runs at module scope, per task-manager's own
- * README — the app can be launched headlessly to run a background task with no views mounted.
- */
 export function BackgroundTasksScreen() {
-  const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.BackgroundTasks];
-  const lineColor = LINE_COLOR[lineInfo.line];
-
-  // --- Task Manager ---
-  const [managerResult, setManagerResult] =
-    useState<IAsyncResult<string> | null>(null);
-
-  const handleCheckRegistered = useCallback(() => {
-    isTaskRegisteredAsync(DEMO_TASK_NAME)
-      .then(registered =>
-        setManagerResult({
-          status: 'success',
-          value: registered ? 'Registered' : 'Not registered',
-        }),
-      )
-      .catch(error =>
-        setManagerResult({ status: 'error', message: errorMessage(error) }),
-      );
-  }, []);
-
-  const handleListRegistered = useCallback(() => {
-    getRegisteredTasksAsync()
-      .then(tasks =>
-        setManagerResult({
-          status: 'success',
-          value: `${tasks.length} task(s): ${tasks.map(task => task.taskName).join(', ') || '—'}`,
-        }),
-      )
-      .catch(error =>
-        setManagerResult({ status: 'error', message: errorMessage(error) }),
-      );
-  }, []);
-
-  const handleUnregisterManaged = useCallback(() => {
-    unregisterManagedTaskAsync(DEMO_TASK_NAME)
-      .then(() =>
-        setManagerResult({ status: 'success', value: 'Unregistered' }),
-      )
-      .catch(error =>
-        setManagerResult({ status: 'error', message: errorMessage(error) }),
-      );
-  }, []);
-
-  // --- Background Fetch ---
-  const [fetchStatus, setFetchStatus] = useState<BackgroundFetchStatus | null>(
-    null,
-  );
-  const [fetchResult, setFetchResult] = useState<IAsyncResult<string> | null>(
-    null,
-  );
-
-  const handleRefreshFetchStatus = useCallback(() => {
-    getFetchStatusAsync()
-      .then(setFetchStatus)
-      .catch(() => setFetchStatus(null));
-  }, []);
-
-  const handleRegisterFetch = useCallback(() => {
-    registerFetchTaskAsync(DEMO_TASK_NAME, {
-      minimumInterval: FETCH_MINIMUM_INTERVAL_SECONDS,
-    })
-      .then(() =>
-        setFetchResult({
-          status: 'success',
-          value: 'Registered for background fetch',
-        }),
-      )
-      .catch(error =>
-        setFetchResult({ status: 'error', message: errorMessage(error) }),
-      )
-      .finally(() => {
-        handleRefreshFetchStatus();
-        handleCheckRegistered();
-      });
-  }, [handleRefreshFetchStatus, handleCheckRegistered]);
-
-  const handleUnregisterFetch = useCallback(() => {
-    unregisterFetchTaskAsync(DEMO_TASK_NAME)
-      .then(() =>
-        setFetchResult({
-          status: 'success',
-          value: 'Unregistered from background fetch',
-        }),
-      )
-      .catch(error =>
-        setFetchResult({ status: 'error', message: errorMessage(error) }),
-      )
-      .finally(() => {
-        handleRefreshFetchStatus();
-        handleCheckRegistered();
-      });
-  }, [handleRefreshFetchStatus, handleCheckRegistered]);
-
-  const handleSetMinimumFetchInterval = useCallback(() => {
-    setMinimumIntervalAsync(FETCH_MINIMUM_INTERVAL_SECONDS)
-      .then(() =>
-        setFetchResult({
-          status: 'success',
-          value: `Minimum interval set to ${FETCH_MINIMUM_INTERVAL_SECONDS}s`,
-        }),
-      )
-      .catch(error =>
-        setFetchResult({ status: 'error', message: errorMessage(error) }),
-      );
-  }, []);
-
-  // --- Background Task ---
-  const [backgroundTaskStatus, setBackgroundTaskStatus] =
-    useState<BackgroundTaskStatus | null>(null);
-  const [backgroundTaskResult, setBackgroundTaskResult] =
-    useState<IAsyncResult<string> | null>(null);
-
-  const handleRefreshBackgroundTaskStatus = useCallback(() => {
-    getBackgroundTaskStatusAsync()
-      .then(setBackgroundTaskStatus)
-      .catch(() => setBackgroundTaskStatus(null));
-  }, []);
-
-  const handleRegisterBackgroundTask = useCallback(() => {
-    registerBackgroundTaskAsync(DEMO_TASK_NAME, {
-      minimumInterval: TASK_MINIMUM_INTERVAL_MINUTES,
-    })
-      .then(() =>
-        setBackgroundTaskResult({
-          status: 'success',
-          value: 'Registered for background task',
-        }),
-      )
-      .catch(error =>
-        setBackgroundTaskResult({
-          status: 'error',
-          message: errorMessage(error),
-        }),
-      )
-      .finally(() => {
-        handleRefreshBackgroundTaskStatus();
-        handleCheckRegistered();
-      });
-  }, [handleRefreshBackgroundTaskStatus, handleCheckRegistered]);
-
-  const handleUnregisterBackgroundTask = useCallback(() => {
-    unregisterBackgroundTaskAsync(DEMO_TASK_NAME)
-      .then(() =>
-        setBackgroundTaskResult({
-          status: 'success',
-          value: 'Unregistered from background task',
-        }),
-      )
-      .catch(error =>
-        setBackgroundTaskResult({
-          status: 'error',
-          message: errorMessage(error),
-        }),
-      )
-      .finally(() => {
-        handleRefreshBackgroundTaskStatus();
-        handleCheckRegistered();
-      });
-  }, [handleRefreshBackgroundTaskStatus, handleCheckRegistered]);
-
-  const handleTriggerForTesting = useCallback(() => {
-    triggerTaskWorkerForTestingAsync()
-      .then(triggered =>
-        setBackgroundTaskResult({
-          status: 'success',
-          value: triggered
-            ? 'Triggered'
-            : 'Not triggered (production build only rejects this)',
-        }),
-      )
-      .catch(error =>
-        setBackgroundTaskResult({
-          status: 'error',
-          message: errorMessage(error),
-        }),
-      );
-  }, []);
-
-  // Mount-time probes — every other screen in this canary shows real status on first render
-  // instead of a placeholder the user has to tap a button to resolve.
-  useEffect(() => {
-    handleCheckRegistered();
-    handleRefreshFetchStatus();
-    handleRefreshBackgroundTaskStatus();
-  }, [handleCheckRegistered, handleRefreshFetchStatus, handleRefreshBackgroundTaskStatus]);
-
+  const [taskName, setTaskName] = useState(FETCH_TASK_NAME);
   return (
-    <safe-area-view className="screen">
-      <scroll-view
-        testID="background-tasks-scroll"
-        className="screen"
-        contentContainerStyle="scroll-content"
-      >
-        <view className={`line-tag line-tag-${lineInfo.line}`}>
-          <text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
-        </view>
-        <view testID="background-tasks-hero" className="hero-card">
-          <view className="hero-badge" style={{ backgroundColor: lineColor }}>
-            <text className="hero-badge-text">{lineInfo.code}</text>
-          </view>
-          <view className="hero-copy">
-            <text className="hero-title">Background Tasks</text>
-            <text className="hero-body">
-              @symbiote-native/task-manager, @symbiote-native/background-fetch,
-              and @symbiote-native/background-task, sharing one demo task
-              defined at module scope. background-fetch is upstream-deprecated
-              in favor of background-task; both are shown for parity.
-            </text>
-          </view>
-        </view>
-
-        <view className={`line-tag line-tag-${lineInfo.line}`}>
-          <text className="line-tag-text">Task Manager</text>
-        </view>
-
-        <view testID="background-task-manager-card" className="auth-card">
-          <view className="auth-card-header">
-            <text className="auth-card-title">Registration</text>
-          </view>
-          <text className="info-text">{DEMO_TASK_NAME}</text>
-          <view className="button-row">
-            <ActionButton
-              testID="background-task-manager-check-registered"
-              title="Is registered?"
-              onPress={handleCheckRegistered}
-              color={lineColor}
-            />
-            <ActionButton
-              testID="background-task-manager-list-registered"
-              title="List registered"
-              onPress={handleListRegistered}
-              color={lineColor}
-            />
-            <ActionButton
-              testID="background-task-manager-unregister"
-              title="Unregister"
-              onPress={handleUnregisterManaged}
-              color={lineColor}
-            />
-          </view>
-          <ResultBlock
-            testID="background-task-manager-result"
-            result={managerResult}
-          />
-        </view>
-
-        <view className={`line-tag line-tag-${lineInfo.line}`}>
-          <text className="line-tag-text">Background Fetch</text>
-        </view>
-
-        <view testID="background-fetch-card" className="auth-card">
-          <view className="auth-card-header">
-            <text className="auth-card-title">
-              Periodic fetch (deprecated upstream)
-            </text>
-          </view>
-          <text testID="background-fetch-status" className="auth-value-text">
-            {fetchStatusLabel(fetchStatus)}
-          </text>
-          <view className="button-row">
-            <ActionButton
-              testID="background-fetch-refresh-status"
-              title="Refresh status"
-              onPress={handleRefreshFetchStatus}
-              color={lineColor}
-            />
-            <ActionButton
-              testID="background-fetch-register"
-              title="Register"
-              onPress={handleRegisterFetch}
-              color={lineColor}
-            />
-            <ActionButton
-              testID="background-fetch-unregister"
-              title="Unregister"
-              onPress={handleUnregisterFetch}
-              color={lineColor}
-            />
-            <ActionButton
-              testID="background-fetch-set-minimum-interval"
-              title={`Set min interval (${FETCH_MINIMUM_INTERVAL_SECONDS}s)`}
-              onPress={handleSetMinimumFetchInterval}
-              color={lineColor}
-            />
-          </view>
-          <ResultBlock testID="background-fetch-result" result={fetchResult} />
-        </view>
-
-        <view className={`line-tag line-tag-${lineInfo.line}`}>
-          <text className="line-tag-text">Background Task</text>
-        </view>
-
-        <view testID="background-task-card" className="auth-card">
-          <view className="auth-card-header">
-            <text className="auth-card-title">
-              Task scheduling (BGTaskScheduler / WorkManager)
-            </text>
-          </view>
-          <text testID="background-task-status" className="auth-value-text">
-            {taskStatusLabel(backgroundTaskStatus)}
-          </text>
-          <view className="button-row">
-            <ActionButton
-              testID="background-task-refresh-status"
-              title="Refresh status"
-              onPress={handleRefreshBackgroundTaskStatus}
-              color={lineColor}
-            />
-            <ActionButton
-              testID="background-task-register"
-              title="Register"
-              onPress={handleRegisterBackgroundTask}
-              color={lineColor}
-            />
-            <ActionButton
-              testID="background-task-unregister"
-              title="Unregister"
-              onPress={handleUnregisterBackgroundTask}
-              color={lineColor}
-            />
-            <ActionButton
-              testID="background-task-trigger-for-testing"
-              title="Trigger for testing"
-              onPress={handleTriggerForTesting}
-              color={lineColor}
-            />
-          </view>
-          <ResultBlock
-            testID="background-task-result"
-            result={backgroundTaskResult}
-          />
-        </view>
-      </scroll-view>
-    </safe-area-view>
+    <ScreenShell
+      route={ROUTE}
+      testID="background-tasks-scroll"
+      title="Background Tasks"
+      body="Run code while the app is closed: define a task, register it for system-scheduled work and inspect the task registry. Background task is the current API, background fetch is its deprecated predecessor."
+    >
+      <WorkerCard />
+      <Explorer testID="background-tasks-explorer" color={color}>
+        <FetchCard />
+        <TaskManagerCalls taskName={taskName} setTaskName={setTaskName} />
+        <ExpirationCard />
+      </Explorer>
+    </ScreenShell>
   );
 }

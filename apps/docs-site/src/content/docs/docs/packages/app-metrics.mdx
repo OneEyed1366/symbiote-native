@@ -1,0 +1,350 @@
+---
+title: App metrics
+description: Collect startup, frame rate, memory, network, crash and session metrics, and report errors, on every SymbioteNative adapter.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+See how your app really performs on users' devices: how long it takes to start and become
+interactive, how it handles network requests, when it crashes. `@symbiote-native/app-metrics`
+wraps [`expo-app-metrics`](https://github.com/expo/expo/tree/main/packages/expo-app-metrics)
+(startup, frame rate, memory, network request, crash and session metrics). The functions and the
+`Session` and `NetworkRequestObserver` classes are shared by every adapter. `AppMetricsRoot` ships
+on all five adapters, and `AppMetricsErrorBoundary` on React, Vue, Solid and Svelte, each wrapping
+that framework's own error-catch primitive.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | live    |
+| Android     | live    |
+
+| Framework adapter | Support                                      |
+| ----------------- | -------------------------------------------- |
+| React             | live                                         |
+| Vue               | live                                         |
+| Angular           | live (no `AppMetricsErrorBoundary` yet)      |
+| Svelte            | live                                         |
+| Solid             | live                                         |
+
+## Installation
+
+```sh
+npm install @symbiote-native/app-metrics
+```
+
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --app-metrics` (or
+`add --app-metrics` in an existing app) installs and wires this for you - see
+[`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
+
+`expo-app-metrics` and `expo-modules-core` come along as regular dependencies, pinned to exact
+versions. Never install either yourself, and never add the `expo` meta-package to your project (it
+bundles its own Metro/Babel pipeline, which conflicts with this project's own).
+
+<Aside type="danger" title="Native setup is required before first use">
+  `expo-app-metrics`'s native code is discovered by `expo-modules-autolinking`, a different
+  mechanism from the `react-native.config.cjs`/podspec autolinking every other SymbioteNative
+  wrapper uses. Follow [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers this package and
+  every other `expo-modules-core` package with zero further native changes.
+</Aside>
+
+No permission string or manifest entry is needed.
+
+## Usage
+
+Wrap your app in `AppMetricsRoot`. It marks the first render for the startup metric and, where the
+adapter has one, catches render errors below it. Then call `markInteractive` when the app can be
+used.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { markInteractive } from '@symbiote-native/app-metrics';
+    import { AppMetricsRoot } from '@symbiote-native/app-metrics/react';
+
+    export default function App() {
+      return (
+        <AppMetricsRoot errorBoundaryFallback={null}>
+          <Home onReady={() => markInteractive({ routeName: 'Home' })} />
+        </AppMetricsRoot>
+      );
+    }
+    ```
+
+    `AppMetricsRoot.wrap(App)` is a React-only helper that wraps a component for you.
+
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { markInteractive } from '@symbiote-native/app-metrics';
+    import { AppMetricsRoot } from '@symbiote-native/app-metrics/vue';
+    </script>
+
+    <template>
+      <AppMetricsRoot :errorBoundaryFallback="null">
+        <Home @ready="markInteractive({ routeName: 'Home' })" />
+      </AppMetricsRoot>
+    </template>
+    ```
+
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component } from '@angular/core';
+    import { markInteractive } from '@symbiote-native/app-metrics';
+    import { AppMetricsRoot } from '@symbiote-native/app-metrics/angular';
+
+    @Component({
+      standalone: true,
+      imports: [AppMetricsRoot],
+      template: `
+        <app-metrics-root>
+          <Home (ready)="onReady()" />
+        </app-metrics-root>
+      `,
+    })
+    export class App {
+      onReady(): void {
+        markInteractive({ routeName: 'Home' });
+      }
+    }
+    ```
+
+    Angular's `AppMetricsRoot` is a plain wrapper that marks the first render. It takes no
+    `errorBoundaryFallback`, since there is no error boundary yet (see Notes).
+
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { markInteractive } from '@symbiote-native/app-metrics';
+      import { AppMetricsRoot } from '@symbiote-native/app-metrics/svelte';
+    </script>
+
+    <AppMetricsRoot errorBoundaryFallback={null}>
+      <Home onReady={() => markInteractive({ routeName: 'Home' })} />
+    </AppMetricsRoot>
+    ```
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { markInteractive } from '@symbiote-native/app-metrics';
+    import { AppMetricsRoot } from '@symbiote-native/app-metrics/solid';
+
+    export default function App() {
+      return (
+        <AppMetricsRoot errorBoundaryFallback={null}>
+          <Home onReady={() => markInteractive({ routeName: 'Home' })} />
+        </AppMetricsRoot>
+      );
+    }
+    ```
+
+  </TabItem>
+</Tabs>
+
+### Catch errors in a subtree
+
+`AppMetricsErrorBoundary` reports a caught error and renders a fallback. The fallback receives the
+`error` and a `resetError` function (`IAppMetricsErrorBoundaryFallbackProps`).
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { AppMetricsErrorBoundary } from '@symbiote-native/app-metrics/react';
+
+    <AppMetricsErrorBoundary
+      fallback={({ error, resetError }) => (
+        <button title={`Retry (${String(error)})`} onPress={resetError} />
+      )}
+    >
+      <RiskyScreen />
+    </AppMetricsErrorBoundary>
+    ```
+
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { h } from 'vue';
+    import { AppMetricsErrorBoundary } from '@symbiote-native/app-metrics/vue';
+    import type { IAppMetricsErrorBoundaryFallbackProps } from '@symbiote-native/app-metrics/vue';
+
+    const renderFallback = ({ error, resetError }: IAppMetricsErrorBoundaryFallbackProps) =>
+      h('button', { title: `Retry (${String(error)})`, onPress: resetError });
+    </script>
+
+    <template>
+      <AppMetricsErrorBoundary :fallback="renderFallback">
+        <RiskyScreen />
+      </AppMetricsErrorBoundary>
+    </template>
+    ```
+
+    The fallback is a render function, so a component is mounted through `h`.
+
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { AppMetricsErrorBoundary } from '@symbiote-native/app-metrics/svelte';
+      import type { IAppMetricsErrorBoundaryFallbackProps } from '@symbiote-native/app-metrics/svelte';
+    </script>
+
+    <AppMetricsErrorBoundary>
+      {#snippet fallback({ error, resetError }: IAppMetricsErrorBoundaryFallbackProps)}
+        <button title={`Retry (${String(error)})`} onPress={resetError} />
+      {/snippet}
+      <RiskyScreen />
+    </AppMetricsErrorBoundary>
+    ```
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { AppMetricsErrorBoundary } from '@symbiote-native/app-metrics/solid';
+
+    <AppMetricsErrorBoundary
+      fallback={({ error, resetError }) => (
+        <button title={`Retry (${String(error)})`} onPress={resetError} />
+      )}
+    >
+      <RiskyScreen />
+    </AppMetricsErrorBoundary>
+    ```
+
+  </TabItem>
+</Tabs>
+
+### Log events and watch the network
+
+```ts
+import { logEvent, reportError, setGlobalAttributes } from '@symbiote-native/app-metrics';
+
+setGlobalAttributes({ plan: 'pro' }); // attached to everything logged from now on
+logEvent('checkout_started', { severity: 'info', attributes: { items: 3 } });
+reportError({
+  source: 'reportedByUser',
+  message: 'payment failed',
+  isFatal: false,
+});
+```
+
+`useNetworkRequestObserver` watches network requests for as long as the component lives
+(`injectNetworkRequestObserver` on Angular). It takes a `filter` and `onStarted` and `onCompleted`
+callbacks:
+
+```tsx
+import { useNetworkRequestObserver } from '@symbiote-native/app-metrics/react';
+
+useNetworkRequestObserver({
+  filter: { hosts: ['api.example.com'], methods: ['POST'] },
+  onStarted: event => console.log('started', event.url),
+  onCompleted: event => console.log(event.statusCode, event.totalDuration),
+});
+```
+
+On Vue, Solid and Svelte it takes a getter returning the same object. Outside a component, use the
+`NetworkRequestObserver` class directly and call `release()` when done.
+
+## API
+
+### Functions
+
+| Signature                                        | Description                                                                                  |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| `markFirstRender(): void`                        | Marks the first render for the startup metric. `AppMetricsRoot` calls it for you             |
+| `markInteractive(attributes?): void`             | Marks the app as interactive, optionally with `routeName` and `params`                       |
+| `logEvent(name, options?): void`                 | Logs a named event with optional `displayName`, `body`, `attributes` and `severity`          |
+| `setGlobalAttributes(attributes?): void`         | Sets attributes attached to everything logged afterwards. `null` clears them                 |
+| `reportError(error: IReportErrorInput): void`    | Reports an error as a `js.exception` log event                                               |
+| `getMainSession(): Session`                      | The main session, which lasts for the app run                                                |
+| `getForegroundSession(): Promise<Session \| null>` | The current foreground session, or `null`                                                  |
+| `getInactiveSessions(): Promise<IDebugSession[]>` | Past sessions. Debug builds only                                                            |
+| `getAllCrashReports(): Promise<ICrashReport[]>`  | Android only, debug builds only. Throws `UnavailabilityError` elsewhere                      |
+| `clearStoredEntries(): Promise<void>`            | Clears the stored metric entries                                                             |
+| `installErrorHandler(): void`                    | Wraps the global error handler so unhandled JS errors reach `reportError`. Runs automatically on import |
+
+### Classes
+
+| Class                    | Description                                                                                          |
+| ------------------------ | ---------------------------------------------------------------------------------------------------- |
+| `Session`                | A metrics session: `id`, `type`, `startDate`, `isActive()`, `getEndDate()`, `getMetrics()`, `getLogs()`, `addMetric(metric)` |
+| `NetworkRequestObserver` | Observes requests. `new NetworkRequestObserver(filter?)`, `setFilter(filter)`, `addListener`, `removeListener`, `release()` |
+
+### Components and bindings
+
+| Name                                  | Adapters                      | Description                                                         |
+| ------------------------------------- | ----------------------------- | ------------------------------------------------------------------- |
+| `AppMetricsRoot`                      | All five                      | Marks first render and, where supported, catches render errors      |
+| `AppMetricsErrorBoundary`             | React, Vue, Solid, Svelte     | Reports a caught error and renders the `fallback`                   |
+| `useNetworkRequestObserver`           | React, Vue, Solid, Svelte     | Observes network requests for the component's lifetime             |
+| `injectNetworkRequestObserver`        | Angular                       | The same, with an `inject*` shape                                   |
+
+### `ILogEventOptions` and `INetworkRequestFilter`
+
+| Field         | Type                                                   | Description                                                      |
+| ------------- | ------------------------------------------------------ | ---------------------------------------------------------------- |
+| `displayName` | `string \| null \| undefined`                          | A human-readable name for the event                              |
+| `body`        | `string \| null \| undefined`                          | Free-text detail                                                 |
+| `attributes`  | `Record<string, ILogAttributeValue> \| null \| undefined` | Structured attributes: strings, numbers, booleans, arrays or objects |
+| `severity`    | `'trace' \| 'debug' \| 'info' \| 'warn' \| 'error' \| 'fatal'` | Defaults to `'info'`                                       |
+| `hosts`       | `string[] \| null \| undefined`                        | `INetworkRequestFilter`: only requests to these hosts            |
+| `methods`     | `string[] \| null \| undefined`                        | `INetworkRequestFilter`: only these HTTP methods                 |
+
+### `IReportErrorInput`
+
+| Field            | Type                                               | Description                                                 |
+| ---------------- | -------------------------------------------------- | ----------------------------------------------------------- |
+| `source`         | `'global' \| 'errorBoundary' \| 'reportedByUser'`  | Where the error came from                                   |
+| `message`        | `string`                                           | The error message                                           |
+| `isFatal`        | `boolean`                                          | Whether the error crashed the app                           |
+| `type`           | `string \| undefined`                              | The error type or class name                                |
+| `stacktrace`     | `string \| undefined`                              | The JS stack trace                                          |
+| `componentStack` | `string \| undefined`                              | The React component stack. Error-boundary captures only     |
+
+The `onCompleted` event carries `id`, `url`, `method`, `statusCode`, `networkProtocol`,
+`requestBytesSent`, `responseBytesReceived`, `errorDescription`, `startedAt`, `completedAt`,
+`totalDuration` and `redirects`.
+
+## Notes
+
+- **`installErrorHandler` runs when the package is imported.** It wraps React Native's global
+  error handler so an unhandled JS error reaches `reportError` before the previous handler runs.
+- **A caught error is reported separately from an uncaught one.** `AppMetricsErrorBoundary` reports
+  through its own path and never reaches the engine's uncaught-error reporting, by design.
+- **Vue and Solid boundaries carry no component stack.** Vue's `onErrorCaptured` gives only a
+  lifecycle-phase string, so only React's boundary forwards a real `componentStack`.
+- **On Solid and Svelte, an uncaught error still rethrows.** `AppMetricsRoot` without
+  `errorBoundaryFallback` leaves that throw to reach the caller, the same as not wrapping the tree.
+- **Angular has no `AppMetricsErrorBoundary` yet.** Angular's `@boundary` and `@error` template
+  primitive is stable from `@angular/core` 22.2, but this repo pins `~22.0.8` because the AOT linker
+  in newer versions asserts Babel 8, which cannot run inside Metro's Babel 7. It ships once the
+  catalog can move past 22.0.8.
+- **`getForegroundSession` works on both platforms.** Upstream's comment says iOS only, but the
+  native modules implement it on both.
+- **Metrics can only be verified on a device.** The headless tests fake the native module and the
+  React layer is mounted through the repo's Fabric-recording harness.
+
+## Common questions
+
+- **What does it collect?** App startup (cold and warm launch, bundle load, time to first render),
+  frame rate, memory and sessions, plus your own events on the same session timeline.
+- **Where do the numbers go?** Expo's EAS Observe service, or any OpenTelemetry-compatible backend.
+- **Why is time to interactive missing?** It is only reported once you mark the app interactive yourself.
+- **Debug or release?** Judge startup numbers on release builds only.
+
+Sources: [Expo docs: Introduction to EAS Observe](https://docs.expo.dev/eas/observe/introduction/),
+[Set up EAS Observe](https://docs.expo.dev/eas/observe/get-started/),
+[Introducing Observe](https://expo.dev/blog/introducing-observe).
+
+## How the wrapper works
+
+`expo-app-metrics`'s JS is hand-ported into this package's `core/`. `Session` and
+`NetworkRequestObserver` are native shared-object classes re-exported straight off the native
+module, so there is no JS logic beyond the re-export. Each framework's error boundary wraps that
+framework's own catch primitive and shares the report-building logic through
+`core/report-caught-error.ts`. The native code is never vendored: `expo-modules-autolinking`
+resolves it from `node_modules` (see [the native setup guide](/docs/howtos/expo-native-module-setup/)).

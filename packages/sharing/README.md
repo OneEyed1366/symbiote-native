@@ -1,34 +1,29 @@
 # @symbiote-native/sharing
 
-A wrapper package for [SymbioteNative](../../README.md) that makes
-[`expo-sharing`](https://github.com/expo/expo/tree/main/packages/expo-sharing) — the platform
-share sheet for a local file — usable from **every** adapter, React, Vue, Svelte, Solid, and
-Angular, not just React. Built the same way as [`@symbiote-native/secure-store`](../secure-store): an
-`expo-modules-core`-based wrapper (see the `symbiote-expo-native-module` project skill for the
-full mechanism — why `expo-modules-core` is depended on directly and never the `expo`
-meta-package, why the upstream JS is hand-ported into `core/` rather than imported, and how
-autolinking picks up the native module).
+Let users send a file from your app to any other app, and receive files other apps share into
+yours. One API for every [SymbioteNative](../../README.md) adapter (React, Vue, Svelte, Solid and
+Angular).
 
-## Scope: outgoing share only
+It wraps [`expo-sharing`](https://github.com/expo/expo/tree/main/packages/expo-sharing) the same
+way [`@symbiote-native/secure-store`](../secure-store) wraps its upstream: `expo-modules-core` is a
+direct dependency, never the `expo` meta-package, and the upstream JS is hand-ported into `core/`.
+The mechanics live in the `symbiote-expo-native-module` project skill.
 
-`expo-sharing` has two halves. This package ships one of them.
+## Scope: outgoing and incoming share
+
+`expo-sharing` has two halves, both ported to every adapter.
 
 | Half                                                          | Upstream API                                                                                     | Here              |
 | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ----------------- |
-| **Outgoing** — hand a local file to another app               | `shareAsync`, `isAvailableAsync`                                                                 | ✅ ported in full |
-| **Incoming** — receive files other apps share _into_ your app | `useIncomingShare`, `getSharedPayloads`, `getResolvedSharedPayloadsAsync`, `clearSharedPayloads` | ❌ not ported     |
+| **Outgoing** - hand a local file to another app               | `shareAsync`, `isAvailableAsync`                                                                 | ported in full    |
+| **Incoming** - receive files other apps share _into_ your app | `useIncomingShare`, `getSharedPayloads`, `getResolvedSharedPayloadsAsync`, `clearSharedPayloads` | ported in full    |
 
-The incoming half is not a thinner JS surface — it needs a whole **iOS Share Extension target**.
-Upstream's config plugin (`plugin/src/ios/*`) generates one: a second Xcode target with its own
-build phases, its own `Info.plist`, an entitlements file, and an App Group ID shared between the
-app and the extension, plus Android intent filters on the main activity. That is native
-app-extension scaffolding, the same category this repo already parks `expo-widgets` in — no
-JS-reachable runtime module can stand in for it, and SymbioteNative has no native-target
-scaffolding story yet. So it is deliberately out of scope for this pass rather than shipped
-half-working. If you need incoming share today, use `expo-sharing` directly in a React-only app
-with Expo's own prebuild pipeline.
-
-Everything below describes the outgoing half.
+The incoming JS runtime reads what the native module holds. The native module only holds data
+once the host app carries a share target: an **iOS Share Extension target** (a second Xcode target
+with its own `Info.plist`, entitlements and an App Group shared with the app) plus Android intent
+filters on the main activity. That target is native app scaffolding, generated upstream by
+`expo-sharing`'s config plugin (`plugin/src/ios/*`) or set up by hand. This package does not
+generate or touch it: without a share target the incoming functions return empty arrays.
 
 ## Install
 
@@ -44,62 +39,60 @@ npx @symbiote-native/cli new my-app --sharing
 npx @symbiote-native/cli add --sharing
 ```
 
-Either way: installs `@symbiote-native/sharing` and wires the native autolinking automatically —
+Either way: installs `@symbiote-native/sharing` and wires the native autolinking automatically -
 see [`@symbiote-native/cli`](../cli).
 
 <details>
-<summary>Manual install (no CLI — installing and wiring native autolinking by hand)</summary>
+<summary>Manual install (no CLI - installing and wiring native autolinking by hand)</summary>
 
 ```bash
 npm install @symbiote-native/sharing
 ```
 
-`expo-sharing` and `expo-modules-core` come along as regular, pinned dependencies — never install
+`expo-sharing` and `expo-modules-core` come along as regular, pinned dependencies - never install
 either yourself, and never add the `expo` meta-package to this project (it bundles its own
 Metro/Babel pipeline that conflicts with this project's own).
 
 ### Required one-time step: native autolinking wiring
 
 Unlike a plain RN native module, `expo-sharing`'s native code is discovered by
-`expo-modules-autolinking` — this needs wiring into the native host app **once**, covering this
+`expo-modules-autolinking` - this needs wiring into the native host app **once**, covering this
 package and every other `expo-modules-core` package with zero further changes:
 
 | Platform | Touches                                                                               |
 | -------- | ------------------------------------------------------------------------------------- |
-| iOS      | `ios/Podfile` — add `use_expo_modules!`                                               |
-| iOS      | `AppDelegate.swift` — Expo's runtime-bootstrap hook                                   |
-| Android  | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects |
-| Android  | `MainApplication.kt` — Expo's bootstrap hook, plus a native-module name map           |
+| iOS      | `ios/Podfile` - add `use_expo_modules!`                                               |
+| iOS      | `AppDelegate.swift` - Expo's runtime-bootstrap hook                                   |
+| Android  | `settings.gradle` / `app/build.gradle` - resolve and include the Expo Gradle projects |
+| Android  | `MainApplication.kt` - Expo's bootstrap hook, plus a native-module name map           |
 
 Full mechanics live in the `symbiote-expo-native-module` skill. The per-package half of that
-table — the Gradle dependency and the module map entry — is generated by
+table - the Gradle dependency and the module map entry - is generated by
 [`@symbiote-native/expo-modules-link`](../expo-modules-link) from this package's
 `native-link.json` on every install.
 
 There is no `Info.plist` usage description to add: opening the share sheet needs no iOS
 permission. On Android, the `SharingFileProvider` and the `<queries>` block the chooser needs on
 API 30+ ship inside `expo-sharing`'s own `AndroidManifest.xml` and merge into your app
-automatically once the Gradle project is included — nothing to declare by hand.
+automatically once the Gradle project is included - nothing to declare by hand.
 
 </details>
 
 ## Shape
 
 ```
-src/core/                 the whole API: isAvailableAsync + shareAsync. native-module.ts
-                          resolves ExpoSharing through expo-modules-core's requireNativeModule.
-src/angular/              @symbiote-native/sharing/angular
+src/core/     shareAsync, isAvailableAsync, the incoming payload functions, and the framework-agnostic
+              incoming-share store (refresh, AppState resync, payload comparison).
+              native-module.ts resolves ExpoSharing through expo-modules-core's requireNativeModule.
+src/react|vue|solid|svelte/  use-incoming-share: the hook over the store
+src/angular/  inject-incoming-share: the same over signals
 ```
 
-`./react`, `./vue`, `./svelte`, and `./solid` are `exports`-map aliases straight onto `src/core/` —
-no physical per-framework file. Both exports are stateless free functions — no per-instance state,
-no event stream — so there is nothing for a hook, composable, or service to wrap, the same
-reason [`@symbiote-native/secure-store`](../secure-store) does the same. (The incoming-share half
-above is exactly the part that _would_ have needed one; it is the reason this package has no
-`hooks/`, `composables/`, or `services/` folder.) `./angular` stays a physical file/subpath since
-Angular ships through a separate `ngc`/AOT build (`build-ngc/`). Import from
-`@symbiote-native/sharing` directly if you don't care which adapter you're on; the per-adapter
-subpaths exist so every wrapper package has the same import surface.
+Outgoing share is two stateless free functions, so only the incoming half has adapter code. Each
+adapter subpath re-exports `core` plus its own `useIncomingShare` (Angular: `injectIncomingShare`,
+call it in an injection context). React returns the result object, Vue a `ComputedRef`, Solid an
+`Accessor`, Svelte a `{ current }` box, Angular a `Signal`. `./angular` ships through a separate
+`ngc`/AOT build (`build-ngc/`).
 
 ## Use it
 
@@ -122,12 +115,28 @@ await shareAsync(localFileUri, {
 });
 ```
 
+Receiving what other apps shared into yours:
+
+```ts
+import { useIncomingShare } from '@symbiote-native/sharing/react';
+
+const { sharedPayloads, resolvedSharedPayloads, isResolving, error, clearSharedPayloads } =
+  useIncomingShare();
+```
+
+The hook reads the payloads synchronously, resolves them after mount, and re-reads whenever the
+app returns to the foreground. Resolving a shared URL may need the network.
+
 ## API
 
-| Export             | Signature                          | Notes                                                                                  |
-| ------------------ | ---------------------------------- | -------------------------------------------------------------------------------------- |
-| `isAvailableAsync` | `() => Promise<boolean>`           | `true` on Android and iOS. Reports on the native module, not on any device capability. |
-| `shareAsync`       | `(url, options?) => Promise<void>` | Opens the share sheet for a local file. Resolves when the sheet is dismissed.          |
+| Export                           | Signature                          | Notes                                                                                  |
+| -------------------------------- | ---------------------------------- | -------------------------------------------------------------------------------------- |
+| `isAvailableAsync`               | `() => Promise<boolean>`           | `true` on Android and iOS. Reports on the native module, not on any device capability. |
+| `shareAsync`                     | `(url, options?) => Promise<void>` | Opens the share sheet for a local file. Resolves when the sheet is dismissed.          |
+| `getSharedPayloads`              | `() => ISharePayload[]`            | Raw data shared with the app, empty when nothing was shared.                           |
+| `getResolvedSharedPayloadsAsync` | `() => Promise<IResolvedSharePayload[]>` | Adds display details per payload.                                                |
+| `clearSharedPayloads`            | `() => void`                       | Clears the data shared with the app.                                                   |
+| `useIncomingShare`               | `() => IUseIncomingShareResult`    | Payloads, resolved payloads, `isResolving`, `error`, `clearSharedPayloads`, `refreshSharePayloads`. |
 
 `ISharingOptions`: `mimeType` (Android), `UTI` (iOS), `dialogTitle`, `anchor` (iOS iPad).
 `ISharingAnchor`: `x`, `y`, `width`, `height`, all optional, all in points.
@@ -135,7 +144,7 @@ await shareAsync(localFileUri, {
 ## Notes
 
 - **`url` must be local.** A `file://` URI or a path from a file-system API. A remote `http(s)`
-  URL is not downloaded first — fetch it to a local file yourself, then share that.
+  URL is not downloaded first - fetch it to a local file yourself, then share that.
 - **A resolved promise is not a delivery receipt.** Neither platform reports which app the user
   picked, or whether they picked one at all: the promise resolves when the sheet closes. iOS
   resolves on every dismissal path, including "picked Print, then cancelled the print dialog".
@@ -144,9 +153,28 @@ await shareAsync(localFileUri, {
   with upstream, not because it changes behavior.
 - **Android runs one share at a time.** A second `shareAsync` while a chooser is open rejects
   rather than queueing.
-- **The url is validated before the native call** — non-empty string — so a bad argument fails
+- **The iOS share extension is experimental upstream.** It opens the main app target instead of
+  handling the share in its own view controller, which Apple does not officially support and may
+  stop working in a future iOS release.
+- **The url is validated before the native call**: non-empty string - so a bad argument fails
   with a readable message instead of as an argument-conversion failure on iOS or a generic
   "Failed to share the file" on Android. Upstream has no such guard.
+
+## Common questions
+
+- **Android: "Not allowed to read file under given URL" / "Failed to find configured root".** Share
+  a file from the app's own document or cache directory (for example one written with
+  [`@symbiote-native/file-system`](../file-system)). A path owned by another app, such as a media
+  library asset, can be rejected: copy it into `Paths.cache` first.
+- **Works on iOS, the receiving Android app cannot open it.** Same cause: Android hands the other
+  app a content URI, and only files in the app's directories are covered.
+- **Can I share a URL or text?** Not with `shareAsync`, which takes a local file.
+- **Did the user actually share?** Unknowable: the promise resolves when the sheet closes.
+
+Sources: [Expo docs: Sharing](https://docs.expo.dev/versions/latest/sdk/sharing/),
+[expo/expo#5933](https://github.com/expo/expo/issues/5933),
+[expo/expo#18887](https://github.com/expo/expo/issues/18887),
+[expo/expo#9222](https://github.com/expo/expo/issues/9222).
 
 ## Test it
 
@@ -154,6 +182,6 @@ await shareAsync(localFileUri, {
 pnpm vitest run packages/sharing
 ```
 
-The core tests fake the native module in place of `requireNativeModule`'s runtime resolution —
+The core tests fake the native module in place of `requireNativeModule`'s runtime resolution -
 `ExpoSharing` only exists on a device, so a headless run would otherwise throw at import. The
 share sheet itself can only be verified on a device or simulator.

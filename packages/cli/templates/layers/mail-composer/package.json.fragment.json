@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "@symbiote-native/mail-composer": "latest"
+  }
+}

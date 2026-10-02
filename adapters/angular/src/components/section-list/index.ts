@@ -1,43 +1,17 @@
-// SectionList, the Angular public list-of-sections component. A thin convenience surface over
-// VirtualizedSectionList, mirroring RN's layering (SectionList -> VirtualizedSectionList ->
-// VirtualizedList). All section-flattening / windowing / sticky-header / imperative-scroll logic
-// lives below; this layer re-exposes the same surface under the SectionList name and delegates
-// the handle to the inner VirtualizedSectionList.
-//
-// SectionList is a PURE FORWARDER: its public prop surface IS VirtualizedSectionList's (RN layers
-// them one-for-one), and the SectionList-flavour defaults (stickySectionHeadersEnabled per
-// Platform.OS, the section entry keyExtractor) already live INSIDE VirtualizedSectionList — double-
-// applying them here would fight it. Angular has no attrs-spread (unlike Vue's $attrs), so every
-// prop is forwarded as an explicit @Input binding, except the seven list-lifecycle events
-// (endReached/startReached/refresh/accessibilityAction/accessibilityTap/magicTap/
-// accessibilityEscape), which are real @Output() EventEmitters re-emitted via a listener binding.
-//
-// TEMPLATE FORWARDING — RE-STAMP, the same pattern FlatList's single-column branch uses (see
-// flat-list/index.ts). A bare `<ng-content></ng-content>` passthrough does NOT let
-// VirtualizedSectionList's own @ContentChild resolve directives across a SECOND projection hop —
-// Angular's content queries resolve only against what was projected directly onto the querying
-// component's OWN tag. So SectionList captures the app's `<ng-template vSectionItem>` /
-// vSectionHeader / vSectionFooter / vSectionSeparator / vListHeader / vListFooter / vListEmpty /
-// vListSeparator with its OWN @ContentChild (a single, direct hop — always resolves) and
-// re-authors equivalent `<ng-template>`s on `<VirtualizedSectionList>`, forwarding the captured
-// templateRef + context through VListOutletDirective — mirroring how VirtualizedSectionList itself
-// re-stamps its own captured directives onto its inner VirtualizedList.
+// SectionList, a pure forwarder over VirtualizedSectionList, mirroring RN's layering
+// A content query does not resolve across a second `<ng-content>` hop, so the app's templates are
+// captured here and re-stamped onto the inner list
 
 import {
   ChangeDetectionStrategy,
   Component,
   ContentChild,
   ElementRef,
-  EventEmitter,
   Input,
-  Output,
   ViewChild,
   inject,
 } from '@angular/core';
 import type {
-  IAccessibilityProps,
-  IAccessibilityStateValue,
-  IAriaProps,
   IScrollViewHandle,
   ISection,
   IVirtualizedSectionListHandle,
@@ -56,6 +30,9 @@ import {
   type IVListSeparatorContext,
 } from '../virtualized-list';
 import { VListOutletDirective } from '../virtualized-list/directives';
+import { LIST_ACCESSIBILITY_FORWARD } from '../virtualized-list/list-a11y-forward';
+import { ListEventsBase } from '../virtualized-list/list-events';
+import { provideGateDemand } from '../../gate-demand';
 import {
   stableAnchorStyle,
   SymbioteStyleInputDirective,
@@ -69,25 +46,16 @@ import {
   type IVirtualizedSectionListProps,
 } from '../virtualized-section-list';
 
-// Angular cannot preserve VListSeparatorDirective<ItemT>'s type parameter across this re-stamp
-// reuse (the directive is matched structurally in SectionList's own template with no explicit type
-// argument to pin ItemT to, so `let-leadingItem`/`let-trailingItem` arrive typed `unknown`) — even
-// though VirtualizedSectionList's own unwrap always supplies a real ItemT value. The narrowest
-// possible I/O-boundary cast for that gap; not a general-purpose unknown-to-T narrowing (mirrors
-// flat-list/index.ts's identical asItem helper).
+// The separator context arrives typed `unknown`, the directive is matched structurally in the
+// template with no type argument to pin the item type. The narrowest cast for that gap
 function asItem<ItemT>(value: unknown): ItemT | undefined {
   return value as ItemT | undefined;
 }
 
-// Re-export the shared section type + the imperative handle so app code (and any later layer) imports
-// them from SectionList, mirroring how the Vue twin re-exposes ISection + ISectionListHandle.
 export type { ISection } from '@symbiote-native/components';
 export type ISectionListHandle = IVirtualizedSectionListHandle;
 
-// Re-export the section authoring directives + the list-level slot directives so app code importing
-// from '@symbiote-native/angular' gets the full `<ng-template vSection*>` / `vList*` authoring surface
-// alongside SectionList (mirrors how virtualized-section-list/index re-exports the section ones and
-// FlatList re-exports the list-level ones).
+// Re-exported so app code gets the whole `vSection*` and `vList*` authoring surface from here
 export {
   VSectionFooterDirective,
   VSectionHeaderDirective,
@@ -100,21 +68,11 @@ export {
   VListHeaderDirective,
   VListSeparatorDirective,
 } from '../virtualized-list';
-import {
-  gateWanted,
-  injectGateDemandAbove,
-  provideGateDemand,
-  type IGatedAccessibilityEvent,
-} from '../../gate-demand';
 
-// SectionList's public surface is exactly VirtualizedSectionList's (RN layers them one-for-one), so
-// the prop type is shared verbatim — no SectionList-only field exists.
+// RN layers the two one-for-one, so the prop type is shared verbatim
 export type ISectionListProps<ItemT> = IVirtualizedSectionListProps<ItemT>;
 
-// What the SectionList component itself takes as plain @Input()s: the full surface minus the
-// list-lifecycle events, which it exposes as real @Output() EventEmitters instead (see the class
-// below) — mirrors IAngularPressableInputs in pressable/index.ts and VirtualizedSectionList's own
-// IVirtualizedSectionListInputs.
+// The plain inputs: the full surface minus the events exposed as real outputs
 export type ISectionListInputs<ItemT> = Omit<
   ISectionListProps<ItemT>,
   | 'onEndReached'
@@ -182,47 +140,7 @@ export type ISectionListInputs<ItemT> = Omit<
       [contentContainerStyle]="contentContainerStyle"
       [testID]="testID"
       [nativeID]="nativeID"
-      [accessible]="accessible"
-      [accessibilityLabel]="accessibilityLabel"
-      [accessibilityHint]="accessibilityHint"
-      [accessibilityRole]="accessibilityRole"
-      [accessibilityState]="accessibilityState"
-      [accessibilityValue]="accessibilityValue"
-      [accessibilityActions]="accessibilityActions"
-      [accessibilityLabelledBy]="accessibilityLabelledBy"
-      [importantForAccessibility]="importantForAccessibility"
-      [accessibilityLiveRegion]="accessibilityLiveRegion"
-      [screenReaderFocusable]="screenReaderFocusable"
-      [accessibilityViewIsModal]="accessibilityViewIsModal"
-      [accessibilityElementsHidden]="accessibilityElementsHidden"
-      [accessibilityIgnoresInvertColors]="accessibilityIgnoresInvertColors"
-      [accessibilityLanguage]="accessibilityLanguage"
-      [accessibilityRespondsToUserInteraction]="
-        accessibilityRespondsToUserInteraction
-      "
-      [accessibilityShowsLargeContentViewer]="
-        accessibilityShowsLargeContentViewer
-      "
-      [accessibilityLargeContentTitle]="accessibilityLargeContentTitle"
-      (accessibilityAction)="accessibilityAction.emit($event)"
-      (accessibilityTap)="accessibilityTap.emit($event)"
-      (magicTap)="magicTap.emit($event)"
-      (accessibilityEscape)="accessibilityEscape.emit($event)"
-      [role]="role"
-      [ariaLabel]="ariaLabel"
-      [ariaLabelledBy]="ariaLabelledBy"
-      [ariaLive]="ariaLive"
-      [ariaHidden]="ariaHidden"
-      [ariaBusy]="ariaBusy"
-      [ariaChecked]="ariaChecked"
-      [ariaDisabled]="ariaDisabled"
-      [ariaExpanded]="ariaExpanded"
-      [ariaSelected]="ariaSelected"
-      [ariaModal]="ariaModal"
-      [ariaValueMax]="ariaValueMax"
-      [ariaValueMin]="ariaValueMin"
-      [ariaValueNow]="ariaValueNow"
-      [ariaValueText]="ariaValueText"
+      ${LIST_ACCESSIBILITY_FORWARD}
     >
       <ng-template
         vSectionItem
@@ -303,27 +221,20 @@ export type ISectionListInputs<ItemT> = Omit<
   `,
 })
 export class SectionList<ItemT = unknown>
+  extends ListEventsBase
   implements ISectionListInputs<ItemT>, IVirtualizedSectionListHandle
 {
   @Input({ required: true }) sections!: ReadonlyArray<ISection<ItemT>>;
   @Input() keyExtractor?: (item: ItemT, index: number) => string;
-  // Passed through FLAT (sections array + flat entry index); VirtualizedSectionList owns the
-  // sections-vs-entries wrapper - see its entryItemLayout getter.
+  // Passed through flat, `VirtualizedSectionList` owns the sections-versus-entries wrapper
   @Input() getItemLayout?: (
     data: ReadonlyArray<ISection<ItemT>> | null,
     index: number,
   ) => { length: number; offset: number; index: number };
   @Input() stickySectionHeadersEnabled?: boolean;
   @Input() extraData?: unknown;
-  @Output() readonly endReached = new EventEmitter<{
-    distanceFromEnd: number;
-  }>();
   @Input() onEndReachedThreshold?: number;
-  @Output() readonly startReached = new EventEmitter<{
-    distanceFromStart: number;
-  }>();
   @Input() onStartReachedThreshold?: number;
-  @Output() readonly refresh = new EventEmitter<void>();
   @Input() refreshing?: boolean | null;
   @Input() progressViewOffset?: number;
   @Input() initialNumToRender?: number;
@@ -351,14 +262,8 @@ export class SectionList<ItemT = unknown>
   @Input() testID?: string;
   @Input() nativeID?: string;
 
-  // Bound to `[style]="resolvedStyle"`, which Angular compiles to ɵɵstyleMap — it only
-  // understands a flat object, never an array (RN's `style={[a, b]}` idiom crashes deep inside
-  // Angular's styling engine), so this flattens `style` first, merging in this component's OWN
-  // anchor's class-derived style via anchorHostStyle (`elementRef` here is SectionList's own
-  // host, not `list`'s inner VirtualizedSectionList). A plain `flattenStyle([...])` would
-  // allocate a fresh object on every CD check, defeating VirtualizedList's `ngDoCheck` dedup gate
-  // and free-running change detection forever — the bug `stableAnchorStyle` exists to prevent
-  // (see its doc comment). `cachedResolvedStyle` is the getter's own persisted "previous" value.
+  // A flat object bound to `[style]`, merged with this host's own class-derived style. A fresh
+  // object per read would defeat the inner list's dedup gate, `stableAnchorStyle` keeps it steady
   private cachedResolvedStyle: Record<string, unknown> | undefined;
   get resolvedStyle(): IViewStyle {
     this.cachedResolvedStyle = stableAnchorStyle(
@@ -368,58 +273,8 @@ export class SectionList<ItemT = unknown>
     );
     return this.cachedResolvedStyle;
   }
-  @Input() accessible?: boolean;
-  @Input() accessibilityLabel?: string;
-  @Input() accessibilityHint?: string;
-  @Input() accessibilityRole?: IAccessibilityProps['accessibilityRole'];
-  @Input() accessibilityState?: IAccessibilityStateValue;
-  @Input() accessibilityValue?: IAccessibilityProps['accessibilityValue'];
-  @Input() accessibilityActions?: IAccessibilityProps['accessibilityActions'];
-  @Input() accessibilityLabelledBy?: string | string[];
-  @Input()
-  importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
-  @Input()
-  accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
-  @Input() screenReaderFocusable?: boolean;
-  @Input() accessibilityViewIsModal?: boolean;
-  @Input() accessibilityElementsHidden?: boolean;
-  @Input() accessibilityIgnoresInvertColors?: boolean;
-  @Input() accessibilityLanguage?: string;
-  @Input() accessibilityRespondsToUserInteraction?: boolean;
-  @Input() accessibilityShowsLargeContentViewer?: boolean;
-  @Input() accessibilityLargeContentTitle?: string;
-  @Output() readonly accessibilityAction = new EventEmitter<ISymbioteEvent>();
-  @Output() readonly accessibilityTap = new EventEmitter<ISymbioteEvent>();
-  @Output() readonly magicTap = new EventEmitter<ISymbioteEvent>();
-  @Output() readonly accessibilityEscape = new EventEmitter<ISymbioteEvent>();
 
-  // This wrapper binds the four gated accessibility events on the component it renders, which
-  // Angular forces to be unconditional and which would light that component's gates on every
-  // instance. It answers for them instead — see `gate-demand.ts`.
-  private readonly gateDemandAbove = injectGateDemandAbove();
-
-  wantsGate(name: IGatedAccessibilityEvent): boolean {
-    return gateWanted(this.gateDemandAbove, name, this[name]);
-  }
-
-  @Input() role?: IAriaProps['role'];
-  @Input() ariaLabel?: string;
-  @Input() ariaLabelledBy?: string;
-  @Input() ariaLive?: IAriaProps['aria-live'];
-  @Input() ariaHidden?: boolean;
-  @Input() ariaBusy?: boolean;
-  @Input() ariaChecked?: boolean | 'mixed';
-  @Input() ariaDisabled?: boolean;
-  @Input() ariaExpanded?: boolean;
-  @Input() ariaSelected?: boolean;
-  @Input() ariaModal?: boolean;
-  @Input() ariaValueMax?: number;
-  @Input() ariaValueMin?: number;
-  @Input() ariaValueNow?: number;
-  @Input() ariaValueText?: string;
-
-  // The app's section/list authoring templates, captured from the app's DIRECT projected content
-  // (single hop — always resolves) and re-stamped onto the inner VirtualizedSectionList above.
+  // The app's templates, captured from directly projected content and re-stamped above
   @ContentChild(VSectionItemDirective)
   sectionItemDir?: VSectionItemDirective<ItemT>;
   @ContentChild(VSectionHeaderDirective)
@@ -434,19 +289,15 @@ export class SectionList<ItemT = unknown>
   @ContentChild(VListSeparatorDirective)
   itemSeparatorDir?: VListSeparatorDirective<ItemT>;
 
-  // The composed inner VirtualizedSectionList. Its instance IS an IVirtualizedSectionListHandle, so
-  // SectionList's handle delegates straight to it. Available from ngAfterViewInit; reads lazily.
+  // The inner list, whose instance is the scroll handle, reads lazily
   @ViewChild(VirtualizedSectionList)
   private list?: VirtualizedSectionList<ItemT>;
 
-  // This component's OWN host — the non-painting anchor `class="..."` at the use site resolves
-  // onto (see anchorHostStyle's doc comment) — NOT `list` above, which targets the real inner
-  // `<VirtualizedSectionList>` one level down (itself its own separate anchor host).
+  // This component's own host, the anchor `class="..."` resolves onto, not the inner list's
   private readonly elementRef = inject(ElementRef);
 
-  // The item separator context: leadingItem/trailingItem arrive `unknown` from the template's `let`
-  // bindings (see the asItem boundary comment above), already-unwrapped real items (no envelope to
-  // narrow through, unlike a section header/footer entry).
+  // The leading and trailing items arrive `unknown` from the template's `let` bindings, already
+  // unwrapped to real items
   itemSeparatorContext(
     highlighted: unknown,
     leadingItem: unknown,
@@ -460,8 +311,6 @@ export class SectionList<ItemT = unknown>
       trailingItem: asItem<ItemT>(trailingItem),
     };
   }
-
-  // ---- imperative handle (the shared IVirtualizedSectionListHandle surface) — delegates down ----
 
   scrollToLocation(params: {
     sectionIndex: number;

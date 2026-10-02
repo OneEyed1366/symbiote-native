@@ -38,6 +38,12 @@ vi.mock('expo-modules-core', () => ({
 }));
 
 vi.mock('@symbiote-native/engine', () => ({ dlog: vi.fn() }));
+vi.mock('@symbiote-native/application', () => ({
+  applicationId: 'com.symbiote.default',
+  getIosPushNotificationServiceEnvironmentAsync: vi.fn(
+    async () => 'production',
+  ),
+}));
 
 const Notifications = await import('./index');
 

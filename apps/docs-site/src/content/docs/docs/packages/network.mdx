@@ -212,6 +212,22 @@ const airplaneMode = await isAirplaneModeEnabledAsync();
   lands a quarter-second late. Disconnects are the exception — they are emitted immediately, to
   avoid re-reading a just-lost network as still connected.
 
+## Common questions
+
+- **Connected to Wi-Fi but the internet is down (hotel login page).** `isConnected` only says there
+  is a network. Use `isInternetReachable` to confirm real internet access.
+- **`ERR_NETWORK_NO_ACCESS_NETWORKINFO` on Android.** Reported when the network info cannot be read;
+  catch the rejection and treat it as offline.
+- **The hook reports offline forever after the app was frozen in the background (Android).** The
+  event stream can arrive out of order. Call `getNetworkStateAsync` on foreground to correct it.
+- **Always `{ isConnected: false, type: NONE }` after an SDK update.** Reported upstream; check
+  the Android network-state permission is present in the final manifest.
+
+Sources: [expo/expo#14527](https://github.com/expo/expo/issues/14527),
+[expo/expo#47846](https://github.com/expo/expo/issues/47846),
+[expo/expo#33070](https://github.com/expo/expo/issues/33070),
+[Expo Network guide](https://www.codingeasypeasy.com/blog/expo-network-mastering-network-connectivity-and-reachability-in-react-native).
+
 ## How the wrapper works
 
 `@symbiote-native/network` ships **zero React/Vue/Angular/Svelte/Solid logic in `expo-network` itself** — that

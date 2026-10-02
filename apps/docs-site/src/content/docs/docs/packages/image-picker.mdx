@@ -1,0 +1,295 @@
+---
+title: Image picker
+description: Pick photos and videos from the library or capture them with the camera, plus permission hooks, on every SymbioteNative adapter.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+Let users choose a photo or video from their library, or take one with the camera.
+`@symbiote-native/image-picker` wraps
+[`expo-image-picker`](https://github.com/expo/expo/tree/main/packages/expo-image-picker), which
+opens the system picker UI, so every SymbioteNative adapter can reach it, not just React. The
+launch and permission functions are free functions shared by every adapter. The two declarative
+permission hooks (`useCameraPermissions`, `useMediaLibraryPermissions`) ship on all five, in each
+framework's own idiom.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | live    |
+| Android     | live    |
+
+| Framework adapter | Support |
+| ----------------- | ------- |
+| React             | live    |
+| Vue               | live    |
+| Angular           | live    |
+| Svelte            | live    |
+| Solid             | live    |
+
+## Installation
+
+```sh
+npm install @symbiote-native/image-picker
+```
+
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --image-picker` (or
+`add --image-picker` in an existing app) installs and wires this for you - see
+[`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
+
+`expo-image-picker` and `expo-modules-core` come along as regular dependencies, pinned to exact
+versions. Never install either yourself, and never add the `expo` meta-package to your project (it
+bundles its own Metro/Babel pipeline, which conflicts with this project's own).
+
+<Aside type="danger" title="Native setup is required before first use">
+  `expo-image-picker`'s native code is discovered by `expo-modules-autolinking`, a different
+  mechanism from the `react-native.config.cjs`/podspec autolinking every other SymbioteNative
+  wrapper uses. Follow [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers this package and
+  every other `expo-modules-core` package with zero further native changes.
+</Aside>
+
+Permission strings land automatically on install:
+
+| Platform | Added                                                                        | Why                                              |
+| -------- | ---------------------------------------------------------------------------- | ------------------------------------------------ |
+| iOS      | `NSPhotoLibraryUsageDescription`                                             | Reading the photo library                        |
+| iOS      | `NSCameraUsageDescription`                                                   | Taking a photo or video                          |
+| iOS      | `NSMicrophoneUsageDescription`                                               | Recording video with sound                       |
+| Android  | `RECORD_AUDIO`                                                               | The camera picker can record video with sound    |
+
+`CAMERA` and the `READ_MEDIA_*` / pre-33 storage permissions ship in `expo-image-picker`'s own
+manifest and merge in once the Gradle project is included. Reword the iOS strings in
+`native-link.json` if the defaults do not fit your app.
+
+## Usage
+
+Request the permission, launch the picker, and check `canceled` before reading `assets`. These
+free functions are identical on every adapter:
+
+```ts
+import {
+  launchImageLibraryAsync,
+  requestMediaLibraryPermissionsAsync,
+} from '@symbiote-native/image-picker';
+
+await requestMediaLibraryPermissionsAsync();
+const result = await launchImageLibraryAsync({ mediaTypes: 'images', quality: 0.8 });
+if (!result.canceled) {
+  console.log(result.assets[0].uri);
+}
+```
+
+Take a photo instead:
+
+```ts
+import { launchCameraAsync, requestCameraPermissionsAsync } from '@symbiote-native/image-picker';
+
+await requestCameraPermissionsAsync();
+const result = await launchCameraAsync({ allowsEditing: true });
+```
+
+### Declarative permission state
+
+To render permission state, use the adapter's own binding. Each is shown for the camera;
+`useMediaLibraryPermissions` has the same shape and also accepts `{ writeOnly }`.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { useCameraPermissions } from '@symbiote-native/image-picker/react';
+
+    export default function CameraGate() {
+      const [status, requestPermission] = useCameraPermissions();
+
+      if (!status?.granted) {
+        return <button title="Allow camera" onPress={() => requestPermission()} />;
+      }
+      return <text>Camera allowed</text>;
+    }
+    ```
+
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { useCameraPermissions } from '@symbiote-native/image-picker/vue';
+
+    const [status, requestPermission] = useCameraPermissions();
+    </script>
+
+    <template>
+      <text v-if="status?.granted">Camera allowed</text>
+      <button v-else title="Allow camera" @press="requestPermission()" />
+    </template>
+    ```
+
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component, inject } from '@angular/core';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
+    import { CameraPermissionsService } from '@symbiote-native/image-picker/angular';
+
+    @Component({
+      standalone: true,
+      imports: [SYMBIOTE_ELEMENTS],
+      template: `
+        @if (camera()?.granted) {
+          <text>Camera allowed</text>
+        } @else {
+          <button title="Allow camera" (press)="request()" />
+        }
+      `,
+    })
+    export class CameraGate {
+      private readonly service = inject(CameraPermissionsService);
+      readonly camera = this.service.connect();
+
+      request(): void {
+        void this.service.request();
+      }
+    }
+    ```
+
+    `connect()` returns a signal of the current status; `get()` and `request()` are imperative.
+
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { useCameraPermissions } from '@symbiote-native/image-picker/svelte';
+
+      const camera = useCameraPermissions();
+    </script>
+
+    {#if camera.status?.granted}
+      <text>Camera allowed</text>
+    {:else}
+      <button title="Allow camera" onPress={() => camera.requestPermission()} />
+    {/if}
+    ```
+
+    Svelte returns `{ status, requestPermission, getPermission }` instead of a tuple, matching this
+    repo's rune idiom.
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { useCameraPermissions } from '@symbiote-native/image-picker/solid';
+
+    export function CameraGate() {
+      const [status, requestPermission] = useCameraPermissions();
+
+      return status()?.granted ? (
+        <text>Camera allowed</text>
+      ) : (
+        <button title="Allow camera" onPress={() => requestPermission()} />
+      );
+    }
+    ```
+
+  </TabItem>
+</Tabs>
+
+## API
+
+### Functions
+
+| Signature                                                     | Description                                                                              |
+| ------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `launchCameraAsync(options?)`                                 | Opens the camera to take a photo or video. Resolves an `IImagePickerResult`              |
+| `launchImageLibraryAsync(options?)`                           | Opens the library picker. Resolves an `IImagePickerResult`                               |
+| `getCameraPermissionsAsync()`                                 | Reads the camera permission without prompting                                            |
+| `requestCameraPermissionsAsync()`                             | Prompts for the camera permission                                                        |
+| `getMediaLibraryPermissionsAsync(writeOnly?)`                 | Reads the media library permission without prompting. `writeOnly` asks for add-only access |
+| `requestMediaLibraryPermissionsAsync(writeOnly?)`             | Prompts for the media library permission                                                 |
+| `getPendingResultAsync()`                                     | Android only. Recovers a result delivered after the app was killed. Resolves `null` on iOS |
+
+### `IImagePickerOptions`
+
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| `mediaTypes` | `IMediaType \| IMediaType[]` | What to show: images, videos, or both. Defaults to `'images'`. The deprecated `MediaTypeOptions` enum still works |
+| `allowsEditing` | `boolean` | Crop or rotate after picking. Exclusive with `allowsMultipleSelection`. Defaults to `false` |
+| `aspect` | `[number, number]` | Crop aspect ratio as `[x, y]`. Android only |
+| `shape` | `'rectangle' \| 'oval'` | Crop shape. Android only. Defaults to `'rectangle'` |
+| `quality` | `number` | Compression from 0 (smallest) to 1 (largest). Defaults to `1` |
+| `exif` | `boolean` | Include EXIF data on each asset |
+| `base64` | `boolean` | Include the image as a base64 string on each asset |
+| `allowsMultipleSelection` | `boolean` | Let the user pick more than one item. Ignored when `allowsEditing` is set. Defaults to `false` |
+| `selectionLimit` | `number` | Maximum items when selecting several. `0` means the system maximum. Android and iOS 14+ |
+| `orderedSelection` | `boolean` | Number selected items in tap order. iOS 15+ only. Defaults to `false` |
+| `defaultTab` | `IDefaultTab` | Which tab the picker opens on. Android only. Defaults to `'photos'` |
+| `videoMaxDuration` | `number` | Longest video in seconds. `0` means no limit |
+| `videoQuality` | `UIImagePickerControllerQualityType` | Video capture quality. iOS only. Defaults to `High` |
+| `videoExportPreset` | `VideoExportPreset` | Video export preset. Deprecated upstream. iOS only |
+| `presentationStyle` | `UIImagePickerPresentationStyle` | How the picker is presented. iOS only. Defaults to automatic |
+| `cameraType` | `CameraType` | Which camera opens first. Defaults to the back camera |
+| `preferredAssetRepresentationMode` | `UIImagePickerPreferredAssetRepresentationMode` | How a picked asset is exported. iOS 14+ only. Defaults to automatic |
+| `legacy` | `boolean` | Allow picking from outside the photo library. Android only. Defaults to `false` |
+| `shouldDownloadFromNetwork` | `boolean` | Download from iCloud when the original is not stored locally. iOS only. Defaults to `false` |
+
+### Permission hooks
+
+| Adapter | `useCameraPermissions` / `useMediaLibraryPermissions`                      |
+| ------- | -------------------------------------------------------------------------- |
+| React   | `[status, requestPermission, getPermission]`                               |
+| Vue     | `[status, requestPermission, getPermission]`                               |
+| Solid   | `[status, requestPermission, getPermission]`, with `status` an accessor    |
+| Svelte  | `{ status, requestPermission, getPermission }`                             |
+| Angular | `CameraPermissionsService` / `MediaLibraryPermissionsService`              |
+
+## Notes
+
+- **Check `canceled` before reading `assets`.** The result is a union: `assets` is `null` when the
+  user backs out.
+- **`allowsEditing` with `allowsMultipleSelection` only warns.** Matching upstream, the native side
+  ignores `allowsEditing` in that case instead of throwing.
+- **`MediaTypeOptions` is deprecated.** It still works but logs a warning pointing at the string or
+  array form of `mediaTypes`.
+- **Android can kill your app while the camera is open.** Call `getPendingResultAsync()` on launch
+  to recover a result that arrived while the activity was destroyed.
+- **Web-only fields are dropped.** `ImagePickerAsset.file`, `ImagePickerResult.output` and the web
+  `base64`/`capture` options are not part of the port; this package targets iOS and Android.
+- **The camera and pickers can only be verified on a device.** The headless tests fake the native
+  module, so they prove option validation and permission delegation, not the pickers.
+
+## Common questions
+
+**Do I need to ask for permission before opening the library?** No. Launching the image library
+needs no permission request. Ask for media library permission only when you need it, for example for
+videos on iOS when `allowsEditing` is `false` and `videoExportPreset` is the default `Passthrough`,
+ideally before the picker so users are not surprised by a dialog after picking.
+
+**The camera does not open on the iOS Simulator.** The Simulator has no camera. Test
+`launchCameraAsync` on a device.
+
+**The app restarts, or the result never arrives, after taking a photo on Android.** Android can
+destroy your activity while the camera is open. Call `getPendingResultAsync()` on launch to recover
+the result.
+
+**The image is huge, or I want a smaller file.** Lower `quality` (0 to 1), and resize or recompress
+the result with the [image manipulator](/docs/packages/image-manipulator/).
+
+**I need the file as base64 or with EXIF.** Set `base64: true` or `exif: true`; both are added to
+each asset.
+
+**The crop rectangle is wrong for a high-resolution photo on iOS.** This is a bug in the underlying
+`UIImagePickerController` that upstream documents and cannot fix.
+
+**Why did Android ask for `RECORD_AUDIO`?** The camera picker can record video with sound. The
+package adds that permission for it.
+
+Sources: [Expo docs: ImagePicker](https://docs.expo.dev/versions/latest/sdk/imagepicker/),
+[expo/expo#20482 Android 13 crash](https://github.com/expo/expo/issues/20482),
+[expo/expo#11752 launchImageLibraryAsync crashes on Android](https://github.com/expo/expo/issues/11752).
+
+## How the wrapper works
+
+`expo-image-picker`'s JS is hand-ported into this package's `core/`, resolving
+`ExponentImagePicker` through `expo-modules-core` rather than the `expo` meta-package. The launch
+and permission functions are framework-agnostic and re-exported by every adapter. The permission
+hooks bind the shared `createPermissionHook` runtime from `@symbiote-native/engine` in each
+framework's own idiom, so the method-dispatch plumbing lives once. The native code is never
+vendored: `expo-modules-autolinking` resolves it from `node_modules` (see
+[the native setup guide](/docs/howtos/expo-native-module-setup/)).

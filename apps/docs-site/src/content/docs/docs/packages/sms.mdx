@@ -1,17 +1,16 @@
 ---
 title: SMS
-description: expo-sms wrapped for every SymbioteNative adapter — open the system SMS composer prefilled with recipients, a message, and attachments.
+description: Open the system SMS composer with a prefilled draft on every SymbioteNative adapter.
 ---
 
 import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 
-`@symbiote-native/sms` wraps [`expo-sms`](https://github.com/expo/expo/tree/main/packages/expo-sms)
-— opening the system SMS composer with recipients, message text, and optional attachments filled
-in — so every SymbioteNative adapter can reach it, not just React. Like
+Open the system SMS composer with recipients, a message and optional attachments already filled
+in. `@symbiote-native/sms` wraps [`expo-sms`](https://github.com/expo/expo/tree/main/packages/expo-sms)
+so every SymbioteNative adapter can reach it, not just React. Like
 [secure store](/docs/packages/secure-store/) and [local auth](/docs/packages/local-auth/), every
-export is a free function with no per-instance state, so there is no hook/composable/service to
-wrap — the React, Vue, Angular, Svelte, and Solid entry points are plain re-exports of the same
-`core`.
+export is a free function with no per-instance state, so the React, Vue, Angular, Svelte, and Solid
+entry points are plain re-exports of the same `core`.
 
 Nothing is ever sent on the user's behalf. Both platforms open their own composer with the draft
 in it; the user presses send, edits it, or throws it away.
@@ -256,6 +255,8 @@ throws a `TypeError` before the native module is reached.
 
 ## Notes
 
+- **Check `isAvailableAsync()` first.** It resolves `false` on devices that cannot send text, such as
+  an iOS simulator or a tablet without telephony, and `sendSMSAsync` rejects there.
 - **Android always resolves `unknown`.** Learning whether a message actually left the device means
   querying the SMS database, which needs the `READ_SMS` permission Google restricts to
   default-SMS-app publishers. Treat `unknown` as "the composer closed", not as a failure — and
@@ -264,6 +265,28 @@ throws a `TypeError` before the native module is reached.
   list is read back, so the user is free to edit both in the composer without your app knowing.
 - **The simulator reports unavailable.** `isAvailableAsync()` is `false` on the iOS simulator,
   which ships no Messages app — the composer can only be exercised on a real device.
+
+## Common questions
+
+**`isAvailableAsync()` is `false` on the iOS Simulator.** That is expected: the simulator cannot send
+text. Test on a device.
+
+**Android rejects with "No messaging application available".** No installed app handled the SMS
+intent. The package ships the Android 11 `<queries>` entries for package visibility, so check that
+the device has a messaging app, and call `isAvailableAsync()` first.
+
+**Can I send a message without the user pressing send?** No. Both platforms open their own composer
+with your draft and the user sends, edits or discards it.
+
+**The result is not `sent` on Android.** Android always resolves `unknown`; see the first note
+above.
+
+**Only my first attachment arrives on Android.** Android's composer takes one attachment, so the
+first is used and the rest are dropped. iOS attaches all of them.
+
+Sources: [Expo docs: SMS](https://docs.expo.dev/versions/latest/sdk/sms/),
+[expo/expo#13277 No messaging application available on Android 11](https://github.com/expo/expo/issues/13277),
+[expo/expo#2384 sendSMSAsync does not return the correct result on Android](https://github.com/expo/expo/issues/2384).
 
 ## How the wrapper works
 

@@ -6,8 +6,12 @@ import {
   getIpAddressAsync,
   isAirplaneModeEnabledAsync,
 } from '@symbiote-native/network/angular';
+import { Scenario } from '../components/Scenario';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
+import { ValueRow } from './ValueRow';
+
+const PENDING_LABEL = 'checking…';
 
 function networkTypeLabel(type: NetworkStateType | undefined): string {
   switch (type) {
@@ -34,21 +38,19 @@ function networkTypeLabel(type: NetworkStateType | undefined): string {
 }
 
 function yesNoLabel(value: boolean | undefined): string {
-  return value === undefined ? 'checking…' : value ? 'Yes' : 'No';
+  if (value === undefined) return PENDING_LABEL;
+  return value ? 'Yes' : 'No';
 }
 
-/**
- * @symbiote-native/network canary demo: a live network-state card driven by
- * NetworkStateService.connect() (seeded via getNetworkStateAsync(), refreshed by
- * addNetworkStateListener()) plus a one-shot card for the IP address and airplane-mode check,
- * re-fetched whenever the live state changes. Angular twin of
- * ../../react/screens/NetworkScreen.tsx. Toggle Wi-Fi/airplane mode on the device to see the
- * live card update on its own.
- */
+function airplaneModeLabel(isEnabled: boolean | null): string {
+  if (isEnabled === null) return PENDING_LABEL;
+  return isEnabled ? 'On' : 'Off';
+}
+
 @Component({
   selector: 'NetworkScreen',
   standalone: true,
-  imports: [SYMBIOTE_ELEMENTS],
+  imports: [Scenario, SYMBIOTE_ELEMENTS, ValueRow],
   template: `
     <safe-area-view class="screen">
       <scroll-view
@@ -56,99 +58,96 @@ function yesNoLabel(value: boolean | undefined): string {
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <view [class]="lineTagClass">
-          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        <view [class]="'line-tag line-tag-' + lineInfo.line">
+          <text class="line-tag-text"
+            >{{ lineInfo.code }} · {{ lineInfo.label }}</text
+          >
         </view>
         <view class="hero-card">
-          <view class="hero-badge" [style]="heroBadgeStyle">
-            <text class="hero-badge-text">{{ heroBadgeCode }}</text>
+          <view class="hero-badge" [style]="badgeStyle">
+            <text class="hero-badge-text">{{ lineInfo.code }}</text>
           </view>
           <view class="hero-copy">
             <text class="hero-title">Network</text>
             <text class="hero-body">
-              @symbiote-native/network — live network state via
-              NetworkStateService, plus the device's IP address and
-              airplane-mode check. Toggle Wi-Fi or airplane mode on the device
-              to see the live card update on its own.
+              React to connectivity: the connection type, whether the internet
+              is reachable, the device IP address and airplane mode, updating
+              live as the network changes.
             </text>
           </view>
         </view>
 
-        <view testID="network-live-card" class="capability-card">
-          <text class="capability-card-title">Live network state</text>
-          <view class="capability-row">
-            <text class="capability-label">Type</text>
-            <text class="value-text">{{ networkTypeLabel() }}</text>
+        <Scenario
+          testID="network-scenario"
+          title="Show an offline banner and queue work until the network is back"
+          why="Tell users when they are offline instead of letting requests fail silently, and retry uploads when the connection returns. Connected does not always mean the internet is reachable."
+          [steps]="scenarioSteps"
+          expect="Type, connected and internet reachable change within a moment each time, and airplane mode reads Yes while it is on."
+        />
+
+        <view testID="network-live-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Live network state</text>
           </view>
-          <view class="capability-row">
-            <text class="capability-label">Connected</text>
-            <text class="value-text">{{ connectedLabel() }}</text>
-          </view>
-          <view class="capability-row">
-            <text class="capability-label">Internet reachable</text>
-            <text class="value-text">{{ internetReachableLabel() }}</text>
-          </view>
+          <ValueRow label="Type" [value]="typeLabel(networkState().type)" />
+          <ValueRow
+            label="Connected"
+            [value]="yesNo(networkState().isConnected)"
+          />
+          <ValueRow
+            label="Internet reachable"
+            [value]="yesNo(networkState().isInternetReachable)"
+          />
         </view>
 
-        <view testID="network-info-card" class="capability-card">
-          <text class="capability-card-title">Device info</text>
-          <view class="capability-row">
-            <text class="capability-label">IP address</text>
-            <text class="value-text">{{ ipAddressLabel() }}</text>
+        <view testID="network-info-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Device info</text>
           </view>
-          <view class="capability-row">
-            <text class="capability-label">Airplane mode</text>
-            <text class="value-text">{{ airplaneModeLabel() }}</text>
-          </view>
+          <ValueRow label="IP address" [value]="ipAddress() ?? pendingLabel" />
+          <ValueRow
+            label="Airplane mode"
+            [value]="airplaneLabel(isAirplaneMode())"
+          />
         </view>
       </scroll-view>
     </safe-area-view>
   `,
 })
 export class NetworkScreen {
-  private readonly lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Network];
-  readonly lineTagClass = `line-tag line-tag-${this.lineInfo.line}`;
-  readonly lineTagLabel = `${this.lineInfo.code} · ${this.lineInfo.label}`;
-  readonly heroBadgeCode = this.lineInfo.code;
-  readonly lineColor = LINE_COLOR[this.lineInfo.line];
-  readonly heroBadgeStyle = { backgroundColor: this.lineColor };
+  readonly lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Network];
+  readonly badgeStyle = { backgroundColor: LINE_COLOR.network };
+  readonly typeLabel = networkTypeLabel;
+  readonly yesNo = yesNoLabel;
+  readonly airplaneLabel = airplaneModeLabel;
+  readonly pendingLabel = PENDING_LABEL;
+  readonly scenarioSteps = [
+    'Turn Wi-Fi off, then airplane mode on',
+    'Watch the live card',
+    'Turn everything back on',
+  ];
 
   readonly networkState = inject(NetworkStateService).connect();
-
   readonly ipAddress = signal<string | null>(null);
   readonly isAirplaneMode = signal<boolean | null>(null);
 
   constructor() {
-    effect(() => {
+    // The bare read of `networkState()` re-runs the lookups on every live state change
+    effect(onCleanup => {
       this.networkState();
-      Promise.all([getIpAddressAsync(), isAirplaneModeEnabledAsync()]).then(
-        ([ip, airplaneMode]) => {
+      let isCurrent = true;
+      onCleanup(() => {
+        isCurrent = false;
+      });
+      void Promise.all([
+        getIpAddressAsync(),
+        isAirplaneModeEnabledAsync(),
+      ]).then(([ip, airplaneMode]) => {
+        if (isCurrent) {
           this.ipAddress.set(ip);
           this.isAirplaneMode.set(airplaneMode);
-        },
-      );
+        }
+      });
     });
-  }
-
-  networkTypeLabel(): string {
-    return networkTypeLabel(this.networkState().type);
-  }
-
-  connectedLabel(): string {
-    return yesNoLabel(this.networkState().isConnected);
-  }
-
-  internetReachableLabel(): string {
-    return yesNoLabel(this.networkState().isInternetReachable);
-  }
-
-  ipAddressLabel(): string {
-    const ip = this.ipAddress();
-    return ip === null ? 'checking…' : ip;
-  }
-
-  airplaneModeLabel(): string {
-    const airplaneMode = this.isAirplaneMode();
-    return airplaneMode === null ? 'checking…' : airplaneMode ? 'On' : 'Off';
   }
 }

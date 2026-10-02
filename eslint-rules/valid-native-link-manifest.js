@@ -370,5 +370,12 @@ function isDependency(packageDir, name) {
   const manifestPath = join(packageDir, 'package.json');
   if (!existsSync(manifestPath)) return true;
   const pkg = JSON.parse(readFileSync(manifestPath, 'utf8'));
-  return Boolean(pkg.dependencies?.[name] ?? pkg.peerDependencies?.[name]);
+  const declared = Object.keys({
+    ...pkg.dependencies,
+    ...pkg.peerDependencies,
+  });
+  // Autolinking derives the Gradle project of a scoped package by dropping the `@` and the `/`
+  return declared.some(
+    dep => dep === name || dep.replace(/^@/, '').replace('/', '-') === name,
+  );
 }

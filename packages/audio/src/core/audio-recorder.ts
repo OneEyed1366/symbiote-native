@@ -44,3 +44,8 @@ export class AudioRecorder extends expoAudio.AudioRecorder {
     return super.prepareToRecordAsync(processedOptions);
   }
 }
+
+/** Does not release automatically, same lifecycle note as `createAudioPlayer` */
+export function createAudioRecorder(options: IRecordingOptions): AudioRecorder {
+  return new AudioRecorder(createRecordingOptions(options));
+}

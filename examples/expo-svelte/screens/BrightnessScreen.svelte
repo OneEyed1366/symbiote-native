@@ -1,10 +1,5 @@
 <script lang="ts">
-  // @symbiote-native/brightness tour stop — a live brightness card (seeded via getBrightnessAsync(),
-  // refreshed by addBrightnessListener() — iOS-only upstream, so on Android the value only changes
-  // via the buttons below) plus a set-brightness action row, an Android-only system-brightness-mode
-  // card, and a permission card driving usePermissions(). Svelte twin of
-  // examples/expo-vue-sfc/screens/BrightnessScreen.vue.
-  import { Platform, ScrollView } from '@symbiote-native/svelte';
+  import { Platform } from '@symbiote-native/svelte';
   import {
     BrightnessMode,
     addBrightnessListener,
@@ -18,6 +13,7 @@
     type EventSubscription,
   } from '@symbiote-native/brightness/svelte';
   import ActionButton from '../components/ActionButton.svelte';
+  import Scenario from '../components/Scenario.svelte';
   import { ROUTE_NAME } from '../routes';
   import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
@@ -64,9 +60,8 @@
   let systemUsageStatus = $state<ICapabilityStatus>('checking');
   const permissions = usePermissions();
 
-  // Vue's onMounted/onUnmounted pair collapses into ONE effect whose returned function is the
-  // teardown. Every touch of the state above is a WRITE, never a read, so the dependency set stays
-  // empty: it runs once on mount and removes the listener once on unmount.
+  // Every touch of the state above is a write, so the dependency set stays empty and the effect
+  // runs once on mount, its returned function removes the listener on unmount
   $effect(() => {
     void getBrightnessAsync().then(value => {
       brightness = value;
@@ -117,22 +112,19 @@
       ? PENDING_LABEL
       : `${Math.round(brightness * PERCENT_SCALE)}%`,
   );
-  const systemModeLabel = $derived(brightnessModeLabel(systemMode));
   const permissionLabel = $derived(
     permissions.status === null ? PENDING_LABEL : permissions.status.status,
   );
 </script>
 
 <safe-area-view class="screen">
-  <ScrollView
+  <scroll-view
     testID="brightness-scroll"
     class="screen"
     contentContainerStyle="scroll-content"
   >
     <view class={`line-tag line-tag-${lineInfo.line}`}>
-      <text class="line-tag-text">
-        {`${lineInfo.code} · ${lineInfo.label}`}
-      </text>
+      <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
     </view>
     <view class="hero-card">
       <view class="hero-badge" style={{ backgroundColor: lineColor }}>
@@ -141,49 +133,59 @@
       <view class="hero-copy">
         <text class="hero-title">Brightness</text>
         <text class="hero-body">
-          @symbiote-native/brightness — screen brightness get/set, Android
-          system-brightness mode, and an iOS-only live listener. Requires
-          SYSTEM_BRIGHTNESS permission on Android before setting the system-wide
-          value.
+          Read and change the screen brightness from the app, for example to
+          make a QR code or a boarding pass easy to scan. Android can also
+          change the system-wide value after the user grants the write settings
+          permission.
         </text>
       </view>
     </view>
-    <view testID="brightness-live-card" class="brightness-card">
-      <text class="brightness-card-title">Live brightness</text>
-      <view class="brightness-row">
-        <text class="brightness-row-label">Screen brightness</text>
-        <text testID="brightness-level-value" class="brightness-value-text">
-          {brightnessLabel}
-        </text>
+
+    <Scenario
+      testID="brightness-scenario"
+      title="Brighten the screen to show a QR code or a ticket"
+      why="Scanners read a bright screen much better. Raise the brightness while the code is on screen and restore the user's level afterwards."
+      steps={[
+        'Note the current brightness in the live card',
+        'Set a new value with the controls',
+        'Restore the system value',
+      ]}
+      expect="The screen visibly brightens or dims, and the live card shows the new value. Restoring returns to the system setting."
+    />
+
+    <view testID="brightness-live-card" class="feature-card">
+      <view class="feature-card-header">
+        <text class="feature-card-title">Live brightness</text>
+      </view>
+      <view class="capability-row">
+        <text class="capability-label">Screen brightness</text>
+        <text class="value-text">{brightnessLabel}</text>
       </view>
       <view class="button-row">
-        {#each BRIGHTNESS_STEPS as step (step.label)}<ActionButton
+        {#each BRIGHTNESS_STEPS as step (step.label)}
+          <ActionButton
             testID={`brightness-set-${step.label}`}
             title={step.label}
             onPress={() => handleSetBrightness(step.value)}
             color={lineColor}
-          />{/each}
+          />
+        {/each}
       </view>
     </view>
-    {#if Platform.OS === 'android'}<view
-        testID="brightness-system-card"
-        class="brightness-card"
-      >
-        <text class="brightness-card-title">
-          System brightness (Android only)
-        </text>
-        <view class="brightness-row">
-          <text class="brightness-row-label">Mode</text>
-          <text testID="brightness-mode-value" class="brightness-value-text">
-            {systemModeLabel}
-          </text>
+
+    {#if Platform.OS === 'android'}
+      <view testID="brightness-system-card" class="feature-card">
+        <view class="feature-card-header">
+          <text class="feature-card-title">System brightness (Android only)</text>
         </view>
-        <view testID="brightness-using-system" class="brightness-row">
-          <text class="brightness-row-label">Using system value</text>
-          <view
-            class={`brightness-status-badge brightness-status-badge-${systemUsageStatus}`}
-          >
-            <text class="brightness-status-text">
+        <view class="capability-row">
+          <text class="capability-label">Mode</text>
+          <text class="value-text">{brightnessModeLabel(systemMode)}</text>
+        </view>
+        <view class="capability-row" testID="brightness-using-system">
+          <text class="capability-label">Using system value</text>
+          <view class={`status-badge status-badge-${systemUsageStatus}`}>
+            <text class="status-badge-text">
               {CAPABILITY_LABEL[systemUsageStatus]}
             </text>
           </view>
@@ -208,17 +210,16 @@
             color={lineColor}
           />
         </view>
-      </view>{/if}
-    <view testID="brightness-permission-card" class="brightness-card">
-      <text class="brightness-card-title">Permission</text>
-      <view class="brightness-row">
-        <text class="brightness-row-label">SYSTEM_BRIGHTNESS status</text>
-        <text
-          testID="brightness-permission-value"
-          class="brightness-value-text"
-        >
-          {permissionLabel}
-        </text>
+      </view>
+    {/if}
+
+    <view testID="brightness-permission-card" class="feature-card">
+      <view class="feature-card-header">
+        <text class="feature-card-title">Permission</text>
+      </view>
+      <view class="capability-row">
+        <text class="capability-label">SYSTEM_BRIGHTNESS status</text>
+        <text class="value-text">{permissionLabel}</text>
       </view>
       <ActionButton
         testID="brightness-request-permission"
@@ -227,5 +228,5 @@
         color={lineColor}
       />
     </view>
-  </ScrollView>
+  </scroll-view>
 </safe-area-view>

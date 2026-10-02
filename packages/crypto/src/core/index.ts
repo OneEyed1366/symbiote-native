@@ -7,6 +7,7 @@ export {
   digestStringAsync,
   digest,
 } from './crypto';
+export * from './aes';
 export {
   CryptoDigestAlgorithm,
   CryptoEncoding,

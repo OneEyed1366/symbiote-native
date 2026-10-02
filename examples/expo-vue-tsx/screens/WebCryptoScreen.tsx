@@ -1,63 +1,59 @@
 import { defineComponent, ref } from 'vue';
-import type { Ref } from 'vue';
-import {} from '@symbiote-native/vue';
 import {
   webCrypto,
   polyfillWebCrypto,
 } from '@symbiote-native/standard-web-crypto/vue';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
+import { Scenario } from '../components/Scenario';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
 const RANDOM_BYTE_COUNT = 16;
 
-function bytesToHex(bytes: Uint8Array): string {
+function toHex(bytes: Uint8Array): string {
   return Array.from(bytes)
     .map(byte => byte.toString(16).padStart(2, '0'))
-    .join('');
+    .join(' ');
+}
+
+// No DOM lib in this tsconfig, so `globalThis.crypto` is not a typed global
+function hasGlobalCrypto(): boolean {
+  return Reflect.get(globalThis, 'crypto') !== undefined;
 }
 
 function ValueRow(props: { label: string; value: string }) {
   return (
-    <view class="auth-capability-row">
-      <text class="auth-capability-label">{props.label}</text>
-      <text class="auth-value-text">{props.value}</text>
+    <view class="capability-row">
+      <text class="capability-label">{props.label}</text>
+      <text class="value-text">{props.value}</text>
     </view>
   );
 }
 
-/**
- * Web Crypto demo: @symbiote-native/standard-web-crypto — a partial W3C Web Crypto polyfill
- * over @symbiote-native/crypto's random source. Plain re-export, same for every adapter, so this
- * screen exercises the module directly plus the `globalThis.crypto` polyfill installer.
- */
 export const WebCryptoScreen = defineComponent(
   () => {
     const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.StandardWebCrypto];
-    const lineColor =
-      LINE_COLOR[ROUTE_LINE_INFO[ROUTE_NAME.StandardWebCrypto].line];
+    const lineColor = LINE_COLOR[lineInfo.line];
 
-    const randomBytesHex: Ref<string | null> = ref(null);
-    const hasGlobalCrypto: Ref<boolean> = ref(
-      typeof globalThis.crypto !== 'undefined',
-    );
+    const randomBytesHex = ref<string | null>(null);
+    const isPolyfillInstalled = ref(hasGlobalCrypto());
 
-    function handleGenerateRandomBytes() {
+    const handleGenerateRandomBytes = () => {
       const bytes = webCrypto.getRandomValues(
         new Uint8Array(RANDOM_BYTE_COUNT),
       );
-      randomBytesHex.value = bytesToHex(bytes);
-    }
+      randomBytesHex.value = toHex(bytes);
+    };
 
-    function handleInstallPolyfill() {
+    const handleInstallPolyfill = () => {
       polyfillWebCrypto();
-      hasGlobalCrypto.value = typeof globalThis.crypto !== 'undefined';
-    }
+      isPolyfillInstalled.value = hasGlobalCrypto();
+    };
 
     return () => (
       <safe-area-view class="screen">
         <scroll-view
-          testID="standard-web-crypto-scroll"
+          testID="web-crypto-scroll"
           class="screen"
           contentContainerStyle="scroll-content"
         >
@@ -71,42 +67,50 @@ export const WebCryptoScreen = defineComponent(
             <view class="hero-copy">
               <text class="hero-title">Web Crypto</text>
               <text class="hero-body">
-                @symbiote-native/standard-web-crypto — a partial W3C Web Crypto
-                API polyfill exposing crypto.getRandomValues, backed by
-                @symbiote-native/crypto's native random source.
+                Make web libraries that expect crypto.getRandomValues, such as
+                uuid, nanoid or wallet libraries, work on React Native by
+                installing it on globalThis.crypto over the native random
+                source.
               </text>
             </view>
           </view>
 
-          <view testID="standard-web-crypto-actions-card" class="auth-card">
-            <view class="auth-card-header">
-              <text class="auth-card-title">Random bytes</text>
+          <Scenario
+            testID="web-crypto-scenario"
+            title="Run a web library that needs crypto.getRandomValues"
+            why="Libraries like uuid and nanoid call the Web Crypto API and crash without it. One polyfill call at startup gives them secure random numbers from the native source."
+            steps={['Press Install polyfill', 'Check that globalThis.crypto is installed', 'Generate random bytes']}
+            expect="The installed row switches to Yes, and every press of the random bytes button shows 16 different values."
+          />
+
+          <view testID="web-crypto-random-card" class="feature-card">
+            <view class="feature-card-header">
+              <text class="feature-card-title">Random bytes</text>
             </view>
             <ActionButton
-              testID="standard-web-crypto-random-bytes-button"
+              testID="web-crypto-random-button"
               title="Generate 16 random bytes"
               onPress={handleGenerateRandomBytes}
               color={lineColor}
             />
-            <ValueRow
-              label="Random bytes (hex)"
-              value={randomBytesHex.value ?? 'not generated yet'}
-            />
+            {randomBytesHex.value !== null && (
+              <ValueRow label="Bytes (hex)" value={randomBytesHex.value} />
+            )}
           </view>
 
-          <view testID="standard-web-crypto-polyfill-card" class="auth-card">
-            <view class="auth-card-header">
-              <text class="auth-card-title">Polyfill</text>
+          <view testID="web-crypto-polyfill-card" class="feature-card">
+            <view class="feature-card-header">
+              <text class="feature-card-title">Polyfill</text>
             </view>
             <ActionButton
-              testID="standard-web-crypto-polyfill-button"
+              testID="web-crypto-polyfill-button"
               title="Install polyfill"
               onPress={handleInstallPolyfill}
               color={lineColor}
             />
             <ValueRow
-              label="globalThis.crypto"
-              value={hasGlobalCrypto.value ? 'defined' : 'undefined'}
+              label="globalThis.crypto installed"
+              value={isPolyfillInstalled.value ? 'Yes' : 'No'}
             />
           </view>
         </scroll-view>

@@ -1,16 +1,19 @@
 ---
 title: File system
-description: expo-file-system wrapped for every SymbioteNative adapter — the modern File/Directory/Paths shared-object API, plus the full legacy function-based surface at /legacy.
+description: Read, write, copy and download files on the device with the File/Directory/Paths API, plus the full legacy surface at /legacy.
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-`@symbiote-native/file-system` wraps
+Read, write, copy, move and download files on the device. `@symbiote-native/file-system` wraps
 [`expo-file-system`](https://github.com/expo/expo/tree/main/packages/expo-file-system) for every
-SymbioteNative adapter. Both of upstream's surfaces are ported: the default export is the modern
+SymbioteNative adapter and ports both of upstream's surfaces: the default export is the modern
 `File`/`Directory`/`Paths` API built on JSI shared objects; the legacy function-based API (read/
 write/copy/move/delete, directory listing, disk-space queries, resumable download/upload, Android
 Storage Access Framework) lives at the `/legacy` subpath.
+
+Which directory? `Paths.document` is for data the user expects to keep. `Paths.cache` is for
+anything you can re-create, and the OS may clear it when storage runs low.
 
 | OS platform | Support |
 | ----------- | ------- |
@@ -153,6 +156,35 @@ error-class hierarchy.
 | `upload()`/`createUploadTask()`/`createDownloadTask()` aborted via `options.signal` | Rejects `AbortError` |
 | `.copy()`/`.move()` onto an existing destination without `overwrite: true` | Native exception — destination already exists |
 | Any operation on a path outside the app sandbox without permission | Native exception — permission/sandbox violation |
+
+## Common questions
+
+**I downloaded a file. Where is it, and why can't the user see it in Files or the Gallery?**
+`File.downloadFileAsync` writes into the app's private sandbox, which other apps and the file
+manager cannot browse. To put a photo or video in the Gallery, save it with the
+[media library](/docs/packages/media-library/) package. To let the user keep or send a file, open
+the share sheet with [sharing](/docs/packages/sharing/). On Android you can also ask the user to
+pick a folder with the legacy `StorageAccessFramework` and write there.
+
+**"Permission denied" or an exception when writing outside the app's folders.** The classes work
+inside `Paths.document` and `Paths.cache`. Anything else is outside the sandbox. On Android, use the
+Storage Access Framework, which prompts the user to pick a directory; no storage permission is
+needed for the app's own folders.
+
+**Should I use `Paths.document` or `Paths.cache`?** `Paths.document` for data the user expects to
+keep. `Paths.cache` for anything you can re-create. The OS may clear the cache when space runs
+low, and it is also your job to delete files you no longer need there.
+
+**Does `file.create()` overwrite?** No. It can throw if the file already exists or you cannot
+create it. Use `file.write()` to replace the contents of a file you own.
+
+**Why are there two APIs?** The class API (`File`, `Directory`, `Paths`) is upstream's default.
+The function API is kept at `/legacy` for code that already uses it.
+
+Sources: [Expo forums: unable to download file in expected location](https://forums.expo.dev/t/unable-to-download-file-in-expected-location/19632),
+[expo/expo#20298 requestDirectoryPermissionsAsync opens a file dialog](https://github.com/expo/expo/issues/20298),
+[Expo docs: FileSystem (legacy)](https://docs.expo.dev/versions/latest/sdk/filesystem-legacy/),
+[DEV: expo-file-system cacheDirectory has to be cleaned](https://dev.to/dmitryame/expo-filesystem-cachedirectory-has-to-be-cleaned-2ifd).
 
 ## Legacy API (`/legacy`)
 

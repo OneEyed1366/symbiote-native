@@ -13,6 +13,7 @@ import {
 import type { ILocalAuthenticationResult } from '@symbiote-native/local-auth';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
+import { Scenario } from '../components/Scenario';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
 type ICapabilityStatus = 'checking' | 'yes' | 'no';
@@ -95,15 +96,8 @@ function ValueRow(props: { label: string; value: string }) {
   );
 }
 
-/**
- * @symbiote-native/local-auth canary demo: a capabilities card (hardware present, enrolled,
- * enrolled security level, supported biometric types) followed by a live authenticateAsync()
- * button. cancelAuthenticate() is Android-only upstream - the Cancel button only renders there.
- */
-export function LocalAuthScreen() {
-  const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.LocalAuth];
-  const lineColor = LINE_COLOR[lineInfo.line];
-
+// Kept apart so the screen body stays readable: the four one-shot capability lookups
+function createLocalAuthCapabilities() {
   const [hasHardware, setHasHardware] =
     createSignal<ICapabilityStatus>('checking');
   const [isEnrolled, setIsEnrolled] =
@@ -114,10 +108,6 @@ export function LocalAuthScreen() {
   const [supportedTypes, setSupportedTypes] = createSignal<
     AuthenticationType[] | null
   >(null);
-  const [authResult, setAuthResult] =
-    createSignal<ILocalAuthenticationResult | null>(null);
-  const [isAuthenticating, setIsAuthenticating] = createSignal(false);
-
   let disposed = false;
   onCleanup(() => {
     disposed = true;
@@ -142,6 +132,18 @@ export function LocalAuthScreen() {
       setSupportedTypes(value);
     }
   });
+  return { hasHardware, isEnrolled, enrolledLevel, supportedTypes };
+}
+
+export function LocalAuthScreen() {
+  const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.LocalAuth];
+  const lineColor = LINE_COLOR[lineInfo.line];
+
+  const { hasHardware, isEnrolled, enrolledLevel, supportedTypes } =
+    createLocalAuthCapabilities();
+  const [authResult, setAuthResult] =
+    createSignal<ILocalAuthenticationResult | null>(null);
+  const [isAuthenticating, setIsAuthenticating] = createSignal(false);
 
   const handleAuthenticate = () => {
     setIsAuthenticating(true);
@@ -172,13 +174,21 @@ export function LocalAuthScreen() {
           <view class="hero-copy">
             <text class="hero-title">Local auth</text>
             <text class="hero-body">
-              @symbiote-native/local-auth — FaceID/TouchID on iOS, the
-              Fingerprint/Biometric API on Android. A simulator with no enrolled
-              biometrics reports "not enrolled"; a real device with
-              FaceID/TouchID/fingerprint set up is needed to see a live prompt.
+              Confirm it is really the user with Face ID, Touch ID or a
+              fingerprint before a sensitive action. A simulator without
+              enrolled biometrics reports not enrolled, use a real device with
+              biometrics set up to see the prompt.
             </text>
           </view>
         </view>
+
+        <Scenario
+          testID="local-auth-scenario"
+          title="Re-confirm the user before showing a balance or sending money"
+          why="Even on an unlocked phone, ask for a biometric check before opening a private section or approving a payment. The app only learns whether it succeeded, never the fingerprint or face."
+          steps={['Check that hardware is present and biometrics are enrolled', 'Press authenticate and approve with your face or finger', 'Press it again and cancel']}
+          expect="Success shows a positive result. Cancelling shows the reason, such as user cancel, and the hardware and enrolled rows tell you why a prompt cannot appear."
+        />
 
         <view testID="local-auth-capabilities-card" class="auth-card">
           <view class="auth-card-header">

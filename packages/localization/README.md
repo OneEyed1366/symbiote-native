@@ -1,7 +1,7 @@
 # @symbiote-native/localization
 
 Port of [`expo-localization`](https://docs.expo.dev/versions/latest/sdk/localization/) for
-[SymbioteNative](../../README.md) — the device's locale list and preferred calendar settings,
+[SymbioteNative](../../README.md) - the device's locale list and preferred calendar settings,
 reachable from every adapter (React, Vue, Svelte, Solid, Angular), not just React.
 
 Built the same way as [`@symbiote-native/battery`](../battery) and
@@ -25,41 +25,41 @@ npx @symbiote-native/cli add --localization
 ```
 
 Either way: installs `@symbiote-native/localization` and wires the native autolinking
-automatically — see [`@symbiote-native/cli`](../cli).
+automatically - see [`@symbiote-native/cli`](../cli).
 
 <details>
-<summary>Manual install (no CLI — installing and wiring native autolinking by hand)</summary>
+<summary>Manual install (no CLI - installing and wiring native autolinking by hand)</summary>
 
 ```bash
 npm install @symbiote-native/localization
 ```
 
 Depends on `expo-localization` and `expo-modules-core` directly (regular dependencies, pinned to
-exact versions — never a caret range, since this package's `core/` is hand-ported against one
+exact versions - never a caret range, since this package's `core/` is hand-ported against one
 specific native API shape and a newer resolve could silently drift the two apart). Never install
-`expo-localization` yourself, and never add the `expo` package to this project — it bundles its
+`expo-localization` yourself, and never add the `expo` package to this project - it bundles its
 own Metro/Babel pipeline that conflicts with this project's own.
 
 ### Required one-time step: native autolinking wiring
 
 Unlike a plain RN native module, `expo-localization`'s native code is discovered by
-`expo-modules-autolinking`, not RN's own `react-native.config.cjs` mechanism — this needs wiring
+`expo-modules-autolinking`, not RN's own `react-native.config.cjs` mechanism - this needs wiring
 into the native host app **once**, covering this package and every other `expo-modules-core`
 package (`@symbiote-native/battery`, `@symbiote-native/device`, ...) with zero further changes:
 
 | Platform | Touches                                                                                                                                             |
 | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| iOS      | `ios/Podfile` — add `use_expo_modules!`                                                                                                             |
-| iOS      | `AppDelegate.swift` — Expo's runtime-bootstrap hook                                                                                                 |
-| Android  | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects                                                               |
-| Android  | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
+| iOS      | `ios/Podfile` - add `use_expo_modules!`                                                                                                             |
+| iOS      | `AppDelegate.swift` - Expo's runtime-bootstrap hook                                                                                                 |
+| Android  | `settings.gradle` / `app/build.gradle` - resolve and include the Expo Gradle projects                                                               |
+| Android  | `MainApplication.kt` - Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
 
-Full mechanics — the Podfile pieces that normally ship inside the `expo` package, the `expo`
-peer-dependency exclusion list — live in the `symbiote-expo-native-module` skill. Reference
+Full mechanics - the Podfile pieces that normally ship inside the `expo` package, the `expo`
+peer-dependency exclusion list - live in the `symbiote-expo-native-module` skill. Reference
 implementation: `examples/expo-react/ios/Podfile` and
 `examples/expo-react/android/app/src/main/java/com/canaryexpo/MainApplication.kt`.
 
-No platform permission string is needed — locale and calendar settings are read-only system
+No platform permission string is needed - locale and calendar settings are read-only system
 state with no runtime permission prompt on either platform.
 
 </details>
@@ -67,33 +67,33 @@ state with no runtime permission prompt on either platform.
 ## Shape
 
 ```
-src/core/               types.ts — Locale, Weekday, CalendarIdentifier, Calendar, hand-ported
+src/core/               types.ts - Locale, Weekday, CalendarIdentifier, Calendar, hand-ported
                         verbatim from Localization.types.ts. native-module.ts resolves the
                         native module through expo-modules-core's requireNativeModule and
-                        exposes addLocaleListener/addCalendarListener. localization.ts —
+                        exposes addLocaleListener/addCalendarListener. localization.ts,
                         getLocales/getCalendars, synchronous getters delegating straight to the
                         native module.
-src/react/hooks/        @symbiote-native/localization/react   — useLocales, useCalendars
-src/vue/composables/    @symbiote-native/localization/vue     — same two names, Vue lifecycle
-src/svelte/runes/       @symbiote-native/localization/svelte  — same two names, read as `.current`
-src/solid/primitives/   @symbiote-native/localization/solid   — createLocales, createCalendars
+src/react/hooks/        @symbiote-native/localization/react   - useLocales, useCalendars
+src/vue/composables/    @symbiote-native/localization/vue     - same two names, Vue lifecycle
+src/svelte/runes/       @symbiote-native/localization/svelte  - same two names, read as `.current`
+src/solid/primitives/   @symbiote-native/localization/solid   - createLocales, createCalendars
                         (each returns an Accessor)
-src/angular/services/   @symbiote-native/localization/angular — LocalesService, CalendarsService
+src/angular/services/   @symbiote-native/localization/angular - LocalesService, CalendarsService
                         (`.connect()` returns a Signal)
 ```
 
 Two independent getters, each with its own native change listener and its own reactive hook per
-adapter — mirroring `@symbiote-native/battery`'s shape of shipping several distinct hooks in one
+adapter - mirroring `@symbiote-native/battery`'s shape of shipping several distinct hooks in one
 package, not one combined hook. Solid's naming differs on purpose: `create*`, not `use*`, which
 Solid reserves for consuming something that already exists. Each hook/composable/rune/primitive/
 service seeds its return value from the
-matching synchronous `get*()` call (no initial "loading" state needed — the native call is
+matching synchronous `get*()` call (no initial "loading" state needed - the native call is
 sync, not async) and recomputes it whenever the matching listener fires.
 
 ## Use it
 
 ```tsx
-// React — examples/expo-react/screens/LocalizationScreen.tsx
+// React - examples/expo-react/screens/LocalizationScreen.tsx
 import { useLocales, useCalendars } from '@symbiote-native/localization/react';
 
 function LocalizationScreen() {
@@ -110,7 +110,7 @@ function LocalizationScreen() {
 ```
 
 ```vue
-<!-- Vue — examples/expo-vue-sfc/screens/LocalizationScreen.vue -->
+<!-- Vue - examples/expo-vue-sfc/screens/LocalizationScreen.vue -->
 <script setup lang="ts">
 import { useLocales, useCalendars } from '@symbiote-native/localization/vue';
 
@@ -140,7 +140,7 @@ const calendars = useCalendars(); // Ref<Calendar[]>
 ```
 
 ```tsx
-// Solid — an accessor per getter; call it to read, so a component body that runs once still
+// Solid - an accessor per getter; call it to read, so a component body that runs once still
 // re-renders the leaf that reads it.
 import {
   createLocales,
@@ -161,7 +161,7 @@ function LocalizationScreen() {
 ```
 
 ```ts
-// Angular — examples/expo-angular/src/screens/LocalizationScreen.ts
+// Angular - examples/expo-angular/src/screens/LocalizationScreen.ts
 import { Component, inject } from '@angular/core';
 import {
   LocalesService,
@@ -179,7 +179,7 @@ export class LocalizationScreen {
 
 Two independent synchronous getters (`getLocales`, `getCalendars`), each with its own
 listener-based subscription (`addLocaleListener`/`addCalendarListener`) and its own adapter-level
-lifecycle hook — one hook/composable/service per getter, matching upstream's own `useLocales`/
+lifecycle hook - one hook/composable/service per getter, matching upstream's own `useLocales`/
 `useCalendars` being two separate hooks, not one combined hook.
 
 ```ts
@@ -189,7 +189,7 @@ addLocaleListener(listener): EventSubscription                 // fires when loc
 addCalendarListener(listener): EventSubscription                // fires when calendar settings change
 ```
 
-Plus `Locale`, `Weekday` (enum), `CalendarIdentifier` (enum), `Calendar` — ported from upstream's
+Plus `Locale`, `Weekday` (enum), `CalendarIdentifier` (enum), `Calendar` - ported from upstream's
 `Localization.types.ts`.
 
 ```ts
@@ -211,16 +211,26 @@ import {
 ```
 
 Each hook/composable/service seeds its initial value from the matching synchronous `get*()`
-call, then subscribes to the matching listener for updates, and unsubscribes on unmount —
+call, then subscribes to the matching listener for updates, and unsubscribes on unmount:
 mirroring upstream's own `useLocales`/`useCalendars`.
+
+## Common questions
+
+- **Locale changed in Settings, app shows the old one.** On Android re-read the locales when the
+  app returns to the foreground (`AppState`); on iOS they stay fixed while the app runs.
+- **Empty `getLocales()`?** No, it has at least one entry, in the user's order.
+- **In-app language picker?** Often unnecessary: iOS and Android support per-app language.
+
+Sources: [Expo docs: Localization](https://docs.expo.dev/versions/latest/sdk/localization/),
+[React Native localization with Expo](https://better-i18n.com/en/blog/react-native-expo-localization/).
 
 ## Test it
 
-No Fabric/Descriptor angle at all — localization is a pure synchronous-function + `EventEmitter`
+No Fabric/Descriptor angle at all - localization is a pure synchronous-function + `EventEmitter`
 listener surface, never a view. Tests inject a fake native-module object in place of the real
 `requireNativeModule` resolution (`src/core/localization.test.ts`,
 `src/{react,vue,svelte,solid,angular}/**/*.test.{ts,tsx}`, `vitest`), the same pattern
-`@symbiote-native/battery` and `@symbiote-native/device` use — no `installFabric()`, no
+`@symbiote-native/battery` and `@symbiote-native/device` use - no `installFabric()`, no
 ViewConfig for the core test; the adapter hook/composable/service tests do use `installFabric()`
 purely to mount a host component, same as every other sibling package. Native rendering itself is
-verified on-device — see the parent [README](../../README.md).
+verified on-device - see the parent [README](../../README.md).

@@ -3,6 +3,7 @@ import {
   createLocales,
 } from '@symbiote-native/localization/solid';
 import { ROUTE_NAME } from '../routes';
+import { Scenario } from '../components/Scenario';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
 function ValueRow(props: { label: string; value: string }) {
@@ -14,12 +15,6 @@ function ValueRow(props: { label: string; value: string }) {
   );
 }
 
-/**
- * @symbiote-native/localization canary demo: createLocales()/createCalendars() each return an
- * accessor over an array guaranteed to hold at least one element (the type's own guarantee - see
- * the package's core types), so the first entry is read directly rather than guarded for
- * emptiness.
- */
 export function LocalizationScreen() {
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Localization];
   const lineColor = LINE_COLOR[lineInfo.line];
@@ -46,11 +41,20 @@ export function LocalizationScreen() {
           <view class="hero-copy">
             <text class="hero-title">Localization</text>
             <text class="hero-body">
-              @symbiote-native/localization — locales and calendars, each
-              reactive to device settings changes via its own primitive.
+              Speak the user's language and format: preferred locales, currency,
+              text direction, calendar, 12 or 24 hour clock and time zone,
+              updating as soon as the device settings change.
             </text>
           </view>
         </view>
+
+        <Scenario
+          testID="localization-scenario"
+          title="Format prices, dates and layout for the user's region"
+          why="Show the right currency, switch to right-to-left layout for Arabic or Hebrew and respect 24-hour clocks, without asking users to configure anything."
+          steps={['Read the locale and calendar cards', 'Open system settings and change the language or region', 'Come back to the app']}
+          expect="Language tag, currency, text direction and clock format update to the new settings without restarting the app."
+        />
 
         <view testID="localization-locale-card" class="feature-card">
           <view class="feature-card-header">

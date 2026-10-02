@@ -7,4 +7,5 @@
 export { useBatteryLevel } from './runes/use-battery-level.svelte';
 export { useBatteryState } from './runes/use-battery-state.svelte';
 export { useLowPowerMode } from './runes/use-low-power-mode.svelte';
+export { usePowerState } from './runes/use-power-state.svelte';
 export * from '../core';

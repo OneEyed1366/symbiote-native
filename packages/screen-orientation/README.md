@@ -1,7 +1,7 @@
 # @symbiote-native/screen-orientation
 
 Port of [`expo-screen-orientation`](https://docs.expo.dev/versions/latest/sdk/screen-orientation/)
-for [SymbioteNative](../../README.md) — orientation locking (`lockAsync`/`lockPlatformAsync`/
+for [SymbioteNative](../../README.md) - orientation locking (`lockAsync`/`lockPlatformAsync`/
 `unlockAsync`), reading the current orientation and lock, and an auto-updating orientation-change
 subscription, reachable from every adapter (React, Vue, Svelte, Solid, Angular), not just
 React.
@@ -27,42 +27,42 @@ npx @symbiote-native/cli add --screen-orientation
 ```
 
 Either way: installs `@symbiote-native/screen-orientation` and wires the native autolinking
-automatically — see [`@symbiote-native/cli`](../cli).
+automatically - see [`@symbiote-native/cli`](../cli).
 
 <details>
-<summary>Manual install (no CLI — installing and wiring native autolinking by hand)</summary>
+<summary>Manual install (no CLI - installing and wiring native autolinking by hand)</summary>
 
 ```bash
 npm install @symbiote-native/screen-orientation
 ```
 
 Depends on `expo-screen-orientation` and `expo-modules-core` directly (regular dependencies,
-pinned to exact versions — never a caret range, since this package's `core/` is hand-ported against
+pinned to exact versions - never a caret range, since this package's `core/` is hand-ported against
 one specific native API shape and a newer resolve could silently drift the two apart). Never
-install `expo-screen-orientation` yourself, and never add the `expo` package to this project — it
+install `expo-screen-orientation` yourself, and never add the `expo` package to this project - it
 bundles its own Metro/Babel pipeline that conflicts with this project's own.
 
 ### Required one-time step: native autolinking wiring
 
 Unlike a plain RN native module, `expo-screen-orientation`'s native code is discovered by
-`expo-modules-autolinking`, not RN's own `react-native.config.cjs` mechanism — this needs wiring
+`expo-modules-autolinking`, not RN's own `react-native.config.cjs` mechanism - this needs wiring
 into the native host app **once**, covering this package and every other `expo-modules-core`
 package (`@symbiote-native/network`, `@symbiote-native/device`, `@symbiote-native/sensors`, ...)
 with zero further changes:
 
 | Platform | Touches                                                                                                                                             |
 | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| iOS      | `ios/Podfile` — add `use_expo_modules!`                                                                                                             |
-| iOS      | `AppDelegate.swift` — Expo's runtime-bootstrap hook                                                                                                 |
-| Android  | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects                                                               |
-| Android  | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
+| iOS      | `ios/Podfile` - add `use_expo_modules!`                                                                                                             |
+| iOS      | `AppDelegate.swift` - Expo's runtime-bootstrap hook                                                                                                 |
+| Android  | `settings.gradle` / `app/build.gradle` - resolve and include the Expo Gradle projects                                                               |
+| Android  | `MainApplication.kt` - Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
 
-Full mechanics — the Podfile pieces that normally ship inside the `expo` package, the `expo`
-peer-dependency exclusion list — live in the `symbiote-expo-native-module` skill. Reference
+Full mechanics - the Podfile pieces that normally ship inside the `expo` package, the `expo`
+peer-dependency exclusion list - live in the `symbiote-expo-native-module` skill. Reference
 implementation: `examples/expo-react/ios/Podfile` and
 `examples/expo-react/android/app/src/main/java/com/canaryexpo/MainApplication.kt`.
 
-No platform permission string is needed for screen-orientation's surface — locking and reading the
+No platform permission string is needed for screen-orientation's surface - locking and reading the
 current orientation read/write system state with no runtime permission prompt on either platform.
 
 </details>
@@ -70,31 +70,31 @@ current orientation read/write system state with no runtime permission prompt on
 ## Shape
 
 ```
-src/core/               screen-orientation.ts — lock*/unlock/get* functions +
+src/core/               screen-orientation.ts - lock*/unlock/get* functions +
                         addOrientationChangeListener subscription. native-module.ts resolves the
-                        native module through expo-modules-core's requireNativeModule. types.ts —
+                        native module through expo-modules-core's requireNativeModule. types.ts:
                         Orientation/OrientationLock/SizeClassIOS/WebOrientationLock/WebOrientation
                         enums, PlatformOrientationInfo, ScreenOrientationInfo,
                         OrientationChangeEvent, hand-ported from ScreenOrientation.types.ts, plus
                         ScreenOrientationState (the shape every adapter's wrapper returns).
-src/react/hooks/        @symbiote-native/screen-orientation/react   — useScreenOrientation
-src/vue/composables/    @symbiote-native/screen-orientation/vue     — useScreenOrientation (same name)
-src/svelte/runes/       @symbiote-native/screen-orientation/svelte  — useScreenOrientation (same name)
-src/solid/primitives/   @symbiote-native/screen-orientation/solid   — createScreenOrientation
+src/react/hooks/        @symbiote-native/screen-orientation/react   - useScreenOrientation
+src/vue/composables/    @symbiote-native/screen-orientation/vue     - useScreenOrientation (same name)
+src/svelte/runes/       @symbiote-native/screen-orientation/svelte  - useScreenOrientation (same name)
+src/solid/primitives/   @symbiote-native/screen-orientation/solid   - createScreenOrientation
                         (returns an Accessor; Solid reserves `use*` for consuming existing state)
-src/angular/services/   @symbiote-native/screen-orientation/angular — ScreenOrientationService
+src/angular/services/   @symbiote-native/screen-orientation/angular - ScreenOrientationService
                         (`.connect()` returns a Signal)
 ```
 
 Each adapter's hook/composable/rune/primitive/service is a thin lifecycle wrapper (seed from
 one-shot `getOrientationAsync()`/`getOrientationLockAsync()` calls, subscribe to
-`addOrientationChangeListener`, unsubscribe on unmount) over the same `core` functions — the
+`addOrientationChangeListener`, unsubscribe on unmount) over the same `core` functions - the
 subscription logic is written once and shared by all of them.
 
 ## Use it
 
 ```tsx
-// React — examples/expo-react/screens/ScreenOrientationScreen.tsx
+// React - examples/expo-react/screens/ScreenOrientationScreen.tsx
 import {
   lockAsync,
   OrientationLock,
@@ -118,7 +118,7 @@ function ScreenOrientationScreen() {
 ```
 
 ```vue
-<!-- Vue — examples/expo-vue-sfc/screens/ScreenOrientationScreen.vue -->
+<!-- Vue - examples/expo-vue-sfc/screens/ScreenOrientationScreen.vue -->
 <script setup lang="ts">
 import {
   lockAsync,
@@ -135,7 +135,7 @@ const screenOrientation = useScreenOrientation(); // Ref<ScreenOrientationState>
 ```
 
 ```svelte
-<!-- Svelte — examples/expo-svelte/screens/ScreenOrientationScreen.svelte -->
+<!-- Svelte - examples/expo-svelte/screens/ScreenOrientationScreen.svelte -->
 <script lang="ts">
   import {
     lockAsync,
@@ -143,7 +143,7 @@ const screenOrientation = useScreenOrientation(); // Ref<ScreenOrientationState>
   } from '@symbiote-native/screen-orientation';
   import { useScreenOrientation } from '@symbiote-native/screen-orientation/svelte';
 
-  // The rune hands back a boxed getter, so `.current` is what a `$derived` subscribes to —
+  // The rune hands back a boxed getter, so `.current` is what a `$derived` subscribes to:
   // Svelte's twin of unwrapping Vue's Ref via `.value`.
   const screenOrientation = useScreenOrientation();
 </script>
@@ -153,7 +153,7 @@ const screenOrientation = useScreenOrientation(); // Ref<ScreenOrientationState>
 ```
 
 ```ts
-// Angular — examples/expo-angular/src/screens/ScreenOrientationScreen.ts
+// Angular - examples/expo-angular/src/screens/ScreenOrientationScreen.ts
 import { Component, inject } from '@angular/core';
 import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import { ScreenOrientationService } from '@symbiote-native/screen-orientation/angular';
@@ -169,7 +169,7 @@ export class ScreenOrientationScreen {
 ```
 
 ```tsx
-// Solid — the accessor is CALLED; a Solid component body runs once, so a snapshot would freeze.
+// Solid - the accessor is CALLED; a Solid component body runs once, so a snapshot would freeze.
 import {
   lockAsync,
   OrientationLock,
@@ -214,7 +214,7 @@ Plus `Orientation` (enum: `UNKNOWN`/`PORTRAIT_UP`/`PORTRAIT_DOWN`/`LANDSCAPE_LEF
 `LANDSCAPE_RIGHT`), `OrientationLock` (enum: `DEFAULT`/`ALL`/`PORTRAIT`/`PORTRAIT_UP`/
 `PORTRAIT_DOWN`/`LANDSCAPE`/`LANDSCAPE_LEFT`/`LANDSCAPE_RIGHT`/`OTHER`/`UNKNOWN`), `SizeClassIOS`,
 `WebOrientationLock`, `WebOrientation`, `PlatformOrientationInfo`, `ScreenOrientationInfo`,
-`OrientationChangeEvent` — ported from upstream's `ScreenOrientation.types.ts`.
+`OrientationChangeEvent` - ported from upstream's `ScreenOrientation.types.ts`.
 
 ```ts
 import {
@@ -239,16 +239,27 @@ returns an `Accessor<ScreenOrientationState>` and subscribes from its body rathe
 so nothing can slip between the seed and the subscription.
 
 **Note (Android):** `expo-screen-orientation` doesn't emit its own `expoDidUpdateDimensions`
-event on Android — the module piggybacks on RN's own `Dimensions.addEventListener('change', ...)`
+event on Android - the module piggybacks on RN's own `Dimensions.addEventListener('change', ...)`
 there instead, re-fetching the lock and orientation on every dimensions change. iOS and web both
 subscribe to the native `expoDidUpdateDimensions` event directly.
 
+## Common questions
+
+- **`lockAsync` ignored on tablets (Android 16+).** Locks are ignored on screens 600dp or wider;
+  design the layout to rotate and resize.
+- **Lock only one screen?** Leave the app unlocked, `lockAsync` on that screen, `unlockAsync` on exit.
+- **iPad.** Locking needs the app declared as full screen.
+- **Initial orientation.** Upstream uses a config plugin; set it in the native project here.
+
+Sources: [Expo docs: ScreenOrientation](https://docs.expo.dev/versions/latest/sdk/screen-orientation/),
+[Android 17 will ignore your portrait lock](https://rorklab.net/en/articles/rork-dev/rork-android-17-large-screen-resizability-preparation).
+
 ## Test it
 
-No Fabric/Descriptor angle at all — screen-orientation is a pure async-function + `EventEmitter`
+No Fabric/Descriptor angle at all - screen-orientation is a pure async-function + `EventEmitter`
 listener surface, never a view. Tests inject a fake native-module object in place of the real
 `requireNativeModule` resolution (`src/core/screen-orientation.test.ts`,
 `src/{react,vue,svelte,solid,angular}/**/*.test.{ts,tsx}`, `vitest`), the same pattern
-`@symbiote-native/network`/`@symbiote-native/device`/`@symbiote-native/sensors` use — no
-`installFabric()`, no ViewConfig. Native rendering itself is verified on-device — see the parent
+`@symbiote-native/network`/`@symbiote-native/device`/`@symbiote-native/sensors` use - no
+`installFabric()`, no ViewConfig. Native rendering itself is verified on-device - see the parent
 [README](../../README.md).

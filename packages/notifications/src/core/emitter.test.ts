@@ -45,7 +45,9 @@ vi.mock('@symbiote-native/engine', () => ({ dlog: vi.fn() }));
 const {
   addNotificationReceivedListener,
   clearLastNotificationResponse,
+  clearLastNotificationResponseAsync,
   getLastNotificationResponse,
+  getLastNotificationResponseAsync,
 } = await import('./emitter');
 
 const FAKE_NOTIFICATION = {
@@ -122,6 +124,34 @@ describe('getLastNotificationResponse', () => {
     expect(() => getLastNotificationResponse()).toThrow(/not available/);
 
     FAKE_EMITTER_MODULE.getLastNotificationResponse = original;
+  });
+});
+
+describe('deprecated Async aliases (upstream keeps them for backwards compatibility)', () => {
+  it('getLastNotificationResponseAsync resolves the same response as the sync form', async () => {
+    FAKE_EMITTER_MODULE.getLastNotificationResponse.mockReturnValue(null);
+
+    await expect(getLastNotificationResponseAsync()).resolves.toBeNull();
+  });
+
+  it('getLastNotificationResponseAsync rejects when the native call is unavailable', async () => {
+    const original = FAKE_EMITTER_MODULE.getLastNotificationResponse;
+    // @ts-expect-error simulating a native module without the method
+    FAKE_EMITTER_MODULE.getLastNotificationResponse = undefined;
+
+    await expect(getLastNotificationResponseAsync()).rejects.toThrow(
+      /not available/,
+    );
+
+    FAKE_EMITTER_MODULE.getLastNotificationResponse = original;
+  });
+
+  it('clearLastNotificationResponseAsync clears through the native module', async () => {
+    await clearLastNotificationResponseAsync();
+
+    expect(
+      FAKE_EMITTER_MODULE.clearLastNotificationResponse,
+    ).toHaveBeenCalledTimes(1);
   });
 });
 

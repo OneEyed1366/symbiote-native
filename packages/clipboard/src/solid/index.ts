@@ -6,4 +6,5 @@
 // existing thing) — see adapters/solid/src/primitives for the same convention.
 
 export { createClipboard } from './primitives/create-clipboard';
+export { ClipboardPasteButton } from './clipboard-paste-button';
 export * from '../core';

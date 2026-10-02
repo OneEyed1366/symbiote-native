@@ -1,7 +1,19 @@
 export { AudioPlayer, createAudioPlayer } from './audio-player';
-export { AudioRecorder } from './audio-recorder';
+export { AudioRecorder, createAudioRecorder } from './audio-recorder';
 export { AudioPlaylist, createAudioPlaylist } from './audio-playlist';
 export { AudioStream, createAudioStream } from './audio-stream';
+export type {
+  IUseAudioStreamOptions,
+  IAudioStreamResult,
+} from './audio-stream';
+export { createAudioStreamController } from './audio-stream-controller';
+export {
+  subscribeAudioStreamBuffer,
+  toAudioStreamKey,
+} from './audio-stream-subscription';
+export type { IAudioStreamBufferSource } from './audio-stream-subscription';
+export { runAudioStreamBufferEffect } from './audio-stream-lifecycle';
+export { createAudioStreamHooks } from './audio-stream-hooks';
 export {
   setIsAudioActiveAsync,
   setAudioModeAsync,
@@ -14,6 +26,12 @@ export {
   getPreloadedSources,
 } from './audio-module';
 export { resolveSource, resolveSources } from './resolve-source';
+export { subscribeAudioSampleListener } from './audio-sample-listener';
+export type { IAudioSamplePlayer } from './audio-sample-listener';
+export { subscribeRecordingStatus } from './audio-recorder-status';
+export type { IStatusRecorder } from './audio-recorder-status';
+export { shouldUpdateRecorderState } from './audio-recorder-state';
+export { pollRecorderState } from './audio-recorder-polling';
 export {
   RecordingPresets,
   IOSOutputFormat,
@@ -32,6 +50,7 @@ export type {
   IAudioSource,
   IAudioSourceInfo,
   IAudioPlayerOptions,
+  IAudioLoadOptions,
   IPreloadOptions,
   IRecordingInput,
   IPitchCorrectionQuality,

@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import {
   getAdvertisingId,
-  usePermissions,
+  useTrackingPermissions,
 } from '@symbiote-native/tracking-transparency/react';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
+import { Scenario } from '../components/Scenario';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
 function ValueRow({ label, value }: { label: string; value: string }) {
@@ -16,16 +17,13 @@ function ValueRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-/**
- * @symbiote-native/tracking-transparency canary demo: usePermissions() auto-fetches status on
- * mount and exposes get/request as imperative callbacks; getAdvertisingId() is a plain sync
- * call fetched once on mount, expected to read null on Android/the iOS simulator.
- */
+// `getAdvertisingId()` reads null on Android and the iOS simulator
+
 export function TrackingTransparencyScreen() {
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.TrackingTransparency];
   const lineColor = LINE_COLOR[lineInfo.line];
 
-  const [status, requestPermission, getPermission] = usePermissions();
+  const [status, requestPermission, getPermission] = useTrackingPermissions();
   const [advertisingId, setAdvertisingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -49,13 +47,20 @@ export function TrackingTransparencyScreen() {
           <view className="hero-copy">
             <text className="hero-title">Tracking Transparency</text>
             <text className="hero-body">
-              @symbiote-native/tracking-transparency — the iOS App Tracking
-              Transparency prompt (always granted on Android) plus the
-              advertising-ID getter.
+              Ask permission to track the user across apps before you use the
+              advertising id. iOS shows the App Tracking Transparency prompt,
+              Android always reports granted.
             </text>
           </view>
         </view>
 
+        <Scenario
+          testID="tracking-transparency-scenario"
+          title="Ask before using the advertising id"
+          why="Apple requires the tracking prompt before an app reads the advertising id for ads or attribution. Without consent the id is empty, so the app must work either way."
+          steps={['Press Get to read the current status', 'Press Request and answer the system prompt', 'Read the advertising id below']}
+          expect="The status changes to granted or denied after your answer. The id shows a value only after consent on a real iOS device and is null elsewhere."
+        />
         <view
           testID="tracking-transparency-permission-card"
           className="feature-card"

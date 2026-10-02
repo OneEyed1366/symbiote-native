@@ -1,5 +1,4 @@
 import { defineComponent, onMounted, onUnmounted, ref, watch } from 'vue';
-import type { Ref } from 'vue';
 import { Platform } from '@symbiote-native/vue';
 import {
   getStringAsync,
@@ -11,6 +10,7 @@ import {
 } from '@symbiote-native/clipboard';
 import { useClipboard } from '@symbiote-native/clipboard/vue';
 import { ActionButton } from '../components/ActionButton';
+import { Scenario } from '../components/Scenario';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
@@ -20,97 +20,104 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
   return value ? 'yes' : 'no';
 }
 
+function CapabilityBadge(props: { status: ICapabilityStatus }) {
+  const label =
+    props.status === 'checking'
+      ? 'CHECKING…'
+      : props.status === 'yes'
+        ? 'YES'
+        : 'NO';
+  return (
+    <view class={`status-badge status-badge-${props.status}`}>
+      <text class="status-badge-text">{label}</text>
+    </view>
+  );
+}
+
 function CapabilityRow(props: {
   testID: string;
   label: string;
   status: ICapabilityStatus;
 }) {
   return (
-    <view testID={props.testID} class="auth-capability-row">
-      <text class="auth-capability-label">{props.label}</text>
-      <view class={`auth-status-badge auth-status-badge-${props.status}`}>
-        <text class="auth-status-text">
-          {props.status === 'checking'
-            ? 'CHECKING…'
-            : props.status === 'yes'
-              ? 'YES'
-              : 'NO'}
-        </text>
-      </view>
+    <view testID={props.testID} class="capability-row">
+      <text class="capability-label">{props.label}</text>
+      <CapabilityBadge status={props.status} />
     </view>
   );
 }
 
-function ValueRow(props: { label: string; value: string }) {
-  return (
-    <view class="auth-capability-row">
-      <text class="auth-capability-label">{props.label}</text>
-      <text class="auth-value-text">{props.value}</text>
-    </view>
-  );
+// `clipboardEvent` carries only content types, so the text is re-fetched on every change
+function useClipboardText(clipboardEvent: ReturnType<typeof useClipboard>) {
+  const clipboardText = ref<string | null>(null);
+  const hasString = ref<ICapabilityStatus>('checking');
+  let isMounted = true;
+  const refresh = () => {
+    Promise.all([getStringAsync(), hasStringAsync()]).then(
+      ([text, hasText]) => {
+        if (isMounted) {
+          clipboardText.value = text;
+          hasString.value = toCapabilityStatus(hasText);
+        }
+      },
+    );
+  };
+  onMounted(refresh);
+  watch(clipboardEvent, refresh);
+  onUnmounted(() => {
+    isMounted = false;
+  });
+  return { clipboardText, hasString };
 }
 
-/**
- * Clipboard demo: @symbiote-native/clipboard — the current text value is seeded via
- * getStringAsync() on mount, then re-fetched every time useClipboard()'s change listener fires
- * (the listener event itself only carries `contentTypes`, not the string, matching upstream's
- * own addClipboardListener payload — so a fresh read is the only way to see the new content). On
- * iOS only, a second card exercises the URL-specific get/set/has surface. Vue TSX twin of
- * ../../expo-react/screens/LocalAuthScreen.tsx's capability-card shape.
- */
+// URL get/set/has exists on iOS only
+function useClipboardUrl(clipboardEvent: ReturnType<typeof useClipboard>) {
+  const clipboardUrl = ref<string | null>(null);
+  const hasUrl = ref<ICapabilityStatus>('checking');
+  let isMounted = true;
+  const refresh = () => {
+    if (Platform.OS !== 'ios') {
+      return;
+    }
+    Promise.all([getUrlAsync(), hasUrlAsync()]).then(([url, hasUrlValue]) => {
+      if (isMounted) {
+        clipboardUrl.value = url;
+        hasUrl.value = toCapabilityStatus(hasUrlValue);
+      }
+    });
+  };
+  onMounted(refresh);
+  watch(clipboardEvent, refresh);
+  onUnmounted(() => {
+    isMounted = false;
+  });
+  const setUrl = (text: string) =>
+    setUrlAsync(text).then(() =>
+      getUrlAsync().then(url => {
+        clipboardUrl.value = url;
+      }),
+    );
+  return { clipboardUrl, hasUrl, setUrl };
+}
+
 export const ClipboardScreen = defineComponent(
   () => {
     const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Clipboard];
-    const lineColor = LINE_COLOR[ROUTE_LINE_INFO[ROUTE_NAME.Clipboard].line];
+    const lineColor = LINE_COLOR[lineInfo.line];
 
-    const clipboardText = ref('');
-    const hasString = ref<ICapabilityStatus>('checking');
-    const inputText = ref('');
     const clipboardEvent = useClipboard();
+    const { clipboardText, hasString } = useClipboardText(clipboardEvent);
+    const { clipboardUrl, hasUrl, setUrl } = useClipboardUrl(clipboardEvent);
+    const inputText = ref('');
+    const urlText = ref('');
 
-    const urlValue: Ref<string | null> = ref(null);
-    const hasUrl = ref<ICapabilityStatus>('checking');
-    const urlInput = ref('');
+    const handleCopy = () => {
+      setStringAsync(inputText.value);
+    };
 
-    let isMounted = true;
-    onUnmounted(() => {
-      isMounted = false;
-    });
-
-    function refreshString() {
-      getStringAsync().then(value => {
-        if (isMounted) clipboardText.value = value;
-      });
-      hasStringAsync().then(value => {
-        if (isMounted) hasString.value = toCapabilityStatus(value);
-      });
-    }
-
-    function refreshUrl() {
-      getUrlAsync().then(value => {
-        if (isMounted) urlValue.value = value;
-      });
-      hasUrlAsync().then(value => {
-        if (isMounted) hasUrl.value = toCapabilityStatus(value);
-      });
-    }
-
-    onMounted(() => {
-      refreshString();
-      if (Platform.OS === 'ios') refreshUrl();
-    });
-
-    watch(clipboardEvent, () => {
-      refreshString();
-    });
-
-    function handleCopy() {
-      setStringAsync(inputText.value).then(refreshString);
-    }
-
-    function handleSetUrl() {
-      setUrlAsync(urlInput.value).then(refreshUrl);
-    }
+    const handleSetUrl = () => {
+      setUrl(urlText.value);
+    };
 
     return () => (
       <safe-area-view class="screen">
@@ -129,38 +136,51 @@ export const ClipboardScreen = defineComponent(
             <view class="hero-copy">
               <text class="hero-title">Clipboard</text>
               <text class="hero-body">
-                @symbiote-native/clipboard — reads and writes the system
-                clipboard text/URL content, plus a change listener. iOS 16+ may
-                prompt for paste permission on every read.
+                Copy and paste from the app: write text or a link to the system
+                clipboard, read it back and follow changes live. Copy something
+                in another app to see the value below update on its own.
               </text>
             </view>
           </view>
 
-          <view testID="clipboard-value-card" class="auth-card">
-            <view class="auth-card-header">
-              <text class="auth-card-title">Current value</text>
+          <Scenario
+            testID="clipboard-scenario"
+            title="Copy a promo code or an invite link with one tap"
+            why="Copy buttons save users from selecting text by hand. Reading the clipboard lets the app offer to paste a code or a link the user just copied elsewhere."
+            steps={['Write some text and press copy', 'Open another app and paste', 'Copy something in another app and come back']}
+            expect="The pasted text matches what you copied. The value card updates by itself when the clipboard changes outside the app."
+          />
+
+          <view testID="clipboard-value-card" class="feature-card">
+            <view class="feature-card-header">
+              <text class="feature-card-title">Current value</text>
             </view>
-            <text testID="clipboard-current-text" class="auth-value-text">
-              {clipboardText.value || '(empty)'}
-            </text>
+            <view class="capability-row">
+              <text class="capability-label">Clipboard text</text>
+              <text class="value-text">
+                {clipboardText.value === null
+                  ? 'checking…'
+                  : clipboardText.value || '(empty)'}
+              </text>
+            </view>
             <CapabilityRow
               testID="clipboard-has-string"
-              label="Has text"
+              label="Has string"
               status={hasString.value}
             />
           </view>
 
-          <view testID="clipboard-copy-card" class="auth-card">
-            <view class="auth-card-header">
-              <text class="auth-card-title">Copy text</text>
+          <view testID="clipboard-copy-card" class="feature-card">
+            <view class="feature-card-header">
+              <text class="feature-card-title">Copy text</text>
             </view>
             <text-input
-              testID="clipboard-input"
+              testID="clipboard-copy-input"
               value={inputText.value}
-              onValueChange={(text: string) => {
-                inputText.value = text;
+              onValueChange={event => {
+                inputText.value = event.text;
               }}
-              placeholder="Type something to copy…"
+              placeholder="Type something to copy"
               placeholderTextColor="#41506a"
               class="text-input"
             />
@@ -173,14 +193,18 @@ export const ClipboardScreen = defineComponent(
           </view>
 
           {Platform.OS === 'ios' && (
-            <view testID="clipboard-url-card" class="auth-card">
-              <view class="auth-card-header">
-                <text class="auth-card-title">URL</text>
+            <view testID="clipboard-url-card" class="feature-card">
+              <view class="feature-card-header">
+                <text class="feature-card-title">URL (iOS only)</text>
               </view>
-              <ValueRow
-                label="Current URL"
-                value={urlValue.value ?? '(none)'}
-              />
+              <view class="capability-row">
+                <text class="capability-label">Clipboard URL</text>
+                <text class="value-text">
+                  {clipboardUrl.value === null
+                    ? 'checking…'
+                    : clipboardUrl.value || '(none)'}
+                </text>
+              </view>
               <CapabilityRow
                 testID="clipboard-has-url"
                 label="Has URL"
@@ -188,9 +212,9 @@ export const ClipboardScreen = defineComponent(
               />
               <text-input
                 testID="clipboard-url-input"
-                value={urlInput.value}
-                onValueChange={(text: string) => {
-                  urlInput.value = text;
+                value={urlText.value}
+                onValueChange={event => {
+                  urlText.value = event.text;
                 }}
                 placeholder="https://example.com"
                 placeholderTextColor="#41506a"

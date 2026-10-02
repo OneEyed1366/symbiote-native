@@ -36,6 +36,25 @@ export const NAV_LINE = {
   Notifications: 'notifications',
   BackgroundTasks: 'background-tasks',
   Sqlite: 'sqlite',
+  MailComposer: 'mail-composer',
+  Print: 'print',
+  Speech: 'speech',
+  VideoThumbnails: 'video-thumbnails',
+  DocumentPicker: 'document-picker',
+  ImagePicker: 'image-picker',
+  ImageManipulator: 'image-manipulator',
+  Blob: 'blob',
+  ScreenCapture: 'screen-capture',
+  Contacts: 'contacts',
+  Calendar: 'calendar',
+  AgeRange: 'age-range',
+  AppIntegrity: 'app-integrity',
+  IntentLauncher: 'intent-launcher',
+  NavigationBar: 'navigation-bar',
+  Font: 'font',
+  Asset: 'asset',
+  AppMetrics: 'app-metrics',
+  AuthSession: 'auth-session',
 } as const;
 
 export type INavLine = (typeof NAV_LINE)[keyof typeof NAV_LINE];
@@ -113,6 +132,44 @@ export const LINE_COLOR: Record<INavLine, string> = {
   // is muted/darker than both — measured minimum RGB distance to every other line here is 45.2,
   // above the tightest pair already in this palette (LocalAuth/ScreenOrientation at 26.9).
   [NAV_LINE.Sqlite]: '#a6af1d',
+  // @symbiote-native/mail-composer.
+  [NAV_LINE.MailComposer]: '#c2410c',
+  // @symbiote-native/print.
+  [NAV_LINE.Print]: '#9d174d',
+  // @symbiote-native/speech.
+  [NAV_LINE.Speech]: '#0e7490',
+  // @symbiote-native/video-thumbnails.
+  [NAV_LINE.VideoThumbnails]: '#6d28d9',
+  // @symbiote-native/document-picker.
+  [NAV_LINE.DocumentPicker]: '#15803d',
+  // @symbiote-native/image-picker.
+  [NAV_LINE.ImagePicker]: '#be185d',
+  // @symbiote-native/image-manipulator.
+  [NAV_LINE.ImageManipulator]: '#b91c1c',
+  // @symbiote-native/blob.
+  [NAV_LINE.Blob]: '#0f766e',
+  // @symbiote-native/screen-capture.
+  [NAV_LINE.ScreenCapture]: '#7e22ce',
+  // @symbiote-native/contacts.
+  [NAV_LINE.Contacts]: '#0891b2',
+  // @symbiote-native/calendar.
+  [NAV_LINE.Calendar]: '#ca8a04',
+  // @symbiote-native/age-range.
+  [NAV_LINE.AgeRange]: '#ea580c',
+  // @symbiote-native/app-integrity.
+  [NAV_LINE.AppIntegrity]: '#4f46e5',
+  // @symbiote-native/intent-launcher.
+  [NAV_LINE.IntentLauncher]: '#16a34a',
+  // @symbiote-native/navigation-bar.
+  [NAV_LINE.NavigationBar]: '#2563eb',
+  // @symbiote-native/font.
+  [NAV_LINE.Font]: '#c026d3',
+  // @symbiote-native/asset.
+  [NAV_LINE.Asset]: '#0d9488',
+  // @symbiote-native/app-metrics.
+  [NAV_LINE.AppMetrics]: '#e11d48',
+  // @symbiote-native/auth-session.
+  [NAV_LINE.AuthSession]: '#65a30d',
 };
 
 export type INavLineInfo = {
@@ -261,5 +318,100 @@ export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
     line: NAV_LINE.Sqlite,
     code: 'SQ',
     label: 'SQLITE LINE',
+  },
+  [ROUTE_NAME.MailComposer]: {
+    line: NAV_LINE.MailComposer,
+    code: 'MC',
+    label: 'MAIL COMPOSER LINE',
+  },
+  [ROUTE_NAME.Print]: {
+    line: NAV_LINE.Print,
+    code: 'PR',
+    label: 'PRINT LINE',
+  },
+  [ROUTE_NAME.Speech]: {
+    line: NAV_LINE.Speech,
+    code: 'SP',
+    label: 'SPEECH LINE',
+  },
+  [ROUTE_NAME.VideoThumbnails]: {
+    line: NAV_LINE.VideoThumbnails,
+    code: 'VT',
+    label: 'VIDEO THUMBNAILS LINE',
+  },
+  [ROUTE_NAME.DocumentPicker]: {
+    line: NAV_LINE.DocumentPicker,
+    code: 'DP',
+    label: 'DOCUMENT PICKER LINE',
+  },
+  [ROUTE_NAME.ImagePicker]: {
+    line: NAV_LINE.ImagePicker,
+    code: 'IP',
+    label: 'IMAGE PICKER LINE',
+  },
+  [ROUTE_NAME.ImageManipulator]: {
+    line: NAV_LINE.ImageManipulator,
+    code: 'IM',
+    label: 'IMAGE MANIPULATOR LINE',
+  },
+  [ROUTE_NAME.Blob]: {
+    line: NAV_LINE.Blob,
+    code: 'BL',
+    label: 'BLOB LINE',
+  },
+  [ROUTE_NAME.ScreenCapture]: {
+    line: NAV_LINE.ScreenCapture,
+    code: 'SC',
+    label: 'SCREEN CAPTURE LINE',
+  },
+  [ROUTE_NAME.Contacts]: {
+    line: NAV_LINE.Contacts,
+    code: 'CT',
+    label: 'CONTACTS LINE',
+  },
+  [ROUTE_NAME.Calendar]: {
+    line: NAV_LINE.Calendar,
+    code: 'CA',
+    label: 'CALENDAR LINE',
+  },
+  [ROUTE_NAME.AgeRange]: {
+    line: NAV_LINE.AgeRange,
+    code: 'AR',
+    label: 'AGE RANGE LINE',
+  },
+  [ROUTE_NAME.AppIntegrity]: {
+    line: NAV_LINE.AppIntegrity,
+    code: 'AI',
+    label: 'APP INTEGRITY LINE',
+  },
+  [ROUTE_NAME.IntentLauncher]: {
+    line: NAV_LINE.IntentLauncher,
+    code: 'IL',
+    label: 'INTENT LAUNCHER LINE',
+  },
+  [ROUTE_NAME.NavigationBar]: {
+    line: NAV_LINE.NavigationBar,
+    code: 'NB',
+    label: 'NAVIGATION BAR LINE',
+  },
+  [ROUTE_NAME.Font]: {
+    line: NAV_LINE.Font,
+    code: 'FN',
+    label: 'FONT LINE',
+  },
+  [ROUTE_NAME.Asset]: {
+    line: NAV_LINE.Asset,
+    code: 'AS',
+    label: 'ASSET LINE',
+  },
+  [ROUTE_NAME.AppMetrics]: {
+    line: NAV_LINE.AppMetrics,
+    code: 'AM',
+    label: 'APP METRICS LINE',
+  },
+  [ROUTE_NAME.AuthSession]: {
+    line: NAV_LINE.AuthSession,
+    code: 'AU',
+    label: 'AUTH SESSION LINE',
   },
 };

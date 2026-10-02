@@ -370,6 +370,18 @@ initial read of whatever's already on the clipboard, only new changes going forw
   plain-text and HTML MIME types. Seeing `plain-text` in an event does not mean the content was
   copied as plain text — check for `html` first if the distinction matters.
 
+## Common questions
+
+- **`getStringAsync` returns an empty string on iOS.** On iOS 16+ a denied paste returns `''`, and
+  it cannot be told apart from an empty clipboard; no error is thrown.
+- **How do I avoid the paste prompt?** Use `ClipboardPasteButton`, which wraps `UIPasteControl` and
+  pastes without asking permission.
+- **How do I copy an image?** `setImageAsync` takes a base64 string.
+
+Sources: [Expo docs: Clipboard](https://docs.expo.dev/versions/latest/sdk/clipboard/),
+[expo/expo#40189](https://github.com/expo/expo/issues/40189),
+[expo/expo#15335](https://github.com/expo/expo/discussions/15335).
+
 ## How the wrapper works
 
 `@symbiote-native/clipboard` ships **zero React/Vue/Angular/Svelte/Solid logic in `expo-clipboard` itself** —
@@ -397,7 +409,9 @@ every other SymbioteNative component (see [how it works](/docs/how-it-works/)). 
 itself is never vendored or copied — `expo-modules-autolinking` resolves it straight out of
 `node_modules` (see [the native setup guide](/docs/howtos/expo-native-module-setup/)).
 
-Upstream's `ClipboardPasteButton` (a native paste-button view, iOS 16+) is **not** ported in this
-pass — it would follow the [third-party native-view wrapper](/docs/packages/slider/#how-the-wrapper-works)
-recipe, not this package's `expo-modules-core` one, since it's a real Fabric view rather than an
-event/async surface.
+`ClipboardPasteButton` (the `UIPasteControl` view, iOS 16+) is ported on every adapter. It is an
+Expo native view: the core registers it through `requireNativeViewManager` when it renders, and it
+paints nothing on Android. Check `isPasteButtonAvailable` before rendering it, give it a width and
+a height in `style`, and style it through `backgroundColor`, `foregroundColor`, `cornerStyle` and
+`displayMode` since Apple restricts the control. `onPress` receives `{ type: 'text', text }` or
+`{ type: 'image', data, size }`: Vue takes `@press`, Angular `[onPress]`, the others `onPress`.

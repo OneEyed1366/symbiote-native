@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { Platform, SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import {
   CellularGeneration,
@@ -11,11 +11,16 @@ import {
   getMobileNetworkCodeAsync,
 } from '@symbiote-native/cellular/angular';
 import { ActionButton } from '../components/ActionButton';
+import { Scenario } from '../components/Scenario';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
+import { ValueRow } from './ValueRow';
 
-function generationLabel(generation: CellularGeneration | null): string {
-  if (generation === null) return 'checking…';
+const PENDING_LABEL = 'checking…';
+const EMPTY_LABEL = '(none)';
+const ANDROID_OS = 'android';
+
+function generationLabel(generation: CellularGeneration): string {
   switch (generation) {
     case CellularGeneration.CELLULAR_2G:
       return '2G';
@@ -31,22 +36,15 @@ function generationLabel(generation: CellularGeneration | null): string {
 }
 
 function valueLabel(value: string | boolean | null): string {
-  if (value === null) return 'checking…';
+  if (value === null) return PENDING_LABEL;
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
-  return value || '(none)';
+  return value || EMPTY_LABEL;
 }
 
-/**
- * @symbiote-native/cellular canary demo: a one-shot info card (generation + carrier/SIM fields,
- * every field except generation returns null on iOS/web upstream — Android-only in practice)
- * plus a permission card driving PermissionsService. Most fields need a physical device with a
- * SIM card; a simulator/emulator reports null/UNKNOWN for nearly everything. Angular twin of
- * ../../react/screens/CellularScreen.tsx.
- */
 @Component({
   selector: 'CellularScreen',
   standalone: true,
-  imports: [ActionButton, SYMBIOTE_ELEMENTS],
+  imports: [ActionButton, Scenario, SYMBIOTE_ELEMENTS, ValueRow],
   template: `
     <safe-area-view class="screen">
       <scroll-view
@@ -54,127 +52,127 @@ function valueLabel(value: string | boolean | null): string {
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <view [class]="lineTagClass">
-          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        <view [class]="'line-tag line-tag-' + lineInfo.line">
+          <text class="line-tag-text"
+            >{{ lineInfo.code }} · {{ lineInfo.label }}</text
+          >
         </view>
         <view class="hero-card">
-          <view class="hero-badge" [style]="heroBadgeStyle">
-            <text class="hero-badge-text">{{ heroBadgeCode }}</text>
+          <view class="hero-badge" [style]="badgeStyle">
+            <text class="hero-badge-text">{{ lineInfo.code }}</text>
           </view>
           <view class="hero-copy">
             <text class="hero-title">Cellular</text>
             <text class="hero-body">
-              @symbiote-native/cellular — cellular generation and carrier/SIM
-              info. Every field except generation is Android-only upstream
-              (iOS/web return null); a physical device with an active SIM is
-              needed for real values.
+              Find out about the mobile connection: network generation (2G to
+              5G), carrier name, country code and whether VoIP is allowed. Only
+              the generation works on iOS, a physical device with a SIM is
+              needed.
             </text>
           </view>
         </view>
 
-        <view testID="cellular-info-card" class="capability-card">
-          <text class="capability-card-title">Cellular info</text>
-          <view class="capability-row">
-            <text class="capability-label">Generation</text>
-            <text class="value-text">{{ generationLabel() }}</text>
+        <Scenario
+          testID="cellular-scenario"
+          title="Choose video quality from the mobile network generation"
+          why="On 3G, lower the stream quality or skip auto-downloads, on 5G allow them. The carrier and country help pick the right payment or support options."
+          [steps]="scenarioSteps"
+          expect="The generation shows 3G, 4G or 5G and the carrier name appears on Android. Fields the platform does not provide show as unavailable."
+        />
+
+        <view testID="cellular-info-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Cellular info</text>
           </view>
-          @if (Platform.OS === 'android') {
-            <view class="capability-row">
-              <text class="capability-label">Allows VoIP</text>
-              <text class="value-text">{{ valueLabel(allowsVoip()) }}</text>
-            </view>
-            <view class="capability-row">
-              <text class="capability-label">ISO country code</text>
-              <text class="value-text">{{ valueLabel(isoCountryCode()) }}</text>
-            </view>
-            <view class="capability-row">
-              <text class="capability-label">Carrier name</text>
-              <text class="value-text">{{ valueLabel(carrierName()) }}</text>
-            </view>
-            <view class="capability-row">
-              <text class="capability-label">Mobile country code</text>
-              <text class="value-text">{{
-                valueLabel(mobileCountryCode())
-              }}</text>
-            </view>
-            <view class="capability-row">
-              <text class="capability-label">Mobile network code</text>
-              <text class="value-text">{{
-                valueLabel(mobileNetworkCode())
-              }}</text>
-            </view>
+          <ValueRow label="Generation" [value]="generationText()" />
+          @if (isAndroid) {
+            <ValueRow label="Allows VoIP" [value]="label(allowsVoip())" />
+            <ValueRow
+              label="ISO country code"
+              [value]="label(isoCountryCode())"
+            />
+            <ValueRow label="Carrier name" [value]="label(carrierName())" />
+            <ValueRow
+              label="Mobile country code"
+              [value]="label(mobileCountryCode())"
+            />
+            <ValueRow
+              label="Mobile network code"
+              [value]="label(mobileNetworkCode())"
+            />
           }
         </view>
 
-        <view testID="cellular-permission-card" class="capability-card">
-          <text class="capability-card-title">Permission</text>
-          <view class="capability-row">
-            <text class="capability-label">Phone-state permission status</text>
-            <text class="value-text">{{ permissionLabel() }}</text>
+        <view testID="cellular-permission-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Permission</text>
           </view>
+          <ValueRow
+            label="Phone-state permission status"
+            [value]="permissionLabel()"
+          />
           <ActionButton
             testID="cellular-request-permission"
             title="Request permission"
             [color]="lineColor"
             (press)="requestPermission()"
-          ></ActionButton>
+          />
         </view>
       </scroll-view>
     </safe-area-view>
   `,
 })
 export class CellularScreen {
-  private readonly lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Cellular];
-  readonly lineTagClass = `line-tag line-tag-${this.lineInfo.line}`;
-  readonly lineTagLabel = `${this.lineInfo.code} · ${this.lineInfo.label}`;
-  readonly heroBadgeCode = this.lineInfo.code;
-  readonly lineColor = LINE_COLOR[this.lineInfo.line];
-  readonly heroBadgeStyle = { backgroundColor: this.lineColor };
+  readonly lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Cellular];
+  readonly lineColor = LINE_COLOR.cellular;
+  readonly badgeStyle = { backgroundColor: LINE_COLOR.cellular };
+  readonly isAndroid = Platform.OS === ANDROID_OS;
+  readonly label = valueLabel;
+  readonly scenarioSteps = [
+    'Turn Wi-Fi off so the phone uses mobile data',
+    'Read the generation and carrier in the card',
+  ];
 
-  readonly Platform = Platform;
+  private readonly permissions = inject(PermissionsService);
+  private readonly permissionStatus = this.permissions.connect();
 
-  private readonly permissionsService = inject(PermissionsService);
-  readonly permissionStatus = this.permissionsService.connect();
-
-  readonly generation = signal<CellularGeneration | null>(null);
+  private readonly generation = signal<CellularGeneration | null>(null);
   readonly allowsVoip = signal<boolean | null>(null);
   readonly isoCountryCode = signal<string | null>(null);
   readonly carrierName = signal<string | null>(null);
   readonly mobileCountryCode = signal<string | null>(null);
   readonly mobileNetworkCode = signal<string | null>(null);
 
+  readonly generationText = computed(() => {
+    const generation = this.generation();
+    return generation === null ? PENDING_LABEL : generationLabel(generation);
+  });
+  readonly permissionLabel = computed(() => {
+    const status = this.permissionStatus();
+    return status === null ? PENDING_LABEL : status.status;
+  });
+
   constructor() {
-    Promise.all([
+    void Promise.all([
       getCellularGenerationAsync(),
       allowsVoipAsync(),
       getIsoCountryCodeAsync(),
       getCarrierNameAsync(),
       getMobileCountryCodeAsync(),
       getMobileNetworkCodeAsync(),
-    ]).then(([generation, voip, iso, carrier, mcc, mnc]) => {
-      this.generation.set(generation);
-      this.allowsVoip.set(voip);
-      this.isoCountryCode.set(iso);
-      this.carrierName.set(carrier);
-      this.mobileCountryCode.set(mcc);
-      this.mobileNetworkCode.set(mnc);
-    });
-  }
-
-  generationLabel(): string {
-    return generationLabel(this.generation());
-  }
-
-  valueLabel(value: string | boolean | null): string {
-    return valueLabel(value);
-  }
-
-  permissionLabel(): string {
-    const status = this.permissionStatus();
-    return status === null ? 'checking…' : status.status;
+    ]).then(
+      ([currentGeneration, voip, iso, carrier, countryCode, networkCode]) => {
+        this.generation.set(currentGeneration);
+        this.allowsVoip.set(voip);
+        this.isoCountryCode.set(iso);
+        this.carrierName.set(carrier);
+        this.mobileCountryCode.set(countryCode);
+        this.mobileNetworkCode.set(networkCode);
+      },
+    );
   }
 
   requestPermission(): void {
-    void this.permissionsService.request();
+    void this.permissions.request();
   }
 }

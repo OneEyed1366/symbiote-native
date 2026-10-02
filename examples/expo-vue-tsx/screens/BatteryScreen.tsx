@@ -10,6 +10,7 @@ import {
   isAvailableAsync,
   isBatteryOptimizationEnabledAsync,
 } from '@symbiote-native/battery';
+import { Scenario } from '../components/Scenario';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
@@ -19,21 +20,18 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
   return value ? 'yes' : 'no';
 }
 
-function batteryStateLabel(state: BatteryState): string {
-  switch (state) {
-    case BatteryState.UNKNOWN:
-      return 'Unknown';
-    case BatteryState.UNPLUGGED:
-      return 'Unplugged';
-    case BatteryState.CHARGING:
-      return 'Charging';
-    case BatteryState.FULL:
-      return 'Full';
-    case BatteryState.NOT_CHARGING:
-      return 'Not charging';
-    default:
-      return 'Unknown';
-  }
+function CapabilityBadge(props: { status: ICapabilityStatus }) {
+  const label =
+    props.status === 'checking'
+      ? 'CHECKING…'
+      : props.status === 'yes'
+        ? 'YES'
+        : 'NO';
+  return (
+    <view class={`status-badge status-badge-${props.status}`}>
+      <text class="status-badge-text">{label}</text>
+    </view>
+  );
 }
 
 function CapabilityRow(props: {
@@ -42,41 +40,33 @@ function CapabilityRow(props: {
   status: ICapabilityStatus;
 }) {
   return (
-    <view testID={props.testID} class="auth-capability-row">
-      <text class="auth-capability-label">{props.label}</text>
-      <view class={`auth-status-badge auth-status-badge-${props.status}`}>
-        <text class="auth-status-text">
-          {props.status === 'checking'
-            ? 'CHECKING…'
-            : props.status === 'yes'
-              ? 'YES'
-              : 'NO'}
-        </text>
-      </view>
+    <view testID={props.testID} class="capability-row">
+      <text class="capability-label">{props.label}</text>
+      <CapabilityBadge status={props.status} />
     </view>
   );
 }
 
-function ValueRow(props: { label: string; value: string }) {
-  return (
-    <view class="auth-capability-row">
-      <text class="auth-capability-label">{props.label}</text>
-      <text class="auth-value-text">{props.value}</text>
-    </view>
-  );
+function batteryStateLabel(state: BatteryState): string {
+  switch (state) {
+    case BatteryState.CHARGING:
+      return 'Charging';
+    case BatteryState.FULL:
+      return 'Full';
+    case BatteryState.UNPLUGGED:
+      return 'Unplugged';
+    case BatteryState.NOT_CHARGING:
+      return 'Not charging (protecting battery)';
+    case BatteryState.UNKNOWN:
+    default:
+      return 'Unknown';
+  }
 }
 
-/**
- * Battery demo: @symbiote-native/battery — the three listener-backed composables
- * (useBatteryLevel/useBatteryState/useLowPowerMode) drive the live-state card; isAvailableAsync()
- * and, Android-only, isBatteryOptimizationEnabledAsync() are one-shot capability checks resolved
- * on mount, matching @symbiote-native/local-auth's capability-card shape. The iOS Simulator
- * reports batteryLevel as -1 (unknown) — a real device is needed for live readings.
- */
 export const BatteryScreen = defineComponent(
   () => {
     const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Battery];
-    const lineColor = LINE_COLOR[ROUTE_LINE_INFO[ROUTE_NAME.Battery].line];
+    const lineColor = LINE_COLOR[lineInfo.line];
 
     const batteryLevel = useBatteryLevel();
     const batteryState = useBatteryState();
@@ -125,42 +115,52 @@ export const BatteryScreen = defineComponent(
             <view class="hero-copy">
               <text class="hero-title">Battery</text>
               <text class="hero-body">
-                @symbiote-native/battery — live battery level, charging state,
-                and low-power-mode, via three composables. The iOS Simulator
-                reports battery level as unknown — a real device is needed for
-                live readings.
+                React to the battery: level, charging state and low-power mode
+                update live through hooks, so the app can pause heavy work when
+                the battery is low. A simulator reports the API as unavailable,
+                use a real device.
               </text>
             </view>
           </view>
 
-          <view testID="battery-live-card" class="auth-card">
-            <view class="auth-card-header">
-              <text class="auth-card-title">Live state</text>
+          <Scenario
+            testID="battery-scenario"
+            title="Pause sync and animations when the battery is low"
+            why="Skip background uploads, heavy animations or video quality when the user is on low power or unplugged at low charge, and resume when they plug in."
+            steps={['Turn Low Power Mode on in the system settings', 'Plug the charger in and out', 'Watch the live status card']}
+            expect="Level, charging state and low power mode change on screen within a moment, without reloading."
+          />
+
+          <view testID="battery-live-card" class="feature-card">
+            <view class="feature-card-header">
+              <text class="feature-card-title">Live status</text>
             </view>
-            <ValueRow label="Battery level" value={batteryLevelLabel.value} />
-            <ValueRow
-              label="Battery state"
-              value={batteryStateLabel(batteryState.value)}
-            />
-            <CapabilityRow
-              testID="battery-low-power-mode"
-              label="Low power mode"
-              status={toCapabilityStatus(lowPowerMode.value)}
-            />
+            <view class="capability-row">
+              <text class="capability-label">Battery level</text>
+              <text class="value-text">{batteryLevelLabel.value}</text>
+            </view>
+            <view class="capability-row">
+              <text class="capability-label">Battery state</text>
+              <text class="value-text">{batteryStateLabel(batteryState.value)}</text>
+            </view>
+            <view class="capability-row">
+              <text class="capability-label">Low power mode</text>
+              <text class="value-text">{lowPowerMode.value ? 'On' : 'Off'}</text>
+            </view>
           </view>
 
-          <view testID="battery-capabilities-card" class="auth-card">
-            <view class="auth-card-header">
-              <text class="auth-card-title">Capabilities</text>
+          <view testID="battery-capabilities-card" class="feature-card">
+            <view class="feature-card-header">
+              <text class="feature-card-title">Capabilities</text>
             </view>
             <CapabilityRow
               testID="battery-available"
-              label="Battery API available"
+              label="Available"
               status={isAvailable.value}
             />
             {Platform.OS === 'android' && (
               <CapabilityRow
-                testID="battery-optimization-enabled"
+                testID="battery-optimization"
                 label="Battery optimization enabled"
                 status={isBatteryOptimizationEnabled.value}
               />

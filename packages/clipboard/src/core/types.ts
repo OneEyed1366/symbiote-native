@@ -1,10 +1,7 @@
 // Ported from expo-clipboard's own Clipboard.types.ts. ContentType and StringFormat are enums —
 // kept unprefixed, matching this repo's convention for enums (see AuthenticationType /
 // SecurityLevel in @symbiote-native/local-auth); the plain option/result shapes get this repo's
-// `I`-prefix convention for exported types. `ClipboardPasteButton`'s own types
-// (PasteEventPayload, TextPasteEvent, ImagePasteEvent, AcceptedContentType, CornerStyleType,
-// DisplayModeType) are intentionally not ported — that native paste-button view is out of scope
-// for this pass (see the package README).
+// `I`-prefix convention for exported types
 
 /**
  * Type used to define what type of data is stored in the clipboard.
@@ -79,3 +76,21 @@ export type IClipboardEvent = {
    */
   contentTypes: ContentType[];
 };
+
+export type IAcceptedContentType = 'plain-text' | 'image' | 'url' | 'html';
+
+export type ICornerStyle =
+  'dynamic' | 'fixed' | 'capsule' | 'large' | 'medium' | 'small';
+
+export type IDisplayMode = 'iconAndLabel' | 'iconOnly' | 'labelOnly';
+
+export type ITextPasteEvent = {
+  text: string;
+  type: 'text';
+};
+
+export type IImagePasteEvent = {
+  type: 'image';
+} & IClipboardImage;
+
+export type IPasteEventPayload = ITextPasteEvent | IImagePasteEvent;

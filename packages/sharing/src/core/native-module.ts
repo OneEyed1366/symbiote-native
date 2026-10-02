@@ -1,5 +1,9 @@
 import { requireNativeModule } from 'expo-modules-core';
-import type { ISharingOptions } from './types';
+import type {
+  IResolvedSharePayload,
+  ISharePayload,
+  ISharingOptions,
+} from './types';
 
 const EXPO_SHARING_MODULE_NAME = 'ExpoSharing';
 
@@ -11,12 +15,14 @@ const EXPO_SHARING_MODULE_NAME = 'ExpoSharing';
 // the web module (which this package does not ship) defines it. Presence of the module itself is
 // therefore what availability is read from — see isAvailableAsync in ./sharing.
 //
-// The incoming-share methods (getSharedPayloads, getResolvedSharedPayloadsAsync,
-// clearSharedPayloads) are deliberately absent from this type: reaching them needs an iOS Share
-// Extension target this package does not ship. See the README.
+// The incoming-share methods exist on the native module, but return data only once the host app
+// carries the share target (iOS Share Extension, Android intent filters), see the README
 export type INativeSharingModule = {
   isAvailableAsync?(): Promise<boolean>;
   shareAsync?(url: string, options: ISharingOptions): Promise<void>;
+  getSharedPayloads?(): ISharePayload[];
+  getResolvedSharedPayloadsAsync?(): Promise<IResolvedSharePayload[]>;
+  clearSharedPayloads?(): void;
 };
 
 export const expoSharing = requireNativeModule<INativeSharingModule>(

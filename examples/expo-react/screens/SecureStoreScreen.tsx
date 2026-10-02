@@ -6,11 +6,24 @@ import {
   isAvailableAsync,
   setItemAsync,
 } from '@symbiote-native/secure-store';
+import type { ISecureStoreOptions } from '@symbiote-native/secure-store';
 import { ActionButton } from '../components/ActionButton';
+import { Explorer, Scenario } from '../components/Scenario';
+import {
+  Card,
+  ResultRow,
+  ScreenShell,
+  lineColorOf,
+} from '../components/ScreenShell';
 import { ROUTE_NAME } from '../routes';
-import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
+import { SecureStoreExtras } from './secure-store-extras';
 
+const ROUTE = ROUTE_NAME.SecureStore;
 const DEMO_KEY = 'canary.secure-store.demo';
+const AUTH_OPTIONS: ISecureStoreOptions = {
+  requireAuthentication: true,
+  authenticationPrompt: 'Unlock to store the demo value',
+};
 
 type ICapabilityStatus = 'checking' | 'yes' | 'no';
 
@@ -18,17 +31,8 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
   return value ? 'yes' : 'no';
 }
 
-function CapabilityRow({
-  testID,
-  label,
-  status,
-}: {
-  testID: string;
-  label: string;
-  status: ICapabilityStatus;
-}) {
-  const text =
-    status === 'checking' ? 'CHECKING…' : status === 'yes' ? 'YES' : 'NO';
+function CapabilityRow({ testID, label, status }: { testID: string; label: string; status: ICapabilityStatus }) {
+  const text = status === 'checking' ? 'CHECKING…' : status === 'yes' ? 'YES' : 'NO';
   return (
     <view testID={testID} className="capability-row">
       <text className="capability-label">{label}</text>
@@ -39,24 +43,9 @@ function CapabilityRow({
   );
 }
 
-/**
- * @symbiote-native/secure-store canary demo: a capability card (isAvailableAsync,
- * canUseBiometricAuthentication), a write/read/delete round-trip against one demo key, and the
- * same round-trip with `requireAuthentication` so the device's own biometric prompt is exercised.
- *
- * Kill and relaunch the app to prove the value really survives outside the JS heap. The
- * authenticated variant only prompts on a real device — simulators and emulators skip it.
- */
-export function SecureStoreScreen() {
-  const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.SecureStore];
-  const lineColor = LINE_COLOR[lineInfo.line];
-
+function CapabilityCard() {
   const [isAvailable, setIsAvailable] = useState<ICapabilityStatus>('checking');
-  const [canUseBiometrics, setCanUseBiometrics] =
-    useState<ICapabilityStatus>('checking');
-  const [inputText, setInputText] = useState('');
-  const [storedValue, setStoredValue] = useState<string | null>(null);
-  const [lastResult, setLastResult] = useState('idle');
+  const [canUseBiometrics, setCanUseBiometrics] = useState<ICapabilityStatus>('checking');
 
   useEffect(() => {
     let isMounted = true;
@@ -65,16 +54,25 @@ export function SecureStoreScreen() {
         return;
       }
       setIsAvailable(toCapabilityStatus(available));
-      // canUseBiometricAuthentication throws when the native module is missing entirely, so it
-      // only runs once availability has come back positive.
-      setCanUseBiometrics(
-        available ? toCapabilityStatus(canUseBiometricAuthentication()) : 'no',
-      );
+      // throws when the native module is missing, so it only runs once availability is positive
+      setCanUseBiometrics(available ? toCapabilityStatus(canUseBiometricAuthentication()) : 'no');
     });
     return () => {
       isMounted = false;
     };
   }, []);
+
+  return (
+    <Card testID="secure-store-capability-card" title="Capabilities">
+      <CapabilityRow testID="secure-store-available" label="Available" status={isAvailable} />
+      <CapabilityRow testID="secure-store-biometrics" label="Biometrics usable" status={canUseBiometrics} />
+    </Card>
+  );
+}
+
+function useDemoEntry() {
+  const [storedValue, setStoredValue] = useState<string | null>(null);
+  const [lastResult, setLastResult] = useState('idle');
 
   const readBack = useCallback(async (label: string) => {
     const value = await getItemAsync(DEMO_KEY);
@@ -82,138 +80,93 @@ export function SecureStoreScreen() {
     setLastResult(value === null ? `${label}: no entry` : `${label}: ok`);
   }, []);
 
-  const handleRead = useCallback(() => {
-    readBack('read').catch((error: Error) =>
-      setLastResult(`read failed: ${error.message}`),
-    );
-  }, [readBack]);
-
-  const handleSave = useCallback(() => {
-    setItemAsync(DEMO_KEY, inputText)
-      .then(() => readBack('saved'))
-      .catch((error: Error) => setLastResult(`save failed: ${error.message}`));
-  }, [inputText, readBack]);
-
-  // Android prompts on every operation, iOS only when reading or updating an entry that already
-  // exists — so the write below may pass silently and the read after it raise the prompt.
-  const handleSaveAuthenticated = useCallback(() => {
-    setItemAsync(DEMO_KEY, inputText, {
-      requireAuthentication: true,
-      authenticationPrompt: 'Unlock to store the demo value',
-    })
-      .then(() => readBack('saved (authenticated)'))
-      .catch((error: Error) =>
-        setLastResult(`authenticated save failed: ${error.message}`),
-      );
-  }, [inputText, readBack]);
-
-  const handleDelete = useCallback(() => {
-    deleteItemAsync(DEMO_KEY)
-      .then(() => {
-        setStoredValue(null);
-        setLastResult('deleted');
-      })
-      .catch((error: Error) =>
-        setLastResult(`delete failed: ${error.message}`),
-      );
+  const run = useCallback((label: string, action: () => Promise<void>) => {
+    action().catch((error: Error) => setLastResult(`${label} failed: ${error.message}`));
   }, []);
 
+  const read = () => run('read', () => readBack('read'));
+  const save = (text: string, options: ISecureStoreOptions = {}, label = 'saved') =>
+    run(label, async () => {
+      await setItemAsync(DEMO_KEY, text, options);
+      await readBack(label);
+    });
+  const remove = () =>
+    run('delete', async () => {
+      await deleteItemAsync(DEMO_KEY);
+      setStoredValue(null);
+      setLastResult('deleted');
+    });
+
+  return { storedValue, lastResult, read, save, remove };
+}
+
+function EntryCards() {
+  const color = lineColorOf(ROUTE);
+  const [inputText, setInputText] = useState('');
+  const entry = useDemoEntry();
+
   return (
-    <safe-area-view className="screen">
-      <scroll-view
-        testID="secure-store-scroll"
-        className="screen"
-        contentContainerStyle="scroll-content"
+    <>
+      <Scenario
+        testID="secure-store-remember-scenario"
+        title="Keep a sign-in token across restarts"
+        why="A session token must survive closing the app but never be readable by other apps or by a backup. The Keychain and Keystore do that; AsyncStorage does not."
+        steps={['Type a fake token below and press Save', 'Force-quit the app and open it again', 'Press Read']}
+        expect="The same token comes back after the relaunch. The value below shows it, and Last result says ok."
       >
-        <view className={`line-tag line-tag-${lineInfo.line}`}>
-          <text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
-        </view>
-        <view className="hero-card">
-          <view className="hero-badge" style={{ backgroundColor: lineColor }}>
-            <text className="hero-badge-text">{lineInfo.code}</text>
-          </view>
-          <view className="hero-copy">
-            <text className="hero-title">Secure Store</text>
-            <text className="hero-body">
-              @symbiote-native/secure-store — encrypted key/value storage in the
-              iOS Keychain and the Android Keystore. Save a value, kill the app,
-              relaunch, and read it back.
-            </text>
-          </view>
-        </view>
+        <text-input
+          testID="secure-store-input"
+          value={inputText}
+          onValueChange={event => setInputText(event.text)}
+          placeholder="Fake token, e.g. eyJhbGciOi..."
+          placeholderTextColor="#41506a"
+          className="text-input"
+        />
+        <ActionButton testID="secure-store-save-button" title="Save" onPress={() => entry.save(inputText)} color={color} />
+        <ActionButton testID="secure-store-read-button" title="Read" onPress={entry.read} color={color} />
+        <ResultRow testID="secure-store-value" label={DEMO_KEY} value={entry.storedValue ?? '(no entry)'} />
+        <ResultRow testID="secure-store-result" label="Last result" value={entry.lastResult} />
+      </Scenario>
+      <Scenario
+        testID="secure-store-biometrics-scenario"
+        title="Lock a secret behind Face ID or a fingerprint"
+        why="For something like a payment PIN, even an unlocked phone in someone else's hands should not reveal it."
+        steps={['Type a value and press Save behind biometrics', 'Approve the system prompt', 'Press Read above and approve again']}
+        expect="Saving and reading both ask for biometrics. Cancelling the prompt shows a failure in Last result and the value stays hidden."
+      >
+        <ActionButton
+          testID="secure-store-save-auth-button"
+          title="Save behind biometrics"
+          onPress={() => entry.save(inputText, AUTH_OPTIONS, 'saved (authenticated)')}
+          color={color}
+        />
+      </Scenario>
+      <Scenario
+        testID="secure-store-signout-scenario"
+        title="Wipe the secret on sign-out"
+        why="After signing out, the token must be gone, not just forgotten by the UI."
+        steps={['Press Delete', 'Press Read above']}
+        expect="Read reports no entry, and the value shows (no entry)."
+      >
+        <ActionButton testID="secure-store-delete-button" title="Delete" onPress={entry.remove} color={color} />
+      </Scenario>
+    </>
+  );
+}
 
-        <view testID="secure-store-capability-card" className="feature-card">
-          <view className="feature-card-header">
-            <text className="feature-card-title">Capabilities</text>
-          </view>
-          <CapabilityRow
-            testID="secure-store-available"
-            label="Available"
-            status={isAvailable}
-          />
-          <CapabilityRow
-            testID="secure-store-biometrics"
-            label="Biometrics usable"
-            status={canUseBiometrics}
-          />
-        </view>
-
-        <view testID="secure-store-value-card" className="feature-card">
-          <view className="feature-card-header">
-            <text className="feature-card-title">Stored value</text>
-          </view>
-          <view className="capability-row">
-            <text className="capability-label">{DEMO_KEY}</text>
-            <text testID="secure-store-value" className="value-text">
-              {storedValue === null ? '(no entry)' : storedValue}
-            </text>
-          </view>
-          <view className="capability-row">
-            <text className="capability-label">Last result</text>
-            <text testID="secure-store-result" className="value-text">
-              {lastResult}
-            </text>
-          </view>
-        </view>
-
-        <view testID="secure-store-write-card" className="feature-card">
-          <view className="feature-card-header">
-            <text className="feature-card-title">Write, read, delete</text>
-          </view>
-          <text-input
-            testID="secure-store-input"
-            value={inputText}
-            onValueChange={event => setInputText(event.text)}
-            placeholder="Value to store"
-            placeholderTextColor="#41506a"
-            className="text-input"
-          />
-          <ActionButton
-            testID="secure-store-save-button"
-            title="Save"
-            onPress={handleSave}
-            color={lineColor}
-          />
-          <ActionButton
-            testID="secure-store-save-auth-button"
-            title="Save behind biometrics"
-            onPress={handleSaveAuthenticated}
-            color={lineColor}
-          />
-          <ActionButton
-            testID="secure-store-read-button"
-            title="Read"
-            onPress={handleRead}
-            color={lineColor}
-          />
-          <ActionButton
-            testID="secure-store-delete-button"
-            title="Delete"
-            onPress={handleDelete}
-            color={lineColor}
-          />
-        </view>
-      </scroll-view>
-    </safe-area-view>
+export function SecureStoreScreen() {
+  return (
+    <ScreenShell
+      route={ROUTE}
+      testID="secure-store-scroll"
+      title="Secure Store"
+      body="Store small secrets, such as a sign-in token or a PIN, in the iOS Keychain and the Android Keystore. They survive app restarts, stay out of backups, and can require Face ID or a fingerprint to read."
+    >
+      <CapabilityCard />
+      <EntryCards />
+      <Explorer testID="secure-store-explorer" color={lineColorOf(ROUTE)}>
+        <SecureStoreExtras />
+      </Explorer>
+    </ScreenShell>
   );
 }

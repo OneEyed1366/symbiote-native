@@ -1,7 +1,6 @@
-// @symbiote-native/tracking-transparency/vue: the Vue entry over the framework-agnostic core.
-// Same reasoning as the React entry — only the permission surface gets a lifecycle composable,
-// every other export is a plain re-export — mirrors the lifecycle-bucket naming convention of
-// adapters/vue/src/composables (never `hooks/`, that's React's term).
-
-export { usePermissions } from './composables/use-permissions';
+// @symbiote-native/tracking-transparency/vue: the core plus `useTrackingPermissions`
+export {
+  useTrackingPermissions,
+  type IUseTrackingPermissionsHook,
+} from './use-tracking-permissions';
 export * from '../core';

@@ -20,6 +20,7 @@
 import { compile } from 'svelte/compiler';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 // The real Metro pipeline's own `.svelte.ts` compile step (TS-strip, then `compileModule` to
 // desugar the runes). Reused rather than reimplemented. Default-imported because it is a `.cjs`
@@ -38,6 +39,55 @@ const COMPILE_OPTIONS = {
   css: 'external',
 } as const;
 const SVELTE_SPECIFIER_PATTERN = /(['"])(\.{1,2}\/[^'"]*\.svelte)\1/g;
+const BARE_SPECIFIER_PATTERN = /(\b(?:from|import)\s*)(['"])([^./'"][^'"]*)\2/g;
+const RUNE_MODULE_SUFFIX = '.svelte.ts';
+
+function relativeSpecifier(fromFile: string, target: string): string {
+  const specifier = relative(dirname(fromFile), target);
+  return specifier.startsWith('..') ? specifier : `./${specifier}`;
+}
+
+// A bare specifier that lands on a `.svelte.ts` file (Metro's transformer compiles those from any
+// package). Returns the path without `.ts`, the shape `compileFile` expects, or null otherwise
+function resolveRuneModule(specifier: string, fromFile: string): string | null {
+  try {
+    const resolved = createRequire(fromFile).resolve(specifier);
+    return resolved.endsWith(RUNE_MODULE_SUFFIX)
+      ? resolved.slice(0, -'.ts'.length)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function rewriteBareRuneImports(
+  code: string,
+  outPath: string,
+  compileFile: (sveltePath: string) => string,
+): string {
+  return code.replace(
+    BARE_SPECIFIER_PATTERN,
+    (match, keyword: string, quote: string, spec: string) => {
+      const runeModule = resolveRuneModule(spec, outPath);
+      if (runeModule === null) return match;
+      return `${keyword}${quote}${relativeSpecifier(outPath, compileFile(runeModule))}${quote}`;
+    },
+  );
+}
+
+function rewriteAliases(
+  code: string,
+  outPath: string,
+  aliases: Readonly<Record<string, string>>,
+): string {
+  let rewritten = code;
+  for (const [specifier, target] of Object.entries(aliases)) {
+    const relativeTarget = relativeSpecifier(outPath, target);
+    rewritten = rewritten.split(`'${specifier}'`).join(`'${relativeTarget}'`);
+    rewritten = rewritten.split(`"${specifier}"`).join(`"${relativeTarget}"`);
+  }
+  return rewritten;
+}
 
 export type ISvelteHarness = {
   // Compile a real `.svelte` file plus everything it imports; returns the compiled entry path.
@@ -59,13 +109,8 @@ export function createSvelteHarness(
     return join(dirname(sveltePath), `.smoke-compiled-${id}-${stem}.mjs`);
   }
 
-  function relativeSpecifier(fromFile: string, target: string): string {
-    const specifier = relative(dirname(fromFile), target);
-    return specifier.startsWith('..') ? specifier : `./${specifier}`;
-  }
-
   function rewrite(code: string, outPath: string): string {
-    let rewritten = code.replace(
+    const withSvelte = code.replace(
       SVELTE_SPECIFIER_PATTERN,
       (_match, quote: string, spec: string) => {
         const childSource = resolve(dirname(outPath), spec);
@@ -73,15 +118,8 @@ export function createSvelteHarness(
         return `${quote}${relativeSpecifier(outPath, childOut)}${quote}`;
       },
     );
-    for (const [specifier, target] of Object.entries(aliases)) {
-      rewritten = rewritten
-        .split(`'${specifier}'`)
-        .join(`'${relativeSpecifier(outPath, target)}'`);
-      rewritten = rewritten
-        .split(`"${specifier}"`)
-        .join(`"${relativeSpecifier(outPath, target)}"`);
-    }
-    return rewritten;
+    const withRunes = rewriteBareRuneImports(withSvelte, outPath, compileFile);
+    return rewriteAliases(withRunes, outPath, aliases);
   }
 
   function emit(

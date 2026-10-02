@@ -1,0 +1,14 @@
+{
+  "keep": [
+    {
+      "path": "packages/notifications/src/core/emitter.ts",
+      "symbol": "clearLastNotificationResponseAsync",
+      "why": "deprecated public alias kept for parity with expo-notifications, approved by the user 2026-09-29"
+    },
+    {
+      "path": "packages/notifications/src/core/emitter.ts",
+      "symbol": "getLastNotificationResponseAsync",
+      "why": "deprecated public alias kept for parity with expo-notifications, approved by the user 2026-09-29"
+    }
+  ]
+}

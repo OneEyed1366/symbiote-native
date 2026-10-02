@@ -33,14 +33,27 @@ describe('Angular adapter gap regressions', () => {
   // it forgets to spread foldedAccessibility() into that bag, an app passing
   // accessibilityLabel/ariaBusy to <VirtualizedList> silently loses it one layer down.
   it('VirtualizedList exposes accessibility and aria inputs and forwards them to the scroll tag', () => {
-    const source = readSource(
-      'adapters/angular/src/components/virtualized-list/index.ts',
+    // The inputs come from the shared base, the fold from the bag base, the binding from the class
+    const inputsSource = readSource(
+      'adapters/angular/src/accessibility-inputs.ts',
+    );
+    const bagsSource = readSource(
+      'adapters/angular/src/components/virtualized-list/list-bags.ts',
+    );
+    const templateSource = readSource(
+      'adapters/angular/src/components/virtualized-list/list-template.ts',
     );
 
-    expectSourceToDeclare(source, '@Input() accessibilityLabel?: string');
-    expectSourceToDeclare(source, '@Input() ariaBusy?: boolean');
-    expectSourceToDeclare(source, '...this.foldedAccessibility()');
-    expectSourceToDeclare(source, '[symbioteHostProps]="scrollViewBag()"');
+    expectSourceToDeclare(inputsSource, '@Input() accessibilityLabel?: string');
+    expectSourceToDeclare(
+      inputsSource,
+      "@Input('aria-busy') ariaBusy?: boolean",
+    );
+    expectSourceToDeclare(bagsSource, '...this.foldedAccessibility()');
+    expectSourceToDeclare(
+      templateSource,
+      '[symbioteHostProps]="scrollViewBag()"',
+    );
   });
 
   // why: angular-adapter §0/§6 — Angular has NO runtime component synthesis under AOT/Metro, so

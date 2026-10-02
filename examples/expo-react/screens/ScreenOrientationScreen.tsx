@@ -8,6 +8,7 @@ import {
 } from '@symbiote-native/screen-orientation/react';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
+import { Scenario } from '../components/Scenario';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
 function orientationLabel(orientation: Orientation): string {
@@ -39,11 +40,6 @@ function ValueRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-/**
- * @symbiote-native/screen-orientation canary demo: useScreenOrientation() drives the live
- * orientation + lock rows, seeded with a one-shot read then kept current by the native
- * orientation-change listener. Buttons drive lockAsync/unlockAsync.
- */
 export function ScreenOrientationScreen() {
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.ScreenOrientation];
   const lineColor = LINE_COLOR[lineInfo.line];
@@ -78,12 +74,20 @@ export function ScreenOrientationScreen() {
           <view className="hero-copy">
             <text className="hero-title">Screen Orientation</text>
             <text className="hero-body">
-              @symbiote-native/screen-orientation — lock/unlock orientation,
-              plus a live orientation + lock state hook.
+              Control how the screen rotates: lock portrait or landscape for a
+              video, a game or a form, unlock it again, and follow the current
+              orientation live.
             </text>
           </view>
         </view>
 
+        <Scenario
+          testID="screen-orientation-scenario"
+          title="Lock landscape for a video player or a game"
+          why="Full-screen video and games need landscape no matter how the phone is held, while forms and feeds work best locked to portrait. Unlock hands control back to the user."
+          steps={['Press Lock landscape and turn the phone', 'Press Lock portrait', 'Press Unlock and turn the phone again']}
+          expect="The screen stays in the locked orientation however you hold the phone, and rotates freely again after Unlock. The state card shows both values."
+        />
         <view testID="screen-orientation-state-card" className="feature-card">
           <view className="feature-card-header">
             <text className="feature-card-title">Current state</text>

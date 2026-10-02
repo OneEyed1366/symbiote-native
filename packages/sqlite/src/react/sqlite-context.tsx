@@ -1,11 +1,6 @@
-// React <SQLiteProvider> + useSQLiteContext(), ported from expo-sqlite's hooks.tsx (sdk-57,
-// .vendors/expo) onto this package's own openDatabaseAsync/SQLiteDatabase. Deliberately excludes
-// `assetSource` (bundling a database from a require()'d asset needs expo-asset, out of scope for
-// this pass — see the README). React 19's built-in `use()` replaces upstream's private
-// Suspense-promise polyfill (~40 LOC of `ReactUsePromise` plumbing, unnecessary now that the
-// peer range is react >=19.0.0). Unlike upstream, `onInit` is NOT invoked here — this package's
-// own `openDatabaseAsync` already runs it internally before resolving (see
-// `IOnInitCallback`'s doc comment in `core/types.ts`), so the provider only has to forward it.
+// React <SQLiteProvider> + useSQLiteContext(), ported from expo-sqlite's hooks.tsx (sdk-57).
+// `assetSource` reaches `openDatabaseAsync` via the `options` prop — see the README.
+// `onInit` is forwarded, not invoked — `openDatabaseAsync` already runs it (core/types.ts).
 
 import {
   createContext,

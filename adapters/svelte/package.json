@@ -36,6 +36,9 @@
     "./collapse-text-whitespace": "./src/preprocessor/collapse-text-whitespace.ts",
     "./style-scope": "./src/style-scope.ts",
     "./scope-token": "./src/scope-token.ts",
+    "./runes/create-permission-hook": "./src/runes/create-permission-hook.svelte.ts",
+    "./runes/create-resource-hook": "./src/runes/create-resource-hook.svelte.ts",
+    "./runes/create-event-value-hook": "./src/runes/create-event-value-hook.svelte.ts",
     "./metro-svelte-transformer": "./metro-svelte-transformer.cjs",
     "./metro-css-parser": "./metro-css-parser.cjs"
   },
@@ -81,6 +84,18 @@
       "./scope-token": {
         "types": "./build/scope-token.d.ts",
         "default": "./build/scope-token.js"
+      },
+      "./runes/create-permission-hook": {
+        "types": "./build/runes/create-permission-hook.svelte.d.ts",
+        "default": "./build/runes/create-permission-hook.svelte.js"
+      },
+      "./runes/create-resource-hook": {
+        "types": "./build/runes/create-resource-hook.svelte.d.ts",
+        "default": "./build/runes/create-resource-hook.svelte.js"
+      },
+      "./runes/create-event-value-hook": {
+        "types": "./build/runes/create-event-value-hook.svelte.d.ts",
+        "default": "./build/runes/create-event-value-hook.svelte.js"
       },
       "./metro-svelte-transformer": "./metro-svelte-transformer.cjs",
       "./metro-css-parser": "./metro-css-parser.cjs"

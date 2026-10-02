@@ -13,6 +13,7 @@ import {
 import { createPermissions } from '@symbiote-native/brightness/solid';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
+import { Scenario } from '../components/Scenario';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
 type ICapabilityStatus = 'checking' | 'yes' | 'no';
@@ -50,29 +51,13 @@ const BRIGHTNESS_STEPS: readonly { label: string; value: number }[] = [
   { label: '100%', value: 1 },
 ];
 
-/**
- * @symbiote-native/brightness canary demo: a live brightness card (seeded via
- * getBrightnessAsync(), refreshed by addBrightnessListener() - iOS-only upstream, so on
- * Android the value only changes via the buttons below), a set-brightness action row, an
- * Android-only system-brightness-mode card, and a permission card driving createPermissions().
- */
-export function BrightnessScreen() {
-  const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Brightness];
-  const lineColor = LINE_COLOR[lineInfo.line];
-
+// Kept apart so the screen body stays readable: the live app brightness and its listener
+function createScreenBrightness() {
   const [brightness, setBrightness] = createSignal<number | null>(null);
-  const [systemMode, setSystemMode] = createSignal<BrightnessMode>(
-    BrightnessMode.UNKNOWN,
-  );
-  const [isUsingSystem, setIsUsingSystem] =
-    createSignal<ICapabilityStatus>('checking');
-  const permissions = createPermissions();
-
   let disposed = false;
   onCleanup(() => {
     disposed = true;
   });
-
   getBrightnessAsync().then(value => {
     if (!disposed) setBrightness(value);
   });
@@ -82,7 +67,25 @@ export function BrightnessScreen() {
   onCleanup(() => {
     subscription.remove();
   });
+  const setTo = (value: number) => {
+    setBrightnessAsync(value).then(() =>
+      getBrightnessAsync().then(setBrightness),
+    );
+  };
+  return { brightness, setTo };
+}
 
+// Android-only system-wide brightness mode and the "using system value" flag
+function createSystemBrightness() {
+  const [systemMode, setSystemMode] = createSignal<BrightnessMode>(
+    BrightnessMode.UNKNOWN,
+  );
+  const [isUsingSystem, setIsUsingSystem] =
+    createSignal<ICapabilityStatus>('checking');
+  let disposed = false;
+  onCleanup(() => {
+    disposed = true;
+  });
   if (Platform.OS === 'android') {
     Promise.all([
       getSystemBrightnessModeAsync(),
@@ -94,26 +97,33 @@ export function BrightnessScreen() {
       }
     });
   }
-
-  const handleSetBrightness = (value: number) => {
-    setBrightnessAsync(value).then(() =>
-      getBrightnessAsync().then(setBrightness),
-    );
-  };
-
-  const handleSetSystemMode = (mode: BrightnessMode) => {
+  const setMode = (mode: BrightnessMode) => {
     setSystemBrightnessModeAsync(mode).then(() =>
       getSystemBrightnessModeAsync().then(setSystemMode),
     );
   };
-
-  const handleRestoreSystem = () => {
+  const restore = () => {
     restoreSystemBrightnessAsync().then(() =>
       isUsingSystemBrightnessAsync().then(value =>
         setIsUsingSystem(value ? 'yes' : 'no'),
       ),
     );
   };
+  return { systemMode, isUsingSystem, setMode, restore };
+}
+
+export function BrightnessScreen() {
+  const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Brightness];
+  const lineColor = LINE_COLOR[lineInfo.line];
+
+  const { brightness, setTo: handleSetBrightness } = createScreenBrightness();
+  const {
+    systemMode,
+    isUsingSystem,
+    setMode: handleSetSystemMode,
+    restore: handleRestoreSystem,
+  } = createSystemBrightness();
+  const permissions = createPermissions();
 
   const brightnessLabel = () =>
     brightness() === null ? 'checking…' : `${Math.round(brightness()! * 100)}%`;
@@ -137,13 +147,21 @@ export function BrightnessScreen() {
           <view class="hero-copy">
             <text class="hero-title">Brightness</text>
             <text class="hero-body">
-              @symbiote-native/brightness — screen brightness get/set, Android
-              system-brightness mode, and an iOS-only live listener. Requires
-              SYSTEM_BRIGHTNESS permission on Android before setting the
-              system-wide value.
+              Read and change the screen brightness from the app, for example to
+              make a QR code or a boarding pass easy to scan. Android can also
+              change the system-wide value after the user grants the write
+              settings permission.
             </text>
           </view>
         </view>
+
+        <Scenario
+          testID="brightness-scenario"
+          title="Brighten the screen to show a QR code or a ticket"
+          why="Scanners read a bright screen much better. Raise the brightness while the code is on screen and restore the user's level afterwards."
+          steps={['Note the current brightness in the live card', 'Set a new value with the controls', 'Restore the system value']}
+          expect="The screen visibly brightens or dims, and the live card shows the new value. Restoring returns to the system setting."
+        />
 
         <view testID="brightness-live-card" class="feature-card">
           <view class="feature-card-header">
