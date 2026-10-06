@@ -237,7 +237,7 @@ and `checkbox-payload.itest.ts` written, per-adapter prop types and Angular `Che
 to pass the 400-line gate). `onValueChange` takes an event with `value`, the Switch convention,
 because a Svelte on* attribute receives one object. Tag tests exist in all five adapters and an
 Android itest covers the teal. Itests pass (iOS 594, Android 29); the owner allowed building them.
-Still open: checkbox docs page.
+Docs: `apps/docs-site/.../packages/checkbox.mdx` (no package, so no README), plus a `checkbox` row in `api/components.mdx`.
 
 Progress, linear-gradient (`packages/linear-gradient`, uncommitted): core `renderLinearGradient`
 (iOS native root, Android View wrapper + absolute-fill leaf), all five adapters tested (37 tests),
