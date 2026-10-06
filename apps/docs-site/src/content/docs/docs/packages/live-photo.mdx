@@ -1,0 +1,83 @@
+---
+title: Live photo
+description: expo-live-photo wrapped for every SymbioteNative adapter, a Live Photo view with playback control on iOS.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+`@symbiote-native/live-photo` wraps
+[`expo-live-photo`](https://docs.expo.dev/versions/latest/sdk/live-photo/), so every
+SymbioteNative adapter can show a Live Photo, not just React.
+
+| OS platform | Support                         |
+| ----------- | ------------------------------- |
+| iOS         | live                            |
+| Android     | renders nothing                 |
+
+| Framework adapter | Support |
+| ----------------- | ------- |
+| React             | live    |
+| Vue               | live    |
+| Angular           | live    |
+| Svelte            | live    |
+| Solid             | live    |
+
+## Installation
+
+```sh
+npm install @symbiote-native/live-photo
+```
+
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --live-photo`
+(or `add --live-photo` in an existing app) installs and wires this for you.
+
+<Aside type="danger" title="Native setup is required before first use">
+  `expo-live-photo`'s native code is discovered by `expo-modules-autolinking`. Follow
+  [How to: wire up an Expo native module](/docs/howtos/expo-native-module-setup/) once per app first.
+</Aside>
+
+## Usage
+
+```tsx
+import { LivePhotoView, type ILivePhotoViewHandle } from '@symbiote-native/live-photo/react';
+
+const ref = useRef<ILivePhotoViewHandle>(null);
+
+<LivePhotoView
+  ref={ref}
+  style={{ width: 300, height: 400 }}
+  source={{ photoUri, pairedVideoUri }}
+  onLoadError={error => console.warn(error.message)}
+/>;
+
+ref.current?.startPlayback('hint');
+```
+
+The photo and the video must come from one unaltered live photo file, the pairing lives in their
+metadata.
+
+## Reaching the playback functions
+
+| Adapter | How                                              |
+| ------- | ------------------------------------------------ |
+| React   | `ref` gets an `ILivePhotoViewHandle`             |
+| Solid   | `ref={handle => ...}` gets the handle            |
+| Vue     | a template ref, `startPlayback`/`stopPlayback` are exposed |
+| Svelte  | `bind:this`, the component exports both functions |
+| Angular | `@ViewChild(LivePhotoView)`, both are methods    |
+
+## Props
+
+| Prop                          | Notes                                              |
+| ----------------------------- | -------------------------------------------------- |
+| `source`                      | `{ photoUri, pairedVideoUri }`                     |
+| `isMuted`                     | `true` by default                                  |
+| `contentFit`                  | `contain` (default) or `cover`                     |
+| `useDefaultGestureRecognizer` | Press and hold plays, `true` by default            |
+| `onLoadStart`                 | Loading began                                      |
+| `onPreviewPhotoLoad`          | The preview photo is loaded                        |
+| `onLoadComplete`              | Ready to play                                      |
+| `onLoadError`                 | Gets `{ message }`                                 |
+| `onPlaybackStart` / `onPlaybackStop` | Playback state changed                      |
+
+Plus `style`, `testID`, `nativeID`, `onLayout` and the accessibility and responder props every View takes.

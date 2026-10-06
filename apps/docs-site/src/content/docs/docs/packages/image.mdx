@@ -1,0 +1,93 @@
+---
+title: Image
+description: expo-image wrapped for every SymbioteNative adapter, an image view with caching, placeholders and SF Symbols.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+`@symbiote-native/image` wraps [`expo-image`](https://docs.expo.dev/versions/latest/sdk/image/),
+so every SymbioteNative adapter gets the same image view, cache functions and hash generators, not
+just React.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | live    |
+| Android     | live    |
+
+| Framework adapter | Support |
+| ----------------- | ------- |
+| React             | live    |
+| Vue               | live    |
+| Angular           | live    |
+| Svelte            | live    |
+| Solid             | live    |
+
+## Installation
+
+```sh
+npm install @symbiote-native/image
+```
+
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --image`
+(or `add --image` in an existing app) installs and wires this for you.
+
+<Aside type="danger" title="Native setup is required before first use">
+  `expo-image`'s native code is discovered by `expo-modules-autolinking`. Follow
+  [How to: wire up an Expo native module](/docs/howtos/expo-native-module-setup/) once per app first.
+</Aside>
+
+## Usage
+
+```tsx
+import { Image, useImage } from '@symbiote-native/image/react';
+
+<Image
+  source="https://picsum.photos/400"
+  placeholder="blurhash:/L6PZfSi_.AyE_3t7t7R**0o#DgR4"
+  contentFit="cover"
+  transition={200}
+  style={{ width: 200, height: 200 }}
+/>;
+
+const image = useImage('https://picsum.photos/1000/800', { maxWidth: 800 });
+```
+
+`ImageBackground` is a view with an image filling it, its children paint over the image, and
+`imageStyle` styles the image itself.
+
+## Names per adapter
+
+| Adapter | View and background          | Load into an `ImageRef` |
+| ------- | ---------------------------- | ----------------------- |
+| React   | `Image`, `ImageBackground`   | `useImage`              |
+| Vue     | `Image`, `ImageBackground`   | `useImage`              |
+| Solid   | `Image`, `ImageBackground`   | `useImage`              |
+| Svelte  | `Image`, `ImageBackground`   | `useImage`              |
+| Angular | `ExpoImage`, `ExpoImageBackground` | `injectImage`     |
+
+Angular selectors differ because `Image` and `ImageBackground` are already tags of the adapter.
+
+## Reaching the view functions
+
+| Adapter | How                                                              |
+| ------- | ---------------------------------------------------------------- |
+| React   | `ref` gets an `IImageViewHandle`                                 |
+| Solid   | `ref={handle => ...}` gets the handle                            |
+| Vue     | a template ref, the functions are exposed                        |
+| Svelte  | `bind:this`, the component exports the functions                 |
+| Angular | `@ViewChild(ExpoImage)`, the functions are methods               |
+
+The handle has `startAnimating`, `stopAnimating`, `lockResourceAsync`, `unlockResourceAsync` and
+`reloadAsync`.
+
+## Functions
+
+The static functions of upstream's `Image` class are plain functions here: `prefetchImages`,
+`clearMemoryCache`, `clearDiskCache`, `getCachePathAsync`, `writeToCacheAsync`,
+`readFromCacheAsync`, `configureCache`, `generateBlurhashAsync`, `generateThumbhashAsync` and
+`loadImageAsync`.
+
+## Not ported
+
+The web build, the RSC render tests of upstream (snapshot tests of a server renderer) and the
+`expo-observe` integration.

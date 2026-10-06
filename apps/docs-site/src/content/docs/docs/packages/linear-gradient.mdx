@@ -1,0 +1,112 @@
+---
+title: Linear gradient
+description: expo-linear-gradient wrapped for every SymbioteNative adapter, a native view that paints a multi-color gradient behind its children.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+`@symbiote-native/linear-gradient` wraps
+[`expo-linear-gradient`](https://docs.expo.dev/versions/latest/sdk/linear-gradient/), a native view
+that paints a gradient behind its children, so every SymbioteNative adapter can reach it, not just
+React. The props, the point normalization and the per-platform structure are written once and
+shared by all five adapters.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | live    |
+| Android     | live    |
+
+| Framework adapter | Support |
+| ----------------- | ------- |
+| React             | live    |
+| Vue               | live    |
+| Angular           | live    |
+| Svelte            | live    |
+| Solid             | live    |
+
+## Installation
+
+```sh
+npm install @symbiote-native/linear-gradient
+```
+
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --linear-gradient` (or
+`add --linear-gradient` in an existing app) installs and wires this for you.
+
+<Aside type="danger" title="Native setup is required before first use">
+  `expo-linear-gradient`'s native code is discovered by `expo-modules-autolinking`. Follow [How to:
+  wire up an Expo native module](/docs/howtos/expo-native-module-setup/) once per app first.
+</Aside>
+
+## Usage
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { LinearGradient } from '@symbiote-native/linear-gradient/react';
+
+    <LinearGradient colors={['#4c669f', '#192f6a']} start={{ x: 0, y: 0 }} end={[1, 1]}>
+      <Text>Over the gradient</Text>
+    </LinearGradient>;
+    ```
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { LinearGradient } from '@symbiote-native/linear-gradient/vue';
+    </script>
+
+    <template>
+      <LinearGradient :colors="['#4c669f', '#192f6a']" :end="[1, 1]">
+        <text>Over the gradient</text>
+      </LinearGradient>
+    </template>
+    ```
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { LinearGradient } from '@symbiote-native/linear-gradient/svelte';
+    </script>
+
+    <LinearGradient colors={['#4c669f', '#192f6a']} end={[1, 1]}>
+      <text>Over the gradient</text>
+    </LinearGradient>
+    ```
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { LinearGradient } from '@symbiote-native/linear-gradient/solid';
+
+    <LinearGradient colors={['#4c669f', '#192f6a']} end={[1, 1]}>
+      <text>Over the gradient</text>
+    </LinearGradient>;
+    ```
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { LinearGradient } from '@symbiote-native/linear-gradient/angular';
+
+    @Component({
+      imports: [LinearGradient],
+      template: `<LinearGradient [colors]="colors" [end]="[1, 1]"><text>Over the gradient</text></LinearGradient>`,
+    })
+    export class Card {
+      readonly colors = ['#4c669f', '#192f6a'];
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## Props
+
+| Prop        | Notes                                                         |
+| ----------- | ------------------------------------------------------------- |
+| `colors`    | Two or more colors. For one color use `style.backgroundColor` |
+| `locations` | Stops from 0 to 1, ascending, same length as `colors`         |
+| `start`     | `{ x, y }` or `[x, y]`, default `{ x: 0.5, y: 0 }`            |
+| `end`       | `{ x, y }` or `[x, y]`, default `{ x: 0.5, y: 1 }`            |
+| `dither`    | Android only, default on                                      |
+
+Plus `style`, `testID`, `nativeID`, `onLayout` and the accessibility and responder props every View
+takes. Not ported: the web variant.

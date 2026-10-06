@@ -1,0 +1,137 @@
+---
+title: Blur
+description: expo-blur wrapped for every SymbioteNative adapter, a native view that blurs what is behind it.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+`@symbiote-native/blur` wraps [`expo-blur`](https://docs.expo.dev/versions/latest/sdk/blur-view/),
+a native view that blurs the content behind it, so every SymbioteNative adapter can reach it, not
+just React. `BlurView` paints the blur, `BlurTargetView` marks the content Android blurs.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | live    |
+| Android     | live    |
+
+| Framework adapter | Support |
+| ----------------- | ------- |
+| React             | live    |
+| Vue               | live    |
+| Angular           | live    |
+| Svelte            | live    |
+| Solid             | live    |
+
+## Installation
+
+```sh
+npm install @symbiote-native/blur
+```
+
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --blur` (or
+`add --blur` in an existing app) installs and wires this for you.
+
+<Aside type="danger" title="Native setup is required before first use">
+  `expo-blur`'s native code is discovered by `expo-modules-autolinking`. Follow [How to: wire up an
+  Expo native module](/docs/howtos/expo-native-module-setup/) once per app first.
+</Aside>
+
+## Usage
+
+On Android the `dimezis` blur methods need a `blurTarget`, the `BlurTargetView` whose content is
+blurred. Without one `BlurView` falls back to `none` and warns. iOS ignores the target.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { BlurTargetView, BlurView } from '@symbiote-native/blur/react';
+
+    const target = useRef<IHostInstance>(null);
+
+    <BlurTargetView ref={target}>
+      <Image source={photo} />
+    </BlurTargetView>;
+    <BlurView blurTarget={target} blurMethod="dimezisBlurView" tint="light" intensity={60}>
+      <Text>Over the blur</Text>
+    </BlurView>;
+    ```
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { ref } from '@vue/runtime-core';
+    import { BlurTargetView, BlurView } from '@symbiote-native/blur/vue';
+
+    const target = ref(null);
+    </script>
+
+    <template>
+      <BlurTargetView ref="target"><image :source="photo" /></BlurTargetView>
+      <BlurView :blur-target="target" blur-method="dimezisBlurView" tint="light" :intensity="60">
+        <text>Over the blur</text>
+      </BlurView>
+    </template>
+    ```
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { BlurTargetView, BlurView } from '@symbiote-native/blur/svelte';
+
+      let target = $state<unknown>();
+    </script>
+
+    <BlurTargetView bind:ref={target}><image source={photo} /></BlurTargetView>
+    <BlurView blurTarget={target} blurMethod="dimezisBlurView" tint="light" intensity={60}>
+      <text>Over the blur</text>
+    </BlurView>
+    ```
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { createSignal } from 'solid-js';
+    import { BlurTargetView, BlurView } from '@symbiote-native/blur/solid';
+
+    const [target, setTarget] = createSignal<IHostInstance>();
+
+    <BlurTargetView ref={setTarget}><image source={photo} /></BlurTargetView>;
+    <BlurView blurTarget={target()} blurMethod="dimezisBlurView" tint="light" intensity={60}>
+      <text>Over the blur</text>
+    </BlurView>;
+    ```
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { BlurTargetView, BlurView } from '@symbiote-native/blur/angular';
+
+    @Component({
+      imports: [BlurTargetView, BlurView],
+      template: `
+        <BlurTargetView #target><image [source]="photo" /></BlurTargetView>
+        <BlurView [blurTarget]="target" blurMethod="dimezisBlurView" tint="light" [intensity]="60">
+          <text>Over the blur</text>
+        </BlurView>
+      `,
+    })
+    export class Card {}
+    ```
+  </TabItem>
+</Tabs>
+
+## Props
+
+| Prop                  | Notes                                                           |
+| --------------------- | --------------------------------------------------------------- |
+| `tint`                | `default`, `light`, `dark`, `extraLight`, `regular`, system materials |
+| `intensity`           | 1 to 100, default 50                                            |
+| `blurMethod`          | Android: `none`, `dimezisBlurView`, `dimezisBlurViewSdk31Plus`  |
+| `blurReductionFactor` | Android divider of the intensity, default 4                     |
+| `blurTarget`          | The framework's reference to a `BlurTargetView`, Android        |
+
+Plus `style`, `testID`, `nativeID`, `onLayout` and the accessibility and responder props every View
+takes. Not ported: the web variant and the Reanimated `getAnimatableRef` hook.
+
+<Aside type="caution" title="Angular and the app identifier">
+  An Angular template spells the Android target tag statically. If the host sets an
+  `__expo_app_identifier__`, `BlurTargetView` warns that the tag does not match instead of rendering.
+</Aside>

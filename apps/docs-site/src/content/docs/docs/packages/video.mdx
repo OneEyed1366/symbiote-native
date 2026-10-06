@@ -1,0 +1,99 @@
+---
+title: Video
+description: expo-video wrapped for every SymbioteNative adapter, the player, the view, thumbnails, the cache and the AirPlay button.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+`@symbiote-native/video` wraps [`expo-video`](https://docs.expo.dev/versions/latest/sdk/video/), so
+every SymbioteNative adapter can play video, not just React.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | live    |
+| Android     | live    |
+
+| Framework adapter | Support |
+| ----------------- | ------- |
+| React             | live    |
+| Vue               | live    |
+| Angular           | live    |
+| Svelte            | live    |
+| Solid             | live    |
+
+## Installation
+
+```sh
+npm install @symbiote-native/video
+```
+
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --video`
+(or `add --video` in an existing app) installs and wires this for you.
+
+<Aside type="danger" title="Native setup is required before first use">
+  `expo-video`'s native code is discovered by `expo-modules-autolinking`. Follow
+  [How to: wire up an Expo native module](/docs/howtos/expo-native-module-setup/) once per app first.
+</Aside>
+
+## Usage
+
+```tsx
+import { VideoView, useVideoPlayer } from '@symbiote-native/video/react';
+
+const player = useVideoPlayer('https://example.com/video.mp4', player => {
+  player.loop = true;
+  player.play();
+});
+
+<VideoView player={player} style={{ width: 320, height: 180 }} nativeControls />;
+```
+
+The player is the native `VideoPlayer` object, the framework supplies only how it is created and
+released.
+
+| Adapter | Player                                                                     |
+| ------- | -------------------------------------------------------------------------- |
+| React   | `useVideoPlayer(source, setup?, options?)`                                 |
+| Vue     | `useVideoPlayer(source, setup?, options?)`, a computed ref                 |
+| Solid   | `useVideoPlayer(() => source, setup?, () => options)`, an accessor         |
+| Svelte  | `useVideoPlayer(() => source, setup?, () => options).current`              |
+| Angular | `injectVideoPlayer(() => source, setup?, () => options)`, a signal         |
+
+`setup` runs once on each new player, a changed source or options make a new one.
+`createVideoPlayer(source, options?)` makes a player that you release yourself.
+
+## Reaching the view functions
+
+| Adapter | How                                                          |
+| ------- | ------------------------------------------------------------ |
+| React   | `ref` gets an `IVideoViewHandle`                             |
+| Solid   | `ref={handle => ...}` gets the handle                        |
+| Vue     | a template ref, the functions are exposed                    |
+| Svelte  | `bind:this`, the component exports the functions             |
+| Angular | `@ViewChild(VideoView)`, the functions are members           |
+
+The functions are `enterFullscreen`, `exitFullscreen`, `startPictureInPicture` and
+`stopPictureInPicture`. On Android `exitFullscreen` works only from a native listener, the JS
+runtime sleeps in fullscreen.
+
+## Module functions
+
+`isPictureInPictureSupported()`, `setVideoCacheSizeAsync(bytes)`, `clearVideoCacheAsync()` and
+`getCurrentVideoCacheSize()`. The cache functions work only while no player exists.
+
+## Background playback and Picture in Picture
+
+The package writes nothing by default. For iOS add `audio` to `UIBackgroundModes` in `Info.plist`.
+For Android choose the "Background video playback" bundle (the foreground service and its
+permissions), and give the main activity `android:supportsPictureInPicture="true"` for Picture in
+Picture.
+
+<Aside type="note" title="Events of the player">
+  `useEvent` and `useEventListener` ship with the `expo` package upstream. Here they come from the
+  adapter, for any emitter: `import { useEvent, useEventListener } from '@symbiote-native/react'`
+  (Vue and Solid the same, Svelte `@symbiote-native/svelte/runes/use-event`, Angular
+  `injectEvent` / `injectEventListener`). `useEvent(player, 'statusChange', { status: player.status })`
+  gives the last payload, `useEventListener(player, 'playingChange', listener)` calls a listener.
+</Aside>
+
+The web build is not ported.

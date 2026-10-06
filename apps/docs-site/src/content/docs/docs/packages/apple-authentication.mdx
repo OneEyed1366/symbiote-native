@@ -1,0 +1,183 @@
+---
+title: Apple authentication
+description: expo-apple-authentication wrapped for every SymbioteNative adapter, the Sign in with Apple flow and the system button on iOS.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+`@symbiote-native/apple-authentication` wraps
+[`expo-apple-authentication`](https://docs.expo.dev/versions/latest/sdk/apple-authentication/), so
+every SymbioteNative adapter can offer Sign in with Apple, not just React. The credential flow is
+shared code; each adapter supplies only the button.
+
+| OS platform | Support                         |
+| ----------- | ------------------------------- |
+| iOS         | live                            |
+| Android     | `isAvailableAsync()` is `false` |
+
+| Framework adapter | Support |
+| ----------------- | ------- |
+| React             | live    |
+| Vue               | live    |
+| Angular           | live    |
+| Svelte            | live    |
+| Solid             | live    |
+
+## Installation
+
+```sh
+npm install @symbiote-native/apple-authentication
+```
+
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --apple-authentication`
+(or `add --apple-authentication` in an existing app) installs and wires this for you.
+
+<Aside type="danger" title="Native setup is required before first use">
+  `expo-apple-authentication`'s native code is discovered by `expo-modules-autolinking`. Follow
+  [How to: wire up an Expo native module](/docs/howtos/expo-native-module-setup/) once per app first.
+</Aside>
+
+<Aside type="caution" title="Pick a signing Team once">
+  The postinstall adds `com.apple.developer.applesignin` and `CFBundleAllowMixedLocalizations`
+  itself, and creates the `*.entitlements` file and wires it into the Xcode project when the app has
+  none. Sign in with Apple still needs a signing Team chosen in Xcode.
+</Aside>
+
+## Usage
+
+Render the button only when `isAvailableAsync()` resolves to `true`, and give it a width and a
+height.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import {
+      AppleAuthenticationButton,
+      AppleAuthenticationButtonStyle,
+      AppleAuthenticationButtonType,
+      signInAsync,
+    } from '@symbiote-native/apple-authentication/react';
+
+    <AppleAuthenticationButton
+      buttonType={AppleAuthenticationButtonType.SIGN_IN}
+      buttonStyle={AppleAuthenticationButtonStyle.BLACK}
+      cornerRadius={8}
+      style={{ width: 200, height: 44 }}
+      onPress={() => signInAsync()}
+    />;
+    ```
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import {
+      AppleAuthenticationButton,
+      AppleAuthenticationButtonStyle,
+      AppleAuthenticationButtonType,
+      signInAsync,
+    } from '@symbiote-native/apple-authentication/vue';
+    </script>
+
+    <template>
+      <AppleAuthenticationButton
+        :button-type="AppleAuthenticationButtonType.SIGN_IN"
+        :button-style="AppleAuthenticationButtonStyle.BLACK"
+        :corner-radius="8"
+        :style="{ width: 200, height: 44 }"
+        :on-press="() => signInAsync()"
+      />
+    </template>
+    ```
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import {
+        AppleAuthenticationButton,
+        AppleAuthenticationButtonStyle,
+        AppleAuthenticationButtonType,
+        signInAsync,
+      } from '@symbiote-native/apple-authentication/svelte';
+    </script>
+
+    <AppleAuthenticationButton
+      buttonType={AppleAuthenticationButtonType.SIGN_IN}
+      buttonStyle={AppleAuthenticationButtonStyle.BLACK}
+      cornerRadius={8}
+      style={{ width: 200, height: 44 }}
+      onPress={() => signInAsync()}
+    />
+    ```
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import {
+      AppleAuthenticationButton,
+      AppleAuthenticationButtonStyle,
+      AppleAuthenticationButtonType,
+      signInAsync,
+    } from '@symbiote-native/apple-authentication/solid';
+
+    <AppleAuthenticationButton
+      buttonType={AppleAuthenticationButtonType.SIGN_IN}
+      buttonStyle={AppleAuthenticationButtonStyle.BLACK}
+      cornerRadius={8}
+      style={{ width: 200, height: 44 }}
+      onPress={() => signInAsync()}
+    />;
+    ```
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import {
+      AppleAuthenticationButton,
+      AppleAuthenticationButtonStyle,
+      AppleAuthenticationButtonType,
+      signInAsync,
+    } from '@symbiote-native/apple-authentication/angular';
+
+    @Component({
+      imports: [AppleAuthenticationButton],
+      template: `
+        <AppleAuthenticationButton
+          [buttonType]="type"
+          [buttonStyle]="style"
+          [cornerRadius]="8"
+          [onPress]="signIn"
+        />
+      `,
+    })
+    export class SignIn {
+      readonly type = AppleAuthenticationButtonType.SIGN_IN;
+      readonly style = AppleAuthenticationButtonStyle.BLACK;
+      readonly signIn = () => signInAsync();
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## Functions
+
+| Function                                  | Notes                                                                 |
+| ----------------------------------------- | --------------------------------------------------------------------- |
+| `isAvailableAsync()`                      | `false` off iOS or on an old system                                   |
+| `signInAsync(options?)`                   | Rejects with `ERR_REQUEST_CANCELED` when the user cancels             |
+| `refreshAsync({ user })`                  | Shows the sign in modal first                                         |
+| `signOutAsync({ user })`                  | Prefer clearing the stored user data instead                          |
+| `getCredentialStateAsync(user)`           | Always throws on the iOS simulator, test on a device                  |
+| `formatFullName(fullName, style?)`        | Locale-aware, `default`, `short`, `medium`, `long` or `abbreviated`   |
+| `addRevokeListener(listener)`             | Fires when the user revokes the credential in the system settings     |
+
+The name and email come only the first time a user signs in, store the credential.
+
+## Button props
+
+| Prop           | Notes                                                           |
+| -------------- | --------------------------------------------------------------- |
+| `onPress`      | Call `signInAsync` in here                                      |
+| `buttonType`   | `SIGN_IN`, `CONTINUE` or `SIGN_UP`                              |
+| `buttonStyle`  | `WHITE`, `WHITE_OUTLINE` or `BLACK`                             |
+| `cornerRadius` | Works like `style.borderRadius`                                 |
+| `style`        | No `backgroundColor` or `borderRadius`, the App Store forbids it |
+
+Plus `testID`, `nativeID`, `onLayout` and the accessibility and responder props every View takes.

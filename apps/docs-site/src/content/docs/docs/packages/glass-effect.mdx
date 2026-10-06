@@ -1,0 +1,133 @@
+---
+title: Glass effect
+description: expo-glass-effect wrapped for every SymbioteNative adapter, Liquid Glass native views on iOS 26 and a plain View elsewhere.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+`@symbiote-native/glass-effect` wraps
+[`expo-glass-effect`](https://docs.expo.dev/versions/latest/sdk/glass-effect/), the Liquid Glass
+native views of iOS 26, so every SymbioteNative adapter can reach them, not just React. Off iOS
+both components render a plain `View`.
+
+| OS platform | Support             |
+| ----------- | ------------------- |
+| iOS         | live                |
+| Android     | plain View fallback |
+
+| Framework adapter | Support |
+| ----------------- | ------- |
+| React             | live    |
+| Vue               | live    |
+| Angular           | live    |
+| Svelte            | live    |
+| Solid             | live    |
+
+## Installation
+
+```sh
+npm install @symbiote-native/glass-effect
+```
+
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --glass-effect` (or
+`add --glass-effect` in an existing app) installs and wires this for you.
+
+<Aside type="danger" title="Native setup is required before first use">
+  `expo-glass-effect`'s native code is discovered by `expo-modules-autolinking`. Follow [How to:
+  wire up an Expo native module](/docs/howtos/expo-native-module-setup/) once per app first.
+</Aside>
+
+<Aside type="caution" title="Check availability first">
+  Some iOS 26 betas lack the Liquid Glass API and crash. Call `isGlassEffectAPIAvailable()` before
+  rendering `GlassView` or `GlassContainer`.
+</Aside>
+
+## Usage
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { GlassContainer, GlassView } from '@symbiote-native/glass-effect/react';
+
+    <GlassContainer spacing={8}>
+      <GlassView glassEffectStyle="clear" tintColor="rgba(255, 59, 48, 0.7)" isInteractive>
+        <Text>Glass</Text>
+      </GlassView>
+    </GlassContainer>;
+    ```
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { GlassContainer, GlassView } from '@symbiote-native/glass-effect/vue';
+    </script>
+
+    <template>
+      <GlassContainer :spacing="8">
+        <GlassView glass-effect-style="clear" tint-color="rgba(255, 59, 48, 0.7)" is-interactive>
+          <text>Glass</text>
+        </GlassView>
+      </GlassContainer>
+    </template>
+    ```
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { GlassContainer, GlassView } from '@symbiote-native/glass-effect/svelte';
+    </script>
+
+    <GlassContainer spacing={8}>
+      <GlassView glassEffectStyle="clear" tintColor="rgba(255, 59, 48, 0.7)" isInteractive={true}>
+        <text>Glass</text>
+      </GlassView>
+    </GlassContainer>
+    ```
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { GlassContainer, GlassView } from '@symbiote-native/glass-effect/solid';
+
+    <GlassContainer spacing={8}>
+      <GlassView glassEffectStyle="clear" tintColor="rgba(255, 59, 48, 0.7)" isInteractive>
+        <text>Glass</text>
+      </GlassView>
+    </GlassContainer>;
+    ```
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { GlassContainer, GlassView } from '@symbiote-native/glass-effect/angular';
+
+    @Component({
+      imports: [GlassContainer, GlassView],
+      template: `
+        <GlassContainer [spacing]="8">
+          <GlassView glassEffectStyle="clear" tintColor="rgba(255, 59, 48, 0.7)" [isInteractive]="true">
+            <text>Glass</text>
+          </GlassView>
+        </GlassContainer>
+      `,
+    })
+    export class Card {}
+    ```
+  </TabItem>
+</Tabs>
+
+## Props
+
+| Prop               | Notes                                                                    |
+| ------------------ | ------------------------------------------------------------------------ |
+| `glassEffectStyle` | `regular` (default), `clear`, `none`, or `{ style, animate, animationDuration }` |
+| `tintColor`        | A color, a `PlatformColor` or a `DynamicColorIOS`                        |
+| `isInteractive`    | Default false                                                            |
+| `colorScheme`      | `auto` (default), `light`, `dark`                                        |
+| `spacing`          | `GlassContainer` only, the distance at which glass views merge           |
+
+Plus `style`, `testID`, `nativeID`, `onLayout` and the accessibility and responder props every View
+takes.
+
+<Aside type="caution" title="Angular and the app identifier">
+  An Angular template spells the iOS native tag statically. If the host sets an
+  `__expo_app_identifier__`, the components warn that the tag does not match instead of rendering.
+</Aside>

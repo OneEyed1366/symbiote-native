@@ -1,0 +1,80 @@
+---
+title: GL
+description: expo-gl wrapped for every SymbioteNative adapter, a GLView that gives a WebGL context to draw into.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+`@symbiote-native/gl` wraps [`expo-gl`](https://docs.expo.dev/versions/latest/sdk/gl-view/), so
+every SymbioteNative adapter gets a `GLView` with a WebGL2 context, headless contexts and
+snapshots, not just React.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | live    |
+| Android     | live    |
+
+| Framework adapter | Support |
+| ----------------- | ------- |
+| React             | live    |
+| Vue               | live    |
+| Angular           | live    |
+| Svelte            | live    |
+| Solid             | live    |
+
+## Installation
+
+```sh
+npm install @symbiote-native/gl
+```
+
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --gl`
+(or `add --gl` in an existing app) installs and wires this for you.
+
+<Aside type="danger" title="Native setup is required before first use">
+  `expo-gl`'s native code is discovered by `expo-modules-autolinking`. Follow
+  [How to: wire up an Expo native module](/docs/howtos/expo-native-module-setup/) once per app first.
+</Aside>
+
+## Usage
+
+```tsx
+import { GLView, type IExpoWebGLRenderingContext } from '@symbiote-native/gl/react';
+
+function onContextCreate(gl: IExpoWebGLRenderingContext) {
+  gl.clearColor(0, 1, 1, 1);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.endFrameEXP();
+}
+
+<GLView style={{ flex: 1 }} onContextCreate={onContextCreate} />;
+```
+
+`gl` is a WebGL2 context. `endFrameEXP()` presents the drawing buffer, call it at the end of each
+frame.
+
+## Functions
+
+The statics of upstream's `GLView` class are plain functions: `createContextAsync` (a headless
+context, take a snapshot to see it), `destroyContextAsync`, `takeSnapshotAsync` and
+`getWorkletContext`. `GLLoggingOption` and `gl.__expoSetLogging(option)` print the GL calls with
+`console.warn`.
+
+## Reaching the view functions
+
+| Adapter | How                                                                       |
+| ------- | ------------------------------------------------------------------------- |
+| React   | `ref` gets an `IGLViewHandle`                                             |
+| Solid   | `ref={handle => ...}` gets the handle                                     |
+| Vue     | a template ref, the functions are exposed                                 |
+| Svelte  | `bind:this`, the component exports the functions                          |
+| Angular | `@ViewChild(GLView)`, the functions are methods                           |
+
+The handle has `exglCtxId`, `createCameraTextureAsync(camera)` (a native tag or a host node),
+`destroyObjectAsync` and `takeSnapshotAsync`. The context of a view is forgotten when the view
+unmounts.
+
+## Not ported
+
+The web build, the `nativeRef_EXPERIMENTAL` prop (hidden upstream) and upstream's one test, which
+is skipped there.

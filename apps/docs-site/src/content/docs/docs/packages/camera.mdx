@@ -1,0 +1,80 @@
+---
+title: Camera
+description: expo-camera wrapped for every SymbioteNative adapter, the camera preview, pictures, video recording and barcode scanning.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+`@symbiote-native/camera` wraps [`expo-camera`](https://docs.expo.dev/versions/latest/sdk/camera/),
+so every SymbioteNative adapter can show a camera, not just React.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | live    |
+| Android     | live    |
+
+| Framework adapter | Support |
+| ----------------- | ------- |
+| React             | live    |
+| Vue               | live    |
+| Angular           | live    |
+| Svelte            | live    |
+| Solid             | live    |
+
+## Installation
+
+```sh
+npm install @symbiote-native/camera
+```
+
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --camera`
+(or `add --camera` in an existing app) installs and wires this for you.
+
+<Aside type="danger" title="Native setup is required before first use">
+  `expo-camera`'s native code is discovered by `expo-modules-autolinking`. Follow
+  [How to: wire up an Expo native module](/docs/howtos/expo-native-module-setup/) once per app first.
+</Aside>
+
+## Usage
+
+```tsx
+import { CameraView, useCameraPermissions, type ICameraViewHandle } from '@symbiote-native/camera/react';
+
+const [permission, requestPermission] = useCameraPermissions();
+const ref = useRef<ICameraViewHandle>(null);
+
+<CameraView ref={ref} style={{ flex: 1 }} facing="back" />;
+
+const picture = await ref.current?.takePictureAsync({ quality: 0.8 });
+```
+
+Wait for `onCameraReady` before taking a picture.
+
+## Reaching the view functions
+
+| Adapter | How                                                        |
+| ------- | ---------------------------------------------------------- |
+| React   | `ref` gets an `ICameraViewHandle`                          |
+| Solid   | `ref={handle => ...}` gets the handle                      |
+| Vue     | a template ref, the functions are exposed                  |
+| Svelte  | `bind:this`, the component exports the functions           |
+| Angular | `@ViewChild(CameraView)`, the functions are members        |
+
+## Functions of the package
+
+| Function                              | Notes                                                       |
+| ------------------------------------- | ----------------------------------------------------------- |
+| `isCameraAvailableAsync()`            | Whether the device has a camera, upstream's `CameraView.isAvailableAsync` |
+| `getAvailableVideoCodecsAsync()`      | iOS only                                                    |
+| `launchScanner(options?)` / `dismissScanner()` | The system scanner, iOS 16+ and Google's code scanner |
+| `onModernBarcodeScanned(listener)`    | Returns a subscription                                      |
+| `isModernBarcodeScannerAvailable()`   | Whether the device has the system scanner                   |
+| `scanFromURLAsync(url, types?)`       | Scans an image, QR only on iOS                              |
+| `Camera.getCameraPermissionsAsync()` and the three twins | The permission calls the hooks use          |
+
+`useCameraPermissions` and `useMicrophonePermissions` are hooks in React, Vue, Svelte and Solid and
+`CameraPermissionsService` and `MicrophonePermissionsService` in Angular.
+
+<Aside type="note" title="Not ported">
+  The web build and the `barcodeScannerEnabled: false` switch of the config plugin.
+</Aside>
