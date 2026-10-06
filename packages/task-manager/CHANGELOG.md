@@ -1,5 +1,15 @@
 # @symbiote-native/task-manager
 
+## 0.1.4
+
+### Patch Changes
+
+- [#93](https://github.com/OneEyed1366/symbiote-native/pull/93) [`5435556`](https://github.com/OneEyed1366/symbiote-native/commit/5435556869929fe5fd4798ac8f3dedb2fe893851) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Add `@symbiote-native/task-manager`, wrapping `expo-task-manager` — `defineTask`, registration tracking, and native-to-JS task dispatch, the low-level primitive other background-work packages (`background-fetch`, `background-task`, `location`) register tasks through.
+
+- [#93](https://github.com/OneEyed1366/symbiote-native/pull/93) [`5435556`](https://github.com/OneEyed1366/symbiote-native/commit/5435556869929fe5fd4798ac8f3dedb2fe893851) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Rewrite the README of every Expo wrapper package around the problem it solves, and add a Common questions section with cited sources.
+
+- [#93](https://github.com/OneEyed1366/symbiote-native/pull/93) [`5435556`](https://github.com/OneEyed1366/symbiote-native/commit/5435556869929fe5fd4798ac8f3dedb2fe893851) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Fix a crash (`NullPointerException` in `getAppScopeKey`) on `getRegisteredTasksAsync` and other task operations: `expo-task-manager`'s legacy `TaskManagerInternalModule` reads `ConstantsInterface` from `AppContext`'s `ServicesRegistry` for `appScopeKey`, which nothing provided. Adds `expo-constants` (safe standalone — its only real dependency is `@expo/env`, no `@expo/metro-config`/`babel-preset-expo`) and registers its `ConstantsService`.
+
 ## 0.1.3
 
 ### Patch Changes

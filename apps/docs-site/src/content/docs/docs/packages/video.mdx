@@ -1,0 +1,256 @@
+---
+title: Video
+description: expo-video wrapped for every SymbioteNative adapter, the player, the view, thumbnails, the cache and the AirPlay button.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+`@symbiote-native/video` wraps [`expo-video`](https://docs.expo.dev/versions/latest/sdk/video/), so
+every SymbioteNative adapter can play video, not just React.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | live    |
+| Android     | live    |
+
+| Framework adapter | Support |
+| ----------------- | ------- |
+| React             | live    |
+| Vue               | live    |
+| Angular           | live    |
+| Svelte            | live    |
+| Solid             | live    |
+
+## Installation
+
+```sh
+npm install @symbiote-native/video
+```
+
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --video`
+(or `add --video` in an existing app) installs and wires this for you.
+
+<Aside type="danger" title="Native setup is required before first use">
+  `expo-video`'s native code is discovered by `expo-modules-autolinking`. Follow
+  [How to: wire up an Expo native module](/docs/howtos/expo-native-module-setup/) once per app first.
+</Aside>
+
+## Usage
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { VideoView, useVideoPlayer } from '@symbiote-native/video/react';
+
+    const player = useVideoPlayer('https://example.com/video.mp4', player => {
+      player.loop = true;
+      player.play();
+    });
+
+    <VideoView player={player} style={{ width: 320, height: 180 }} nativeControls />;
+    ```
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { VideoView, useVideoPlayer } from '@symbiote-native/video/vue';
+
+    const player = useVideoPlayer(
+      () => 'https://example.com/video.mp4',
+      instance => {
+        instance.loop = true;
+        instance.play();
+      },
+    );
+    </script>
+
+    <template>
+      <VideoView :player="player" :style="{ width: 320, height: 180 }" :nativeControls="true" />
+    </template>
+    ```
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component } from '@angular/core';
+    import { VideoView, injectVideoPlayer } from '@symbiote-native/video/angular';
+
+    @Component({
+      standalone: true,
+      imports: [VideoView],
+      template: `
+        <VideoView [player]="player()" [style]="{ width: 320, height: 180 }" [nativeControls]="true" />
+      `,
+    })
+    export class Clip {
+      readonly player = injectVideoPlayer(
+        () => 'https://example.com/video.mp4',
+        instance => {
+          instance.loop = true;
+          instance.play();
+        },
+      );
+    }
+    ```
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { VideoView, useVideoPlayer } from '@symbiote-native/video/svelte';
+
+      const player = useVideoPlayer(
+        () => 'https://example.com/video.mp4',
+        instance => {
+          instance.loop = true;
+          instance.play();
+        },
+      );
+    </script>
+
+    <VideoView player={player.current} style={{ width: 320, height: 180 }} nativeControls />
+    ```
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { VideoView, useVideoPlayer } from '@symbiote-native/video/solid';
+
+    const player = useVideoPlayer(
+      () => 'https://example.com/video.mp4',
+      instance => {
+        instance.loop = true;
+        instance.play();
+      },
+    );
+
+    <VideoView player={player()} style={{ width: 320, height: 180 }} nativeControls />;
+    ```
+  </TabItem>
+</Tabs>
+
+The player is the native `VideoPlayer` object, the framework supplies only how it is created and
+released.
+
+| Adapter | Player                                                                     |
+| ------- | -------------------------------------------------------------------------- |
+| React   | `useVideoPlayer(source, setup?, options?)`                                 |
+| Vue     | `useVideoPlayer(source, setup?, options?)`, a computed ref                 |
+| Solid   | `useVideoPlayer(() => source, setup?, () => options)`, an accessor         |
+| Svelte  | `useVideoPlayer(() => source, setup?, () => options).current`              |
+| Angular | `injectVideoPlayer(() => source, setup?, () => options)`, a signal         |
+
+`setup` runs once on each new player, a changed source or options make a new one.
+`createVideoPlayer(source, options?)` makes a player that you release yourself.
+
+## API
+
+### Reaching the view functions
+
+| Adapter | How                                                          |
+| ------- | ------------------------------------------------------------ |
+| React   | `ref` gets an `IVideoViewHandle`                             |
+| Solid   | `ref={handle => ...}` gets the handle                        |
+| Vue     | a template ref, the functions are exposed                    |
+| Svelte  | `bind:this`, the component exports the functions             |
+| Angular | `@ViewChild(VideoView)`, the functions are members           |
+
+The functions are `enterFullscreen`, `exitFullscreen`, `startPictureInPicture` and
+`stopPictureInPicture`. On Android `exitFullscreen` works only from a native listener, the JS
+runtime sleeps in fullscreen.
+
+### Module functions
+
+`isPictureInPictureSupported()`, `setVideoCacheSizeAsync(bytes)`, `clearVideoCacheAsync()` and
+`getCurrentVideoCacheSize()`. The cache functions work only while no player exists.
+
+### Background playback and Picture in Picture
+
+The package writes nothing by default. For iOS add `audio` to `UIBackgroundModes` in `Info.plist`.
+For Android choose the "Background video playback" bundle (the foreground service and its
+permissions), and give the main activity `android:supportsPictureInPicture="true"` for Picture in
+Picture.
+
+<Aside type="note" title="Events of the player">
+  `useEvent` and `useEventListener` ship with the `expo` package upstream. Here they come from the
+  adapter, for any emitter: `import { useEvent, useEventListener } from '@symbiote-native/react'`
+  (Vue and Solid the same, Svelte `@symbiote-native/svelte/runes/use-event`, Angular
+  `injectEvent` / `injectEventListener`). `useEvent(player, 'statusChange', { status: player.status })`
+  gives the last payload, `useEventListener(player, 'playingChange', listener)` calls a listener.
+</Aside>
+
+The web build is not ported.
+
+## Notes
+
+- **One player, one `VideoView` on Android.** Mounting several views with the same player does not
+  work there, a platform limitation. iOS accepts it. Create a player per visible view, or move the
+  player to the new view only after the old one is gone.
+- **`useVideoPlayer` releases the player for you.** It disposes of it when the component unmounts,
+  and a changed source or options make a new one. A player from `createVideoPlayer` is yours:
+  call `release()` when you are done, or it leaks.
+- **Android renders on a surface by default.** `surfaceType="surfaceView"` is the efficient choice,
+  `surfaceType="textureView"` composes like an ordinary view and costs more performance.
+- **Caching is per source.** Set `useCaching: true` on the source object. The cache is persistent
+  and trimmed least-recently-used, 1 GB by default, and works offline for what it holds.
+  iOS cannot cache HLS, and DRM-protected video is not cached on either platform.
+- **The cache functions work only while no player exists**, so call `setVideoCacheSizeAsync` and
+  `clearVideoCacheAsync` before you create one.
+- **`useEvent` and `useEventListener` come from the adapter**, not from this package. See the aside
+  above.
+
+## Common questions
+
+**The screen is black on Android though the controls show.** The usual cause is one player rendered
+in more than one `VideoView`, or a player moved from one view to another while both still exist.
+Android supports a player in a single view at a time. Keep one `VideoView` per player, and unmount
+the old view before the new one takes the player.
+
+**Two videos overlap or one is drawn out of bounds on Android.** With `contentFit="cover"`, two
+overlapping views trigger a bug in ExoPlayer itself. Set `surfaceType="textureView"` on the views.
+It composes like a normal view, so overlap and stacking behave, at some cost in performance.
+
+**A `VideoView` ignores `zIndex` on Android.** Reported for the default surface, where a video is
+drawn above everything around it. If you stack videos or put views over one, such as a deck of
+cards, try `surfaceType="textureView"`.
+
+**Touch handlers on the `VideoView` do not fire on Android.** Reported upstream. Put the handler on
+a plain view that wraps or sits over the player instead of on the native view itself.
+
+**Audio keeps playing after the screen closes, or the player is never released.** A player made with
+`useVideoPlayer` is released when its component unmounts. One made with `createVideoPlayer` is not:
+call `player.release()` yourself, for example in your cleanup. If you do not want playback to
+continue in the background, leave `staysActiveInBackground` off.
+
+**Fullscreen will not rotate on Android.** Android follows the app's orientation lock, while iOS's
+fullscreen player rotates on its own. Unlock the orientation for the fullscreen session with
+[`@symbiote-native/screen-orientation`](/docs/packages/screen-orientation/) and lock it again when
+the player closes.
+
+**How do I cache a video?** Pass `{ uri, useCaching: true }` as the source. Use
+`setVideoCacheSizeAsync(bytes)` to set the limit, `getCurrentVideoCacheSize()` to read the size, and
+`clearVideoCacheAsync()` to empty it.
+
+**How do I play audio in the background or in Picture in Picture?** It needs native setup first,
+see [Background playback and Picture in Picture](#background-playback-and-picture-in-picture):
+`audio` in `UIBackgroundModes` on iOS, the background-playback bundle on Android, and
+`android:supportsPictureInPicture="true"` on the main activity.
+
+Sources: [Expo docs: Video](https://docs.expo.dev/versions/latest/sdk/video/),
+[expo/expo#35012 black screen when reusing a player on Android](https://github.com/expo/expo/issues/35012),
+[expo/expo#31248 one player in several VideoViews on Android](https://github.com/expo/expo/issues/31248),
+[expo/expo#31722 contentFit cover overlaps on Android](https://github.com/expo/expo/issues/31722),
+[androidx/media#1107 the ExoPlayer bug behind it](https://github.com/androidx/media/issues/1107),
+[expo/expo#30275 VideoView ignores zIndex on Android](https://github.com/expo/expo/issues/30275),
+[expo/expo#34630 touch events on VideoView on Android](https://github.com/expo/expo/issues/34630),
+[expo/expo#33804 player not released on unmount](https://github.com/expo/expo/issues/33804),
+[expo/expo#9899 fullscreen orientation on Android](https://github.com/expo/expo/issues/9899).
+
+## How the wrapper works
+
+`expo-video`'s JS is hand-ported into this package's `core/`. The player is the native
+`VideoPlayer` shared object, and `useVideoPlayer` and `injectVideoPlayer` create and release it
+through `createVideoPlayerController`, built on the engine's `createJsonKeyedResourceController`
+so a changed source or options make a new player. `VideoView` is one component per platform: the
+native `VideoView` on iOS, and `SurfaceVideoView` or `TextureVideoView` on Android, with the view
+functions following whichever surface the last render chose. `VideoAirPlayButton` is a plain view
+off iOS. Every adapter only hands over its host node, and the shared `createVideoView` does the rest.
+The native code is never vendored: `expo-modules-autolinking` resolves it from `node_modules` (see
+[the native setup guide](/docs/howtos/expo-native-module-setup/)).

@@ -125,6 +125,7 @@ export type {
 // its place. RN's Button has no statics, so the name exports nothing at all now; the prop type
 // stays, for a component forwarding a bag.
 export type { IButtonProps } from './components/button-props';
+export type { ICheckboxProps } from './components/checkbox-props';
 export {
   VirtualizedList,
   VListCellDirective,

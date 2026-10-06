@@ -210,6 +210,7 @@ export const CANONICAL_PROP_NAMES: readonly string[] = [
   'onAccessibilityEscape',
   'onAccessibilityTap',
   'onBlur',
+  'onChange',
   'onChangeText',
   'onContentSizeChange',
   'onDismiss',

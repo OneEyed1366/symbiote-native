@@ -1,5 +1,18 @@
 # @symbiote-native/notifications
 
+## 0.1.4
+
+### Patch Changes
+
+- [#93](https://github.com/OneEyed1366/symbiote-native/pull/93) [`5435556`](https://github.com/OneEyed1366/symbiote-native/commit/5435556869929fe5fd4798ac8f3dedb2fe893851) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Add `@symbiote-native/notifications`, wrapping `expo-notifications` — permissions, device/Expo push tokens, scheduling, presentation, badges, Android channels/channel groups, categories, and a `@symbiote-native/task-manager`-backed background-task hook, usable from every adapter.
+
+- [#93](https://github.com/OneEyed1366/symbiote-native/pull/93) [`5435556`](https://github.com/OneEyed1366/symbiote-native/commit/5435556869929fe5fd4798ac8f3dedb2fe893851) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Rewrite the README of every Expo wrapper package around the problem it solves, and add a Common questions section with cited sources.
+
+- [#93](https://github.com/OneEyed1366/symbiote-native/pull/93) [`5435556`](https://github.com/OneEyed1366/symbiote-native/commit/5435556869929fe5fd4798ac8f3dedb2fe893851) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Fix a crash: `AndroidXNotificationsChannelsProvider` was never registered in `native-link.json`, so `NotificationChannelManagerModule`/`NotificationChannelGroupManagerModule`'s `ModuleRegistry.getModule()` lookup for it returned null. Marked `internal: true` since it's reached only by another native module, never by `requireNativeModule` from JS.
+
+- Updated dependencies [[`5435556`](https://github.com/OneEyed1366/symbiote-native/commit/5435556869929fe5fd4798ac8f3dedb2fe893851), [`5435556`](https://github.com/OneEyed1366/symbiote-native/commit/5435556869929fe5fd4798ac8f3dedb2fe893851)]:
+  - @symbiote-native/application@3.0.4
+
 ## 0.1.3
 
 ### Patch Changes

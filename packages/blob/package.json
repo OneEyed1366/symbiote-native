@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/blob",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "expo-blob wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, Svelte, Solid, and Angular adapters. A native, JSI-backed W3C Blob implementation.",
   "license": "MIT",
   "keywords": [

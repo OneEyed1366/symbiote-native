@@ -8,6 +8,7 @@ import { ROUTE_NAME } from './routes';
 import { LINE_COLOR } from './navigation-lines';
 import type { INavLine } from './navigation-lines';
 import './App.css';
+import './ExpoViews.css';
 
 // The native header is OS chrome and never sees the class registry, so its colors are literals
 const HEADER_BACKGROUND_COLOR = '#0b1622';

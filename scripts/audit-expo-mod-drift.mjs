@@ -49,10 +49,11 @@ async function auditPackage({ name, dir }, baseline) {
   const nativeLinkPath = join(dir, 'native-link.json');
   if (!existsSync(nativeLinkPath)) return null;
   const nativeLink = readJson(nativeLinkPath);
-  const gradleProjectName = nativeLink.android?.gradleProjectName;
-  if (!gradleProjectName) return null;
+  // iOS-only packages have no Gradle project, they name the upstream package under `ios`
+  const upstreamName = nativeLink.android?.gradleProjectName ?? nativeLink.ios?.upstreamPackage;
+  if (!upstreamName) return null;
 
-  const loaded = resolvePlugin(resolve(dir), gradleProjectName);
+  const loaded = resolvePlugin(resolve(dir), upstreamName);
   if (!loaded) return { name, skipped: 'upstream ships no config plugin (no app.plugin.js)' };
 
   let result;
@@ -100,6 +101,29 @@ function writeAcceptedBaseline(results, dryRun) {
   console.log(`Wrote ${BASELINE_PATH} — fill in each "TODO: needs review" verdict by hand.`);
 }
 
+// Печатает находки одного пакета, возвращает true при дрейфе или непроверенном моде
+function printResult(r) {
+  if (r.skipped) return false;
+  if (!r.diffs.length && !r.unreviewedMods.length && !r.reviewedMods.length) return false;
+  console.log(`\n${r.name}`);
+  for (const d of r.diffs) {
+    console.log(`  DRIFT ${d.path}`);
+    console.log(`    before: ${JSON.stringify(d.before)}`);
+    console.log(`    after:  ${JSON.stringify(d.after)}`);
+  }
+  for (const mod of r.unreviewedMods) {
+    console.log(`  UNREVIEWED non-introspectable mod: ${mod}`);
+    console.log(
+      `    add {"mod": "${mod}", "note": "..."} to native-link.json's ` +
+        '"reviewedNonIntrospectableMods" once a human has read the plugin\'s mod body',
+    );
+  }
+  for (const mod of r.reviewedMods) {
+    console.log(`  reviewed non-introspectable mod: ${mod}`);
+  }
+  return r.diffs.length > 0 || r.unreviewedMods.length > 0;
+}
+
 export async function main() {
   const args = process.argv.slice(2);
   const filter = args.find((a) => a.startsWith('--package='))?.replace('--package=', '');
@@ -115,29 +139,8 @@ export async function main() {
     results.push(await auditPackage(entry, baseline));
   }
 
-  let hasFailure = false;
-  for (const r of results.filter(Boolean)) {
-    if (r.skipped) continue;
-    if (!r.diffs.length && !r.unreviewedMods.length && !r.reviewedMods.length) continue;
-    console.log(`\n${r.name}`);
-    for (const d of r.diffs) {
-      hasFailure = true;
-      console.log(`  DRIFT ${d.path}`);
-      console.log(`    before: ${JSON.stringify(d.before)}`);
-      console.log(`    after:  ${JSON.stringify(d.after)}`);
-    }
-    for (const mod of r.unreviewedMods) {
-      hasFailure = true;
-      console.log(`  UNREVIEWED non-introspectable mod: ${mod}`);
-      console.log(
-        `    add {"mod": "${mod}", "note": "..."} to native-link.json's ` +
-          '"reviewedNonIntrospectableMods" once a human has read the plugin\'s mod body',
-      );
-    }
-    for (const mod of r.reviewedMods) {
-      console.log(`  reviewed non-introspectable mod: ${mod}`);
-    }
-  }
+  const failures = results.filter(Boolean).map(printResult);
+  const hasFailure = failures.some(Boolean);
 
   if (accept) {
     writeAcceptedBaseline(results, dryRun);

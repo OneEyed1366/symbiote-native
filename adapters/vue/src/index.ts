@@ -153,6 +153,7 @@ export type { ITouchableNativeFeedbackProps } from './components/touchable-nativ
 // statics (unlike `TouchableNativeFeedback` next to it), so the name exports nothing at all now;
 // the prop type stays, for a component forwarding a bag.
 export type { IButtonProps } from './components/button-props';
+export type { ICheckboxProps } from './components/checkbox-props';
 // `TextInput` is a TAG — `<text-input>`, and `multiline` picks `text-input-multiline` underneath —
 // so there is nothing to import in its place. The controlled handshake, the focus mirror and
 // `autoFocus` live on the engine node now; the imperative API comes from `buildTextInputHandle`,
@@ -273,7 +274,9 @@ export {
 export { useWindowDimensions } from './composables/use-window-dimensions';
 export { createPermissionHook } from './composables/create-permission-hook';
 export { createResourceHook } from './composables/create-resource-hook';
+export { defineNativeViewComponent } from './composables/define-native-view-component';
 export { createEventValueHook } from './composables/create-event-value-hook';
+export { useEvent, useEventListener } from './composables/use-event';
 
 // Imperative runtime modules: the SAME module both adapters share, re-exported from @symbiote-native/engine.
 export {

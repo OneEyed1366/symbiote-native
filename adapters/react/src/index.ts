@@ -130,6 +130,8 @@ export type { ITouchableWithoutFeedbackProps } from './components/touchable-with
 // statics (unlike `TouchableNativeFeedback`), so the name exports nothing at all now; the
 // prop type stays, for a component forwarding a bag.
 export type { IButtonProps } from './components/button-props';
+// `Checkbox` из expo-checkbox это тег `<checkbox>`, импортировать нечего, остаётся тип пропсов
+export type { ICheckboxProps } from './components/checkbox-props';
 
 export { FlatList } from './components/flat-list';
 export type { IFlatListProps, IFlatListHandle } from './components/flat-list';
@@ -178,6 +180,7 @@ export { createTunnel, type ITunnel } from './create-tunnel';
 // an external wrapper package (e.g. @symbiote-native/slider/react over a third-party native view) can map
 // a shared render fn's Descriptor onto React elements through the SAME bridge the adapter uses.
 export { descriptorToReact } from './descriptor-to-react';
+export { descriptorToReactWithChildren } from './descriptor-to-react/with-children';
 export { findNodeHandle } from './host-instance';
 export type { IHostInstance } from './host-instance';
 // AppRegistry: RN's app entry point over `mount`. setHostRegistrar wires RN's own
@@ -326,7 +329,9 @@ export {
 } from './hooks/use-animated-value';
 export { createPermissionHook } from './hooks/create-permission-hook';
 export { createResourceHook } from './hooks/create-resource-hook';
+export { useNativeViewController } from './hooks/use-native-view-controller';
 export { createEventValueHook } from './hooks/create-event-value-hook';
+export { useEvent, useEventListener } from './hooks/use-event';
 
 export { AccessibilityInfo } from './modules/accessibility-info';
 export type {

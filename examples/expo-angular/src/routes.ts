@@ -53,6 +53,17 @@ export const ROUTE_NAME = {
   Asset: 'Asset',
   AppMetrics: 'AppMetrics',
   AuthSession: 'AuthSession',
+  Checkbox: 'Checkbox',
+  LinearGradient: 'LinearGradient',
+  Blur: 'Blur',
+  GlassEffect: 'GlassEffect',
+  Symbols: 'Symbols',
+  AppleAuthentication: 'AppleAuthentication',
+  Image: 'Image',
+  Video: 'Video',
+  Camera: 'Camera',
+  LivePhoto: 'LivePhoto',
+  Gl: 'Gl',
 } as const;
 
 export type IRouteName = (typeof ROUTE_NAME)[keyof typeof ROUTE_NAME];

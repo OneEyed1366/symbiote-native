@@ -32,36 +32,12 @@
 // (`[onPressMove]="fn"`, where `fn` keeps its `ISymbioteEvent` parameter).
 //
 // `valueChange` is the ONE exception, and it is forced rather than chosen: see ValueChangeElement.
-import { Directive, Input } from '@angular/core';
 import { SymbioteCallbackHost } from './callback-host';
 import { withholdFromRuntimeMatching } from './runtime-matching';
-import { ReadBackElement, SymbioteElement } from './element-base';
-import {
-  MultilineTextInputElement,
-  SwitchElement,
-  SwitchValueAccessor,
-  TextInputElement,
-  TextInputValueAccessor,
-} from './elements-controlled';
-import {
-  ButtonElement,
-  PressableElement,
-  TouchableHighlightElement,
-  TouchableNativeFeedbackElement,
-  TouchableOpacityElement,
-  TouchableWithoutFeedbackElement,
-} from './elements-touchable';
-import {
-  HorizontalScrollContentElement,
-  HorizontalScrollViewElement,
-  ScrollContentElement,
-  ScrollViewElement,
-} from './elements-scroll';
 import type {
   IActivityIndicatorProps,
   IImageProps,
   IInputAccessoryViewViewProps,
-  ILayoutConformanceMode,
   IModalViewProps,
   ISwitchProps,
   ITextInputProps,
@@ -71,6 +47,7 @@ import type {
   IStickyHeaderElementProps,
   ITextElementProps,
 } from './element-props';
+import type { ICheckboxProps } from './components/checkbox-props';
 import type { IAngularImageBackgroundProps } from './components/image-background-props';
 import type { IAngularPressableProps } from './components/pressable-props';
 import type {
@@ -80,202 +57,74 @@ import type {
 // Type-only, so none of these components enters the bundle of an app that writes bare tags.
 import type { IAngularRefreshControlProps } from './components/refresh-control-props';
 import type { IAngularScrollViewProps } from './components/scroll-view-props';
-
-// Defined in sibling files for size, re-exported so this stays the one place an app imports from
-export {
+import { SymbioteElement } from './element-base';
+import {
   ButtonElement,
+  CheckboxElement,
+  PressableElement,
+  TextElement,
+  TouchableHighlightElement,
+  TouchableNativeFeedbackElement,
+  TouchableOpacityElement,
+  TouchableWithoutFeedbackElement,
+  ViewElement,
+} from './elements-press';
+import {
   HorizontalScrollContentElement,
   HorizontalScrollViewElement,
-  MultilineTextInputElement,
-  PressableElement,
+  ImageBackgroundElement,
+  ImageElement,
   ScrollContentElement,
   ScrollViewElement,
+} from './elements-layout';
+import {
+  ActivityIndicatorElement,
+  ActivityIndicatorSpinnerElement,
+  InputAccessoryViewElement,
+  LayoutConformanceElement,
+  ModalElement,
+  MultilineTextInputElement,
+  RefreshControlElement,
+  SafeAreaViewElement,
+  StickyHeaderElement,
+  SwitchElement,
+  SwitchValueAccessor,
+  TextInputElement,
+  TextInputValueAccessor,
+} from './elements-controls';
+
+// Классы живут в соседних модулях по ответственности, этот файл остаётся их единой точкой входа
+export {
+  ActivityIndicatorElement,
+  ActivityIndicatorSpinnerElement,
+  ButtonElement,
+  CheckboxElement,
+  HorizontalScrollContentElement,
+  HorizontalScrollViewElement,
+  ImageBackgroundElement,
+  ImageElement,
+  InputAccessoryViewElement,
+  LayoutConformanceElement,
+  ModalElement,
+  MultilineTextInputElement,
+  PressableElement,
+  RefreshControlElement,
+  SafeAreaViewElement,
+  ScrollContentElement,
+  ScrollViewElement,
+  StickyHeaderElement,
   SwitchElement,
   SwitchValueAccessor,
   SymbioteElement,
+  TextElement,
   TextInputElement,
   TextInputValueAccessor,
   TouchableHighlightElement,
   TouchableNativeFeedbackElement,
   TouchableOpacityElement,
   TouchableWithoutFeedbackElement,
+  ViewElement,
 };
-
-// BOTH SPELLINGS ON THE SEVEN DASHLESS TAGS, and it is a correctness fix rather than a convenience.
-//
-// The renderer has always mapped `symbiote-view` onto `view` (`PRIMITIVE_SELECTOR_ALIAS`), because
-// `CUSTOM_ELEMENTS_SCHEMA` admits an unknown element only when the name carries a hyphen — so the
-// hyphenated form is the spelling an app WITHOUT these directives has to use. It is the same tag and
-// commits the same node.
-//
-// It was not the same tag HERE. A selector of `view` alone meant an app that imports
-// `SYMBIOTE_ELEMENTS` and writes `<symbiote-view>` matched nothing: no type check on its props, no
-// declared inputs, none of `SymbioteElement`'s forwarding or callback wrapping — silently, with the
-// tree still looking right. Measured, that shape also ran ~8.6 us per element FASTER, which is what
-// made it look like an optimization instead of a hole (`angular-directive-cost.itest.ts`).
-//
-// Only the seven dashless tags need it: `hyphenatedIntrinsicAliases` skips any tag that already
-// carries a dash, so `symbiote-scroll-view` resolves nowhere on either side and the two halves agree
-// already.
-@Directive({ selector: 'view, symbiote-view', standalone: true })
-export class ViewElement extends SymbioteElement {}
-
-@Directive({ selector: 'text, symbiote-text', standalone: true })
-export class TextElement extends SymbioteElement {
-  // Narrows the inherited input to a TEXT style so `fontSize`/`fontWeight` type-check here. The
-  // initializer is what TS2612 asks for to accept a redeclaration as deliberate; `declare` would
-  // be the other answer and cannot carry a decorator.
-  @Input() override style?: ITextElementProps['style'] = undefined;
-  @Input() override styleProp?: ITextElementProps['styleProp'] = undefined;
-  @Input() numberOfLines?: ITextElementProps['numberOfLines'];
-  @Input() ellipsizeMode?: ITextElementProps['ellipsizeMode'];
-  @Input() selectable?: ITextElementProps['selectable'];
-  @Input() adjustsFontSizeToFit?: ITextElementProps['adjustsFontSizeToFit'];
-  @Input() minimumFontScale?: ITextElementProps['minimumFontScale'];
-  @Input() allowFontScaling?: ITextElementProps['allowFontScaling'];
-  @Input() maxFontSizeMultiplier?: ITextElementProps['maxFontSizeMultiplier'];
-  @Input() selectionColor?: ITextElementProps['selectionColor'];
-  @Input() disabled?: ITextElementProps['disabled'];
-  @Input() dynamicTypeRamp?: ITextElementProps['dynamicTypeRamp'];
-  @Input() lineBreakStrategyIOS?: ITextElementProps['lineBreakStrategyIOS'];
-  @Input() lineBreakMode?: ITextElementProps['lineBreakMode'];
-  @Input() textBreakStrategy?: ITextElementProps['textBreakStrategy'];
-  @Input() dataDetectorType?: ITextElementProps['dataDetectorType'];
-  @Input()
-  android_hyphenationFrequency?: ITextElementProps['android_hyphenationFrequency'];
-}
-
-@Directive({ selector: 'image, symbiote-image', standalone: true })
-export class ImageElement extends SymbioteElement {
-  @Input() source?: IImageProps['source'];
-  @Input() src?: IImageProps['src'];
-  @Input() srcSet?: IImageProps['srcSet'];
-  @Input() alt?: IImageProps['alt'];
-  @Input() width?: IImageProps['width'];
-  @Input() height?: IImageProps['height'];
-  @Input() resizeMode?: IImageProps['resizeMode'];
-  @Input() resizeMethod?: IImageProps['resizeMethod'];
-  @Input() defaultSource?: IImageProps['defaultSource'];
-  @Input() loadingIndicatorSource?: IImageProps['loadingIndicatorSource'];
-  @Input() blurRadius?: IImageProps['blurRadius'];
-  @Input() capInsets?: IImageProps['capInsets'];
-  @Input() crossOrigin?: IImageProps['crossOrigin'];
-  @Input() referrerPolicy?: IImageProps['referrerPolicy'];
-  @Input() fadeDuration?: IImageProps['fadeDuration'];
-  @Input()
-  progressiveRenderingEnabled?: IImageProps['progressiveRenderingEnabled'];
-  @Input() tintColor?: IImageProps['tintColor'];
-  @Input() onLoad?: IImageProps['onLoad'];
-  @Input() onLoadStart?: IImageProps['onLoadStart'];
-  @Input() onLoadEnd?: IImageProps['onLoadEnd'];
-  @Input() onError?: IImageProps['onError'];
-  @Input() onProgress?: IImageProps['onProgress'];
-  @Input() onPartialLoad?: IImageProps['onPartialLoad'];
-}
-
-// The box, not the image. Every Image prop below rides the engine's `slotPropsExcept` redirect onto
-// the absolutely-filled image the behavior builds, exactly as RN's own `...props` spread does
-// (ImageBackground.js:81) — so this directive declares them to make the BINDING legal, and the
-// engine decides which node each lands on.
-@Directive({ selector: 'image-background', standalone: true })
-export class ImageBackgroundElement extends SymbioteElement {
-  @Input() imageStyle?: IAngularImageBackgroundProps['imageStyle'];
-  @Input() source?: IImageProps['source'];
-  @Input() src?: IImageProps['src'];
-  @Input() srcSet?: IImageProps['srcSet'];
-  @Input() alt?: IImageProps['alt'];
-  @Input() width?: IImageProps['width'];
-  @Input() height?: IImageProps['height'];
-  @Input() resizeMode?: IImageProps['resizeMode'];
-  @Input() resizeMethod?: IImageProps['resizeMethod'];
-  @Input() defaultSource?: IImageProps['defaultSource'];
-  @Input() loadingIndicatorSource?: IImageProps['loadingIndicatorSource'];
-  @Input() blurRadius?: IImageProps['blurRadius'];
-  @Input() capInsets?: IImageProps['capInsets'];
-  @Input() crossOrigin?: IImageProps['crossOrigin'];
-  @Input() referrerPolicy?: IImageProps['referrerPolicy'];
-  @Input() fadeDuration?: IImageProps['fadeDuration'];
-  @Input()
-  progressiveRenderingEnabled?: IImageProps['progressiveRenderingEnabled'];
-  @Input() tintColor?: IImageProps['tintColor'];
-  @Input() onLoad?: IImageProps['onLoad'];
-  @Input() onLoadStart?: IImageProps['onLoadStart'];
-  @Input() onLoadEnd?: IImageProps['onLoadEnd'];
-  @Input() onError?: IImageProps['onError'];
-  @Input() onProgress?: IImageProps['onProgress'];
-  @Input() onPartialLoad?: IImageProps['onPartialLoad'];
-}
-
-// The HOST — RN's centering RCTView (ActivityIndicator.js:112), which is the tag an app writes.
-// The four spinner props are declared here because that is where the app writes them; the engine's
-// behavior redirects them onto the spinner it builds underneath (`slotProps`).
-@Directive({ selector: 'activity-indicator', standalone: true })
-export class ActivityIndicatorElement extends SymbioteElement {
-  @Input() animating?: IActivityIndicatorProps['animating'];
-  @Input() color?: IActivityIndicatorProps['color'];
-  @Input() size?: IActivityIndicatorProps['size'];
-  @Input() hidesWhenStopped?: IActivityIndicatorProps['hidesWhenStopped'];
-}
-
-// The native spinner. Built by the behavior's `buildStructure` and by the wrapper's render fn, never
-// written in an app template — declared only so the tag alphabet stays covered, the same as
-// `scroll-content`.
-@Directive({ selector: 'activity-indicator-spinner', standalone: true })
-export class ActivityIndicatorSpinnerElement extends ActivityIndicatorElement {}
-
-@Directive({ selector: 'safe-area-view', standalone: true })
-export class SafeAreaViewElement extends SymbioteElement {}
-
-// RN's `experimental_LayoutConformance`: the tag paints as `display: contents` through its fold
-@Directive({ selector: 'layout-conformance', standalone: true })
-export class LayoutConformanceElement extends SymbioteElement {
-  @Input() mode?: ILayoutConformanceMode;
-}
-
-@Directive({ selector: 'modal, symbiote-modal', standalone: true })
-export class ModalElement extends SymbioteElement {
-  @Input() visible?: IModalViewProps['visible'];
-  @Input() transparent?: IModalViewProps['transparent'];
-  @Input() animationType?: IModalViewProps['animationType'];
-  @Input() presentationStyle?: IModalViewProps['presentationStyle'];
-  @Input() supportedOrientations?: IModalViewProps['supportedOrientations'];
-  @Input() hardwareAccelerated?: IModalViewProps['hardwareAccelerated'];
-  @Input() statusBarTranslucent?: IModalViewProps['statusBarTranslucent'];
-  @Input()
-  navigationBarTranslucent?: IModalViewProps['navigationBarTranslucent'];
-  @Input() allowSwipeDismissal?: IModalViewProps['allowSwipeDismissal'];
-  @Input() backdropColor?: IModalViewProps['backdropColor'];
-}
-
-@Directive({ selector: 'refresh-control', standalone: true })
-export class RefreshControlElement extends ReadBackElement {
-  @Input() refreshing?: IAngularRefreshControlProps['refreshing'];
-  @Input() enabled?: IAngularRefreshControlProps['enabled'];
-  @Input() colors?: IAngularRefreshControlProps['colors'];
-  @Input() tintColor?: IAngularRefreshControlProps['tintColor'];
-  @Input() title?: IAngularRefreshControlProps['title'];
-  @Input() titleColor?: IAngularRefreshControlProps['titleColor'];
-  @Input() size?: IAngularRefreshControlProps['size'];
-  @Input()
-  progressBackgroundColor?: IAngularRefreshControlProps['progressBackgroundColor'];
-  @Input()
-  progressViewOffset?: IAngularRefreshControlProps['progressViewOffset'];
-  @Input() onRefresh?: IAngularRefreshControlProps['onRefresh'];
-}
-
-@Directive({ selector: 'sticky-header', standalone: true })
-export class StickyHeaderElement extends SymbioteElement {
-  @Input() inverted?: IStickyHeaderElementProps['inverted'];
-  @Input() nextHeaderLayoutY?: IStickyHeaderElementProps['nextHeaderLayoutY'];
-  @Input()
-  scrollAnimatedValue?: IStickyHeaderElementProps['scrollAnimatedValue'];
-  @Input() scrollViewHeight?: IStickyHeaderElementProps['scrollViewHeight'];
-}
-
-@Directive({ selector: 'input-accessory-view', standalone: true })
-export class InputAccessoryViewElement extends SymbioteElement {
-  @Input() backgroundColor?: IInputAccessoryViewViewProps['backgroundColor'];
-}
 
 /**
  * Every element directive, as ONE symbol an app puts in `imports`. Angular flattens a nested array
@@ -294,6 +143,7 @@ export const SYMBIOTE_ELEMENTS = [
   TouchableNativeFeedbackElement,
   TouchableWithoutFeedbackElement,
   ButtonElement,
+  CheckboxElement,
   TextElement,
   ImageElement,
   ImageBackgroundElement,
@@ -373,6 +223,11 @@ const DECLARES_EVERY_PROP: {
     IAngularTouchableHighlightProps,
     TouchableHighlightElement
   >;
+  checkbox: IMissingInputs<
+    ICheckboxProps,
+    CheckboxElement,
+    keyof IElementProps
+  >;
   text: IMissingInputs<ITextElementProps, TextElement>;
   image: IMissingInputs<IImageProps, ImageElement>;
   imageBackground: IMissingInputs<
@@ -406,6 +261,7 @@ const DECLARES_EVERY_PROP: {
   pressable: true,
   touchableOpacity: true,
   touchableHighlight: true,
+  checkbox: true,
   text: true,
   image: true,
   imageBackground: true,

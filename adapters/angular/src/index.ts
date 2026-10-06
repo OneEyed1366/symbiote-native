@@ -93,6 +93,7 @@ export type {
   IAngularTouchableOpacityProps,
   IAngularTouchableWithoutFeedbackProps,
   IButtonProps,
+  ICheckboxProps,
   ICellLayout,
   IFlatListHandle,
   IFlatListProps,
@@ -151,6 +152,7 @@ export {
   ActivityIndicatorElement,
   ActivityIndicatorSpinnerElement,
   ButtonElement,
+  CheckboxElement,
   HorizontalScrollContentElement,
   HorizontalScrollViewElement,
   ImageBackgroundElement,
@@ -195,6 +197,7 @@ export { mount, unmount } from './render';
 // @symbiote-native/slider) can render a shared @symbiote-native/components/@symbiote-native/slider Descriptor tree
 // without hand-writing its own Renderer2 walker.
 export { DescriptorOutlet } from './descriptor-to-angular';
+export { DescriptorHost } from './descriptor-to-angular/descriptor-host';
 // createPortal (same-surface only — see the file header) and createTunnel (cross-surface,
 // see its file header) are the Angular twins of the React/Vue portal/tunnel primitives.
 // Angular can't synthesize components at runtime (no JIT under Metro/Hermes), so both are
@@ -214,7 +217,7 @@ export { SymbioteRenderer, SymbioteRendererFactory } from './renderer';
 // import straight from that subpath so app-screen registration never routes through this cyclic
 // barrel.
 export { registerComposedComponent } from './anchor-host-registry';
-export { findNodeHandle } from './host-instance';
+export { findNodeHandle, hostNodeOf } from './host-instance';
 export type { IHostInstance } from './host-instance';
 export { StatusBar } from './modules/status-bar';
 export type { IStatusBarProps, IStatusBarStyle } from './modules/status-bar';
@@ -243,6 +246,8 @@ export {
   WindowDimensionsService,
   createResourceHook,
   createEventValueHook,
+  injectEvent,
+  injectEventListener,
   connectWatchedSignal,
   PermissionsServiceBase,
 } from './services';

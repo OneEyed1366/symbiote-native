@@ -25,7 +25,7 @@ are peer dependencies and stay top-level dependencies of the app.
 ## Status matrix
 
 `view`, `text`, `pressable`,
-`image`, `image-background`, `scroll-view`, `text-input`, `switch`,
+`image`, `image-background`, `scroll-view`, `text-input`, `switch`, `checkbox`,
 `activity-indicator`, `safe-area-view`, `modal`, `refresh-control`,
 `input-accessory-view`, `button`, `touchable-opacity`,
 `touchable-native-feedback`, `touchable-without-feedback`,
@@ -87,6 +87,7 @@ Framework-specific when the prop contains framework values:
 | `pressable`  | `onLongPress`   | `@long-press`                     | `(longPress)`   | `onLongPress`   | `onLongPress`   | `ISymbioteEvent` |
 | `switch`     | `onValueChange` | `@value-change`<br />or `v-model` | `(valueChange)` | `onValueChange` | `onValueChange` | `boolean`        |
 | `text-input` | `onValueChange` | `@value-change`<br />or `v-model` | `(valueChange)` | `onValueChange` | `onValueChange` | `string`         |
+| `checkbox`   | `onValueChange` | `@value-change`                   | `[onValueChange]` | `onValueChange` | `onValueChange` | `{ value: boolean }` |
 | `view`       | `onLayout`      | `@layout`                         | `(layout)`      | `onLayout`      | `onLayout`      | `ISymbioteEvent` |
 
 `text-input`'s React/Vue callback fires as `(text, event)` — one value merged

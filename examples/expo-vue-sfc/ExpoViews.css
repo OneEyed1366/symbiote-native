@@ -1,0 +1,91 @@
+/* Layout of the Tier 3 and Tier 4 view demo screens */
+
+.lg-banner { border-radius: 16px; padding: 1.25rem; min-height: 7.5rem; justify-content: center; }
+.lg-banner-title { color: #ffffff; font-size: 1.375rem; font-weight: 700; }
+.lg-banner-body { color: #ffffff; font-size: 0.875rem; }
+.lg-photo-frame { height: 11.25rem; border-radius: 16px; overflow: hidden; }
+.lg-photo { position: absolute; top: 0; bottom: 0; left: 0; right: 0; }
+.lg-scrim { position: absolute; left: 0; right: 0; bottom: 0; height: 6.875rem; justify-content: flex-end; padding: 0.875rem; }
+.lg-caption { color: #ffffff; font-size: 1rem; font-weight: 600; }
+.lg-track { height: 0.875rem; border-radius: 7px; background-color: #1f2937; overflow: hidden; }
+.lg-fill { height: 0.875rem; }
+.lg-button { border-radius: 24px; padding-top: 0.875rem; padding-bottom: 0.875rem; align-items: center; }
+.lg-button-text { color: #ffffff; font-weight: 700; }
+.lg-playground { height: 8.75rem; border-radius: 12px; }
+
+.blur-frame { height: 13.75rem; border-radius: 16px; overflow: hidden; }
+.blur-fill { position: absolute; top: 0; bottom: 0; left: 0; right: 0; }
+.blur-card { position: absolute; left: 1.25rem; right: 1.25rem; bottom: 1.25rem; padding: 1rem; border-radius: 12px; overflow: hidden; }
+.blur-card-title { font-size: 1.125rem; font-weight: 700; color: #ffffff; }
+.blur-card-body { font-size: 0.8125rem; color: #ffffff; }
+.blur-feed-frame { height: 16.25rem; border-radius: 16px; overflow: hidden; }
+.blur-feed-content { padding-bottom: 3.5rem; }
+.blur-feed-row { height: 3.25rem; justify-content: center; padding-left: 1rem; padding-right: 1rem; border-bottom-width: 1px; border-bottom-color: #334155; }
+.blur-feed-text { font-size: 0.9375rem; color: #e2e8f0; }
+.blur-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 3.5rem; justify-content: center; padding-left: 1rem; padding-right: 1rem; }
+.blur-bar-text { font-size: 0.9375rem; font-weight: 600; color: #ffffff; }
+.blur-secret { height: 5.625rem; border-radius: 12px; overflow: hidden; background-color: #0f172a; justify-content: center; padding-left: 1rem; padding-right: 1rem; }
+.blur-secret-text { font-size: 1.5rem; font-weight: 700; color: #f8fafc; }
+.blur-secret-cover { position: absolute; top: 0; bottom: 0; left: 0; right: 0; align-items: center; justify-content: center; }
+
+.glass-frame { height: 13.75rem; border-radius: 16px; overflow: hidden; justify-content: flex-end; }
+.glass-photo { position: absolute; top: 0; bottom: 0; left: 0; right: 0; }
+.glass-toolbar { flex-direction: row; justify-content: space-around; padding: 1rem; }
+.glass-pill { padding-left: 1.125rem; padding-right: 1.125rem; padding-top: 0.75rem; padding-bottom: 0.75rem; border-radius: 24px; }
+.glass-pill-text { color: #ffffff; font-size: 0.9375rem; font-weight: 600; }
+.glass-merge-row { flex-direction: row; justify-content: center; align-items: center; height: 6.25rem; }
+.glass-bubble { width: 4rem; height: 4rem; border-radius: 32px; align-items: center; justify-content: center; }
+.glass-bubble-text { color: #ffffff; font-size: 1.375rem; }
+.glass-panel { margin: 1.5rem; padding: 1.25rem; border-radius: 20px; }
+.glass-panel-text { color: #ffffff; font-size: 1rem; }
+
+.sym-tab-bar { flex-direction: row; justify-content: space-around; padding-top: 0.625rem; padding-bottom: 0.625rem; border-radius: 14px; background-color: #111c2b; }
+.sym-tab { align-items: center; gap: 0.25rem; min-width: 4rem; }
+.sym-tab-label { font-size: 0.6875rem; }
+.sym-weight-row { flex-direction: row; justify-content: space-between; align-items: center; }
+.sym-weight-cell { align-items: center; gap: 0.25rem; }
+.sym-weight-label { font-size: 0.625rem; color: #94a3b8; }
+.sym-big { align-self: center; margin-top: 0.75rem; margin-bottom: 0.75rem; }
+.sym-image-icon { width: 2.5rem; height: 2.5rem; }
+
+.apple-button { width: 15rem; height: 2.75rem; }
+.apple-gallery { gap: 0.625rem; align-items: flex-start; }
+
+.img-avatar { width: 6rem; height: 6rem; border-radius: 48px; }
+.img-hero { width: 100%; height: 12.5rem; border-radius: 14px; }
+.img-grid { flex-direction: row; flex-wrap: wrap; gap: 0.5rem; }
+.img-thumb { width: 4.5rem; height: 4.5rem; border-radius: 8px; }
+.img-fit-frame { width: 6.25rem; height: 4.375rem; background-color: #1e293b; }
+.img-fit-cell { align-items: center; gap: 0.25rem; }
+.img-fit-label { font-size: 0.625rem; color: #94a3b8; }
+.img-fit-image { width: 6.25rem; height: 4.375rem; }
+.img-list { height: 16rem; border-radius: 12px; background-color: #0f172a; }
+.img-row { flex-direction: row; align-items: center; gap: 0.75rem; padding: 0.5rem; }
+.img-row-photo { width: 5rem; height: 5rem; border-radius: 8px; }
+.img-animated { width: 10rem; height: 10rem; border-radius: 80px; align-self: center; }
+.img-symbol { width: 4rem; height: 4rem; align-self: center; }
+.img-banner { height: 9.375rem; border-radius: 14px; overflow: hidden; justify-content: flex-end; padding: 0.875rem; }
+.img-banner-text { color: #ffffff; font-size: 1.25rem; font-weight: 700; }
+.img-hash { width: 6rem; height: 6rem; border-radius: 12px; }
+.img-playground { width: 100%; height: 11.25rem; border-radius: 12px; }
+
+.vid-video { width: 100%; height: 12.5rem; border-radius: 12px; background-color: #000000; }
+.vid-feed { width: 100%; height: 16.25rem; border-radius: 12px; background-color: #000000; }
+.vid-small { width: 8.75rem; height: 5.625rem; border-radius: 8px; }
+.vid-feed-item { gap: 0.5rem; }
+.vid-airplay { width: 2.75rem; height: 2.75rem; }
+.vid-thumb-row { flex-direction: row; flex-wrap: wrap; gap: 0.5rem; }
+.vid-thumb { width: 6rem; height: 3.375rem; border-radius: 6px; }
+.vid-badge { position: absolute; top: 0.625rem; right: 0.625rem; background-color: rgba(0, 0, 0, 0.67); border-radius: 12px; padding-left: 0.625rem; padding-right: 0.625rem; padding-top: 0.25rem; padding-bottom: 0.25rem; }
+.cam-preview { width: 100%; height: 22rem; border-radius: 12px; background-color: #000000; }
+.cam-placeholder { width: 100%; height: 12rem; border-radius: 12px; background-color: #0f172a; align-items: center; justify-content: center; padding: 1rem; }
+.cam-photo { width: 100%; height: 12.5rem; border-radius: 12px; background-color: #000000; }
+
+.live-view { width: 100%; height: 25rem; border-radius: 12px; background-color: #000000; }
+.live-placeholder { width: 100%; height: 10rem; border-radius: 12px; background-color: #0f172a; align-items: center; justify-content: center; padding: 1rem; }
+
+.gl-view { width: 100%; height: 18.75rem; border-radius: 12px; }
+.gl-camera-source { width: 100%; height: 8rem; border-radius: 12px; background-color: #000000; }
+.gl-snapshot { width: 12rem; height: 12rem; border-radius: 12px; align-self: center; }
+
+.vid-badge-text { color: #ffffff; font-size: 0.75rem; }

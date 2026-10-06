@@ -31,6 +31,7 @@
 		674B025862E6424E4951EE9C /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-CanaryExpo/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = CanaryExpo/AppDelegate.swift; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = CanaryExpo/LaunchScreen.storyboard; sourceTree = "<group>"; };
+		B095339A9F9BB5793AE57CA3 /* CanaryExpo.entitlements */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.entitlements; name = CanaryExpo.entitlements; path = CanaryExpo/CanaryExpo.entitlements; sourceTree = "<group>"; };
 		B2F1A0C8AAA04A459F673841 /* BootSplash.storyboard */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = BootSplash.storyboard; path = CanaryExpo/BootSplash.storyboard; sourceTree = "<group>"; };
 		E64095E37371896F42A60053 /* SymbioteExpoModulesFactory.mm */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.cpp.objcpp; name = SymbioteExpoModulesFactory.mm; path = CanaryExpo/SymbioteExpoModulesFactory.mm; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
@@ -54,6 +55,7 @@
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				761780EC2CA45674006654EE /* AppDelegate.swift */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
+				B095339A9F9BB5793AE57CA3 /* CanaryExpo.entitlements */,
 				81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */,
 				13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */,
 				B2F1A0C8AAA04A459F673841 /* BootSplash.storyboard */,
@@ -283,6 +285,7 @@
 			inputPaths = (
 				"$(SRCROOT)/.xcode.env",
 				"$(SRCROOT)/.xcode.env.local",
+				"$(SRCROOT)/CanaryExpo/CanaryExpo.entitlements",
 				"$(SRCROOT)/Pods/Target Support Files/Pods-CanaryExpo/expo-configure-project.sh",
 			);
 			name = "[Expo] Configure project";
@@ -317,6 +320,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = CanaryExpo/CanaryExpo.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = CanaryExpo/Info.plist;
@@ -349,6 +353,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = CanaryExpo/CanaryExpo.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
 				INFOPLIST_FILE = CanaryExpo/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.4;

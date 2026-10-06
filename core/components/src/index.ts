@@ -16,6 +16,12 @@ export type {
 // adapter barrels, unlike the passthrough names in tests/adapter-barrel-parity.test.ts.
 export { createDescriptorShapeGuard } from './descriptor';
 export type { IDescriptorShapeGuard } from './descriptor';
+export { createHostNodeHolder } from './host-node-holder';
+export type {
+  ICreateNativeViewController,
+  IHostNodeHolder,
+  INativeViewController,
+} from './host-node-holder';
 
 // Accessibility folding: the web-alias (aria-*/role) → canonical accessibility* transform
 // and its types. Framework-agnostic, so React, Vue, and the next adapter all fold
@@ -493,6 +499,15 @@ export {
   TOUCHABLE_HIGHLIGHT_TAG,
 } from './behaviors/touchable-highlight';
 export { registerButtonBehavior, BUTTON_TAG } from './behaviors/button';
+export {
+  registerCheckboxBehavior,
+  CHECKBOX_TAG,
+  CHECKBOX_MARK_TAG,
+} from './behaviors/checkbox';
+export type {
+  ICheckboxProps,
+  ICheckboxChangeEvent,
+} from './view/render-checkbox';
 
 // Registered by ALL FIVE adapters, in the same commit that deleted the five wrappers — safe
 // only because those wrappers no longer render their own Pressable, which would put a second

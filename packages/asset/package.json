@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/asset",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "expo-asset wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, Svelte, Solid, and Angular adapters. Resolves bundled/remote assets by require() module id or URI, and downloads them to a local cache file.",
   "license": "MIT",
   "repository": {

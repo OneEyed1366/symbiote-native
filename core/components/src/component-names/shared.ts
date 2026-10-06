@@ -30,6 +30,9 @@ export type ISymbioteIntrinsic =
   // host is an RCTView exactly like `touchable-opacity` — the behavior builds the other two. Same
   // registry reason as `pressable`: keyed by tag, so the button's folds cannot land on every View.
   | 'button'
+  // expo-checkbox is a Pressable box with a checkmark Image under it, the host is that box
+  // Same registry reason as `pressable`: keyed by tag, so its rules cannot land on every View
+  | 'checkbox'
   | 'text'
   | 'image'
   // RN's ImageBackground is a View holding an absolutely-filled Image plus the app's children

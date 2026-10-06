@@ -1,0 +1,22 @@
+{
+  "android": {
+    "gradleProjectName": "expo-camera",
+    "modules": [
+      {
+        "importPath": "expo.modules.camera.CameraViewModule",
+        "className": "CameraViewModule",
+        "nativeName": "ExpoCamera"
+      }
+    ],
+    "manifestPermissions": [
+      "android.permission.CAMERA",
+      "android.permission.RECORD_AUDIO"
+    ]
+  },
+  "ios": {
+    "infoPlistKeys": {
+      "NSCameraUsageDescription": "Allow $(PRODUCT_NAME) to access your camera",
+      "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to access your microphone"
+    }
+  }
+}

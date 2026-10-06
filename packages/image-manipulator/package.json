@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/image-manipulator",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "expo-image-manipulator wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, Svelte, Solid, and Angular adapters. Resizes, rotates, flips and crops images, rendering to a new file.",
   "license": "MIT",
   "keywords": [

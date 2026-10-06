@@ -62,6 +62,16 @@ minimumReleaseAgeExclude:
   - expo-tracking-transparency@57.0.1
   - expo-store-review@57.0.1
   - expo-system-ui@57.0.2
+  - expo-linear-gradient@57.0.2
+  - expo-blur@57.0.3
+  - expo-glass-effect@57.0.4
+  - expo-symbols@57.0.3
+  - expo-apple-authentication@57.0.2
+  - expo-live-photo@57.0.2
+  - expo-camera@57.0.6
+  - expo-video@57.0.5
+  - expo-image@57.0.5
+  - expo-gl@57.0.2
 
 # Single source of truth for dependency versions (pnpm catalogs).
 # A package references a version with `catalog:` (default) or `catalog:<name>`
@@ -316,6 +326,31 @@ catalog:
   expo-tracking-transparency: 57.0.1
   expo-store-review: 57.0.1
   expo-system-ui: 57.0.2
+  # packages/linear-gradient depends on expo-linear-gradient ONLY for its native ios/android
+  # folders (JS hand-ported into our own core). Pinned to the version at origin/sdk-57
+  expo-linear-gradient: 57.0.2
+  # packages/blur depends on expo-blur ONLY for its native ios/android folders (JS hand-ported
+  # into our own core). Pinned to the version at origin/sdk-57
+  expo-blur: 57.0.3
+  # packages/glass-effect takes expo-glass-effect for its native ios folder only
+  expo-glass-effect: 57.0.4
+  # packages/symbols takes expo-symbols for its native ios folder only
+  expo-symbols: 57.0.3
+  # packages/apple-authentication takes expo-apple-authentication for its native ios folder only
+  expo-apple-authentication: 57.0.2
+  # packages/live-photo takes expo-live-photo for its native ios folder only
+  expo-live-photo: 57.0.2
+  # packages/camera takes expo-camera for its native ios and android folders only
+  expo-camera: 57.0.6
+  # packages/video takes expo-video for its native ios and android folders only
+  expo-video: 57.0.5
+  # packages/image takes expo-image for its native ios and android folders only
+  expo-image: 57.0.5
+  # packages/gl takes expo-gl for its native ios and android folders only
+  expo-gl: 57.0.2
+  # The Android and web path of SymbolView renders Material Symbols from these, as upstream does
+  '@expo-google-fonts/material-symbols': ^0.4.1
+  sf-symbols-typescript: ^2.0.0
   # Same exact-pin reasoning again — first of tier-2: packages/secure-store depends on
   # expo-secure-store ONLY for its native ios/android folders (JS hand-ported into our own core).
   # Version verified against .vendors/expo at origin/sdk-57 (57.0.1) and matches the real

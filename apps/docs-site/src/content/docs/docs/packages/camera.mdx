@@ -1,0 +1,248 @@
+---
+title: Camera
+description: expo-camera wrapped for every SymbioteNative adapter, the camera preview, pictures, video recording and barcode scanning.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+`@symbiote-native/camera` wraps [`expo-camera`](https://docs.expo.dev/versions/latest/sdk/camera/),
+so every SymbioteNative adapter can show a camera, not just React.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | live    |
+| Android     | live    |
+
+| Framework adapter | Support |
+| ----------------- | ------- |
+| React             | live    |
+| Vue               | live    |
+| Angular           | live    |
+| Svelte            | live    |
+| Solid             | live    |
+
+## Installation
+
+```sh
+npm install @symbiote-native/camera
+```
+
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --camera`
+(or `add --camera` in an existing app) installs and wires this for you.
+
+<Aside type="danger" title="Native setup is required before first use">
+  `expo-camera`'s native code is discovered by `expo-modules-autolinking`. Follow
+  [How to: wire up an Expo native module](/docs/howtos/expo-native-module-setup/) once per app first.
+</Aside>
+
+## Usage
+
+Ask for permission first and render the view only once it is `granted`. Keep the handle of the view
+to take pictures, and wait for `onCameraReady` before you do.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { useRef } from 'react';
+    import { CameraView, useCameraPermissions, type ICameraViewHandle } from '@symbiote-native/camera/react';
+
+    const [permission, requestPermission] = useCameraPermissions();
+    const camera = useRef<ICameraViewHandle>(null);
+
+    return permission?.granted === true ? (
+      <>
+        <CameraView ref={camera} style={{ flex: 1 }} facing="back" />
+        <button title="Take picture" onPress={() => camera.current?.takePictureAsync({ quality: 0.8 })} />
+      </>
+    ) : (
+      <button title="Allow the camera" onPress={() => requestPermission()} />
+    );
+    ```
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { ref } from 'vue';
+    import { CameraView, useCameraPermissions, type ICameraViewHandle } from '@symbiote-native/camera/vue';
+
+    const [permission, requestPermission] = useCameraPermissions();
+    const camera = ref<ICameraViewHandle | null>(null);
+    </script>
+
+    <template>
+      <template v-if="permission?.granted === true">
+        <CameraView ref="camera" :style="{ flex: 1 }" facing="back" />
+        <button title="Take picture" @press="camera?.takePictureAsync({ quality: 0.8 })" />
+      </template>
+      <button v-else title="Allow the camera" @press="requestPermission()" />
+    </template>
+    ```
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component, inject } from '@angular/core';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
+    import { CameraPermissionsService, CameraView } from '@symbiote-native/camera/angular';
+
+    @Component({
+      standalone: true,
+      imports: [CameraView, SYMBIOTE_ELEMENTS],
+      template: `
+        @if (permission()?.granted === true) {
+          <CameraView #camera [style]="{ flex: 1 }" facing="back" />
+          <button title="Take picture" (press)="camera.takePictureAsync({ quality: 0.8 })" />
+        } @else {
+          <button title="Allow the camera" (press)="request()" />
+        }
+      `,
+    })
+    export class CameraCard {
+      private readonly service = inject(CameraPermissionsService);
+      readonly permission = this.service.connect();
+
+      request(): void {
+        void this.service.request();
+      }
+    }
+    ```
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { CameraView, useCameraPermissions, type ICameraViewHandle } from '@symbiote-native/camera/svelte';
+
+      const permission = useCameraPermissions();
+      let camera = $state<ICameraViewHandle | undefined>();
+    </script>
+
+    {#if permission.status?.granted === true}
+      <CameraView bind:this={camera} style={{ flex: 1 }} facing="back" />
+      <button title="Take picture" onPress={() => camera?.takePictureAsync({ quality: 0.8 })} />
+    {:else}
+      <button title="Allow the camera" onPress={() => permission.requestPermission()} />
+    {/if}
+    ```
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { Show, createSignal } from 'solid-js';
+    import { CameraView, useCameraPermissions, type ICameraViewHandle } from '@symbiote-native/camera/solid';
+
+    const [permission, requestPermission] = useCameraPermissions();
+    const [camera, setCamera] = createSignal<ICameraViewHandle>();
+
+    <Show
+      when={permission()?.granted === true}
+      fallback={<button title="Allow the camera" onPress={() => requestPermission()} />}
+    >
+      <CameraView ref={setCamera} style={{ flex: 1 }} facing="back" />
+      <button title="Take picture" onPress={() => camera()?.takePictureAsync({ quality: 0.8 })} />
+    </Show>;
+    ```
+  </TabItem>
+</Tabs>
+
+## API
+
+### Reaching the view functions
+
+| Adapter | How                                                        |
+| ------- | ---------------------------------------------------------- |
+| React   | `ref` gets an `ICameraViewHandle`                          |
+| Solid   | `ref={handle => ...}` gets the handle                      |
+| Vue     | a template ref, the functions are exposed                  |
+| Svelte  | `bind:this`, the component exports the functions           |
+| Angular | `@ViewChild(CameraView)`, the functions are members        |
+
+### Functions of the package
+
+| Function                              | Description                                                       |
+| ------------------------------------- | ----------------------------------------------------------- |
+| `isCameraAvailableAsync()`            | Whether the device has a camera, upstream's `CameraView.isAvailableAsync` |
+| `getAvailableVideoCodecsAsync()`      | iOS only                                                    |
+| `launchScanner(options?)` / `dismissScanner()` | The system scanner, iOS 16+ and Google's code scanner |
+| `onModernBarcodeScanned(listener)`    | Returns a subscription                                      |
+| `isModernBarcodeScannerAvailable()`   | Whether the device has the system scanner                   |
+| `scanFromURLAsync(url, types?)`       | Scans an image, QR only on iOS                              |
+| `Camera.getCameraPermissionsAsync()` and the three twins | The permission calls the hooks use          |
+
+`useCameraPermissions` and `useMicrophonePermissions` are hooks in React, Vue, Svelte and Solid and
+`CameraPermissionsService` and `MicrophonePermissionsService` in Angular.
+
+<Aside type="note" title="Not ported">
+  The web build and the `barcodeScannerEnabled: false` switch of the config plugin.
+</Aside>
+
+## Notes
+
+- **The postinstall asks for both permissions.** It writes `NSCameraUsageDescription` and
+  `NSMicrophoneUsageDescription` into `Info.plist` and `CAMERA` and `RECORD_AUDIO` into the Android
+  manifest. iOS needs the microphone text even if you only take pictures, because the same view can
+  record. Reword both texts to fit your app.
+- **Ask first, then render.** Show `CameraView` only once `useCameraPermissions` reports `granted`.
+- **`onBarcodeScanned` turns scanning on.** The scanner is enabled exactly when you pass the prop,
+  and `barcodeScannerSettings={{ barcodeTypes: [...] }}` narrows what it looks for.
+- **`CameraView` takes no children.** The native view does not host them, so draw controls and
+  frames as siblings, absolutely positioned over it.
+- **The handle works after `onCameraReady`.** `takePictureAsync` and `recordAsync` before that can
+  fail or return nothing.
+- **`active={false}` stops the camera session without unmounting the view.** iOS only, it is on by
+  default.
+
+## Common questions
+
+**The app crashes on iOS the first time the camera opens.** A missing usage description kills the
+app. The postinstall writes both `NSCameraUsageDescription` and `NSMicrophoneUsageDescription`. If
+you removed one, put it back: iOS checks the microphone text for the camera view too.
+
+**The preview is a black box.** Check that permission is `granted` before you render the view, that
+you are on a device (the iOS Simulator has no camera, test with `isCameraAvailableAsync()`), and wait
+for `onCameraReady` before you call the handle. A black preview with `facing="front"` on a
+development build was reported for one iOS release range, so also try the other `facing` to tell a
+configuration problem from a device problem.
+
+**The barcode callback fires many times, or only once.** `onBarcodeScanned` is called for every
+detection, throttled per view. To scan once, stop passing it after the first result, for example
+`onBarcodeScanned={isScanned ? undefined : handleScan}`, which also switches the scanner off. If it
+fires only once on Android, that was reported as an Android regression and is closed upstream, so
+update the package. Limit the work with `barcodeScannerSettings={{ barcodeTypes: ['qr'] }}`.
+
+**I put children inside `CameraView` and got a warning or a crash.** Upstream documents that the
+view does not support children. Render the overlay as a sibling above it: a parent `View`, the
+`CameraView` filling it, and your controls absolutely positioned on top.
+
+**Showing and hiding the camera freezes or crashes iOS.** Mounting and unmounting `CameraView` over
+and over, or rendering it conditionally while it is starting, was reported to freeze the iOS
+Simulator and crash some builds. On iOS keep the view mounted and use `active` to stop the session instead of unmounting.
+
+**The torch turns off right after it switches on.** `enableTorch` set at the same moment the view
+starts was reported to stay on for a fraction of a second on iOS. Set it after `onCameraReady`.
+
+**What is the system scanner?** `launchScanner()` opens the platform's own code scanner, iOS 16 and
+later and Google's code scanner on Android. `isModernBarcodeScannerAvailable()` tells you whether
+the device has it, and `onModernBarcodeScanned` delivers the results.
+
+**Can I use it with a gesture library on the same screen?** Long-press and pan handlers around a
+camera view were reported not to reach the gesture library on iOS from SDK 51 on. Put the gesture
+area on its own transparent view above the camera and not on the camera itself.
+
+Sources: [Expo docs: Camera](https://docs.expo.dev/versions/latest/sdk/camera/),
+[expo/expo#11736 iOS requires NSMicrophoneUsageDescription](https://github.com/expo/expo/issues/11736),
+[expo/expo#34305 facing front is a black box](https://github.com/expo/expo/issues/34305),
+[expo/expo#16126 barcode scanned only once on Android](https://github.com/expo/expo/issues/16126),
+[expo/expo#37150 CameraView does not support children](https://github.com/expo/expo/issues/37150),
+[expo/expo#34957 conditional rendering crashes on iOS](https://github.com/expo/expo/issues/34957),
+[expo/expo#48780 mounting and unmounting freezes the iOS Simulator](https://github.com/expo/expo/issues/48780),
+[expo/expo#36352 torch stays on for a split second](https://github.com/expo/expo/issues/36352),
+[expo/expo#28966 gesture handler and CameraView](https://github.com/expo/expo/issues/28966).
+
+## How the wrapper works
+
+`expo-camera`'s JS is hand-ported into this package's `core/`. `createCameraView(getNode)` holds
+everything that belongs to one mounted view: the render, the handle with all the view functions and
+the barcode throttle. The friendly props are turned into the native ones in `ensureNativeProps`,
+which is where `onBarcodeScanned` becomes `barcodeScannerEnabled`. The statics of upstream's class
+are plain functions of the package, and `createHostNodeHolder` (components) is how React, Vue and
+Solid reach the host node, `NativeViewBase.hostNode()` how Angular does. The native code is never
+vendored: `expo-modules-autolinking` resolves it from `node_modules` (see
+[the native setup guide](/docs/howtos/expo-native-module-setup/)).

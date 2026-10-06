@@ -53,6 +53,8 @@ export type ISymbioteExpoLinkManifest = {
     // manifestPermissions/manifestServices (see @symbiote-native/cli's `grant` command) has
     // neither, and is a legitimate entry, not a malformed one.
     gradleProjectName?: string;
+    /** Нативный `build.gradle` читает `kspVersion` из корня, линкер пишет его по таблице Expo */
+    requiresKsp?: boolean;
     modules?: ISymbioteExpoLinkAndroidModule[];
     /** Attributes to set on the app's own `<application>` element, e.g. Auto Backup rules. */
     manifestApplicationAttributes?: Record<string, string>;
@@ -78,7 +80,15 @@ export type ISymbioteExpoLinkManifest = {
     services?: ISymbioteExpoLinkAndroidService[];
   };
   ios?: {
-    infoPlistKeys: Record<string, string>;
+    infoPlistKeys?: Record<string, string>;
+    /** Array-valued Info.plist keys, items merge across packages (`UIBackgroundModes`) */
+    infoPlistArrayKeys?: Record<string, string[]>;
+    /** Boolean Info.plist keys (`CFBundleAllowMixedLocalizations`) */
+    infoPlistBooleanKeys?: Record<string, boolean>;
+    /** Entitlements for the app's `.entitlements` file, created and wired into Xcode if missing */
+    entitlements?: Record<string, string | boolean | string[]>;
+    /** Upstream package whose config plugin the audit compares, for iOS-only packages */
+    upstreamPackage?: string;
   };
 };
 
@@ -91,6 +101,16 @@ export type ISymbioteExpoLinkEntry = {
 export function linkApp(appRoot?: string): void;
 export function collectManifests(appRoot: string): ISymbioteExpoLinkEntry[];
 export function findAppRoot(): string | null;
+/** Adds every `entries[].manifest.ios.infoPlistBooleanKeys` to the app's Info.plist. */
+export function patchInfoPlistBooleans(
+  appRoot: string,
+  entries: readonly ISymbioteExpoLinkEntry[],
+): void;
+/** Adds every `entries[].manifest.ios.entitlements` to the app's `.entitlements` file. */
+export function patchEntitlements(
+  appRoot: string,
+  entries: readonly ISymbioteExpoLinkEntry[],
+): void;
 /** Adds every `entries[].manifest.android.manifestPermissions` to the app's AndroidManifest.xml. */
 export function patchAndroidManifestPermissions(
   appRoot: string,

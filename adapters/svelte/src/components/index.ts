@@ -80,6 +80,7 @@ export type { ITouchableNativeFeedbackProps } from './touchable-native-feedback/
 // statics (unlike `TouchableNativeFeedback` next to it), so the name exports nothing at all now;
 // the prop type stays, for a component forwarding a bag.
 export type { IButtonProps } from './button-props';
+export type { ICheckboxProps } from './checkbox-props';
 
 // `ScrollView` is a TAG — `<scroll-view>` / `<horizontal-scroll-view>`, axis picked by which one
 // you write. No wrapper: the engine binds an AnimatedNode on any host node, and scroll commands

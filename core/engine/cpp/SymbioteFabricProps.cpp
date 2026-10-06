@@ -905,23 +905,13 @@ dynamic foldTextInputAliases(const dynamic &props, bool isMultiline) {
 }
 
 /**
- * Which tags the pressable rule below belongs to — the three that a pressable IS, in RN's own terms.
- *
- * `touchable-opacity` is a pressable plus a fade (`TouchableOpacity.js` wraps Pressability), and
- * `button` is a touchable plus a label on iOS and a TouchableNativeFeedback on Android
- * (`Button.js:283`) — so on either platform a `<button>`'s platform half runs through this. Both
- * composed the same function in JS before it moved, which is what this list is the record of.
- *
- * A composed tag has to be NAMED here because the wire carries what the node IS, not what its
- * behavior was built out of — the browser's arrangement, and the one worth keeping: a reader asks
- * "what does a `<button>` send" and this answers it without tracing a composition.
- *
- * `touchable-highlight` is deliberately ABSENT and always was: its behavior replaces the fold rather
- * than composing it, so it has never carried the machine-key strip. That is a gap in it, not here.
+ * Теги, к которым применяется правило pressable: сам pressable и всё, что собрано из него
+ * Составной тег называется здесь явно, т.к. на провод идёт то, чем нода является
  */
 bool usesPressableRule(const std::string &tagName) {
   return tagName == "pressable" || tagName == "touchable-opacity" ||
-      tagName == "touchable-highlight" || tagName == "button";
+      tagName == "touchable-highlight" || tagName == "button" ||
+      tagName == "checkbox";
 }
 
 /**
@@ -2506,18 +2496,9 @@ dynamic foldImageProps(const dynamic &props, bool ariaHiddenIsTrue) {
 constexpr double kIosSwitchBackgroundRadius = 16;
 
 /**
- * Switch's user-agent half — and every authored name it reads is INVENTED.
- *
- * `trackColor`, `thumbColor` and `ios_backgroundColor` are not Fabric props. RN's Switch view
- * declares `onTintColor`/`tintColor` on iOS and `trackColorFor*`/`trackTintColor` on Android, plus
- * `thumbTintColor` on both, and `ios_backgroundColor` is not a prop at all — it is a STYLE
- * (`Switch.js:266-276`, a background plus a 16pt radius so the pill shows through the track).
- *
- * A wrapper body took those per-platform NAMES from an adapter-supplied table. A tag has no adapter
- * to ask, so the platform branch is here, once, instead of in five adapters.
- *
- * WRITES ONLY WHAT IT RESOLVES: an absent authored colour leaves its native name unset rather than
- * writing a null, which is what the payload builder would otherwise send as an explicit reset.
+ * Платформенная часть Switch: `trackColor`, `thumbColor`, `ios_backgroundColor` не Fabric-пропы
+ * Нативные имена зависят от платформы, а `ios_backgroundColor` это стиль (`Switch.js:266-276`)
+ * Пишет только разрешённое: без цвета имя остаётся unset, null payload прочёл бы как сброс
  */
 dynamic foldSwitchProps(const dynamic &props, bool isAndroidSwitch) {
   dynamic out = props;
@@ -2537,10 +2518,7 @@ dynamic foldSwitchProps(const dynamic &props, bool isAndroidSwitch) {
   const std::optional<bool> disabled = boolAt(props, "disabled");
 
   if (isAndroidSwitch) {
-    // A DIFFERENT NATIVE COMPONENT WITH A DIFFERENT PROP SURFACE (`Switch.js:240-249`), which is
-    // why the branch reads the view name rather than a compile-time macro: `AndroidSwitch` declares
-    // `on` and `enabled`, and knows neither `value` nor `disabled`. Sending the iOS names here
-    // painted an Android switch from nothing and left it impossible to disable.
+    // Другой нативный компонент (`Switch.js:240-249`): `on` и `enabled` вместо `value` и `disabled`
     out["on"] = isOn;
     out.erase("value");
 
@@ -2551,19 +2529,14 @@ dynamic foldSwitchProps(const dynamic &props, bool isAndroidSwitch) {
         authoredState != nullptr && authoredState->isObject()
         ? boolAt(*authoredState, "disabled")
         : std::nullopt;
-    // `_disabled = disabled ?? accessibilityState?.disabled` (`:232-233`) — stays UNDEFINED, not
-    // `false`, when neither is authored. Collapsing straight to a bool here (as an earlier version
-    // did) made `enabled` come out right but broke the write-back check below for the commonest
-    // case: an ordinary switch with no `disabled` and no `accessibilityState` at all.
+    // `disabled ?? accessibilityState?.disabled` (`:232-233`), без обоих остаётся undefined
+    // Свёрнутый в false он ломает проверку write-back ниже для switch без `disabled`
     const std::optional<bool> resolvedDisabled =
         disabled.has_value() ? disabled : stateDisabled;
     out["enabled"] = resolvedDisabled.value_or(false) != true;
     out.erase("disabled");
 
-    // `:235-238` — `_disabled !== accessibilityState?.disabled`. With NEITHER authored both sides
-    // are undefined and RN sends no `accessibilityState` at all; inventing `{disabled: false}` here
-    // would be a payload a device never produces. Merged rather than replaced when it DOES differ —
-    // an authored `busy` survives.
+    // `:235-238`: без обоих RN не шлёт `accessibilityState` вовсе, при расхождении state мёржится
     if (resolvedDisabled != stateDisabled) {
       dynamic state = authoredState != nullptr && authoredState->isObject()
           ? *authoredState
@@ -2588,12 +2561,8 @@ dynamic foldSwitchProps(const dynamic &props, bool isAndroidSwitch) {
     if (trackTrue != nullptr) out["onTintColor"] = *trackTrue;
     if (trackFalse != nullptr) out["tintColor"] = *trackFalse;
 
-    // THE iOS STYLE COMPOSITION, and it is iOS's alone — `:266-276` is the `else` branch, so
-    // Android's style is the app's untouched and `ios_backgroundColor` is not read there at all.
-    //
-    // The slot takes an ARRAY, which `addStyle` flattens in order, so this reproduces RN's nested
-    // `StyleSheet.compose` exactly: `alignSelf` UNDER the app's style (an app that writes
-    // `alignSelf: 'stretch'` still wins), the pill OVER it.
+    // Композиция стиля только для iOS (`:266-276`), массив как `StyleSheet.compose`
+    // `alignSelf` под стилем автора (его `stretch` побеждает), pill поверх
     const dynamic *authoredStyle = props.get_ptr("style");
     const dynamic *iosBackground = colorAt(props, "ios_backgroundColor");
     dynamic composed = dynamic::array();
@@ -2627,6 +2596,121 @@ dynamic foldSwitchProps(const dynamic &props, bool isAndroidSwitch) {
   out.erase("trackColor");
   out.erase("thumbColor");
   out.erase("ios_backgroundColor");
+  return out;
+}
+
+// Литералы `styles` из `ExpoCheckbox.tsx`, по одной константе на значение
+constexpr double kCheckboxSize = 20;
+constexpr double kCheckboxBorderRadius = 2;
+constexpr double kCheckboxBorderWidth = 2;
+constexpr const char *kCheckboxGray = "#657786";
+constexpr const char *kCheckboxDisabledGray = "#CCD6DD";
+constexpr const char *kCheckboxDisabledCheckedGray = "#AAB8C2";
+// Единственный литерал, зависящий от платформы (`Platform.select` в upstream)
+#ifdef ANDROID
+constexpr const char *kCheckboxEnabled = "#009688";
+#else
+constexpr const char *kCheckboxEnabled = "#007AFF";
+#endif
+
+/**
+ * Бокс expo-checkbox: Pressable со своим видом и закреплённой ролью (`ExpoCheckbox.tsx`)
+ * Идёт после `foldPressableProps`, он уже стёр `disabled`, поэтому его читаем из `authored`
+ * Порядок стилей upstream: база, стиль автора, checked, `color`, disabled, checked + disabled
+ */
+dynamic foldCheckboxProps(const dynamic &props, const dynamic &authored) {
+  dynamic out = props;
+  // `foldPressableProps` ставит `collapsable` только голому `pressable`
+  out["collapsable"] = false;
+  out["accessibilityRole"] = "checkbox";
+
+  const std::optional<bool> value = boolAt(authored, "value");
+  const bool checked = value.value_or(false);
+  const bool disabled = boolAt(authored, "disabled").value_or(false);
+
+  // `aria-checked` приоритетнее `value` (`ariaChecked ?? accessibilityState.checked` в Pressable)
+  if (value.has_value() && authored.get_ptr("aria-checked") == nullptr) {
+    const dynamic *existing = out.get_ptr("accessibilityState");
+    dynamic state = existing != nullptr && existing->isObject()
+        ? *existing
+        : dynamic::object();
+    state["checked"] = *value;
+    out["accessibilityState"] = std::move(state);
+  }
+
+  dynamic composed = dynamic::array();
+  dynamic base = dynamic::object();
+  base["height"] = kCheckboxSize;
+  base["width"] = kCheckboxSize;
+  base["borderRadius"] = kCheckboxBorderRadius;
+  base["borderWidth"] = kCheckboxBorderWidth;
+  base["borderColor"] = kCheckboxGray;
+  composed.push_back(std::move(base));
+
+  const dynamic *authoredStyle = props.get_ptr("style");
+  if (authoredStyle != nullptr) composed.push_back(*authoredStyle);
+
+  if (checked) {
+    dynamic enabled = dynamic::object();
+    enabled["backgroundColor"] = kCheckboxEnabled;
+    enabled["borderColor"] = kCheckboxEnabled;
+    composed.push_back(std::move(enabled));
+  }
+
+  // `!!color` из upstream: `''`, `0` и `false` значат "цвета нет"
+  const dynamic *color = truthyColorAt(authored, "color");
+  if (color != nullptr) {
+    dynamic tint = dynamic::object();
+    // NOTE: upstream кладёт `backgroundColor: undefined` и стирает им фон автора, у нас ключа нет
+    if (checked) tint["backgroundColor"] = *color;
+    tint["borderColor"] = *color;
+    composed.push_back(std::move(tint));
+  }
+
+  if (disabled) {
+    dynamic grey = dynamic::object();
+    grey["borderColor"] = kCheckboxDisabledGray;
+    grey["backgroundColor"] = "transparent";
+    composed.push_back(std::move(grey));
+    if (checked) {
+      dynamic darker = dynamic::object();
+      darker["backgroundColor"] = kCheckboxDisabledCheckedGray;
+      darker["borderColor"] = kCheckboxDisabledCheckedGray;
+      composed.push_back(std::move(darker));
+    }
+  }
+
+  out["style"] = std::move(composed);
+  // Не нативные пропы, Fabric дропнул бы их молча
+  out.erase("value");
+  out.erase("color");
+  return out;
+}
+
+/**
+ * Галочка под `checkbox`: `absoluteFill`, скрыта пока владелец не отмечен
+ * У upstream Image есть только при truthy `value`, у нас `display: none` заменяет отсутствие
+ * `value` читается у владельца (`ownerProps`), `slotDerived` метит галочку при записи `value`
+ */
+dynamic foldCheckboxMarkProps(const dynamic &props, const dynamic *ownerProps) {
+  dynamic out = props;
+  dynamic fill = dynamic::object();
+  fill["position"] = "absolute";
+  fill["left"] = 0;
+  fill["right"] = 0;
+  fill["top"] = 0;
+  fill["bottom"] = 0;
+  dynamic composed = dynamic::array();
+  composed.push_back(std::move(fill));
+
+  const bool checked = ownerProps != nullptr &&
+      boolAt(*ownerProps, "value").value_or(false);
+  if (!checked) {
+    dynamic hidden = dynamic::object();
+    hidden["display"] = "none";
+    composed.push_back(std::move(hidden));
+  }
+  out["style"] = std::move(composed);
   return out;
 }
 
@@ -2694,6 +2778,9 @@ dynamic fabricProps(
     // rules layer over the touchable's rather than replacing them.
     if (tagName == "button")
       tagResolved = foldButtonProps(tagResolved, props, self.hasPressListener);
+    // Checkbox это Pressable со своим видом, правило поверх `foldPressableProps` как у Button
+    if (tagName == "checkbox")
+      tagResolved = foldCheckboxProps(tagResolved, props);
     bag = &tagResolved;
   } else if (tagName == "image" || tagName == "image-background-image") {
     // `aria-hidden` read off the RAW, pre-aria-fold `props`: by the time `*bag` reaches here the
@@ -2712,6 +2799,9 @@ dynamic fabricProps(
     bag = &tagResolved;
   } else if (tagName == "button-label-text") {
     tagResolved = foldButtonLabelStyle(*bag, ancestors);
+    bag = &tagResolved;
+  } else if (tagName == "checkbox-mark") {
+    tagResolved = foldCheckboxMarkProps(*bag, owner.props);
     bag = &tagResolved;
   } else if (tagName == "scroll-view" || tagName == "horizontal-scroll-view") {
     // The parent's TAG decides which composition this is — the descendant seam again, read from the

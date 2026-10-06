@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/mail-composer",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "expo-mail-composer wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, Svelte, Solid, and Angular adapters. Opens the system mail composer prefilled with recipients, subject, body, and attachments.",
   "license": "MIT",
   "keywords": [

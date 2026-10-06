@@ -61,6 +61,8 @@ export { setImageSourceResolver } from '@symbiote-native/components';
 // the same reason React exports descriptorToReact — an external wrapper package over a third-party
 // native view maps its shared render fn's Descriptor through the SAME bridge the adapter uses.
 export { descriptorToSolid } from './descriptor-to-solid';
+export { defineDescriptorComponent } from './define-descriptor-component';
+export { defineOptionalDescriptorComponent } from './define-optional-descriptor-component';
 
 // Safe in the barrel (unlike ./bootstrap, which imports react-native): the registry seam itself
 // only reaches the engine and solid-js.
@@ -122,7 +124,9 @@ export {
 } from '@symbiote-native/engine';
 export { createPermissionHook } from './primitives/create-permission-hook';
 export { createResourceHook } from './primitives/create-resource-hook';
+export { defineNativeViewComponent } from './primitives/define-native-view-component';
 export { createEventValueHook } from './primitives/create-event-value-hook';
+export { useEvent, useEventListener } from './primitives/use-event';
 
 export { Animated, createAnimatedComponent } from './modules/animated';
 export type { IAnimatedComponentProps } from './modules/animated';
