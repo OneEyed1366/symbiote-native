@@ -50,6 +50,11 @@ export class DescriptorOutlet implements OnChanges, OnDestroy {
     inject<ElementRef<unknown>>(ElementRef).nativeElement;
   private rendered: IRenderedElement | undefined;
 
+  // The host node of the root element, for a component that calls a function of its native view
+  get rootNode(): unknown {
+    return this.rendered?.node ?? null;
+  }
+
   ngOnChanges(changes: SimpleChanges): void {
     if (!('node' in changes) || this.node === undefined) return;
     this.rendered = this.patchRoot(this.rendered, this.node);

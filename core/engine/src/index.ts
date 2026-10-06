@@ -213,6 +213,7 @@ export { StyleSheet, computeHairlineWidth } from './style-sheet';
 export {
   registerRules,
   resolveClassName,
+  styleOfProps,
   clearGlobalStyles,
   isClassNameValue,
 } from './style-registry';
@@ -224,6 +225,7 @@ export type {
   IScopableClassValue,
 } from './style-registry/scope';
 export { Platform } from './platform';
+export { isDevBuild } from './platform/shared';
 export type {
   IPlatformStatic,
   IPlatformOSType,
@@ -245,6 +247,14 @@ export {
   setDeviceEventSource,
 } from './native-events';
 export type { IEventValueSource } from './event-value-source';
+export { bindEventListener } from './event-listener-binding';
+export type {
+  IEmitterListener,
+  IEventEmitterOf,
+  IEventName,
+  IEventPayload,
+  IEventsMap,
+} from './event-listener-binding';
 export type {
   IEventSubscription,
   IEventEmitterModule,
@@ -528,8 +538,22 @@ export {
   splitWriteOnlyPermissionOptions,
 } from './permission-hook-runtime';
 export type { IWriteOnlyPermissionOptions } from './permission-hook-runtime';
-export { expoViewManagerName, tryRegisterNativeView } from './expo-native-view';
+export {
+  expoViewManagerName,
+  tryRegisterNativeView,
+  warnIfViewNameIsDynamic,
+} from './expo-native-view';
+export {
+  defineExpoNativeView,
+  defineExpoNativeViews,
+  type IExpoNativeView,
+} from './expo-native-view-handle';
+export {
+  defineExpoViewMethods,
+  type IExpoViewMethodCaller,
+} from './expo-view-method';
 export { createResourceController } from './resource-controller';
+export { createJsonKeyedResourceController } from './json-keyed-resource-controller';
 export type { IResourceController } from './resource-controller';
 export type {
   IPermissionHookBehavior,

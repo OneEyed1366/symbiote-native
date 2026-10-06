@@ -11,17 +11,24 @@
 
 const KEBAB_SEGMENT = /-([a-z])/g;
 
+// The template compiler keys a native tag's `@valueChange` as `on:valueChange`, to keep its case
+const NATIVE_EVENT_PREFIX = 'on:';
+
+function foldNativeEventKey(key: string): string {
+  const name = key.slice(NATIVE_EVENT_PREFIX.length);
+  return `on${name.charAt(0).toUpperCase()}${name.slice(1)}`;
+}
+
 function toCamel(key: string): string {
   return key.replace(KEBAB_SEGMENT, (_match, char: string) =>
     char.toUpperCase(),
   );
 }
 
-// The per-KEY half, for the path that never sees a whole attrs bag: an intrinsic tag reaches the
-// renderer one patchProp call at a time, with no component in between to fold the bag. Returns the
-// key unchanged (same string identity)
-// whenever there is nothing to convert, which is every key on the hot path.
+// The per-KEY half, for an intrinsic tag: `patchProp` hands over one key with no bag to fold
+// Returns the same string when nothing converts, which is every key on the hot path
 export function normalizeVueAttrKey(key: string): string {
+  if (key.startsWith(NATIVE_EVENT_PREFIX)) return foldNativeEventKey(key);
   if (!key.includes('-')) return key;
   if (key.startsWith('aria-') || key.startsWith('data-')) return key;
   return toCamel(key);

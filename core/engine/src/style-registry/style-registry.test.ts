@@ -11,6 +11,7 @@ import {
   registerRules,
   resolveClassName,
   clearGlobalStyles,
+  styleOfProps,
 } from './index';
 
 describe('style-registry', () => {
@@ -365,5 +366,39 @@ describe('style-registry — scoped class names', () => {
       },
     ]);
     expect(resolveClassName('card__title')).toEqual({ color: 'red' });
+  });
+});
+
+describe('styleOfProps', () => {
+  beforeEach(() => {
+    clearGlobalStyles();
+    registerRules([
+      {
+        tokens: ['rounded'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { borderRadius: 12 },
+      },
+    ]);
+  });
+
+  it('puts the class style before the inline style, so the inline one wins', () => {
+    expect(
+      styleOfProps({ className: 'rounded', style: { borderRadius: 4 } }),
+    ).toEqual([{ borderRadius: 12 }, { borderRadius: 4 }]);
+  });
+
+  it('reads `class` as well as `className`', () => {
+    expect(styleOfProps({ class: 'rounded' })).toEqual([
+      { borderRadius: 12 },
+      undefined,
+    ]);
+  });
+
+  it('gives only the inline style when there is no class', () => {
+    expect(styleOfProps({ style: { padding: 1 } })).toEqual([
+      undefined,
+      { padding: 1 },
+    ]);
   });
 });

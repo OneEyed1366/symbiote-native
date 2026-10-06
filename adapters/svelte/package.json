@@ -31,6 +31,7 @@
     ".": "./src/index.ts",
     "./bootstrap": "./src/bootstrap.ts",
     "./native-view-bridge": "./src/native-view-bridge.ts",
+    "./descriptor-host": "./src/descriptor-host.svelte",
     "./preprocessor": "./src/preprocessor/forbid-web-only-constructs.ts",
     "./scoped-styles": "./src/preprocessor/scoped-styles.ts",
     "./collapse-text-whitespace": "./src/preprocessor/collapse-text-whitespace.ts",
@@ -39,6 +40,8 @@
     "./runes/create-permission-hook": "./src/runes/create-permission-hook.svelte.ts",
     "./runes/create-resource-hook": "./src/runes/create-resource-hook.svelte.ts",
     "./runes/create-event-value-hook": "./src/runes/create-event-value-hook.svelte.ts",
+    "./runes/use-native-view-controller": "./src/runes/use-native-view-controller.svelte.ts",
+    "./runes/use-event": "./src/runes/use-event.svelte.ts",
     "./metro-svelte-transformer": "./metro-svelte-transformer.cjs",
     "./metro-css-parser": "./metro-css-parser.cjs"
   },
@@ -64,6 +67,10 @@
       "./native-view-bridge": {
         "types": "./build/native-view-bridge.d.ts",
         "default": "./build/native-view-bridge.js"
+      },
+      "./descriptor-host": {
+        "types": "./build/descriptor-host.svelte.d.ts",
+        "default": "./build/descriptor-host.svelte"
       },
       "./preprocessor": {
         "types": "./build/preprocessor/forbid-web-only-constructs.d.ts",
@@ -96,6 +103,14 @@
       "./runes/create-event-value-hook": {
         "types": "./build/runes/create-event-value-hook.svelte.d.ts",
         "default": "./build/runes/create-event-value-hook.svelte.js"
+      },
+      "./runes/use-native-view-controller": {
+        "types": "./build/runes/use-native-view-controller.svelte.d.ts",
+        "default": "./build/runes/use-native-view-controller.svelte.js"
+      },
+      "./runes/use-event": {
+        "types": "./build/runes/use-event.svelte.d.ts",
+        "default": "./build/runes/use-event.svelte.js"
       },
       "./metro-svelte-transformer": "./metro-svelte-transformer.cjs",
       "./metro-css-parser": "./metro-css-parser.cjs"

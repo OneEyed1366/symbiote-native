@@ -10,14 +10,17 @@ import type {
   IDescriptorChild,
 } from '@symbiote-native/components';
 
-export function descriptorToVue(node: IDescriptor): VNode {
+// `extraChildren` are caller vnodes (a component's slot) that go after the descriptor's own
+export function descriptorToVue(
+  node: IDescriptor,
+  extraChildren: readonly VNode[] = [],
+): VNode {
   // String type → host element (the Vue renderer's createElement → descriptorFor maps it to
   // a Fabric name); array children, since these are host elements, not slotted components.
-  return h(
-    node.type,
-    { ...node.props, key: node.key },
-    node.children.map(toChild),
-  );
+  return h(node.type, { ...node.props, key: node.key }, [
+    ...node.children.map(toChild),
+    ...extraChildren,
+  ]);
 }
 
 function toChild(child: IDescriptorChild): VNode | string {

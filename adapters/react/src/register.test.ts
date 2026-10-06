@@ -15,6 +15,7 @@ import { describe, expect, it } from 'vitest';
 import { hostBehaviorFor } from '@symbiote-native/engine';
 import {
   BUTTON_TAG,
+  CHECKBOX_TAG,
   HORIZONTAL_SCROLL_VIEW_TAG,
   IMAGE_TAG,
   INPUT_ACCESSORY_VIEW_TAG,
@@ -47,6 +48,7 @@ describe('the React adapter registration', () => {
       PRESSABLE_TAG,
       TOUCHABLE_NATIVE_FEEDBACK_TAG,
       BUTTON_TAG,
+      CHECKBOX_TAG,
       TEXT_INPUT_TAG,
       TEXT_INPUT_MULTILINE_TAG,
       SWITCH_TAG,
@@ -60,6 +62,7 @@ describe('the React adapter registration', () => {
       PRESSABLE_TAG,
       TOUCHABLE_NATIVE_FEEDBACK_TAG,
       BUTTON_TAG,
+      CHECKBOX_TAG,
       TEXT_INPUT_TAG,
       TEXT_INPUT_MULTILINE_TAG,
       SWITCH_TAG,

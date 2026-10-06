@@ -26,6 +26,7 @@ const PRIMITIVE_SELECTORS = new Set([
   // The second anchor-backed primitive, same shape (TouchableWithoutFeedback.js:286).
   'touchable-without-feedback',
   'button',
+  'checkbox',
   'text',
   'image',
   // The box RN wraps the background image in — the tag an app writes. The image itself is built by

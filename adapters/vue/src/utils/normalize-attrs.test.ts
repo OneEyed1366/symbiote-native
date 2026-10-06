@@ -9,6 +9,11 @@ describe('normalizeVueAttrKey', () => {
     expect(normalizeVueAttrKey('onPress')).toBe('onPress');
   });
 
+  // `@valueChange` на нативном теге компилятор шаблона отдаёт ключом `on:valueChange`
+  it('folds the compiler key of a camelCase native event to onXxx', () => {
+    expect(normalizeVueAttrKey('on:valueChange')).toBe('onValueChange');
+  });
+
   it('keeps aria-* and data-* kebab', () => {
     expect(normalizeVueAttrKey('aria-label')).toBe('aria-label');
     expect(normalizeVueAttrKey('data-test-id')).toBe('data-test-id');

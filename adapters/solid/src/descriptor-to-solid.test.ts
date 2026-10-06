@@ -66,10 +66,24 @@ describe('descriptorToSolid', () => {
       ).toBeDefined();
     });
 
-    // why: THE reason this bridge takes an accessor instead of a Descriptor. A Solid component body
-    // runs once, so a value-taking bridge would freeze at mount; a bridge that rebuilt from a fresh
-    // Descriptor would swap the node out from under Fabric. Reading the node's IDENTITY is what
-    // tells those three outcomes apart — the prop moved AND it is the same node it moved on.
+    it('inserts the caller children after the descriptor own children', async () => {
+      mount(ROOT_TAG, () =>
+        descriptorToSolid(
+          () => el('view', { testID: 'host' }, [el('view', { testID: 'own' })]),
+          () => descriptorToSolid(() => el('view', { testID: 'caller' })),
+        ),
+      );
+      await tick();
+
+      const host = committed(node => node.payload.testID === 'host');
+      expect(host?.children.map(child => child.payload.testID)).toEqual([
+        'own',
+        'caller',
+      ]);
+    });
+
+    // The bridge takes an accessor because a component body runs once: a value would freeze at
+    // mount, a rebuilt tree would swap the node under Fabric, so identity must hold too
     it('re-props the SAME native node on a reactive change', async () => {
       const [opacity, setOpacity] = createSignal(0.5);
       mount(ROOT_TAG, () =>
@@ -119,11 +133,8 @@ describe('descriptorToSolid', () => {
       );
     });
 
-    // why: Solid's spread walks only the current key set and never resets one that vanished, so a
-    // prop the render fn STOPS emitting would stick on the native view. This is the live path, not
-    // a synthetic edge: resolveAccessibilityProps returns its input untouched until an aria-* alias
-    // holds a VALUE, so a caller's `aria-label` going undefined drops the folded
-    // `accessibilityLabel` key entirely — and a screen reader would keep announcing it.
+    // Solid's spread never resets a vanished key, so a prop the render fn stops emitting would
+    // stick: `aria-label` going undefined drops the folded `accessibilityLabel` entirely
     it('clears a prop the descriptor stops emitting', async () => {
       const [label, setLabel] = createSignal<string | undefined>('Wi-Fi');
       mount(ROOT_TAG, () =>
@@ -161,10 +172,8 @@ describe('descriptorToSolid', () => {
   });
 
   describe('Negative', () => {
-    // why: the build-once model is only sound while a render fn's Descriptor keeps a constant
-    // shape. If one ever stops being shape-stable, the cached tree no longer describes the output —
-    // failing loudly names the real bug, where silently re-propping the wrong node would surface
-    // much later as a mispainted screen.
+    // The build-once model needs a constant descriptor shape, a drift must fail loudly rather
+    // than re-prop the wrong node and mispaint later
     it('throws when a child changes from text to an element between renders', async () => {
       const [child, setChild] = createSignal<IDescriptorChild>('text');
       mount(ROOT_TAG, () =>

@@ -27,6 +27,7 @@ function strictlyDeclared(): string[] {
 const STRICT = [
   'activity-indicator',
   'button',
+  'checkbox',
   'image',
   'image-background',
   'input-accessory-view',

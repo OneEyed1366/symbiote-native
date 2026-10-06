@@ -23,6 +23,7 @@ const IOS_NAMES: Readonly<Record<ISymbioteIntrinsic, string>> = {
   'touchable-without-feedback': ANCHOR_COMPONENT,
   'touchable-highlight': 'RCTView',
   button: 'RCTView',
+  checkbox: 'RCTView',
   text: 'RCTText',
   image: 'RCTImageView',
   'image-background': 'RCTView',

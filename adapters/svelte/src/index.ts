@@ -64,6 +64,7 @@ export type {
   ITouchableWithoutFeedbackProps,
   ITouchableNativeFeedbackProps,
   IButtonProps,
+  ICheckboxProps,
   IScrollViewProps,
   IScrollViewHandle,
   IVirtualizedListProps,
