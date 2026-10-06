@@ -30,7 +30,7 @@ import { INITIAL_EVENT_COUNT } from '../state/text-input';
 
 const fabric = installRecordingFabric();
 const live = createLiveTree(fabric);
-let nextRootTag = 7000;
+let nextRootTag = 7_000;
 
 // PRODUCTION SHAPE: an adapter resolves the intrinsic tag through descriptorFor and calls
 // createElement with the FABRIC view name. Building the subject as createElement(TEXT_INPUT_TAG)
@@ -348,6 +348,60 @@ describe('text input host behavior', () => {
     expect(onBlur).toHaveBeenCalledTimes(1);
   });
 
+  // In RN `isFocused` reads the app-wide tracker, so a command moves it with no native event
+  it('reports focused right after focus() and unfocused right after blur()', () => {
+    registerTextInputBehavior();
+    const node = makeTextInput();
+    mount(node);
+    const handle = buildTextInputHandle(node);
+
+    handle.focus();
+    expect(handle.isFocused()).toBe(true);
+
+    handle.blur();
+    expect(handle.isFocused()).toBe(false);
+  });
+
+  // RN's `getNativeRef` hands back the native instance the input renders to
+  it('answers the native node from getNativeRef', () => {
+    registerTextInputBehavior();
+    const node = makeTextInput();
+    mount(node);
+
+    expect(buildTextInputHandle(node).getNativeRef()).toBe(node);
+  });
+
+  // `TextInput-test.js`: the first input loses focus when a second one takes it
+  it('unfocuses the first input when a second one takes focus', () => {
+    registerTextInputBehavior();
+    const first = makeTextInput();
+    const second = makeTextInput();
+    mount(first);
+    mount(second);
+    const firstHandle = buildTextInputHandle(first);
+    const secondHandle = buildTextInputHandle(second);
+
+    firstHandle.focus();
+    secondHandle.focus();
+
+    expect(firstHandle.isFocused()).toBe(false);
+    expect(secondHandle.isFocused()).toBe(true);
+    expect(currentlyFocusedInput()).toBe(second);
+  });
+
+  it('reports unfocused once the input is unmounted', () => {
+    registerTextInputBehavior();
+    const node = makeTextInput();
+    const surface = mount(node);
+    const handle = buildTextInputHandle(node);
+    handle.focus();
+
+    surface.removeChild(node);
+    surface.commit();
+
+    expect(handle.isFocused()).toBe(false);
+  });
+
   it('drives focus and blur as native view commands', () => {
     registerTextInputBehavior();
     const node = makeTextInput();
@@ -431,10 +485,9 @@ describe('text input host behavior', () => {
     expect(commandsNamed('blur')).toHaveLength(0);
   });
 
-  // `clear` goes down the same stale-safe path a controlled write takes, and it must also move the
-  // mirror to '' — the app's own `value` follows the clear a moment later, and against a stale
-  // mirror that empty value reads as a divergence and commands a second, redundant write.
-  it('clears through setTextAndSelection and moves the mirror with it', () => {
+  // RN's `clear` only sends the command and never moves its mirror of the native text, so a commit
+  // with the same value commands nothing and a later empty value still reads as a divergence
+  it('clears through setTextAndSelection and leaves the mirror alone', () => {
     registerTextInputBehavior();
     const node = makeTextInput();
     routeProp(node, 'value', 'abc');
@@ -444,14 +497,15 @@ describe('text input host behavior', () => {
     handle.clear();
     expect(commandsNamed('setTextAndSelection')[0].args).toEqual([0, '', 0, 0]);
 
-    commitValue(surface, node, '');
-
+    commitValue(surface, node, 'abc');
     expect(commandsNamed('setTextAndSelection')).toHaveLength(1);
+
+    commitValue(surface, node, '');
+    expect(commandsNamed('setTextAndSelection')).toHaveLength(2);
   });
 
-  // A selection move must not rewrite the text: it echoes what native currently holds, which after
-  // a change is the text native reported — never the app's `value`.
-  it('moves the selection over the CURRENT text, not the app value', () => {
+  // RN passes a null text, so a selection move never rewrites it (`TextInput-itest.js`)
+  it('moves the selection with a null text', () => {
     registerTextInputBehavior();
     const node = makeTextInput();
     routeProp(node, 'value', 'app value');
@@ -464,7 +518,7 @@ describe('text input host behavior', () => {
     expect(commandsNamed('setTextAndSelection')).toHaveLength(1);
     expect(commandsNamed('setTextAndSelection')[0].args).toEqual([
       NATIVE_EVENT_COUNT,
-      'native text',
+      null,
       1,
       4,
     ]);

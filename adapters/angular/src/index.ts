@@ -36,12 +36,15 @@ export {
   Text,
   TouchableNativeFeedback,
   View,
+  injectVirtualizedListScope,
   VirtualizedList,
   VirtualizedSectionList,
+  VListCellDirective,
   VListEmptyDirective,
   VListFooterDirective,
   VListHeaderDirective,
   VListItemDirective,
+  VListOutletDirective,
   VListSeparatorDirective,
   VSectionFooterDirective,
   VSectionHeaderDirective,
@@ -78,6 +81,7 @@ export type {
   IAngularImageBackgroundProps,
   IAngularInputAccessoryViewProps,
   IAngularKeyboardAvoidingViewProps,
+  IAngularLayoutConformanceProps,
   IAngularModalProps,
   IAngularPressableProps,
   IAngularRefreshControlProps,
@@ -100,6 +104,7 @@ export type {
   IImageSourceProp,
   IInputMode,
   IKeyboardAvoidingBehavior,
+  ILayoutConformanceMode,
   IModalAnimationType,
   IModalOrientation,
   IModalOrientationChangeEvent,
@@ -118,6 +123,7 @@ export type {
   IViewabilityConfigCallbackPair,
   IViewableItemsChangedInfo,
   IViewToken,
+  IListScope,
   IVirtualizedListHandle,
   IVirtualizedListProps,
   IVirtualizedSectionListHandle,
@@ -126,6 +132,7 @@ export type {
   IVListSeparatorContext,
   IVSectionContext,
   IVSectionItemContext,
+  IVSectionSeparatorContext,
   ISection,
   ISwitchProps,
   ISwitchTrackColor,
@@ -154,6 +161,7 @@ export {
   PressableElement,
   RefreshControlElement,
   SafeAreaViewElement,
+  LayoutConformanceElement,
   ScrollContentElement,
   ScrollViewElement,
   StickyHeaderElement,
@@ -212,9 +220,14 @@ export { StatusBar } from './modules/status-bar';
 export type { IStatusBarProps, IStatusBarStyle } from './modules/status-bar';
 // AppRegistry: RN's app entry point over `mount`. setHostRegistrar wires RN's own
 // registrar so the native Fabric host finds our runnable by app key.
-export { AppRegistry, setHostRegistrar } from './modules/app-registry';
+export {
+  AppRegistry,
+  HeadlessJsTaskError,
+  setHostRegistrar,
+} from './modules/app-registry';
 export type {
   IComponentProvider,
+  IAppConfig,
   IAppParameters,
   IRunnable,
   IHostRegistrar,
@@ -233,6 +246,11 @@ export {
   connectWatchedSignal,
   PermissionsServiceBase,
 } from './services';
+export {
+  createAnimatedColor as injectAnimatedColor,
+  createAnimatedValue as injectAnimatedValue,
+  createAnimatedValueXY as injectAnimatedValueXY,
+} from '@symbiote-native/engine';
 export { AccessibilityInputsBase } from './accessibility-inputs';
 export { NativeViewBase } from './native-view-base';
 export { anchorStyleProp } from './primitives/shared';
@@ -253,6 +271,7 @@ export {
   AppState,
   Keyboard,
   KEYBOARD_EVENT,
+  TextInputState,
   BackHandler,
   PermissionsAndroid,
   PERMISSIONS,
@@ -376,3 +395,41 @@ export {
   setAngularProfileDetail,
 } from './diagnostics';
 export type { IAngularProfile, IAngularProfileDetail } from './diagnostics';
+
+// The device event bus and the easing curves, shared verbatim from the engine
+export {
+  DeviceEventEmitter,
+  Easing,
+  NativeAppEventEmitter,
+  NativeEventEmitter,
+} from '@symbiote-native/engine';
+export type {
+  IEasing,
+  IEasingFunction,
+  IEventEmitterModule,
+  IEventSubscription,
+  INativeEventListener,
+} from '@symbiote-native/engine';
+
+// RN's dev and native-module utilities, shared verbatim from the engine. The ones RN owns forward
+// to its own module, which `registerApp` hands over
+export {
+  codegenNativeCommands,
+  codegenNativeComponent,
+  DevMenu,
+  DevSettings,
+  LogBox,
+  NativeComponentRegistry,
+  NativeModules,
+  Networking,
+  PushNotificationIOS,
+  ReactNativeVersion,
+  registerCallableModule,
+  requireNativeComponent,
+  Systrace,
+  Touchable,
+  TurboModuleRegistry,
+  UIManager,
+  UTFSequence,
+} from '@symbiote-native/engine';
+export type { IDevSettings } from '@symbiote-native/engine';

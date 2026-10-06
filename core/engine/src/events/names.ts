@@ -11,6 +11,8 @@ export const BUBBLING_EVENTS: Readonly<Record<string, string>> = {
   topEndEditing: 'endEditing',
   topSubmitEditing: 'submitEditing',
   topKeyPress: 'keyPress',
+  // RN's base ViewConfig: an accessibility activation arrives as a click, not as a touch sequence
+  topClick: 'click',
 };
 
 export const DIRECT_EVENTS: Readonly<Record<string, string>> = {

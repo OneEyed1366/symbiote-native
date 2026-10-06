@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { createElement, type ISymbioteEvent } from '@symbiote-native/engine';
 import {
   invertedYStyleFor,
-  computeMvcpAdjustment,
   resolveItemKey,
   indexOfItem,
   offsetForEnd,
@@ -15,9 +14,8 @@ import {
   readScrollOffset,
   readLayoutLength,
   buildOffsets,
-  computeWindow,
-  throttleWindow,
   initialRenderRegion,
+  LIST_SEGMENT_KIND,
   isCellViewable,
   offsetForIndex,
   averageMeasuredLength,
@@ -28,11 +26,13 @@ import {
   computeViewableSet,
   diffViewable,
   maxMinimumViewTime,
-  NO_INDEX,
   type ICellLayout,
+  type IOffsetTableParams,
   type IViewToken,
+  type IViewabilityConfig,
   type IViewabilityConfigCallbackPair,
 } from './virtualized-list';
+import type { IRenderRange } from './virtualize-utils';
 
 // why: every symbol below is a pure computation with no throwing path (no `throw` in
 // virtualized-list.ts) — there is no Negative group to write here. Boundaries that must
@@ -49,156 +49,9 @@ function nativeEventFor(payload: Record<string, unknown>): ISymbioteEvent {
   };
 }
 
-// keyFor over a fixed key array (index -> key), the adapter's keyForIndex twin.
-const keyForOf =
-  (keys: string[]) =>
-  (index: number): string =>
-    keys[index] ?? String(index);
 // uniform 100px cells: offsets[i] = i*100.
 const uniformOffsets = (n: number): number[] =>
   Array.from({ length: n }, (_value, i) => i * 100);
-
-describe('computeMvcpAdjustment', () => {
-  it('no-ops with MVCP off (minIndexForVisible undefined)', () => {
-    const result = computeMvcpAdjustment({
-      minIndexForVisible: undefined,
-      autoscrollToTopThreshold: undefined,
-      count: 5,
-      committedFirst: 0,
-      offsets: uniformOffsets(5),
-      scrollOffset: 0,
-      prevFirstVisibleKey: 'a',
-      keyFor: keyForOf(['a', 'b', 'c', 'd', 'e']),
-    });
-    expect(result).toEqual({ firstVisibleKey: null, action: { kind: 'none' } });
-  });
-
-  it('no-ops on an empty list', () => {
-    const result = computeMvcpAdjustment({
-      minIndexForVisible: 0,
-      autoscrollToTopThreshold: undefined,
-      count: 0,
-      committedFirst: 0,
-      offsets: [],
-      scrollOffset: 0,
-      prevFirstVisibleKey: null,
-      keyFor: keyForOf([]),
-    });
-    expect(result).toEqual({ firstVisibleKey: null, action: { kind: 'none' } });
-  });
-
-  it('first pass records the anchor key without acting', () => {
-    const result = computeMvcpAdjustment({
-      minIndexForVisible: 0,
-      autoscrollToTopThreshold: undefined,
-      count: 3,
-      committedFirst: 0,
-      offsets: uniformOffsets(3),
-      scrollOffset: 0,
-      prevFirstVisibleKey: null,
-      keyFor: keyForOf(['a', 'b', 'c']),
-    });
-    expect(result).toEqual({ firstVisibleKey: 'a', action: { kind: 'none' } });
-  });
-
-  it('no-ops when the anchor key is unchanged', () => {
-    const result = computeMvcpAdjustment({
-      minIndexForVisible: 0,
-      autoscrollToTopThreshold: undefined,
-      count: 3,
-      committedFirst: 0,
-      offsets: uniformOffsets(3),
-      scrollOffset: 50,
-      prevFirstVisibleKey: 'a',
-      keyFor: keyForOf(['a', 'b', 'c']),
-    });
-    expect(result).toEqual({ firstVisibleKey: 'a', action: { kind: 'none' } });
-  });
-
-  it('shifts by the inserted spacer extent on a prepend below a scrolled window', () => {
-    // 'a' was at index 0; a 2-item prepend pushed it to index 2, window scrolled (committedFirst=2).
-    const result = computeMvcpAdjustment({
-      minIndexForVisible: 0,
-      autoscrollToTopThreshold: undefined,
-      count: 5,
-      committedFirst: 2,
-      offsets: uniformOffsets(5),
-      scrollOffset: 500,
-      prevFirstVisibleKey: 'a',
-      keyFor: keyForOf(['x', 'y', 'a', 'b', 'c']),
-    });
-    // spacerEnd = min(2,2)=2; insertedExtent = offsets[2]-offsets[0] = 200; shift = 500+200.
-    expect(result).toEqual({
-      firstVisibleKey: 'x',
-      action: { kind: 'shift', offset: 700 },
-    });
-  });
-
-  it('autoscrolls to top when the anchor sits within the threshold', () => {
-    const result = computeMvcpAdjustment({
-      minIndexForVisible: 0,
-      autoscrollToTopThreshold: 10,
-      count: 5,
-      committedFirst: 2,
-      offsets: uniformOffsets(5),
-      scrollOffset: 5,
-      prevFirstVisibleKey: 'a',
-      keyFor: keyForOf(['x', 'y', 'a', 'b', 'c']),
-    });
-    expect(result).toEqual({
-      firstVisibleKey: 'x',
-      action: { kind: 'autoscroll-top' },
-    });
-  });
-
-  it('no-ops when the prepend stays inside the committed window (native MVCP owns it)', () => {
-    // committedFirst=0: the whole prepend is in-window; JS must not double-correct.
-    const result = computeMvcpAdjustment({
-      minIndexForVisible: 0,
-      autoscrollToTopThreshold: undefined,
-      count: 5,
-      committedFirst: 0,
-      offsets: uniformOffsets(5),
-      scrollOffset: 0,
-      prevFirstVisibleKey: 'a',
-      keyFor: keyForOf(['x', 'y', 'a', 'b', 'c']),
-    });
-    // spacerEnd = min(2,0)=0; insertedExtent 0 → none.
-    expect(result).toEqual({ firstVisibleKey: 'x', action: { kind: 'none' } });
-  });
-
-  // why: a filtered/truncated data set can shrink below minIndexForVisible — there is no anchor
-  // cell to track anymore, so MVCP must go fully idle rather than reading past the end of `count`.
-  it('reports no anchor key once the list shrinks to or below minIndexForVisible', () => {
-    const result = computeMvcpAdjustment({
-      minIndexForVisible: 2,
-      autoscrollToTopThreshold: undefined,
-      count: 2,
-      committedFirst: 0,
-      offsets: uniformOffsets(2),
-      scrollOffset: 0,
-      prevFirstVisibleKey: 'a',
-      keyFor: keyForOf(['a', 'b']),
-    });
-    expect(result).toEqual({ firstVisibleKey: null, action: { kind: 'none' } });
-  });
-
-  // why: the previous anchor item was removed outright (not just shifted) — keyFor can no longer
-  // find it in [minIndexForVisible, count), so there is nothing to shift by and MVCP must not guess.
-  it('does not shift when the previous anchor item was removed from the data entirely', () => {
-    const result = computeMvcpAdjustment({
-      minIndexForVisible: 0,
-      autoscrollToTopThreshold: undefined,
-      count: 3,
-      committedFirst: 0,
-      offsets: uniformOffsets(3),
-      scrollOffset: 300,
-      prevFirstVisibleKey: 'gone',
-      keyFor: keyForOf(['x', 'y', 'z']),
-    });
-    expect(result).toEqual({ firstVisibleKey: 'x', action: { kind: 'none' } });
-  });
-});
 
 describe('resolveItemKey', () => {
   it('uses the keyExtractor when provided', () => {
@@ -234,7 +87,7 @@ describe('indexOfItem', () => {
 
 describe('offsetForEnd', () => {
   it('scrolls the content to the bottom edge', () => {
-    expect(offsetForEnd(1000, 300)).toBe(700);
+    expect(offsetForEnd(1_000, 300)).toBe(700);
   });
   it('never goes negative when content is shorter than the viewport', () => {
     expect(offsetForEnd(200, 300)).toBe(0);
@@ -314,120 +167,99 @@ describe('resolveStickySectionHeaders', () => {
   });
 });
 
+type IPlanCase = {
+  regions: IRenderRange[];
+  stickyIndices?: Set<number>;
+};
+
+// The plan as RN's snapshots read: a cell is its key, a spacer is `[extent]`
+function planShape(planCase: IPlanCase): string {
+  const plan = buildListPlan({
+    count: 20,
+    regions: planCase.regions,
+    offsets: uniformOffsets(20),
+    lengths: Array.from({ length: 20 }, () => 100),
+    keyFor: String,
+    stickyIndices: planCase.stickyIndices,
+  });
+  return plan.segments
+    .map(segment =>
+      segment.kind === LIST_SEGMENT_KIND.spacer
+        ? `[${segment.extent}]`
+        : segment.key,
+    )
+    .join(' ');
+}
+
+// 20 uniform 100px cells, sticky section headers at index 0 and 10, the SectionList repro that
+// vanished on device once scrolling carried the window past a section's origin index
 describe('buildListPlan', () => {
-  // 20 uniform 100px cells (offsets[i] = i*100), sticky section headers at index 0 and 10 —
-  // mirrors the SectionList repro (Fruit@0, Tools@10) that vanished on-device once scrolling
-  // carried the window past a section's origin index.
-  const offsets = uniformOffsets(20);
-  const lengths = Array.from({ length: 20 }, () => 100);
-  const keyFor = keyForOf(offsets.map((_o, i) => String(i)));
+  const sticky = new Set([0, 10]);
 
   it('force-mounts the nearest sticky index below the window, RN _ensureClosestStickyHeader-style', () => {
-    const plan = buildListPlan({
-      count: 20,
-      first: 6,
-      last: 15,
-      offsets,
-      lengths,
-      total: 2000,
-      keyFor,
-      stickyIndices: new Set([0, 10]),
-      hasHeader: false,
-      hasSeparators: false,
-    });
-    // The section-0 header must stay a distinct, force-mounted cell even though index 0 is
-    // long out of [first,last] — NOT silently dropped from plan.cells (which is what
-    // destroyed/recreated the adapter's sticky component every re-entry into the window).
-    expect(plan.forcedStickyCell).toEqual({ index: 0, key: '0' });
-    expect(plan.cells.map(c => c.index)).toEqual([
-      6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
-    ]);
-    // Space before the forced cell (it sits at offset 0) plus the gap between it and the
-    // window's own first cell (offsets[6] - offsets[0] - lengths[0]).
-    expect(plan.leadingExtent).toBe(0);
-    expect(plan.gapExtent).toBe(500);
-    expect(plan.trailingExtent).toBe(400);
-    // Position 0 is the forced cell; position 6 is index 10, still correctly sticky inside
-    // the window (header absent, leading spacer absent, forced cell + its gap spacer = +2).
-    expect(plan.stickyChildPositions).toEqual([0, 6]);
+    expect(
+      planShape({ regions: [{ first: 6, last: 15 }], stickyIndices: sticky }),
+    ).toBe('0 [500] 6 7 8 9 10 11 12 13 14 15 [400]');
   });
 
-  it('matches the old single-window shape when no sticky index precedes the window', () => {
-    const plan = buildListPlan({
-      count: 20,
-      first: 0,
-      last: 9,
-      offsets,
-      lengths,
-      total: 2000,
-      keyFor,
-      stickyIndices: new Set([0, 10]),
-      hasHeader: false,
-      hasSeparators: false,
-    });
-    expect(plan.forcedStickyCell).toBeUndefined();
-    expect(plan.gapExtent).toBe(0);
-    expect(plan.leadingExtent).toBe(0);
-    expect(plan.cells.map(c => c.index)).toEqual([
-      0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
-    ]);
-    expect(plan.stickyChildPositions).toEqual([0]);
+  it('adds nothing when no sticky index precedes the window', () => {
+    expect(
+      planShape({ regions: [{ first: 0, last: 9 }], stickyIndices: sticky }),
+    ).toBe('0 1 2 3 4 5 6 7 8 9 [1000]');
   });
 
   it('does not force-mount a sticky index that is already inside the window', () => {
-    const plan = buildListPlan({
-      count: 20,
-      first: 8,
-      last: 12,
-      offsets,
-      lengths,
-      total: 2000,
-      keyFor,
-      stickyIndices: new Set([10]),
-      hasHeader: false,
-      hasSeparators: false,
-    });
-    expect(plan.forcedStickyCell).toBeUndefined();
-    expect(plan.gapExtent).toBe(0);
+    expect(
+      planShape({
+        regions: [{ first: 8, last: 12 }],
+        stickyIndices: new Set([10]),
+      }),
+    ).toBe('[800] 8 9 10 11 12 [700]');
   });
 
-  // why: ListHeaderComponent occupies child position 0 ahead of every spacer/cell — every
-  // sticky-position and spacer index downstream must shift by one to account for it, or the
-  // adapter would mount the sticky child one slot too early and clobber the header.
-  it('shifts every child position by one when a ListHeaderComponent is present', () => {
-    const plan = buildListPlan({
-      count: 20,
-      first: 0,
-      last: 9,
-      offsets,
-      lengths,
-      total: 2000,
-      keyFor,
-      stickyIndices: new Set([0]),
-      hasHeader: true,
-      hasSeparators: false,
-    });
-    expect(plan.stickyChildPositions).toEqual([1]);
+  it('keeps a retained region mounted with a spacer for the gap', () => {
+    expect(
+      planShape({
+        regions: [
+          { first: 12, last: 15 },
+          { first: 0, last: 2 },
+        ],
+      }),
+    ).toBe('0 1 2 [900] 12 13 14 15 [400]');
   });
 
-  // why: an ItemSeparatorComponent rides INSIDE its cell's measuring wrapper (RN
-  // VirtualizedListCellRenderer.js:218-221), so it emits no child of its own and cannot shift a
-  // sticky index's position.
-  it('keeps sticky child positions independent of any separator', () => {
+  it('measures the sticky header against the window, not the retained region', () => {
+    expect(
+      planShape({
+        regions: [
+          { first: 14, last: 15 },
+          { first: 0, last: 9 },
+        ],
+        stickyIndices: new Set([10]),
+      }),
+    ).toBe('0 1 2 3 4 5 6 7 8 9 10 [300] 14 15 [400]');
+  });
+
+  it('merges a region that touches the window into one run of cells', () => {
+    expect(
+      planShape({
+        regions: [
+          { first: 5, last: 9 },
+          { first: 0, last: 4 },
+        ],
+      }),
+    ).toBe('0 1 2 3 4 5 6 7 8 9 [1000]');
+  });
+
+  it('is empty for an empty list', () => {
     const plan = buildListPlan({
-      count: 20,
-      first: 8,
-      last: 12,
-      offsets,
-      lengths,
-      total: 2000,
-      keyFor,
-      stickyIndices: new Set([10]),
-      hasHeader: false,
+      count: 0,
+      regions: [{ first: 0, last: -1 }],
+      offsets: [],
+      lengths: [],
+      keyFor: String,
     });
-    // Leading spacer (child 0), then one child per cell: index 10 is the 3rd cell in the window,
-    // so child position 3.
-    expect(plan.stickyChildPositions).toEqual([3]);
+    expect(plan.segments).toEqual([]);
   });
 });
 
@@ -509,12 +341,28 @@ describe('readLayoutLength', () => {
   });
 });
 
+function tableOf(overrides: Partial<IOffsetTableParams>) {
+  return buildOffsets({
+    count: 0,
+    measured: new Map(),
+    measuredOffsets: new Map(),
+    fixedLayout: undefined,
+    averageLength: 0,
+    ...overrides,
+  });
+}
+
 describe('buildOffsets', () => {
   // why: with nothing measured by the host, every position is an estimate carried forward from
   // the one before it — a bug here misplaces every cell after the first.
   it('carries unmeasured cells forward from the previous one', () => {
     const measured = new Map([[0, 50]]);
-    const result = buildOffsets(3, measured, new Map(), undefined, 20, 20);
+    const result = tableOf({
+      count: 3,
+      measured,
+      averageLength: 20,
+      averageStride: 20,
+    });
     // cell 0 measured (50), cells 1 and 2 fall back to the 20px average.
     expect(result).toEqual({
       offsets: [0, 50, 70],
@@ -532,7 +380,12 @@ describe('buildOffsets', () => {
       length: 15 + index,
       offset: index === 0 ? 0 : 15 * index + index - 1,
     });
-    const result = buildOffsets(3, new Map(), new Map(), fixedLayout, 999, 999);
+    const result = tableOf({
+      count: 3,
+      fixedLayout,
+      averageLength: 999,
+      averageStride: 999,
+    });
     expect(result).toEqual({
       offsets: [0, 15, 31],
       lengths: [15, 16, 17],
@@ -541,18 +394,15 @@ describe('buildOffsets', () => {
   });
 
   it('returns an empty table with zero total for an empty list', () => {
-    expect(buildOffsets(0, new Map(), new Map(), undefined, 0)).toEqual({
+    expect(tableOf({})).toEqual({
       offsets: [],
       lengths: [],
       total: 0,
     });
   });
 
-  // why: a cell's own height is NOT the distance to the next cell — a separator, a section gap, any
-  // chrome the list renders BETWEEN cells sits in that distance too. Summing heights alone makes the
-  // model shorter than the real content, so the spacer that stands in for a windowed-out region is
-  // short by exactly that chrome and everything below it slides up. Two measured neighbours know
-  // their true distance; use it.
+  // A separator or section gap sits between cells, so the real distance exceeds the height
+  // Summing heights shortens the model and the spacer under-reserves, the rest slides up
   it('uses the real distance between two measured neighbours, not the sum of their heights', () => {
     const measured = new Map([
       [0, 50],
@@ -564,16 +414,22 @@ describe('buildOffsets', () => {
       [1, 61],
     ]);
 
-    expect(buildOffsets(2, measured, offsets, undefined, 50)).toEqual({
+    expect(
+      tableOf({
+        count: 2,
+        measured,
+        measuredOffsets: offsets,
+        averageLength: 50,
+      }),
+    ).toEqual({
       offsets: [0, 61],
       lengths: [50, 50],
       total: 111,
     });
   });
 
-  // why: an unmeasured cell is an ESTIMATE, and an estimate must not move a cell whose real position
-  // is known. Flinging leaves such holes behind, and while the average keeps shifting under them
-  // every later cell would slide back and forth — the jump-and-return the canary shows on device.
+  // An estimate must not move a cell whose real position is known
+  // A fling leaves holes, and a shifting average would slide every later cell back and forth
   it('does not let an unmeasured hole displace a later measured cell', () => {
     const measured = new Map([
       [0, 50],
@@ -584,7 +440,12 @@ describe('buildOffsets', () => {
       [2, 200],
     ]);
 
-    const table = buildOffsets(3, measured, offsets, undefined, 999);
+    const table = tableOf({
+      count: 3,
+      measured,
+      measuredOffsets: offsets,
+      averageLength: 999,
+    });
 
     expect(table.offsets[2], 'the measured cell keeps its real position').toBe(
       200,
@@ -592,10 +453,8 @@ describe('buildOffsets', () => {
     expect(table.total).toBe(240);
   });
 
-  // why: a measured cell is placed where the host said it is, untouched. Re-basing index 0 back to
-  // zero is what turned the table into a function of its own output — the spacer it feeds is part
-  // of the very y it would be re-basing. See buildOffsets' header and
-  // virtualized-list-feedback.test.ts.
+  // A measured cell sits where the host said, never rebased onto a sum
+  // Rebasing made the table a function of its own output, see virtualized-list-feedback.test.ts
   it('places a measured cell at the host offset verbatim, list header included', () => {
     const measured = new Map([
       [0, 50],
@@ -609,51 +468,14 @@ describe('buildOffsets', () => {
     ]);
 
     expect(
-      buildOffsets(2, measured, hostOffsets, undefined, 50, 60).offsets,
+      tableOf({
+        count: 2,
+        measured,
+        measuredOffsets: hostOffsets,
+        averageLength: 50,
+        averageStride: 60,
+      }).offsets,
     ).toEqual([120, 180]);
-  });
-});
-
-describe('computeWindow', () => {
-  // why: an empty list has no window to render — first/last must resolve to the documented
-  // empty-range sentinel (last < first), not an out-of-bounds index.
-  it('resolves an empty window on an empty list', () => {
-    expect(computeWindow(0, [], [], 0, 500, 21, 10)).toEqual({
-      first: 0,
-      last: NO_INDEX,
-    });
-  });
-
-  // why: before the first onLayout, the viewport length is unknown — painting a bounded prefix
-  // (rather than nothing, or the full list) matches RN's initial-render contract.
-  it('paints a bounded initial prefix before the viewport is measured', () => {
-    const offsets = uniformOffsets(20);
-    const lengths = Array.from({ length: 20 }, () => 100);
-    expect(computeWindow(20, offsets, lengths, 0, 0, 21, 10)).toEqual({
-      first: 0,
-      last: 9,
-    });
-  });
-
-  it('clamps the initial prefix to the list length when it is shorter than initialNumToRender', () => {
-    const offsets = uniformOffsets(5);
-    const lengths = Array.from({ length: 5 }, () => 100);
-    expect(computeWindow(5, offsets, lengths, 0, 0, 21, 10)).toEqual({
-      first: 0,
-      last: 4,
-    });
-  });
-
-  // why: the resident window is every cell whose box overlaps [scrollOffset - overscan,
-  // scrollOffset + viewport + overscan] — this is the core windowing contract every adapter
-  // relies on to avoid mounting the whole list.
-  it('centers the window on the scroll offset with symmetric overscan', () => {
-    const offsets = uniformOffsets(50);
-    const lengths = Array.from({ length: 50 }, () => 100);
-    // viewport 500px, windowSize 3 => overscan = (3-1)/2 * 500 = 500px each side.
-    // scrolled to 2000: window = [1500, 3000] => cells whose box overlaps that range.
-    const window = computeWindow(50, offsets, lengths, 2000, 500, 3, 10);
-    expect(window).toEqual({ first: 15, last: 29 });
   });
 });
 
@@ -681,50 +503,29 @@ describe('initialRenderRegion', () => {
   });
 });
 
-describe('throttleWindow', () => {
-  // why: with no previous window (the list just received data) RN paints its initial region, not
-  // the whole viewport window - 10 rows where the window for a 420pt viewport holds ~125. The rest
-  // fills in batch by batch. Painting the target at once made every first paint ~12x heavier.
-  it('paints the initial region when there is no previous window yet', () => {
-    const target = { first: 0, last: 124 };
-    expect(
-      throttleWindow(target, { first: 0, last: NO_INDEX }, 10, {
-        first: 0,
-        last: 9,
-      }),
-    ).toEqual({ first: 0, last: 9 });
-  });
+type ISpan = [start: number, length: number];
 
-  // why: incremental fill grows the window by at most maxToRenderPerBatch cells per side per
-  // tick — a big jump (e.g. scrollToEnd) must not snap the whole target window in at once.
-  it('clamps growth to maxToRenderPerBatch cells on each side', () => {
-    const target = { first: 0, last: 100 };
-    const previous = { first: 20, last: 30 };
-    expect(throttleWindow(target, previous, 5)).toEqual({
-      first: 15,
-      last: 35,
-    });
-  });
-
-  // why: clamping symmetric growth on a target window narrower than the previous one can cross
-  // first > last (an empty window) — falling back to the full target avoids ever presenting a
-  // window with nothing in it while cells clearly should render.
-  it('falls back to the target when clamping would cross into an empty window', () => {
-    const target = { first: 40, last: 42 };
-    const previous = { first: 0, last: 1 };
-    expect(throttleWindow(target, previous, 2)).toEqual(target);
-  });
-});
+// `cell` is [offset, length] in content space, `viewport` is [scroll offset, viewport length]
+function viewable(
+  cell: ISpan,
+  viewport: ISpan,
+  config: IViewabilityConfig,
+): boolean {
+  return isCellViewable(
+    { offset: cell[0], length: cell[1] },
+    { offset: viewport[0], length: viewport[1] },
+    config,
+  );
+}
 
 describe('isCellViewable', () => {
-  // why: `ViewabilityHelper.js`'s `computeViewableItems` checks `viewAreaCoveragePercentThreshold
-  // != null` FIRST to decide the mode — area wins whenever it is set, itemVisiblePercentThreshold
-  // only when it is not. The old code checked item-threshold first, backwards from vendor.
+  // RN checks `viewAreaCoveragePercentThreshold != null` FIRST to pick the mode
+  // Area wins whenever set, the item threshold only when it is not
   it('honors viewAreaCoveragePercentThreshold over an item threshold when both are set', () => {
-    // cell [0,100) fully visible in viewport 500 -> area% = 100/500*100 = 20, item% = 100.
-    // A failing item threshold proves area actually won, since item alone would also pass.
+    // cell [0,100) fully visible in viewport 500: area% = 20, item% = 100
+    // The failing item threshold proves area won, since item alone would pass
     expect(
-      isCellViewable(0, 100, 0, 500, {
+      viewable([0, 100], [0, 500], {
         viewAreaCoveragePercentThreshold: 10,
         itemVisiblePercentThreshold: 99,
       }),
@@ -732,73 +533,60 @@ describe('isCellViewable', () => {
   });
 
   it('rejects a cell below itemVisiblePercentThreshold', () => {
-    // cell [0,100) at scroll 60 in viewport 500: 40 of 100px visible -> item% = 40.
+    // cell [0,100) at scroll 60 in viewport 500: 40 of 100px visible -> item% = 40
     expect(
-      isCellViewable(0, 100, 60, 500, { itemVisiblePercentThreshold: 50 }),
+      viewable([0, 100], [60, 500], { itemVisiblePercentThreshold: 50 }),
     ).toBe(false);
   });
 
-  // why: THE core bug — `viewAreaCoveragePercentThreshold` is a fraction of the VIEWPORT, never
-  // of the cell's own length. A cell clipped by the viewport edge must be judged by how much of
-  // the VIEWPORT it fills, not how much of ITSELF is visible — the two diverge sharply when the
-  // cell is much shorter than the viewport, and the cell must stay clear of the entirely-visible
-  // shortcut (below) to actually exercise the percent math.
+  // The area threshold is a share of the VIEWPORT, never of the cell's own length
+  // The cell stays clear of the entirely-visible shortcut so the percent math runs
   it('measures viewAreaCoveragePercentThreshold against the viewport, not the cell', () => {
-    // cell [480,530) clipped by viewport 500 -> 20px visible.
-    // area% (viewport-relative) = 20/500*100 = 4; item% (cell-relative) would be 20/50*100 = 40.
+    // cell [480,530) clipped by viewport 500 -> 20px visible
+    // area% = 20/500*100 = 4, the cell-relative item% would be 40
     expect(
-      isCellViewable(480, 50, 0, 500, { viewAreaCoveragePercentThreshold: 10 }),
+      viewable([480, 50], [0, 500], { viewAreaCoveragePercentThreshold: 10 }),
     ).toBe(false);
     expect(
-      isCellViewable(480, 50, 0, 500, { viewAreaCoveragePercentThreshold: 3 }),
+      viewable([480, 50], [0, 500], { viewAreaCoveragePercentThreshold: 3 }),
     ).toBe(true);
   });
 
-  // why: RN's own `_isEntirelyVisible` shortcut — a cell wholly inside the viewport is viewable
-  // in EITHER mode regardless of how small its share of the viewport is.
+  // RN's `_isEntirelyVisible`: a cell wholly inside the viewport is viewable in either mode
   it('always counts an entirely visible cell as viewable, whatever the area threshold', () => {
     expect(
-      isCellViewable(100, 50, 0, 500, {
-        viewAreaCoveragePercentThreshold: 90,
-      }),
+      viewable([100, 50], [0, 500], { viewAreaCoveragePercentThreshold: 90 }),
     ).toBe(true);
   });
 
-  // why: RN compares with `>=`, never `>` — a cell sitting exactly at the threshold must clear
-  // it, not fall just short.
+  // RN compares with `>=`, so a cell exactly at the threshold clears it
   it('includes a cell sitting exactly at the threshold (RN uses >=, not >)', () => {
-    // cell [400,600), viewport [0,500): 100 of 500 viewport px visible -> area% = 20 exactly.
+    // cell [400,600), viewport [0,500): 100 of 500 viewport px visible -> area% = 20 exactly
     expect(
-      isCellViewable(400, 200, 0, 500, {
-        viewAreaCoveragePercentThreshold: 20,
-      }),
+      viewable([400, 200], [0, 500], { viewAreaCoveragePercentThreshold: 20 }),
     ).toBe(true);
   });
 
   it('uses the documented zero default when no threshold is configured at all', () => {
-    expect(isCellViewable(0, 100, 1000, 500, {})).toBe(false);
-    expect(isCellViewable(400, 200, 0, 500, {})).toBe(true);
+    expect(viewable([0, 100], [1_000, 500], {})).toBe(false);
+    expect(viewable([400, 200], [0, 500], {})).toBe(true);
   });
 
-  // why: a cell with no overlap at all must never read as viewable, however low the threshold —
-  // RN's caller loop never even calls `_isViewable` for such a cell.
+  // RN's caller loop never calls `_isViewable` for a cell with no overlap, whatever the threshold
   it('rejects a cell with no overlap at all, even at threshold 0', () => {
     expect(
-      isCellViewable(1000, 100, 0, 500, {
-        viewAreaCoveragePercentThreshold: 0,
-      }),
+      viewable([1_000, 100], [0, 500], { viewAreaCoveragePercentThreshold: 0 }),
     ).toBe(false);
   });
 
-  // why: vendor's `_isEntirelyVisible` is `top >= 0 && bottom <= viewportHeight && bottom > top` —
-  // a zero-length cell (no measurement yet) satisfies the first two clauses but never the third,
-  // so it must fall through to the percent math (0 visible pixels) rather than short-circuit true.
+  // `_isEntirelyVisible` is `top >= 0 && bottom <= viewportHeight && bottom > top`
+  // A zero-length cell fails the third clause, so it falls through to the percent math
   it('does not treat a zero-length cell as entirely visible', () => {
     expect(
-      isCellViewable(100, 0, 0, 500, { viewAreaCoveragePercentThreshold: 1 }),
+      viewable([100, 0], [0, 500], { viewAreaCoveragePercentThreshold: 1 }),
     ).toBe(false);
     expect(
-      isCellViewable(100, 0, 0, 500, { viewAreaCoveragePercentThreshold: 0 }),
+      viewable([100, 0], [0, 500], { viewAreaCoveragePercentThreshold: 0 }),
     ).toBe(true);
   });
 });
@@ -806,31 +594,50 @@ describe('isCellViewable', () => {
 describe('offsetForIndex', () => {
   const offsets = uniformOffsets(10);
   const lengths = Array.from({ length: 10 }, () => 100);
+  const indexOffset = (
+    index: number,
+    bias: { viewPosition?: number; viewOffset?: number } = {},
+  ): number =>
+    offsetForIndex({
+      index,
+      viewPosition: bias.viewPosition ?? 0,
+      viewOffset: bias.viewOffset ?? 0,
+      count: 10,
+      offsets,
+      lengths,
+      viewportLength: 500,
+    });
 
   it('clamps an out-of-range index to the last cell', () => {
-    expect(offsetForIndex(999, 0, 0, 10, offsets, lengths, 500)).toBe(
-      offsets[9],
-    );
+    expect(indexOffset(999)).toBe(offsets[9]);
   });
 
   it('aligns the cell to the viewport top with viewPosition 0', () => {
-    expect(offsetForIndex(5, 0, 0, 10, offsets, lengths, 500)).toBe(500);
+    expect(indexOffset(5)).toBe(500);
   });
 
-  // why: viewPosition biases where in the viewport the target lands (RN scrollToIndex) — 1
-  // aligns the cell's bottom edge to the viewport bottom, a materially different offset than
-  // aligning its top, so the bias must actually shift the result.
+  // `viewPosition` biases where the target lands (RN `scrollToIndex`), 1 aligns its bottom edge
   it('aligns the cell to the viewport bottom with viewPosition 1', () => {
-    // cellOffset 500, viewport 500, cell 100: positioned = 500 - 1*(500-100) = 100.
-    expect(offsetForIndex(5, 1, 0, 10, offsets, lengths, 500)).toBe(100);
+    // cellOffset 500, viewport 500, cell 100: positioned = 500 - 1 * (500 - 100) = 100
+    expect(indexOffset(5, { viewPosition: 1 })).toBe(100);
   });
 
   it('nudges the result by viewOffset', () => {
-    expect(offsetForIndex(5, 0, 30, 10, offsets, lengths, 500)).toBe(470);
+    expect(indexOffset(5, { viewOffset: 30 })).toBe(470);
   });
 
   it('never returns a negative offset even when the bias would push it below zero', () => {
-    expect(offsetForIndex(0, 1, 0, 10, offsets, lengths, 500)).toBe(0);
+    expect(indexOffset(0, { viewPosition: 1 })).toBe(0);
+  });
+
+  // RN clamps the view-position part and subtracts `viewOffset` after, so a positive offset on the
+  // first cell scrolls above the content
+  it('lets viewOffset carry the result below zero', () => {
+    expect(indexOffset(0, { viewOffset: 30 })).toBe(-30);
+  });
+
+  it('interpolates a fractional index inside its cell', () => {
+    expect(indexOffset(5.5)).toBe(550);
   });
 });
 
@@ -853,8 +660,8 @@ describe('averageMeasuredLength', () => {
 });
 
 describe('highestMeasuredIndex', () => {
-  it('reports NO_INDEX with nothing measured', () => {
-    expect(highestMeasuredIndex(new Map())).toBe(NO_INDEX);
+  it('reports 0 with nothing measured, as RN does', () => {
+    expect(highestMeasuredIndex(new Map())).toBe(0);
   });
 
   // why: measurement arrives out of order (cells scroll into view non-sequentially) — the
@@ -876,7 +683,7 @@ describe('highestMeasuredIndex', () => {
 describe('computeEndReached / computeStartReached', () => {
   it('reports the remaining distance to the end and whether it clears the threshold', () => {
     // total 1000, viewport 500 at offset 400 -> distanceFromEnd = 100; threshold = 1*500 = 500.
-    expect(computeEndReached(1000, 400, 500, 1)).toEqual({
+    expect(computeEndReached(1_000, 400, 500, 1)).toEqual({
       distanceFromEnd: 100,
       withinThreshold: true,
     });
@@ -889,8 +696,7 @@ describe('computeEndReached / computeStartReached', () => {
     });
   });
 
-  // why: RN floors a sub-pixel overshoot to exactly 0 so a debounced scroll that stops a
-  // fraction of a pixel short of the true end still reads as "reached the end".
+  // RN floors a sub-pixel overshoot to 0 so a scroll stopping a hair short still reaches the end
   it('floors a sub-epsilon end distance to exactly 0', () => {
     expect(computeEndReached(500.0002, 0, 500, 1).distanceFromEnd).toBe(0);
   });
@@ -906,22 +712,18 @@ describe('computeEndReached / computeStartReached', () => {
     expect(computeStartReached(0.0002, 500, 1).distanceFromStart).toBe(0);
   });
 
-  // why: `VirtualizedList.js`'s `_maybeCallOnEdgeReached` — when the app gives NO
-  // onEndReachedThreshold/onStartReachedThreshold, the callback-firing threshold is a flat
-  // `DEFAULT_THRESHOLD_PX = 2` (pixels), never `2 * viewportLength`. That "2" is a DIFFERENT
-  // RN default (`onEndReachedThresholdOrDefault`'s `?? 2`, a multiplier used only for internal
-  // windowing) that this engine does not otherwise consume — conflating the two meant the
-  // no-threshold-given case fired `onEndReached` a full 2 screens early.
+  // Without a threshold prop RN fires at a flat 2px (`_maybeCallOnEdgeReached`)
+  // The `?? 2` of `onEndReachedThresholdOrDefault` is a windowing multiplier, a different default
   it('defaults an unset end threshold to 2px, not 2 viewport-lengths', () => {
-    expect(computeEndReached(1000, 495, 500, undefined)).toEqual({
+    expect(computeEndReached(1_000, 495, 500, undefined)).toEqual({
       distanceFromEnd: 5,
       withinThreshold: false,
     });
-    expect(computeEndReached(1000, 497, 500, undefined)).toEqual({
+    expect(computeEndReached(1_000, 497, 500, undefined)).toEqual({
       distanceFromEnd: 3,
       withinThreshold: false,
     });
-    expect(computeEndReached(1000, 498, 500, undefined)).toEqual({
+    expect(computeEndReached(1_000, 498, 500, undefined)).toEqual({
       distanceFromEnd: 2,
       withinThreshold: true,
     });
@@ -940,7 +742,7 @@ describe('computeEndReached / computeStartReached', () => {
 
   it('still treats a given threshold as a viewport-length multiple when unset is not the case', () => {
     // total 1000, viewport 500 at offset 400 -> distanceFromEnd = 100; explicit threshold 1 -> 500.
-    expect(computeEndReached(1000, 400, 500, 1).withinThreshold).toBe(true);
+    expect(computeEndReached(1_000, 400, 500, 1).withinThreshold).toBe(true);
   });
 });
 
@@ -980,7 +782,7 @@ describe('computeViewableSet', () => {
   const getItem = (_source: unknown, index: number): string => data[index];
 
   function pairsWith(
-    config: Parameters<typeof isCellViewable>[4],
+    config: IViewabilityConfig,
   ): IViewabilityConfigCallbackPair<string>[] {
     return [{ viewabilityConfig: config, onViewableItemsChanged: () => {} }];
   }

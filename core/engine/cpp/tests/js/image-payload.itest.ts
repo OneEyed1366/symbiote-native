@@ -58,19 +58,16 @@ function commit(props: Record<string, unknown>): ICommitted {
   return { payload, folds: readSurfaceTelemetry(ROOT_TAG)?.foldsFound ?? 0 };
 }
 
-// The committed `source`, as a CANONICAL string: array order preserved (native picks by scale, so
-// the order is part of the contract), object keys sorted.
-//
-// Sorting matters because a `folly::dynamic` object does not keep its authored key order, so a
-// plain `JSON.stringify` comparison asserts the host's hash order and fails on a payload that is
-// correct. The array is deliberately NOT sorted — that would hide a real reordering.
+// A canonical string of the committed `source`: array order kept (native picks by scale), object
+// keys sorted because a `folly::dynamic` object has no stable key order
 function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
   if (value === null || typeof value !== 'object') return JSON.stringify(value);
   const entries = Object.entries({ ...value }).sort(([left], [right]) =>
     left < right ? -1 : 1,
   );
-  return `{${entries.map(([key, held]) => `${key}:${canonical(held)}`).join(',')}}`;
+  const fields = entries.map(([key, held]) => key + ':' + canonical(held));
+  return `{${fields.join(',')}}`;
 }
 
 const sourceOf = (payload: Readonly<Record<string, unknown>>): string =>
@@ -163,6 +160,58 @@ describe('what an image sends native, resolved by the engine', () => {
     );
   });
 
+  // An entry of `srcSet` with no descriptor is 1x
+  it('reads a srcSet entry with no descriptor as 1x', () => {
+    const payload = commit({
+      srcSet: 'https://a/1.png, https://a/2.png 2x',
+    }).payload;
+
+    expect(sourceOf(payload)).toBe(
+      '[{headers:{},scale:1,uri:"https://a/1.png"},' +
+        '{headers:{},scale:2,uri:"https://a/2.png"}]',
+    );
+  });
+
+  // RN режет запись по одиночному пробелу и берёт второй токен, лишние токены игнорируются
+  it('reads the second space-separated token of a srcSet entry as the scale', () => {
+    const payload = commit({ srcSet: 'https://a/2.png 2x extra' }).payload;
+
+    expect(sourceOf(payload)).toBe(
+      '[{headers:{},scale:2,uri:"https://a/2.png"}]',
+    );
+  });
+
+  // Двойной пробел даёт пустой токен масштаба, он не кончается на `x`, запись пропускается
+  it('skips a srcSet entry with an empty scale token', () => {
+    const payload = commit({
+      srcSet: 'https://a/2.png  2x, https://a/3.png 3x',
+    }).payload;
+
+    expect(sourceOf(payload)).toBe(
+      '[{headers:{},scale:3,uri:"https://a/3.png"}]',
+    );
+  });
+
+  // Пустая строка это одна запись с пустым uri и масштабом 1x, как `''.split(', ')` в RN
+  it('keeps the empty entry of an empty srcSet', () => {
+    const payload = commit({ srcSet: '' }).payload;
+
+    expect(sourceOf(payload)).toBe('[{headers:{},scale:1,uri:""}]');
+  });
+
+  // `width` and `height` ride on every `srcSet` source, not only on the `src` shape
+  it('carries width and height onto the srcSet sources', () => {
+    const payload = commit({
+      srcSet: 'https://a/2x.png 2x',
+      width: 40,
+      height: 20,
+    }).payload;
+
+    expect(sourceOf(payload)).toBe(
+      '[{headers:{},height:20,scale:2,uri:"https://a/2x.png",width:40}]',
+    );
+  });
+
   // why: ImageSourceUtils.js:40-46 — the two W3C aliases are HTTP headers, not props. Without them
   // a credentialed image 401s and the failure looks like a broken URL.
   it('turns the W3C aliases into request headers', () => {
@@ -243,10 +292,7 @@ describe('what an image sends native, resolved by the engine', () => {
     expect(payload.accessible).toBe(undefined);
   });
 
-  // why: `Image.ios.js`/`Image.android.js`'s real formula is `accessible = ariaHidden !== true &&
-  // (alt !== undefined ? true : props.accessible)` — an explicit `aria-hidden` overrides `alt`'s
-  // own accessible-true, not the other way round. An app pairing `alt` (for other consumers) with
-  // `aria-hidden` to deliberately exclude the image must still get an inaccessible image.
+  // `aria-hidden` beats the accessible-true that `alt` forces, not the other way round
   it('lets aria-hidden override the accessible-true that alt would otherwise force', () => {
     const payload = commit({
       src: 'https://a/1.png',
@@ -269,25 +315,29 @@ describe('what an image sends native, resolved by the engine', () => {
     expect(payload.tintColor).toBe(0xff_ff_00_00);
   });
 
-  // [characterization — behavior not confirmed]
-  //
-  // QUESTION: the PROP should win over the style key — `mapImageProps` spells it
-  // `view.resizeMode ?? readStyleString(view.style, 'resizeMode')`, and RN's own `??` says the same.
-  // It does not, and the fold is not why: `fabricProps` writes the top-level keys and THEN hoists
-  // the style over them (`addStyle` runs last), so a style `resizeMode` always lands second and
-  // wins. The `??` in the fold is dead for exactly the two keys that can appear in both places.
-  //
-  // Pre-existing, and it survives the port unchanged because the hoist order is the payload
-  // builder's rather than the rule's. Recorded here rather than fixed in the same commit: a port is
-  // a MOVE, and the fix belongs with its own before and after.
-  it('lets a style resizeMode beat the prop, which is backwards', () => {
+  // `Image.ios.js:141`: объект из `objectFit`, затем prop, затем ключ стиля, затем `cover`
+  it('lets the resizeMode prop beat the style key', () => {
     const payload = commit({
       src: 'https://a/1.png',
       resizeMode: 'cover',
       style: { resizeMode: 'contain' },
     }).payload;
 
-    expect(payload.resizeMode).toBe('contain');
+    expect(payload.resizeMode).toBe('cover');
+  });
+
+  it('defaults resizeMode to cover', () => {
+    expect(commit({ src: 'https://a/1.png' }).payload.resizeMode).toBe('cover');
+  });
+
+  it('maps objectFit onto resizeMode ahead of the prop and the style key', () => {
+    const payload = commit({
+      src: 'https://a/1.png',
+      resizeMode: 'center',
+      style: { objectFit: 'fill', resizeMode: 'contain' },
+    }).payload;
+
+    expect(payload.resizeMode).toBe('stretch');
   });
 
   // why: Android's loading indicator is a bare uri STRING under a different name, not the array
@@ -302,12 +352,8 @@ describe('what an image sends native, resolved by the engine', () => {
     expect(payload.loadingIndicatorSource).toBe(undefined);
   });
 
-  // why: ImageViewNativeComponent.js:138 — `defaultSource: { process: resolveAssetSource }`, the
-  // SINGULAR resolver, unlike `source` (which the JS component itself normalizes to an array before
-  // any prop reaches native — the ViewConfig declares it bare `true`). The engine's own resolver
-  // wraps every source-shaped prop into an array uniformly (`image-source-write.ts`, "one shape to
-  // reason about"), so `defaultSource` needs the SAME downstream unwrap `loadingIndicatorSource`
-  // already gets, or a native view manager expecting a map receives an array and paints nothing.
+  // Native reads `defaultSource` as a bare map, the engine wraps every source in an array
+  // So it gets the same unwrap as `loadingIndicatorSource`
   it('unwraps defaultSource to the bare object native expects', () => {
     const payload = commit({
       src: 'https://a/1.png',
@@ -357,6 +403,51 @@ describe('what an image sends native, resolved by the engine', () => {
     expect(payload.alt).toBe('a logo');
     expect(payload.source).toBe(undefined);
     expect(payload.accessibilityLabel).toBe(undefined);
+  });
+});
+
+// Image's render hands native its own subset of the aria aliases (`Image.ios.js:134-160`)
+describe('the aria aliases an image reads', () => {
+  const source = 'https://a/1.png';
+
+  it('drops the aliases Image never reads', () => {
+    const payload = commit({
+      src: source,
+      role: 'img',
+      'aria-live': 'polite',
+      'aria-modal': true,
+      'aria-valuenow': 3,
+    }).payload;
+
+    expect(payload.accessibilityRole).toBe(undefined);
+    expect(payload.accessibilityLiveRegion).toBe(undefined);
+    expect(payload.accessibilityViewIsModal).toBe(undefined);
+    expect(payload.accessibilityValue).toBe(undefined);
+  });
+
+  it('hides a non-alt image from accessibility with aria-hidden', () => {
+    const payload = commit({
+      src: source,
+      accessible: true,
+      'aria-hidden': true,
+    }).payload;
+
+    expect(payload.accessible).toBe(false);
+  });
+
+  it('still maps aria-label and the state aliases', () => {
+    const payload = commit({
+      src: source,
+      'aria-label': 'x',
+      'aria-busy': true,
+    }).payload;
+
+    expect(payload.accessibilityLabel).toBe('x');
+    expect(
+      typeof payload.accessibilityState === 'object'
+        ? Reflect.get({ ...payload.accessibilityState }, 'busy')
+        : undefined,
+    ).toBe(true);
   });
 });
 

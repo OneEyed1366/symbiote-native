@@ -8,15 +8,15 @@
 
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 
-interface IDeviceHub {
+type IDeviceHub = {
   emit: (eventType: string, ...args: unknown[]) => void;
-}
-interface IWindowMetrics {
+};
+type IWindowMetrics = {
   width: number;
   height: number;
   scale: number;
   fontScale: number;
-}
+};
 
 const WINDOW: IWindowMetrics = {
   width: 400,
@@ -77,9 +77,13 @@ describe('PixelRatio', () => {
       expect(PixelRatio.getFontScale()).toBe(2);
     });
 
-    // why: RN's documented fallback -- a 0/absent fontScale (no accessibility
-    // text-size preference reported) must fall back to the pixel scale, not
-    // surface as 0 (which would collapse all font sizes to zero downstream).
+    // Без `fontScale` в payload RN отдает `scale`
+    it('falls back to the pixel scale when the payload has no fontScale', () => {
+      Dimensions.set(JSON.parse('{"windowPhysicalPixels":{"scale":2}}'));
+      expect(PixelRatio.getFontScale()).toBe(2);
+    });
+
+    // Нулевой `fontScale` не должен схлопнуть шрифты в ноль
     it('falls back to the pixel scale when fontScale is 0', async () => {
       const fakeDeviceInfo = {
         getConstants: (): { Dimensions: { window: IWindowMetrics } } => ({

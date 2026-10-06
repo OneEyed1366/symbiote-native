@@ -7,7 +7,7 @@
 import type { ISymbioteNode } from '@symbiote-native/engine';
 import type { IScrollViewHandle } from '../scroll-view-commands';
 
-export interface IScrollRoutingHandle {
+export type IScrollRoutingHandle = {
   flashScrollIndicators(): void;
   // These three route to the same underlying handle today (SymbioteNative has no
   // findNodeHandle/legacy-component-instance distinction), but they are NOT redundant:
@@ -22,5 +22,10 @@ export interface IScrollRoutingHandle {
   getScrollableNode(): IScrollViewHandle | null;
   getScrollResponder(): IScrollViewHandle | null;
   getScrollNode(): ISymbioteNode | null;
+  // The node the list scrolls by, or the host view of a nested list: both answer `scrollTo` and
+  // `measure*`, as RN's `getScrollRef()` answers a ScrollView or a View
+  getScrollRef(): ISymbioteNode | null;
   recordInteraction(): void;
-}
+  // RN forwards it to the scroll view, so a list writes the props straight onto the scroll node
+  setNativeProps(props: Record<string, unknown>): void;
+};

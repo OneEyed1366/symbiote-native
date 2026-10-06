@@ -48,6 +48,8 @@ export type {
 // an app's `imports: [SafeAreaView]` becomes `imports: [SafeAreaViewElement]`. Only the prop type
 // stays.
 export type { IAngularSafeAreaViewProps } from './components/safe-area-view-props';
+export type { IAngularLayoutConformanceProps } from './components/layout-conformance-props';
+export type { ILayoutConformanceMode } from '@symbiote-native/components';
 // `Switch` is a TAG — `<switch>`, matched by `SwitchElement` — and there is nothing to import in
 // its place. RN gives it no statics, so the name exports nothing at all now; `[(value)]` is handled
 // by the renderer and `[(ngModel)]` by `SwitchValueAccessor` (`../elements`), which is where the
@@ -125,12 +127,16 @@ export type {
 export type { IButtonProps } from './components/button-props';
 export {
   VirtualizedList,
+  VListCellDirective,
   VListEmptyDirective,
   VListFooterDirective,
   VListHeaderDirective,
   VListItemDirective,
+  VListOutletDirective,
   VListSeparatorDirective,
 } from './components/virtualized-list';
+export { injectVirtualizedListScope } from './components/virtualized-list/nested-scope';
+export type { IListScope } from '@symbiote-native/components';
 export type {
   ICellLayout,
   ISeparatorProps,
@@ -141,6 +147,7 @@ export type {
   IViewToken,
   IVirtualizedListHandle,
   IVirtualizedListProps,
+  IVListCellContext,
   IVListItemContext,
   IVListSeparatorContext,
 } from './components/virtualized-list';
@@ -159,6 +166,7 @@ export type {
   IVirtualizedSectionListProps,
   IVSectionContext,
   IVSectionItemContext,
+  IVSectionSeparatorContext,
 } from './components/virtualized-section-list';
 export { SectionList } from './components/section-list';
 export type {

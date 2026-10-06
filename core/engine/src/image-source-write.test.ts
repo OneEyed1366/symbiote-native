@@ -1,11 +1,40 @@
 // resolveImageSourceProp's Android `source` rule: RN lifts headers only from an array source, so
 // a single `{uri, headers}` object sends none — only visible once the write wraps it in an array.
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { resolveImageSourceProp } from './image-source-write';
+import {
+  resolveImageSourceProp,
+  warnOnEmptyImageUri,
+} from './image-source-write';
 
 const HEADERS = { Authorization: 'Bearer t' };
+const EMPTY_URI_WARNING = 'source.uri should not be an empty string';
+
+describe('warnOnEmptyImageUri', () => {
+  // RN предупреждает на каждой записи единственного `source`, `Image.ios.js:131`
+  it('warns about an empty uri of a single source', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      warnOnEmptyImageUri('source', { uri: '' });
+      expect(warn).toHaveBeenCalledWith(EMPTY_URI_WARNING);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('stays quiet for a real uri, an array source and a placeholder prop', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      warnOnEmptyImageUri('source', { uri: 'https://a/1.png' });
+      warnOnEmptyImageUri('source', [{ uri: '' }]);
+      warnOnEmptyImageUri('defaultSource', { uri: '' });
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+});
 
 describe('resolveImageSourceProp — Android single-object source', () => {
   // why: RN Android drops a single object source's headers (Image.android.js lifts only arrays).

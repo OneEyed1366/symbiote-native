@@ -17,10 +17,12 @@ import { registerButtonBehavior } from './behaviors/button';
 import { registerImageBackgroundBehavior } from './behaviors/image-background';
 import { registerImageBehavior } from './behaviors/image';
 import { registerInputAccessoryViewBehavior } from './behaviors/input-accessory-view';
+import { registerLayoutConformanceBehavior } from './behaviors/layout-conformance';
 import { registerPressableBehavior } from './behaviors/pressable';
 import { registerRefreshControlBehavior } from './behaviors/refresh-control';
 import { registerScrollViewBehavior } from './behaviors/scroll-view';
 import { registerSwitchBehavior } from './behaviors/switch';
+import { registerTextBehavior } from './behaviors/text';
 import { registerTextInputBehavior } from './behaviors/text-input';
 import { registerTouchableHighlightBehavior } from './behaviors/touchable-highlight';
 import { registerTouchableNativeFeedbackBehavior } from './behaviors/touchable-native-feedback';
@@ -41,6 +43,8 @@ registerButtonBehavior();
 // (ActivityIndicator.js:112), so the tag is that View and `buildStructure` builds the spinner.
 registerActivityIndicatorBehavior();
 
+// Text takes the press machine only once it has a press listener (`Text.js` `isPressable`)
+registerTextBehavior();
 registerTextInputBehavior();
 registerSwitchBehavior();
 registerRefreshControlBehavior();
@@ -48,6 +52,7 @@ registerRefreshControlBehavior();
 registerImageBehavior();
 registerInputAccessoryViewBehavior();
 registerImageBackgroundBehavior();
+registerLayoutConformanceBehavior();
 
 // The ENGINE is the single owner of a ScrollView's content node: `buildStructure` builds the
 // `RCTScrollContentView`, `slotProps` carries `contentContainerStyle` onto it, the claim on a

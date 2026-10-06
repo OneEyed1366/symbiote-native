@@ -64,10 +64,15 @@ export { descriptorToSolid } from './descriptor-to-solid';
 
 // Safe in the barrel (unlike ./bootstrap, which imports react-native): the registry seam itself
 // only reaches the engine and solid-js.
-export { AppRegistry, setHostRegistrar } from './modules/app-registry';
+export {
+  AppRegistry,
+  HeadlessJsTaskError,
+  setHostRegistrar,
+} from './modules/app-registry';
 export type {
   IComponentProvider,
   IWrapperComponentProvider,
+  IAppConfig,
   IAppParameters,
   IRunnable,
   IHostRegistrar,
@@ -110,6 +115,11 @@ export type { ITunnel, ITunnelInProps } from './create-tunnel';
 // the subscription logic; these add only the Solid lifecycle (signal + onCleanup).
 export { createColorScheme } from './primitives/create-color-scheme';
 export { createWindowDimensions } from './primitives/create-window-dimensions';
+export {
+  createAnimatedColor,
+  createAnimatedValue,
+  createAnimatedValueXY,
+} from '@symbiote-native/engine';
 export { createPermissionHook } from './primitives/create-permission-hook';
 export { createResourceHook } from './primitives/create-resource-hook';
 export { createEventValueHook } from './primitives/create-event-value-hook';
@@ -179,6 +189,7 @@ export {
   AppState,
   Keyboard,
   KEYBOARD_EVENT,
+  TextInputState,
   BackHandler,
   PermissionsAndroid,
   PERMISSIONS,
@@ -278,3 +289,41 @@ export {
   Suspense,
   SuspenseList,
 } from 'solid-js';
+
+// The device event bus and the easing curves, shared verbatim from the engine
+export {
+  DeviceEventEmitter,
+  Easing,
+  NativeAppEventEmitter,
+  NativeEventEmitter,
+} from '@symbiote-native/engine';
+export type {
+  IEasing,
+  IEasingFunction,
+  IEventEmitterModule,
+  IEventSubscription,
+  INativeEventListener,
+} from '@symbiote-native/engine';
+
+// RN's dev and native-module utilities, shared verbatim from the engine. The ones RN owns forward
+// to its own module, which `registerApp` hands over
+export {
+  codegenNativeCommands,
+  codegenNativeComponent,
+  DevMenu,
+  DevSettings,
+  LogBox,
+  NativeComponentRegistry,
+  NativeModules,
+  Networking,
+  PushNotificationIOS,
+  ReactNativeVersion,
+  registerCallableModule,
+  requireNativeComponent,
+  Systrace,
+  Touchable,
+  TurboModuleRegistry,
+  UIManager,
+  UTFSequence,
+} from '@symbiote-native/engine';
+export type { IDevSettings } from '@symbiote-native/engine';

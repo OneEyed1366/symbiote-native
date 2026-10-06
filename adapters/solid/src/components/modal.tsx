@@ -45,6 +45,7 @@ import {
   renderModal,
   resolveAccessibilityProps,
   shouldRenderModal,
+  warnAboutModalProps,
   type IAccessibilityProps,
   type IAriaProps,
   type IDescriptor,
@@ -62,6 +63,7 @@ import {
   type IViewStyle,
 } from '@symbiote-native/engine';
 import { withStableKeys } from '../utils/stable-keys';
+import { VirtualizedListScopeResetter } from './virtualized-list/nested-scope';
 
 export type {
   IModalAnimationType,
@@ -76,36 +78,37 @@ export type {
 // (IAccessibilityProps / IAriaProps, IStyleProp, ISymbioteEvent, and the four IModal* detail types
 // re-exported verbatim above) is shared, the framework-flavoured field is per-adapter. React's,
 // Vue's and Svelte's IModalProps are separate declarations for the same reason.
-export interface IModalProps extends IAccessibilityProps, IAriaProps {
-  visible?: boolean;
-  transparent?: boolean;
-  backdropColor?: string;
-  animationType?: IModalAnimationType;
-  presentationStyle?: IModalPresentationStyle;
-  supportedOrientations?: ReadonlyArray<IModalOrientation>;
-  hardwareAccelerated?: boolean;
-  // navigationBarTranslucent makes the Android nav bar translucent; RN requires
-  // statusBarTranslucent true alongside it (Modal.js ~172 / confirmProps ~193).
-  statusBarTranslucent?: boolean;
-  navigationBarTranslucent?: boolean;
-  // allowSwipeDismissal lets a swipe-down dismiss the modal on iOS; RN pairs it with
-  // onRequestClose to handle the dismissal (Modal.js ~155).
-  allowSwipeDismissal?: boolean;
-  // Real ViewConfig DirectEvents — they ride `passthrough` onto the host node raw, not through any
-  // JS synthesis, so routeProp attaches them from the ModalHostView ViewConfig.
-  onShow?: () => void;
-  onDismiss?: () => void;
-  onRequestClose?: () => void;
-  // The engine hands every listener the ISymbioteEvent wrapper, so the orientation is read at
-  // event.nativeEvent.orientation (IModalOrientationChangeEvent describes that payload).
-  onOrientationChange?: (event: ISymbioteEvent) => void;
-  style?: IStyleProp<IViewStyle>;
-  // Like `style`, targets the CONTAINER View renderModal wraps the children in, not the outer
-  // modal host — the same split React's className and Vue's/Svelte's class apply. Solid's
-  // spelling is `class`, matching View, Text, Pressable and Switch.
-  class?: IClassNameValue;
-  children?: JSX.Element;
-}
+export type IModalProps = IAccessibilityProps &
+  IAriaProps & {
+    visible?: boolean;
+    transparent?: boolean;
+    backdropColor?: string;
+    animationType?: IModalAnimationType;
+    presentationStyle?: IModalPresentationStyle;
+    supportedOrientations?: ReadonlyArray<IModalOrientation>;
+    hardwareAccelerated?: boolean;
+    // navigationBarTranslucent makes the Android nav bar translucent; RN requires
+    // statusBarTranslucent true alongside it (Modal.js ~172 / confirmProps ~193).
+    statusBarTranslucent?: boolean;
+    navigationBarTranslucent?: boolean;
+    // allowSwipeDismissal lets a swipe-down dismiss the modal on iOS; RN pairs it with
+    // onRequestClose to handle the dismissal (Modal.js ~155).
+    allowSwipeDismissal?: boolean;
+    // Real ViewConfig DirectEvents — they ride `passthrough` onto the host node raw, not through any
+    // JS synthesis, so routeProp attaches them from the ModalHostView ViewConfig.
+    onShow?: () => void;
+    onDismiss?: () => void;
+    onRequestClose?: () => void;
+    // The engine hands every listener the ISymbioteEvent wrapper, so the orientation is read at
+    // event.nativeEvent.orientation (IModalOrientationChangeEvent describes that payload).
+    onOrientationChange?: (event: ISymbioteEvent) => void;
+    style?: IStyleProp<IViewStyle>;
+    // Like `style`, targets the CONTAINER View renderModal wraps the children in, not the outer
+    // modal host — the same split React's className and Vue's/Svelte's class apply. Solid's
+    // spelling is `class`, matching View, Text, Pressable and Switch.
+    class?: IClassNameValue;
+    children?: JSX.Element;
+  };
 
 // Read by Modal itself; everything else (the four DirectEvents, testID/nativeID, every
 // accessibility* and aria-* field) forwards onto the host node through `passthrough`, exactly as
@@ -130,6 +133,8 @@ const HANDLED_PROPS = [
 const shape = createDescriptorShapeGuard('Modal');
 
 export function Modal(props: IModalProps): JSX.Element {
+  // RN checks on mount and on every update, a dev build only
+  createEffect(() => warnAboutModalProps(props));
   const [local, rest] = splitProps(props, HANDLED_PROPS);
 
   const isVisible = (): boolean => isModalVisible(local.visible);
@@ -162,11 +167,7 @@ export function Modal(props: IModalProps): JSX.Element {
     if (!shouldRender()) dlog('Modal hidden -> no node committed');
   });
 
-  // A plain accessor rather than a createMemo, unlike descriptor-to-solid.ts. A memo runs EAGERLY
-  // at creation, which would paint a descriptor (and emit renderModal's "committing" dlog) for a
-  // modal that is hidden and commits nothing. Read from inside the two `spread` render effects
-  // instead, it never runs at all while `Show` is closed; the cost is that a change recomputes this
-  // pure object literal twice, once per bag.
+  // An accessor, not a memo: a memo runs eagerly and would build a descriptor for a hidden modal
   const descriptor = (): IDescriptor =>
     renderModal({
       visible: local.visible,
@@ -195,10 +196,7 @@ export function Modal(props: IModalProps): JSX.Element {
     return shape.asElement(first);
   };
 
-  // withStableKeys on both bags because `passthrough` goes through resolveAccessibilityProps, whose
-  // two branches emit DIFFERENT key sets — and Solid's `spread` walks only the CURRENT keys with no
-  // removal pass, so a vanished key would keep its last value on the native view forever
-  // (.claude/rules/solid-descriptor-bridge.md §1).
+  // `resolveAccessibilityProps` emits different key sets per branch and `spread` never removes one
   const hostBag = withStableKeys(() => descriptor().props);
   const containerBag = withStableKeys(() => ({
     ...container().props,
@@ -208,7 +206,11 @@ export function Modal(props: IModalProps): JSX.Element {
   return (
     <Show when={shouldRender()}>
       <modal {...hostBag()}>
-        <view {...containerBag()}>{local.children}</view>
+        <view {...containerBag()}>
+          <VirtualizedListScopeResetter>
+            {local.children}
+          </VirtualizedListScopeResetter>
+        </view>
       </modal>
     </Show>
   );

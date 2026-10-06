@@ -37,6 +37,7 @@ export {
   isSymbioteNode,
   isSymbioteEvent,
   RAW_TEXT_COMPONENT,
+  TEXT_COMPONENT,
   debugNodeId,
   takePropKeyTally,
 } from './node';
@@ -117,6 +118,8 @@ export {
   disposeRoot,
   requestCommitFor,
 } from './imperative';
+export { setScrollResponderImpl } from './scroll-responder';
+export type { IScrollResponderImpl, IZoomRect } from './scroll-responder';
 export type { IDomRect } from './tree-host';
 // The tree host: the seam a runtime installs to answer about the tree JS does not hold. `setTreeHost`
 // is what `installFabric()` (@symbiote-native/test-utils) calls with the TypeScript applier.
@@ -224,6 +227,7 @@ export type {
   IScopableClassValue,
 } from './style-registry/scope';
 export { Platform } from './platform';
+export { isDevBuild } from './platform/shared';
 export type {
   IPlatformStatic,
   IPlatformOSType,
@@ -235,12 +239,45 @@ export type {
 export type { IPlatformConstantsIOS } from './platform/index.ios';
 export type { IPlatformConstantsAndroid } from './platform/index.android';
 export { dlog, isDebug } from './debug';
+export { Systrace } from './systrace';
+export { ReactNativeVersion } from './react-native-version';
+export { UTFSequence } from './utf-sequence';
+export {
+  codegenNativeCommands,
+  codegenNativeComponent,
+  DevMenu,
+  loadPressability,
+  LogBox,
+  NativeComponentRegistry,
+  NativeModules,
+  Networking,
+  PushNotificationIOS,
+  registerCallableModule,
+  requireNativeComponent,
+  setPressabilityLoader,
+  setReactNativeHost,
+  Touchable,
+  UIManager,
+} from './react-native-host';
+export type {
+  IPressability,
+  IPressabilityClass,
+  IPressabilityHandlers,
+} from './react-native-host';
+export { DevSettings } from './dev-settings';
+export type { IDevSettings } from './dev-settings';
 export { reportUncaughtError } from './report-error';
 export type { IUncaughtErrorInfo } from './report-error';
 
-export { getNativeModule, getEnforcingNativeModule } from './native-modules';
 export {
+  getNativeModule,
+  getEnforcingNativeModule,
+  TurboModuleRegistry,
+} from './native-modules';
+export {
+  DeviceEventEmitter,
   installDeviceEventHub,
+  NativeAppEventEmitter,
   NativeEventEmitter,
   setDeviceEventSource,
 } from './native-events';
@@ -300,6 +337,10 @@ export {
   AnimatedStyle,
   AnimatedTransform,
   AnimatedMock,
+  AnimatedDrivers,
+  createAnimatedColor,
+  createAnimatedValue,
+  createAnimatedValueXY,
   reduceProps,
   isAnimatedNode,
   readPassthroughStyle,
@@ -307,6 +348,7 @@ export {
 } from './animated';
 export type {
   IAnimatedLeafLifecycle,
+  IAnimatedValueConfig,
   IValueXY,
   IRgbaValue,
   IColorInput,
@@ -326,6 +368,12 @@ export type {
   ITimingConfig,
   ISpringConfig,
   IDecayConfig,
+  IVectorTimingConfig,
+  IVectorSpringConfig,
+  IVectorDecayConfig,
+  IVectorNumbers,
+  IVectorTarget,
+  IVectorValue,
   IParallelConfig,
   ILoopAnimationConfig,
   INativeNodeConfig,
@@ -419,8 +467,9 @@ export type { IAppStateStatus, IAppStateEvent } from './app-state';
 // AppRegistry core: registry bookkeeping + host-registrar bridge + headless tasks, shared by
 // every adapter. Each adapter calls createAppRegistry with its own runnableFor (the one
 // framework-specific seam — how to build a runnable from a component provider).
-export { createAppRegistry } from './app-registry';
+export { createAppRegistry, HeadlessJsTaskError } from './app-registry';
 export type {
+  IAppConfig,
   IAppRegistry,
   ICreateAppRegistryResult,
   IAppParameters,
@@ -444,6 +493,7 @@ export {
   setInputBlurred,
   blurTextInput,
   focusTextInput,
+  TextInputState,
 } from './text-input-state';
 export { LayoutAnimation } from './layout-animation';
 export type {
@@ -484,14 +534,12 @@ export type {
 // StatusBar: values from the platform-selected './status-bar', types from '-shared' (the
 // .ios re-export would otherwise duplicate-export the type symbols).
 export {
-  applyStatusBarProps,
+  createStatusBarEntry,
   statusBarImperative,
   statusBarCurrentHeight,
 } from './status-bar';
 export {
-  hideTransition,
   STATUS_BAR_MANAGER,
-  ANIMATED_HIDE_TRANSITION,
   STATIC_HIDE_TRANSITION,
 } from './status-bar/shared';
 export type {
@@ -499,9 +547,12 @@ export type {
   IStatusBarStyle,
   IStatusBarAnimation,
   IStatusBarImperative,
+  IStatusBarEntryHandle,
+  IStatusBarStackEntry,
 } from './status-bar/shared';
 export {
   registerHostBehavior,
+  registerLazyHostBehavior,
   hasHostBehaviors,
   hostBehaviorFor,
   clearHostBehaviors,

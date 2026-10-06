@@ -32,16 +32,16 @@ const FIRST_WATCH_ID = 0;
 // The iOS SettingsManager native module: constants carry the seeded snapshot,
 // setValues persists, deleteValues removes. It also drives the device event, so it
 // participates in the addListener/removeListeners observe-counter protocol.
-interface INativeSettingsManager extends IEventEmitterModule {
+type INativeSettingsManager = IEventEmitterModule & {
   getConstants(): { settings: Record<string, unknown> };
   setValues(values: Record<string, unknown>): void;
   deleteValues(keys: string[]): void;
-}
+};
 
-interface ISubscription {
+type ISubscription = {
   keys: string[];
   callback: (() => void) | null;
-}
+};
 
 // Lazily resolved so importing this module has no native side effect. `null` when
 // the module isn't linked (headless): the snapshot then starts empty and `set`
@@ -125,13 +125,15 @@ class SettingsImpl {
   // keys that changed. Without a native module (headless) only JS state updates.
   set(settings: Record<string, unknown>): void {
     subscribeToNative();
+    // Снимок обновляется до нативной записи, а native не шлёт `settingsUpdated` на `setValues`,
+    // поэтому watchers молчат на собственный `set`, как в RN
+    Object.assign(getSnapshot(), settings);
     const module = getModule();
     if (module === null) {
-      dlog('Settings.set -> no module (JS snapshot + watchers only)');
+      dlog('Settings.set -> no module (JS snapshot only)');
     } else {
       module.setValues(settings);
     }
-    applyChanges(settings);
   }
 
   // Register a watcher for one or more keys. Returns a numeric watchId (the registry
@@ -139,6 +141,9 @@ class SettingsImpl {
   watchKeys(keys: string | string[], callback: () => void): number {
     subscribeToNative();
     const watched = typeof keys === 'string' ? [keys] : keys;
+    if (!Array.isArray(watched)) {
+      throw new Error('keys should be a string or array of strings');
+    }
     const watchId = subscriptions.length + FIRST_WATCH_ID;
     subscriptions.push({ keys: watched, callback });
     return watchId;

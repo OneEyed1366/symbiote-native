@@ -61,7 +61,7 @@ type IStateCallback = (enabled: boolean) => void;
 // and the recommended-timeout query. Optional methods guard older hosts. No error callback
 // and no setAccessibilityFocus: focus is a 'focus' accessibility event routed through the
 // Fabric slot (see sendAccessibilityEvent below).
-interface INativeAccessibilityInfoAndroid extends IEventEmitterModule {
+type INativeAccessibilityInfoAndroid = IEventEmitterModule & {
   isTouchExplorationEnabled(onSuccess: IStateCallback): void;
   isReduceMotionEnabled(onSuccess: IStateCallback): void;
   isInvertColorsEnabled?(onSuccess: IStateCallback): void;
@@ -75,7 +75,7 @@ interface INativeAccessibilityInfoAndroid extends IEventEmitterModule {
   ): void;
   addListener(eventType: string): void;
   removeListeners(count: number): void;
-}
+};
 
 // Lazily resolved so importing this module has no native side effect. `null` when
 // unlinked. The lazy-resolve + lazy-emitter shape lives in `createDeviceEventModule`
@@ -95,22 +95,21 @@ function getEmitter() {
 }
 
 const MODULE_UNAVAILABLE = 'NativeAccessibilityInfoAndroid is not available';
+const REDUCE_MOTION_UNAVAILABLE =
+  'AccessibilityInfo native module is not available';
 
-// Run a single-callback Android getter as a Promise, REJECTING when it cannot run, as RN does
-// (AccessibilityInfo.js): a required getter names the module, an optional one names itself.
+// Отклоняем, если геттер не запустить, как RN: по умолчанию ошибка называет метод,
+// обязательные геттеры передают свой текст
 function queryState(
   pick: (
     module: INativeAccessibilityInfoAndroid,
   ) => ((s: IStateCallback) => void) | undefined,
   label: string,
-  isOptional = false,
+  message = `NativeAccessibilityInfoAndroid.${label} is not available`,
 ): Promise<boolean> {
   const module = getModule();
   const getter = module === null ? undefined : pick(module);
   if (module === null || getter === undefined) {
-    const message = isOptional
-      ? `NativeAccessibilityInfoAndroid.${label} is not available`
-      : MODULE_UNAVAILABLE;
     dlog(`AccessibilityInfo(android).${label} -> rejected: ${message}`);
     return Promise.reject(new Error(message));
   }
@@ -125,11 +124,16 @@ class AccessibilityInfoAndroid implements IAccessibilityInfoStatic {
     return queryState(
       m => m.isTouchExplorationEnabled,
       'isScreenReaderEnabled',
+      MODULE_UNAVAILABLE,
     );
   }
 
   isReduceMotionEnabled(): Promise<boolean> {
-    return queryState(m => m.isReduceMotionEnabled, 'isReduceMotionEnabled');
+    return queryState(
+      m => m.isReduceMotionEnabled,
+      'isReduceMotionEnabled',
+      REDUCE_MOTION_UNAVAILABLE,
+    );
   }
 
   // iOS-only query; Android has no bold-text setting, so resolve false (RN parity).
@@ -138,15 +142,11 @@ class AccessibilityInfoAndroid implements IAccessibilityInfoStatic {
   }
 
   isGrayscaleEnabled(): Promise<boolean> {
-    return queryState(m => m.isGrayscaleEnabled, 'isGrayscaleEnabled', true);
+    return queryState(m => m.isGrayscaleEnabled, 'isGrayscaleEnabled');
   }
 
   isInvertColorsEnabled(): Promise<boolean> {
-    return queryState(
-      m => m.isInvertColorsEnabled,
-      'isInvertColorsEnabled',
-      true,
-    );
+    return queryState(m => m.isInvertColorsEnabled, 'isInvertColorsEnabled');
   }
 
   // iOS-only query; resolve false (RN parity).
@@ -158,7 +158,6 @@ class AccessibilityInfoAndroid implements IAccessibilityInfoStatic {
     return queryState(
       m => m.isHighTextContrastEnabled,
       'isHighTextContrastEnabled',
-      true,
     );
   }
 
@@ -176,7 +175,6 @@ class AccessibilityInfoAndroid implements IAccessibilityInfoStatic {
     return queryState(
       m => m.isAccessibilityServiceEnabled,
       'isAccessibilityServiceEnabled',
-      true,
     );
   }
 

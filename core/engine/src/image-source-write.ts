@@ -6,6 +6,7 @@
 // `loadingIndicatorSource` Android's spinner.
 
 import { resolveImageSource } from './image-source-resolver';
+import { Platform } from './platform';
 
 export const IMAGE_SOURCE_PROPS: ReadonlySet<string> = new Set([
   'source',
@@ -27,19 +28,62 @@ export function resolveImageSourceProp(
   if (typeof value !== 'number' && typeof value !== 'object') return value;
   const resolved = resolveImageSource(value);
   if (Array.isArray(resolved)) return resolved;
-  // Android `source` only: `Image.android.js` lifts headers to the native `headers` prop just for an
-  // ARRAY source, and ReactImageView ignores per-source headers, so RN sends none for a single
-  // object. Wrapping here erases that shape, so its headers go here too.
-  if (
-    dropsSingleSourceHeaders &&
-    typeof resolved === 'object' &&
-    resolved !== null &&
-    'headers' in resolved
-  ) {
+  // Android `source`: RN lifts headers only from an ARRAY source, so a single object sends none
+  // Wrapping erases that shape, hence the headers go here too
+  const hasSourceHeaders =
+    typeof resolved === 'object' && resolved !== null && 'headers' in resolved;
+  if (dropsSingleSourceHeaders && hasSourceHeaders) {
     const { headers: _dropped, ...rest } = resolved;
     return [rest];
   }
   return [resolved];
+}
+
+// Пустой `uri` единственного `source`: RN предупреждает на обеих платформах, `Image.ios.js:131`
+export function warnOnEmptyImageUri(key: string, value: unknown): void {
+  const isSingleSource =
+    typeof value === 'object' && value !== null && !Array.isArray(value);
+  if (key !== 'source' || !isSingleSource) return;
+  if (Reflect.get(value, 'uri') === '') {
+    console.warn('source.uri should not be an empty string');
+  }
+}
+
+const ANDROID_OS = 'android';
+
+const PLACEHOLDER_PARTNER: Readonly<Record<string, string>> = {
+  defaultSource: 'loadingIndicatorSource',
+  loadingIndicatorSource: 'defaultSource',
+};
+
+// Какие из двух заглушек заданы у узла, т.к. чтение из хоста стоило бы flush на каждую запись
+const placeholdersOf = new WeakMap<object, Set<string>>();
+
+// `Image.android.js:191` бросает, когда заданы заглушка и спиннер сразу, и не только в dev
+export function assertSinglePlaceholder(
+  node: object,
+  key: string,
+  value: unknown,
+): void {
+  const partner = PLACEHOLDER_PARTNER[key];
+  if (partner === undefined) return;
+  if (Platform.OS !== ANDROID_OS) return;
+  let set = placeholdersOf.get(node);
+  if (value == null) {
+    set?.delete(key);
+    return;
+  }
+  if (set?.has(partner) === true) {
+    throw new Error(
+      'The <Image> component cannot have defaultSource and loadingIndicatorSource at the same time. ' +
+        'Please use either defaultSource or loadingIndicatorSource.',
+    );
+  }
+  if (set === undefined) {
+    set = new Set();
+    placeholdersOf.set(node, set);
+  }
+  set.add(key);
 }
 
 // Android's ReactImageView.setShouldNotifyLoadEvents gates on this prop: none of these four ever

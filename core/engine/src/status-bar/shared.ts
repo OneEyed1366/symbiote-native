@@ -1,57 +1,78 @@
-// StatusBar: shared contract. The component renders NO Fabric view; it imperatively
-// drives a status-bar native module. What DIVERGES by platform is the native module's
-// method shape: iOS's StatusBarManager takes `setStyle(style, animated)` /
-// `setHidden(hidden, withAnimation)`, while Android's takes single-arg `setStyle(style)` /
-// `setHidden(hidden)` plus `setColor` / `setTranslucent`, and driving those Android window
-// flags from our bridgeless surface blanks it (a window-insets relayout detaches the Fabric
-// surface). So the .ios/.android files own the native calls (applyStatusBarProps +
-// statusBarImperative); the types + the framework-agnostic imperative surface live here.
-// Filename selects, no Platform.OS read.
-//
-// This is the engine half: pure types + the imperative API. Each adapter wraps it with a
-// per-framework declarative component (React FC + useEffect, Vue defineComponent + watchEffect)
-// that renders null and applies the props through applyStatusBarProps. The imperative API is
-// shared verbatim: a single StatusBarManager driver behind both adapters.
+// StatusBar renders no Fabric view, it drives the `StatusBarManager` module through a props stack
+// An adapter calls `createEntry()` on mount, `apply(props)` on every change, `release()` on unmount
 
 import type { IColorValue } from '../platform-color';
 
-// The bar styles RN documents (statusBarStyles), as a closed union so a typo can't
-// reach the native call.
 export type IStatusBarStyle = 'default' | 'light-content' | 'dark-content';
 
-// The native `withAnimation` argument of iOS setHidden: 'none' | 'fade' | 'slide'.
+// The native `withAnimation` argument of iOS `setHidden`
 export type IStatusBarAnimation = 'none' | 'fade' | 'slide';
 
 export const STATUS_BAR_MANAGER = 'StatusBarManager';
 
-// RN's default hide/show transition when `animated` is true (showHideTransition
-// defaults to 'fade'); 'none' otherwise.
-export const ANIMATED_HIDE_TRANSITION: IStatusBarAnimation = 'fade';
 export const STATIC_HIDE_TRANSITION: IStatusBarAnimation = 'none';
 
-export function hideTransition(animated: boolean): IStatusBarAnimation {
-  return animated ? ANIMATED_HIDE_TRANSITION : STATIC_HIDE_TRANSITION;
-}
-
-export interface IStatusBarProps {
+export type IStatusBarProps = {
   barStyle?: IStatusBarStyle;
   hidden?: boolean;
   animated?: boolean;
+  // iOS-only, the transition used when `hidden` changes while `animated`
+  showHideTransition?: IStatusBarAnimation;
   networkActivityIndicatorVisible?: boolean;
-  // Android-only, inert on iOS (RN's StatusBar has no iOS background color).
+  // Android-only
   backgroundColor?: IColorValue;
   translucent?: boolean;
-}
+};
 
-// The framework-agnostic imperative API RN exposes, used widely without rendering a
-// component. Each adapter attaches these onto its StatusBar component function object,
-// mirroring RN. setBackgroundColor / setTranslucent and currentHeight are Android-only; on
-// iOS they are inert/absent per RN, but stay on the contract so a typo can't pass and callers
-// don't branch on platform.
-export interface IStatusBarImperative {
+// What one mounted StatusBar contributes, a prop it did not set stays `null` / `undefined`
+export type IStatusBarStackEntry = {
+  backgroundColor: { value: IColorValue; animated: boolean } | null;
+  barStyle: { value: IStatusBarStyle; animated: boolean } | null;
+  translucent: boolean | undefined;
+  hidden: {
+    value: boolean;
+    animated: boolean;
+    transition: IStatusBarAnimation;
+  } | null;
+  networkActivityIndicatorVisible: boolean | undefined;
+};
+
+// The stack merged over the defaults, every field present
+export type IStatusBarMerged = {
+  backgroundColor: { value: IColorValue; animated: boolean };
+  barStyle: { value: IStatusBarStyle; animated: boolean };
+  translucent: boolean;
+  hidden: {
+    value: boolean;
+    animated: boolean;
+    transition: IStatusBarAnimation;
+  };
+  networkActivityIndicatorVisible: boolean;
+};
+
+// RN's static API, a setter for the other platform warns and does nothing
+export type IStatusBarImperative = {
   setBarStyle(style: IStatusBarStyle, animated?: boolean): void;
   setHidden(hidden: boolean, animation?: IStatusBarAnimation): void;
   setNetworkActivityIndicatorVisible(visible: boolean): void;
   setBackgroundColor(color: IColorValue, animated?: boolean): void;
   setTranslucent(translucent: boolean): void;
-}
+  pushStackEntry(props: IStatusBarProps): IStatusBarStackEntry;
+  popStackEntry(entry: IStatusBarStackEntry): void;
+  replaceStackEntry(
+    entry: IStatusBarStackEntry,
+    props: IStatusBarProps,
+  ): IStatusBarStackEntry;
+};
+
+// One mounted StatusBar's slot in the stack
+export type IStatusBarEntryHandle = {
+  apply(props: IStatusBarProps): void;
+  release(): void;
+};
+
+export type IStatusBarController = {
+  createEntry(): IStatusBarEntryHandle;
+  imperative: IStatusBarImperative;
+  currentHeight(): number | undefined;
+};

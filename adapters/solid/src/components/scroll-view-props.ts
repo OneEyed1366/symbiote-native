@@ -32,6 +32,8 @@ import type { ISymbioteEvent } from '@symbiote-native/engine';
 import type {
   IAccessibilityProps,
   IAriaProps,
+  IInnerViewRef,
+  IScrollViewNativeOnlyProps,
 } from '@symbiote-native/components';
 import type {
   IClassNameValue,
@@ -44,85 +46,92 @@ export type { IScrollViewHandle } from '@symbiote-native/components';
 
 type IScrollHandler = (event: ISymbioteEvent) => void;
 
-export interface IScrollViewProps extends IAccessibilityProps, IAriaProps {
-  style?: IStyleProp<IViewStyle>;
-  class?: IClassNameValue;
-  // A bare string resolves through the shared style registry, like `class` — not the full
-  // IClassNameValue union, since IStyleProp is itself an object/array and that would be
-  // ambiguous with a real style (mirrors React's/Vue's contentContainerStyle typing).
-  contentContainerStyle?: IStyleProp<IViewStyle> | string;
-  // See the header: the AXIS comes from the tag. Kept typed for RN parity.
-  horizontal?: boolean;
-  scrollEnabled?: boolean;
-  showsVerticalScrollIndicator?: boolean;
-  showsHorizontalScrollIndicator?: boolean;
-  pagingEnabled?: boolean;
-  bounces?: boolean;
-  decelerationRate?: 'normal' | 'fast' | number;
-  scrollEventThrottle?: number;
-  contentInset?: {
-    top?: number;
-    left?: number;
-    bottom?: number;
-    right?: number;
+export type IScrollViewProps = IAccessibilityProps &
+  IAriaProps &
+  IScrollViewNativeOnlyProps & {
+    style?: IStyleProp<IViewStyle>;
+    class?: IClassNameValue;
+    // A bare string resolves through the shared style registry, like `class` — not the full
+    // IClassNameValue union, since IStyleProp is itself an object/array and that would be
+    // ambiguous with a real style (mirrors React's/Vue's contentContainerStyle typing).
+    contentContainerStyle?: IStyleProp<IViewStyle> | string;
+    // See the header: the AXIS comes from the tag. Kept typed for RN parity.
+    horizontal?: boolean;
+    scrollEnabled?: boolean;
+    showsVerticalScrollIndicator?: boolean;
+    showsHorizontalScrollIndicator?: boolean;
+    pagingEnabled?: boolean;
+    bounces?: boolean;
+    decelerationRate?: 'normal' | 'fast' | number;
+    scrollEventThrottle?: number;
+    contentInset?: {
+      top?: number;
+      left?: number;
+      bottom?: number;
+      right?: number;
+    };
+    contentOffset?: { x: number; y: number };
+    removeClippedSubviews?: boolean;
+    // Fired when the content container's size changes. RN synthesizes this in JS by putting an
+    // onLayout on the inner content view; the native scroll view has no such event of its own.
+    onContentSizeChange?: (width: number, height: number) => void;
+    snapToInterval?: number;
+    snapToOffsets?: number[];
+    snapToAlignment?: 'start' | 'center' | 'end';
+    snapToStart?: boolean;
+    snapToEnd?: boolean;
+    disableIntervalMomentum?: boolean;
+    experimental_endDraggingSensitivityMultiplier?: number;
+    // Honored by the behavior, which walks the COMMITTED children — no wrapper needed to pull "the
+    // child at index N" out of anything.
+    stickyHeaderIndices?: number[];
+    // Stick to the BOTTOM instead of the top (RN invertStickyHeaders). Used by inverted lists; an
+    // ordinary prop of the scroll node, read off the owner when the behavior builds a pin.
+    invertStickyHeaders?: boolean;
+    // Sticky headers also slide off on a downward scroll and come back on a scroll up
+    stickyHeaderHiddenOnScroll?: boolean;
+    // Gets the content view after the first commit and null when it goes away
+    innerViewRef?: IInnerViewRef;
+    keyboardDismissMode?: 'none' | 'on-drag' | 'interactive';
+    keyboardShouldPersistTaps?: boolean | 'always' | 'never' | 'handled';
+    maintainVisibleContentPosition?: {
+      minIndexForVisible: number;
+      autoscrollToTopThreshold?: number;
+    };
+    // iOS-only forwarding props. Harmless on Android (its manager ignores unknown props).
+    alwaysBounceHorizontal?: boolean;
+    alwaysBounceVertical?: boolean;
+    centerContent?: boolean;
+    scrollIndicatorInsets?: {
+      top?: number;
+      left?: number;
+      bottom?: number;
+      right?: number;
+    };
+    indicatorStyle?: 'default' | 'black' | 'white';
+    directionalLockEnabled?: boolean;
+    automaticallyAdjustKeyboardInsets?: boolean;
+    contentInsetAdjustmentBehavior?:
+      'automatic' | 'scrollableAxes' | 'never' | 'always';
+    minimumZoomScale?: number;
+    maximumZoomScale?: number;
+    zoomScale?: number;
+    bouncesZoom?: boolean;
+    pinchGestureEnabled?: boolean;
+    // Android-only forwarding props. See the header: this one DEFAULTS to true in the behavior.
+    nestedScrollEnabled?: boolean;
+    overScrollMode?: 'auto' | 'always' | 'never';
+    fadingEdgeLength?: number;
+    persistentScrollbar?: boolean;
+    endFillColor?: string;
+    onLayout?: IScrollHandler;
+    onScroll?: IScrollHandler;
+    onScrollBeginDrag?: IScrollHandler;
+    onScrollEndDrag?: IScrollHandler;
+    onMomentumScrollBegin?: IScrollHandler;
+    onMomentumScrollEnd?: IScrollHandler;
+    // iOS-only: user tapped the status bar to scroll to top. Inert on Android.
+    onScrollToTop?: IScrollHandler;
+    ref?: Ref<IHostInstance>;
+    children?: JSX.Element;
   };
-  contentOffset?: { x: number; y: number };
-  removeClippedSubviews?: boolean;
-  // Fired when the content container's size changes. RN synthesizes this in JS by putting an
-  // onLayout on the inner content view; the native scroll view has no such event of its own.
-  onContentSizeChange?: (width: number, height: number) => void;
-  snapToInterval?: number;
-  snapToOffsets?: number[];
-  snapToAlignment?: 'start' | 'center' | 'end';
-  snapToStart?: boolean;
-  snapToEnd?: boolean;
-  disableIntervalMomentum?: boolean;
-  // Honored by the behavior, which walks the COMMITTED children — no wrapper needed to pull "the
-  // child at index N" out of anything.
-  stickyHeaderIndices?: number[];
-  // Stick to the BOTTOM instead of the top (RN invertStickyHeaders). Used by inverted lists; an
-  // ordinary prop of the scroll node, read off the owner when the behavior builds a pin.
-  invertStickyHeaders?: boolean;
-  keyboardDismissMode?: 'none' | 'on-drag' | 'interactive';
-  keyboardShouldPersistTaps?: boolean | 'always' | 'never' | 'handled';
-  maintainVisibleContentPosition?: {
-    minIndexForVisible: number;
-    autoscrollToTopThreshold?: number;
-  };
-  // iOS-only forwarding props. Harmless on Android (its manager ignores unknown props).
-  alwaysBounceHorizontal?: boolean;
-  alwaysBounceVertical?: boolean;
-  centerContent?: boolean;
-  scrollIndicatorInsets?: {
-    top?: number;
-    left?: number;
-    bottom?: number;
-    right?: number;
-  };
-  indicatorStyle?: 'default' | 'black' | 'white';
-  directionalLockEnabled?: boolean;
-  automaticallyAdjustKeyboardInsets?: boolean;
-  contentInsetAdjustmentBehavior?:
-    'automatic' | 'scrollableAxes' | 'never' | 'always';
-  minimumZoomScale?: number;
-  maximumZoomScale?: number;
-  zoomScale?: number;
-  bouncesZoom?: boolean;
-  pinchGestureEnabled?: boolean;
-  // Android-only forwarding props. See the header: this one DEFAULTS to true in the behavior.
-  nestedScrollEnabled?: boolean;
-  overScrollMode?: 'auto' | 'always' | 'never';
-  fadingEdgeLength?: number;
-  persistentScrollbar?: boolean;
-  endFillColor?: string;
-  onLayout?: IScrollHandler;
-  onScroll?: IScrollHandler;
-  onScrollBeginDrag?: IScrollHandler;
-  onScrollEndDrag?: IScrollHandler;
-  onMomentumScrollBegin?: IScrollHandler;
-  onMomentumScrollEnd?: IScrollHandler;
-  // iOS-only: user tapped the status bar to scroll to top. Inert on Android.
-  onScrollToTop?: IScrollHandler;
-  ref?: Ref<IHostInstance>;
-  children?: JSX.Element;
-}

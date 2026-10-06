@@ -14,8 +14,11 @@ const setNativeViewConfigSource = vi.fn();
 const setImageSourceResolver = vi.fn();
 const setAssetSourceResolver = vi.fn();
 const installBackHandler = vi.fn();
+const setReactNativeHost = vi.fn();
+const setPressabilityLoader = vi.fn();
 
 vi.mock('react-native', () => ({
+  UIManager: { measure: vi.fn() },
   processColor: vi.fn(),
   DeviceEventEmitter: { addListener: vi.fn() },
   Image: { resolveAssetSource: vi.fn() },
@@ -32,6 +35,8 @@ vi.mock('@symbiote-native/engine', () => ({
   setImageSourceResolver,
   setAssetSourceResolver,
   setNativeViewConfigSource,
+  setReactNativeHost,
+  setPressabilityLoader,
   installBackHandler,
 }));
 
@@ -133,10 +138,8 @@ describe('bootstrapHost — env-driven debug default (Positive)', () => {
 });
 
 describe("bootstrapHost — zero-config seams (Positive, the module's actual purpose)", () => {
-  // why: this is the whole point of bootstrapHost per its own header ("wired from real
-  // react-native in one call") — proving the DEFAULT seams (no overrides given) really delegate
-  // to RN's processColor / Image.resolveAssetSource / DeviceEventEmitter, not just that some
-  // function got registered.
+  // The default seams, with no overrides, must reach RN's own `processColor`, `Image` and
+  // `DeviceEventEmitter`, not just register some function
   it('wires the default color processor straight to RN processColor', () => {
     bootstrapHost();
     const registered = setColorProcessor.mock.calls[0][0] as (
@@ -158,6 +161,34 @@ describe("bootstrapHost — zero-config seams (Positive, the module's actual pur
   it('wires the default device event source straight to RN DeviceEventEmitter', () => {
     bootstrapHost();
     expect(setDeviceEventSource).toHaveBeenCalledWith(DeviceEventEmitter);
+  });
+
+  // The engine's `UIManager`, `LogBox` and the rest forward to RN's own module, handed over here
+  it('hands react-native to the engine', () => {
+    bootstrapHost();
+    expect(setReactNativeHost).toHaveBeenCalledWith(
+      expect.objectContaining({ UIManager: expect.anything() }),
+    );
+  });
+
+  it('hands over a loader for RN Pressability instead of the class itself', () => {
+    bootstrapHost();
+
+    expect(setPressabilityLoader).toHaveBeenCalledWith(expect.any(Function));
+  });
+
+  it('hands over an explicit pressabilityLoader', () => {
+    const pressabilityLoader = vi.fn();
+    bootstrapHost({ pressabilityLoader });
+
+    expect(setPressabilityLoader).toHaveBeenCalledWith(pressabilityLoader);
+    expect(pressabilityLoader).not.toHaveBeenCalled();
+  });
+
+  it('hands over an explicit reactNative instead of the module', () => {
+    const reactNative = { UIManager: { measure: vi.fn() } };
+    bootstrapHost({ reactNative });
+    expect(setReactNativeHost).toHaveBeenCalledWith(reactNative);
   });
 });
 

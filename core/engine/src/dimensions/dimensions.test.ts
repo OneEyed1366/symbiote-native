@@ -9,21 +9,20 @@
 // pixel-ratio/pixel-ratio.test.ts; useWindowDimensions belongs to the React adapter
 // and is out of scope for this engine module's test.
 //
-// Dimensions never throws: an unresolvable/malformed native module degrades to
-// ZERO_METRICS rather than crashing a render. So there is no Negative (toThrow)
-// group -- every scenario below is Positive.
+// Без нативного модуля метрики деградируют в ZERO_METRICS
+// Бросают только неизвестный ключ и неизвестное событие, как в RN
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-interface IDeviceHub {
+type IDeviceHub = {
   emit: (eventType: string, ...args: unknown[]) => void;
-}
-interface IWindowMetrics {
+};
+type IWindowMetrics = {
   width: number;
   height: number;
   scale: number;
   fontScale: number;
-}
+};
 
 const INITIAL_WINDOW: IWindowMetrics = {
   width: 400,
@@ -120,8 +119,8 @@ describe('Dimensions', () => {
           getConstants: () => ({
             Dimensions: {
               windowPhysicalPixels: {
-                width: 1200,
-                height: 2400,
+                width: 1_200,
+                height: 2_400,
                 scale: 3,
                 fontScale: 1,
                 densityDpi: 480,
@@ -148,14 +147,14 @@ describe('Dimensions', () => {
             Dimensions: {
               windowPhysicalPixels: {
                 width: 900,
-                height: 1800,
+                height: 1_800,
                 scale: 3,
                 fontScale: 1,
                 densityDpi: 480,
               },
               screenPhysicalPixels: {
-                width: 1200,
-                height: 2400,
+                width: 1_200,
+                height: 2_400,
                 scale: 3,
                 fontScale: 1,
                 densityDpi: 480,
@@ -236,11 +235,26 @@ describe('Dimensions', () => {
     });
   });
 
+  describe('invariants', () => {
+    it('get() throws for a key that was never set', async () => {
+      await loadDimensions();
+      // @ts-expect-error a key outside the typed union
+      expect(() => Dimensions.get('nope')).toThrow(
+        'No dimension set for key nope',
+      );
+    });
+
+    it('addEventListener() throws for an event other than change', async () => {
+      await loadDimensions();
+      // @ts-expect-error an event outside the typed union
+      expect(() => Dimensions.addEventListener('resize', () => {})).toThrow(
+        'Trying to subscribe to unknown event: "resize"',
+      );
+    });
+  });
+
   describe('set() -- the public native-push entry point', () => {
-    // why: RN exposes Dimensions.set() as the public static natively pushes metrics
-    // through; the very FIRST set() ever (nothing resolved yet) is the initial
-    // seed, not a "change" -- it must NOT notify a listener that subscribes right after,
-    // exactly like the initial getConstants() push during lazy resolution.
+    // Первый `set()` только засевает кэш, подписчик после него `change` не получает
     it('the first set() call seeds the cache without notifying; the next one does', async () => {
       await loadDimensions();
       Dimensions.set({

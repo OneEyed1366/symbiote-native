@@ -12,17 +12,21 @@ import {
   ViewChild,
   inject,
   type DoCheck,
+  type TemplateRef,
 } from '@angular/core';
 import {
+  cellGapsFor,
+  createSeparatorBoard,
   flattenSections,
   resolveStickySectionHeaders,
-  scrollLocationToFlatIndex,
+  resolveScrollLocation,
+  SECTION_ENTRY_KIND,
+  SEPARATOR_GAP_KIND,
+  SEPARATOR_SIDE,
   sectionEntryKey,
-  unwrapEntryItem,
-  type IAccessibilityProps,
-  type IAriaProps,
-  type ISection,
+  type IInnerViewRef,
   type ISectionEntry,
+  type ISeparatorGap,
   type ISeparators,
   type IScrollViewHandle,
   type IVirtualizedSectionListHandle,
@@ -37,12 +41,13 @@ import {
 } from '@symbiote-native/engine';
 import {
   VirtualizedList,
+  VListCellDirective,
   VListEmptyDirective,
   VListFooterDirective,
   VListHeaderDirective,
   VListItemDirective,
   VListSeparatorDirective,
-  type IVListSeparatorContext,
+  type IVListCellContext,
 } from '../virtualized-list';
 import { VListOutletDirective } from '../virtualized-list/directives';
 import { ListEventsBase } from '../virtualized-list/list-events';
@@ -56,12 +61,18 @@ import {
   VSectionHeaderDirective,
   VSectionItemDirective,
   VSectionSeparatorDirective,
+  type ISection,
   type IVSectionContext,
   type IVSectionItemContext,
 } from './directives';
+import { VSectionCellDirective, type ISeparatorSlot } from './section-cell';
+import type {
+  IItemLayout,
+  IVirtualizedSectionListInputs,
+  IVirtualizedSectionListProps,
+} from './section-list-props';
 import { VIRTUALIZED_SECTION_LIST_TEMPLATE } from './section-list-template';
 
-export type { ISection } from '@symbiote-native/components';
 export type { IVirtualizedSectionListHandle } from '@symbiote-native/components';
 export {
   VSectionFooterDirective,
@@ -69,66 +80,30 @@ export {
   VSectionItemDirective,
   VSectionSeparatorDirective,
 } from './directives';
-export type { IVSectionContext, IVSectionItemContext } from './directives';
+export type {
+  ISection,
+  IVSectionContext,
+  IVSectionItemContext,
+  IVSectionSeparatorContext,
+} from './directives';
 
-type IItemLayout = { length: number; offset: number; index: number };
+type IEntry<ItemT> = ISectionEntry<ItemT, ISection<ItemT>>;
 
-// The React and Vue surface minus element-returning props, which are `<ng-template>` here
-export interface IVirtualizedSectionListProps<ItemT>
-  extends IAccessibilityProps, IAriaProps {
-  sections: ReadonlyArray<ISection<ItemT>>;
-  keyExtractor?: (item: ItemT, index: number) => string;
-  // Flat like RN's: the sections array plus a flat entry index, where every section adds two rows
-  // beyond its items (header, footer). Without it a fast scroll outruns measurement
-  getItemLayout?: (
-    data: ReadonlyArray<ISection<ItemT>> | null,
-    index: number,
-  ) => IItemLayout;
-  // Defaults to `Platform.OS === 'ios'`, pass true or false to override
-  stickySectionHeadersEnabled?: boolean;
-  extraData?: unknown;
-  onEndReached?: (info: { distanceFromEnd: number }) => void;
-  onEndReachedThreshold?: number;
-  onStartReached?: (info: { distanceFromStart: number }) => void;
-  onStartReachedThreshold?: number;
-  onRefresh?: () => void;
-  refreshing?: boolean | null;
-  progressViewOffset?: number;
-  initialNumToRender?: number;
-  initialScrollIndex?: number;
-  maxToRenderPerBatch?: number;
-  updateCellsBatchingPeriod?: number;
-  windowSize?: number;
-  inverted?: boolean;
-  maintainVisibleContentPosition?: {
-    minIndexForVisible: number;
-    autoscrollToTopThreshold?: number;
-  };
-  onScroll?: (event: ISymbioteEvent) => void;
-  onScrollBeginDrag?: (event: ISymbioteEvent) => void;
-  onScrollEndDrag?: (event: ISymbioteEvent) => void;
-  onMomentumScrollBegin?: (event: ISymbioteEvent) => void;
-  onMomentumScrollEnd?: (event: ISymbioteEvent) => void;
-  scrollEventThrottle?: number;
-  keyboardShouldPersistTaps?: boolean | 'always' | 'never' | 'handled';
-  keyboardDismissMode?: 'none' | 'on-drag' | 'interactive';
-  removeClippedSubviews?: boolean;
-  nestedScrollEnabled?: boolean;
-  style?: IStyleProp<IViewStyle>;
-  contentContainerStyle?: IStyleProp<IViewStyle>;
-}
+// Everything an item cell needs to paint itself, separators in painting order
+export type ICellPlan<ItemT> = {
+  cellKey: string;
+  prevCellKey: string | undefined;
+  hasLeading: boolean;
+  hasTrailing: boolean;
+  itemTemplate: TemplateRef<IVSectionItemContext<ItemT>> | undefined;
+  first: ISeparatorSlot<ItemT>;
+  second: ISeparatorSlot<ItemT>;
+};
 
-// The plain inputs: the full surface minus the events exposed as real outputs
-export type IVirtualizedSectionListInputs<ItemT> = Omit<
-  IVirtualizedSectionListProps<ItemT>,
-  | 'onEndReached'
-  | 'onStartReached'
-  | 'onRefresh'
-  | 'onAccessibilityAction'
-  | 'onAccessibilityTap'
-  | 'onMagicTap'
-  | 'onAccessibilityEscape'
->;
+export type {
+  IVirtualizedSectionListInputs,
+  IVirtualizedSectionListProps,
+} from './section-list-props';
 
 @Component({
   selector: 'VirtualizedSectionList',
@@ -143,8 +118,8 @@ export type IVirtualizedSectionListInputs<ItemT> = Omit<
     VListHeaderDirective,
     VListFooterDirective,
     VListEmptyDirective,
-    VListSeparatorDirective,
     VListOutletDirective,
+    VSectionCellDirective,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: VIRTUALIZED_SECTION_LIST_TEMPLATE,
@@ -176,7 +151,9 @@ export class VirtualizedSectionList<ItemT = unknown>
   @Input() maxToRenderPerBatch?: number;
   @Input() updateCellsBatchingPeriod?: number;
   @Input() windowSize?: number;
+  @Input() disableVirtualization?: boolean;
   @Input() inverted?: boolean;
+  @Input() horizontal?: boolean;
   @Input() maintainVisibleContentPosition?: {
     minIndexForVisible: number;
     autoscrollToTopThreshold?: number;
@@ -186,13 +163,18 @@ export class VirtualizedSectionList<ItemT = unknown>
   @Input() onScrollEndDrag?: (event: ISymbioteEvent) => void;
   @Input() onMomentumScrollBegin?: (event: ISymbioteEvent) => void;
   @Input() onMomentumScrollEnd?: (event: ISymbioteEvent) => void;
+  @Input() onContentSizeChange?: (width: number, height: number) => void;
   @Input() scrollEventThrottle?: number;
   @Input() keyboardShouldPersistTaps?: boolean | 'always' | 'never' | 'handled';
   @Input() keyboardDismissMode?: 'none' | 'on-drag' | 'interactive';
   @Input() removeClippedSubviews?: boolean;
   @Input() nestedScrollEnabled?: boolean;
+  @Input() stickyHeaderHiddenOnScroll?: boolean;
+  @Input() innerViewRef?: IInnerViewRef;
   @Input() style?: IStyleProp<IViewStyle>;
   @Input() contentContainerStyle?: IStyleProp<IViewStyle>;
+  @Input() listHeaderComponentStyle?: IStyleProp<IViewStyle>;
+  @Input() listFooterComponentStyle?: IStyleProp<IViewStyle>;
   @Input() testID?: string;
   @Input() nativeID?: string;
 
@@ -216,7 +198,7 @@ export class VirtualizedSectionList<ItemT = unknown>
   @ContentChild(VSectionFooterDirective)
   sectionFooterDir?: VSectionFooterDirective<ItemT>;
   @ContentChild(VSectionSeparatorDirective)
-  sectionSeparatorDir?: VSectionSeparatorDirective;
+  sectionSeparatorDir?: VSectionSeparatorDirective<ItemT>;
 
   // List-level slots reuse the `VirtualizedList` directives and are forwarded to the inner list
   @ContentChild(VListHeaderDirective) listHeaderDir?: VListHeaderDirective;
@@ -224,41 +206,38 @@ export class VirtualizedSectionList<ItemT = unknown>
   @ContentChild(VListEmptyDirective) listEmptyDir?: VListEmptyDirective;
   @ContentChild(VListSeparatorDirective)
   itemSeparatorDir?: VListSeparatorDirective<ItemT>;
+  // The cell wrapper, from projection or handed in by `SectionList`, the item is the list's entry
+  @ContentChild(VListCellDirective) cellDir?: VListCellDirective;
+  @Input() cellRendererTemplate?: TemplateRef<IVListCellContext>;
+
+  get cellRendererTpl(): TemplateRef<IVListCellContext> | undefined {
+    return this.cellRendererTemplate ?? this.cellDir?.templateRef;
+  }
 
   // The inner list, whose instance is the scroll handle, reads lazily and no-ops before commit
-  @ViewChild(VirtualizedList) private list?: VirtualizedList<
-    ISectionEntry<ItemT>
-  >;
+  @ViewChild(VirtualizedList) private list?: VirtualizedList<IEntry<ItemT>>;
 
   // This component's own host, the anchor `class="..."` resolves onto, not the inner list's
   private readonly elementRef = inject(ElementRef);
 
-  flatEntries: ISectionEntry<ItemT>[] = [];
+  flatEntries: IEntry<ItemT>[] = [];
   stickyHeaderIndices: number[] | undefined = undefined;
+  readonly board = createSeparatorBoard<Record<string, unknown>>();
 
   // Flat positions of every section header, so `scrollToLocation` skips re-deriving the layout
   private headerIndices: number[] = [];
-  // Memo guards, the inner list marks for check on every scroll tick and re-runs `ngDoCheck`
+  // Memo guard, the inner list marks for check on every scroll tick and re-runs `ngDoCheck`
   private lastSectionsRef: ReadonlyArray<ISection<ItemT>> | null = null;
-  private lastHasSectionSeparator = false;
 
   private readonly cdr = inject(ChangeDetectorRef);
 
   ngDoCheck(): void {
-    const hasSectionSeparator = this.sectionSeparatorDir !== undefined;
-    if (
-      this.sections === this.lastSectionsRef &&
-      hasSectionSeparator === this.lastHasSectionSeparator
-    ) {
-      return;
-    }
+    if (this.sections === this.lastSectionsRef) return;
     this.lastSectionsRef = this.sections;
-    this.lastHasSectionSeparator = hasSectionSeparator;
 
     const sections = this.sections ?? [];
-    const { entries, headerIndices } = flattenSections(
+    const { entries, headerIndices } = flattenSections<ItemT, ISection<ItemT>>(
       sections,
-      hasSectionSeparator,
     );
     this.flatEntries = entries;
     this.headerIndices = headerIndices;
@@ -277,14 +256,13 @@ export class VirtualizedSectionList<ItemT = unknown>
   }
 
   // Stable arrow fields, so the bindings to the inner list keep a constant identity
-  getEntry = (_source: unknown, index: number): ISectionEntry<ItemT> =>
+  getEntry = (_source: unknown, index: number): IEntry<ItemT> =>
     this.flatEntries[index];
   getEntryCount = (): number => this.flatEntries.length;
-  entryKeyExtractor = (entry: ISectionEntry<ItemT>, index: number): string =>
-    sectionEntryKey(entry, index, this.keyExtractor);
+  entryKeyExtractor = (entry: IEntry<ItemT>): string =>
+    sectionEntryKey(entry, this.keyExtractor);
 
-  // RN hands the callback `sections`, not the flattened entries. The flat index matches RN's only
-  // while no section separator template is set, which adds one row per boundary here
+  // RN hands the callback `sections`, not the flattened entries
   // Cached on the input's identity, the inner list folds it into its dedup array
   private cachedEntryItemLayout?: (data: unknown, index: number) => IItemLayout;
   private lastGetItemLayout?: IVirtualizedSectionListProps<ItemT>['getItemLayout'];
@@ -323,11 +301,11 @@ export class VirtualizedSectionList<ItemT = unknown>
   }
 
   // The inner cell context is typed `unknown` under strict templates, so entries are narrowed
-  private isEntry(value: unknown): value is ISectionEntry<ItemT> {
+  private isEntry(value: unknown): value is IEntry<ItemT> {
     return typeof value === 'object' && value !== null && 'kind' in value;
   }
 
-  entryKind(value: unknown): ISectionEntry<ItemT>['kind'] | 'unknown' {
+  entryKind(value: unknown): IEntry<ItemT>['kind'] | 'unknown' {
     return this.isEntry(value) ? value.kind : 'unknown';
   }
 
@@ -351,22 +329,37 @@ export class VirtualizedSectionList<ItemT = unknown>
     };
   }
 
-  // The inner separator context carries flattened entries, unwrapped back to real items so the
-  // app's separator, typed on the item, never sees an envelope
-  itemSeparatorContextOf(
-    highlighted: unknown,
-    leadingItem: unknown,
-    trailingItem: unknown,
-  ): IVListSeparatorContext<ItemT> {
+  // The separator template for a gap: the section one, or the item one where a section's own
+  // template beats the list's
+  private slotFor(
+    gap: ISeparatorGap<ItemT, ISection<ItemT>>,
+    side: ISeparatorSlot<ItemT>['side'],
+  ): ISeparatorSlot<ItemT> {
+    if (gap.props === undefined) return { template: undefined, gap, side };
+    const template =
+      gap.kind === SEPARATOR_GAP_KIND.section
+        ? this.sectionSeparatorDir?.templateRef
+        : (gap.props.section.separator ?? this.itemSeparatorDir?.templateRef);
+    return { template, gap, side };
+  }
+
+  cellPlanOf(value: unknown, index: number): ICellPlan<ItemT> | undefined {
+    if (!this.isEntry(value) || value.kind !== SECTION_ENTRY_KIND.item)
+      return undefined;
+    const gaps = cellGapsFor(this.flatEntries, index);
+    const leading = this.slotFor(gaps.leading, SEPARATOR_SIDE.leading);
+    const trailing = this.slotFor(gaps.trailing, SEPARATOR_SIDE.trailing);
+    const previous = this.flatEntries[index - 1];
+    const isInverted = this.inverted === true;
     return {
-      $implicit: highlighted === true,
-      highlighted: highlighted === true,
-      leadingItem: this.isEntry(leadingItem)
-        ? unwrapEntryItem(leadingItem)
-        : undefined,
-      trailingItem: this.isEntry(trailingItem)
-        ? unwrapEntryItem(trailingItem)
-        : undefined,
+      cellKey: this.entryKeyExtractor(value),
+      prevCellKey:
+        previous === undefined ? undefined : this.entryKeyExtractor(previous),
+      hasLeading: leading.template !== undefined,
+      hasTrailing: trailing.template !== undefined,
+      itemTemplate: value.section.item ?? this.sectionItemDir?.templateRef,
+      first: isInverted ? trailing : leading,
+      second: isInverted ? leading : trailing,
     };
   }
 
@@ -377,12 +370,12 @@ export class VirtualizedSectionList<ItemT = unknown>
     viewPosition?: number;
     animated?: boolean;
   }): void {
-    const flatIndex = scrollLocationToFlatIndex(
+    const target = resolveScrollLocation(
       this.headerIndices,
-      params.sectionIndex,
-      params.itemIndex,
+      this.stickyHeaderIndices,
+      params,
     );
-    if (flatIndex === undefined) {
+    if (target === undefined) {
       dlog(
         `Angular VirtualizedSectionList scrollToLocation: section ${params.sectionIndex} out of range`,
       );
@@ -390,14 +383,9 @@ export class VirtualizedSectionList<ItemT = unknown>
     }
     dlog(
       `Angular VirtualizedSectionList scrollToLocation section=${params.sectionIndex} ` +
-        `item=${params.itemIndex} -> flat ${flatIndex}`,
+        `item=${params.itemIndex} -> flat ${target.index}`,
     );
-    this.list?.scrollToIndex({
-      index: flatIndex,
-      viewOffset: params.viewOffset,
-      viewPosition: params.viewPosition,
-      animated: params.animated,
-    });
+    this.list?.scrollToIndex(target);
   }
 
   flashScrollIndicators(): void {
@@ -420,7 +408,15 @@ export class VirtualizedSectionList<ItemT = unknown>
     return this.list?.getScrollNode() ?? null;
   }
 
+  getScrollRef(): ISymbioteNode | null {
+    return this.list?.getScrollRef() ?? null;
+  }
+
   recordInteraction(): void {
     this.list?.recordInteraction();
+  }
+
+  setNativeProps(props: Record<string, unknown>): void {
+    this.list?.setNativeProps(props);
   }
 }

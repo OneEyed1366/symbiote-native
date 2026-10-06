@@ -5,7 +5,7 @@
 // from this module's implementation. Every StyleSheet member is pure/total (never throws),
 // so there is no Negative group.
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { StyleSheet, computeHairlineWidth } from './index';
 
 function isType<T>(value: unknown): value is T {
@@ -42,9 +42,100 @@ describe('StyleSheet', () => {
       });
     });
 
-    // why: setStyleAttributePreprocessor's whole purpose is rewriting one style key's value
-    // AFTER flattenStyle collapses the array — this is the seam that lets, e.g., a color
-    // preprocessor run exactly once regardless of how many style-array entries carried it.
+    // Порт `flattenStyle-test.js` RN
+    describe('RN flattenStyle semantics', () => {
+      const classes = StyleSheet.create({
+        elementA: { width: 1, height: 2 },
+        elementB: { height: 3 },
+      });
+
+      it('overrides properties, null and undefined included', () => {
+        expect(
+          StyleSheet.flatten([
+            { backgroundColor: '#000', width: 10 },
+            { backgroundColor: undefined, width: null },
+          ]),
+        ).toEqual({ backgroundColor: undefined, width: null });
+      });
+
+      it('does not fail on falsy entries', () => {
+        expect(() =>
+          StyleSheet.flatten([null, false, undefined]),
+        ).not.toThrow();
+      });
+
+      it('flattens nested arrays', () => {
+        const flat = StyleSheet.flatten([
+          null,
+          [],
+          [{ width: 10 }, { height: 20 }],
+          { width: 30 },
+        ]);
+        expect(flat).toEqual({ width: 30, height: 20 });
+      });
+
+      it('returns undefined and allocates nothing for no style', () => {
+        expect(StyleSheet.flatten(null)).toBeUndefined();
+        expect(StyleSheet.flatten(undefined)).toBeUndefined();
+      });
+
+      it('returns a single style object itself', () => {
+        const style = { a: 'b' };
+        expect(StyleSheet.flatten(style)).toBe(style);
+        expect(StyleSheet.flatten(classes.elementA)).toBe(classes.elementA);
+      });
+
+      it('merges classes, the later one winning', () => {
+        expect(
+          StyleSheet.flatten([classes.elementA, classes.elementB]),
+        ).toEqual({
+          width: 1,
+          height: 3,
+        });
+        expect(
+          StyleSheet.flatten([classes.elementB, classes.elementA]),
+        ).toEqual({
+          width: 1,
+          height: 2,
+        });
+      });
+
+      it('merges classes with an inline style and nested arrays', () => {
+        const nested = [{ width: 10, height: 11 }, { width: 12 }];
+        expect(
+          StyleSheet.flatten([classes.elementA, classes.elementB, nested]),
+        ).toEqual({ width: 12, height: 11 });
+      });
+
+      it('ignores an invalid style such as a number', () => {
+        expect(StyleSheet.flatten(JSON.parse('1234'))).toBeUndefined();
+      });
+    });
+
+    describe('setStyleAttributePreprocessor warning', () => {
+      it('warns like RN when a preprocessor is overwritten', () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        StyleSheet.setStyleAttributePreprocessor('fontFamily', value => value);
+        expect(warn).not.toHaveBeenCalled();
+        StyleSheet.setStyleAttributePreprocessor('fontFamily', value => value);
+        expect(warn).toHaveBeenCalledWith(
+          'Overwriting fontFamily style attribute preprocessor',
+        );
+        warn.mockRestore();
+      });
+
+      // RN предупреждает, только когда новая функция отличается от прежней
+      it('stays silent when the same preprocessor is set again', () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const process = (value: unknown) => value;
+        StyleSheet.setStyleAttributePreprocessor('__testSame', process);
+        StyleSheet.setStyleAttributePreprocessor('__testSame', process);
+        expect(warn).not.toHaveBeenCalled();
+        warn.mockRestore();
+      });
+    });
+
+    // Preprocessor переписывает значение одного ключа после схлопывания массива
     it('applies a registered per-attribute preprocessor to the matching flattened key', () => {
       StyleSheet.setStyleAttributePreprocessor('__testDoubled', value =>
         typeof value === 'number' ? value * 2 : value,
@@ -95,11 +186,7 @@ describe('StyleSheet', () => {
       expect(StyleSheet.compose(null, null)).toBeNull();
     });
 
-    // why: nullish, not falsy - and that is the CORRECT behavior, not a gap. React Native's
-    // composeStyles branches on `== null` (src/private/styles/composeStyles.js), so `0` is a
-    // present style there too, which matters wherever a raw number reaches compose (an animated
-    // scale or opacity, say). The file comment used to say "falsy" and was the thing that was
-    // wrong; it has been corrected. This test pins the parity so neither drifts again.
+    // RN `composeStyles` сравнивает с `== null`, поэтому `0` это присутствующий стиль
     it('treats 0 as a present style rather than falsy, matching RN composeStyles', () => {
       expect(StyleSheet.compose(0, y)).toEqual([0, y]);
       expect(StyleSheet.compose(x, 0)).toEqual([x, 0]);

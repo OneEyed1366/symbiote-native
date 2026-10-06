@@ -16,6 +16,7 @@
 
 import {
   createElement,
+  useCallback,
   useEffect,
   useRef,
   type ComponentType,
@@ -44,11 +45,11 @@ function assignRef<T>(ref: Ref<T> | undefined, value: T | null): void {
   ref.current = value;
 }
 
-export interface IAnimatedComponentProps {
+export type IAnimatedComponentProps = {
   style?: unknown;
   ref?: Ref<unknown>;
   [key: string]: unknown;
-}
+};
 
 // Base components carry their own concrete prop shape (View wants ViewStyle, etc.).
 // We stay generic over that P so reduced props type-check against the base, while
@@ -81,14 +82,7 @@ export function createAnimatedComponent<P extends IAnimatableProps>(
     // headless / unsupported hosts keep the JS flush path (and the existing JS smokes green).
     const wantsNative = passthrough != null && isNativeAnimatedAvailable();
 
-    // The leaf lifecycle - build/swap/bind/detach, native event rebinding, and the
-    // rebuild-vs-skip decision - is the engine's, shared by every adapter
-    // (core/engine/src/animated/leaf-lifecycle.ts). React owns only WHEN to run it.
-    //
-    // This used to be `useMemo(() => new AnimatedProps(rest), [rest])`, which reads like the same
-    // guard but never was one: `rest` comes out of a rest-destructure, so it is a fresh object on
-    // every render and the memo's dependency always differed. The real content check now lives in
-    // the shared lifecycle.
+    // Жизненный цикл листа общий для адаптеров (`leaf-lifecycle.ts`), React решает лишь когда
     const lifecycleRef = useRef<IAnimatedLeafLifecycle | null>(null);
     lifecycleRef.current ??= createAnimatedLeafLifecycle('react');
     const lifecycle = lifecycleRef.current;
@@ -97,34 +91,32 @@ export function createAnimatedComponent<P extends IAnimatableProps>(
     // tag, not the AnimatedProps leaf.
     const nodeRef = useRef<unknown>(null);
 
-    // Reconcile after every commit. No dependency array on purpose: the props object is rebuilt
-    // by every render anyway, so a dependency list could only ever say "always" - the real
-    // rebuild-vs-skip decision is the lifecycle's, and it compares CONTENT by key identity.
+    // `rest` пересобирается каждым рендером, поэтому эффект идёт после каждого коммита,
+    // а пересобирать ли лист, решает жизненный цикл по содержимому
     useEffect(() => {
       lifecycle.reconcile(
         rest,
         isSymbioteNode(nodeRef.current) ? nodeRef.current : null,
         wantsNative,
       );
-    });
+    }, [lifecycle, rest, wantsNative]);
 
     // Final teardown: detach the last-attached leaf and any native event bindings on unmount.
     useEffect(() => {
       return () => lifecycle.teardown();
     }, [lifecycle]);
 
-    // Callback ref: when the base component mounts, capture its public instance, resolve
-    // it to the underlying host node (unwrapping a scroll-container handle), record THAT
-    // for the event-attach effect and bind it to the leaf, but forward the ORIGINAL
-    // instance to the caller, who expects the component's public handle (scrollTo, …).
-    const captureRef = (instance: unknown): void => {
-      nodeRef.current = resolveHostNode(instance);
-      assignRef(forwardedRef, instance);
-    };
+    // Стабильный ref, как у RN: пока `ref` приложения тот же, он не отцепляется и не цепляется
+    // заново на каждый рендер. Приложению уходит исходный instance, а узлу для привязки - host node
+    const captureRef = useCallback(
+      (instance: unknown): void => {
+        nodeRef.current = resolveHostNode(instance);
+        assignRef(forwardedRef, instance);
+      },
+      [forwardedRef],
+    );
 
-    // Reduced props are P-shaped (animated nodes already replaced by values); add the
-    // capture ref. Build via Object.assign so the merged object stays typed as P & ref
-    // without a cast. createElement then accepts it for the generic base component.
+    // Object.assign держит тип P & ref без приведения, `createElement` принимает его для базы
     const reduced = reduceProps(rest);
     // Override the committed style with the explicit passthrough values (last wins via the style
     // array, which the commit layer flattens) so the ShadowTree carries the current transform.

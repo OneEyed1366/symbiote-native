@@ -213,6 +213,7 @@ void installBindings(jsi::Runtime &runtime) {
   install("teardownSubtreesOf", 1, &Tree::teardownSubtreesOf);
   install("ancestorsOf", 1, &Tree::ancestorsOf);
   install("committedRecordOf", 1, &Tree::committedRecordOf);
+  install("shadowNodeOf", 1, &Tree::shadowNodeOf);
   // A TEST read, and it is on this list rather than behind a build flag because the bag it returns
   // is already retained per node for diffing — see `Tree::committedPayloadOf` for why the complete
   // props read-back cannot come from React Native's own `getDebugProps` or `rawProps`.

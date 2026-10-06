@@ -2,9 +2,8 @@
 // per attribute (aria-checked folds against a sibling accessibilityState), so it belongs at the
 // one point where the whole bag is known, the payload build.
 
-// A move, not a rewrite: the function carries two contradictory precedence rules — scalars let an
-// explicit accessibility* win, alias only fills a hole; the composites let the alias win per field
-// instead. Both mirror RN's View.js. accessibility-props.test.ts pins both directions.
+// The alias wins everywhere, as in RN's View.js: a scalar is assigned over the explicit prop and a
+// composite field is `alias ?? existing`. accessibility-props.test.ts pins both
 
 // Record-level rather than typed: the engine's caller has a raw node.props bag with no index
 // signature. The typed resolveAccessibilityProps<T> in core/components delegates here.
@@ -84,6 +83,88 @@ function fieldOf(source: unknown, field: string): unknown {
   return isRecord(source) ? source[field] : undefined;
 }
 
+function anyDefined(values: readonly unknown[]): boolean {
+  for (const value of values) {
+    if (value !== undefined) return true;
+  }
+  return false;
+}
+
+// Every scalar alias is written over the explicit prop, one input can feed two outputs and the
+// second is conditional on the VALUE rather than on presence
+function foldScalarAliases(
+  bag: Record<string, unknown>,
+  props: Readonly<Record<string, unknown>>,
+): void {
+  const role = props.role;
+  const ariaLabelledBy = props['aria-labelledby'];
+  const ariaLive = props['aria-live'];
+  const ariaHidden = props['aria-hidden'];
+
+  if (typeof ariaLabelledBy === 'string') {
+    bag.accessibilityLabelledBy = ariaLabelledBy.split(/\s*,\s*/g);
+  }
+  if (props['aria-label'] !== undefined) {
+    bag.accessibilityLabel = props['aria-label'];
+  }
+  if (ariaLive !== undefined) {
+    bag.accessibilityLiveRegion = ariaLive === 'off' ? 'none' : ariaLive;
+  }
+  if (ariaHidden !== undefined) {
+    bag.accessibilityElementsHidden = ariaHidden;
+    if (ariaHidden === true) {
+      bag.importantForAccessibility = 'no-hide-descendants';
+    }
+  }
+  if (props['aria-modal'] !== undefined) {
+    bag.accessibilityViewIsModal = props['aria-modal'];
+  }
+  if (typeof role === 'string') {
+    bag.accessibilityRole = ROLE_TO_ACCESSIBILITY_ROLE[role] ?? role;
+  }
+}
+
+// Upstream bug, ported verbatim: `checked: ariaChecked ?? accessibilityState?.checked` has no
+// coercion, so a string "true" reaches native (aria-fold-parity.test.ts pins it)
+// The composite is rebuilt from the known fields only, an unknown incoming field is dropped
+function foldAccessibilityState(
+  props: Readonly<Record<string, unknown>>,
+): Record<string, unknown> | undefined {
+  const existing = fieldOf(props, 'accessibilityState');
+  const busy = props['aria-busy'];
+  const checked = props['aria-checked'];
+  const disabled = props['aria-disabled'];
+  const expanded = props['aria-expanded'];
+  const selected = props['aria-selected'];
+  if (!anyDefined([existing, busy, checked, disabled, expanded, selected])) {
+    return undefined;
+  }
+  return {
+    busy: busy ?? fieldOf(existing, 'busy'),
+    checked: checked ?? fieldOf(existing, 'checked'),
+    disabled: disabled ?? fieldOf(existing, 'disabled'),
+    expanded: expanded ?? fieldOf(existing, 'expanded'),
+    selected: selected ?? fieldOf(existing, 'selected'),
+  };
+}
+
+function foldAccessibilityValue(
+  props: Readonly<Record<string, unknown>>,
+): Record<string, unknown> | undefined {
+  const existing = fieldOf(props, 'accessibilityValue');
+  const max = props['aria-valuemax'];
+  const min = props['aria-valuemin'];
+  const now = props['aria-valuenow'];
+  const text = props['aria-valuetext'];
+  if (!anyDefined([existing, max, min, now, text])) return undefined;
+  return {
+    max: max ?? fieldOf(existing, 'max'),
+    min: min ?? fieldOf(existing, 'min'),
+    now: now ?? fieldOf(existing, 'now'),
+    text: text ?? fieldOf(existing, 'text'),
+  };
+}
+
 // Fold the web-alias aria-*/role props into RN's canonical accessibility* props. Returns the input
 // by identity when no alias is present, keeping this off the hot path for nodes carrying none —
 // and idempotent, since pass 1 blanks every alias so a second pass finds nothing.
@@ -98,106 +179,16 @@ export function foldAriaProps(
 
   dlog('foldAriaProps: folding aria/role aliases into accessibility* props');
 
-  const role = bag.role;
-  const ariaLabel = bag['aria-label'];
-  const ariaLabelledBy = bag['aria-labelledby'];
-  const ariaLive = bag['aria-live'];
-  const ariaHidden = bag['aria-hidden'];
-  const ariaBusy = bag['aria-busy'];
-  const ariaChecked = bag['aria-checked'];
-  const ariaDisabled = bag['aria-disabled'];
-  const ariaExpanded = bag['aria-expanded'];
-  const ariaSelected = bag['aria-selected'];
-  const ariaModal = bag['aria-modal'];
-  const ariaValueMax = bag['aria-valuemax'];
-  const ariaValueMin = bag['aria-valuemin'];
-  const ariaValueNow = bag['aria-valuenow'];
-  const ariaValueText = bag['aria-valuetext'];
-
   for (let index = 0; index < ARIA_ALIAS_KEYS.length; index += 1) {
     bag[ARIA_ALIAS_KEYS[index]] = undefined;
   }
 
-  // RULE ONE, for every scalar: the explicit prop WINS, the alias only fills a hole.
-  if (
-    typeof ariaLabelledBy === 'string' &&
-    bag.accessibilityLabelledBy === undefined
-  ) {
-    bag.accessibilityLabelledBy = ariaLabelledBy.split(/\s*,\s*/g);
-  }
-
-  if (ariaLabel !== undefined && bag.accessibilityLabel === undefined) {
-    bag.accessibilityLabel = ariaLabel;
-  }
-
-  if (ariaLive !== undefined && bag.accessibilityLiveRegion === undefined) {
-    bag.accessibilityLiveRegion = ariaLive === 'off' ? 'none' : ariaLive;
-  }
-
-  // One input, TWO outputs, and the second is conditional on the VALUE rather than on presence.
-  if (ariaHidden !== undefined) {
-    if (bag.accessibilityElementsHidden === undefined) {
-      bag.accessibilityElementsHidden = ariaHidden;
-    }
-    if (ariaHidden === true && bag.importantForAccessibility === undefined) {
-      bag.importantForAccessibility = 'no-hide-descendants';
-    }
-  }
-
-  if (ariaModal !== undefined && bag.accessibilityViewIsModal === undefined) {
-    bag.accessibilityViewIsModal = ariaModal;
-  }
-
-  if (typeof role === 'string' && bag.accessibilityRole === undefined) {
-    bag.accessibilityRole = ROLE_TO_ACCESSIBILITY_ROLE[role] ?? role;
-  }
-
-  // Rule two, inside the composites: the polarity inverts and the alias wins per field. Read from
-  // the original props, not bag — the loop above has already blanked the aliases there.
-
-  // Upstream bug, ported verbatim: RN's View.js does `checked: ariaChecked ?? accessibilityState
-  // ?.checked` with no coercion, so a string "true" reaches native where it declares boolean |
-  // 'mixed'. No cast without recording a divergence (aria-fold-parity.test.ts pins it).
-
-  // A second, smaller divergence, ours rather than upstream's: upstream gates the composite on
-  // `!= null`, this on `!== undefined`, so `aria-busy={null}` builds an all-undefined
-  // accessibilityState here but nothing upstream — the values agree either way.
-
-  // The composite is replaced by a fresh literal listing exactly the known fields, so an unknown
-  // field riding on the incoming object is dropped, faithful to RN.
-  const existingState = fieldOf(props, 'accessibilityState');
-  if (
-    existingState !== undefined ||
-    ariaBusy !== undefined ||
-    ariaChecked !== undefined ||
-    ariaDisabled !== undefined ||
-    ariaExpanded !== undefined ||
-    ariaSelected !== undefined
-  ) {
-    bag.accessibilityState = {
-      busy: ariaBusy ?? fieldOf(existingState, 'busy'),
-      checked: ariaChecked ?? fieldOf(existingState, 'checked'),
-      disabled: ariaDisabled ?? fieldOf(existingState, 'disabled'),
-      expanded: ariaExpanded ?? fieldOf(existingState, 'expanded'),
-      selected: ariaSelected ?? fieldOf(existingState, 'selected'),
-    };
-  }
-
-  const existingValue = fieldOf(props, 'accessibilityValue');
-  if (
-    existingValue !== undefined ||
-    ariaValueMax !== undefined ||
-    ariaValueMin !== undefined ||
-    ariaValueNow !== undefined ||
-    ariaValueText !== undefined
-  ) {
-    bag.accessibilityValue = {
-      max: ariaValueMax ?? fieldOf(existingValue, 'max'),
-      min: ariaValueMin ?? fieldOf(existingValue, 'min'),
-      now: ariaValueNow ?? fieldOf(existingValue, 'now'),
-      text: ariaValueText ?? fieldOf(existingValue, 'text'),
-    };
-  }
+  // Each helper reads the original props, the loop above has already blanked the aliases in bag
+  foldScalarAliases(bag, props);
+  const state = foldAccessibilityState(props);
+  if (state !== undefined) bag.accessibilityState = state;
+  const value = foldAccessibilityValue(props);
+  if (value !== undefined) bag.accessibilityValue = value;
 
   return bag;
 }

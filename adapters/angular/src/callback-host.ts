@@ -73,6 +73,7 @@ const CALLBACK_INPUTS = [
   'onResponderStart',
   'onResponderTerminate',
   'onResponderTerminationRequest',
+  'onScrollAnimationEnd',
   'onScrollBeginDrag',
   'onScrollEndDrag',
   'onScrollToTop',
@@ -101,7 +102,7 @@ export const CALLBACK_ATTRIBUTE_SELECTOR =
   '[onMoveShouldSetResponderCapture],[onPartialLoad],[onPress],[onPressIn],[onPressMove],' +
   '[onPressOut],[onProgress],[onRefresh],[onResponderEnd],[onResponderGrant],[onResponderMove],' +
   '[onResponderReject],[onResponderRelease],[onResponderStart],[onResponderTerminate],' +
-  '[onResponderTerminationRequest],[onScrollBeginDrag],[onScrollEndDrag],[onScrollToTop],' +
+  '[onResponderTerminationRequest],[onScrollAnimationEnd],[onScrollBeginDrag],[onScrollEndDrag],[onScrollToTop],' +
   '[onSelectionChange],[onStartShouldSetResponder],[onStartShouldSetResponderCapture],' +
   '[onSubmitEditing],[onValueChange]';
 
@@ -117,7 +118,7 @@ export const CALLBACK_INPUT_NAMES: readonly string[] = CALLBACK_INPUTS;
     '[onMoveShouldSetResponderCapture],[onPartialLoad],[onPress],[onPressIn],[onPressMove],' +
     '[onPressOut],[onProgress],[onRefresh],[onResponderEnd],[onResponderGrant],[onResponderMove],' +
     '[onResponderReject],[onResponderRelease],[onResponderStart],[onResponderTerminate],' +
-    '[onResponderTerminationRequest],[onScrollBeginDrag],[onScrollEndDrag],[onScrollToTop],' +
+    '[onResponderTerminationRequest],[onScrollAnimationEnd],[onScrollBeginDrag],[onScrollEndDrag],[onScrollToTop],' +
     '[onSelectionChange],[onStartShouldSetResponder],[onStartShouldSetResponderCapture],' +
     '[onSubmitEditing],[onValueChange]',
   // DECLARED, and this is not an optimisation — it is what makes withholding the tag directives
@@ -168,6 +169,7 @@ export const CALLBACK_INPUT_NAMES: readonly string[] = CALLBACK_INPUTS;
     'onResponderStart',
     'onResponderTerminate',
     'onResponderTerminationRequest',
+    'onScrollAnimationEnd',
     'onScrollBeginDrag',
     'onScrollEndDrag',
     'onScrollToTop',

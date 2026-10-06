@@ -37,6 +37,12 @@ type INativeImageLoader = {
   // The arg is optional so the iOS call passes exactly one — a second arg makes the bridgeless
   // TurboModule throw "Exception in HostFunction".
   prefetchImage(uri: string, requestId?: number): Promise<unknown>;
+  // iOS only, and an older host may not have it
+  prefetchImageWithMetadata?(
+    uri: string,
+    queryRootName: string,
+    rootTag: number,
+  ): Promise<unknown>;
   abortRequest?(requestId: number): void;
   queryCache(uris: string[]): Promise<unknown>;
 };
@@ -85,6 +91,11 @@ function requireLoader(method: string): INativeImageLoader {
   return loader;
 }
 
+// A throw inside `load`, a missing module included, becomes a rejection like any native failure
+async function sizeOf(load: () => Promise<unknown>): Promise<IImageSize> {
+  return toImageSize(await load());
+}
+
 // Image.ios.js / Image.android.js: the promise when no success callback is given; otherwise the
 // result goes to the callbacks and nothing is returned, a missing `failure` becoming a warning.
 function deliverSize(
@@ -116,9 +127,7 @@ function getSize(
   success?: ISizeSuccess,
   failure?: ISizeFailure,
 ): Promise<IImageSize> | undefined {
-  const promise = Promise.resolve()
-    .then(() => requireLoader('getSize').getSize(uri))
-    .then(toImageSize);
+  const promise = sizeOf(() => requireLoader('getSize').getSize(uri));
   return deliverSize(promise, uri, success, failure);
 }
 
@@ -138,21 +147,19 @@ function getSizeWithHeaders(
   success?: ISizeSuccess,
   failure?: ISizeFailure,
 ): Promise<IImageSize> | undefined {
-  const promise = Promise.resolve()
-    .then(() =>
-      requireLoader('getSizeWithHeaders').getSizeWithHeaders(uri, headers),
-    )
-    .then(toImageSize);
+  const promise = sizeOf(() =>
+    requireLoader('getSizeWithHeaders').getSizeWithHeaders(uri, headers),
+  );
   return deliverSize(promise, uri, success, failure);
 }
+
+const ANDROID_OS = 'android';
 
 // Android keys an in-flight prefetch by a monotonic requestId (so abortRequest can cancel it);
 // RN's Image.android.js generates the same way. iOS ignores the arg.
 let prefetchRequestId = 0;
 
-// Download a remote image into the disk cache. Resolves to whether it succeeded. `callback`
-// receives the requestId (RN's Image.android.js shape) so the caller can later pass it to
-// abortPrefetch.
+// Resolves to whether native fetched it, `callback` gets the `requestId` for `abortPrefetch`
 async function prefetch(
   uri: string,
   callback?: (requestId: number) => void,
@@ -160,22 +167,39 @@ async function prefetch(
   prefetchRequestId += 1;
   const requestId = prefetchRequestId;
   if (typeof callback === 'function') callback(requestId);
-  const loader = requireLoader('prefetch');
-  return (
-    Promise.resolve()
-      // Android's prefetchImage keys an abortable request on requestId; iOS takes ONLY the uri and
-      // throws on an extra arg (bridgeless TurboModule arg-count check). Match RN's per-platform call.
-      .then(() =>
-        Platform.OS === 'android'
-          ? loader.prefetchImage(uri, requestId)
-          : loader.prefetchImage(uri),
-      )
-      .then(result => result === true)
-      .catch((error: unknown) => {
-        dlog(`Image.prefetch failed for ${uri}: ${String(error)}`);
-        throw error;
-      })
+  try {
+    const loader = requireLoader('prefetch');
+    // iOS takes only the uri, an extra arg throws in the bridgeless TurboModule
+    const result =
+      Platform.OS === ANDROID_OS
+        ? await loader.prefetchImage(uri, requestId)
+        : await loader.prefetchImage(uri);
+    return result === true;
+  } catch (error: unknown) {
+    dlog(`Image.prefetch failed for ${uri}: ${String(error)}`);
+    throw error;
+  }
+}
+
+// iOS hands native the query root and a root tag (0 when absent), Android is plain `prefetch`
+async function prefetchWithMetadata(
+  uri: string,
+  queryRootName: string,
+  rootTag?: number,
+  callback?: (requestId: number) => void,
+): Promise<boolean> {
+  const loader = requireLoader('prefetchWithMetadata');
+  const withMetadata = loader.prefetchImageWithMetadata;
+  if (Platform.OS === ANDROID_OS || withMetadata === undefined) {
+    return prefetch(uri, callback);
+  }
+  const result = await withMetadata.call(
+    loader,
+    uri,
+    queryRootName,
+    rootTag ?? 0,
   );
+  return result === true;
 }
 
 // Cancel an in-flight prefetch by the requestId prefetch handed back. Android only (mirrors
@@ -243,6 +267,7 @@ export type IImageStatics = {
   getSize: typeof getSize;
   getSizeWithHeaders: typeof getSizeWithHeaders;
   prefetch: typeof prefetch;
+  prefetchWithMetadata: typeof prefetchWithMetadata;
   abortPrefetch: typeof abortPrefetch;
   queryCache: typeof queryCache;
   resolveAssetSource: typeof resolveAssetSource;
@@ -252,6 +277,7 @@ export const imageStatics: IImageStatics = {
   getSize,
   getSizeWithHeaders,
   prefetch,
+  prefetchWithMetadata,
   abortPrefetch,
   queryCache,
   resolveAssetSource,

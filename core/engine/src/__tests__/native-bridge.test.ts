@@ -14,9 +14,9 @@ import {
   type IEventSubscription,
 } from '../index';
 
-interface IFakeStatusBar {
+type IFakeStatusBar = {
   setHidden(hidden: boolean): void;
-}
+};
 
 type IDeviceHub = { emit: (eventType: string, ...args: unknown[]) => void };
 
@@ -145,7 +145,7 @@ describe('getEnforcingNativeModule', () => {
     // a missing autolink until a user reports the feature "does nothing".
     it('throws naming the missing module', () => {
       expect(() => getEnforcingNativeModule('NopeManager')).toThrow(
-        /NopeManager.*not registered/,
+        /NopeManager.*could not be found/,
       );
     });
   });

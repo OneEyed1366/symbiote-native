@@ -6,8 +6,10 @@
 // animated entries into a plain flat object the props leaf hoists onto the view.
 
 import { AnimatedNode, AnimatedWithChildren } from './graph';
+import { animatedNodeOrObject } from './object';
 import { flattenStyle } from '../style';
 import type { INativeNodeConfig } from './native/native-animated';
+import { validateStyles, validateTransform } from './native/validation';
 
 // A transform entry is a single-key object: `{ translateX: <number|node> }`.
 // We only walk the first level (the value of the one key), matching RN.
@@ -24,6 +26,15 @@ function transformDataType(value: unknown): unknown {
   if (value.endsWith('deg')) return ((parseFloat(value) || 0) * Math.PI) / 180;
   if (value.endsWith('rad')) return parseFloat(value) || 0;
   return value;
+}
+
+// Значение вида `translate: [x, y]` держит узлы внутри массива, оборачиваем его в `AnimatedObject`
+function withObjectNodes(entry: ITransformEntry): ITransformEntry {
+  const out: ITransformEntry = {};
+  for (const key of Object.keys(entry)) {
+    out[key] = animatedNodeOrObject(entry[key]) ?? entry[key];
+  }
+  return out;
 }
 
 // Collect the AnimatedNodes nested directly under a list of transform entries,
@@ -51,7 +62,8 @@ export class AnimatedTransform extends AnimatedWithChildren {
     if (!Array.isArray(transforms)) return undefined;
     const entries: ITransformEntry[] = [];
     for (const entry of transforms) {
-      if (typeof entry === 'object' && entry !== null) entries.push(entry);
+      if (typeof entry === 'object' && entry !== null)
+        entries.push(withObjectNodes(entry));
     }
     const nodes = animatedNodesInTransforms(entries);
     if (nodes.length === 0) return undefined;
@@ -105,7 +117,11 @@ export class AnimatedTransform extends AnimatedWithChildren {
   // Native: one entry per transform, animated entries pointing at their value's
   // native tag, static ones carrying the (angle-normalized) literal.
   override __getNativeConfig(): INativeNodeConfig {
-    const transforms: Record<string, unknown>[] = [];
+    const transforms: {
+      type: string;
+      property: string;
+      [key: string]: unknown;
+    }[] = [];
     for (const entry of this.transforms) {
       for (const key of Object.keys(entry)) {
         const value = entry[key];
@@ -125,8 +141,19 @@ export class AnimatedTransform extends AnimatedWithChildren {
         }
       }
     }
+    validateTransform(transforms);
     return { type: 'transform', transforms };
   }
+}
+
+// Узел для значения стиля: transform, сам анимированный узел или вложенный объект
+// вроде `shadowOffset: {width: anim}`
+function animatedNodeFor(
+  key: string,
+  value: unknown,
+): AnimatedNode | undefined {
+  if (key === 'transform') return AnimatedTransform.from(value);
+  return animatedNodeOrObject(value);
 }
 
 export class AnimatedStyle extends AnimatedWithChildren {
@@ -143,20 +170,9 @@ export class AnimatedStyle extends AnimatedWithChildren {
     const nodes: AnimatedNode[] = [];
     for (const key of Object.keys(flat)) {
       const value = Reflect.get(flat, key);
-      if (key === 'transform') {
-        const transformNode = AnimatedTransform.from(value);
-        if (transformNode !== undefined) {
-          style[key] = transformNode;
-          nodes.push(transformNode);
-        } else {
-          style[key] = value;
-        }
-      } else if (isAnimatedNode(value)) {
-        style[key] = value;
-        nodes.push(value);
-      } else {
-        style[key] = value;
-      }
+      const node = animatedNodeFor(key, value);
+      style[key] = node ?? value;
+      if (node !== undefined) nodes.push(node);
     }
     if (nodes.length === 0) return undefined;
     return new AnimatedStyle(style, nodes);
@@ -177,6 +193,18 @@ export class AnimatedStyle extends AnimatedWithChildren {
     return out;
   }
 
+  // Узлы остаются, статические ключи берутся из нового стиля: лист, который не пересобрали,
+  // не должен писать во вью прошлые значения
+  refreshStatics(styleProp: unknown): void {
+    const flat = flattenStyle(styleProp);
+    for (const key of Object.keys(this.style)) {
+      if (!isAnimatedNode(this.style[key])) delete this.style[key];
+    }
+    for (const key of Object.keys(flat)) {
+      if (!isAnimatedNode(this.style[key])) this.style[key] = flat[key];
+    }
+  }
+
   override __getAnimatedValue(): Record<string, unknown> {
     const out: Record<string, unknown> = {};
     for (const key of Object.keys(this.style)) {
@@ -195,8 +223,7 @@ export class AnimatedStyle extends AnimatedWithChildren {
     super.__detach();
   }
 
-  // Native: map each animated style key to its value's native tag.
-  // Static keys are not in the native style node. The view already carries them.
+  // В native уходят только анимированные ключи, статические уже есть во вью
   override __getNativeConfig(): INativeNodeConfig {
     const style: Record<string, number> = {};
     for (const key of Object.keys(this.style)) {
@@ -206,6 +233,7 @@ export class AnimatedStyle extends AnimatedWithChildren {
         style[key] = value.__getNativeTag();
       }
     }
+    validateStyles(style);
     return { type: 'style', style };
   }
 }

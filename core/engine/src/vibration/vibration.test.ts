@@ -95,14 +95,23 @@ describe('Vibration (iOS build -> JS scheduler)', () => {
     expect(vibrateArg).toBeUndefined(); // the second call's immediate buzz never ran
   });
 
-  it('cancel() reaches native cancel()', () => {
+  // У нативного iOS `cancel` реализации нет, он пишет RCTLogError
+  it('cancel() does not call native cancel()', () => {
     iosVibration.cancel();
-    expect(canceled).toBe(true);
+    expect(canceled).toBe(false);
   });
 
-  // why: cancel's stopPattern hook resets the scheduler's `vibrating` flag — without it, a
-  // canceled pattern would permanently block every future vibrate() call via the
-  // already-vibrating reentrancy guard.
+  // RN: число во время паттерна игнорируется
+  it('a number vibrate() while a pattern is running is ignored', () => {
+    vi.useFakeTimers();
+    iosVibration.vibrate([0, 500]);
+    vibrateArg = undefined;
+
+    iosVibration.vibrate(100);
+    expect(vibrateArg).toBeUndefined();
+  });
+
+  // Иначе отменённый паттерн навсегда блокирует `vibrate()`
   it('cancel() clears the scheduler so a new pattern can start immediately', () => {
     vi.useFakeTimers();
     iosVibration.vibrate([0, 500]);
@@ -138,6 +147,18 @@ describe('Vibration (Android build -> native vibrateByPattern)', () => {
   it('cancel() reaches native cancel()', () => {
     androidVibration.cancel();
     expect(canceled).toBe(true);
+  });
+});
+
+describe('Vibration (a pattern that is neither number nor array)', () => {
+  it.each([
+    ['ios', () => iosVibration],
+    ['android', () => androidVibration],
+  ])('%s throws like RN', (_platform, vibration) => {
+    const bad: unknown = JSON.parse('"x"');
+    expect(() => Reflect.apply(vibration().vibrate, undefined, [bad])).toThrow(
+      'Vibration pattern should be a number or array',
+    );
   });
 });
 

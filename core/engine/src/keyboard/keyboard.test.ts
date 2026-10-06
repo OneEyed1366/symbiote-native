@@ -12,13 +12,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IKeyboardEvent } from './index';
 
-interface IDeviceHub {
+type IDeviceHub = {
   emit: (eventType: string, ...args: unknown[]) => void;
-}
-interface ILayoutAnimationCall {
+};
+type ILayoutAnimationCall = {
   duration: number;
   updateType: unknown;
-}
+};
 
 const ROOT_TAG = 88;
 
@@ -252,6 +252,24 @@ describe('Keyboard', () => {
       Keyboard.scheduleLayoutAnimation(noDuration);
       expect(layoutAnimationCalls).toHaveLength(0);
     });
+
+    // RN берет тип `keyboard`, если `easing` равен null или его нет в `Types`
+    it.each([
+      ['null', 'null', 'keyboard'],
+      ['linear', '"linear"', 'linear'],
+      ['unknown', '"no-such-type"', 'keyboard'],
+    ])(
+      'maps a %s easing onto the layout animation type',
+      (_label, easing, type) => {
+        const event: IKeyboardEvent = JSON.parse(
+          `{"duration":12,"easing":${easing},"endCoordinates":{"screenX":0,"screenY":0,"width":1,"height":1}}`,
+        );
+        Keyboard.scheduleLayoutAnimation(event);
+        expect(layoutAnimationCalls).toEqual([
+          { duration: 12, updateType: type },
+        ]);
+      },
+    );
 
     // why: RN's removeAllListeners goes to the device emitter itself, so it also drops
     // Keyboard's own didShow tracking — a later show is no longer seen.

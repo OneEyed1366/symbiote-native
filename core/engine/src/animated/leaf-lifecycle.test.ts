@@ -136,10 +136,7 @@ describe('AnimatedProps reconcile against a stable-identity props object (Positi
     lifecycle.teardown();
   });
 
-  // why: the skip is explicitly gated on `!nodeChanged` (leaf-lifecycle.ts's own
-  // comment) — rebinding an already-native leaf to a DIFFERENT host (e.g. the component's
-  // `bind:this` target swaps) must not be mistaken for "nothing changed" just because the props
-  // content is byte-identical.
+  // Смена хоста у нативного листа - это изменение, даже если props те же
   it('rebuilds when the host node identity changes, even with unchanged rest content', () => {
     const lifecycle = createAnimatedLeafLifecycle('test');
     const scroll = new AnimatedValue(0);
@@ -166,10 +163,23 @@ describe('AnimatedProps reconcile against a stable-identity props object (Positi
     lifecycle.teardown();
   });
 
-  // why: the skip is also gated on `!wantsNativeChanged` — a component whose native opt-in
-  // flips (e.g. `passthroughAnimatedPropExplicitValues` becomes/stops being present) must rebuild
-  // even though nothing else about the call differs, or the leaf keeps whatever native/JS mode it
-  // happened to be built with.
+  // Порт идеи `createAnimatedPropsMemoHook`: меняется обычный проп и объект style, узел тот же
+  it('does not rebuild when only a plain prop and the style object change', () => {
+    const lifecycle = createAnimatedLeafLifecycle('test');
+    const opacity = new AnimatedValue(1);
+
+    lifecycle.reconcile({ width: 1, style: { opacity } }, null, true);
+    const attached = opacity.__getChildren()[0];
+
+    lifecycle.reconcile({ width: 2, style: { opacity } }, null, true);
+
+    expect(opacity.__getChildren()[0]).toBe(attached);
+    expect(opacity.__getChildren().length).toBe(1);
+
+    lifecycle.teardown();
+  });
+
+  // Смена флага native пересобирает лист, иначе он остаётся в режиме, в котором был собран
   it('rebuilds when wantsNative flips, even with unchanged rest and node', () => {
     const lifecycle = createAnimatedLeafLifecycle('test');
     const scroll = new AnimatedValue(0);
@@ -195,12 +205,8 @@ describe('AnimatedProps reconcile against a stable-identity props object (Positi
     lifecycle.teardown();
   });
 
-  // why: the skip is gated on the leaf ALREADY being native, and that gate is load-bearing in the
-  // opposite direction from the rest of this file. Before the first native connection, reconcile
-  // must run on every call - that cadence is what wires a rebuilt interpolation into the shared
-  // value's children. Skipping there would leave a fresh interpolation never attached, so its
-  // listener never fires and the debounce that promotes the chain to native never settles: the
-  // exact bootstrap deadlock the gate exists to avoid.
+  // До первой нативной привязки reconcile идёт каждый раз, иначе новая интерполяция не прицепится
+  // к значению и цепочка никогда не уйдёт в native
   it('never skips while still JS-driven, even on byte-identical repeat calls', () => {
     const lifecycle = createAnimatedLeafLifecycle('test');
     const scroll = new AnimatedValue(0);
@@ -225,9 +231,33 @@ describe('AnimatedProps reconcile against a stable-identity props object (Positi
     lifecycle.teardown();
   });
 
-  // why: teardown() is the only path that runs on unmount ($effect(() => () => lifecycle.teardown())
-  // in every Animated.* component) — if it left the leaf attached, an unmounted component would
-  // keep receiving native/graph updates and leak a child edge on the shared Value forever.
+  // Flush пишет props целиком, поэтому оставленный лист обязан нести актуальную статику
+  it('hands the new plain props and static style keys to a kept leaf', () => {
+    const lifecycle = createAnimatedLeafLifecycle('test');
+    const opacity = new AnimatedValue(1);
+
+    lifecycle.reconcile(
+      { width: 1, style: { opacity, height: 10 } },
+      null,
+      true,
+    );
+    const kept = opacity.__getChildren()[0]?.__getChildren()[0];
+    lifecycle.reconcile(
+      { width: 2, style: { opacity, height: 20 } },
+      null,
+      true,
+    );
+
+    expect(opacity.__getChildren()[0]?.__getChildren()[0]).toBe(kept);
+    expect(kept?.__getValue()).toEqual({
+      width: 2,
+      style: { opacity: 1, height: 20 },
+    });
+
+    lifecycle.teardown();
+  });
+
+  // teardown единственный путь при unmount, иначе размонтированный компонент течёт ребром
   it('teardown detaches the attached leaf from the graph', () => {
     const lifecycle = createAnimatedLeafLifecycle('test');
     const scroll = new AnimatedValue(0);

@@ -10,7 +10,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-interface ICapturedArgs {
+type ICapturedArgs = {
   title: string;
   message?: string;
   buttons: Array<Record<number, string>>;
@@ -18,16 +18,16 @@ interface ICapturedArgs {
   cancelButtonKey?: string;
   destructiveButtonKey?: string;
   preferredButtonKey?: string;
-}
+};
 
-interface IDialogConfig {
+type IDialogConfig = {
   title: string;
   message: string;
   cancelable: boolean;
   buttonPositive?: string;
   buttonNegative?: string;
   buttonNeutral?: string;
-}
+};
 
 const ANDROID_CONSTANTS = {
   buttonClicked: 'buttonClicked',
@@ -157,10 +157,7 @@ describe('Alert (iOS build -> AlertManager)', () => {
       expect(okPressed).toBe(true);
     });
 
-    // why: prompt() maps each button's style to the matching native key (cancelButtonKey /
-    // destructiveButtonKey / preferredButtonKey) by its INDEX — a native alert relies on these
-    // to render the destructive row in red and the preferred row in bold, distinct from which
-    // button's onPress eventually fires.
+    // Стиль кнопки уходит в native ключом по индексу, по нему рисуются destructive и preferred
     it('maps button style/isPreferred to cancelButtonKey/destructiveButtonKey/preferredButtonKey by index', () => {
       iosAlert.alert('t', 'm', [
         { text: 'Delete', style: 'destructive' },
@@ -182,25 +179,22 @@ describe('Alert (iOS build -> AlertManager)', () => {
   });
 
   describe('trailing textless button — upstream parity', () => {
-    // why: pins a defect we inherit on purpose. A trailing button with no text never reaches the
-    // native dialog, yet its onPress still occupies callbacks[index] and so can never fire -
-    // native has no id to hand back for a button it was never told about. React Native does the
-    // same (Alert.js:173), so the port keeps it; see the UPSTREAM-BUG tag at the call site. This
-    // test exists to catch the day someone "cleans up" that condition without meaning to.
+    // Баг RN `Alert.js:173`: `onPress` такой кнопки уже не сработает, native её не знает
     it('drops a trailing button with no text from the native buttons list', () => {
       iosAlert.alert('t', 'm', [{ text: 'Cancel' }, {}]);
       expect(captured?.buttons).toHaveLength(1);
       expect(captured?.buttons[0][0]).toBe('Cancel');
     });
 
-    // why: the one place this deliberately parts ways with upstream. RN tests `btn.text` for
-    // truthiness, so an explicit empty label is discarded along with a missing one; we test for
-    // `undefined`, because a caller who writes `text: ''` asked for a blank button rather than
-    // no button. Asserting it keeps the divergence intentional instead of accidental.
-    it('keeps a trailing button whose text is explicitly empty', () => {
+    // RN проверяет `btn.text` на truthiness, пустая подпись отбрасывается как и отсутствующая
+    it('drops a trailing button whose text is empty', () => {
       iosAlert.alert('t', 'm', [{ text: 'Cancel' }, { text: '' }]);
-      expect(captured?.buttons).toHaveLength(2);
-      expect(captured?.buttons[1][1]).toBe('');
+      expect(captured?.buttons).toHaveLength(1);
+    });
+
+    it('keeps an empty-text button that is not the last', () => {
+      iosAlert.alert('t', 'm', [{ text: '' }, { text: 'OK' }]);
+      expect(captured?.buttons).toEqual([{ 0: '' }, { 1: 'OK' }]);
     });
   });
 
@@ -253,10 +247,7 @@ describe('Alert (Android build -> DialogManagerAndroid)', () => {
       expect(androidNeutralPressed).toBe(false);
     });
 
-    // why: at most three buttons map onto positive/negative/neutral (`.slice(0, 3)` keeps only
-    // the FIRST three, then pops last-to-first onto positive/negative/neutral) — an app passing
-    // a 4th button must not crash, and that trailing button must be silently dropped rather than
-    // silently replacing one of the first three.
+    // Четвёртая кнопка отбрасывается молча, остальные идут в neutral, negative и positive
     it('more than three buttons: only the first three are used, the rest are dropped', () => {
       androidAlert.alert('t', 'm', [
         { text: 'Neutral' },
@@ -269,9 +260,7 @@ describe('Alert (Android build -> DialogManagerAndroid)', () => {
       expect(capturedConfig?.buttonPositive).toBe('OK');
     });
 
-    // why: RN's Alert.alert() with no buttons array shows a single default "OK" — normalizeButtons
-    // (the shared helper both alert() paths route through) must supply that default rather than
-    // popping up a dialog with zero buttons.
+    // Без массива кнопок RN показывает одну кнопку OK
     it('no buttons supplied defaults to a single OK positive button', () => {
       androidAlert.alert('t', 'm');
       expect(capturedConfig?.buttonPositive).toBe('OK');
@@ -279,8 +268,7 @@ describe('Alert (Android build -> DialogManagerAndroid)', () => {
       expect(capturedConfig?.buttonNeutral).toBeUndefined();
     });
 
-    // why: RN defaults to OK only when `buttons` is ABSENT (`buttons ? buttons.slice(0, 3) :
-    // [{text: 'OK'}]`, Alert.js); an explicit empty array shows a dialog with no buttons.
+    // OK по умолчанию только при отсутствии `buttons`, пустой массив даёт диалог без кнопок
     it('an explicit empty buttons array shows no buttons', () => {
       androidAlert.alert('t', 'm', []);
       expect(capturedConfig?.buttonPositive).toBeUndefined();
@@ -288,9 +276,7 @@ describe('Alert (Android build -> DialogManagerAndroid)', () => {
       expect(capturedConfig?.buttonNeutral).toBeUndefined();
     });
 
-    // why: the 'dismissed' action (back-button / outside-tap on a cancelable dialog) is a
-    // DIFFERENT native action than 'buttonClicked' — it must fire options.onDismiss, not any
-    // button's onPress.
+    // `dismissed` вызывает `onDismiss`, а не `onPress` кнопки
     it('the dismissed action fires options.onDismiss instead of a button onPress', () => {
       installFakeModules({
         alert: fakeAlertManager(),
@@ -315,9 +301,23 @@ describe('Alert (Android build -> DialogManagerAndroid)', () => {
       expect(pressed).toBe(false);
     });
 
-    // why: getConstants() crosses the native trust boundary as `unknown` — a host that returns
-    // a malformed/non-object constants payload must fall back to RN's documented hardwired
-    // button-key defaults rather than crash on undefined key reads.
+    // RN показывает ошибку нативного диалога через `console.warn`
+    it('warns with the native error message', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      installFakeModules({
+        dialog: {
+          getConstants: () => ANDROID_CONSTANTS,
+          showAlert(_config, onError): void {
+            onError('dialog failed');
+          },
+        },
+      });
+      androidAlert.alert('t', 'm');
+      expect(warn).toHaveBeenCalledWith('dialog failed');
+      warn.mockRestore();
+    });
+
+    // `getConstants()` с чужим форматом откатывается на зашитые ключи кнопок
     it('falls back to the documented button-key defaults when getConstants returns something malformed', () => {
       installFakeModules({
         alert: fakeAlertManager(),

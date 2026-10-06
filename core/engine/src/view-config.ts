@@ -32,6 +32,7 @@ const BASE_EVENTS: readonly string[] = [
   'layout',
   'focus',
   'blur',
+  'click',
   ...A11Y_EVENTS,
 ];
 

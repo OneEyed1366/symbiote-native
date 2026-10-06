@@ -47,10 +47,9 @@ function contentNode(): ILiveNode | undefined {
 }
 
 describe('React reaches the scroll view content-size and sticky seams', () => {
-  // why: the behavior installs the content onLayout ONLY when the app passed the callback, so this
-  // is also the proof that React's prop routing delivers a FUNCTION prop to a slot node the
-  // adapter never sees. A `.tsx` call site that type-checks and commits nothing looks identical.
-  it('synthesizes onContentSizeChange from the content onLayout and dedupes', () => {
+  // Content `onLayout` ставится только если приложение передало колбэк, значит функция-проп
+  // доехала до слота, которого адаптер не видит
+  it('synthesizes onContentSizeChange from the content onLayout on every layout', () => {
     mount(
       ROOT_TAG,
       <scroll-view
@@ -72,25 +71,21 @@ describe('React reaches the scroll view content-size and sticky seams', () => {
     expect(contentSizes.length).toBe(1);
     expect(contentSizes[0]).toEqual([320, 800]);
 
-    // Same size again -> deduped, no second call (RN's behavior).
+    // Same size again still reports: RN's `_handleContentOnLayout` has no dedupe
     fabric.fireEvent(content!.instanceHandle, 'topLayout', {
       layout: { x: 0, y: 0, width: 320, height: 800 },
     });
-    expect(contentSizes.length).toBe(1);
-
-    // Changed -> fires again.
-    fabric.fireEvent(content!.instanceHandle, 'topLayout', {
-      layout: { x: 0, y: 0, width: 320, height: 1200 },
-    });
     expect(contentSizes.length).toBe(2);
-    expect(contentSizes[1][1]).toBe(1200);
+
+    fabric.fireEvent(content!.instanceHandle, 'topLayout', {
+      layout: { x: 0, y: 0, width: 320, height: 1_200 },
+    });
+    expect(contentSizes.length).toBe(3);
+    expect(contentSizes[2][1]).toBe(1_200);
   });
 
-  // why: no native support at all — an un-collapsed view carrying a translateY IS the feature, so
-  // a flattened wrapper would silently kill stickiness. Here the discriminator is that React
-  // committed the hyphenated tag through its own JSX namespace and the behavior found it: a
-  // `<sticky-header>` React failed to resolve would commit as an inert unknown view with none of
-  // these props.
+  // Дефис-тег должен пройти через JSX-namespace React: нераспознанный `<sticky-header>`
+  // закоммитился бы инертным видом без пина
   it('pins a <sticky-header> child written in its own JSX', () => {
     mount(
       ROOT_TAG,
@@ -110,12 +105,7 @@ describe('React reaches the scroll view content-size and sticky seams', () => {
       header,
       'the sticky header is the first content child',
     ).toBeDefined();
-    // THE TAG the engine was told, which is this case's own claim said directly. It used to assert
-    // `collapsable: false` — a proxy for "a behavior attached", and one that expired the day the
-    // pin became a tag rule in `SymbioteFabricProps.cpp` (this harness builds payloads through the
-    // TypeScript `fabricProps`, which carries no copy of the tag rules). What the pin PAINTS is
-    // pinned in `core/engine/cpp/tests/js/sticky-header-payload.itest.ts`; what belongs here is
-    // that React resolved the hyphenated tag and handed it over.
+    // Тег, который получил движок: сам пин проверяет `sticky-header-payload.itest.ts`
     expect(header.tagName).toBe(STICKY_HEADER_TAG);
     expect(header.children[0]?.viewName).toBe('RCTText');
     // The unflagged sibling stays an ordinary, untouched content child.

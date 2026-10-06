@@ -1,49 +1,43 @@
-// VirtualizedSectionList authoring directives: the Angular-faithful equivalent of React/Vue's
-// `renderItem` / `renderSectionHeader` / `renderSectionFooter` / `SectionSeparatorComponent`.
-// React/Vue pass element-returning callbacks; that does NOT translate to Angular, where per-cell
-// content is a TEMPLATE. So the app supplies each section slot as an `<ng-template>` carrying one
-// of these structural directives, and VirtualizedSectionList stamps the windowed slice through
-// them. The shared flatten/window surface stays in @symbiote-native/components, only the cell-AUTHORING shape is
-// framework-specific. SectionList (the next layer) reuses these same directives verbatim.
-//
-// Authoring API (what the app imports and what SectionList builds on):
-//   <VirtualizedSectionList [sections]="sections">
-//     <ng-template vSectionItem let-item let-index="index" let-section="section" let-separators="separators"> … </ng-template>
-//     <ng-template vSectionHeader let-section> … </ng-template>
-//     <ng-template vSectionFooter let-section> … </ng-template>
-//     <ng-template vSectionSeparator> … </ng-template>            <!-- between adjacent sections -->
-//     <!-- list-level slots reuse VirtualizedList's own directives: -->
-//     <ng-template vListHeader> … </ng-template>
-//     <ng-template vListFooter> … </ng-template>
-//     <ng-template vListEmpty> … </ng-template>
-//     <ng-template vListSeparator let-highlighted let-leadingItem="leadingItem"> … </ng-template>  <!-- between items -->
-//   </VirtualizedSectionList>
-//
-// Each directive carries a static ngTemplateContextGuard so the `let-` bindings infer at the call
-// site (the Angular twin of renderItem / renderSectionHeader's typed info arg).
+// Section list slots are `<ng-template>`s carrying these directives, the list stamps the window
+// through them. Each has a context guard so the `let-` bindings infer at the call site
 
 import { Directive, TemplateRef, inject } from '@angular/core';
-import type { ISection, ISeparators } from '@symbiote-native/components';
+import type {
+  ISection as ICoreSection,
+  ISeparators,
+} from '@symbiote-native/components';
+import type { IVListSeparatorContext } from '../virtualized-list';
 
-// The context a `vSectionItem` template receives, mirroring RN's section renderItem info arg
-// ({ item, index, section, separators }). `$implicit` is the item, so `let-item` (no key) binds it.
-export interface IVSectionItemContext<ItemT> {
+// A section may bring its own `item` and `separator` templates, which beat the list's
+export type ISection<ItemT> = ICoreSection<ItemT> & {
+  item?: TemplateRef<IVSectionItemContext<ItemT>>;
+  separator?: TemplateRef<IVListSeparatorContext<ItemT>>;
+};
+
+// The `renderItem` info arg of RN, `$implicit` is the item so `let-item` binds it
+export type IVSectionItemContext<ItemT> = {
   $implicit: ItemT;
   item: ItemT;
   index: number;
   section: ISection<ItemT>;
   separators: ISeparators;
-}
+};
 
-// The context a `vSectionHeader` / `vSectionFooter` template receives (RN's renderSectionHeader /
-// renderSectionFooter info arg, { section }). `$implicit` is the section, so `let-section` (no key)
-// binds it.
-export interface IVSectionContext<ItemT> {
+// The `renderSectionHeader` and `renderSectionFooter` info arg, `$implicit` is the section
+export type IVSectionContext<ItemT> = {
   $implicit: ISection<ItemT>;
   section: ISection<ItemT>;
-}
+};
 
-// `<ng-template vSectionItem>` — one section item row. The static guard types the `let-` bindings.
+// RN's separator props around a section edge, `props` is the same bag whole so a forwarding
+// layer can pass it on without naming every key
+export type IVSectionSeparatorContext<ItemT> = IVListSeparatorContext<ItemT> & {
+  section?: ISection<ItemT>;
+  leadingSection?: ISection<ItemT>;
+  trailingSection?: ISection<ItemT>;
+  props?: IVListSeparatorContext<ItemT>;
+};
+
 @Directive({ selector: '[vSectionItem]', standalone: true })
 export class VSectionItemDirective<ItemT = unknown> {
   readonly templateRef =
@@ -57,7 +51,7 @@ export class VSectionItemDirective<ItemT = unknown> {
   }
 }
 
-// `<ng-template vSectionHeader>` — rendered above each section's items (RN renderSectionHeader).
+// Rendered above each section's items, RN's `renderSectionHeader`
 @Directive({ selector: '[vSectionHeader]', standalone: true })
 export class VSectionHeaderDirective<ItemT = unknown> {
   readonly templateRef =
@@ -71,7 +65,7 @@ export class VSectionHeaderDirective<ItemT = unknown> {
   }
 }
 
-// `<ng-template vSectionFooter>` — rendered below each section's items (RN renderSectionFooter).
+// Rendered below each section's items, RN's `renderSectionFooter`
 @Directive({ selector: '[vSectionFooter]', standalone: true })
 export class VSectionFooterDirective<ItemT = unknown> {
   readonly templateRef =
@@ -85,9 +79,16 @@ export class VSectionFooterDirective<ItemT = unknown> {
   }
 }
 
-// `<ng-template vSectionSeparator>` — painted between adjacent sections (after one section's footer,
-// before the next section's header). Mirrors RN's SectionSeparatorComponent; carries no context.
+// Painted before a section's first item and after its last, RN's `SectionSeparatorComponent`
 @Directive({ selector: '[vSectionSeparator]', standalone: true })
-export class VSectionSeparatorDirective {
-  readonly templateRef = inject(TemplateRef);
+export class VSectionSeparatorDirective<ItemT = unknown> {
+  readonly templateRef =
+    inject<TemplateRef<IVSectionSeparatorContext<ItemT>>>(TemplateRef);
+
+  static ngTemplateContextGuard<T>(
+    _dir: VSectionSeparatorDirective<T>,
+    _ctx: unknown,
+  ): _ctx is IVSectionSeparatorContext<T> {
+    return true;
+  }
 }

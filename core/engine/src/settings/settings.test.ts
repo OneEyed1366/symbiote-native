@@ -8,13 +8,13 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-interface INativeCall {
+type INativeCall = {
   method: string;
   args: unknown[];
-}
-interface IDeviceHub {
+};
+type IDeviceHub = {
   emit: (eventType: string, ...args: unknown[]) => void;
-}
+};
 
 let Settings: typeof import('./index').Settings;
 
@@ -84,22 +84,44 @@ describe('Settings', () => {
     expect(Settings.get('foo')).toBe(2);
   });
 
+  // RN: native ignores updates it caused itself, so a JS `set` never fires a watcher
+  it('a watcher does not fire for the app’s own set', () => {
+    let fooFires = 0;
+    Settings.watchKeys('foo', () => {
+      fooFires += 1;
+    });
+
+    Settings.set({ foo: 3 });
+    expect(fooFires).toBe(0);
+    expect(Settings.get('foo')).toBe(3);
+  });
+
   it('a watcher fires only when its key changes, never for an unrelated key or an unchanged value', () => {
     let fooFires = 0;
     Settings.watchKeys('foo', () => {
       fooFires += 1;
     });
 
-    Settings.set({ bar: 'x' });
+    deviceHub?.emit('settingsUpdated', { bar: 'x' });
     expect(fooFires).toBe(0);
 
-    Settings.set({ foo: 3 });
+    deviceHub?.emit('settingsUpdated', { foo: 3 });
     expect(fooFires).toBe(1);
     expect(Settings.get('foo')).toBe(3);
 
-    // Setting the SAME value again is not a change.
-    Settings.set({ foo: 3 });
+    deviceHub?.emit('settingsUpdated', { foo: 3 });
     expect(fooFires).toBe(1);
+  });
+
+  it('does not fire for a value the app already set itself', () => {
+    let fooFires = 0;
+    Settings.watchKeys('foo', () => {
+      fooFires += 1;
+    });
+
+    Settings.set({ foo: 7 });
+    deviceHub?.emit('settingsUpdated', { foo: 7 });
+    expect(fooFires).toBe(0);
   });
 
   // why: watchKeys accepts a key ARRAY, not just a single key — a real component often
@@ -110,11 +132,18 @@ describe('Settings', () => {
       fires += 1;
     });
 
-    Settings.set({ bar: 'x' });
+    deviceHub?.emit('settingsUpdated', { bar: 'x' });
     expect(fires).toBe(1);
 
-    Settings.set({ foo: 99 });
+    deviceHub?.emit('settingsUpdated', { foo: 99 });
     expect(fires).toBe(2);
+  });
+
+  it('rejects keys that are neither a string nor an array', () => {
+    // @ts-expect-error - a wrong-typed argument is the case under test
+    expect(() => Settings.watchKeys(5, () => {})).toThrow(
+      'keys should be a string or array of strings',
+    );
   });
 
   it('a native settingsUpdated event feeds the snapshot and fires watchers', () => {
@@ -139,7 +168,7 @@ describe('Settings', () => {
       });
 
       Settings.clearWatch(watchId);
-      Settings.set({ foo: 5 });
+      deviceHub?.emit('settingsUpdated', { foo: 5 });
 
       expect(fires).toBe(0);
     });
@@ -160,7 +189,7 @@ describe('Settings', () => {
       });
 
       Settings.clearWatch(watchId);
-      Settings.set({ foo: 6 });
+      deviceHub?.emit('settingsUpdated', { foo: 6 });
 
       expect(fires).toBe(1);
     });
@@ -212,7 +241,7 @@ describe('Settings', () => {
 
       expect(() => fresh.Settings.set({ foo: 1 })).not.toThrow();
       expect(fresh.Settings.get('foo')).toBe(1);
-      expect(fires).toBe(1);
+      expect(fires).toBe(0);
     });
   });
 });

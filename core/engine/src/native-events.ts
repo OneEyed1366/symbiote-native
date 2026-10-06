@@ -24,9 +24,9 @@ declare global {
 
 type IDeviceListener = (...args: unknown[]) => void;
 
-export interface IEventSubscription {
+export type IEventSubscription = {
   remove(): void;
-}
+};
 
 // The single device-event bus. Native pushes into `emit`; subscribers (wrapped by
 // NativeEventEmitter) live in `listeners`, keyed by event name.
@@ -82,16 +82,13 @@ export function installDeviceEventHub(): void {
 
 // The host event bus the app injects: RN's DeviceEventEmitter, the JS module
 // native actually invokes. Its `addListener` returns a removable subscription.
-export interface IDeviceEventSource {
-  addListener(
-    eventType: string,
-    listener: (payload: unknown) => void,
-  ): IEventSubscription;
+export type IDeviceEventSource = {
+  addListener(eventType: string, listener: IDeviceListener): IEventSubscription;
   // RN's DeviceEventEmitter has these; NativeEventEmitter.removeAllListeners / emit use them.
-  removeAllListeners?(eventType: string): void;
+  removeAllListeners?(eventType?: string): void;
   listenerCount?(eventType: string): number;
   emit?(eventType: string, ...args: unknown[]): void;
-}
+};
 
 let injectedSource: IDeviceEventSource | undefined;
 
@@ -102,13 +99,75 @@ export function setDeviceEventSource(source: IDeviceEventSource): void {
   injectedSource = source;
 }
 
+// The host bus delivers raw, so its listener is wrapped to land a `setState` on the sync lane
+function addBusListener(
+  eventType: string,
+  listener: IDeviceListener,
+): IEventSubscription {
+  let removed = false;
+  const subscription = injectedSource?.addListener(eventType, (...args) => {
+    runWrapped(() => listener(...args));
+  });
+  if (subscription === undefined) addRawListener(eventType, listener);
+  return {
+    remove: () => {
+      if (removed) return;
+      removed = true;
+      if (subscription === undefined) removeRawListener(eventType, listener);
+      else subscription.remove();
+    },
+  };
+}
+
+function busListenerCount(eventType: string): number {
+  if (injectedSource !== undefined) {
+    return injectedSource.listenerCount?.(eventType) ?? 0;
+  }
+  return listeners.get(eventType)?.size ?? 0;
+}
+
+function emitOnBus(eventType: string, ...args: unknown[]): void {
+  if (injectedSource === undefined) emit(eventType, ...args);
+  else injectedSource.emit?.(eventType, ...args);
+}
+
+// Without an event name every listener of every event goes, as in RN's `EventEmitter`
+function removeAllFromBus(eventType?: string): void {
+  if (injectedSource !== undefined) {
+    injectedSource.removeAllListeners?.(eventType);
+  } else if (eventType === undefined) {
+    listeners.clear();
+  } else {
+    listeners.delete(eventType);
+  }
+}
+
+// RN's `DeviceEventEmitter` and its alias `NativeAppEventEmitter`: the device bus itself,
+// a listener gets every argument of an emit
+export const DeviceEventEmitter = {
+  addListener(
+    eventType: string,
+    listener: IDeviceListener,
+    context?: unknown,
+  ): IEventSubscription {
+    return addBusListener(eventType, (...args) => {
+      listener.apply(context, args);
+    });
+  },
+  emit: emitOnBus,
+  listenerCount: busListenerCount,
+  removeAllListeners: removeAllFromBus,
+};
+
+export const NativeAppEventEmitter = DeviceEventEmitter;
+
 // A module that emits events tells native when JS starts/stops observing via these
 // counters, so native can lazily begin/end its own observation. Optional: a plain
 // device event (no owning module) needs none.
-export interface IEventEmitterModule {
+export type IEventEmitterModule = {
   addListener(eventType: string): void;
   removeListeners(count: number): void;
-}
+};
 
 // The payload native emitted, untyped at this boundary: shared can't know an event's shape,
 // so the listener gets `unknown` and the consumer narrows with a runtime guard, same as
@@ -125,6 +184,20 @@ function hasObserveCounters(module: IEventEmitterModule): boolean {
   );
 }
 
+// RN warns once per missing method, a module without them is dropped
+function warnAboutMissingCounters(module: IEventEmitterModule): void {
+  if (typeof module.addListener !== 'function') {
+    console.warn(
+      '`new NativeEventEmitter()` was called with a non-null argument without the required `addListener` method.',
+    );
+  }
+  if (typeof module.removeListeners !== 'function') {
+    console.warn(
+      '`new NativeEventEmitter()` was called with a non-null argument without the required `removeListeners` method.',
+    );
+  }
+}
+
 // Subscribe to events for one native module. Mirrors RN's NativeEventEmitter: each
 // `addListener` also pings the module's `addListener` counter, and removal pings
 // `removeListeners`, so native observes only while someone is listening.
@@ -138,51 +211,37 @@ export class NativeEventEmitter {
     if (module !== undefined && hasObserveCounters(module)) {
       this.module = module;
     } else if (module !== undefined) {
-      dlog(
-        'NativeEventEmitter: module lacks addListener/removeListeners; dropping it (counter pings become no-ops)',
-      );
+      warnAboutMissingCounters(module);
     }
+  }
+
+  // The listeners of the event on the device bus, not only this emitter's
+  listenerCount(eventType: string): number {
+    return busListenerCount(eventType);
   }
 
   addListener(
     eventType: string,
     listener: INativeEventListener,
+    context?: unknown,
   ): IEventSubscription {
     // The module counter tells native to START observing; without it (module
     // unresolved) native may never emit. Logged to pinpoint a silent native side.
-    const via = injectedSource !== undefined ? 'host-bus' : 'fallback-hub';
+    const via = injectedSource === undefined ? 'fallback-hub' : 'host-bus';
     dlog(
       `NativeEventEmitter.addListener "${eventType}" ` +
         `module-counter=${this.module ? 'pinged' : 'none'} via=${via}`,
     );
     this.module?.addListener(eventType);
-
-    if (injectedSource !== undefined) {
-      // The host bus delivers raw (no framework flush); wrap so a listener's
-      // setState lands on the sync lane and paints, like Fabric touch events.
-      const subscription = injectedSource.addListener(eventType, payload => {
-        runWrapped(() => listener(payload));
-      });
-      let removed = false;
-      return {
-        remove: () => {
-          if (removed) return;
-          removed = true;
-          subscription.remove();
-          this.module?.removeListeners(1);
-        },
-      };
-    }
-
-    // Fallback bus (headless / non-RN host): the internal hub. Its `emit` wraps.
-    const raw: IDeviceListener = (...args) => listener(args[0]);
-    addRawListener(eventType, raw);
+    const subscription = addBusListener(eventType, (...args) => {
+      listener.call(context, args[0]);
+    });
     let removed = false;
     return {
       remove: () => {
         if (removed) return;
         removed = true;
-        removeRawListener(eventType, raw);
+        subscription.remove();
         this.module?.removeListeners(1);
       },
     };
@@ -190,11 +249,7 @@ export class NativeEventEmitter {
 
   // RN's NativeEventEmitter.emit: a JS-side emit onto the same device bus native feeds.
   emit(eventType: string, ...args: unknown[]): void {
-    if (injectedSource !== undefined) {
-      injectedSource.emit?.(eventType, ...args);
-      return;
-    }
-    emit(eventType, ...args);
+    emitOnBus(eventType, ...args);
   }
 
   // RN's NativeEventEmitter.removeAllListeners: EVERY listener of the event on the device bus goes,
@@ -204,14 +259,7 @@ export class NativeEventEmitter {
       eventType != null,
       '`NativeEventEmitter.removeAllListener()` requires a non-null argument.',
     );
-    if (injectedSource !== undefined) {
-      this.module?.removeListeners(
-        injectedSource.listenerCount?.(eventType) ?? 0,
-      );
-      injectedSource.removeAllListeners?.(eventType);
-      return;
-    }
-    this.module?.removeListeners(listeners.get(eventType)?.size ?? 0);
-    listeners.delete(eventType);
+    this.module?.removeListeners(busListenerCount(eventType));
+    removeAllFromBus(eventType);
   }
 }

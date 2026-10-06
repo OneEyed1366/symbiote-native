@@ -142,11 +142,13 @@ describe('AccessibilityInfo (iOS)', () => {
     expect(await AccessibilityInfo.isInvertColorsEnabled()).toBe(false);
     expect(await AccessibilityInfo.isReduceTransparencyEnabled()).toBe(true);
 
-    // Android-only queries resolve false on the iOS build (no throw, RN parity).
+    // На iOS запрос high text contrast даёт `false`, а запрос сервиса отклоняется
     expect(await AccessibilityInfo.isHighTextContrastEnabled()).toBe(false);
-    expect(await AccessibilityInfo.isAccessibilityServiceEnabled()).toBe(false);
+    await expect(
+      AccessibilityInfo.isAccessibilityServiceEnabled(),
+    ).rejects.toThrow('only available on Android');
 
-    // The newer iOS getters resolve to their module's values (optional methods, present here).
+    // Новые iOS-геттеры опциональны, но в этом fake они есть
     expect(await AccessibilityInfo.isDarkerSystemColorsEnabled()).toBe(true);
     expect(await AccessibilityInfo.prefersCrossFadeTransitions()).toBe(false);
   });
@@ -166,6 +168,35 @@ describe('AccessibilityInfo (iOS)', () => {
     expect(focusedTag).toBe(42);
   });
 
+  // RN вызывает `announceForAccessibilityWithOptions` с теми же options, когда он есть у хоста
+  it('announceForAccessibilityWithOptions forwards options to a host that has it', () => {
+    const received: { announcement: string; options: unknown }[] = [];
+    Object.assign(fakeAccessibilityInfo, {
+      announceForAccessibilityWithOptions: (
+        announcement: string,
+        options: unknown,
+      ): void => {
+        received.push({ announcement, options });
+      },
+    });
+    announced = undefined;
+    try {
+      AccessibilityInfo.announceForAccessibilityWithOptions('queued', {
+        queue: true,
+        priority: 'high',
+      });
+    } finally {
+      Reflect.deleteProperty(
+        fakeAccessibilityInfo,
+        'announceForAccessibilityWithOptions',
+      );
+    }
+    expect(received).toEqual([
+      { announcement: 'queued', options: { queue: true, priority: 'high' } },
+    ]);
+    expect(announced).toBeUndefined();
+  });
+
   it('getRecommendedTimeoutMillis returns the original on iOS', async () => {
     expect(await AccessibilityInfo.getRecommendedTimeoutMillis(3_000)).toBe(
       3_000,
@@ -173,8 +204,7 @@ describe('AccessibilityInfo (iOS)', () => {
   });
 
   it('sendAccessibilityEvent routes a host ref through the Fabric slot, click is a no-op', () => {
-    // Mount a View and capture its host ref, the public-instance handle RN's Fabric
-    // sendAccessibilityEvent expects. iOS routes every non-'click' event through the slot.
+    // Host ref вью, его ждёт `sendAccessibilityEvent` в Fabric
     let box: unknown;
     function App(): ReactElement {
       return (
@@ -182,7 +212,6 @@ describe('AccessibilityInfo (iOS)', () => {
           ref={instance => {
             box = instance;
           }}
-          style={{ width: 10, height: 10 }}
         />
       );
     }
@@ -195,7 +224,7 @@ describe('AccessibilityInfo (iOS)', () => {
     expect(focus).toBeDefined();
     expect(focus.eventType).toBe('focus');
 
-    // RN early-returns 'click' on iOS (VoiceOver has no click producer) -> nothing reaches the slot.
+    // RN на iOS выходит раньше для `click`, до slot событие не доходит
     const before = a11yEvents.length;
     AccessibilityInfo.sendAccessibilityEvent(box, 'click');
     expect(a11yEvents.length).toBe(before);

@@ -4,6 +4,7 @@
 import { recordSetOwnedListener } from './mutation-buffer';
 import {
   appListenerFor,
+  attachLazyHostBehavior,
   hasHostBehaviors,
   notifyOwnedListenerChange,
   ownsListener,
@@ -34,6 +35,7 @@ const GATED_EVENT_PROPS: ReadonlyMap<string, string> = new Map([
   ['magicTap', 'onMagicTap'],
   ['accessibilityEscape', 'onAccessibilityEscape'],
   ['accessibilityAction', 'onAccessibilityAction'],
+  ['click', 'onClick'],
 ]);
 
 // Install a listener the BEHAVIOR owns, bypassing the ownership check, т.к. `setEventListener`
@@ -125,7 +127,7 @@ export function setEventListener(
   value: unknown,
 ): void {
   const isHandler = typeof value === 'function';
-  if (hasHostBehaviors() && ownsListener(node, name)) {
+  if (isOwnedByBehavior(node, name, isHandler)) {
     stashOwnedListener(node, name, value, isHandler);
     return;
   }
@@ -137,11 +139,31 @@ export function setEventListener(
   }
   if (isHandler) {
     const handler = value;
-    const listeners = (node.listeners ??= new Map());
-    listeners.set(name, (event: ISymbioteEvent) => handler(event));
+    node.listeners ??= new Map();
+    node.listeners.set(name, (event: ISymbioteEvent) => handler(event));
   } else {
     node.listeners?.delete(name);
   }
+  syncEventFlags(node, name, isHandler);
+}
+
+// The behavior that owns `name`, attaching a lazy one first: its trigger is the very write that
+// brings the name, so the check has to come before the owned-or-not decision
+function isOwnedByBehavior(
+  node: ISymbioteNode,
+  name: string,
+  isHandler: boolean,
+): boolean {
+  if (isHandler && attachLazyHostBehavior(node, name)) return true;
+  return hasHostBehaviors() && ownsListener(node, name);
+}
+
+// Kept apart so `setEventListener` stays readable: the props a listener's presence implies
+function syncEventFlags(
+  node: ISymbioteNode,
+  name: string,
+  isHandler: boolean,
+): void {
   const flagProp = GATED_EVENT_PROPS.get(name);
   if (flagProp !== undefined)
     setProp(node, flagProp, isHandler ? true : undefined);

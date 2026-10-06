@@ -24,6 +24,7 @@ import { isRecord } from '../type-guards';
 import {
   DEFAULT_POSITIVE_TEXT,
   normalizeButtons,
+  type IAlertButton,
   type IAlertButtons,
   type IAlertOptions,
   type IAlertStatic,
@@ -52,35 +53,41 @@ const ANDROID_DIALOG_CONSTANTS = {
 
 // The Android dialog config (RN's DialogOptions). At most three buttons map onto the
 // positive/negative/neutral slots; `cancelable` controls dismiss-on-outside-tap.
-interface IDialogConfig {
+type IDialogConfig = {
   title: string;
   message: string;
   cancelable: boolean;
   buttonPositive?: string;
   buttonNegative?: string;
   buttonNeutral?: string;
-}
+};
 
 // The button-key constants getConstants() returns: the two action strings and the three
 // numeric button keys. We narrow them at the trust boundary below.
-interface IAndroidDialogConstants {
+type IAndroidDialogConstants = {
   buttonClicked: string;
   dismissed: string;
   buttonPositive: number;
   buttonNegative: number;
   buttonNeutral: number;
-}
+};
 
 // The Android native module: getConstants() for the button-key constants plus showAlert.
 // `buttonKey` is optional on dismiss (no button was tapped).
-interface INativeDialogManagerAndroid {
+type INativeDialogManagerAndroid = {
   getConstants(): unknown;
   showAlert(
     config: IDialogConfig,
     onError: (error: string) => void,
     onAction: (action: string, buttonKey?: number) => void,
   ): void;
-}
+};
+
+type IDialogSlots = {
+  positive?: IAlertButton;
+  negative?: IAlertButton;
+  neutral?: IAlertButton;
+};
 
 // The trust boundary for getConstants(): native sends an untyped HostObject. Read each key
 // with a typeof guard and fall back to RN's documented default when it's missing.
@@ -107,12 +114,63 @@ function readDialogConstants(raw: unknown): IAndroidDialogConstants {
   };
 }
 
+// Не больше трёх кнопок, RN снимает их с конца: последняя positive, первая neutral
+function pickSlots(buttons?: IAlertButtons): IDialogSlots {
+  const valid = normalizeButtons(buttons).slice(0, 3);
+  const positive = valid.pop();
+  const negative = valid.pop();
+  const neutral = valid.pop();
+  return { positive, negative, neutral };
+}
+
+function buildConfig(
+  title: string | undefined,
+  message: string | undefined,
+  options: IAlertOptions | undefined,
+  { positive, negative, neutral }: IDialogSlots,
+): IDialogConfig {
+  return {
+    title: title || '',
+    message: message || '',
+    cancelable: options?.cancelable ?? false,
+    ...(neutral && { buttonNeutral: neutral.text || '' }),
+    ...(negative && { buttonNegative: negative.text || '' }),
+    ...(positive && { buttonPositive: positive.text || DEFAULT_POSITIVE_TEXT }),
+  };
+}
+
+// Native возвращает ключ кнопки, по нему вызываем её `onPress`, а `dismissed` даёт `onDismiss`
+function actionHandler(
+  constants: IAndroidDialogConstants,
+  { positive, negative, neutral }: IDialogSlots,
+  options?: IAlertOptions,
+): (action: string, buttonKey?: number) => void {
+  return (action, buttonKey) => {
+    dlog(`Alert onAction action=${action} buttonKey=${String(buttonKey)}`);
+    if (action === constants.dismissed) {
+      options?.onDismiss?.();
+      return;
+    }
+    if (action !== constants.buttonClicked) return;
+    if (buttonKey === constants.buttonNeutral) {
+      neutral?.onPress?.();
+    } else if (buttonKey === constants.buttonNegative) {
+      negative?.onPress?.();
+    } else if (buttonKey === constants.buttonPositive) {
+      positive?.onPress?.();
+    }
+  };
+}
+
+function reportError(errorMessage: string): void {
+  dlog(`Alert onError: ${errorMessage}`);
+  console.warn(errorMessage);
+}
+
 // The static imperative API RN exposes, mirrored as a static-method object. `prompt` has
 // no Android counterpart in RN, so it is a dlog'd no-op here (documented below).
 export const Alert: IAlertStatic & { prompt: () => void } = {
-  // The Android dialog path. RN keeps at most three buttons and maps them, last-to-first,
-  // onto positive/negative/neutral; onAction reads the native button-key constant back and
-  // fires that button's onPress. Non-throwing: no module -> no-op.
+  // Диалог Android, без нативного модуля ничего не делаем
   alert(
     title?: string,
     message?: string,
@@ -128,50 +186,12 @@ export const Alert: IAlertStatic & { prompt: () => void } = {
       return;
     }
     const constants = readDialogConstants(manager.getConstants());
-
-    const config: IDialogConfig = {
-      title: title || '',
-      message: message || '',
-      cancelable: options?.cancelable ?? false,
-    };
-
-    // At most three buttons (neutral, negative, positive). Ignore the rest. RN pops
-    // last-to-first, so the LAST button becomes positive and the FIRST neutral.
-    const validButtons: IAlertButtons = normalizeButtons(buttons).slice(0, 3);
-    const buttonPositive = validButtons.pop();
-    const buttonNegative = validButtons.pop();
-    const buttonNeutral = validButtons.pop();
-
-    if (buttonNeutral) {
-      config.buttonNeutral = buttonNeutral.text || '';
-    }
-    if (buttonNegative) {
-      config.buttonNegative = buttonNegative.text || '';
-    }
-    if (buttonPositive) {
-      config.buttonPositive = buttonPositive.text || DEFAULT_POSITIVE_TEXT;
-    }
-
-    // onAction maps the returned button-key constant back to the matching button's onPress;
-    // the dismiss action fires options.onDismiss.
-    const onAction = (action: string, buttonKey?: number): void => {
-      dlog(`Alert onAction action=${action} buttonKey=${String(buttonKey)}`);
-      if (action === constants.buttonClicked) {
-        if (buttonKey === constants.buttonNeutral) {
-          buttonNeutral?.onPress?.();
-        } else if (buttonKey === constants.buttonNegative) {
-          buttonNegative?.onPress?.();
-        } else if (buttonKey === constants.buttonPositive) {
-          buttonPositive?.onPress?.();
-        }
-      } else if (action === constants.dismissed) {
-        options?.onDismiss?.();
-      }
-    };
-    const onError = (errorMessage: string): void => {
-      dlog(`Alert onError: ${errorMessage}`);
-    };
-    manager.showAlert(config, onError, onAction);
+    const slots = pickSlots(buttons);
+    manager.showAlert(
+      buildConfig(title, message, options, slots),
+      reportError,
+      actionHandler(constants, slots, options),
+    );
   },
 
   // Android has no native `prompt` (RN's Alert.prompt is iOS-only; there is no

@@ -8,28 +8,22 @@
 // Only the driver factories (timing/spring/decay) and compositions are mocked.
 
 import { AnimatedValue } from './value';
-import { AnimatedValueXY } from './value-xy';
-import { AnimatedColor } from './color';
 import { AnimatedNode } from './graph';
-import { Easing } from './easing';
-import {
-  add,
-  subtract,
-  multiply,
-  divide,
-  modulo,
-  diffClamp,
-} from './operators';
-import { event, forkEvent, unforkEvent } from './event';
+import { AnimatedDrivers } from './drivers';
 import { dlog } from '../debug';
 import type { IEndCallback, IEndResult } from './animation';
-import type {
-  ICompositeAnimation,
-  ITimingConfig,
-  ISpringConfig,
-  IDecayConfig,
-  IParallelConfig,
+import {
+  isSpringConfig,
+  isTimingConfig,
+  type ICompositeAnimation,
+  type ITimingConfig,
+  type ISpringConfig,
+  type IDecayConfig,
+  type IParallelConfig,
+  type IVectorSpringConfig,
+  type IVectorTimingConfig,
 } from './animations/composition';
+import { splitChannels, type IVectorValue } from './animations/vector';
 
 // Prevent a callback invocation from recursively triggering another callback,
 // which may trigger another animation (RN's AnimatedMock.js:36-60).
@@ -88,30 +82,58 @@ function resolveToValue(toValue: number | AnimatedNode): number {
   return toValue;
 }
 
-function spring(
-  value: AnimatedValue,
-  config: ISpringConfig,
+type IJumpConfig = { toValue: number | AnimatedNode };
+
+// Значение или каждый канал вектора сразу садится в свою цель
+function jumpTo<TConfig extends IJumpConfig>(
+  value: AnimatedValue | IVectorValue,
+  config: object,
+  isScalarConfig: (candidate: unknown) => candidate is TConfig,
 ): ICompositeAnimation {
   return {
     ...emptyAnimation,
     start: mockAnimationStart(callback => {
-      value.setValue(resolveToValue(config.toValue));
+      if (value instanceof AnimatedValue) {
+        if (isScalarConfig(config))
+          value.setValue(resolveToValue(config.toValue));
+      } else {
+        for (const part of splitChannels(value, config, isScalarConfig)) {
+          part.value.setValue(resolveToValue(part.config.toValue));
+        }
+      }
       callback?.({ finished: true });
     }),
   };
 }
 
+function spring(
+  value: AnimatedValue,
+  config: ISpringConfig,
+): ICompositeAnimation;
+function spring(
+  value: IVectorValue,
+  config: IVectorSpringConfig,
+): ICompositeAnimation;
+function spring(
+  value: AnimatedValue | IVectorValue,
+  config: ISpringConfig | IVectorSpringConfig,
+): ICompositeAnimation {
+  return jumpTo(value, config, isSpringConfig);
+}
+
 function timing(
   value: AnimatedValue,
   config: ITimingConfig,
+): ICompositeAnimation;
+function timing(
+  value: IVectorValue,
+  config: IVectorTimingConfig,
+): ICompositeAnimation;
+function timing(
+  value: AnimatedValue | IVectorValue,
+  config: ITimingConfig | IVectorTimingConfig,
 ): ICompositeAnimation {
-  return {
-    ...emptyAnimation,
-    start: mockAnimationStart(callback => {
-      value.setValue(resolveToValue(config.toValue));
-      callback?.({ finished: true });
-    }),
-  };
+  return jumpTo(value, config, isTimingConfig);
 }
 
 // Decay has no toValue to land on, so RN returns the empty animation (AnimatedMock.js:121).
@@ -148,15 +170,10 @@ function loop(_animation: ICompositeAnimation): ICompositeAnimation {
   return emptyAnimation;
 }
 
-// The mocked namespace surface. The animation factories above resolve immediately;
-// everything else (value nodes, operators, easing, events) is the real engine. The
-// animated components are spread in by the caller (animated/index.ts) so this file
-// stays free of the createAnimatedComponent / TDZ-sensitive container wrapping.
+// Фабрики анимаций сразу приходят к цели, остальное (значения, операторы, события) настоящее
+// Компоненты и `createAnimatedComponent` добавляет адаптер
 export const AnimatedMock = {
-  Value: AnimatedValue,
-  ValueXY: AnimatedValueXY,
-  Color: AnimatedColor,
-  Easing,
+  ...AnimatedDrivers,
   timing,
   spring,
   decay,
@@ -165,13 +182,4 @@ export const AnimatedMock = {
   stagger,
   loop,
   delay,
-  add,
-  subtract,
-  multiply,
-  divide,
-  modulo,
-  diffClamp,
-  event,
-  forkEvent,
-  unforkEvent,
 };

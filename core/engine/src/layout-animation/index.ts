@@ -1,30 +1,16 @@
-// LayoutAnimation: configures the NEXT commit to animate layout changes. The
-// animation itself is performed natively; this module only ships a config to the
-// native UIManager via `configureNextLayoutAnimation(config, onSuccess, onError)`
-// before the commit. Ports RN's Libraries/LayoutAnimation/LayoutAnimation.js
-// (the JS surface + the native configure call), built on symbiote's single
-// native trust boundary, `getNativeModule`.
-//
-// It is a native-bridge consumer (RN's `Platform`/`StyleSheet` purity split puts
-// these in the adapter, not in shared, like Keyboard / StatusBar).
+// LayoutAnimation: взводит анимацию следующего коммита, сама анимация нативная
+// Вызывает `configureNextLayoutAnimation` через слот Fabric или TurboModule `UIManager`
 
 import { getNativeModule } from '../native-modules';
 import { dlog } from '../debug';
+import { Platform } from '../platform';
 import { isRecord } from '../type-guards';
 
-// ---- native module routing ----------------------------------------------
-
-// RN's actual dual-path (LayoutAnimation.js): the Fabric global slot
-// (`global.nativeFabricUIManager`, a JSI slot read directly, not a TurboModule
-// lookup) is tried FIRST; only when it lacks `configureNextLayoutAnimation` does
-// RN fall back to the TurboModule `UIManager.configureNextLayoutAnimation`
-// (`TurboModuleRegistry.getEnforcing('UIManager')` in NativeUIManager.js; iOS's
-// RCTUIManager.mm registers under the same bare "UIManager" name via
-// RCT_EXPORT_MODULE()). There is only ONE correct TurboModule name; RN never
-// registers a module under "FabricUIManager".
+// Как в RN: сначала слот Fabric (JSI-глобал), затем TurboModule `UIManager`
 const NATIVE_UI_MANAGER_MODULE_NAME = 'UIManager';
 
-// ---- public type surface (ported from RN's ReactNativeTypes) -------------
+// Запас гонки с нативным callback: один кадр и 1 мс
+const COMPLETION_RACE_SLACK_MS = 17;
 
 const ANIMATION_TYPE = {
   spring: 'spring',
@@ -54,42 +40,35 @@ export type ILayoutAnimationProperties = Readonly<
   Record<ILayoutAnimationProperty, ILayoutAnimationProperty>
 >;
 
-export interface ILayoutAnimationAnim {
+export type ILayoutAnimationAnim = {
   duration?: number;
   delay?: number;
   springDamping?: number;
   initialVelocity?: number;
   type?: ILayoutAnimationType;
   property?: ILayoutAnimationProperty;
-}
+};
 
-export interface ILayoutAnimationConfig {
+export type ILayoutAnimationConfig = {
   duration: number;
   create?: ILayoutAnimationAnim;
   update?: ILayoutAnimationAnim;
   delete?: ILayoutAnimationAnim;
-}
+};
 
 type IOnAnimationDidEndCallback = () => void;
 type IOnAnimationDidFailCallback = () => void;
 
-// The caller vouches for this shape via `getNativeModule<T>` (the single
-// trust-boundary narrowing, no per-call `as`). The method is optional because an
-// older/partial host may not expose it; we feature-detect before calling.
-interface INativeLayoutAnimationUIManager {
+// Метод опционален: старый или частичный хост его не отдаёт, перед вызовом проверяем
+type INativeLayoutAnimationUIManager = {
   configureNextLayoutAnimation?(
     config: ILayoutAnimationConfig,
     onSuccess: IOnAnimationDidEndCallback,
     onError: IOnAnimationDidFailCallback,
   ): void;
-}
+};
 
-// Narrows the Fabric global slot down to whether it ALSO carries the
-// layout-animation hook. `fabric.ts`'s `IFabricSlot` deliberately omits this
-// method (out of scope for the engine's own mutation API), so the slot's static
-// type never has it either; this is the runtime feature-detect RN itself does
-// (`FabricUIManager?.configureNextLayoutAnimation` in LayoutAnimation.js) before
-// calling it, no `as` cast needed.
+// Слот Fabric в `IFabricSlot` этого метода не объявляет, поэтому проверяем в рантайме, как RN
 function hasConfigureNextLayoutAnimation(
   value: unknown,
 ): value is INativeLayoutAnimationUIManager {
@@ -98,16 +77,9 @@ function hasConfigureNextLayoutAnimation(
   );
 }
 
-// Resolved FRESH on every configureNext, deliberately NOT memoized. Either mechanism can
-// come and go at runtime (the Fabric global installs during bootstrap; a TurboModule can be
-// absent at one moment and linked later), and a cached answer would pin the first result;
-// both lookups are cheap, so per-call resolution costs nothing and stays correct.
-// (Memoizing here also broke the headless smoke, which flips a fake module on/off in one
-// process: a cached module survived the flip-off, so configureNext kept calling native when
-// the module was meant to be absent.)
+// Не мемоизируем: слот Fabric и TurboModule появляются и пропадают в рантайме,
+// а кэш закрепил бы первый ответ
 function resolveUIManager(): INativeLayoutAnimationUIManager | null {
-  // Mechanism 1: the Fabric global slot, read directly: a JSI global, not a
-  // TurboModule lookup.
   const fabricUIManager = globalThis.nativeFabricUIManager;
   if (hasConfigureNextLayoutAnimation(fabricUIManager)) {
     dlog(
@@ -116,7 +88,6 @@ function resolveUIManager(): INativeLayoutAnimationUIManager | null {
     return fabricUIManager;
   }
 
-  // Mechanism 2: the TurboModule fallback (RN's non-Fabric path).
   const module = getNativeModule<INativeLayoutAnimationUIManager>(
     NATIVE_UI_MANAGER_MODULE_NAME,
   );
@@ -129,16 +100,12 @@ function resolveUIManager(): INativeLayoutAnimationUIManager | null {
 
   dlog(
     'LayoutAnimation: no native UIManager resolved (no Fabric global slot, ' +
-      `"${NATIVE_UI_MANAGER_MODULE_NAME}" module not linked); configureNext is a no-op ` +
-      '(headless or module not linked)',
+      `"${NATIVE_UI_MANAGER_MODULE_NAME}" module not linked)`,
   );
   return null;
 }
 
-// ---- config builder ------------------------------------------------------
-
-// Builds a well-formed config for `configureNext`. Mirrors RN's `create`:
-// `create`/`delete` carry both type and property; `update` carries only type.
+// `create` и `delete` несут тип и свойство, `update` только тип, как в RN
 function createLayoutAnimation(
   duration: number,
   type?: ILayoutAnimationType,
@@ -151,8 +118,6 @@ function createLayoutAnimation(
     delete: { type, property },
   };
 }
-
-// ---- presets -------------------------------------------------------------
 
 const PRESET_DURATION = {
   easeInEaseOut: 300,
@@ -187,64 +152,43 @@ const Presets = {
   },
 } as const satisfies Readonly<Record<string, ILayoutAnimationConfig>>;
 
-// ---- enabled gate --------------------------------------------------------
-
-// Whether `configureNext` actually arms the next commit. RN seeds this from a
-// feature flag (LayoutAnimation.js:45) and exposes `setEnabled` to toggle it;
-// here it defaults on (our Fabric path always supports it) and `configureNext`
-// short-circuits when it is off, mirroring RN's `if (!isLayoutAnimationEnabled)
-// return` (LayoutAnimation.js:69).
+// RN сидит на флаге, по умолчанию включено
 let isLayoutAnimationEnabled = true;
 
-// Gates whether the next commit animates. RN's own `setLayoutAnimationEnabled`
-// (LayoutAnimation.js:48) is a no-op due to a self-assignment bug; we implement
-// the intended behaviour: a disabled state makes `configureNext` a no-op.
+// В RN `setEnabled` присваивает флаг самому себе и ничего не делает, здесь он переключает
 function setLayoutAnimationEnabled(value: boolean): void {
   isLayoutAnimationEnabled = value;
 }
 
-// ---- configureNext -------------------------------------------------------
-
-// Configures the next commit to be animated. NATIVE drives completion:
-// `onAnimationDidEnd` is passed straight through as the native success callback,
-// so it fires exactly when the native animation finishes, including
-// when native extends it past `duration` (spring overshoot, OS slowdown,
-// reduce-motion). `onAnimationDidFail` fires only if native config parsing fails.
-// When no native module is linked (headless), this is a logged no-op; an app
-// without it must still run, so we never throw.
-//
-// We deliberately do NOT arm a JS `setTimeout(duration + slack)` to force
-// completion. RN keeps such a timer as a fallback for platform/renderer combos
-// where native never calls back (non-Fabric Android, iOS Fabric pre-ship); but a
-// fixed `duration + 17ms` timer races and usually beats the real native callback,
-// firing `onAnimationDidEnd` before the animation visually completes. On our
-// Fabric-only path native completion is reliably wired, so we rely on it solely.
+// Native-callback гоняется с таймером `duration + 17`, как в RN: хост без анимаций
+// не отзовётся, а `onAnimationDidEnd` должен прийти. Без UIManager таймер тоже взводится
 function configureNext(
   config: ILayoutAnimationConfig,
   onAnimationDidEnd?: IOnAnimationDidEndCallback,
   onAnimationDidFail?: IOnAnimationDidFailCallback,
 ): void {
-  // RN bails before touching native when animations are disabled
-  // (LayoutAnimation.js:69).
-  if (!isLayoutAnimationEnabled) {
+  if (Platform.isDisableAnimations || !isLayoutAnimationEnabled) {
     dlog('LayoutAnimation.configureNext: disabled; no-op');
     return;
   }
 
-  const manager = resolveUIManager();
-  if (manager === null || manager.configureNextLayoutAnimation === undefined) {
-    dlog('LayoutAnimation.configureNext: no native UIManager; no-op');
-    return;
-  }
-
-  // Idempotent guard so native can't drive both success and error into a
-  // double-fire (RN's `animationCompletionHasRun`), without a JS timer racing it.
-  let completionHasRun = false;
+  let hasCompletionRun = false;
   const onComplete: IOnAnimationDidEndCallback = () => {
-    if (completionHasRun) return;
-    completionHasRun = true;
+    if (hasCompletionRun) return;
+    hasCompletionRun = true;
+    clearTimeout(raceTimer);
     onAnimationDidEnd?.();
   };
+  const raceTimer = setTimeout(
+    onComplete,
+    config.duration + COMPLETION_RACE_SLACK_MS,
+  );
+
+  const manager = resolveUIManager();
+  if (manager === null || manager.configureNextLayoutAnimation === undefined) {
+    dlog('LayoutAnimation.configureNext: no native UIManager');
+    return;
+  }
 
   dlog(
     `LayoutAnimation.configureNext: dispatching config (duration=${config.duration})`,
@@ -256,18 +200,14 @@ function configureNext(
   );
 }
 
-// ---- the LayoutAnimation facade ------------------------------------------
-
 class LayoutAnimationImpl {
-  // Frozen so callers can't mutate the shared type/property tables.
   readonly Types: ILayoutAnimationTypes = Object.freeze({ ...ANIMATION_TYPE });
   readonly Properties: ILayoutAnimationProperties = Object.freeze({
     ...ANIMATION_PROPERTY,
   });
   readonly Presets = Presets;
 
-  // Methods (not class fields) so they stay overridable under
-  // useDefineForClassFields.
+  // Методы, а не поля класса: остаются переопределяемыми при `useDefineForClassFields`
   configureNext(
     config: ILayoutAnimationConfig,
     onAnimationDidEnd?: IOnAnimationDidEndCallback,
@@ -296,26 +236,20 @@ class LayoutAnimationImpl {
     configureNext(Presets.spring, onAnimationDidEnd);
   }
 
-  // RN exposes this as both `setLayoutAnimationEnabled` and the `setEnabled`
-  // alias (LayoutAnimation.js:48,222); we surface the primary name. A disabled
-  // state makes `configureNext` a no-op.
+  setEnabled(enabled: boolean): void {
+    setLayoutAnimationEnabled(enabled);
+  }
+
   setLayoutAnimationEnabled(enabled: boolean): void {
     setLayoutAnimationEnabled(enabled);
   }
 
-  // RN's dev-time config validator. It has been retired upstream
-  // (LayoutAnimation.js:204); the live impl only logs that it is disabled, so
-  // we mirror that and keep the call a no-op rather than re-add dead validation.
+  // RN отключил валидатор, вызов только пишет в `console.error`
   checkConfig(..._args: unknown[]): void {
-    dlog('LayoutAnimation.checkConfig(...) has been disabled.');
+    console.error('LayoutAnimation.checkConfig(...) has been disabled.');
   }
 
-  // Coerce an arbitrary string (e.g. a keyboard event's `easing` field) onto a known
-  // ILayoutAnimationType, falling back to 'keyboard' when it isn't a key of `Types`.
-  // Owned here, not by a caller: `Types` is this class's own frozen table, so by
-  // Information Expert the coercion belongs on the type it reads (Keyboard's
-  // scheduleLayoutAnimation is the first caller; RN's own
-  // `LayoutAnimation.Types[easing] || 'keyboard'` is the same rule).
+  // Строка вроде `easing` из события клавиатуры, не из `Types`, превращается в 'keyboard'
   coerceType(easing: string): ILayoutAnimationType {
     const types: Readonly<Record<string, ILayoutAnimationType>> = this.Types;
     return types[easing] ?? ANIMATION_TYPE.keyboard;

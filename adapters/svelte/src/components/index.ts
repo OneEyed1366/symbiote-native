@@ -43,6 +43,8 @@ export { default as Modal } from './modal/index.svelte';
 export type { IModalProps } from './modal/modal-props';
 
 export type { ISafeAreaViewProps } from './safe-area-view-props';
+export type { ILayoutConformanceProps } from './layout-conformance-props';
+export type { ILayoutConformanceMode } from '@symbiote-native/components';
 
 // `RefreshControl` is a TAG — `<refresh-control>` — carrying its own engine behavior
 // (`registerRefreshControlBehavior`). No wrapper: the accessibility fold it would call already
@@ -87,6 +89,7 @@ export type { IScrollViewHandle } from '@symbiote-native/components';
 
 export { default as VirtualizedList } from './virtualized-list/index.svelte';
 export type {
+  ICellRendererProps,
   IVirtualizedListProps,
   IVirtualizedListHandle,
 } from './virtualized-list/virtualized-list-props';

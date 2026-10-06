@@ -3,9 +3,9 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-interface IDeviceHub {
+type IDeviceHub = {
   emit: (eventType: string, ...args: unknown[]) => void;
-}
+};
 
 type IFakeModule = Record<string, unknown>;
 
@@ -59,7 +59,16 @@ describe('AccessibilityInfo (android)', () => {
       );
     });
 
-    // why: the optional Android getters reject naming the missing method (AccessibilityInfo.js:121-127).
+    // RN называет здесь не нативный модуль, а `AccessibilityInfo`
+    it('rejects isReduceMotionEnabled when the native module is missing', async () => {
+      nativeModule = null;
+      const info = await load();
+      await expect(info.isReduceMotionEnabled()).rejects.toThrow(
+        'AccessibilityInfo native module is not available',
+      );
+    });
+
+    // Необязательные геттеры называют в ошибке свой метод
     it('rejects isGrayscaleEnabled when the method is missing', async () => {
       const info = await load();
       await expect(info.isGrayscaleEnabled()).rejects.toThrow(

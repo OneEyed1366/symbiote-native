@@ -14,13 +14,14 @@ import type { ILayoutAnimationConfig } from './index';
 // NATIVE_UI_MANAGER_MODULE_NAME.
 const NATIVE_MODULE_NAME = 'UIManager';
 
-interface ICapturedCall {
+type ICapturedCall = {
   config: ILayoutAnimationConfig;
   onSuccess: () => void;
   onError: () => void;
-}
+};
 
 let LayoutAnimation: typeof import('./index').LayoutAnimation;
+let PlatformUnderTest: typeof import('../platform').Platform;
 
 let captured: ICapturedCall | null;
 
@@ -44,9 +45,11 @@ beforeEach(async () => {
 
   vi.resetModules();
   ({ LayoutAnimation } = await import('./index'));
+  ({ Platform: PlatformUnderTest } = await import('../platform'));
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   globalThis.__turboModuleProxy = undefined;
   globalThis.nativeFabricUIManager = undefined;
   vi.useRealTimers();
@@ -110,7 +113,7 @@ describe('LayoutAnimation.coerceType', () => {
 });
 
 describe('LayoutAnimation.configureNext dispatch', () => {
-  it('dispatches the config to native and drives onAnimationDidEnd ONLY from native success', () => {
+  it('dispatches the config to native and fires onAnimationDidEnd once on native success', () => {
     vi.useFakeTimers();
     const preset = LayoutAnimation.Presets.easeInEaseOut;
 
@@ -122,19 +125,60 @@ describe('LayoutAnimation.configureNext dispatch', () => {
     expect(captured).not.toBeNull();
     expect(captured?.config).toBe(preset);
 
-    // Regression guard: onAnimationDidEnd must NOT fire on a JS timer. Advance well past
-    // the old `duration + slack` race window without invoking native.
-    vi.advanceTimersByTime((preset.duration ?? 0) + 100);
-    expect(didEndCount).toBe(0);
-
-    // Native invokes its success callback. THAT drives onAnimationDidEnd, exactly once.
     captured?.onSuccess();
     expect(didEndCount).toBe(1);
 
-    // No double-fire: a repeat success or a late error is swallowed by the idempotent guard.
+    // Идемпотентность: повторный success, поздняя ошибка и сработавший таймер не удваивают вызов
     captured?.onSuccess();
     captured?.onError();
+    vi.advanceTimersByTime(preset.duration + 100);
     expect(didEndCount).toBe(1);
+  });
+
+  // RN гоняет нативный callback с `setTimeout(duration + 17)`: если native не отозвался,
+  // `onAnimationDidEnd` всё равно придёт
+  it('fires onAnimationDidEnd from the duration + 17ms timer when native never calls back', () => {
+    vi.useFakeTimers();
+    const preset = LayoutAnimation.Presets.easeInEaseOut;
+    let didEndCount = 0;
+    LayoutAnimation.configureNext(preset, () => {
+      didEndCount += 1;
+    });
+
+    vi.advanceTimersByTime(preset.duration + 16);
+    expect(didEndCount).toBe(0);
+    vi.advanceTimersByTime(1);
+    expect(didEndCount).toBe(1);
+
+    captured?.onSuccess();
+    expect(didEndCount).toBe(1);
+  });
+
+  it('arms the timer even with no native UIManager (headless)', () => {
+    vi.useFakeTimers();
+    globalThis.__turboModuleProxy = <T>(_name: string): T | null => null;
+    let didEndCount = 0;
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.linear, () => {
+      didEndCount += 1;
+    });
+
+    vi.advanceTimersByTime(LayoutAnimation.Presets.linear.duration + 17);
+    expect(didEndCount).toBe(1);
+  });
+
+  it('is a no-op when Platform.isDisableAnimations is set', () => {
+    vi.useFakeTimers();
+    vi.spyOn(PlatformUnderTest, 'isDisableAnimations', 'get').mockReturnValue(
+      true,
+    );
+    let didEndCount = 0;
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.linear, () => {
+      didEndCount += 1;
+    });
+
+    vi.advanceTimersByTime(1_000);
+    expect(captured).toBeNull();
+    expect(didEndCount).toBe(0);
   });
 
   // why: onAnimationDidFail is a real, distinct callback (native config parsing
@@ -175,21 +219,34 @@ describe('LayoutAnimation.configureNext dispatch', () => {
   });
 });
 
-describe('LayoutAnimation.setLayoutAnimationEnabled', () => {
+describe('LayoutAnimation.setEnabled', () => {
   // why: this is the documented kill switch for the whole feature (e.g. a
   // reduce-motion setting) -- once disabled, configureNext must never reach
   // native, regardless of which module is linked.
   it('makes configureNext a no-op while disabled', () => {
-    LayoutAnimation.setLayoutAnimationEnabled(false);
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.linear);
+    vi.useFakeTimers();
+    LayoutAnimation.setEnabled(false);
+    let didEndCount = 0;
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.linear, () => {
+      didEndCount += 1;
+    });
+    vi.advanceTimersByTime(1_000);
     expect(captured).toBeNull();
+    expect(didEndCount).toBe(0);
+  });
+
+  it('is the same function as setLayoutAnimationEnabled', () => {
+    LayoutAnimation.setLayoutAnimationEnabled(false);
+    LayoutAnimation.setEnabled(true);
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.linear);
+    expect(captured).not.toBeNull();
   });
 
   // why: the gate must be reversible -- re-enabling must restore normal dispatch,
   // proving it's a toggle, not a one-way kill switch.
   it('re-enabling restores normal dispatch', () => {
-    LayoutAnimation.setLayoutAnimationEnabled(false);
-    LayoutAnimation.setLayoutAnimationEnabled(true);
+    LayoutAnimation.setEnabled(false);
+    LayoutAnimation.setEnabled(true);
     LayoutAnimation.configureNext(LayoutAnimation.Presets.linear);
     expect(captured).not.toBeNull();
   });
@@ -290,12 +347,12 @@ describe('LayoutAnimation (no native module)', () => {
 });
 
 describe('LayoutAnimation.checkConfig', () => {
-  // why: RN retired this dev-time validator upstream (it now only logs a
-  // deprecation notice) -- calling it with any arguments must stay a harmless
-  // no-op so old call sites don't need to be ripped out.
-  it('is a no-op regardless of arguments', () => {
-    expect(() =>
-      LayoutAnimation.checkConfig(LayoutAnimation.Presets.linear, () => {}),
-    ).not.toThrow();
+  // RN retired this validator: any call logs one `console.error` and does nothing else
+  it('logs the disabled notice through console.error for any arguments', () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    LayoutAnimation.checkConfig(LayoutAnimation.Presets.linear, () => {});
+    expect(error).toHaveBeenCalledExactlyOnceWith(
+      'LayoutAnimation.checkConfig(...) has been disabled.',
+    );
   });
 });

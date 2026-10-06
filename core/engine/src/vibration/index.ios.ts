@@ -17,15 +17,17 @@ export type { INativeVibration, IVibrationStatic } from './shared';
 let vibrating = false;
 let scheduleId = 0;
 
+type IRun = {
+  module: INativeVibration;
+  id: number;
+  pattern: number[];
+  repeat: boolean;
+};
+
 // Walk one pattern step: buzz, then arm the next step (or repeat / stop). Bails if
 // vibration was canceled (vibrating=false) or superseded by a newer run (id mismatch).
-function vibrateScheduler(
-  module: INativeVibration,
-  id: number,
-  pattern: number[],
-  repeat: boolean,
-  nextIndex: number,
-): void {
+function vibrateScheduler(run: IRun, nextIndex: number): void {
+  const { module, id, pattern, repeat } = run;
   if (!vibrating || id !== scheduleId) {
     return;
   }
@@ -39,10 +41,7 @@ function vibrateScheduler(
       return;
     }
   }
-  setTimeout(
-    () => vibrateScheduler(module, id, pattern, repeat, index + 1),
-    pattern[index],
-  );
+  setTimeout(() => vibrateScheduler(run, index + 1), pattern[index]);
 }
 
 // iOS pattern entry point: a leading 0 means "buzz immediately", otherwise the first
@@ -66,15 +65,16 @@ function vibratePattern(
     return;
   }
   setTimeout(
-    () => vibrateScheduler(module, ++scheduleId, pattern, repeat, 1),
+    () => vibrateScheduler({ module, id: ++scheduleId, pattern, repeat }, 1),
     pattern[0],
   );
 }
 
 export const Vibration = createVibration({
   vibratePattern,
-  // cancel stops the JS scheduler: the next tick sees vibrating=false and bails.
-  stopPattern: () => {
+  isBusy: () => vibrating,
+  // Отмена только сбрасывает флаг, следующий тик планировщика выходит
+  cancel: () => {
     vibrating = false;
   },
 });

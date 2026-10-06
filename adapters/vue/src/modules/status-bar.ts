@@ -1,28 +1,30 @@
-// StatusBar, the Vue lifecycle half. The native StatusBarManager driving (applyStatusBarProps),
-// the imperative statics, and the Android bar-height constant all live in @symbiote-native/engine,
-// shared verbatim with React; Metro selects the engine's status-bar.ios.ts/.android.ts per host,
-// so platform divergence never reaches this file. Vue supplies only the declarative shape: a
-// component that renders NOTHING and re-applies the props through a watchEffect on mount + every
-// prop change, with the imperative statics attached to the component object.
-//
-// Inputs arrive as attrs (untyped) and run through normalizeVueAttrs before each is narrowed by a guard.
+// Vue half of StatusBar, the props stack and statics live in the engine. It renders nothing, keeps
+// one stack entry through `watchEffect` and releases it on unmount
 
 import {
   defineComponent,
+  onUnmounted,
   watchEffect,
   type SetupContext,
 } from '@vue/runtime-core';
 import {
-  applyStatusBarProps,
+  createStatusBarEntry,
   statusBarImperative,
   statusBarCurrentHeight,
   isOpaqueColorValue,
   type IColorValue,
+  type IStatusBarAnimation,
   type IStatusBarProps,
   type IStatusBarStyle,
 } from '@symbiote-native/engine';
 export type { IStatusBarProps, IStatusBarStyle } from '@symbiote-native/engine';
 import { normalizeVueAttrs } from '../utils/normalize-attrs';
+
+const TRANSITIONS = [
+  'none',
+  'fade',
+  'slide',
+] as const satisfies readonly IStatusBarAnimation[];
 
 function asBoolean(value: unknown): boolean | undefined {
   return typeof value === 'boolean' ? value : undefined;
@@ -36,6 +38,10 @@ function asBarStyle(value: unknown): IStatusBarStyle | undefined {
     : undefined;
 }
 
+function asTransition(value: unknown): IStatusBarAnimation | undefined {
+  return TRANSITIONS.find(transition => transition === value);
+}
+
 function asColorValue(value: unknown): IColorValue | undefined {
   if (typeof value === 'string') return value;
   if (isOpaqueColorValue(value)) return value;
@@ -47,6 +53,7 @@ function buildProps(attrs: Record<string, unknown>): IStatusBarProps {
     barStyle: asBarStyle(attrs.barStyle),
     hidden: asBoolean(attrs.hidden),
     animated: asBoolean(attrs.animated),
+    showHideTransition: asTransition(attrs.showHideTransition),
     networkActivityIndicatorVisible: asBoolean(
       attrs.networkActivityIndicatorVisible,
     ),
@@ -59,11 +66,13 @@ const StatusBarComponent = defineComponent({
   name: 'StatusBar',
   inheritAttrs: false,
   setup(_props, { attrs: rawAttrs }: SetupContext) {
-    // watchEffect tracks rawAttrs (reactive), so reading it here re-applies on every prop change.
-    // Resolution is lazy inside the engine (a missing StatusBarManager is a no-op).
+    const entry = createStatusBarEntry();
+    // `rawAttrs` is reactive, so every prop change replaces this entry
     watchEffect(() => {
-      applyStatusBarProps(buildProps(normalizeVueAttrs(rawAttrs)));
+      entry.apply(buildProps(normalizeVueAttrs(rawAttrs)));
     });
+    // Popping restores what the stack held below this entry
+    onUnmounted(() => entry.release());
     return () => null;
   },
 });
@@ -73,15 +82,13 @@ const StatusBarWithStatics = Object.assign(
   statusBarImperative,
 );
 
-// Android exposes the bar height as a native constant; undefined on iOS / when absent. Read lazily
-// (getter) so nothing touches native at import time; the Android engine impl resolves on access.
+// A getter, not a value, so nothing touches native at import time
 Object.defineProperty(StatusBarWithStatics, 'currentHeight', {
   get: statusBarCurrentHeight,
   enumerable: true,
 });
 
-// currentHeight is optional, so the defineProperty-added accessor doesn't need to appear on the
-// runtime object's inferred type for this assignment to hold (no cast).
+// `currentHeight` is optional, so the accessor need not appear on the inferred type (no cast)
 export const StatusBar: typeof StatusBarWithStatics & {
   readonly currentHeight?: number;
 } = StatusBarWithStatics;

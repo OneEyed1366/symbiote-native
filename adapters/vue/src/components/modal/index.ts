@@ -11,7 +11,15 @@
 // events (onShow/onDismiss/onRequestClose/onOrientationChange) are real ViewConfig DirectEvents,
 // so, unlike Switch's pure-JS onValueChange, they forward to the host raw via passthrough.
 
-import { defineComponent, h, ref, watch } from '@vue/runtime-core';
+import {
+  defineComponent,
+  getCurrentInstance,
+  h,
+  ref,
+  watch,
+  watchEffect,
+  type Ref,
+} from '@vue/runtime-core';
 import {
   createInitialModalState,
   isModalVisible,
@@ -20,6 +28,7 @@ import {
   renderModal,
   resolveAccessibilityProps,
   shouldRenderModal,
+  warnAboutModalProps,
   type IAccessibilityProps,
   type IAriaProps,
   type IModalAnimationType,
@@ -37,6 +46,7 @@ import {
 } from '@symbiote-native/engine';
 
 import { normalizeVueAttrs } from '../../utils/normalize-attrs';
+import { provideVirtualizedListScope } from '../virtualized-list/nested-scope';
 
 export type {
   IModalAnimationType,
@@ -46,23 +56,24 @@ export type {
 } from '@symbiote-native/components';
 
 // The Vue-facing prop surface (React's carries `children?: ReactNode`; Vue takes children via slots).
-export interface IModalProps extends IAccessibilityProps, IAriaProps {
-  visible?: boolean;
-  transparent?: boolean;
-  backdropColor?: string;
-  animationType?: IModalAnimationType;
-  presentationStyle?: IModalPresentationStyle;
-  supportedOrientations?: ReadonlyArray<IModalOrientation>;
-  hardwareAccelerated?: boolean;
-  statusBarTranslucent?: boolean;
-  navigationBarTranslucent?: boolean;
-  allowSwipeDismissal?: boolean;
-  style?: IStyleProp<IViewStyle>;
-  // Like `style`, targets the CONTAINER View renderModal wraps the children in, not the outer
-  // modal host — IS in HANDLED_ATTRS below (unlike a plain passthrough prop) so it is
-  // applied explicitly on the container in the final h() call, matching where style lands.
-  class?: IClassNameValue;
-}
+export type IModalProps = IAccessibilityProps &
+  IAriaProps & {
+    visible?: boolean;
+    transparent?: boolean;
+    backdropColor?: string;
+    animationType?: IModalAnimationType;
+    presentationStyle?: IModalPresentationStyle;
+    supportedOrientations?: ReadonlyArray<IModalOrientation>;
+    hardwareAccelerated?: boolean;
+    statusBarTranslucent?: boolean;
+    navigationBarTranslucent?: boolean;
+    allowSwipeDismissal?: boolean;
+    style?: IStyleProp<IViewStyle>;
+    // Like `style`, targets the CONTAINER View renderModal wraps the children in, not the outer
+    // modal host — IS in HANDLED_ATTRS below (unlike a plain passthrough prop) so it is
+    // applied explicitly on the container in the final h() call, matching where style lands.
+    class?: IClassNameValue;
+  };
 
 export type IModalEmits = {
   show: () => boolean;
@@ -153,23 +164,69 @@ function forwardAttrs(attrs: Record<string, unknown>): IForwardBag {
   return result;
 }
 
+// Arms the iOS keep-alive on show; a hide is left to the native dismiss (state/modal.ts). The
+// reducer is identity-stable, so a no-op transition triggers no extra render.
+function useKeepAlive(rawAttrs: Record<string, unknown>): Ref<IModalState> {
+  const state = ref<IModalState>(
+    createInitialModalState(isModalVisible(rawAttrs.visible)),
+  );
+  watch(
+    () => isModalVisible(rawAttrs.visible),
+    isVisible => {
+      const action = modalVisibilityAction(isVisible);
+      if (action !== undefined) state.value = modalReducer(state.value, action);
+    },
+    { flush: 'post' },
+  );
+  return state;
+}
+
+// The attrs the render and the dev warnings both read
+function modalFlagsOf(attrs: Record<string, unknown>) {
+  return {
+    transparent: asBoolean(attrs.transparent),
+    presentationStyle: asPresentationStyle(attrs.presentationStyle),
+    statusBarTranslucent: asBoolean(attrs.statusBarTranslucent),
+    navigationBarTranslucent: asBoolean(attrs.navigationBarTranslucent),
+    allowSwipeDismissal: asBoolean(attrs.allowSwipeDismissal),
+  };
+}
+
+// Kept apart so the setup reads as lifecycle: the attrs narrowed into what `renderModal` takes
+function modalRootOf(
+  attrs: Record<string, unknown>,
+): ReturnType<typeof renderModal> {
+  return renderModal({
+    ...modalFlagsOf(attrs),
+    visible: asBoolean(attrs.visible),
+    backdropColor: asString(attrs.backdropColor),
+    animationType: asAnimationType(attrs.animationType),
+    supportedOrientations: asSupportedOrientations(attrs.supportedOrientations),
+    hardwareAccelerated: asBoolean(attrs.hardwareAccelerated),
+    style: isStyleProp(attrs.style) ? attrs.style : undefined,
+    passthrough: resolveAccessibilityProps(forwardAttrs(attrs)),
+  });
+}
+
+// RN checks on mount and on every update, a dev build only
+// The `requestClose` emit is stripped from the attrs, so the vnode props tell if it is listened to
+function useModalWarnings(rawAttrs: Record<string, unknown>): void {
+  const listeners = getCurrentInstance()?.vnode.props;
+  watchEffect(() => {
+    const attrs = normalizeVueAttrs(rawAttrs);
+    warnAboutModalProps({
+      ...modalFlagsOf(attrs),
+      onRequestClose: typeof listeners?.onRequestClose === 'function',
+    });
+  });
+}
+
 export const Modal = defineComponent<IModalProps, IModalEmits>(
   (_props, { attrs: rawAttrs, slots, emit }) => {
-    const state = ref<IModalState>(
-      createInitialModalState(isModalVisible(rawAttrs.visible)),
-    );
-
-    // Arms the iOS keep-alive on show; a hide is left to the native dismiss (state/modal.ts). The
-    // reducer is identity-stable, so a no-op transition triggers no extra render.
-    watch(
-      () => isModalVisible(rawAttrs.visible),
-      isVisible => {
-        const action = modalVisibilityAction(isVisible);
-        if (action !== undefined)
-          state.value = modalReducer(state.value, action);
-      },
-      { flush: 'post' },
-    );
+    // The content sits outside the list's scroll, so a list in it is not nested in that list
+    provideVirtualizedListScope(null);
+    useModalWarnings(rawAttrs);
+    const state = useKeepAlive(rawAttrs);
 
     // Modal.js: onDismiss is iOS-only — it drops the keep-alive, then tells the app.
     const handleDismiss = (): void => {
@@ -186,28 +243,13 @@ export const Modal = defineComponent<IModalProps, IModalEmits>(
       }
 
       const attrs = normalizeVueAttrs(rawAttrs);
-      const root = renderModal({
-        visible: asBoolean(attrs.visible),
-        transparent: asBoolean(attrs.transparent),
-        backdropColor: asString(attrs.backdropColor),
-        animationType: asAnimationType(attrs.animationType),
-        presentationStyle: asPresentationStyle(attrs.presentationStyle),
-        supportedOrientations: asSupportedOrientations(
-          attrs.supportedOrientations,
-        ),
-        hardwareAccelerated: asBoolean(attrs.hardwareAccelerated),
-        statusBarTranslucent: asBoolean(attrs.statusBarTranslucent),
-        navigationBarTranslucent: asBoolean(attrs.navigationBarTranslucent),
-        allowSwipeDismissal: asBoolean(attrs.allowSwipeDismissal),
-        style: isStyleProp(attrs.style) ? attrs.style : undefined,
-        passthrough: resolveAccessibilityProps(forwardAttrs(attrs)),
-      });
+      const root = modalRootOf(attrs);
 
       // root = modal > [container]; the slot children nest UNDER the container View, never
       // as a direct sibling of the host (RN's modal content layout).
       const [container] = root.children;
       if (typeof container === 'string') return null;
-      const slotChildren = slots.default !== undefined ? slots.default() : [];
+      const slotChildren = slots.default?.() ?? [];
       return h(
         root.type,
         {

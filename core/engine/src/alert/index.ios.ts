@@ -35,7 +35,7 @@ const ALERT_MANAGER = 'AlertManager';
 // The native `Args` the spec accepts. Each entry in `buttons` is a single-key map of
 // `{ [index]: label }`, RN's wire shape (the native side assigns the tapped button's
 // index back as the callback `id`).
-interface IAlertArgs {
+type IAlertArgs = {
   title: string;
   message?: string;
   buttons: Array<Record<number, string>>;
@@ -46,73 +46,86 @@ interface IAlertArgs {
   preferredButtonKey?: string;
   keyboardType?: string;
   userInterfaceStyle?: string;
-}
+};
 
-// The native module typed as the interface we vouch for: only `alertWithArgs`. The
-// single point that accepts the native shape (no per-call `as`); the generic on
-// getNativeModule carries it. The callback `id`/`value` arrive typed because we declare
-// them here, so they cross the trust boundary already narrowed.
-interface INativeAlertManager {
+// Нативный модуль с одним методом `alertWithArgs`, `id` и `value` приходят уже типизированными
+type INativeAlertManager = {
   alertWithArgs(
     args: IAlertArgs,
     callback: (id: number, value: string) => void,
   ): void;
-}
+};
 
 type IPromptCallbackOrButtons = ((text: string) => void) | IAlertButtons;
 
-// prompt builds the native args, assigns each button its array index as id, and dispatches
-// the matching button's onPress when the native callback returns that id. Non-throwing: no
-// native module -> dlog + no-op.
-function prompt(
+type IButtonPlan = {
+  // Индекс кнопки это id, который native возвращает в callback
+  callbacks: Array<((value: string) => void) | undefined>;
+  buttons: Array<Record<number, string>>;
+  cancelButtonKey?: string;
+  destructiveButtonKey?: string;
+  preferredButtonKey?: string;
+};
+
+// Разбираем кнопки так же, как RN, включая его особенность с последней кнопкой без `text`
+function planButtons(
+  callbackOrButtons?: IPromptCallbackOrButtons,
+): IButtonPlan {
+  const plan: IButtonPlan = { callbacks: [], buttons: [] };
+  if (typeof callbackOrButtons === 'function') {
+    plan.callbacks = [callbackOrButtons];
+    return plan;
+  }
+  if (!Array.isArray(callbackOrButtons)) return plan;
+  callbackOrButtons.forEach((btn, index) => {
+    plan.callbacks[index] = btn.onPress;
+    if (btn.style === 'cancel') {
+      plan.cancelButtonKey = String(index);
+    } else if (btn.style === 'destructive') {
+      plan.destructiveButtonKey = String(index);
+    }
+    if (btn.isPreferred) {
+      plan.preferredButtonKey = String(index);
+    }
+    // Последняя кнопка без текста не попадает в native, и её `onPress` уже не сработает
+    if (btn.text || index < callbackOrButtons.length - 1) {
+      plan.buttons.push({ [index]: btn.text || '' });
+    }
+  });
+  return plan;
+}
+
+// Позиционная сигнатура RN, поэтому tuple, а не объект
+type IPromptArgs = [
   title?: string,
   message?: string,
   callbackOrButtons?: IPromptCallbackOrButtons,
-  type: IAlertType = 'plain-text',
+  type?: IAlertType,
   defaultValue?: string,
   keyboardType?: string,
   options?: IAlertOptions,
-): void {
+];
+
+// Без нативного модуля пишем в лог и выходим
+function prompt(...args: IPromptArgs): void {
+  const [
+    title,
+    message,
+    callbackOrButtons,
+    type = 'plain-text',
+    defaultValue,
+    keyboardType,
+    options,
+  ] = args;
   dlog('Alert.prompt');
 
-  // callbacks[id] is the onPress for the button at that index: the id->onPress map the
-  // native callback indexes into. The native always supplies a real string value, so the
-  // element accepts `string`; a button's `onPress` (`value?: string`) is contravariantly
-  // assignable to it.
-  let callbacks: Array<((value: string) => void) | undefined> = [];
-  const buttons: Array<Record<number, string>> = [];
-  let cancelButtonKey: string | undefined;
-  let destructiveButtonKey: string | undefined;
-  let preferredButtonKey: string | undefined;
-
-  if (typeof callbackOrButtons === 'function') {
-    callbacks = [callbackOrButtons];
-  } else if (Array.isArray(callbackOrButtons)) {
-    callbackOrButtons.forEach((btn, index) => {
-      callbacks[index] = btn.onPress;
-      if (btn.style === 'cancel') {
-        cancelButtonKey = String(index);
-      } else if (btn.style === 'destructive') {
-        destructiveButtonKey = String(index);
-      }
-      if (btn.isPreferred) {
-        preferredButtonKey = String(index);
-      }
-      // UPSTREAM-BUG(react-native): Libraries/Alert/Alert.js:173 - a TRAILING button with no text
-      // is left out of the native buttons array while its onPress still occupies callbacks[index],
-      // so that handler can never fire: native has no id to return for a button it was never told
-      // about. Only the last button, only when textless, which reads more like leftover
-      // length - 1 bookkeeping than an intended "omit a blank trailing button" affordance.
-      // Ported for parity; do NOT fix without recording a deliberate divergence.
-      //
-      // The `!== undefined` here IS a deliberate divergence from upstream's truthy `btn.text`:
-      // an explicit `text: ''` is a caller asking for a blank label, not an omission, and this
-      // codebase treats falsy-vs-absent as distinct on principle. Upstream drops that button.
-      if (btn.text !== undefined || index < callbackOrButtons.length - 1) {
-        buttons.push({ [index]: btn.text ?? '' });
-      }
-    });
-  }
+  const {
+    callbacks,
+    buttons,
+    cancelButtonKey,
+    destructiveButtonKey,
+    preferredButtonKey,
+  } = planButtons(callbackOrButtons);
 
   const manager = getNativeModule<INativeAlertManager>(ALERT_MANAGER);
   if (manager === null) {
@@ -133,8 +146,6 @@ function prompt(
       keyboardType,
       userInterfaceStyle: options?.userInterfaceStyle || undefined,
     },
-    // The native callback crossing back: `id` is the tapped button's index, `value` the
-    // text-input contents. Index into callbacks and fire onPress.
     (id, value) => {
       dlog(`Alert callback id=${id}`);
       callbacks[id]?.(value);

@@ -2,14 +2,6 @@
 // `slotProps`, `slotDerived`, `claimedChildren`. Only the RefreshControl claim differs by platform
 // (`index.ios` beside the content view, `index.android` wraps it); everything else is shared.
 
-// TODO(rn-parity): `keyboardShouldPersistTaps` is type-only — no capture-phase responder
-// negotiation eats a tap-elsewhere to dismiss the keyboard (`ScrollView.js:1360-1590`). Needs
-// `TextInputState.isTextInput`-equivalent wiring on this tag; see audit skill.
-
-// TODO(rn-parity): `stickyHeaderHiddenOnScroll` is entirely absent (no prop, no state, no
-// wiring). Vendor composes `Animated.diffClamp` over the scroll delta onto the sticky translateY
-// (`ScrollViewStickyHeader.js:39,84-103`); our sticky pin is a discrete number, not live Animated.
-
 // A composed primitive could not become a tag from props alone: `foldPayload` gives a tag its
 // wrapper's PROP MAPPING, but every adapter's ScrollView wrapper also built the same two nodes as
 // a framework component instance — this file gives the tag the wrapper's COMPOSITION too.
@@ -21,12 +13,11 @@
 // The ENGINE is the single owner of the content node: an adapter wrapper building one for the
 // same tag would double-commit it if registered while the wrapper still stands.
 
-// STYLE precedence differs by node: owner is [base, style] (base UNDER the app's), slot is
-// [contentContainerStyle, rowStyle] (row OVER the app's, horizontal only).
+// Both nodes compose their base UNDER the app's style: the owner is `[base, style]` and the slot
+// is `[row, contentContainerStyle]` (`ScrollView.js:1654`), the row on the horizontal axis only
 
-// `contentContainerStyle` travels through `slotProps` as a pure RENAME onto the slot's `style`;
-// the row-direction CONSTANT is a `payloadFold` instead, assigned to the slot node inside
-// `buildStructure` since `IHostBehavior.foldPayload` is only ever the OWNER's.
+// `contentContainerStyle` travels through `slotProps` as a pure RENAME onto the slot's `style`,
+// the row-direction constant is `foldScrollContentProps` in C++
 import {
   appendChild,
   appListenerFor,
@@ -40,16 +31,13 @@ import {
   type IHostBehavior,
   type ISymbioteEvent,
   type ISymbioteNode,
-  type IViewStyle,
 } from '@symbiote-native/engine';
 
 import { descriptorFor } from '../../component-names';
 import type { ISymbioteIntrinsic } from '../../component-names/shared';
-import {
-  didContentSizeChange,
-  readLayoutDimension,
-  type IContentSize,
-} from '../../view/render-scroll-view';
+import { readLayoutDimension } from '../../view/render-scroll-view';
+import { installScrollResponder } from './imperative';
+import { releaseInnerViewRef, syncInnerViewRef } from './inner-view-ref';
 import {
   deliverResponderEvent,
   RESPONDER_DISPATCHED_NAMES,
@@ -58,12 +46,13 @@ import {
 import {
   handleOwnerScroll,
   markScrollOwner,
-  reconcileStickyIndices,
   releaseStickyOwner,
   stickyHeaderBehavior,
   STICKY_HEADER_TAG,
+  syncHiddenOnScroll,
   syncOwnerLayout,
 } from './sticky';
+import { forgetStickyIndexOwner, reconcileStickyIndices } from './sticky-index';
 
 export const SCROLL_VIEW_TAG = 'scroll-view';
 export const HORIZONTAL_SCROLL_VIEW_TAG = 'horizontal-scroll-view';
@@ -115,16 +104,11 @@ function buildContent(contentIntrinsic: ISymbioteIntrinsic) {
   };
 }
 
-// The last size each owner reported, so a layout pass that did not change the content size does not
-// fire the app's handler — RN dedupes the same way (`_handleContentOnLayout`). Off the node: this
-// exists only for the ScrollViews an app wired a handler to.
-const lastContentSize = new WeakMap<ISymbioteNode, IContentSize>();
+// RN синтезирует `onContentSizeChange` из `onLayout` контент-вью и не дедуплицирует
+// У тега нет внутреннего узла, поэтому поведение ставит слушатель на слот
 
-// RN synthesizes onContentSizeChange from the CONTENT view's own onLayout — there's no native
-// content-size event. A tag has no inner node of its own, so the behavior installs it on the slot.
-
-// The app's callback takes `(width, height)`, not an event, so `contentSizeChange` is an OWNED
-// listener: setEventListener would wrap it as `(event) => handler(event)` and call it wrong.
+// Колбэк приложения берёт `(width, height)`, не событие, поэтому `contentSizeChange` это OWNED
+// слушатель: `setEventListener` обернул бы его как `(event) => handler(event)`
 function contentSizeListener(owner: ISymbioteNode) {
   return (event: ISymbioteEvent): void => {
     const handler = appListenerFor(owner, 'contentSizeChange');
@@ -132,14 +116,6 @@ function contentSizeListener(owner: ISymbioteNode) {
     const width = readLayoutDimension(event, 'width');
     const height = readLayoutDimension(event, 'height');
     if (width === undefined || height === undefined) return;
-    if (
-      !didContentSizeChange(lastContentSize.get(owner) ?? null, {
-        width,
-        height,
-      })
-    )
-      return;
-    lastContentSize.set(owner, { width, height });
     dlog(`ScrollView onContentSizeChange ${width}x${height}`);
     handler(width, height);
   };
@@ -156,7 +132,6 @@ function syncContentSizeWiring(owner: ISymbioteNode, wired: boolean): void {
   if (wired) {
     setEventListener(slot, 'layout', contentSizeListener(owner));
   } else {
-    lastContentSize.delete(owner);
     setEventListener(slot, 'layout', undefined);
   }
 }
@@ -187,17 +162,16 @@ function syncOwnedListener(
 // The platform half is a CLAIM MODE and a dirty list — nothing else. iOS takes the RefreshControl
 // `beside` the content view; Android takes it as a `wrap`; the style split that inversion needs is
 // `foldScrollViewProps`/`foldRefreshWrapperProps` in the engine.
-export interface IScrollPlatform {
+export type IScrollPlatform = {
   claimMode: IClaimMode;
   // Owner props this platform's WRAPPER fold reads, added to the slot's own. Android needs
   // `style`, since foldRefreshWrapperProps derives from a node that isn't its own and only
   // re-reads on a commit that marks it — dirtying the content node too costs one avoidable clone.
   slotDerived?: readonly string[];
-}
+};
 
 function scrollBehavior(
   contentIntrinsic: ISymbioteIntrinsic,
-  rowStyle: IViewStyle | undefined,
   platform: IScrollPlatform,
 ): IHostBehavior {
   return {
@@ -223,10 +197,15 @@ function scrollBehavior(
     onOwnedListenerChange: syncOwnedListener,
     // The one beat where the app's children are all present — no hook reports a children CHANGE,
     // and reconcileStickyIndices returns on a WeakSet miss for any that never used the prop.
-    afterCommit: reconcileStickyIndices,
+    afterCommit(owner) {
+      reconcileStickyIndices(owner);
+      syncHiddenOnScroll(owner);
+      syncInnerViewRef(owner);
+    },
     detach(node) {
+      releaseInnerViewRef(node);
       setNodeDispatch(node, undefined);
-      lastContentSize.delete(node);
+      forgetStickyIndexOwner(node);
       releaseStickyOwner(node);
     },
   };
@@ -235,17 +214,14 @@ function scrollBehavior(
 // Both axes, given the platform's answer to the RefreshControl question. The platform files call
 // this; nothing else should.
 export function registerScrollViewBehaviors(platform: IScrollPlatform): void {
+  installScrollResponder();
   registerHostBehavior(
     SCROLL_VIEW_TAG,
-    scrollBehavior('scroll-content', undefined, platform),
+    scrollBehavior('scroll-content', platform),
   );
   registerHostBehavior(
     HORIZONTAL_SCROLL_VIEW_TAG,
-    scrollBehavior(
-      'horizontal-scroll-content',
-      { flexDirection: 'row' },
-      platform,
-    ),
+    scrollBehavior('horizontal-scroll-content', platform),
   );
   // REGISTRATIONS WITH NO RUNTIME, what hand the content tags to the host: a tag with no behavior
   // registered carries an EMPTY tagName in C++ and no rule can fire for it. A registration is how

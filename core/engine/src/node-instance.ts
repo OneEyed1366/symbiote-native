@@ -30,6 +30,7 @@ import {
   setNativeProps as engineSetNativeProps,
   dispatchViewCommand,
 } from './imperative';
+import { scrollResponderImpl, type IZoomRect } from './scroll-responder';
 import {
   ANCHOR_COMPONENT,
   BRAND,
@@ -149,6 +150,43 @@ class SymbioteNode implements ISymbioteNode {
   flashScrollIndicators(): void {
     dlog('ScrollView.flashScrollIndicators');
     dispatchViewCommand(this, FLASH_SCROLL_INDICATORS_COMMAND, []);
+  }
+
+  getScrollResponder(): ISymbioteNode {
+    return this;
+  }
+
+  getScrollableNode(): ISymbioteNode {
+    return this;
+  }
+
+  getNativeScrollRef(): ISymbioteNode {
+    return this;
+  }
+
+  getInnerViewRef(): ISymbioteNode | undefined {
+    return this.childHost;
+  }
+
+  getInnerViewNode(): ISymbioteNode | undefined {
+    return this.childHost;
+  }
+
+  scrollResponderZoomTo(rect: IZoomRect, animated?: boolean): void {
+    scrollResponderImpl()?.zoomTo(this, rect, animated);
+  }
+
+  scrollResponderScrollNativeHandleToKeyboard(
+    target: ISymbioteNode | number,
+    additionalOffset = 0,
+    preventNegativeScrollOffset = false,
+  ): void {
+    scrollResponderImpl()?.scrollToKeyboard(
+      this,
+      target,
+      additionalOffset,
+      preventNegativeScrollOffset,
+    );
   }
 }
 

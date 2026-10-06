@@ -11,6 +11,7 @@
 // native host) is inert until a native-driven animation actually starts.
 
 import { dlog } from '../../debug';
+import { hostCall } from '../../host-call';
 import { getNativeModule } from '../../native-modules';
 import {
   NativeEventEmitter,
@@ -27,31 +28,30 @@ export type IPlatformConfig = Record<string, unknown>;
 // An animated-node config (`{type:'value'|'interpolation'|'style'|'transform'|'props', ...}`)
 // and an animation config (`{type:'frames'|'spring'|'decay', ...}`) cross into native as
 // plain JSON. They are open by design: each node/driver fills its own shape.
-export interface INativeNodeConfig {
+export type INativeNodeConfig = {
   readonly type: string;
   readonly [key: string]: unknown;
-}
-export interface INativeAnimationConfig {
+};
+export type INativeAnimationConfig = {
   readonly type: string;
   readonly [key: string]: unknown;
-}
-export interface INativeEventMapping {
+};
+export type INativeEventMapping = {
   readonly nativeEventPath: readonly string[];
   readonly animatedValueTag: number;
-}
+};
 
-export interface INativeEndResult {
+export type INativeEndResult = {
   finished: boolean;
   value?: number;
   offset?: number;
-}
+};
 export type INativeEndCallback = (result: INativeEndResult) => void;
 
-// The TurboModule method surface we use (iOS, no Android single-op batching). The
-// caller vouches for this shape via getNativeModule's generic: the single trust
-// boundary, no per-call cast.
-interface INativeAnimatedSpec {
+// Методы TurboModule без батчинга Android, форму гарантирует дженерик `getNativeModule`
+type INativeAnimatedSpec = {
   createAnimatedNode(tag: number, config: INativeNodeConfig): void;
+  updateAnimatedNodeConfig?(tag: number, config: INativeNodeConfig): void;
   connectAnimatedNodes(parentTag: number, childTag: number): void;
   disconnectAnimatedNodes(parentTag: number, childTag: number): void;
   connectAnimatedNodeToView(nodeTag: number, viewTag: number): void;
@@ -82,7 +82,18 @@ interface INativeAnimatedSpec {
     eventName: string,
     animatedNodeTag: number,
   ): void;
-}
+  connectAnimatedNodeToShadowNodeFamily?(
+    nodeTag: number,
+    shadowNode: unknown,
+  ): void;
+  startOperationBatch?(): void;
+  finishOperationBatch?(): void;
+};
+
+type IFeatureFlagsSpec = {
+  cxxNativeAnimatedEnabled?(): boolean;
+  useSharedAnimatedBackend?(): boolean;
+};
 
 // iOS bridgeless registers the Turbo variant; the legacy name is the fallback.
 const TURBO_MODULE_NAME = 'NativeAnimatedTurboModule';
@@ -143,34 +154,92 @@ function ensureValueUpdateSubscription(): void {
   );
 }
 
-// Thin pass-throughs. Calls are issued synchronously in dependency order
-// (createAnimatedNode before connect before start), so no operation queue is
-// needed on iOS. RN's own non-single-op path calls straight through when its
-// queue is empty. Each guards on availability so a missing module degrades to a
-// logged no-op rather than a throw inside a commit.
+// Очередь как в `NativeAnimatedHelper`: при `cxxNativeAnimatedEnabled` C++ модуль исполняет вызовы
+// только между `startOperationBatch` и `finishOperationBatch`, поэтому все вызовы встают в очередь
+const queue: (() => void)[] = [];
+let flushHandle: unknown;
+const flagValues = new Map<keyof IFeatureFlagsSpec, boolean>();
+
+// Читаем один раз как RN, промах (хост ещё не поднят) не кешируем
+function readFlag(name: keyof IFeatureFlagsSpec): boolean {
+  const cached = flagValues.get(name);
+  if (cached !== undefined) return cached;
+  const flags = getNativeModule<IFeatureFlagsSpec>(
+    'NativeReactNativeFeatureFlags',
+  );
+  if (flags === null) return false;
+  const isOn = flags[name]?.() === true;
+  flagValues.set(name, isOn);
+  return isOn;
+}
+
+function shouldSignalBatch(): boolean {
+  return readFlag('cxxNativeAnimatedEnabled');
+}
+
+// Общий backend находит вью по семейству shadow node, поэтому узел цепляется и к нему
+export function usesSharedBackend(): boolean {
+  return (
+    readFlag('cxxNativeAnimatedEnabled') && readFlag('useSharedAnimatedBackend')
+  );
+}
+
+function flushQueue(): void {
+  flushHandle = undefined;
+  if (queue.length === 0) return;
+  const native = module();
+  native?.startOperationBatch?.();
+  for (const operation of queue.splice(0)) operation();
+  native?.finishOperationBatch?.();
+}
+
+// Без модуля вызов тихо пропускается, а не бросает внутри коммита
+function send(operation: (native: INativeAnimatedSpec) => void): void {
+  const native = module();
+  if (native === null) return;
+  if (queue.length === 0 && !shouldSignalBatch()) {
+    operation(native);
+    return;
+  }
+  queue.push(() => operation(native));
+  hostCall('clearImmediate', [flushHandle]);
+  flushHandle = hostCall('setImmediate', [flushQueue]);
+}
+
 export const nativeAnimated = {
   createAnimatedNode(tag: number, config: INativeNodeConfig): void {
-    module()?.createAnimatedNode(tag, config);
+    send(native => native.createAnimatedNode(tag, config));
+  },
+  updateAnimatedNodeConfig(tag: number, config: INativeNodeConfig): void {
+    send(native => native.updateAnimatedNodeConfig?.(tag, config));
   },
   connectAnimatedNodes(parentTag: number, childTag: number): void {
-    module()?.connectAnimatedNodes(parentTag, childTag);
+    send(native => native.connectAnimatedNodes(parentTag, childTag));
   },
   disconnectAnimatedNodes(parentTag: number, childTag: number): void {
-    module()?.disconnectAnimatedNodes(parentTag, childTag);
+    send(native => native.disconnectAnimatedNodes(parentTag, childTag));
   },
   connectAnimatedNodeToView(nodeTag: number, viewTag: number): void {
     dlog(`native: connect node=${nodeTag} -> view=${viewTag}`);
-    module()?.connectAnimatedNodeToView(nodeTag, viewTag);
+    send(native => native.connectAnimatedNodeToView(nodeTag, viewTag));
+  },
+  connectAnimatedNodeToShadowNodeFamily(
+    nodeTag: number,
+    shadowNode: unknown,
+  ): void {
+    send(native =>
+      native.connectAnimatedNodeToShadowNodeFamily?.(nodeTag, shadowNode),
+    );
   },
   disconnectAnimatedNodeFromView(nodeTag: number, viewTag: number): void {
-    module()?.disconnectAnimatedNodeFromView(nodeTag, viewTag);
+    send(native => native.disconnectAnimatedNodeFromView(nodeTag, viewTag));
   },
   restoreDefaultValues(nodeTag: number): void {
     dlog(`native: restoreDefaultValues node=${nodeTag}`);
-    module()?.restoreDefaultValues(nodeTag);
+    send(native => native.restoreDefaultValues(nodeTag));
   },
   dropAnimatedNode(tag: number): void {
-    module()?.dropAnimatedNode(tag);
+    send(native => native.dropAnimatedNode(tag));
   },
   startAnimatingNode(
     animationId: number,
@@ -181,29 +250,34 @@ export const nativeAnimated = {
     dlog(
       `native: startAnimatingNode id=${animationId} node=${nodeTag} type=${config.type}`,
     );
-    module()?.startAnimatingNode(animationId, nodeTag, config, endCallback);
+    send(native =>
+      native.startAnimatingNode(animationId, nodeTag, config, endCallback),
+    );
   },
   stopAnimation(animationId: number): void {
-    module()?.stopAnimation(animationId);
+    send(native => native.stopAnimation(animationId));
   },
   setAnimatedNodeValue(nodeTag: number, value: number): void {
     dlog(`native: setAnimatedNodeValue node=${nodeTag} value=${value}`);
-    module()?.setAnimatedNodeValue(nodeTag, value);
+    send(native => native.setAnimatedNodeValue(nodeTag, value));
   },
   setAnimatedNodeOffset(nodeTag: number, offset: number): void {
-    module()?.setAnimatedNodeOffset(nodeTag, offset);
+    send(native => native.setAnimatedNodeOffset(nodeTag, offset));
   },
   flattenAnimatedNodeOffset(nodeTag: number): void {
-    module()?.flattenAnimatedNodeOffset(nodeTag);
+    send(native => native.flattenAnimatedNodeOffset(nodeTag));
   },
   extractAnimatedNodeOffset(nodeTag: number): void {
-    module()?.extractAnimatedNodeOffset(nodeTag);
+    send(native => native.extractAnimatedNodeOffset(nodeTag));
   },
   startListeningToAnimatedNodeValue(tag: number): void {
-    module()?.startListeningToAnimatedNodeValue(tag);
+    send(native => native.startListeningToAnimatedNodeValue(tag));
   },
   stopListeningToAnimatedNodeValue(tag: number): void {
-    module()?.stopListeningToAnimatedNodeValue(tag);
+    send(native => native.stopListeningToAnimatedNodeValue(tag));
+  },
+  getValue(tag: number, callback: (value: number) => void): void {
+    send(native => native.getValue(tag, callback));
   },
   // High-level value observation: register a per-tag callback and ask native to
   // stream this node's updates. The last unsubscribe tears the shared device
@@ -212,11 +286,11 @@ export const nativeAnimated = {
     ensureValueUpdateSubscription();
     valueListeners.set(tag, callback);
     dlog(`native: startListeningToValue node=${tag}`);
-    module()?.startListeningToAnimatedNodeValue(tag);
+    send(native => native.startListeningToAnimatedNodeValue(tag));
   },
   stopListeningToValue(tag: number): void {
     valueListeners.delete(tag);
-    module()?.stopListeningToAnimatedNodeValue(tag);
+    send(native => native.stopListeningToAnimatedNodeValue(tag));
     if (valueListeners.size === 0 && valueUpdateSubscription !== undefined) {
       valueUpdateSubscription.remove();
       valueUpdateSubscription = undefined;
@@ -227,13 +301,15 @@ export const nativeAnimated = {
     eventName: string,
     mapping: INativeEventMapping,
   ): void {
-    module()?.addAnimatedEventToView(viewTag, eventName, mapping);
+    send(native => native.addAnimatedEventToView(viewTag, eventName, mapping));
   },
   removeAnimatedEventFromView(
     viewTag: number,
     eventName: string,
     animatedNodeTag: number,
   ): void {
-    module()?.removeAnimatedEventFromView(viewTag, eventName, animatedNodeTag);
+    send(native =>
+      native.removeAnimatedEventFromView(viewTag, eventName, animatedNodeTag),
+    );
   },
 };

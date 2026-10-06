@@ -125,6 +125,11 @@ if (typeof globalThis.console === "undefined") {
     group: say("group"), groupEnd: function () {}, table: say("table"),
   };
 }
+// A bridgeless host always has this global and the engine's device-event hub refuses to start
+// without it. Nothing is reachable behind it, so Dimensions falls back to zero metrics
+if (typeof globalThis.RN$registerCallableModule !== "function") {
+  globalThis.RN$registerCallableModule = function () {};
+}
 if (typeof globalThis.window === "undefined") globalThis.window = globalThis;
 if (typeof globalThis.navigator === "undefined") {
   globalThis.navigator = { product: "ReactNative" };
@@ -248,6 +253,35 @@ const PLATFORM_EXTENSIONS_DIRECTIVE = '@symbiote-platform-extensions';
  * rename does not change behaviour.
  */
 const FABRIC_COUNT_DIRECTIVE = '@symbiote-count-fabric-calls';
+
+// A file asks for Fabric feature flags with `@symbiote-fabric-flags {"enableViewCulling":true}`,
+// on as many lines as it likes. The tester reads them once per process: `SYMBIOTE_FLAGS`
+const FABRIC_FLAGS_PATTERN = /@symbiote-fabric-flags\s+(\{.*\})/g;
+
+// A flag value `"*"` runs the file once per boolean, as Fantom's `@fantom_flags name:*` does
+const EVERY_VALUE = '*';
+
+// One entry per flag combination a file asks for, `flags` undefined when it asks for none
+function fabricFlagVariantsOf(file) {
+  const found = [...readFileSync(file, 'utf8').matchAll(FABRIC_FLAGS_PATTERN)];
+  if (found.length === 0) return [{ flags: undefined, label: '' }];
+  const merged = Object.assign({}, ...found.map(match => JSON.parse(match[1])));
+  const combinations = Object.entries(merged).reduce(
+    (variants, [name, value]) =>
+      variants.flatMap(variant =>
+        (value === EVERY_VALUE ? [true, false] : [value]).map(one => ({
+          ...variant,
+          [name]: one,
+        })),
+      ),
+    [{}],
+  );
+  const isExpanded = Object.values(merged).includes(EVERY_VALUE);
+  return combinations.map(flags => ({
+    flags: JSON.stringify(flags),
+    label: isExpanded ? `[${JSON.stringify(flags)}] ` : '',
+  }));
+}
 
 const FABRIC_COUNT_PRELUDE = `
 (function () {
@@ -533,18 +567,20 @@ function vueCompileSfc() {
 // SFC's content is fixed for the run.
 const vueSfcCache = new Map();
 
+async function compileVueFixture(file) {
+  const compileSfc = await vueCompileSfc();
+  const code = await compileSfc(readFileSync(file, 'utf8'), file);
+  // The compiled script still carries its TypeScript, the `ts` loader is esbuild's strip pass
+  return { contents: code, loader: 'ts' };
+}
+
 const vueSfc = {
   name: 'compile-vue-sfc',
   setup(build) {
     build.onLoad({ filter: /\.vue$/ }, ({ path: file }) => {
       let cached = vueSfcCache.get(file);
       if (cached === undefined) {
-        cached = vueCompileSfc()
-          .then(compileSfc => compileSfc(readFileSync(file, 'utf8'), file))
-          // `compileScript`'s output still carries the `<script setup>` block's TypeScript
-          // verbatim — Metro's SECOND pass (RN's own babel transformer) is what strips it there;
-          // `ts` here is that pass, esbuild's own.
-          .then(code => ({ contents: code, loader: 'ts' }));
+        cached = compileVueFixture(file);
         vueSfcCache.set(file, cached);
       }
       return cached;
@@ -587,43 +623,52 @@ const workspaceRoots = new Map(
 // outright rather than re-walking `existsSync` candidates each time.
 const workspaceResolveCache = new Map();
 
+function subpathWithin(specifier, packageName) {
+  if (specifier === packageName) return 'index';
+  if (specifier.startsWith(`${packageName}/`)) {
+    return specifier.slice(packageName.length + 1);
+  }
+  return undefined;
+}
+
+// The Android arm resolves our own sources the way Metro does on a device: `X.android.ts` and
+// `X/index.android.ts` win over the base file. Without it every name table is the iOS one
+const platformSuffixes = () => (shouldRunAndroid ? ['.android', ''] : ['']);
+
+// Returning a path from `onResolve` is final, esbuild would not try extensions or an index file
+function firstExistingModule(source, subpath) {
+  const base = path.join(source, subpath);
+  const found = platformSuffixes().flatMap(suffix => [
+    `${base}${suffix}.ts`,
+    `${base}${suffix}.tsx`,
+    path.join(base, `index${suffix}.ts`),
+    path.join(base, `index${suffix}.tsx`),
+  ])
+    .concat(base)
+    .find(candidate => existsSync(candidate));
+  return found === undefined ? undefined : { path: found };
+}
+
+function resolveWorkspace(specifier) {
+  for (const [name, source] of workspaceRoots) {
+    const subpath = subpathWithin(specifier, name);
+    if (subpath === undefined) continue;
+    const resolved = firstExistingModule(source, subpath);
+    if (resolved !== undefined) return resolved;
+  }
+  return undefined;
+}
+
 const workspaceSources = {
   name: 'symbiote-workspace-sources',
   setup(build) {
     build.onResolve(
       { filter: /^@symbiote-native\// },
       ({ path: specifier }) => {
-        if (workspaceResolveCache.has(specifier)) {
-          return workspaceResolveCache.get(specifier);
+        if (!workspaceResolveCache.has(specifier)) {
+          workspaceResolveCache.set(specifier, resolveWorkspace(specifier));
         }
-        let resolved;
-        for (const [name, source] of workspaceRoots) {
-          const subpath =
-            specifier === name
-              ? 'index'
-              : specifier.startsWith(`${name}/`)
-                ? specifier.slice(name.length + 1)
-                : undefined;
-          if (subpath === undefined) continue;
-          // Returning a path from `onResolve` is FINAL — esbuild does not then try extensions or an
-          // index file — so the candidates are spelled out here.
-          const base = path.join(source, subpath);
-          for (const candidate of [
-            `${base}.ts`,
-            `${base}.tsx`,
-            path.join(base, 'index.ts'),
-            path.join(base, 'index.tsx'),
-            base,
-          ]) {
-            if (existsSync(candidate)) {
-              resolved = { path: candidate };
-              break;
-            }
-          }
-          if (resolved !== undefined) break;
-        }
-        workspaceResolveCache.set(specifier, resolved);
-        return resolved;
+        return workspaceResolveCache.get(specifier);
       },
     );
   },
@@ -656,7 +701,7 @@ const binary = path.join(
 // `-Xes6-block-scoping` IS NOT OPTIONAL: `hermesc` defaults it off, so `const one` in a `for…of`
 // stops being per-iteration and every closure in `report()`'s case chain captures the LAST case —
 // a wrong ANSWER, not an error. A single-case fixture passes happily, which is how this hides.
-const wantsBytecode = process.env.SYMBIOTE_ITEST_BYTECODE === '1';
+const shouldRunBytecode = process.env.SYMBIOTE_ITEST_BYTECODE === '1';
 
 // `hermesc` ships inside the `hermes-engine` pod, not on npm, so it is the SAME compiler the app
 // build uses and pairs with the `hermesvm.framework` the tester links against
@@ -680,8 +725,8 @@ function findHermesc() {
   return existsSync(fetched) ? fetched : undefined;
 }
 
-const hermesc = wantsBytecode ? findHermesc() : undefined;
-if (wantsBytecode && hermesc === undefined) {
+const hermesc = shouldRunBytecode ? findHermesc() : undefined;
+if (shouldRunBytecode && hermesc === undefined) {
   console.error(
     'SYMBIOTE_ITEST_BYTECODE=1 but no hermesc found - run `node scripts/fetch-hermes.mjs`',
   );
@@ -718,13 +763,15 @@ function reportRun(run) {
   let failures = 0;
   for (const line of run.stdout.split('\n').filter(Boolean)) {
     if (line.startsWith('FAIL ')) failures += 1;
-    console.log(line);
+    console.log(run.label === undefined ? line : `${run.label}${line}`);
   }
   if (run.status === 0 && run.signal === null) return failures;
   // A tester killed by a SIGNAL exits with `status` `null` and writes NOTHING to stderr, so without
   // the file name and the signal a dead run is indistinguishable from a silent one
   const how =
-    run.signal !== null ? `killed by ${run.signal}` : `exit status ${run.status}`;
+    run.signal === null
+      ? `exit status ${run.status}`
+      : `killed by ${run.signal}`;
   const silent = run.stdout.trim() === '' ? ', no output' : '';
   console.error(`CRASH ${path.relative(testsDir, run.file)} - ${how}${silent}`);
   if (run.stderr.trim() !== '') console.error(run.stderr.trim());
@@ -741,19 +788,19 @@ function reportRun(run) {
  * a file's name says which binary it belongs to and nothing has to maintain a list.
  */
 const ANDROID_SUFFIX = '.android.itest.ts';
-const wantsAndroid = buildDirectory === 'build-android';
+const shouldRunAndroid = buildDirectory === 'build-android';
 
 /**
- * Recursive, because this directory has to hold hundreds of files eventually and a flat one stops
- * being readable long before that. A subdirectory per subject mirrors how the vitest suites are laid
- * out, which is also where these files come FROM.
+ * Recursive, a subdirectory per subject mirrors how the vitest suites are laid out
  */
 function itestsUnder(directory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
     const full = path.join(directory, entry.name);
     if (entry.isDirectory()) return itestsUnder(full);
-    if (entry.name.endsWith(ANDROID_SUFFIX)) return wantsAndroid ? [full] : [];
-    if (wantsAndroid) return [];
+    if (entry.name.endsWith(ANDROID_SUFFIX)) {
+      return shouldRunAndroid ? [full] : [];
+    }
+    if (shouldRunAndroid) return [];
     return entry.name.endsWith('.itest.ts') || entry.name.endsWith('.itest.tsx')
       ? [full]
       : [];
@@ -815,9 +862,11 @@ function createLimiter(max) {
 
 const limitTestRun = createLimiter(testConcurrency);
 
-function runTester(bundle) {
+function runTester(bundle, flags) {
   return new Promise((resolve, reject) => {
-    const child = spawn(binary, [bundle]);
+    const env =
+      flags === undefined ? process.env : { ...process.env, SYMBIOTE_FLAGS: flags };
+    const child = spawn(binary, [bundle], { env });
     let stdout = '';
     let stderr = '';
     child.stdout.on('data', chunk => {
@@ -865,6 +914,7 @@ try {
       platform: 'neutral',
       mainFields: ['module', 'main'],
       resolveExtensions: [
+        ...(shouldRunAndroid ? ['.android.ts', '.android.tsx'] : []),
         '.ts',
         '.tsx',
         '.mjs',
@@ -942,7 +992,7 @@ try {
     // thing a reader can act on is which test file died.
     bundles.push({
       file,
-      bundle: wantsBytecode ? await compileToBytecode(bundle) : bundle,
+      bundle: shouldRunBytecode ? await compileToBytecode(bundle) : bundle,
     });
     buildMs += performance.now() - buildStart;
   }
@@ -951,8 +1001,12 @@ try {
   // Every bundle is queued at once — the limiter caps how many run concurrently — and printing
   // still walks them in submission order, so output stays grouped exactly as the sequential run
   // printed it even though completion order underneath is whatever finishes first.
-  const runPromises = bundles.map(({ file, bundle }) =>
-    limitTestRun(() => runTester(bundle).then(run => ({ ...run, file }))),
+  const runPromises = bundles.flatMap(({ file, bundle }) =>
+    fabricFlagVariantsOf(file).map(({ flags, label }) =>
+      limitTestRun(() =>
+        runTester(bundle, flags).then(run => ({ ...run, file, label })),
+      ),
+    ),
   );
   for (const runPromise of runPromises) failed += reportRun(await runPromise);
   runMs += performance.now() - runStart;

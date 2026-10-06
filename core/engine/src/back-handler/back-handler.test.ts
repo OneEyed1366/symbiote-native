@@ -9,9 +9,9 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-interface IDeviceHub {
+type IDeviceHub = {
   emit: (eventType: string, ...args: unknown[]) => void;
-}
+};
 
 let BackHandler: typeof import('./index').BackHandler;
 
@@ -254,11 +254,28 @@ describe('BackHandler', () => {
         },
       );
       if (deviceHub === undefined) throw new Error('no device hub');
-      deviceHub.emit('hardwareBackPress', { timeStamp: 1234 });
+      deviceHub.emit('hardwareBackPress', { timeStamp: 1_234 });
       expect(event).toMatchObject({
         type: 'hardwareBackPress',
-        timeStamp: 1234,
+        timeStamp: 1_234,
       });
+      sub.remove();
+    });
+
+    // RN без нативного timestamp берет `performance.now()`
+    it('falls back to performance.now() when native sends no timestamp', async () => {
+      await loadBackHandler();
+      let timeStamp: number | undefined;
+      const sub = BackHandler.addEventListener('hardwareBackPress', event => {
+        timeStamp = event.timeStamp;
+        return true;
+      });
+      if (deviceHub === undefined) throw new Error('no device hub');
+      const before = performance.now();
+      deviceHub.emit('hardwareBackPress', null);
+      const after = performance.now();
+      expect(timeStamp).toBeGreaterThanOrEqual(before);
+      expect(timeStamp).toBeLessThanOrEqual(after);
       sub.remove();
     });
   });

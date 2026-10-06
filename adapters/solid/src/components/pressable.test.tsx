@@ -50,7 +50,7 @@ const TERMINATION_REQUEST = 'responderTerminationRequest';
 const LONG_PRESS_MS = 500;
 const PRESS_DELAY_MS = 120;
 
-// The frame slot.measure reports; undefined disables measure (the radius fallback path).
+// The frame slot.measure reports; undefined leaves the responder unmeasured, so nothing drifts
 let measuredFrame:
   { width: number; height: number; pageX: number; pageY: number } | undefined;
 
@@ -177,12 +177,8 @@ describe('Solid Pressable on the engine', () => {
       expect(pressOuts).toBe(1);
     });
 
-    // why: RN's disabled Pressable must not claim the responder or fire feedback at all, and must
-    // still report itself disabled to a screen reader — a disabled control that keeps reacting is
-    // both a product and an a11y bug.
-    // The a11y half of this case is the engine's rule now (`foldPressableProps`) and is asserted in
-    // `core/engine/cpp/tests/js/pressable-payload.itest.ts`; what is left here is the half that is
-    // genuinely Solid's — that a disabled tag reaches the press machine and the press never fires.
+    // The a11y half is `foldPressableProps`, asserted in `pressable-payload.itest.ts`
+    // Here a disabled tag reaches the press machine and the press never fires
     it('suppresses the press when disabled', async () => {
       let presses = 0;
       mount(ROOT_TAG, () => (
@@ -202,10 +198,8 @@ describe('Solid Pressable on the engine', () => {
       expect(presses).toBe(0);
     });
 
-    // why: unrelated a11y props reach the native node untouched. The "an enabled Pressable must not
-    // report itself disabled" half left with its disabled twin, to
-    // `core/engine/cpp/tests/js/pressable-payload.itest.ts` — an absence assertion on a harness
-    // that can no longer produce the key passes for the wrong reason forever.
+    // Unrelated a11y props reach the native node
+    // The disabled twin is asserted in `pressable-payload.itest.ts`
     it('passes a11y props through untouched', async () => {
       mount(ROOT_TAG, () => (
         <pressable
@@ -275,10 +269,7 @@ describe('Solid Pressable on the engine', () => {
       expect(longPresses).toBe(0);
     });
 
-    // why: RN's finger tracking is not pixel-perfect — a small wobble while holding must still
-    // count as a press, but a real drag must drop it (early pressOut) so a Pressable inside a
-    // scrollable area does not fire spuriously. No measured frame here, so this is the radius
-    // fallback: hitSlop 0 + retention 30 -> threshold 30.
+    // A small wobble keeps the press, a real drag drops it so a scrolled Pressable stays quiet
     it('retains the press on a small drift and drops it past pressRetentionOffset', async () => {
       let presses = 0;
       let pressOuts = 0;
@@ -298,8 +289,9 @@ describe('Solid Pressable on the engine', () => {
       await flush();
       const handle = responderHandle();
 
+      measuredFrame = { width: 20, height: 20, pageX: 95, pageY: 95 };
       fireAt(handle, TOUCH_START, 100, 100);
-      fireAt(handle, TOUCH_MOVE, 108, 106); // hypot(8,6) = 10 < 30 -> retained
+      fireAt(handle, TOUCH_MOVE, 108, 106); // inside the region -> retained
       fireAt(handle, TOUCH_END, 108, 106);
       expect(presses).toBe(1);
       expect(pressOuts).toBe(0);
@@ -317,10 +309,8 @@ describe('Solid Pressable on the engine', () => {
       expect(presses).toBe(0);
     });
 
-    // why: pressRetentionOffset can be set per-edge, so the drift test must run against the real
-    // measured frame rather than a symmetric approximation. This is also the only test that proves
-    // IPressHost.getMeasureFn is wired to a LIVE host ref: with a broken ref the machine silently
-    // falls back to the radius test and (a) below would drop the press instead of retaining it.
+    // `pressRetentionOffset` is per-edge, so drift is judged on the measured frame
+    // Also proves `getMeasureFn` reaches a live host ref, without it nothing drifts
     it('tests the measured rect per-edge (asymmetric) for retention', async () => {
       measuredFrame = { width: 100, height: 40, pageX: 0, pageY: 0 };
       let presses = 0;
@@ -359,10 +349,8 @@ describe('Solid Pressable on the engine', () => {
       expect(presses).toBe(0);
     });
 
-    // why: unstable_pressDelay exists so a fast swipe-through does not flash every Pressable it
-    // crosses as "pressed" — pressIn must wait for the delay, but a release before the delay
-    // elapses must still FLUSH the deferred press rather than silently dropping the tap. Also
-    // proves IPressHost.schedule is wired: without it the machine would never activate at all.
+    // `pressIn` waits for `unstable_pressDelay`, an early release still flushes the deferred press
+    // Also proves `IPressHost.schedule` is wired, without it nothing activates
     it('defers the pressed state with unstable_pressDelay and flushes an early release', async () => {
       let pressIns = 0;
       let presses = 0;
@@ -444,11 +432,8 @@ describe('Solid Pressable on the engine', () => {
       expect(moves).toBe(2);
     });
 
-    // why: cancelable={false} means "I refuse to yield the responder to a parent (e.g. a
-    // ScrollView) that asks to take over". The gate is a RESPONDER event, which no ViewConfig
-    // declares — it reaches the node only because routeProp knows the JS responder protocol
-    // (symbiote-engine-core §2). An adapter-side `onX` check would have routed it to setProp, where
-    // it would sit as a dead prop and the Pressable would yield anyway.
+    // `cancelable={false}` refuses to yield the responder to a parent such as a ScrollView
+    // The gate is a responder event no ViewConfig declares, `routeProp` is what delivers it
     it('registers a termination gate returning false for cancelable={false}', async () => {
       mount(ROOT_TAG, () => (
         <pressable testID={TARGET} cancelable={false} onPress={() => {}} />
@@ -471,14 +456,8 @@ describe('Solid Pressable on the engine', () => {
       expect(gate?.({ nativeEvent: {} })).toBe(true);
     });
 
-    // why: leaving `cancelable` unset must leave RN's own native default in charge — FORCING an
-    // answer would override that default with our own opinion.
-    //
-    // Asserted on the ANSWER, not on the listener's presence: the behavior installs ONE dispatcher
-    // per owned event at attach (it has to, since the machine needs the slot before any gesture
-    // can start), and that dispatcher returns `undefined` when no inner gate was built — exactly
-    // what an absent listener yields to the engine (`.claude/rules/adapter-parity-audit.md`,
-    // "phrase a parity oracle as a CAPABILITY").
+    // An unset `cancelable` leaves RN's native default in charge, so no answer is forced
+    // Asserted on the answer, since the behavior always installs one dispatcher
     it('forces no termination answer when cancelable is unset (RN implicit yes)', async () => {
       mount(ROOT_TAG, () => <pressable testID={TARGET} onPress={() => {}} />);
       await flush();
@@ -486,10 +465,8 @@ describe('Solid Pressable on the engine', () => {
       expect(gate?.({ nativeEvent: {} })).toBeUndefined();
     });
 
-    // why: android_ripple is gated on Platform.OS === 'android' and must be inert elsewhere (RN
-    // Pressable.js). The fold itself is the engine behavior's (`core/components/src/behaviors/
-    // pressable.ts`, asserted in `ripple-android.test.ts`); this pins that a bare tag
-    // never wraps its child regardless — headless vitest resolves Platform.OS to 'ios'.
+    // `android_ripple` is inert off Android, so a bare tag never wraps its child
+    // The fold itself is asserted in `ripple-android.test.ts`
     it('never wraps the child in a ripple View, even on this iOS-resolved host', async () => {
       mount(ROOT_TAG, () => (
         <pressable
@@ -532,11 +509,8 @@ describe('Solid Pressable on the engine', () => {
       expect('android_disableSound' in committedTargetProps()).toBe(false);
     });
 
-    // why: the user's own press callbacks are plain JS. `onPress` happens to be a real View event
-    // so it would be swallowed as a listener, but `onLongPress`/`onPressMove` and the plain
-    // numbers (delayLongPress, unstable_pressDelay) are NOT — leaking a function onto the native
-    // prop bag crashes Android's folly::dynamic serializer, and leaking the numbers sends Fabric
-    // props it has no attribute for.
+    // Press callbacks and timing numbers are plain JS, a function on the native prop bag crashes
+    // the Android `folly::dynamic` serializer
     it('never forwards its own config props onto the native prop bag', async () => {
       mount(ROOT_TAG, () => (
         <pressable
@@ -554,12 +528,8 @@ describe('Solid Pressable on the engine', () => {
       await flush();
 
       const props = committedTargetProps();
-      // LISTENERS ONLY. The timing and config props beside them — `delayLongPress`,
-      // `unstable_pressDelay`, `pressRetentionOffset`, `delayHoverIn`, `android_ripple` — are
-      // stripped by the engine now (`foldPressableProps`) and are asserted in
-      // `core/engine/cpp/tests/js/pressable-payload.itest.ts`. These three are a different
-      // mechanism that is still entirely JS: `ownedListeners` diverts them into the behavior's
-      // stash at `routeProp`, so they never become props at all.
+      // Listeners only, the config props are stripped by `foldPressableProps` (itest)
+      // These three never become props, `ownedListeners` diverts them at `routeProp`
       for (const key of ['onLongPress', 'onPressMove', 'onHoverIn']) {
         expect(key in props, `${key} must not reach Fabric`).toBe(false);
       }

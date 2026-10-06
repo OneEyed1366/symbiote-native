@@ -15,14 +15,14 @@ const TARGET_TAG = 1;
 // location coords ride along to prove the event shape is realistic.
 const LOCATION_OFFSET = 5;
 
-interface ISyntheticTouch {
+type ISyntheticTouch = {
   pageX: number;
   pageY: number;
   locationX: number;
   locationY: number;
   identifier: number;
   timestamp: number;
-}
+};
 
 function makeTouch(
   pageX: number,
@@ -63,13 +63,13 @@ function buildEvent(
   };
 }
 
-interface ISnapshot {
+type ISnapshot = {
   dx: number;
   dy: number;
   vx: number;
   vy: number;
   numberActiveTouches: number;
-}
+};
 
 function snapshot(gestureState: IPanResponderGestureState): ISnapshot {
   return {
@@ -234,6 +234,25 @@ describe('PanResponder should-set defaults (no callback configured)', () => {
     });
     expect(panHandlers.onResponderGrant(buildEvent(0, 0, 0))).toBe(false);
   });
+
+  // RN читает колбэки через `== null`: явный `null` значит то же, что отсутствие
+  it('treats null callbacks like missing ones', () => {
+    const { panHandlers } = PanResponder.create({
+      onStartShouldSetPanResponder: null,
+      onMoveShouldSetPanResponder: null,
+      onStartShouldSetPanResponderCapture: null,
+      onMoveShouldSetPanResponderCapture: null,
+      onShouldBlockNativeResponder: null,
+      onPanResponderTerminationRequest: null,
+    });
+    const event = buildEvent(0, 0, 10);
+    expect(panHandlers.onStartShouldSetResponder(event)).toBe(false);
+    expect(panHandlers.onMoveShouldSetResponder(event)).toBe(false);
+    expect(panHandlers.onStartShouldSetResponderCapture(event)).toBe(false);
+    expect(panHandlers.onMoveShouldSetResponderCapture(event)).toBe(false);
+    expect(panHandlers.onResponderGrant(event)).toBe(true);
+    expect(panHandlers.onResponderTerminationRequest(event)).toBe(true);
+  });
 });
 
 describe('PanResponder reject / terminate', () => {
@@ -363,10 +382,8 @@ describe('PanResponder touch-history store (RN-faithful multitouch)', () => {
     };
   }
 
-  // why: this IS the reason touch-history-based geometry exists (per the source's
-  // own comment) -- a finger that stops moving must stop contributing to dx,
-  // rather than diluting the centroid average with its unchanged position.
-  it('a stationary touch does not dilute dx once another touch moves', () => {
+  // RN не двигает `_accountsForMovesUpTo` на grant, поэтому стоящий палец входит в первый кадр
+  it('a touch idle since before the grant still counts in the first moved frame (RN)', () => {
     const grantHistory = {
       touchBank: [
         {
@@ -402,18 +419,16 @@ describe('PanResponder touch-history store (RN-faithful multitouch)', () => {
         moveSnap = snapshot(gestureState);
       },
     });
-    panHandlers.onResponderGrant(
-      historyEvent(
-        [makeTouch(100, 0, 1_000), makeTouch(300, 0, 1_000)],
-        grantHistory,
-      ),
+    const grantEvent = historyEvent(
+      [makeTouch(100, 0, 1_000), makeTouch(300, 0, 1_000)],
+      grantHistory,
     );
+    // Счётчик касаний ведёт capture, grant с банком касаний его не трогает
+    panHandlers.onStartShouldSetResponderCapture(grantEvent);
+    panHandlers.onResponderGrant(grantEvent);
     expect(grantSnap?.numberActiveTouches).toBe(2);
 
-    // Move frame: touch A moved +50 to x=150 at t=1016; touch B's record is
-    // UNCHANGED and its currentTimeStamp is left at 500 -- BEFORE the grant's
-    // accounted-for time (1000), so the `>= touchesChangedAfter` scan excludes it,
-    // exactly modeling "B never reported a move after the gesture was granted".
+    // Палец A сдвинулся на +50, запись пальца B не менялась и её время 500 больше 0
     const moveHistory = {
       touchBank: [
         {
@@ -444,16 +459,12 @@ describe('PanResponder touch-history store (RN-faithful multitouch)', () => {
       ),
     );
 
-    // Only A's +50 delta counts -- if B's stale-but-included position had diluted
-    // the centroid average, dx would be 25 (the two-touch average) instead of 50.
-    expect(moveSnap?.dx).toBeCloseTo(50, PRECISION);
+    // Среднее по двум пальцам, (50 + 0) / 2
+    expect(moveSnap?.dx).toBeCloseTo(25, PRECISION);
     expect(moveSnap?.numberActiveTouches).toBe(2);
   });
 
-  // why: centroidDimension takes a DIFFERENT fast path (a strict `>`, not `>=`)
-  // when exactly one touch is active, reading touchBank[indexOfSingleActiveTouch]
-  // directly instead of scanning -- this is a genuinely separate branch from both
-  // the plain-centroid (no touchHistory) path and the multi-touch scan above.
+  // Одно активное касание идёт по быстрому пути `TouchHistoryMath` (строгий `>`, без скана банка)
   it('uses the single-active-touch fast path when touchHistory reports exactly one touch', () => {
     const grantHistory = {
       touchBank: [

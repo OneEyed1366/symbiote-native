@@ -40,22 +40,22 @@ export type ITransformProp =
 // New-Architecture box shadow (StyleSheetTypes BoxShadowValue:816). Either a CSS
 // `box-shadow` string or an array of shadow objects; Fabric's C++ parses both, so
 // these reach native as raw style props (no JS-side processColor on the nested color).
-export interface IBoxShadowValue {
+export type IBoxShadowValue = {
   offsetX: number | string;
   offsetY: number | string;
   color?: IColorValue;
   blurRadius?: number | string;
   spreadDistance?: number | string;
   inset?: boolean;
-}
+};
 
 // `filter`'s drop-shadow primitive (StyleSheetTypes DropShadowValue:721).
-export interface IDropShadowValue {
+export type IDropShadowValue = {
   offsetX: number | string;
   offsetY: number | string;
   standardDeviation?: number | string;
   color?: IColorValue;
-}
+};
 
 // One CSS filter function (StyleSheetTypes FilterFunction:709): each entry names
 // exactly one filter, mirroring the single-key-object shape of TransformProp.
@@ -136,7 +136,7 @@ export type IBlendMode =
   | 'luminosity'
   | 'plus-lighter';
 
-export interface IViewStyle {
+export type IViewStyle = {
   // Box dimensions
   width?: IDimensionValue;
   height?: IDimensionValue;
@@ -163,8 +163,34 @@ export interface IViewStyle {
   rowGap?: number | string;
   columnGap?: number | string;
 
+  boxSizing?: 'border-box' | 'content-box';
+
   // Positioning
   position?: 'absolute' | 'relative' | 'static';
+  // Logical insets, margins and paddings: block is the vertical axis, inline the horizontal one,
+  // both resolved against `direction` by Yoga
+  insetBlock?: IDimensionValue;
+  insetBlockEnd?: IDimensionValue;
+  insetBlockStart?: IDimensionValue;
+  insetInline?: IDimensionValue;
+  insetInlineEnd?: IDimensionValue;
+  insetInlineStart?: IDimensionValue;
+  marginBlock?: IDimensionValue;
+  marginBlockEnd?: IDimensionValue;
+  marginBlockStart?: IDimensionValue;
+  marginInline?: IDimensionValue;
+  marginInlineEnd?: IDimensionValue;
+  marginInlineStart?: IDimensionValue;
+  paddingBlock?: IDimensionValue;
+  paddingBlockEnd?: IDimensionValue;
+  paddingBlockStart?: IDimensionValue;
+  paddingInline?: IDimensionValue;
+  paddingInlineEnd?: IDimensionValue;
+  paddingInlineStart?: IDimensionValue;
+  outlineColor?: IColorValue;
+  outlineOffset?: number;
+  outlineStyle?: 'solid' | 'dotted' | 'dashed';
+  outlineWidth?: number;
   top?: IDimensionValue;
   right?: IDimensionValue;
   bottom?: IDimensionValue;
@@ -257,9 +283,9 @@ export interface IViewStyle {
   filter?: IFilterFunction[] | string;
   experimental_backgroundImage?: IBackgroundImageValue[] | string;
   mixBlendMode?: IBlendMode;
-}
+};
 
-export interface ITextStyle extends IViewStyle {
+export type ITextStyle = IViewStyle & {
   color?: IColorValue;
   fontFamily?: string;
   fontSize?: number;
@@ -296,7 +322,7 @@ export interface ITextStyle extends IViewStyle {
   // Per-text override of the layout writing direction.
   writingDirection?: 'auto' | 'ltr' | 'rtl';
   includeFontPadding?: boolean;
-}
+};
 
 // A style "slot" exactly as RN callers pass it: a style object, a (possibly nested) array of
 // them, or a falsy entry contributing nothing (`style={[base, cond && override]}`). Mirrors RN's

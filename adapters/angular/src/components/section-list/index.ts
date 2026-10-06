@@ -12,8 +12,8 @@ import {
   inject,
 } from '@angular/core';
 import type {
+  IInnerViewRef,
   IScrollViewHandle,
-  ISection,
   IVirtualizedSectionListHandle,
 } from '@symbiote-native/components';
 import {
@@ -23,11 +23,11 @@ import {
   type IViewStyle,
 } from '@symbiote-native/engine';
 import {
+  VListCellDirective,
   VListEmptyDirective,
   VListFooterDirective,
   VListHeaderDirective,
   VListSeparatorDirective,
-  type IVListSeparatorContext,
 } from '../virtualized-list';
 import { VListOutletDirective } from '../virtualized-list/directives';
 import { LIST_ACCESSIBILITY_FORWARD } from '../virtualized-list/list-a11y-forward';
@@ -43,16 +43,11 @@ import {
   VSectionItemDirective,
   VSectionSeparatorDirective,
   VirtualizedSectionList,
+  type ISection,
   type IVirtualizedSectionListProps,
 } from '../virtualized-section-list';
 
-// The separator context arrives typed `unknown`, the directive is matched structurally in the
-// template with no type argument to pin the item type. The narrowest cast for that gap
-function asItem<ItemT>(value: unknown): ItemT | undefined {
-  return value as ItemT | undefined;
-}
-
-export type { ISection } from '@symbiote-native/components';
+export type { ISection } from '../virtualized-section-list';
 export type ISectionListHandle = IVirtualizedSectionListHandle;
 
 // Re-exported so app code gets the whole `vSection*` and `vList*` authoring surface from here
@@ -124,20 +119,28 @@ export type ISectionListInputs<ItemT> = Omit<
       [maxToRenderPerBatch]="maxToRenderPerBatch"
       [updateCellsBatchingPeriod]="updateCellsBatchingPeriod"
       [windowSize]="windowSize"
+      [disableVirtualization]="disableVirtualization"
       [inverted]="inverted"
+      [horizontal]="horizontal"
       [maintainVisibleContentPosition]="maintainVisibleContentPosition"
       [onScroll]="onScroll"
       [onScrollBeginDrag]="onScrollBeginDrag"
       [onScrollEndDrag]="onScrollEndDrag"
       [onMomentumScrollBegin]="onMomentumScrollBegin"
       [onMomentumScrollEnd]="onMomentumScrollEnd"
+      [onContentSizeChange]="onContentSizeChange"
       [scrollEventThrottle]="scrollEventThrottle"
       [keyboardShouldPersistTaps]="keyboardShouldPersistTaps"
       [keyboardDismissMode]="keyboardDismissMode"
       [removeClippedSubviews]="removeClippedSubviews"
       [nestedScrollEnabled]="nestedScrollEnabled"
+      [stickyHeaderHiddenOnScroll]="stickyHeaderHiddenOnScroll"
+      [innerViewRef]="innerViewRef"
       [style]="resolvedStyle"
       [contentContainerStyle]="contentContainerStyle"
+      [listHeaderComponentStyle]="listHeaderComponentStyle"
+      [listFooterComponentStyle]="listFooterComponentStyle"
+      [cellRendererTemplate]="cellDir?.templateRef"
       [testID]="testID"
       [nativeID]="nativeID"
       ${LIST_ACCESSIBILITY_FORWARD}
@@ -177,9 +180,10 @@ export type ISectionListInputs<ItemT> = Omit<
         </ng-template>
       }
       @if (sectionSeparatorDir !== undefined) {
-        <ng-template vSectionSeparator>
+        <ng-template vSectionSeparator let-props="props">
           <ng-container
             [vListOutlet]="sectionSeparatorDir.templateRef"
+            [vListOutletContext]="props"
           ></ng-container>
         </ng-template>
       }
@@ -203,17 +207,10 @@ export type ISectionListInputs<ItemT> = Omit<
         </ng-template>
       }
       @if (itemSeparatorDir !== undefined) {
-        <ng-template
-          vListSeparator
-          let-highlighted="highlighted"
-          let-leadingItem="leadingItem"
-          let-trailingItem="trailingItem"
-        >
+        <ng-template vListSeparator let-props="props">
           <ng-container
             [vListOutlet]="itemSeparatorDir.templateRef"
-            [vListOutletContext]="
-              itemSeparatorContext(highlighted, leadingItem, trailingItem)
-            "
+            [vListOutletContext]="props"
           ></ng-container>
         </ng-template>
       }
@@ -242,7 +239,9 @@ export class SectionList<ItemT = unknown>
   @Input() maxToRenderPerBatch?: number;
   @Input() updateCellsBatchingPeriod?: number;
   @Input() windowSize?: number;
+  @Input() disableVirtualization?: boolean;
   @Input() inverted?: boolean;
+  @Input() horizontal?: boolean;
   @Input() maintainVisibleContentPosition?: {
     minIndexForVisible: number;
     autoscrollToTopThreshold?: number;
@@ -252,13 +251,18 @@ export class SectionList<ItemT = unknown>
   @Input() onScrollEndDrag?: (event: ISymbioteEvent) => void;
   @Input() onMomentumScrollBegin?: (event: ISymbioteEvent) => void;
   @Input() onMomentumScrollEnd?: (event: ISymbioteEvent) => void;
+  @Input() onContentSizeChange?: (width: number, height: number) => void;
   @Input() scrollEventThrottle?: number;
   @Input() keyboardShouldPersistTaps?: boolean | 'always' | 'never' | 'handled';
   @Input() keyboardDismissMode?: 'none' | 'on-drag' | 'interactive';
   @Input() removeClippedSubviews?: boolean;
   @Input() nestedScrollEnabled?: boolean;
+  @Input() stickyHeaderHiddenOnScroll?: boolean;
+  @Input() innerViewRef?: IInnerViewRef;
   @Input() style?: IStyleProp<IViewStyle>;
   @Input() contentContainerStyle?: IStyleProp<IViewStyle>;
+  @Input() listHeaderComponentStyle?: IStyleProp<IViewStyle>;
+  @Input() listFooterComponentStyle?: IStyleProp<IViewStyle>;
   @Input() testID?: string;
   @Input() nativeID?: string;
 
@@ -282,12 +286,13 @@ export class SectionList<ItemT = unknown>
   @ContentChild(VSectionFooterDirective)
   sectionFooterDir?: VSectionFooterDirective<ItemT>;
   @ContentChild(VSectionSeparatorDirective)
-  sectionSeparatorDir?: VSectionSeparatorDirective;
+  sectionSeparatorDir?: VSectionSeparatorDirective<ItemT>;
   @ContentChild(VListHeaderDirective) listHeaderDir?: VListHeaderDirective;
   @ContentChild(VListFooterDirective) listFooterDir?: VListFooterDirective;
   @ContentChild(VListEmptyDirective) listEmptyDir?: VListEmptyDirective;
   @ContentChild(VListSeparatorDirective)
   itemSeparatorDir?: VListSeparatorDirective<ItemT>;
+  @ContentChild(VListCellDirective) cellDir?: VListCellDirective;
 
   // The inner list, whose instance is the scroll handle, reads lazily
   @ViewChild(VirtualizedSectionList)
@@ -295,22 +300,6 @@ export class SectionList<ItemT = unknown>
 
   // This component's own host, the anchor `class="..."` resolves onto, not the inner list's
   private readonly elementRef = inject(ElementRef);
-
-  // The leading and trailing items arrive `unknown` from the template's `let` bindings, already
-  // unwrapped to real items
-  itemSeparatorContext(
-    highlighted: unknown,
-    leadingItem: unknown,
-    trailingItem: unknown,
-  ): IVListSeparatorContext<ItemT> {
-    const isHighlighted = highlighted === true;
-    return {
-      $implicit: isHighlighted,
-      highlighted: isHighlighted,
-      leadingItem: asItem<ItemT>(leadingItem),
-      trailingItem: asItem<ItemT>(trailingItem),
-    };
-  }
 
   scrollToLocation(params: {
     sectionIndex: number;
@@ -342,7 +331,15 @@ export class SectionList<ItemT = unknown>
     return this.list?.getScrollNode() ?? null;
   }
 
+  getScrollRef(): ISymbioteNode | null {
+    return this.list?.getScrollRef() ?? null;
+  }
+
   recordInteraction(): void {
     this.list?.recordInteraction();
+  }
+
+  setNativeProps(props: Record<string, unknown>): void {
+    this.list?.setNativeProps(props);
   }
 }

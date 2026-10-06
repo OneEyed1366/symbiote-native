@@ -1,715 +1,249 @@
-// VirtualizedList orchestration reducer: the framework-agnostic STATE MACHINE that folds every
-// per-adapter effect skeleton into one place, so the same predicates no longer live in three
-// reactive dialects and quietly drift.
+// The framework-agnostic list STATE MACHINE: one pure `reduceList(state, action, inputs)`
+// The adapter turns a native event into an action, holds one state cell and executes the returned
+// effects with its own primitives, so a windowing, edge or viewability bug is fixed once for all
 
-// The whole decision half is one pure `reduceList(state, action, inputs) -> {state, effects}`. The
-// adapter keeps only what's genuinely framework-bound: translate a native event into an ACTION,
-// hold ONE state cell, and EXECUTE the returned EFFECTS with its own primitives.
-
-// Effect EXECUTION stays per-adapter by design — an effect list DESCRIBES the work, it doesn't run
-// it. State TRANSITIONS (including derived window metrics) are owned entirely here, so a
-// windowing/edge/viewability/MVCP bug is fixed once for all adapters.
-
-import { dlog } from '@symbiote-native/engine';
 import {
-  EMPTY_OFFSET,
-  FIRST_INDEX,
-  NO_CONTENT_LENGTH_SENT,
-  NO_INDEX,
-  averageMeasuredStride,
-  buildOffsets,
-  computeEndReached,
-  computeMvcpAdjustment,
-  computeStartReached,
-  computeViewableSet,
-  computeWindow,
-  decideEdgeReached,
-  diffViewable,
-  highestMeasuredIndex,
-  indexOfItem,
-  isSettledLayout,
-  maxMinimumViewTime,
-  offsetForEnd,
-  offsetForIndex,
-  resolveAverageLength,
-  resolveItemKey,
-  throttleWindow,
-  initialRenderRegion,
-  wrapFixedLayout,
-  type ICellLayout,
-  type IViewToken,
-  type IViewabilityConfigCallbackPair,
-  type IViewableItemsChangedInfo,
-} from './virtualized-list';
+  commitList,
+  viewabilityEffects,
+  viewableDueEffects,
+} from './list-commit';
+import { deriveMetrics } from './list-derive';
+import { keyForOf } from './list-keys';
+import { isSettledLayout } from './list-metrics';
 import {
-  recordCellMove,
-  recordListFrame,
-} from './virtualized-list-diagnostics';
+  flowRelativeOffset,
+  isRtlList,
+  withCartesianScrollTo,
+} from './list-rtl';
+import type {
+  IListAction,
+  IListReduceResult,
+  IListReducerInputs,
+  IListState,
+} from './list-reducer-types';
+import {
+  resolveScrollToIndex,
+  resolveScrollToItem,
+  scrollToEffect,
+  scrollToEnd,
+} from './list-scroll-to';
+import { recordCellMove } from './virtualized-list-diagnostics';
 
-// The derived window snapshot, recomputed on every render-relevant transition and read straight by
-// the adapter's render (buildListPlan + the cell walk). `fixedLayout` is the wrapped getItemLayout
-// (undefined when the list measures cells itself); the adapter re-uses it for its own cell metrics.
-export interface IListMetrics {
-  count: number;
-  offsets: number[];
-  lengths: number[];
-  total: number;
-  first: number;
-  last: number;
-  target: { first: number; last: number };
-  averageLength: number;
-  fixedLayout: ((index: number) => ICellLayout) | undefined;
+export { createInitialListState, listEffectSignature } from './list-derive';
+export type * from './list-reducer-types';
+
+function settle<ItemT>(
+  state: IListState<ItemT>,
+  changed: boolean,
+): IListReduceResult<ItemT> {
+  return { state, effects: [], changed };
 }
 
-// The folded list state — everything that was scattered across each adapter's refs/fields. Maps are
-// mutated in place (they were ref-backed, never render state); `metrics` is the derived cache the
-// render reads. The adapter holds ONE reference to this and re-reads it after each reduceList call.
-export interface IListState<ItemT> {
-  scrollOffset: number;
-  viewportLength: number;
-  measured: Map<number, number>;
-  // The raw host offset of each measured cell, kept beside its length. buildOffsets stores these
-  // VERBATIM — see that function on why re-deriving one from another cannot be done here.
-  measuredOffsets: Map<number, number>;
-  // Bumped by the ONLY two writers of the two maps above (the 'measure' case). The maps are
-  // mutated in place, so their identity can never say "nothing changed" — this counter can.
-  measureVersion: number;
-  // buildOffsets walks the WHOLE list per call, and deriveMetrics runs it every scroll frame —
-  // with getItemLayout the answer is byte-identical frame to frame, so this caches on everything
-  // buildOffsets reads. State, not a module-level map, so two lists can't evict each other.
-  offsetsCache: {
-    count: number;
-    data: unknown;
-    getItemLayout: unknown;
-    averageLength: number;
-    averageStride: number;
-    measureVersion: number;
-    offsets: number[];
-    lengths: number[];
-    total: number;
-  } | null;
-  committedWindow: { first: number; last: number };
-  sentEndForContentLength: number;
-  sentStartForContentLength: number;
-  lastViewable: Map<string, IViewToken<ItemT>>;
-  hasInteracted: boolean;
-  firstVisibleKey: string | null;
-  appliedInitialScroll: boolean;
-  metrics: IListMetrics;
+// The first scroll is the interaction that ungates `waitForInteraction` viewability configs
+function applyScroll<ItemT>(
+  state: IListState<ItemT>,
+  action: { offset: number; timestamp?: number },
+): IListReduceResult<ItemT> {
+  const elapsed =
+    state.scrollTimestamp !== undefined && state.scrollTimestamp !== 0
+      ? Math.max(1, (action.timestamp ?? 0) - state.scrollTimestamp)
+      : 1;
+  state.scrollVelocity = (action.offset - state.scrollOffset) / elapsed;
+  state.scrollTimestamp = action.timestamp;
+  state.hasInteracted = true;
+  state.scrollOffset = action.offset;
+  state.pendingScrollUpdates = Math.max(0, state.pendingScrollUpdates - 1);
+  return settle(state, true);
 }
 
-// The config the reducer reads each call, passed in rather than stored. The edge/viewability
-// CALLBACKS never reach the reducer — only whether a listener is ACTIVE and the viewability PAIRS;
-// the adapter fires the actual callbacks from the effect.
-export interface IListReducerInputs<ItemT> {
-  data: unknown;
-  getItem: (data: unknown, index: number) => ItemT;
-  getItemCount: (data: unknown) => number;
-  keyExtractor?: (item: ItemT, index: number) => string;
-  getItemLayout?: (
-    data: unknown,
-    index: number,
-  ) => { length: number; offset: number; index: number };
-  horizontal: boolean;
-  windowSize: number;
-  initialNumToRender: number;
-  maxToRenderPerBatch: number;
-  updateCellsBatchingPeriod: number;
-  onEndReachedThreshold: number | undefined;
-  onStartReachedThreshold: number | undefined;
-  onEndReachedActive: boolean;
-  onStartReachedActive: boolean;
-  viewabilityPairs: IViewabilityConfigCallbackPair<ItemT>[];
-  maintainVisibleContentPosition?: {
-    minIndexForVisible: number;
-    autoscrollToTopThreshold?: number;
-  };
-  initialScrollIndex?: number;
+// Same settling rule as a cell measurement: the scroll host re-reports its size after every
+// relayout, and a re-derive off noise in its last bits drives the same loop
+function applyLayout<ItemT>(
+  state: IListState<ItemT>,
+  length: number,
+): IListReduceResult<ItemT> {
+  if (isSettledLayout(state.viewportLength, length))
+    return settle(state, false);
+  state.viewportLength = length;
+  return settle(state, true);
 }
 
-// The events the adapter turns native callbacks / imperative calls into. `commit` is the
-// after-render pass (produces the deferred effects); `viewable-fired` folds a completed
-// minimumViewTime debounce back into lastViewable; `batch-tick` is the refill timer firing.
-export type IListAction<ItemT> =
-  | { kind: 'scroll'; offset: number }
-  | { kind: 'layout'; length: number }
-  // `offset` is the cell's raw y/x inside the scroll content, read at the SAME onLayout as
-  // `length`. Optional so an adapter that cannot report it still measures heights; without it every
-  // position is an estimate and the chrome between cells goes uncounted (buildOffsets).
-  | { kind: 'measure'; index: number; length: number; offset?: number }
-  | { kind: 'refresh-metrics' }
-  | { kind: 'batch-tick' }
-  | { kind: 'record-interaction' }
-  | { kind: 'viewable-fired'; map: Map<string, IViewToken<ItemT>> }
-  | { kind: 'commit' }
-  | { kind: 'scroll-to-offset'; offset: number; animated: boolean }
-  | {
-      kind: 'scroll-to-index';
-      index: number;
-      animated: boolean;
-      viewPosition: number;
-      viewOffset: number;
-    }
-  | {
-      kind: 'scroll-to-item';
-      item: unknown;
-      animated: boolean;
-      viewPosition: number;
-    }
-  | { kind: 'scroll-to-end'; animated: boolean };
-
-// The work the adapter executes with its own primitives: `scroll-to` rides the native scrollTo;
-// `fire-*` invoke callbacks/emits; `fire-viewable` carries the debounce delay and map to fold back
-// on completion; `schedule-refill` sets the batch timer.
-export type IListEffect<ItemT> =
-  | { kind: 'scroll-to'; offset: number; animated: boolean }
-  | { kind: 'fire-end-reached'; distanceFromEnd: number }
-  | { kind: 'fire-start-reached'; distanceFromStart: number }
-  | {
-      kind: 'fire-viewable';
-      info: IViewableItemsChangedInfo<ItemT>;
-      delay: number;
-      map: Map<string, IViewToken<ItemT>>;
-    }
-  | { kind: 'schedule-refill'; delay: number }
-  | {
-      kind: 'fire-scroll-to-index-failed';
-      index: number;
-      highestMeasuredFrameIndex: number;
-      averageItemLength: number;
-    };
-
-export interface IListReduceResult<ItemT> {
-  state: IListState<ItemT>;
-  effects: IListEffect<ItemT>[];
-  // Whether render-relevant state (the window metrics) changed, so the adapter knows to re-render. A
-  // measure that repeats a known length, or a pure bookkeeping action, returns false.
-  changed: boolean;
+// A nested list ignores the parent's scroll until it knows where it sits, as RN does
+function applyParentScroll<ItemT>(
+  state: IListState<ItemT>,
+  action: { offset: number; visibleLength: number; timestamp?: number },
+): IListReduceResult<ItemT> {
+  if (state.nestedContentLength === 0) return settle(state, false);
+  state.viewportLength = action.visibleLength;
+  return applyScroll(state, {
+    offset: action.offset - state.offsetFromParent,
+    timestamp: action.timestamp,
+  });
 }
 
-export function createInitialListState<ItemT>(): IListState<ItemT> {
+function applyParentLayout<ItemT>(
+  state: IListState<ItemT>,
+  action: { offsetFromParent: number; contentLength: number },
+): IListReduceResult<ItemT> {
+  state.offsetFromParent = action.offsetFromParent;
+  state.nestedContentLength = action.contentLength;
+  return settle(state, true);
+}
+
+type IMeasureAction = { index: number; length: number; offset?: number };
+
+// An RTL cell's x counts from the left, the table counts from the right edge
+function flowMeasure<ItemT>(
+  state: IListState<ItemT>,
+  inputs: IListReducerInputs<ItemT>,
+  action: IMeasureAction,
+): IMeasureAction {
+  if (!isRtlList(inputs) || action.offset === undefined) return action;
   return {
-    scrollOffset: EMPTY_OFFSET,
-    viewportLength: EMPTY_OFFSET,
-    measured: new Map<number, number>(),
-    measuredOffsets: new Map<number, number>(),
-    measureVersion: 0,
-    offsetsCache: null,
-    committedWindow: { first: FIRST_INDEX, last: NO_INDEX },
-    sentEndForContentLength: NO_CONTENT_LENGTH_SENT,
-    sentStartForContentLength: NO_CONTENT_LENGTH_SENT,
-    lastViewable: new Map<string, IViewToken<ItemT>>(),
-    hasInteracted: false,
-    firstVisibleKey: null,
-    appliedInitialScroll: false,
-    metrics: {
-      count: EMPTY_OFFSET,
-      offsets: [],
-      lengths: [],
-      total: EMPTY_OFFSET,
-      first: FIRST_INDEX,
-      last: NO_INDEX,
-      target: { first: FIRST_INDEX, last: NO_INDEX },
-      averageLength: EMPTY_OFFSET,
-      fixedLayout: undefined,
-    },
-  };
-}
-
-// A cheap signature over the render-relevant state. The adapter skips the after-commit pass when it
-// is unchanged (the same dedup Angular's lastEffectSignature did), so the batch-fill timer is not
-// thrashed by unrelated re-renders. Shared so the key CANNOT drift between adapters.
-export function listEffectSignature<ItemT>(state: IListState<ItemT>): string {
-  const m = state.metrics;
-  return `${state.scrollOffset}|${state.viewportLength}|${m.first}|${m.last}|${m.count}|${m.total}`;
-}
-
-// Recompute the derived window metrics off the current state + inputs. Owns the controlled
-// committedWindow throttle (the side effect React ran during render): committedWindow is plain
-// state, so growing it toward target one batch-step at a time triggers no reactivity loop.
-function deriveMetrics<ItemT>(
-  state: IListState<ItemT>,
-  inputs: IListReducerInputs<ItemT>,
-): IListState<ItemT> {
-  const count = inputs.getItemCount(inputs.data);
-  const fixedLayout = wrapFixedLayout(inputs.data, inputs.getItemLayout);
-  const averageLength = resolveAverageLength(
-    fixedLayout,
-    count,
-    state.measured,
-  );
-  const averageStride = averageMeasuredStride(
-    state.measuredOffsets,
-    averageLength,
-  );
-  // Every input buildOffsets reads, compared before paying for it again. `data` and
-  // `getItemLayout` stand in for `fixedLayout`, which wrapFixedLayout mints fresh on every call
-  // and whose identity therefore means nothing.
-  const cached = state.offsetsCache;
-  const reusable =
-    cached !== null &&
-    cached.count === count &&
-    cached.data === inputs.data &&
-    cached.getItemLayout === inputs.getItemLayout &&
-    cached.averageLength === averageLength &&
-    cached.averageStride === averageStride &&
-    cached.measureVersion === state.measureVersion;
-  const { offsets, lengths, total } = reusable
-    ? cached
-    : buildOffsets(
-        count,
-        state.measured,
-        state.measuredOffsets,
-        fixedLayout,
-        averageLength,
-        averageStride,
-      );
-  if (!reusable) {
-    state.offsetsCache = {
-      count,
-      data: inputs.data,
-      getItemLayout: inputs.getItemLayout,
-      averageLength,
-      averageStride,
-      measureVersion: state.measureVersion,
-      offsets,
-      lengths,
-      total,
-    };
-  }
-  const target = computeWindow(
-    count,
-    offsets,
-    lengths,
-    state.scrollOffset,
-    state.viewportLength,
-    inputs.windowSize,
-    inputs.initialNumToRender,
-  );
-  const throttled = throttleWindow(
-    target,
-    state.committedWindow,
-    inputs.maxToRenderPerBatch,
-    initialRenderRegion(
-      count,
-      inputs.initialScrollIndex,
-      inputs.initialNumToRender,
+    ...action,
+    offset: flowRelativeOffset(
+      state.contentLength,
+      action.offset,
+      action.length,
     ),
-  );
-  state.committedWindow = throttled;
-  state.metrics = {
-    count,
-    offsets,
-    lengths,
-    total,
-    first: throttled.first,
-    last: throttled.last,
-    target,
-    averageLength,
-    fixedLayout,
   };
-  recordListFrame(() => ({
-    scrollOffset: state.scrollOffset,
-    viewportLength: state.viewportLength,
-    first: throttled.first,
-    last: throttled.last,
-    targetFirst: target.first,
-    targetLast: target.last,
-    count,
-    measuredCount: state.measured.size,
-    averageLength,
-    averageStride: averageMeasuredStride(state.measuredOffsets, averageLength),
-    firstOffset: offsets[throttled.first] ?? EMPTY_OFFSET,
-    firstRaw: state.measuredOffsets.get(throttled.first),
-    total,
-    leadingExtent:
-      throttled.first > FIRST_INDEX
-        ? offsets[throttled.first - 1] +
-          lengths[throttled.first - 1] -
-          offsets[FIRST_INDEX]
-        : EMPTY_OFFSET,
-    trailingExtent:
-      throttled.last < count - 1
-        ? total - offsets[throttled.last + 1]
-        : EMPTY_OFFSET,
-  }));
-  return state;
 }
 
-function keyForOf<ItemT>(
-  inputs: IListReducerInputs<ItemT>,
-): (index: number) => string {
-  return (index: number): string =>
-    resolveItemKey(
-      inputs.getItem(inputs.data, index),
-      index,
-      inputs.keyExtractor,
-    );
-}
-
-// Reclassify the rendered cells and, if the viewable set changed, hand the adapter an info
-// payload to fire. lastViewable folds back only when the fire actually lands, so a debounce
-// superseded mid-flight still diffs against the last COMMITTED set.
-
-// Extracted from commitList because 'record-interaction' needs the same pass: RN's
-// recordInteraction() ungates waitForInteraction immediately, and leaving this inline meant a
-// never-scrolled list reported nothing after the interaction.
-function viewabilityEffects<ItemT>(
+// Each half is stored only if IT moved, so a cell that slid without resizing keeps its length
+// A settled re-report bails WITHOUT storing: byte-identical values stop the spacer moving
+function applyMeasure<ItemT>(
   state: IListState<ItemT>,
   inputs: IListReducerInputs<ItemT>,
-): IListEffect<ItemT>[] {
-  const m = state.metrics;
-  if (
-    inputs.viewabilityPairs.length === EMPTY_OFFSET ||
-    state.viewportLength === EMPTY_OFFSET ||
-    m.count === FIRST_INDEX
-  ) {
-    return [];
-  }
-  const { tokens, map } = computeViewableSet<ItemT>({
-    first: m.first,
-    last: m.last,
-    count: m.count,
-    offsets: m.offsets,
-    lengths: m.lengths,
-    scrollOffset: state.scrollOffset,
-    viewportLength: state.viewportLength,
-    data: inputs.data,
-    getItem: inputs.getItem,
-    keyExtractor: inputs.keyExtractor,
-    pairs: inputs.viewabilityPairs,
-    hasInteracted: state.hasInteracted,
-  });
-  const diff = diffViewable(state.lastViewable, map, tokens);
-  if (!diff.hasChanged) return [];
-  dlog(
-    `VirtualizedList viewable=${tokens.length} changed=${diff.changed.length} ` +
-      `(window [${m.first}, ${m.last}])`,
-  );
-  return [
-    {
-      kind: 'fire-viewable',
-      info: { viewableItems: tokens, changed: diff.changed },
-      delay: maxMinimumViewTime(inputs.viewabilityPairs),
-      map,
-    },
-  ];
-}
-
-function commitList<ItemT>(
-  state: IListState<ItemT>,
-  inputs: IListReducerInputs<ItemT>,
+  action: IMeasureAction,
 ): IListReduceResult<ItemT> {
-  const effects: IListEffect<ItemT>[] = [];
-  const m = state.metrics;
-
-  // Batch fill: when the throttled window has not reached the target, ask for another render tick so
-  // it keeps filling toward target (RN's incremental fill).
-  if (!(m.first <= m.target.first && m.last >= m.target.last)) {
-    effects.push({
-      kind: 'schedule-refill',
-      delay: inputs.updateCellsBatchingPeriod,
-    });
-  }
-
-  // onEndReached: fire only when the actual last cell is rendered AND within threshold; dedup by
-  // content length; re-arm on scroll away from the end (RN _maybeCallOnEdgeReached).
-  if (inputs.onEndReachedActive && state.viewportLength > EMPTY_OFFSET) {
-    const { distanceFromEnd, withinThreshold } = computeEndReached(
-      m.total,
-      state.scrollOffset,
-      state.viewportLength,
-      inputs.onEndReachedThreshold,
-    );
-    const decision = decideEdgeReached({
-      withinThreshold,
-      edgeCellRendered: m.last === m.count - 1,
-      total: m.total,
-      sentForContentLength: state.sentEndForContentLength,
-    });
-    state.sentEndForContentLength = decision.nextSentForContentLength;
-    if (decision.shouldFire) {
-      dlog(
-        `VirtualizedList onEndReached distanceFromEnd=${distanceFromEnd} ` +
-          `(last=${m.last} of ${m.count}, contentLength=${m.total})`,
-      );
-      effects.push({ kind: 'fire-end-reached', distanceFromEnd });
-    }
-  }
-
-  // onStartReached: the top-edge twin of onEndReached.
-  if (inputs.onStartReachedActive && state.viewportLength > EMPTY_OFFSET) {
-    const { distanceFromStart, withinThreshold } = computeStartReached(
-      state.scrollOffset,
-      state.viewportLength,
-      inputs.onStartReachedThreshold,
-    );
-    const decision = decideEdgeReached({
-      withinThreshold,
-      edgeCellRendered: m.first === FIRST_INDEX,
-      total: m.total,
-      sentForContentLength: state.sentStartForContentLength,
-    });
-    state.sentStartForContentLength = decision.nextSentForContentLength;
-    if (decision.shouldFire) {
-      dlog(
-        `VirtualizedList onStartReached distanceFromStart=${distanceFromStart} ` +
-          `(first=${m.first}, contentLength=${m.total})`,
-      );
-      effects.push({ kind: 'fire-start-reached', distanceFromStart });
-    }
-  }
-
-  effects.push(...viewabilityEffects(state, inputs));
-
-  // initialScrollIndex: once the first viewport is known, jump to that index a single time.
-  if (
-    inputs.initialScrollIndex !== undefined &&
-    !state.appliedInitialScroll &&
-    state.viewportLength > EMPTY_OFFSET &&
-    m.count !== FIRST_INDEX
-  ) {
-    state.appliedInitialScroll = true;
-    const offset = offsetForIndex(
-      inputs.initialScrollIndex,
-      FIRST_INDEX,
-      EMPTY_OFFSET,
-      m.count,
-      m.offsets,
-      m.lengths,
-      state.viewportLength,
-    );
-    // The initial jump is instant (RN does not animate initialScrollIndex).
-    effects.push({ kind: 'scroll-to', offset, animated: false });
-  }
-
-  // maintainVisibleContentPosition: shift for the prepended items collapsed into the leading spacer
-  // that native MVCP cannot see (RN getDerivedStateFromProps). computeMvcpAdjustment owns the pure
-  // decision; here it becomes a scroll-to effect.
-  const mvcp = computeMvcpAdjustment({
-    minIndexForVisible:
-      inputs.maintainVisibleContentPosition?.minIndexForVisible,
-    autoscrollToTopThreshold:
-      inputs.maintainVisibleContentPosition?.autoscrollToTopThreshold,
-    count: m.count,
-    committedFirst: state.committedWindow.first,
-    offsets: m.offsets,
-    scrollOffset: state.scrollOffset,
-    prevFirstVisibleKey: state.firstVisibleKey,
-    keyFor: keyForOf(inputs),
-  });
-  if (mvcp.action.kind === 'autoscroll-top') {
-    effects.push({ kind: 'scroll-to', offset: EMPTY_OFFSET, animated: true });
-  } else if (mvcp.action.kind === 'shift') {
-    effects.push({
-      kind: 'scroll-to',
-      offset: mvcp.action.offset,
-      animated: false,
-    });
-  }
-  state.firstVisibleKey = mvcp.firstVisibleKey;
-
-  return { state, effects, changed: false };
-}
-
-// Resolve an imperative scrollToIndex: report the failure when there is no getItemLayout and the
-// target is past the last measured cell (RN VirtualizedList.js), else scroll to the resolved offset.
-function resolveScrollToIndex<ItemT>(
-  state: IListState<ItemT>,
-  inputs: IListReducerInputs<ItemT>,
-  action: {
-    index: number;
-    animated: boolean;
-    viewPosition: number;
-    viewOffset: number;
-  },
-): IListReduceResult<ItemT> {
-  const m = state.metrics;
-
-  // Range check FIRST: it must precede the onScrollToIndexFailed branch below, or an out-of-range
-  // index would be reported as a MEASUREMENT problem instead of a caller bug.
-
-  // The one place the range is enforced: offsetForIndex() still CLAMPS, since scrollToEnd and
-  // initialScrollIndex resolve through it with indices legitimately at or past the edge.
-  const itemCount = inputs.getItemCount(inputs.data);
-  if (action.index < FIRST_INDEX) {
-    throw new Error(
-      `scrollToIndex out of range: requested index ${action.index} but minimum is 0`,
-    );
-  }
-  if (itemCount < 1) {
-    throw new Error(
-      `scrollToIndex out of range: item length ${itemCount} but minimum is 1`,
-    );
-  }
-  if (action.index >= itemCount) {
-    throw new Error(
-      `scrollToIndex out of range: requested index ${action.index} is out of 0 to ${itemCount - 1}`,
-    );
-  }
-
-  const measuredCeiling = highestMeasuredIndex(state.measured);
-  if (inputs.getItemLayout === undefined && action.index > measuredCeiling) {
-    dlog(
-      `VirtualizedList onScrollToIndexFailed index=${action.index} ` +
-        `highestMeasured=${measuredCeiling} (no getItemLayout)`,
-    );
-    return {
-      state,
-      effects: [
-        {
-          kind: 'fire-scroll-to-index-failed',
-          index: action.index,
-          highestMeasuredFrameIndex: measuredCeiling,
-          averageItemLength: m.averageLength,
-        },
-      ],
-      changed: false,
-    };
-  }
-  const offset = offsetForIndex(
+  // A fixed `getItemLayout` owns cell sizes, so a measured length is ignored
+  if (inputs.getItemLayout !== undefined) return settle(state, false);
+  // A reading taken for another key is no reading, the cell now at this index is measured anew
+  const wasStale = state.staleMeasured.delete(action.index);
+  state.measuredKeys.set(action.index, keyForOf(inputs)(action.index));
+  state.highestMeasuredIndex = Math.max(
+    state.highestMeasuredIndex,
     action.index,
-    action.viewPosition,
-    action.viewOffset,
-    m.count,
-    m.offsets,
-    m.lengths,
-    state.viewportLength,
   );
+  const knownLength = wasStale ? undefined : state.measured.get(action.index);
+  const knownOffset = wasStale
+    ? undefined
+    : state.measuredOffsets.get(action.index);
+  const isLengthSettled = isSettledLayout(knownLength, action.length);
+  const isOffsetSettled =
+    action.offset === undefined || isSettledLayout(knownOffset, action.offset);
+  if (isLengthSettled && isOffsetSettled) return settle(state, false);
+
+  if (!isLengthSettled) {
+    if (knownLength !== undefined) {
+      recordCellMove('sized', action.index, knownLength, action.length);
+    }
+    state.measured.set(action.index, action.length);
+    state.measureVersion += 1;
+  }
+  if (action.offset !== undefined && !isOffsetSettled) {
+    if (knownOffset !== undefined) {
+      recordCellMove('moved', action.index, knownOffset, action.offset);
+    }
+    state.measuredOffsets.set(action.index, action.offset);
+    state.measureVersion += 1;
+  }
+  return settle(state, true);
+}
+
+// The flag flip lands BEFORE the pass, `computeViewableSet` reads it to decide who is still gated
+function recordInteraction<ItemT>(
+  state: IListState<ItemT>,
+  inputs: IListReducerInputs<ItemT>,
+): IListReduceResult<ItemT> {
+  state.hasInteracted = true;
   return {
     state,
-    effects: [{ kind: 'scroll-to', offset, animated: action.animated }],
+    effects: viewabilityEffects(state, inputs),
     changed: false,
   };
 }
 
-// The single transition every adapter shares. The adapter maps a native event / imperative call to
-// an action, calls this, stores the returned state, and executes the returned effects.
+// Scalar transitions never recompute the window, derivation runs once per render in
+// `refresh-metrics`, or `committedWindow` would advance twice per frame
 export function reduceList<ItemT>(
   state: IListState<ItemT>,
   action: IListAction<ItemT>,
   inputs: IListReducerInputs<ItemT>,
 ): IListReduceResult<ItemT> {
-  switch (action.kind) {
-    // Scalar transitions never recompute the window — metrics derive runs exactly ONCE per
-    // render, in 'refresh-metrics', or committedWindow would advance twice per frame.
-    case 'scroll':
-      // First scroll is the interaction that ungates waitForInteraction viewability configs.
-      state.hasInteracted = true;
-      state.scrollOffset = action.offset;
-      return { state, effects: [], changed: true };
-    case 'layout':
-      // Same settling rule as a cell measurement: the scroll host re-reports its own size after
-      // every relayout, and a re-derive off noise in its last bits drives the same loop.
-      if (isSettledLayout(state.viewportLength, action.length))
-        return { state, effects: [], changed: false };
-      state.viewportLength = action.length;
-      return { state, effects: [], changed: true };
-    case 'measure': {
-      // A fixed getItemLayout owns cell sizes, so a measured length is ignored.
-      if (inputs.getItemLayout !== undefined)
-        return { state, effects: [], changed: false };
-      const knownLength = state.measured.get(action.index);
-      const knownOffset = state.measuredOffsets.get(action.index);
-      const lengthSettled = isSettledLayout(knownLength, action.length);
-      const offsetSettled =
-        action.offset === undefined ||
-        isSettledLayout(knownOffset, action.offset);
-      // Settled means the same measurement, re-reported. Bail WITHOUT storing: keeping the value
-      // byte-identical is what stops the spacer moving and starves the relayout loop.
-      if (lengthSettled && offsetSettled)
-        return { state, effects: [], changed: false };
+  const result = reduceAction(state, action, inputs);
+  return isRtlList(inputs) ? withCartesianScrollTo(result, action) : result;
+}
 
-      // Each half is stored only if IT moved: a cell that slid without resizing must not have its
-      // length rewritten with a noisier reading of the same number.
-      if (!lengthSettled) {
-        if (knownLength !== undefined)
-          recordCellMove('sized', action.index, knownLength, action.length);
-        state.measured.set(action.index, action.length);
-        state.measureVersion += 1;
-      }
-      if (action.offset !== undefined && !offsetSettled) {
-        if (knownOffset !== undefined)
-          recordCellMove('moved', action.index, knownOffset, action.offset);
-        state.measuredOffsets.set(action.index, action.offset);
-        state.measureVersion += 1;
-      }
-      return { state, effects: [], changed: true };
-    }
+function reduceAction<ItemT>(
+  state: IListState<ItemT>,
+  action: IListAction<ItemT>,
+  inputs: IListReducerInputs<ItemT>,
+): IListReduceResult<ItemT> {
+  switch (action.kind) {
+    case 'scroll':
+      return applyScroll(state, action);
+    case 'layout':
+      return applyLayout(state, action.length);
+    case 'content-size':
+      state.contentLength = action.length;
+      return settle(state, true);
+    case 'parent-scroll':
+      return applyParentScroll(state, action);
+    case 'parent-layout':
+      return applyParentLayout(state, action);
+    case 'measure':
+      return applyMeasure(state, inputs, flowMeasure(state, inputs, action));
     case 'batch-tick':
-      // The refill timer fired: ask for a render, whose refresh-metrics grows the window one step.
-      return { state, effects: [], changed: true };
+      // The refill timer fired, the render it asks for grows the window one step
+      state.isBatchDue = true;
+      return settle(state, true);
     case 'refresh-metrics':
-      return {
-        state: deriveMetrics(state, inputs),
-        effects: [],
-        changed: true,
-      };
+      return settle(deriveMetrics(state, inputs), true);
     case 'record-interaction':
-      // The flag flip must land BEFORE the pass — computeViewableSet reads hasInteracted to decide
-      // whether a waitForInteraction pair is still gated.
-      state.hasInteracted = true;
+      return recordInteraction(state, inputs);
+    case 'cell-focused':
+      state.focusedCell = {
+        index: action.index,
+        key: keyForOf(inputs)(action.index),
+      };
+      return settle(state, true);
+    case 'viewable-due':
       return {
         state,
-        effects: viewabilityEffects(state, inputs),
+        effects: viewableDueEffects(state, inputs, action),
         changed: false,
       };
-    case 'viewable-fired':
-      state.lastViewable = action.map;
-      return { state, effects: [], changed: false };
     case 'commit':
       return commitList(state, inputs);
+    default:
+      return reduceImperativeScroll(state, action, inputs);
+  }
+}
+
+// The imperative scroll family, kept apart so `reduceList` stays one line per kind
+function reduceImperativeScroll<ItemT>(
+  state: IListState<ItemT>,
+  action: Extract<
+    IListAction<ItemT>,
+    {
+      kind:
+        | 'scroll-to-offset'
+        | 'scroll-to-index'
+        | 'scroll-to-item'
+        | 'scroll-to-end';
+    }
+  >,
+  inputs: IListReducerInputs<ItemT>,
+): IListReduceResult<ItemT> {
+  switch (action.kind) {
     case 'scroll-to-offset':
-      return {
-        state,
-        effects: [
-          {
-            kind: 'scroll-to',
-            offset: action.offset,
-            animated: action.animated,
-          },
-        ],
-        changed: false,
-      };
+      return scrollToEffect(state, action.offset, action.animated);
     case 'scroll-to-index':
       return resolveScrollToIndex(state, inputs, action);
-    case 'scroll-to-item': {
-      const index = indexOfItem(
-        inputs.data,
-        inputs.getItem,
-        state.metrics.count,
-        action.item,
-      );
-      if (index === NO_INDEX) {
-        dlog('VirtualizedList scrollToItem: item not found');
-        return { state, effects: [], changed: false };
-      }
-      const offset = offsetForIndex(
-        index,
-        action.viewPosition,
-        EMPTY_OFFSET,
-        state.metrics.count,
-        state.metrics.offsets,
-        state.metrics.lengths,
-        state.viewportLength,
-      );
-      return {
-        state,
-        effects: [{ kind: 'scroll-to', offset, animated: action.animated }],
-        changed: false,
-      };
-    }
+    case 'scroll-to-item':
+      return resolveScrollToItem(state, inputs, action);
     case 'scroll-to-end':
-      return {
-        state,
-        effects: [
-          {
-            kind: 'scroll-to',
-            offset: offsetForEnd(state.metrics.total, state.viewportLength),
-            animated: action.animated,
-          },
-        ],
-        changed: false,
-      };
+      return scrollToEnd(state, action.animated);
   }
 }

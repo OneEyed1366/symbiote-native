@@ -165,6 +165,8 @@ export type {
   ITextInputChangeEvent,
 } from '@symbiote-native/components';
 export { VirtualizedList } from './components/virtualized-list';
+export { useVirtualizedListScope } from './components/virtualized-list/nested-scope';
+export type { IListScope } from '@symbiote-native/components';
 export type {
   IVirtualizedListProps,
   IVirtualizedListSlots,
@@ -203,6 +205,8 @@ export type {
 // `SafeAreaView` is a TAG — `<safe-area-view>` — and there is nothing to import in its place: the
 // wrapper only normalized attrs and folded aria, and both now run below every path.
 export type { ISafeAreaViewProps } from './components/safe-area-view-props';
+export type { ILayoutConformanceProps } from './components/layout-conformance-props';
+export type { ILayoutConformanceMode } from '@symbiote-native/components';
 // `RefreshControl` is a TAG — `<refresh-control>` — carrying its own engine behavior
 // (`registerRefreshControlBehavior`, the controlled-spinner handshake). `@refresh` reaches native
 // as an ordinary `onRefresh` prop, so the wrapper's `refresh` emit had nothing left to add.
@@ -241,9 +245,14 @@ export { StatusBar } from './modules/status-bar';
 export type { IStatusBarProps, IStatusBarStyle } from './modules/status-bar';
 // RN's app entry point over `mount`. setHostRegistrar wires RN's own registrar so the native
 // Fabric host finds our runnable by app key.
-export { AppRegistry, setHostRegistrar } from './modules/app-registry';
+export {
+  AppRegistry,
+  HeadlessJsTaskError,
+  setHostRegistrar,
+} from './modules/app-registry';
 export type {
   IComponentProvider,
+  IAppConfig,
   IAppParameters,
   IRunnable,
   IHostRegistrar,
@@ -256,6 +265,11 @@ export type {
 } from './modules/app-registry';
 // Vue composables over the core device-state modules.
 export { useColorScheme } from './composables/use-color-scheme';
+export {
+  useAnimatedColor,
+  useAnimatedValue,
+  useAnimatedValueXY,
+} from './composables/use-animated-value';
 export { useWindowDimensions } from './composables/use-window-dimensions';
 export { createPermissionHook } from './composables/create-permission-hook';
 export { createResourceHook } from './composables/create-resource-hook';
@@ -276,6 +290,7 @@ export {
   AppState,
   Keyboard,
   KEYBOARD_EVENT,
+  TextInputState,
   BackHandler,
   PermissionsAndroid,
   PERMISSIONS,
@@ -403,3 +418,41 @@ export type {
   ITask,
   IHandle,
 } from '@symbiote-native/engine';
+
+// The device event bus and the easing curves, shared verbatim from the engine
+export {
+  DeviceEventEmitter,
+  Easing,
+  NativeAppEventEmitter,
+  NativeEventEmitter,
+} from '@symbiote-native/engine';
+export type {
+  IEasing,
+  IEasingFunction,
+  IEventEmitterModule,
+  IEventSubscription,
+  INativeEventListener,
+} from '@symbiote-native/engine';
+
+// RN's dev and native-module utilities, shared verbatim from the engine. The ones RN owns forward
+// to its own module, which `registerApp` hands over
+export {
+  codegenNativeCommands,
+  codegenNativeComponent,
+  DevMenu,
+  DevSettings,
+  LogBox,
+  NativeComponentRegistry,
+  NativeModules,
+  Networking,
+  PushNotificationIOS,
+  ReactNativeVersion,
+  registerCallableModule,
+  requireNativeComponent,
+  Systrace,
+  Touchable,
+  TurboModuleRegistry,
+  UIManager,
+  UTFSequence,
+} from '@symbiote-native/engine';
+export type { IDevSettings } from '@symbiote-native/engine';

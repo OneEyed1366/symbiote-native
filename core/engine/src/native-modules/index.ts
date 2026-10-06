@@ -15,6 +15,7 @@ import {
   NativeEventEmitter,
   type IEventEmitterModule,
 } from '../native-events';
+import { invariant } from '../invariant';
 import { isRecord } from '../type-guards';
 
 // The JSI global, typed at the trust boundary. It is genuinely polymorphic in the
@@ -75,14 +76,19 @@ export function getNativeModule<T>(name: string): T | null {
 // silent no-op).
 export function getEnforcingNativeModule<T>(name: string): T {
   const module = getNativeModule<T>(name);
-  if (module === null) {
-    throw new Error(
-      `Native module "${name}" is not registered in the binary. ` +
-        'Verify it is linked (New Architecture / bridgeless host with __turboModuleProxy installed).',
-    );
-  }
+  invariant(
+    module !== null,
+    `TurboModuleRegistry.getEnforcing(...): '${name}' could not be found. ` +
+      'Verify that a module by this name is registered in the native binary.',
+  );
   return module;
 }
+
+// RN's `TurboModuleRegistry`, for a native module named in `react-native` code
+export const TurboModuleRegistry = {
+  get: getNativeModule,
+  getEnforcing: getEnforcingNativeModule,
+};
 
 // ---- device-event module factory ------------------------------------------
 //
@@ -121,24 +127,22 @@ function hasEventEmitterShape(value: unknown): value is IEventEmitterModule {
   );
 }
 
-export interface IDeviceEventModuleConfig<TModule> {
+export type IDeviceEventModuleConfig<TModule> = {
   // The native module name, resolved via getNativeModule.
   moduleName: string;
-  // Exact dlog prefix for the module-resolution log (e.g. 'AppState: module' or
-  // 'Keyboard: KeyboardObserver module') - caller-specified so each module's
-  // existing dlog text doesn't drift.
+  // The `dlog` prefix of the module-resolution line, so each module keeps its own text
   moduleLogPrefix: string;
   bindModuleToEmitter?: boolean;
   onEmitterCreated?: (
     emitter: NativeEventEmitter,
     module: TModule | null,
   ) => void;
-}
+};
 
-export interface IDeviceEventModule<TModule> {
+export type IDeviceEventModule<TModule> = {
   getModule(): TModule | null;
   getEmitter(): NativeEventEmitter;
-}
+};
 
 // Build one module's lazy-resolve + lazy-emitter pair. Each call owns its own
 // cache, so two callers (or two platform builds loaded together in one smoke) stay

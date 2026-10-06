@@ -7,9 +7,9 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-interface IDeviceHub {
+type IDeviceHub = {
   emit: (eventType: string, ...args: unknown[]) => void;
-}
+};
 
 let iosLinking: typeof import('./index.ios').Linking;
 let androidLinking: typeof import('./index.android').Linking;
@@ -157,15 +157,24 @@ describe('Linking (iOS build -> LinkingManager)', () => {
   });
 
   describe('invalid input (Negative)', () => {
-    // why: RN's _validateURL fails loudly and SYNCHRONOUSLY (before any promise is
-    // even created) on an empty/non-string url -- a typo'd deep link must surface
-    // immediately at the call site, not as a swallowed rejection.
+    // RN бросает синхронно, до создания промиса
     it('openURL throws synchronously for an empty url', () => {
-      expect(() => iosLinking.openURL('')).toThrow('Invalid URL: ');
+      expect(() => iosLinking.openURL('')).toThrow(
+        'Invalid URL: cannot be empty',
+      );
     });
 
     it('canOpenURL throws synchronously for an empty url', () => {
-      expect(() => iosLinking.canOpenURL('')).toThrow('Invalid URL: ');
+      expect(() => iosLinking.canOpenURL('')).toThrow(
+        'Invalid URL: cannot be empty',
+      );
+    });
+
+    it('openURL throws for a url that is not a string', () => {
+      const bad: unknown = JSON.parse('5');
+      expect(() =>
+        Reflect.apply(iosLinking.openURL, iosLinking, [bad]),
+      ).toThrow('Invalid URL: should be a string. Was: 5');
     });
   });
 

@@ -90,6 +90,9 @@ export type { IActivityIndicatorProps } from './components/activity-indicator-pr
 // the engine's `fabricProps`, `id -> nativeID` to `foldHostBag`). The prop type stays, for a
 // component forwarding a bag.
 export type { ISafeAreaViewProps } from './components/safe-area-view-props';
+// RN's `experimental_LayoutConformance` is a TAG too: `<layout-conformance mode="strict">`
+export type { ILayoutConformanceProps } from './components/layout-conformance-props';
+export type { ILayoutConformanceMode } from '@symbiote-native/components';
 // `RefreshControl` is a TAG — `<refresh-control>` — and there is nothing to import in its place.
 // Its wrapper was a passthrough; the controlled-spinner handshake lives on the engine node
 // (`registerRefreshControlBehavior`). The prop type stays, for a component forwarding a bag.
@@ -142,7 +145,11 @@ export type {
   IVirtualizedSectionListHandle,
 } from './components/virtualized-section-list';
 export { VirtualizedList } from './components/virtualized-list';
+export { useVirtualizedListScope } from './components/virtualized-list/nested-scope';
+export type { IListScope } from '@symbiote-native/components';
 export type {
+  ICellRendererComponent,
+  ICellRendererProps,
   IVirtualizedListProps,
   IVirtualizedListHandle,
   IViewToken,
@@ -175,9 +182,14 @@ export { findNodeHandle } from './host-instance';
 export type { IHostInstance } from './host-instance';
 // AppRegistry: RN's app entry point over `mount`. setHostRegistrar wires RN's own
 // registrar so the native Fabric host finds our runnable by app key.
-export { AppRegistry, setHostRegistrar } from './modules/app-registry';
+export {
+  AppRegistry,
+  HeadlessJsTaskError,
+  setHostRegistrar,
+} from './modules/app-registry';
 export type {
   IComponentProvider,
+  IAppConfig,
   IAppParameters,
   IRunnable,
   IHostRegistrar,
@@ -251,6 +263,7 @@ export {
   AppState,
   Keyboard,
   KEYBOARD_EVENT,
+  TextInputState,
   BackHandler,
   PermissionsAndroid,
   PERMISSIONS,
@@ -301,6 +314,16 @@ export type {
 // React lifecycle over those core device-state modules.
 export { useWindowDimensions } from './hooks/use-window-dimensions';
 export { useColorScheme } from './hooks/use-color-scheme';
+export { RootTagContext } from './root-tag-context';
+export { unstable_batchedUpdates } from './batched-updates';
+export { unstable_NativeText, unstable_NativeView } from './native-host-tags';
+export { usePressability } from './hooks/use-pressability';
+export type { IPressabilityConfig } from './hooks/use-pressability';
+export {
+  useAnimatedColor,
+  useAnimatedValue,
+  useAnimatedValueXY,
+} from './hooks/use-animated-value';
 export { createPermissionHook } from './hooks/create-permission-hook';
 export { createResourceHook } from './hooks/create-resource-hook';
 export { createEventValueHook } from './hooks/create-event-value-hook';
@@ -367,3 +390,41 @@ export type {
   ITextInputSelection,
   IImageStatics,
 } from '@symbiote-native/components';
+
+// The device event bus and the easing curves, shared verbatim from the engine
+export {
+  DeviceEventEmitter,
+  Easing,
+  NativeAppEventEmitter,
+  NativeEventEmitter,
+} from '@symbiote-native/engine';
+export type {
+  IEasing,
+  IEasingFunction,
+  IEventEmitterModule,
+  IEventSubscription,
+  INativeEventListener,
+} from '@symbiote-native/engine';
+
+// RN's dev and native-module utilities, shared verbatim from the engine. The ones RN owns forward
+// to its own module, which `registerApp` hands over
+export {
+  codegenNativeCommands,
+  codegenNativeComponent,
+  DevMenu,
+  DevSettings,
+  LogBox,
+  NativeComponentRegistry,
+  NativeModules,
+  Networking,
+  PushNotificationIOS,
+  ReactNativeVersion,
+  registerCallableModule,
+  requireNativeComponent,
+  Systrace,
+  Touchable,
+  TurboModuleRegistry,
+  UIManager,
+  UTFSequence,
+} from '@symbiote-native/engine';
+export type { IDevSettings } from '@symbiote-native/engine';

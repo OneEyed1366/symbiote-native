@@ -23,20 +23,18 @@ const URL_EVENT = 'url';
 // The `nullthrows` package's message, which RN's Linking surfaces for a missing native module.
 const NULLTHROWS_MESSAGE = 'Got unexpected null or undefined';
 
-export interface IUrlEvent {
+export type IUrlEvent = {
   url: string;
-}
+};
 
-// One Android intent extra, mirroring RN's sendIntent extras entry.
-export interface IIntentExtra {
+// Элемент extras для Android `sendIntent`, как в RN
+export type IIntentExtra = {
   key: string;
   value: string | number | boolean;
-}
+};
 
-// The linking native module typed as the interface we vouch for: the four imperative
-// URL methods plus the observe-counters, and the Android-only `sendIntent` (absent on
-// iOS's LinkingManager, hence optional). The single point that accepts the native shape.
-export interface INativeLinkingModule extends IEventEmitterModule {
+// Нативный модуль: URL-методы, счётчики подписки и `sendIntent` только для Android
+export type INativeLinkingModule = IEventEmitterModule & {
   getInitialURL(): Promise<string | null>;
   canOpenURL(url: string): Promise<boolean>;
   openURL(url: string): Promise<void>;
@@ -44,9 +42,9 @@ export interface INativeLinkingModule extends IEventEmitterModule {
   sendIntent?(action: string, extras?: IIntentExtra[]): Promise<void>;
   addListener(eventName: string): void;
   removeListeners(count: number): void;
-}
+};
 
-export interface ILinkingStatic {
+export type ILinkingStatic = {
   addEventListener(
     eventType: typeof URL_EVENT,
     listener: (event: IUrlEvent) => void,
@@ -56,23 +54,25 @@ export interface ILinkingStatic {
   getInitialURL(): Promise<string | null>;
   openSettings(): Promise<void>;
   sendIntent(action: string, extras?: IIntentExtra[]): Promise<void>;
-}
+};
 
-// The two things a platform file supplies: the native module name, and how `sendIntent`
-// behaves (Android launches an intent; iOS has no counterpart and rejects 'Unsupported').
-export interface ILinkingPlatform {
+// Платформа задаёт имя модуля и `sendIntent`: на Android это intent, на iOS отказ `Unsupported`
+export type ILinkingPlatform = {
   moduleName: string;
   sendIntent(
     requireModule: () => INativeLinkingModule,
     action: string,
     extras?: IIntentExtra[],
   ): Promise<void>;
-}
+};
 
-// RN's _validateURL: a typo / empty URL must fail loudly at the call, not reach native.
+// RN `_validateURL`: опечатка или пустой URL падают на вызове и не доходят до native
 function validateUrl(url: string): void {
-  if (typeof url !== 'string' || url.length === 0) {
-    throw new Error(`Invalid URL: ${url}`);
+  if (typeof url !== 'string') {
+    throw new Error(`Invalid URL: should be a string. Was: ${url}`);
+  }
+  if (url.length === 0) {
+    throw new Error('Invalid URL: cannot be empty');
   }
 }
 

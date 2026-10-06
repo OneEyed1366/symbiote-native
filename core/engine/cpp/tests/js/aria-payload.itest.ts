@@ -57,22 +57,34 @@ describe('the aria spelling, resolved by the engine', () => {
     expect(payload['aria-label']).toBe(undefined);
   });
 
-  // why: RULE ONE, and it holds for every scalar — the explicit prop WINS and the alias only fills
-  // a hole. Getting this backwards would let a web-facing name silently override the platform one
-  // an app deliberately wrote.
-  //
-  // TWO-SIDED on purpose. "The explicit value survived" is also true of a rule that never ran, so
-  // the erasure is asserted beside it — break-tested by returning the bag unfolded, which leaves the
-  // first line green and turns the second red. A one-sided oracle here would have been a case that
-  // can only ever confirm.
-  it('lets an explicit accessibility prop beat the alias', () => {
+  // `View.js` assigns the alias over the spread explicit prop, so it wins for every scalar
+  // The erasure is asserted beside it, a bag returned unfolded would leave the winner line red too
+  it('lets the alias beat an explicit accessibility prop', () => {
     const payload = commit({
       'aria-label': 'from aria',
       accessibilityLabel: 'explicit',
     });
 
-    expect(payload.accessibilityLabel).toBe('explicit');
+    expect(payload.accessibilityLabel).toBe('from aria');
     expect(payload['aria-label']).toBe(undefined);
+  });
+
+  it('lets role beat an explicit accessibilityRole', () => {
+    expect(
+      commit({ role: 'heading', accessibilityRole: 'button' })
+        .accessibilityRole,
+    ).toBe('header');
+  });
+
+  it('lets aria-hidden beat both explicit hide flags', () => {
+    const payload = commit({
+      'aria-hidden': true,
+      accessibilityElementsHidden: false,
+      importantForAccessibility: 'yes',
+    });
+
+    expect(payload.accessibilityElementsHidden).toBe(true);
+    expect(payload.importantForAccessibility).toBe('no-hide-descendants');
   });
 
   // why: `aria-labelledby` is a STRING of ids in the W3C spelling and an ARRAY in RN's. A rule that
@@ -115,13 +127,8 @@ describe('the aria spelling, resolved by the engine', () => {
     expect(commit({ role: 'summary' }).accessibilityRole).toBe('summary');
   });
 
-  // why: RULE TWO, and the POLARITY INVERTS inside a composite — here the ALIAS wins per field,
-  // where every scalar above lets the explicit prop win. That is RN's own asymmetry and it is the
-  // single most likely thing for a second implementation to get backwards.
-  //
-  // Field by field rather than `toEqual`: this harness compares with `JSON.stringify`, which is
-  // sensitive to KEY ORDER, and the two implementations build the composite in different orders
-  // while agreeing on every value. An order difference is not a defect and must not read as one.
+  // Inside a composite the alias wins per field, read field by field since this harness compares
+  // with `JSON.stringify` and the two implementations build the composite in different key orders
   it('lets the alias win per field inside accessibilityState', () => {
     const state = commit({
       'aria-disabled': true,
@@ -134,14 +141,8 @@ describe('the aria spelling, resolved by the engine', () => {
     expect(state.checked).toBe(null);
   });
 
-  // why: the composite is REPLACED by a fresh object listing exactly the known fields, so a field
-  // riding on the incoming object is DROPPED rather than forwarded. Faithful to RN, and the kind of
-  // detail that survives one implementation and not the other.
-  //
-  // The `aria-busy` is LOAD-BEARING and is what this case taught: the whole fold is behind an
-  // outer gate (`hasAriaAlias`), so a bag carrying only `accessibilityState` never reaches the rule
-  // at all. Written without it, this case asserted the inner rule while never satisfying the outer
-  // one — see the gate's own case below, which pins that behaviour rather than working around it.
+  // The composite is rebuilt from the known fields only, so an unknown one is dropped
+  // `aria-busy` is needed to pass the outer gate, see the next case
   it('replaces the state composite rather than merging into it', () => {
     const state = commit({
       'aria-busy': false,
@@ -154,12 +155,8 @@ describe('the aria spelling, resolved by the engine', () => {
     expect(state.busy).toBe(false);
   });
 
-  // why: THE OUTER GATE, which the case above discovered. `foldAriaProps` runs only when the bag
-  // carries at least one aria key, so an `accessibilityState` written on its own reaches Fabric
-  // EXACTLY as authored — unnormalised, invented fields included. Both implementations agree on
-  // this (`hasAnyAriaKey` / `hasAriaAlias` guard each), so it is the contract rather than a gap,
-  // and it is worth pinning because it is the surprising half: the composite rules do not apply to
-  // a node that only uses RN's own spelling.
+  // The fold runs only when the bag carries an aria key, so a lone `accessibilityState` is sent
+  // as authored. Both implementations gate the same way
   it('leaves a composite alone on a node with no aria key at all', () => {
     const state = commit({
       accessibilityState: { disabled: true, invented: 'nonsense' },
@@ -171,12 +168,8 @@ describe('the aria spelling, resolved by the engine', () => {
     expect(state.busy).toBe(undefined);
   });
 
-  // why: the rule COERCES NOTHING, and that matters because a template produces strings. Every
-  // Svelte/Angular/Vue template spells `aria-checked="true"` as the STRING `'true'`, and what lands
-  // in `accessibilityState.checked` is that string — which is not what RN's native side expects
-  // (`boolean | 'mixed'`). Pinned rather than fixed: the decision to pass it through is the rule's,
-  // and `adapters/svelte/src/aria-fold-parity.test.ts` pins the other half, that the template is
-  // where the string is born. If someone adds coercion, one of the two fails and names the layer.
+  // Nothing is coerced: a template's `aria-checked="true"` arrives as the string, as in RN
+  // The svelte parity test pins where the string is born
   it('coerces nothing, so a template’s string arrives as a string', () => {
     const state = commit({ 'aria-checked': 'true' }).accessibilityState;
     if (!isRecord(state)) throw new Error('no accessibilityState committed');
@@ -201,19 +194,8 @@ describe('the aria spelling, resolved by the engine', () => {
     expect(value.text).toBe('four');
   });
 
-  // why: THE FOLD RUNS TWICE ON DEVICE under React, and this is the only place that can be seen.
-  // React's surviving wrappers call `resolveAccessibilityProps` on the way in (pass 1, JS), and this
-  // rule folds the same bag again on the way to Fabric (pass 2, C++). Pass 2 must be a no-op, or a
-  // composite pass 1 built from an alias would be overwritten by the alias it already consumed.
-  //
-  // It holds by CONSTRUCTION rather than by care, which is the part worth recording: pass 1 blanks
-  // its aliases to `undefined`, and `recordSetProp` erases a key written `undefined` instead of
-  // storing a null — so a folded bag reaches this rule with the aliases genuinely ABSENT, and the
-  // gate reports nothing to do. `coalesce` would survive a null anyway. Asserted because neither of
-  // those two facts is local to this file, and either could change without anyone thinking of aria.
-  //
-  // `adapters/react/src/__tests__/` cannot test this: its harness runs no second pass at all, and
-  // the file that claimed to was mounting a BARE tag, which has no wrapper to be pass 1.
+  // React folds in JS first and this rule folds again, so pass 2 must be a no-op
+  // Pass 1 blanks the aliases and `recordSetProp` erases an undefined key, so the gate sees none
   it('leaves an already-folded bag alone, which is what makes React’s second pass safe', () => {
     const payload = commit({
       accessibilityRole: 'button',
@@ -229,9 +211,7 @@ describe('the aria spelling, resolved by the engine', () => {
     expect(state.busy).toBe(true);
   });
 
-  // why: THE CONTROL. A node with no aria key must come out with nothing invented — no empty
-  // composite, no role. Without it every case above could be passing against a rule that runs
-  // unconditionally and writes defaults, which is a different rule with the same green.
+  // The control: no aria key in, no composite or role out
   it('invents nothing on a node that authored no aria key', () => {
     const payload = commit({ testID: 'plain' });
 

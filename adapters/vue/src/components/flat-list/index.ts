@@ -20,11 +20,13 @@ import {
 } from '@vue/runtime-core';
 import {
   SINGLE_COLUMN,
+  arrayLikeLength,
   chunkIntoRows,
   expandRowViewability,
   firstItemOfRow,
   lastItemOfRow,
   removeClippedSubviewsOrDefault,
+  routeScrollHandle,
   rowKeyExtractor,
   type IRow,
   type ISeparatorProps,
@@ -32,13 +34,11 @@ import {
   type IViewabilityConfigCallbackPair,
   type IViewableItemsChangedInfo,
   type IVirtualizedListHandle,
-  type IScrollViewHandle,
 } from '@symbiote-native/components';
 import {
   Platform,
   dlog,
   resolveClassName,
-  type ISymbioteNode,
   type IStyleProp,
   type IViewStyle,
 } from '@symbiote-native/engine';
@@ -56,7 +56,7 @@ const VirtualizedListHost = VirtualizedList as unknown as FunctionalComponent<
 // FlatList's imperative handle is exactly VirtualizedList's.
 export type IFlatListHandle = IVirtualizedListHandle;
 
-export interface IFlatListProps<ItemT> {
+export type IFlatListProps<ItemT> = {
   data: readonly ItemT[];
   // The cell renderer + separator are Vue scoped slots (#item / #separator / #header / #footer /
   // #empty), typed by IFlatListSlots - not renderItem / ItemSeparatorComponent props.
@@ -69,7 +69,7 @@ export interface IFlatListProps<ItemT> {
   // Plus every VirtualizedList passthrough prop (horizontal, inverted, getItemLayout, style, raw
   // scroll events, …), forwarded through $attrs onto the inner list. See IVirtualizedListProps.
   [key: string]: unknown;
-}
+};
 
 // In multi-column mode #item is invoked per cell inside a packed row.
 export type IFlatListSlots<ItemT> = {
@@ -123,6 +123,14 @@ function isVirtualizedListHandle(
   return isRecord(value) && typeof value.scrollToOffset === 'function';
 }
 
+// A bare string is a registered class name, an object or array is a style, anything else is none
+function wrapperStyleOf(
+  style: IFlatListProps<unknown>['columnWrapperStyle'],
+): IStyleProp<IViewStyle> | undefined {
+  if (typeof style === 'string') return resolveClassName(style);
+  return isRecord(style) || Array.isArray(style) ? style : undefined;
+}
+
 // The handle FlatList exposes delegates to the inner VirtualizedList's handle (Vue resolves a
 // parent ref to the exposed object, so the wrapper must re-expose rather than forward the ref).
 function buildDelegateHandle(
@@ -133,16 +141,7 @@ function buildDelegateHandle(
     scrollToIndex: params => getInner()?.scrollToIndex(params),
     scrollToItem: params => getInner()?.scrollToItem(params),
     scrollToEnd: params => getInner()?.scrollToEnd(params),
-    flashScrollIndicators: () => getInner()?.flashScrollIndicators(),
-    getNativeScrollRef: (): IScrollViewHandle | null =>
-      getInner()?.getNativeScrollRef() ?? null,
-    getScrollableNode: (): IScrollViewHandle | null =>
-      getInner()?.getScrollableNode() ?? null,
-    getScrollResponder: (): IScrollViewHandle | null =>
-      getInner()?.getScrollResponder() ?? null,
-    getScrollNode: (): ISymbioteNode | null =>
-      getInner()?.getScrollNode() ?? null,
-    recordInteraction: () => getInner()?.recordInteraction(),
+    ...routeScrollHandle(getInner),
   };
 }
 
@@ -171,9 +170,8 @@ export const FlatList = defineComponent(
     };
 
     return () => {
-      const data: readonly ItemT[] = Array.isArray(props.data)
-        ? props.data
-        : [];
+      // RN takes any array-like, and a null or a non-list as an empty one
+      const data: ArrayLike<ItemT> | null | undefined = props.data;
       const keyExtractor = props.keyExtractor;
       const numColumns =
         typeof props.numColumns === 'number' ? props.numColumns : SINGLE_COLUMN;
@@ -193,7 +191,9 @@ export const FlatList = defineComponent(
         ),
       };
 
-      dlog(`Vue FlatList over ${data.length} items, ${numColumns} column(s)`);
+      dlog(
+        `Vue FlatList over ${arrayLikeLength(data)} items, ${numColumns} column(s)`,
+      );
 
       const endReached = listens('onEndReached')
         ? (info: { distanceFromEnd: number }): void => emit('endReached', info)
@@ -226,7 +226,7 @@ export const FlatList = defineComponent(
             ref: setInner,
             data,
             getItem: (_source: unknown, index: number): unknown => data[index],
-            getItemCount: (): number => data.length,
+            getItemCount: (): number => arrayLikeLength(data),
             keyExtractor,
             onEndReached: endReached,
             onStartReached: startReached,
@@ -244,12 +244,7 @@ export const FlatList = defineComponent(
       const rows = chunkIntoRows(data, numColumns);
       const rowStyle: IStyleProp<IViewStyle> = [
         { flexDirection: 'row' },
-        typeof props.columnWrapperStyle === 'string'
-          ? resolveClassName(props.columnWrapperStyle)
-          : isRecord(props.columnWrapperStyle) ||
-              Array.isArray(props.columnWrapperStyle)
-            ? props.columnWrapperStyle
-            : undefined,
+        wrapperStyleOf(props.columnWrapperStyle),
       ];
 
       const rowItemSlot = (info: {
@@ -265,9 +260,9 @@ export const FlatList = defineComponent(
           return h(
             'view',
             { key, style: { flex: 1 } },
-            slots.item !== undefined
-              ? slots.item({ item, index, separators: info.separators })
-              : [],
+            slots.item === undefined
+              ? []
+              : slots.item({ item, index, separators: info.separators }),
           );
         });
         return [h('view', { style: rowStyle }, cells)];

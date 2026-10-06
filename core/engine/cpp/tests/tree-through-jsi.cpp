@@ -510,7 +510,8 @@ struct ModelNode {
 /** The shape Fabric should be holding, as `componentName(childShape…)`. */
 std::string expectedShape(const std::vector<ModelNode> &model, int32_t slot, bool hasTextAncestor) {
   const auto &node = model.at(static_cast<size_t>(slot));
-  const bool childHasTextAncestor = hasTextAncestor || node.isText;
+  const bool endsTextContext = node.kind == opCreateElement && node.viewName == kView;
+  const bool childHasTextAncestor = node.isText || (hasTextAncestor && !endsTextContext);
 
   std::string children;
   for (int32_t child : node.children) {

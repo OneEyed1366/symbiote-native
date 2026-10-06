@@ -35,31 +35,52 @@ import {
   type OnDestroy,
   type SimpleChanges,
 } from '@angular/core';
-import { dlog, isDebug } from '@symbiote-native/engine';
+import { dlog, isDebug, type IViewStyle } from '@symbiote-native/engine';
 import { countAngular } from '../../diagnostics';
 import type { ISeparators } from '@symbiote-native/components';
 
 let vListOutletInstanceCounter = 0;
 
+function nextOutletInstanceId(): number {
+  vListOutletInstanceCounter += 1;
+  return vListOutletInstanceCounter;
+}
+
 // The context a `vListItem` template receives, mirroring RN's renderItem info arg
 // ({ item, index, separators }). `$implicit` is the item, so `let-item` (no key) binds it.
-export interface IVListItemContext<ItemT> {
+export type IVListItemContext<ItemT> = {
   $implicit: ItemT;
   index: number;
   separators: ISeparators;
-}
+};
 
 // The context a `vListSeparator` template receives, mirroring RN's ItemSeparatorComponent props
 // (the highlight flag the cell toggles + the items flanking the gap). `$implicit` is the highlight
 // flag, so `let-highlighted` binds it.
-export interface IVListSeparatorContext<ItemT> {
+export type IVListSeparatorContext<ItemT> = {
   $implicit: boolean;
   highlighted: boolean;
   leadingItem?: ItemT;
   trailingItem?: ItemT;
   // RN lets a row drive arbitrary separator props via separators.updateProps; they ride here.
   [key: string]: unknown;
-}
+};
+
+// The context a `vListCell` template receives, RN's `CellRendererComponent` props
+// The template draws the wrapper and stamps the item and its separator through `content`
+// The item is `unknown`, a wrapping list hands it an entry or a row, not its own item type
+export type IVListCellContext = {
+  $implicit: unknown;
+  cellKey: string;
+  index: number;
+  style: IViewStyle | undefined;
+  // Wire both onto the wrapper: `(layout)="cell.layout($event)"`, `(focus)="cell.focus()"`
+  layout: (event: unknown) => void;
+  focus: () => void;
+  // Stamp it with `[vListOutlet]="cell.content" [vListOutletContext]="cell.contentContext"`
+  content: TemplateRef<unknown> | undefined;
+  contentContext: unknown;
+};
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -114,6 +135,20 @@ export class VListSeparatorDirective<ItemT = unknown> {
   }
 }
 
+// `<ng-template vListCell>` replaces the view around each cell (RN CellRendererComponent)
+// It must wire `layout` and `focus` itself, as RN's custom cell must wire `onLayout`
+@Directive({ selector: '[vListCell]', standalone: true })
+export class VListCellDirective {
+  readonly templateRef = inject<TemplateRef<IVListCellContext>>(TemplateRef);
+
+  static ngTemplateContextGuard(
+    _dir: VListCellDirective,
+    _ctx: unknown,
+  ): _ctx is IVListCellContext {
+    return true;
+  }
+}
+
 // Core-only NgTemplateOutlet twin. The adapter cannot import @angular/common's NgTemplateOutlet
 // (not a dependency), so the list stamps templates through this: it creates the embedded view when
 // the template changes and updates the live view's context IN PLACE on a context change, so a
@@ -125,7 +160,7 @@ export class VListOutletDirective<C = unknown> implements OnChanges, OnDestroy {
 
   private viewRef: EmbeddedViewRef<C> | null = null;
   private readonly viewContainer = inject(ViewContainerRef);
-  private readonly instanceId = (vListOutletInstanceCounter += 1);
+  private readonly instanceId = nextOutletInstanceId();
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['templateRef'] !== undefined) {

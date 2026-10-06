@@ -62,7 +62,7 @@ type IErrorCallback = (error: unknown) => void;
 // The iOS AccessibilityManager native module: callback-based state getters, announce /
 // focus side effects, plus the observe-counters. announceForAccessibilityWithOptions is
 // optional; older hosts only have the plain announce.
-interface INativeAccessibilityManagerIOS extends IEventEmitterModule {
+type INativeAccessibilityManagerIOS = IEventEmitterModule & {
   getCurrentVoiceOverState(
     onSuccess: IStateCallback,
     onError: IErrorCallback,
@@ -103,7 +103,7 @@ interface INativeAccessibilityManagerIOS extends IEventEmitterModule {
   setAccessibilityFocus(reactTag: number): void;
   addListener(eventType: string): void;
   removeListeners(count: number): void;
-}
+};
 
 // Lazily resolved so importing this module has no native side effect: a headless run
 // without a fake __turboModuleProxy still loads it; resolution happens on first use.
@@ -124,48 +124,23 @@ function getEmitter() {
   return deviceEventModule.getEmitter();
 }
 
-// Run a callback-based native getter as a Promise; resolves false when the module is
-// unlinked, mirroring RN's "unavailable query -> false" contract for the cross-platform
-// getters. (RN rejects on iOS, but a false fallback keeps the unified surface uniform with
-// Android's missing-method getters; the dlog records the miss.)
+const MANAGER_MISSING = 'NativeAccessibilityManagerIOS is not available';
+const MODULE_MISSING = 'AccessibilityInfo native module is not available';
+const SERVICE_ANDROID_ONLY =
+  'isAccessibilityServiceEnabled is only available on Android';
+
+// Отклоняем с `missing`, если нет модуля или геттера, как RN, текст у каждого запроса свой
 function queryState(
   pick: (
     module: INativeAccessibilityManagerIOS,
-  ) => (s: IStateCallback, e: IErrorCallback) => void,
-  label: string,
-): Promise<boolean> {
-  const module = getModule();
-  if (module === null) {
-    dlog(`AccessibilityInfo(ios).${label} -> no module (false)`);
-    return Promise.resolve(false);
-  }
-  const getter = pick(module);
-  return new Promise((resolve, reject) => {
-    getter.call(
-      module,
-      enabled => resolve(enabled),
-      error => reject(error),
-    );
-  });
-}
-
-// Like queryState, but for an OPTIONAL native getter (newer iOS surfaces): resolves false
-// when the module is unlinked OR the method is absent on this host, instead of throwing.
-function queryOptionalState(
-  pick: (
-    module: INativeAccessibilityManagerIOS,
   ) => ((s: IStateCallback, e: IErrorCallback) => void) | undefined,
-  label: string,
+  missing: string,
 ): Promise<boolean> {
   const module = getModule();
-  if (module === null) {
-    dlog(`AccessibilityInfo(ios).${label} -> no module (false)`);
-    return Promise.resolve(false);
-  }
-  const getter = pick(module);
-  if (getter === undefined) {
-    dlog(`AccessibilityInfo(ios).${label} -> method absent (false)`);
-    return Promise.resolve(false);
+  const getter = module === null ? undefined : pick(module);
+  if (module === null || getter === undefined) {
+    dlog(`AccessibilityInfo(ios) -> rejected: ${missing}`);
+    return Promise.reject(new Error(missing));
   }
   return new Promise((resolve, reject) => {
     getter.call(
@@ -178,69 +153,55 @@ function queryOptionalState(
 
 class AccessibilityInfoIOS implements IAccessibilityInfoStatic {
   isScreenReaderEnabled(): Promise<boolean> {
-    return queryState(m => m.getCurrentVoiceOverState, 'isScreenReaderEnabled');
+    return queryState(m => m.getCurrentVoiceOverState, MANAGER_MISSING);
   }
 
   isReduceMotionEnabled(): Promise<boolean> {
-    return queryState(
-      m => m.getCurrentReduceMotionState,
-      'isReduceMotionEnabled',
-    );
+    return queryState(m => m.getCurrentReduceMotionState, MANAGER_MISSING);
   }
 
   isBoldTextEnabled(): Promise<boolean> {
-    return queryState(m => m.getCurrentBoldTextState, 'isBoldTextEnabled');
+    return queryState(m => m.getCurrentBoldTextState, MANAGER_MISSING);
   }
 
   isGrayscaleEnabled(): Promise<boolean> {
-    return queryState(m => m.getCurrentGrayscaleState, 'isGrayscaleEnabled');
+    return queryState(m => m.getCurrentGrayscaleState, MODULE_MISSING);
   }
 
   isInvertColorsEnabled(): Promise<boolean> {
-    return queryState(
-      m => m.getCurrentInvertColorsState,
-      'isInvertColorsEnabled',
-    );
+    return queryState(m => m.getCurrentInvertColorsState, MODULE_MISSING);
   }
 
   isReduceTransparencyEnabled(): Promise<boolean> {
     return queryState(
       m => m.getCurrentReduceTransparencyState,
-      'isReduceTransparencyEnabled',
+      MANAGER_MISSING,
     );
   }
 
-  // iOS "Increase Contrast": Settings > Accessibility > Display & Text Size. The native
-  // getter is optional (older hosts lack it); resolve false when absent rather than reject,
-  // keeping the unified surface non-throwing (RN rejects, we mirror the false fallback).
+  // "Increase Contrast" в настройках экрана iOS
   isDarkerSystemColorsEnabled(): Promise<boolean> {
-    return queryOptionalState(
+    return queryState(
       m => m.getCurrentDarkerSystemColorsState,
-      'isDarkerSystemColorsEnabled',
+      'NativeAccessibilityManagerIOS.getCurrentDarkerSystemColorsState is not available',
     );
   }
 
-  // iOS reduce-motion sub-setting (prefer cross-fade over slide). Optional native getter;
-  // resolve false when absent (RN parity for the unavailable case).
+  // Подпункт reduce motion: cross-fade вместо слайда
   prefersCrossFadeTransitions(): Promise<boolean> {
-    return queryOptionalState(
+    return queryState(
       m => m.getCurrentPrefersCrossFadeTransitionsState,
-      'prefersCrossFadeTransitions',
+      'NativeAccessibilityManagerIOS.getCurrentPrefersCrossFadeTransitionsState is not available',
     );
   }
 
-  // Android-only query; iOS has no high-text-contrast concept, so resolve false (RN parity).
+  // Только Android, на iOS такой настройки нет
   isHighTextContrastEnabled(): Promise<boolean> {
     return Promise.resolve(false);
   }
 
-  // Android-only query; on iOS RN rejects. We resolve false to keep the unified surface
-  // non-throwing; the dlog records that it's a no-op on this platform.
   isAccessibilityServiceEnabled(): Promise<boolean> {
-    dlog(
-      'AccessibilityInfo(ios).isAccessibilityServiceEnabled -> Android-only (false)',
-    );
-    return Promise.resolve(false);
+    return Promise.reject(new Error(SERVICE_ANDROID_ONLY));
   }
 
   // Post a string to be announced by the screen reader. No-op without a module.

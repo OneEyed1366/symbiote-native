@@ -14,10 +14,15 @@
 import './register';
 
 export { mount, unmount } from './render';
-export { AppRegistry, setHostRegistrar } from './modules/app-registry';
+export {
+  AppRegistry,
+  HeadlessJsTaskError,
+  setHostRegistrar,
+} from './modules/app-registry';
 export type {
   IComponentProvider,
   IWrapperComponentProvider,
+  IAppConfig,
   IAppParameters,
   IRunnable,
   IHostRegistrar,
@@ -41,6 +46,8 @@ export {
   VirtualizedSectionList,
   SectionList,
 } from './components';
+export { getVirtualizedListScope } from './components/virtualized-list/nested-scope';
+export type { IListScope } from '@symbiote-native/components';
 export type {
   IViewProps,
   ITextProps,
@@ -57,6 +64,8 @@ export type {
   ITextInputChangeEvent,
   IModalProps,
   ISafeAreaViewProps,
+  ILayoutConformanceProps,
+  ILayoutConformanceMode,
   IRefreshControlProps,
   IPressableProps,
   ITouchableOpacityProps,
@@ -66,6 +75,7 @@ export type {
   IButtonProps,
   IScrollViewProps,
   IScrollViewHandle,
+  ICellRendererProps,
   IVirtualizedListProps,
   IVirtualizedListHandle,
   IFlatListProps,
@@ -188,6 +198,7 @@ export {
   AppState,
   Keyboard,
   KEYBOARD_EVENT,
+  TextInputState,
   BackHandler,
   PermissionsAndroid,
   PERMISSIONS,
@@ -311,6 +322,11 @@ export { Portal, type IPortalProps, type IPortalTarget } from './create-portal';
 // bucket is named `runes/`, not `hooks/`/`composables/`.
 export { useWindowDimensions } from './runes/use-window-dimensions.svelte';
 export { useColorScheme } from './runes/use-color-scheme.svelte';
+export {
+  useAnimatedColor,
+  useAnimatedValue,
+  useAnimatedValueXY,
+} from './runes/use-animated-value';
 
 // The React Native twins of `svelte/reactivity/window`, which is browser-only and would read
 // `undefined` forever here. Same names, same `.current` shape, engine Dimensions/PixelRatio
@@ -346,3 +362,41 @@ export {
 // `createAnimatedComponent` — the engine resolves an AnimatedNode in any prop of any host node, so
 // nothing needs wrapping (modules/animated/index.ts).
 export { Animated } from './modules/animated';
+
+// The device event bus and the easing curves, shared verbatim from the engine
+export {
+  DeviceEventEmitter,
+  Easing,
+  NativeAppEventEmitter,
+  NativeEventEmitter,
+} from '@symbiote-native/engine';
+export type {
+  IEasing,
+  IEasingFunction,
+  IEventEmitterModule,
+  IEventSubscription,
+  INativeEventListener,
+} from '@symbiote-native/engine';
+
+// RN's dev and native-module utilities, shared verbatim from the engine. The ones RN owns forward
+// to its own module, which `registerApp` hands over
+export {
+  codegenNativeCommands,
+  codegenNativeComponent,
+  DevMenu,
+  DevSettings,
+  LogBox,
+  NativeComponentRegistry,
+  NativeModules,
+  Networking,
+  PushNotificationIOS,
+  ReactNativeVersion,
+  registerCallableModule,
+  requireNativeComponent,
+  Systrace,
+  Touchable,
+  TurboModuleRegistry,
+  UIManager,
+  UTFSequence,
+} from '@symbiote-native/engine';
+export type { IDevSettings } from '@symbiote-native/engine';

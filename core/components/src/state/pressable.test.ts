@@ -2,96 +2,12 @@
 // adapter wires this machine to its own lifecycle; this file owns the timing/transition contract
 // itself: delayed activation, retention drift/re-entry, RN's 130ms active-duration floor, and
 // teardown of every timer class.
-import { createElement, type ISymbioteEvent } from '@symbiote-native/engine';
 import { describe, expect, it } from 'vitest';
 import {
-  createPressHandlers,
-  createPressRuntime,
   disposePressRuntime,
   DEFAULT_MIN_PRESS_DURATION_MS,
-  type IPressHost,
-  type IPressMachineConfig,
 } from './pressable';
-
-interface IScheduled {
-  due: number;
-  callback: () => void;
-  cancelled: boolean;
-}
-
-function makeClock(): {
-  schedule: IPressHost['schedule'];
-  now: () => number;
-  advance: (ms: number) => void;
-  pending: () => number;
-} {
-  let now = 0;
-  const scheduled: IScheduled[] = [];
-  return {
-    schedule(callback, ms) {
-      const entry: IScheduled = { due: now + ms, callback, cancelled: false };
-      scheduled.push(entry);
-      return () => {
-        entry.cancelled = true;
-      };
-    },
-    now: () => now,
-    advance(ms) {
-      const target = now + ms;
-      for (;;) {
-        const due = scheduled
-          .filter(entry => !entry.cancelled && entry.due <= target)
-          .sort((a, b) => a.due - b.due)[0];
-        if (due === undefined) break;
-        now = due.due;
-        due.cancelled = true;
-        due.callback();
-      }
-      now = target;
-    },
-    pending: () => scheduled.filter(entry => !entry.cancelled).length,
-  };
-}
-
-function eventAt(x = 0, y = 0): ISymbioteEvent {
-  const target = createElement('RCTView');
-  return {
-    type: 'press',
-    target,
-    currentTarget: target,
-    nativeEvent: { pageX: x, pageY: y },
-    stopPropagation: () => {},
-  };
-}
-
-function makeHarness(overrides: Partial<IPressMachineConfig> = {}) {
-  const clock = makeClock();
-  const log: string[] = [];
-  const runtime = createPressRuntime();
-  const config: IPressMachineConfig = {
-    delayLongPress: 500,
-    unstable_pressDelay: 0,
-    hitSlop: 0,
-    pressRetentionOffset: 30,
-    onPress: () => log.push('press'),
-    onPressIn: () => log.push('in'),
-    onPressOut: () => log.push('out'),
-    onLongPress: () => log.push('long'),
-    ...overrides,
-  };
-  const host: IPressHost = {
-    setPressed: pressed => log.push(pressed ? 'pressed:true' : 'pressed:false'),
-    getMeasureFn: () => undefined,
-    schedule: clock.schedule,
-    now: clock.now,
-  };
-  return {
-    clock,
-    log,
-    runtime,
-    handlers: createPressHandlers(config, runtime, host),
-  };
-}
+import { eventAt, makeHarness } from './pressable-harness';
 
 describe('Pressable delayed activation and retention', () => {
   it('never activates or emits pressOut when the touch leaves before the delay and stays out', () => {

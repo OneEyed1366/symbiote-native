@@ -28,6 +28,16 @@ export type IInputMode =
 export type IEnterKeyHint =
   'enter' | 'done' | 'go' | 'next' | 'previous' | 'search' | 'send';
 export type ISubmitBehavior = 'submit' | 'blurAndSubmit' | 'newline';
+export type IDataDetectorType =
+  | 'phoneNumber'
+  | 'link'
+  | 'address'
+  | 'calendarEvent'
+  | 'trackingNumber'
+  | 'flightNumber'
+  | 'lookupSuggestion'
+  | 'none'
+  | 'all';
 export type ITextInputSelection = { start: number; end?: number };
 export type ITextInputEventHandler = (event: ISymbioteEvent) => void;
 
@@ -144,6 +154,30 @@ export type ITextInputProps = IAccessibilityProps &
     // Pairs this input with an InputAccessoryView whose nativeID matches; native docks that
     // view above the keyboard while the input is focused. Forwarded via passthrough.
     inputAccessoryViewID?: string;
+    // Native-only props of RN's `TextInput.d.ts`: the engine forwards each as written, so they
+    // need no fold, only a type for app code
+    caretHidden?: boolean;
+    contextMenuHidden?: boolean;
+    spellCheck?: boolean;
+    clearTextOnFocus?: boolean;
+    enablesReturnKeyAutomatically?: boolean;
+    smartInsertDelete?: boolean;
+    disableKeyboardShortcuts?: boolean;
+    disableFullscreenUI?: boolean;
+    clearButtonMode?: 'never' | 'while-editing' | 'unless-editing' | 'always';
+    keyboardAppearance?: 'default' | 'light' | 'dark';
+    dataDetectorTypes?: IDataDetectorType | IDataDetectorType[];
+    passwordRules?: string | null;
+    lineBreakStrategyIOS?: 'none' | 'standard' | 'hangul-word' | 'push-out';
+    lineBreakModeIOS?:
+      'wordWrapping' | 'char' | 'clip' | 'head' | 'middle' | 'tail';
+    importantForAutofill?:
+      'auto' | 'no' | 'noExcludeDescendants' | 'yes' | 'yesExcludeDescendants';
+    inlineImageLeft?: string;
+    inlineImagePadding?: number;
+    returnKeyLabel?: string;
+    textBreakStrategy?: 'simple' | 'highQuality' | 'balanced';
+    inputAccessoryViewButtonLabel?: string;
     style?: ITextStyle;
     // TextInput.js's own `usePressability` — the same Pressability class every Touchable uses,
     // wired so a tap inside an authored `hitSlop` but outside the native view's focus zone still
@@ -224,6 +258,8 @@ export type ITextInputHandle = {
   clear(): void;
   isFocused(): boolean;
   setSelection(start: number, end: number): void;
+  // RN's `getNativeRef`: the native instance the input renders to
+  getNativeRef(): ISymbioteNode;
   // Forwarded from the engine node, so a TextInput ref is not poorer than any other host ref.
   measure(callback: IMeasureOnSuccess): void;
   measureInWindow(callback: IMeasureInWindowOnSuccess): void;

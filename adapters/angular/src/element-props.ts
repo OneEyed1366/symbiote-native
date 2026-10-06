@@ -17,6 +17,7 @@ import type {
   IPressState,
   IRectOffset,
   IResponderProps,
+  ITextNativeOnlyProps,
 } from '@symbiote-native/components';
 import type {
   ISymbioteEvent,
@@ -38,38 +39,39 @@ export type IAngularStyleBinding<TStyle> = TStyle | string | null | undefined;
 export type IElementStyleProp =
   IStyleProp<IViewStyle> | ((state: IPressState) => IStyleProp<IViewStyle>);
 
-export interface IElementProps
-  extends IAccessibilityProps, IAriaProps, IResponderProps {
-  /** RN's modern W3C-named alias for `nativeID`; the renderer folds it (`PROP_ALIASES`). */
-  id?: string;
-  pointerEvents?: 'auto' | 'none' | 'box-none' | 'box-only';
-  hitSlop?: IRectOffset | number;
-  focusable?: boolean;
-  collapsable?: boolean;
-  removeClippedSubviews?: boolean;
-  renderToHardwareTextureAndroid?: boolean;
-  shouldRasterizeIOS?: boolean;
-  needsOffscreenAlphaCompositing?: boolean;
-  style?: IAngularStyleBinding<IViewStyle>;
-  /**
-   * An RN StyleProp as ONE property binding: arrays, falsy entries, and the press-state callback.
-   * The callback is in the union because a subclass cannot widen an inherited property and
-   * `<pressable>`/`<touchable-*>` are the tags that take one; on every other tag the engine resolves
-   * it at `pressed: false`.
-   */
-  styleProp?: IElementStyleProp;
-  onPress?: IEventHandler;
-  onPressIn?: IEventHandler;
-  onPressOut?: IEventHandler;
-  onPressMove?: IEventHandler;
-  onLongPress?: IEventHandler;
-  onLayout?: IEventHandler;
-  onFocus?: IEventHandler;
-  onBlur?: IEventHandler;
-}
+export type IElementProps = IAccessibilityProps &
+  IAriaProps &
+  IResponderProps & {
+    /** RN's modern W3C-named alias for `nativeID`; the renderer folds it (`PROP_ALIASES`). */
+    id?: string;
+    pointerEvents?: 'auto' | 'none' | 'box-none' | 'box-only';
+    hitSlop?: IRectOffset | number;
+    focusable?: boolean;
+    collapsable?: boolean;
+    removeClippedSubviews?: boolean;
+    renderToHardwareTextureAndroid?: boolean;
+    shouldRasterizeIOS?: boolean;
+    needsOffscreenAlphaCompositing?: boolean;
+    style?: IAngularStyleBinding<IViewStyle>;
+    /**
+     * An RN StyleProp as ONE property binding: arrays, falsy entries, and the press-state callback.
+     * The callback is in the union because a subclass cannot widen an inherited property and
+     * `<pressable>`/`<touchable-*>` are the tags that take one; on every other tag the engine resolves
+     * it at `pressed: false`.
+     */
+    styleProp?: IElementStyleProp;
+    onPress?: IEventHandler;
+    onPressIn?: IEventHandler;
+    onPressOut?: IEventHandler;
+    onPressMove?: IEventHandler;
+    onLongPress?: IEventHandler;
+    onLayout?: IEventHandler;
+    onFocus?: IEventHandler;
+    onBlur?: IEventHandler;
+  };
 
 /** Text's own surface on top of the shared one. `onTextLayout` is an event, so it is not here. */
-export interface ITextElementProps {
+export type ITextElementProps = ITextNativeOnlyProps & {
   /** Narrows the shared `style` so `fontSize` / `fontWeight` type-check on a `<text>`. */
   style?: IAngularStyleBinding<ITextStyle>;
   styleProp?: IStyleProp<ITextStyle>;
@@ -84,12 +86,12 @@ export interface ITextElementProps {
   // RN's Text carries it (Text.js) and Button hands it to the label so a screen reader announces
   // the text as disabled along with the button holding it (Button.js:388).
   disabled?: boolean;
-}
+};
 
 /** The sticky-header wrapper RN builds in JS (ScrollViewStickyHeader.js). */
-export interface IStickyHeaderElementProps {
+export type IStickyHeaderElementProps = {
   inverted?: boolean;
   nextHeaderLayoutY?: number | null;
   scrollAnimatedValue?: unknown;
   scrollViewHeight?: number | null;
-}
+};

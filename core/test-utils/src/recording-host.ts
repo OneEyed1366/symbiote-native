@@ -124,6 +124,15 @@ export type IRecordingHost = ITreeHost & {
    */
   reset: () => void;
   forget: () => void;
+  /**
+   * What `measureLayout` answers, by the two handles
+   * No Yoga runs headless, so a test that needs a rect names it here, no answer means it fails
+   */
+  answerMeasureLayout: (
+    answer:
+      | ((handle: object, relativeTo: object) => IDomRect | undefined)
+      | undefined,
+  ) => void;
 };
 
 type IEventHandler = (
@@ -225,6 +234,7 @@ export function createRecordingHost(): IRecordingHost {
   const tree: IRecordedTree = createRecordedTree();
   const { nodeOf } = tree;
   let eventHandler: IEventHandler | undefined;
+  let measureLayoutAnswer: Parameters<IRecordingHost['answerMeasureLayout']>[0];
   const commands: IRecordingHost['commands'] = [];
   const responderHandovers: IRecordingHost['responderHandovers'] = [];
   const accessibilityEvents: IRecordingHost['accessibilityEvents'] = [];
@@ -234,6 +244,7 @@ export function createRecordingHost(): IRecordingHost {
     commands.length = 0;
     responderHandovers.length = 0;
     accessibilityEvents.length = 0;
+    measureLayoutAnswer = undefined;
   };
 
   return {
@@ -376,12 +387,17 @@ export function createRecordingHost(): IRecordingHost {
       return { x: 0, y: 0, width: 0, height: 0 };
     },
     measureLayout(
-      _handle: object,
-      _relativeTo: object,
+      handle: object,
+      relativeTo: object,
       onFail: () => void,
-      _onSuccess: IMeasureLayoutOnSuccess,
+      onSuccess: IMeasureLayoutOnSuccess,
     ): void {
-      onFail();
+      const rect = measureLayoutAnswer?.(handle, relativeTo);
+      if (rect === undefined) onFail();
+      else onSuccess(rect.x, rect.y, rect.width, rect.height);
+    },
+    answerMeasureLayout(answer): void {
+      measureLayoutAnswer = answer;
     },
     setIsJSResponder(
       handle: object,

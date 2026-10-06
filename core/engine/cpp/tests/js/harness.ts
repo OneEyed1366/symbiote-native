@@ -28,6 +28,17 @@ declare const __symbioteTester: {
     payload?: Record<string, unknown>,
   ) => void;
   commands: () => IRecordedCommand[];
+  scrollTo: (tag: number, x: number, y: number) => void;
+  enqueueScroll: (tag: number, x: number, y: number) => void;
+  runWorkLoop: () => void;
+  setViewport: (width: number, height: number) => void;
+  setModalSize: (tag: number, width: number, height: number) => void;
+  animatedModule: () => unknown;
+  usesSharedAnimatedBackend: () => boolean;
+  boundingClientRect: (tag: number) => IBoundingRect;
+  produceFrames: (milliseconds: number) => void;
+  directManipulationProps: (tag: number) => Record<string, unknown>;
+  fabricUpdateProps: (tag: number) => Record<string, unknown>;
   mountingLogs: () => string[];
   commitNumber: () => number;
   heapInfo: () => Record<string, number>;
@@ -51,6 +62,82 @@ export function dispatchEvent(
   payload?: Record<string, unknown>,
 ): void {
   __symbioteTester.dispatchEvent(tag, type, payload);
+}
+
+/** Fantom's `runWorkLoop`: deliver pending state updates and run the tasks they scheduled */
+export function runWorkLoop(): void {
+  __symbioteTester.runWorkLoop();
+}
+
+/** Hands RN's own `NativeAnimatedModule` (C++) to the engine, as a device's TurboModule registry */
+export function useNativeAnimatedModule(): void {
+  const module = __symbioteTester.animatedModule();
+  // Fantom's tester turns `cxxNativeAnimatedEnabled` on for the C++ module
+  const flags = {
+    cxxNativeAnimatedEnabled: (): boolean => true,
+    useSharedAnimatedBackend: usesSharedAnimatedBackend,
+  };
+  Reflect.set(globalThis, '__turboModuleProxy', (name: string): unknown => {
+    if (name === 'NativeReactNativeFeatureFlags') return flags;
+    return name === 'NativeAnimatedModule' ||
+      name === 'NativeAnimatedTurboModule'
+      ? module
+      : null;
+  });
+}
+
+/** `ReactNativeFeatureFlags.useSharedAnimatedBackend()` of this run */
+export function usesSharedAnimatedBackend(): boolean {
+  return __symbioteTester.usesSharedAnimatedBackend();
+}
+
+export type IBoundingRect = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+/** `getBoundingClientRect` of a mounted view, its transform included, from the committed tree */
+export function getBoundingClientRect(tag: number): IBoundingRect {
+  return __symbioteTester.boundingClientRect(tag);
+}
+
+/** Fantom's `unstable_produceFramesForDuration`: native animation frames of ~16.3 ms each */
+export function produceFramesForDuration(milliseconds: number): void {
+  __symbioteTester.produceFrames(milliseconds);
+}
+
+/** Fantom's `unstable_getDirectManipulationProps`: what a native animation wrote into a view */
+export function getDirectManipulationProps(
+  tag: number,
+): Record<string, unknown> {
+  return __symbioteTester.directManipulationProps(tag);
+}
+
+/** Fantom's `unstable_getFabricUpdateProps`: what a native animation committed to Fabric */
+export function getFabricUpdateProps(tag: number): Record<string, unknown> {
+  return __symbioteTester.fabricUpdateProps(tag);
+}
+
+/** Fantom's `enqueueScrollEvent`: queued, delivered to JS by the next `runWorkLoop` */
+export function enqueueScroll(tag: number, x: number, y: number): void {
+  __symbioteTester.enqueueScroll(tag, x, y);
+}
+
+/** Fantom's `createRoot` viewport: resizes the surface the tree lays out in */
+export function setViewport(width: number, height: number): void {
+  __symbioteTester.setViewport(width, height);
+}
+
+/** Fantom's `enqueueModalSizeUpdate`: the host's screen size for a mounted Modal */
+export function setModalSize(tag: number, width: number, height: number): void {
+  __symbioteTester.setModalSize(tag, width, height);
+}
+
+/** Scroll a mounted ScrollView by its tag, which writes the offset into its Fabric state */
+export function scrollTo(tag: number, x: number, y: number): void {
+  __symbioteTester.scrollTo(tag, x, y);
 }
 
 /** A view as the PLATFORM holds it: what the differ told a host to create, not what JS built. */

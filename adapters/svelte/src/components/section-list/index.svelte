@@ -58,6 +58,9 @@
   export function getScrollNode(): ISymbioteNode | null {
     return inner?.getScrollNode() ?? null;
   }
+  export function getScrollRef(): ISymbioteNode | null {
+    return inner?.getScrollRef() ?? null;
+  }
   export function recordInteraction(): void {
     inner?.recordInteraction();
   }
@@ -77,6 +80,7 @@
   sectionFooter={props.sectionFooter}
   sectionSeparator={props.sectionSeparator}
   separator={props.separator}
+  cellRenderer={props.cellRenderer}
   header={props.header}
   footer={props.footer}
   empty={props.empty}
@@ -84,6 +88,7 @@
   getItemLayout={props.getItemLayout}
   stickySectionHeadersEnabled={props.stickySectionHeadersEnabled}
   inverted={props.inverted}
+  horizontal={props.horizontal}
   extraData={props.extraData}
   onEndReached={props.onEndReached}
   onEndReachedThreshold={props.onEndReachedThreshold}
@@ -97,8 +102,10 @@
   maxToRenderPerBatch={props.maxToRenderPerBatch}
   updateCellsBatchingPeriod={props.updateCellsBatchingPeriod}
   windowSize={props.windowSize}
+  disableVirtualization={props.disableVirtualization}
   maintainVisibleContentPosition={props.maintainVisibleContentPosition}
   onScroll={props.onScroll}
+  onContentSizeChange={props.onContentSizeChange}
   onScrollBeginDrag={props.onScrollBeginDrag}
   onScrollEndDrag={props.onScrollEndDrag}
   onMomentumScrollBegin={props.onMomentumScrollBegin}
@@ -108,7 +115,11 @@
   keyboardDismissMode={props.keyboardDismissMode}
   removeClippedSubviews={props.removeClippedSubviews}
   nestedScrollEnabled={props.nestedScrollEnabled}
+  stickyHeaderHiddenOnScroll={props.stickyHeaderHiddenOnScroll}
+  innerViewRef={props.innerViewRef}
   style={props.style}
   contentContainerStyle={props.contentContainerStyle}
+  listHeaderComponentStyle={props.listHeaderComponentStyle}
+  listFooterComponentStyle={props.listFooterComponentStyle}
   class={props.class}
 />

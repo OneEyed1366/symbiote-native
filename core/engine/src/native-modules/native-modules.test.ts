@@ -11,9 +11,9 @@ import {
   getNativeModule,
 } from './index';
 
-interface IDeviceHub {
+type IDeviceHub = {
   emit: (eventType: string, ...args: unknown[]) => void;
-}
+};
 
 beforeEach(() => {
   globalThis.RN$registerCallableModule = (
@@ -98,7 +98,7 @@ describe('getEnforcingNativeModule', () => {
   // the message, not silently degrade like the plain getNativeModule.
   it('throws naming the module when it is not registered', () => {
     expect(() => getEnforcingNativeModule('DefinitelyMissing')).toThrow(
-      /DefinitelyMissing.*not registered/,
+      /DefinitelyMissing.*could not be found/,
     );
   });
 });

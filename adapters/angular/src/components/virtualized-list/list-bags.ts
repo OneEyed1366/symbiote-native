@@ -3,15 +3,14 @@
 
 import { Directive, computed, signal, type OnChanges } from '@angular/core';
 import {
-  LIST_ACTION_KIND,
-  readLayoutLength,
-  readScrollOffset,
+  createListHandlers,
   resolveAccessibilityProps,
   type IAccessibilityProps,
   type IAriaProps,
+  type IListHandlers,
+  type IListNesting,
 } from '@symbiote-native/components';
 import {
-  dlog,
   type IStyleProp,
   type ISymbioteEvent,
   type IViewStyle,
@@ -31,6 +30,23 @@ export abstract class VirtualizedListBagsBase<ItemT>
     | undefined = undefined;
   // A fresh object per push, so the commit re-applies a repeated offset
   commandedOffset: { x: number; y: number } | undefined = undefined;
+
+  protected abstract get nesting(): IListNesting<ItemT>;
+
+  protected abstract readonly keyFor: (index: number) => string;
+
+  // Reads of `this` are deferred to the event, so the inputs are set by the time they run
+  protected readonly listHandlers: IListHandlers = createListHandlers<ItemT>({
+    isHorizontal: () => this.isHorizontal,
+    user: () => this,
+    nesting: () => this.nesting,
+    dispatch: action => this.dispatch(action),
+    clearCommandedOffset: () => {
+      this.commandedOffset = undefined;
+    },
+    getNode: () => this.scrollNode,
+    keyFor: index => this.keyFor(index),
+  });
 
   // Only inputs may feed this signal, window state changes skip `ngOnChanges`
   private readonly inputsRevision = signal(0);
@@ -64,15 +80,18 @@ export abstract class VirtualizedListBagsBase<ItemT>
       contentContainerStyle: this.resolvedContentContainerStyle,
       onScroll: this.onScrollTick,
       onLayout: this.onLayoutTick,
-      onScrollBeginDrag: this.onScrollBeginDrag,
-      onScrollEndDrag: this.onScrollEndDrag,
-      onMomentumScrollBegin: this.onMomentumScrollBegin,
-      onMomentumScrollEnd: this.onMomentumScrollEnd,
+      onScrollBeginDrag: this.listHandlers.onScrollBeginDrag,
+      onScrollEndDrag: this.listHandlers.onScrollEndDrag,
+      onMomentumScrollBegin: this.listHandlers.onMomentumScrollBegin,
+      onMomentumScrollEnd: this.listHandlers.onMomentumScrollEnd,
+      onContentSizeChange: this.listHandlers.onContentSizeChange,
       scrollEventThrottle: this.scrollEventThrottle,
       keyboardShouldPersistTaps: this.keyboardShouldPersistTaps,
       keyboardDismissMode: this.keyboardDismissMode,
       removeClippedSubviews: this.removeClippedSubviews,
       nestedScrollEnabled: this.nestedScrollEnabled,
+      stickyHeaderHiddenOnScroll: this.stickyHeaderHiddenOnScroll,
+      innerViewRef: this.innerViewRef,
       // Android moves the scrollbar back after the `scale: -1` flip
       isInvertedVirtualizedList: this.isInverted ? true : undefined,
       contentOffset: this.commandedOffset,
@@ -101,23 +120,23 @@ export abstract class VirtualizedListBagsBase<ItemT>
     };
   }
 
+  // The list above scrolls, so RN renders a `View` with no content container
+  nestedViewBag(): Record<string, unknown> {
+    return {
+      ...this.foldedAccessibility(),
+      style: this.resolvedStyle,
+      onLayout: this.onLayoutTick,
+    };
+  }
+
   // `onScroll` stays a callback so an `Animated.event` target can flow through it
   onScrollTick = (event: ISymbioteEvent): void => {
     countAngular('scrollTicks');
-    const offset = readScrollOffset(event, this.isHorizontal);
-    if (offset === undefined) return;
-    dlog(`Angular VirtualizedList onScroll offset=${offset}`);
-    // A real native scroll supersedes any pending commanded offset
-    this.commandedOffset = undefined;
-    this.dispatch({ kind: LIST_ACTION_KIND.scroll, offset });
-    this.onScroll?.(event);
+    this.listHandlers.onScroll(event);
   };
 
   onLayoutTick = (event: ISymbioteEvent): void => {
-    const length = readLayoutLength(event, this.isHorizontal);
-    if (length === undefined) return;
-    dlog(`Angular VirtualizedList onLayout viewport=${length}`);
-    this.dispatch({ kind: LIST_ACTION_KIND.layout, length });
+    this.listHandlers.onViewportLayout(event);
   };
 
   handleRefresh = (): void => {

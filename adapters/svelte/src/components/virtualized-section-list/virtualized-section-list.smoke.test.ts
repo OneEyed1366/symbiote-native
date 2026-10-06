@@ -10,7 +10,11 @@ import { compile } from 'svelte/compiler';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
-import { installRecordingFabric, payloadOf } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  payloadOf,
+} from '@symbiote-native/test-utils';
 // See scroll-view.smoke.test.ts: mounting through `../../render` skips `index.ts`, so the host
 // behaviors have to be named here.
 import '../../register';
@@ -46,6 +50,10 @@ const SECTION_LIST_OUT = join(
   __dirname,
   '.section-smoke-compiled-virtualized-section-list.mjs',
 );
+const SECTION_CELL_OUT = join(
+  __dirname,
+  '.section-smoke-compiled-section-item-cell.mjs',
+);
 const WRAPPER_OUT = join(
   COMPONENTS_DIR,
   'section-list',
@@ -61,6 +69,14 @@ const WRAPPER_ROOT_OUT = join(
 const CLIPPED_ROOT_OUT = join(
   __dirname,
   '.section-smoke-compiled-clipped-root.mjs',
+);
+const SEPARATOR_ROOT_OUT = join(
+  __dirname,
+  '.section-smoke-compiled-separator-root.mjs',
+);
+const OVERRIDE_ROOT_OUT = join(
+  __dirname,
+  '.section-smoke-compiled-override-root.mjs',
 );
 
 const COMPILE_OPTIONS = {
@@ -96,11 +112,21 @@ function compileSectionListTree(): void {
       ...COMPILE_OPTIONS,
       filename: 'VirtualizedSectionList.svelte',
     },
-  ).js.code.replace(
-    "from '../virtualized-list/index.svelte'",
-    "from '../virtualized-list/.section-smoke-compiled-virtualized-list.mjs'",
-  );
+  )
+    .js.code.replace(
+      "from '../virtualized-list/index.svelte'",
+      "from '../virtualized-list/.section-smoke-compiled-virtualized-list.mjs'",
+    )
+    .replace(
+      "from './section-item-cell.svelte'",
+      "from './.section-smoke-compiled-section-item-cell.mjs'",
+    );
   writeFileSync(SECTION_LIST_OUT, sectionList);
+  compileToFile(
+    readFileSync(join(__dirname, 'section-item-cell.svelte'), 'utf8'),
+    'SectionItemCell.svelte',
+    SECTION_CELL_OUT,
+  );
 
   const wrapper = compile(
     readFileSync(join(COMPONENTS_DIR, 'section-list', 'index.svelte'), 'utf8'),
@@ -141,10 +167,13 @@ afterEach(() => {
   unmount(ROOT_TAG);
   rmSync(LIST_OUT, { force: true });
   rmSync(SECTION_LIST_OUT, { force: true });
+  rmSync(SECTION_CELL_OUT, { force: true });
   rmSync(WRAPPER_OUT, { force: true });
   rmSync(ROOT_OUT, { force: true });
   rmSync(WRAPPER_ROOT_OUT, { force: true });
   rmSync(CLIPPED_ROOT_OUT, { force: true });
+  rmSync(SEPARATOR_ROOT_OUT, { force: true });
+  rmSync(OVERRIDE_ROOT_OUT, { force: true });
 });
 
 // Mount, then report a real viewport so the windowing math runs off real geometry — the path that
@@ -170,10 +199,8 @@ async function mountAndLayout(root: Component, seen: unknown[]): Promise<void> {
 
 describe('VirtualizedSectionList getItemLayout (real compiled index.svelte)', () => {
   describe('Positive', () => {
-    // why: RN hands its inner VirtualizedList `data={this.props.sections}`, so a user's
-    // getItemLayout receives the SECTIONS. Ours streams the flattened entries as `data`, so
-    // without the wrapper the very same callback would be handed a different first argument here
-    // than on RN — silently, since the layout it returns still looks plausible.
+    // RN hands its inner list `data={this.props.sections}`, so `getItemLayout` gets the sections
+    // while ours streams the flattened entries, a wrapper has to swap them back
     it('calls getItemLayout with the sections array, not the flattened entries', async () => {
       const seen: unknown[] = [];
       const root = await loadRoot(
@@ -198,9 +225,7 @@ describe('VirtualizedSectionList getItemLayout (real compiled index.svelte)', ()
       }
     });
 
-    // why: forwarding here is prop-by-prop with no rest spread, so SectionList inheriting the
-    // TYPE from VirtualizedSectionList proves nothing at runtime — a missing binding in its
-    // template would drop the prop with no type error anywhere.
+    // The relay is prop-by-prop, so a missing binding would drop the prop with no type error
     it('relays getItemLayout through SectionList to the same sections argument', async () => {
       const seen: unknown[] = [];
       const root = await loadRoot(
@@ -228,8 +253,7 @@ describe('VirtualizedSectionList getItemLayout (real compiled index.svelte)', ()
       }
     });
 
-    // why: RN's SectionList spreads every prop down to its ScrollView; the relay here is
-    // prop-by-prop, so a missing binding at either layer silently drops the prop.
+    // RN's SectionList spreads every prop down to its ScrollView, here a missing binding drops it
     it('relays removeClippedSubviews through SectionList to the scroll view', async () => {
       const root = await loadRoot(
         `<script>
@@ -251,6 +275,86 @@ describe('VirtualizedSectionList getItemLayout (real compiled index.svelte)', ()
       expect(scrollView, 'inner list committed a scroll view').toBeDefined();
       if (scrollView === undefined) return;
       expect(payloadOf(scrollView.handle).removeClippedSubviews).toBe(true);
+    });
+  });
+
+  // RN paints separators inside the item cell (`ItemWithSeparator`), not as cells of their own
+  describe('separators', () => {
+    const live = createLiveTree(fabric);
+
+    async function streamOf(root: Component): Promise<string[]> {
+      mount(ROOT_TAG, root, { sections: SECTIONS });
+      await tick();
+      const scrollView = fabric.find(node => node.viewName === 'RCTScrollView');
+      if (scrollView !== undefined) {
+        fabric.fireEvent(scrollView.instanceHandle, 'topLayout', {
+          layout: { width: 300, height: 2_000 },
+        });
+      }
+      await tick();
+      await tick();
+      const texts: string[] = [];
+      live.walkLive(live.appRoot(), node => {
+        const text = payloadOf(node.handle).text;
+        if (typeof text === 'string') texts.push(text);
+      });
+      return texts;
+    }
+
+    it('paints section separators around the items and item separators between them', async () => {
+      const root = await loadRoot(
+        `<script>
+           import VirtualizedSectionList from './.section-smoke-compiled-virtualized-section-list.mjs';
+           let { sections } = $props();
+         </script>
+         ${CELL_SNIPPETS}
+         {#snippet sep()}<text p={{ text: 'sep' }}></text>{/snippet}
+         {#snippet sectionSep()}<text p={{ text: 'section-sep' }}></text>{/snippet}
+         <VirtualizedSectionList {sections} item={cell} {sectionHeader} separator={sep} sectionSeparator={sectionSep} />`,
+        'SeparatorRoot.svelte',
+        SEPARATOR_ROOT_OUT,
+      );
+
+      expect(await streamOf(root)).toEqual([
+        'head-A',
+        'section-sep',
+        'row-a0',
+        'sep',
+        'row-a1',
+        'section-sep',
+        'head-B',
+        'section-sep',
+        'row-b0',
+        'sep',
+        'row-b1',
+        'section-sep',
+      ]);
+    });
+
+    it('lets a section bring its own item snippet and separator', async () => {
+      const root = await loadRoot(
+        `<script>
+           import VirtualizedSectionList from './.section-smoke-compiled-virtualized-section-list.mjs';
+           let { sections: base } = $props();
+           const sections = [{ ...base[0], item: custom, separator: customSep }, base[1]];
+         </script>
+         ${CELL_SNIPPETS}
+         {#snippet custom({ item })}<text p={{ text: 'custom-' + item }}></text>{/snippet}
+         {#snippet customSep()}<text p={{ text: 'custom-sep' }}></text>{/snippet}
+         {#snippet sep()}<text p={{ text: 'sep' }}></text>{/snippet}
+         <VirtualizedSectionList {sections} item={cell} separator={sep} />`,
+        'OverrideRoot.svelte',
+        OVERRIDE_ROOT_OUT,
+      );
+
+      expect(await streamOf(root)).toEqual([
+        'custom-a0',
+        'custom-sep',
+        'custom-a1',
+        'row-b0',
+        'sep',
+        'row-b1',
+      ]);
     });
   });
 });

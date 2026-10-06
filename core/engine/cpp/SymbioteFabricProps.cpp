@@ -10,6 +10,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -388,18 +389,9 @@ dynamic splitLabelledBy(const std::string &text) {
 }
 
 /**
- * Fold the web-alias `aria-*` / `role` props into RN's canonical `accessibility*` props.
- *
- * A MOVE of `accessibility-props.ts`, not a rewrite, and its TWO CONTRADICTORY PRECEDENCE RULES
- * survive intact: for the scalars an explicit `accessibility*` WINS and the alias only fills a hole,
- * while INSIDE the `accessibilityState` / `accessibilityValue` composites the ALIAS wins per field.
- * Both mirror RN's View.js. Collapsing them into one rule changes real accessibility with nothing
- * visible on screen — read `core/components/src/accessibility-props.test.ts` before touching either
- * branch, including the UPSTREAM-BUG(react-native) note there about `aria-checked` reaching native
- * as a STRING, which is ported deliberately.
- *
- * Aliases are ERASED rather than blanked. The reference writes `undefined` over them so its own
- * top-level walk skips them; the payload is the same either way, and this side has no `undefined`.
+ * Fold the web-alias `aria-*` / `role` props into RN's canonical `accessibility*` props, the alias
+ * WINS over the explicit prop as in RN's View.js and each composite field is `alias ?? existing`
+ * Aliases are ERASED rather than blanked, this side has no `undefined`
  */
 dynamic foldAriaProps(const dynamic &props) {
   dynamic bag = props;
@@ -422,47 +414,40 @@ dynamic foldAriaProps(const dynamic &props) {
 
   for (const auto &key : kAriaKeys) bag.erase(key);
 
-  // RULE ONE, for every scalar: the explicit prop WINS, the alias only fills a hole.
-  if (ariaLabelledBy != nullptr && ariaLabelledBy->isString() &&
-      bag.get_ptr("accessibilityLabelledBy") == nullptr) {
+  // Every scalar alias is written over the explicit prop
+  if (ariaLabelledBy != nullptr && ariaLabelledBy->isString()) {
     bag["accessibilityLabelledBy"] = splitLabelledBy(ariaLabelledBy->getString());
   }
 
-  if (ariaLabel != nullptr && bag.get_ptr("accessibilityLabel") == nullptr) {
+  if (ariaLabel != nullptr) {
     bag["accessibilityLabel"] = *ariaLabel;
   }
 
-  if (ariaLive != nullptr && bag.get_ptr("accessibilityLiveRegion") == nullptr) {
+  if (ariaLive != nullptr) {
     const bool isOff = ariaLive->isString() && ariaLive->getString() == "off";
     bag["accessibilityLiveRegion"] = isOff ? dynamic("none") : *ariaLive;
   }
 
   // One input, TWO outputs, and the second is conditional on the VALUE rather than on presence.
   if (ariaHidden != nullptr) {
-    if (bag.get_ptr("accessibilityElementsHidden") == nullptr) {
-      bag["accessibilityElementsHidden"] = *ariaHidden;
-    }
-    if (ariaHidden->isBool() && ariaHidden->getBool() &&
-        bag.get_ptr("importantForAccessibility") == nullptr) {
+    bag["accessibilityElementsHidden"] = *ariaHidden;
+    if (ariaHidden->isBool() && ariaHidden->getBool()) {
       bag["importantForAccessibility"] = "no-hide-descendants";
     }
   }
 
-  if (ariaModal != nullptr && bag.get_ptr("accessibilityViewIsModal") == nullptr) {
+  if (ariaModal != nullptr) {
     bag["accessibilityViewIsModal"] = *ariaModal;
   }
 
-  if (role != nullptr && role->isString() && bag.get_ptr("accessibilityRole") == nullptr) {
+  if (role != nullptr && role->isString()) {
     const auto mapped = kRoleToAccessibilityRole.find(role->getString());
     bag["accessibilityRole"] =
         mapped == kRoleToAccessibilityRole.end() ? role->getString() : mapped->second;
   }
 
-  // RULE TWO, INSIDE the composites: the polarity INVERTS and the ALIAS wins per field. Read from
-  // the ORIGINAL props — the erase loop above has already taken the aliases out of `bag`.
-  //
-  // The composite is REPLACED by a fresh object listing exactly the known fields, so an unknown
-  // field riding on the incoming object is dropped. Faithful to RN, and pinned by a test.
+  // Inside the composites the alias wins per field, read from the ORIGINAL props since the erase
+  // loop has taken the aliases out of `bag`. The composite is rebuilt from the known fields only
   const dynamic *existingState = props.get_ptr("accessibilityState");
   if (existingState != nullptr || ariaBusy != nullptr || ariaChecked != nullptr ||
       ariaDisabled != nullptr || ariaExpanded != nullptr || ariaSelected != nullptr) {
@@ -690,6 +675,96 @@ const std::string *mappedToken(
   return found == table.end() ? nullptr : &found->second;
 }
 
+// `Text.js:36-46` and `:48-58`
+const std::unordered_map<std::string, bool> kUserSelectToSelectable = {
+    {"auto", true},
+    {"text", true},
+    {"none", false},
+    {"contain", true},
+    {"all", true},
+};
+// `ImageUtils.js`: the CSS names RN maps onto its own `resizeMode`
+const std::unordered_map<std::string, std::string> kObjectFitToResizeMode = {
+    {"contain", "contain"},
+    {"cover", "cover"},
+    {"fill", "stretch"},
+    {"scale-down", "contain"},
+    {"none", "none"},
+};
+const std::unordered_map<std::string, std::string> kVerticalAlignToTextAlign = {
+    {"auto", "auto"},
+    {"top", "top"},
+    {"bottom", "bottom"},
+    {"middle", "center"},
+};
+
+/** `Text.js:187-195`, a count that is not `>= 0` (negative, NaN) is reset to 0 (unlimited) */
+void clampTextNumberOfLines(dynamic &bag) {
+  const dynamic *lines = bag.get_ptr("numberOfLines");
+  if (lines == nullptr || !lines->isNumber()) return;
+  if (!(lines->asDouble() >= 0)) bag["numberOfLines"] = 0;
+}
+
+/**
+ * `Text.js:100-117`, `disabled` folded into `accessibilityState` when it disagrees with the state's
+ * own field and either side is truthy, the effective value is also sent as `disabled`
+ */
+void foldTextDisabled(dynamic &bag) {
+  const std::optional<bool> direct = boolAt(bag, "disabled");
+  const dynamic *state = bag.get_ptr("accessibilityState");
+  const bool hasState = state != nullptr && state->isObject();
+  const std::optional<bool> stateDisabled =
+      hasState ? boolAt(*state, "disabled") : std::nullopt;
+  if (!direct.has_value()) {
+    if (stateDisabled.has_value()) bag["disabled"] = *stateDisabled;
+    return;
+  }
+  if (direct == stateDisabled) return;
+  if (!*direct && !stateDisabled.value_or(false)) return;
+  dynamic next = hasState ? *state : dynamic::object();
+  next["disabled"] = *direct;
+  bag["accessibilityState"] = std::move(next);
+}
+
+/**
+ * `Text.js:207-219`, two style keys native cannot read: `userSelect` becomes `selectable` (winning
+ * over the prop) and `verticalAlign` becomes `textAlignVertical`
+ * An unmapped value leaves the target unset like RN's `undefined`
+ */
+void applyTextStyleOverrides(dynamic &out, bool withUserSelect) {
+  // `Text.js:192-197`, `TextInput.js:549-558`: native reads the weight as a string
+  const dynamic *fontWeight = out.get_ptr("fontWeight");
+  if (fontWeight != nullptr && fontWeight->isNumber()) {
+    out["fontWeight"] = fontWeight->isInt()
+        ? std::to_string(fontWeight->asInt())
+        : folly::to<std::string>(fontWeight->asDouble());
+  }
+  const dynamic *userSelect = withUserSelect ? out.get_ptr("userSelect") : nullptr;
+  if (userSelect != nullptr) {
+    const auto mapped = userSelect->isString()
+        ? kUserSelectToSelectable.find(userSelect->getString())
+        : kUserSelectToSelectable.end();
+    if (mapped == kUserSelectToSelectable.end()) {
+      out.erase("selectable");
+    } else {
+      out["selectable"] = mapped->second;
+    }
+    out.erase("userSelect");
+  }
+  const dynamic *verticalAlign = out.get_ptr("verticalAlign");
+  if (verticalAlign != nullptr) {
+    const auto mapped = verticalAlign->isString()
+        ? kVerticalAlignToTextAlign.find(verticalAlign->getString())
+        : kVerticalAlignToTextAlign.end();
+    if (mapped == kVerticalAlignToTextAlign.end()) {
+      out.erase("textAlignVertical");
+    } else {
+      out["textAlignVertical"] = mapped->second;
+    }
+    out.erase("verticalAlign");
+  }
+}
+
 /**
  * RN's submitBehavior reconciliation, TextInput.js:559.
  *
@@ -876,6 +951,48 @@ bool usesTouchableFeedbackRule(const std::string &tagName) {
  */
 bool usesTouchableFocusableRule(const std::string &tagName) {
   return tagName == "touchable-opacity" || tagName == "touchable-highlight";
+}
+
+using KeyList = std::span<const char *const>;
+
+constexpr std::array<const char *, 2> kRoleAndLabelledBy = {"role", "aria-labelledby"};
+constexpr std::array<const char *, 5> kAriaStateAliases = {
+    "aria-busy", "aria-checked", "aria-disabled", "aria-expanded", "aria-selected"};
+constexpr std::array<const char *, 8> kImageUnreadAliases = {
+    "role", "aria-live", "aria-modal", "aria-hidden", "aria-valuemax", "aria-valuemin",
+    "aria-valuenow", "aria-valuetext"};
+#ifndef ANDROID
+constexpr std::array<const char *, 1> kLabelledByOnly = {"aria-labelledby"};
+#endif
+
+// Aliases the tag's render never reads, so the fold must not map them
+// `TouchableOpacity.js:307`, `TouchableHighlight.js:313-341`, `Image.ios.js:134-160`
+// Returns `props` itself when nothing is dropped, else `storage` holding the trimmed copy
+const dynamic &withoutUnreadAriaKeys(
+    const std::string &tagName, const dynamic &props, dynamic &storage) {
+  KeyList first;
+  KeyList second;
+  if (tagName == "touchable-opacity") {
+    first = kRoleAndLabelledBy;
+  } else if (tagName == "touchable-highlight") {
+    first = kRoleAndLabelledBy;
+    second = kAriaStateAliases;
+  } else if (tagName == "image" || tagName == "image-background-image") {
+    first = kImageUnreadAliases;
+#ifndef ANDROID
+    second = kLabelledByOnly;
+#endif
+  } else {
+    return props;
+  }
+  bool found = false;
+  for (const char *key : first) found = found || props.get_ptr(key) != nullptr;
+  for (const char *key : second) found = found || props.get_ptr(key) != nullptr;
+  if (!found) return props;
+  storage = props;
+  for (const char *key : first) storage.erase(key);
+  for (const char *key : second) storage.erase(key);
+  return storage;
 }
 
 /**
@@ -1079,6 +1196,20 @@ void flattenStyleInto(dynamic &out, const dynamic &style) {
   }
 }
 
+#ifndef ANDROID
+/** `TextInput.js:677`: null `padding`, `paddingVertical` and `paddingTop` all count as unset */
+bool hasVerticalPadding(const dynamic *style) {
+  if (style == nullptr) return false;
+  dynamic flat = dynamic::object();
+  flattenStyleInto(flat, *style);
+  for (const char *key : {"padding", "paddingVertical", "paddingTop"}) {
+    const dynamic *value = flat.get_ptr(key);
+    if (value != nullptr && !value->isNull()) return true;
+  }
+  return false;
+}
+#endif
+
 struct IScrollStyleSplit {
   dynamic outer;
   dynamic inner;
@@ -1223,6 +1354,11 @@ dynamic foldScrollViewProps(
   out.erase("stickyHeaderIndices");
   out.erase("invertStickyHeaders");
 
+  // `ScrollView.js:1766,1796`
+  out.erase("experimental_endDraggingSensitivityMultiplier");
+  const dynamic *sensitivity = presentAt(props, "experimental_endDraggingSensitivityMultiplier");
+  if (sensitivity != nullptr) out["endDraggingSensitivityMultiplier"] = *sensitivity;
+
   // ONE AUTHORED PROP OVER TWO INCOMPATIBLE NATIVE MEANINGS, which is why the expression INVERTS
   // between the platforms (`ScrollView.js:1810-1821`). Read the native sides before touching it —
   // the JS is a normalisation and says nothing about why:
@@ -1243,8 +1379,8 @@ dynamic foldScrollViewProps(
   //
   // Resolved on EVERY scroll view rather than only when it changes something, as RN does: leaving
   // the key absent would let a `true` from a previous commit stand after the app added a snap prop.
-  const bool snaps = props.get_ptr("snapToInterval") != nullptr ||
-      props.get_ptr("snapToOffsets") != nullptr;
+  const bool snaps = presentAt(props, "snapToInterval") != nullptr ||
+      presentAt(props, "snapToOffsets") != nullptr;
   const bool asksPaging = boolAt(props, "pagingEnabled").value_or(false);
 #ifdef ANDROID
   out["pagingEnabled"] = asksPaging || snaps;
@@ -1274,9 +1410,8 @@ dynamic foldScrollViewProps(
  * ScrollView's CONTENT node — the first rule here that reads the node ABOVE it.
  *
  * Two halves from two places. The row direction is a constant of this node's OWN tag
- * (`horizontal-scroll-content`), composed OVER the app's `contentContainerStyle` because that is the
- * order RN writes it in (`[contentContainerStyle, {flexDirection:'row'}]`) — the opposite precedence
- * from the owner's base style, and deliberately so.
+ * (`horizontal-scroll-content`), composed UNDER the app's `contentContainerStyle`, the order RN
+ * writes it in (`ScrollView.js:1654`, `[row, contentContainerStyle]`)
  *
  * `collapsableChildren` is the half that needed `ownerProps`: both names that decide it stay on the
  * SCROLLER, and the node that must stop collapsing is this one. A Yoga-collapsed content view takes
@@ -1318,10 +1453,9 @@ dynamic foldScrollContentProps(
   if (isHorizontal) {
     dynamic row = dynamic::object();
     row["flexDirection"] = "row";
-    dynamic composed = dynamic::array();
+    dynamic composed = dynamic::array(std::move(row));
     const dynamic *authored = props.get_ptr("style");
     if (authored != nullptr) composed.push_back(*authored);
-    composed.push_back(std::move(row));
     out["style"] = std::move(composed);
   }
   if (preserves) out["collapsableChildren"] = false;
@@ -2029,9 +2163,14 @@ bool usesCloneOntoChildRule(const char *ownerTag) {
 dynamic foldCloneOntoChild(
     const dynamic &props, const IOwner &owner, bool isNativeFeedback) {
   if (owner.props == nullptr) return props;
-  const bool foldsAria = hasAriaAlias(*owner.props);
-  const dynamic ariaFolded = foldsAria ? foldAriaProps(*owner.props) : dynamic();
-  const dynamic &source = foldsAria ? ariaFolded : *owner.props;
+  // Neither clone reads `role` or `aria-labelledby`, and WithoutFeedback has no `aria-label` either
+  dynamic ownerBag = *owner.props;
+  ownerBag.erase("role");
+  ownerBag.erase("aria-labelledby");
+  if (!isNativeFeedback) ownerBag.erase("aria-label");
+  const bool foldsAria = hasAriaAlias(ownerBag);
+  const dynamic ariaFolded = foldsAria ? foldAriaProps(ownerBag) : dynamic();
+  const dynamic &source = foldsAria ? ariaFolded : ownerBag;
 
   dynamic out = props;
   if (isNativeFeedback) {
@@ -2165,12 +2304,17 @@ dynamic expandSrcSet(
     const size_t end = std::min(srcSet.find(", ", at), srcSet.size());
     const std::string entry = srcSet.substr(at, end - at);
     at = end + 2;
-    if (entry.empty()) continue;
 
+    // `entry.split(' ')` в RN: uri первый токен, масштаб второй, остальные игнорируются
     const size_t space = entry.find(' ');
     const std::string uri = entry.substr(0, space);
-    const std::string token =
-        space == std::string::npos ? "1x" : entry.substr(space + 1);
+    std::string token = "1x";
+    if (space != std::string::npos) {
+      const size_t tokenEnd = entry.find(' ', space + 1);
+      const size_t length =
+          tokenEnd == std::string::npos ? tokenEnd : tokenEnd - space - 1;
+      token = entry.substr(space + 1, length);
+    }
     if (token.empty() || token.back() != 'x') continue;
     char *parsedTo = nullptr;
     const long scale = std::strtol(token.c_str(), &parsedTo, 10);
@@ -2264,23 +2408,35 @@ dynamic foldImageProps(const dynamic &props, bool ariaHiddenIsTrue) {
   // RN spells it `{width, height}, ...style`, so they go UNDER.
   const dynamic *width = props.get_ptr("width");
   const dynamic *height = props.get_ptr("height");
+  const dynamic *style = props.get_ptr("style");
+
+  // `Image.ios.js:141`: `objectFit`, then the prop, then the style key, then `cover`
+  // The winner goes last into the style, which is hoisted over the props and would beat the prop
+  const dynamic *objectFit = style == nullptr ? nullptr : lastStyleValue(*style, "objectFit");
+  const dynamic *fromStyle = style == nullptr ? nullptr : lastStyleValue(*style, "resizeMode");
+  const dynamic *fromProp = props.get_ptr("resizeMode");
+  dynamic resizeMode = "cover";
+  const auto fit = objectFit != nullptr && objectFit->isString()
+      ? kObjectFitToResizeMode.find(objectFit->getString())
+      : kObjectFitToResizeMode.end();
+  if (fit != kObjectFitToResizeMode.end()) resizeMode = fit->second;
+  else if (fromProp != nullptr && !fromProp->isNull()) resizeMode = *fromProp;
+  else if (fromStyle != nullptr && !fromStyle->isNull()) resizeMode = *fromStyle;
+  out["resizeMode"] = resizeMode;
+
+  // `Image.ios.js:261`: the base style goes under the app's
+  dynamic composed = dynamic::array(dynamic::object("overflow", "hidden"));
   if (width != nullptr || height != nullptr) {
     dynamic sizes = dynamic::object();
     if (width != nullptr) sizes["width"] = *width;
     if (height != nullptr) sizes["height"] = *height;
-    dynamic composed = dynamic::array(std::move(sizes));
-    const dynamic *authored = props.get_ptr("style");
-    if (authored != nullptr) composed.push_back(*authored);
-    out["style"] = std::move(composed);
+    composed.push_back(std::move(sizes));
   }
+  if (style != nullptr) composed.push_back(*style);
+  composed.push_back(dynamic::object("resizeMode", resizeMode));
+  out["style"] = std::move(composed);
 
-  // RN accepts these two as style keys as well as props; reading only the prop drops a style
-  // authors legitimately write.
-  const dynamic *style = props.get_ptr("style");
-  if (out.get_ptr("resizeMode") == nullptr && style != nullptr) {
-    const dynamic *fromStyle = lastStyleValue(*style, "resizeMode");
-    if (fromStyle != nullptr) out["resizeMode"] = *fromStyle;
-  }
+  // RN accepts `tintColor` as a style key as well as a prop
   if (out.get_ptr("tintColor") == nullptr && style != nullptr) {
     const dynamic *fromStyle = lastStyleValue(*style, "tintColor");
     if (fromStyle != nullptr) out["tintColor"] = *fromStyle;
@@ -2305,6 +2461,13 @@ dynamic foldImageProps(const dynamic &props, bool ariaHiddenIsTrue) {
     out["accessible"] = !ariaHiddenIsTrue;
 #endif
   }
+#ifdef ANDROID
+  // `Image.android.js:295-297`, the only thing `aria-hidden` reaches there
+  if (ariaHiddenIsTrue) out["importantForAccessibility"] = "no-hide-descendants";
+#else
+  // `Image.ios.js:149`: aria-hidden turns `accessible` off even without an alt
+  if (ariaHiddenIsTrue) out["accessible"] = false;
+#endif
 
   // Android's loading indicator is a bare uri STRING under a different name, not the array shape
   // the main source uses. Sending the array paints no placeholder and says nothing.
@@ -2498,9 +2661,14 @@ dynamic fabricProps(
   // runs once per node per commit.
   const dynamic *bag = &props;
 
+  // Aliases the tag's own render never reads, dropped before the fold so they cannot map
+  dynamic unreadStripped;
+  const dynamic &ariaSource = withoutUnreadAriaKeys(tagName, props, unreadStripped);
+  bag = &ariaSource;
+
   dynamic aliasFolded;
-  if (hasAriaAlias(props)) {
-    aliasFolded = foldAriaProps(props);
+  if (hasAriaAlias(ariaSource)) {
+    aliasFolded = foldAriaProps(ariaSource);
     bag = &aliasFolded;
   }
 
@@ -2699,6 +2867,8 @@ dynamic fabricProps(
     if (overflow == nullptr || overflow->isNull()) {
       textDefaulted["overflow"] = "hidden";
     }
+    clampTextNumberOfLines(textDefaulted);
+    foldTextDisabled(textDefaulted);
     bag = &textDefaulted;
   }
 
@@ -2714,6 +2884,12 @@ dynamic fabricProps(
   // intermediate flatten. See `addStyle`.
   const dynamic *style = folded.get_ptr("style");
   if (style != nullptr) addStyle(out, *style);
+  if (component == kTextComponent) applyTextStyleOverrides(out, true);
+  if (isTextInput) applyTextStyleOverrides(out, false);
+#ifndef ANDROID
+  // `TextInput.js:767`, under the app style: only a missing vertical padding gets it
+  if (isMultilineTextInput && !hasVerticalPadding(style)) out["paddingTop"] = 5;
+#endif
   return out;
 }
 

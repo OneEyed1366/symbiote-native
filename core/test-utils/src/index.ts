@@ -22,9 +22,15 @@ export {
   type ILiveNode,
   type ILiveTree,
 } from './live-tree';
+export {
+  createListHarness,
+  type IBox,
+  type IListHarness,
+} from './list-harness';
 // How many times JS crossed the host boundary — generic over whichever host is installed.
 export {
   trackHostCrossings,
   type IHostCrossingTracker,
 } from './host-crossings';
 export * from './wait-for';
+export { seedWindowDimensions, TEST_WINDOW } from './window-dimensions';

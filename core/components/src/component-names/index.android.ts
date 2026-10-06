@@ -43,6 +43,7 @@ const ANDROID_NAMES: Readonly<Record<ISymbioteIntrinsic, string>> = {
   // `RCTSafeAreaView` applies the window insets there too (`ReactSafeAreaViewManager`), so one
   // screen is safe on both platforms.
   'safe-area-view': 'RCTSafeAreaView',
+  'layout-conformance': 'LayoutConformance',
   modal: 'RCTModalHostView',
   'refresh-control': 'AndroidSwipeRefreshLayout',
   'sticky-header': 'RCTView',

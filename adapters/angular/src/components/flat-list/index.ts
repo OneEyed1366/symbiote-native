@@ -16,6 +16,7 @@ import {
 } from '@angular/core';
 import {
   SINGLE_COLUMN,
+  arrayLikeLength,
   chunkIntoRows,
   expandRowViewability,
   firstItemOfRow,
@@ -213,7 +214,7 @@ export class FlatList<ItemT = unknown>
         ? chunkIntoRows(this.data, this.columns)
         : [];
       dlog(
-        `Angular FlatList over ${this.data?.length ?? 0} items, ${this.columns} column(s)`,
+        `Angular FlatList over ${arrayLikeLength(this.data)} items, ${this.columns} column(s)`,
       );
     }
     if (
@@ -225,7 +226,7 @@ export class FlatList<ItemT = unknown>
   }
 
   getFlatItem = (_data: unknown, index: number): ItemT => this.data[index];
-  getFlatCount = (_data: unknown): number => this.data.length;
+  getFlatCount = (_data: unknown): number => arrayLikeLength(this.data);
 
   // With several columns the virtualized stream is rows
   getRow = (_data: unknown, index: number): IRow<ItemT> => this.rows[index];
@@ -328,7 +329,13 @@ export class FlatList<ItemT = unknown>
   getScrollNode(): ISymbioteNode | null {
     return this.listRef?.getScrollNode() ?? null;
   }
+  getScrollRef(): ISymbioteNode | null {
+    return this.listRef?.getScrollRef() ?? null;
+  }
   recordInteraction(): void {
     this.listRef?.recordInteraction();
+  }
+  setNativeProps(props: Record<string, unknown>): void {
+    this.listRef?.setNativeProps(props);
   }
 }

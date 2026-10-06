@@ -14,6 +14,7 @@ import {
   DEFAULT_MAX_TO_RENDER_PER_BATCH,
   DEFAULT_UPDATE_CELLS_BATCHING_PERIOD,
   DEFAULT_WINDOW_SIZE,
+  type IInnerViewRef,
   type IViewabilityConfig,
   type IViewabilityConfigCallbackPair,
   type IViewableItemsChangedInfo,
@@ -24,11 +25,13 @@ import type {
   IViewStyle,
 } from '@symbiote-native/engine';
 import {
+  VListCellDirective,
   VListEmptyDirective,
   VListFooterDirective,
   VListHeaderDirective,
   VListItemDirective,
   VListSeparatorDirective,
+  type IVListCellContext,
   type IVListItemContext,
   type IVListSeparatorContext,
 } from './directives';
@@ -66,6 +69,8 @@ export abstract class ListInputsBase<ItemT> extends ListEventsBase {
   @Input() maxToRenderPerBatch?: number;
   @Input() updateCellsBatchingPeriod?: number;
   @Input() windowSize?: number;
+  // Mounts every cell from the top and paints no spacer, the window only grows toward the end
+  @Input() disableVirtualization?: boolean;
   @Input() stickyHeaderIndices?: number[];
   @Input() maintainVisibleContentPosition?: {
     minIndexForVisible: number;
@@ -76,13 +81,18 @@ export abstract class ListInputsBase<ItemT> extends ListEventsBase {
   @Input() onScrollEndDrag?: (event: ISymbioteEvent) => void;
   @Input() onMomentumScrollBegin?: (event: ISymbioteEvent) => void;
   @Input() onMomentumScrollEnd?: (event: ISymbioteEvent) => void;
+  @Input() onContentSizeChange?: (width: number, height: number) => void;
   @Input() scrollEventThrottle?: number;
   @Input() keyboardShouldPersistTaps?: boolean | 'always' | 'never' | 'handled';
   @Input() keyboardDismissMode?: 'none' | 'on-drag' | 'interactive';
   @Input() removeClippedSubviews?: boolean;
   @Input() nestedScrollEnabled?: boolean;
+  @Input() stickyHeaderHiddenOnScroll?: boolean;
+  @Input() innerViewRef?: IInnerViewRef;
   @Input() style?: IStyleProp<IViewStyle>;
   @Input() contentContainerStyle?: IStyleProp<IViewStyle>;
+  @Input() listHeaderComponentStyle?: IStyleProp<IViewStyle>;
+  @Input() listFooterComponentStyle?: IStyleProp<IViewStyle>;
   @Input() testID?: string;
   @Input() nativeID?: string;
 
@@ -93,6 +103,7 @@ export abstract class ListInputsBase<ItemT> extends ListEventsBase {
   @ContentChild(VListEmptyDirective) emptyDir?: VListEmptyDirective;
   @ContentChild(VListSeparatorDirective)
   separatorDir?: VListSeparatorDirective<ItemT>;
+  @ContentChild(VListCellDirective) cellDir?: VListCellDirective;
 
   get isHorizontal(): boolean {
     return this.horizontal === true;
@@ -137,6 +148,11 @@ export abstract class VirtualizedListInputs<
   // outlet deep instead of a wrapper outlet around the app's own. Each wins over projection
   @Input() itemTemplate?: TemplateRef<IVListItemContext<ItemT>>;
   @Input() itemSeparatorTemplate?: TemplateRef<IVListSeparatorContext<ItemT>>;
+  @Input() cellRendererTemplate?: TemplateRef<IVListCellContext>;
+
+  get cellRendererTpl(): TemplateRef<IVListCellContext> | undefined {
+    return this.cellRendererTemplate ?? this.cellDir?.templateRef;
+  }
 
   get cellTemplate(): TemplateRef<IVListItemContext<ItemT>> | undefined {
     return this.itemTemplate ?? this.itemDir?.templateRef;

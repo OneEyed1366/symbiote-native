@@ -31,9 +31,9 @@ export type IModalOrientation =
 // (core/engine/src/node.ts setEventListener), so a handler always gets the wrapper and reads the
 // orientation at `event.nativeEvent.orientation`, narrowed at runtime like every other nativeEvent
 // field (readLayoutField, valueFromChange).
-export interface IModalOrientationChangeEvent {
+export type IModalOrientationChangeEvent = {
   orientation: 'portrait' | 'landscape';
-}
+};
 
 // The full-screen box RN anchors the modal content in (Modal.js styles.container: [side]:0,
 // top:0, flex:1, backgroundColor:'white'). It is NOT position:absolute, it is a flex child that
@@ -55,6 +55,9 @@ const CONTAINER_STYLE_BASE: Readonly<Omit<IViewStyle, 'left' | 'right'>> = {
 const MODAL_HOST_STYLE: Readonly<IViewStyle> = {
   position: 'absolute',
 };
+
+// Modal.js `_shouldSetResponder`: no responder event bubbles out of the modal to a view above it
+const claimResponder = (): boolean => true;
 
 const TRANSPARENT_BACKDROP = 'transparent';
 const OPAQUE_BACKDROP = 'white';
@@ -85,6 +88,14 @@ export type IModalViewProps = {
   passthrough: Record<string, unknown>;
 };
 
+function backdropOverrideOf(view: IModalViewProps): IViewStyle {
+  if (view.transparent === true) {
+    return { backgroundColor: TRANSPARENT_BACKDROP };
+  }
+  if (view.backdropColor === undefined) return {};
+  return { backgroundColor: view.backdropColor };
+}
+
 // `isRTL` is injectable purely for testability, the same shape `computeInset`'s `os` option
 // takes: `I18nManager`'s constants are resolved once at module load with no setter, so a test
 // exercising the RTL branch cannot toggle the real module and must pass the value in.
@@ -95,12 +106,7 @@ export function renderModal(
   // Only override backgroundColor when transparent or backdropColor are explicitly set, so these
   // Modal-specific props take precedence over the generic style prop (Modal.js: containerStyles
   // composed LAST in [styles.container, props.style, containerStyles]).
-  const backdropOverride: IViewStyle =
-    view.transparent === true
-      ? { backgroundColor: TRANSPARENT_BACKDROP }
-      : view.backdropColor !== undefined
-        ? { backgroundColor: view.backdropColor }
-        : {};
+  const backdropOverride = backdropOverrideOf(view);
 
   const containerStyle: IStyleProp<IViewStyle> = [
     {
@@ -147,6 +153,7 @@ export function renderModal(
       navigationBarTranslucent: view.navigationBarTranslucent,
       allowSwipeDismissal: view.allowSwipeDismissal,
       visible: view.visible ?? true,
+      onStartShouldSetResponder: claimResponder,
     },
     [container],
   );

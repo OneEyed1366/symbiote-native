@@ -32,37 +32,36 @@
 // (`[onPressMove]="fn"`, where `fn` keeps its `ISymbioteEvent` parameter).
 //
 // `valueChange` is the ONE exception, and it is forced rather than chosen: see ValueChangeElement.
-import {
-  ChangeDetectorRef,
-  Directive,
-  ElementRef,
-  ErrorHandler,
-  EventEmitter,
-  Input,
-  Output,
-  Renderer2,
-  forwardRef,
-  inject,
-} from '@angular/core';
-import type {
-  OnChanges,
-  OnDestroy,
-  OnInit,
-  SimpleChanges,
-} from '@angular/core';
-import { NG_VALUE_ACCESSOR, type ControlValueAccessor } from '@angular/forms';
-import { VALUE_CHANGE_EVENT } from './renderer/value-change';
-import {
-  registerViewFlush,
-  unregisterViewFlush,
-} from './change-detection-flush';
+import { Directive, Input } from '@angular/core';
 import { SymbioteCallbackHost } from './callback-host';
 import { withholdFromRuntimeMatching } from './runtime-matching';
+import { ReadBackElement, SymbioteElement } from './element-base';
+import {
+  MultilineTextInputElement,
+  SwitchElement,
+  SwitchValueAccessor,
+  TextInputElement,
+  TextInputValueAccessor,
+} from './elements-controlled';
+import {
+  ButtonElement,
+  PressableElement,
+  TouchableHighlightElement,
+  TouchableNativeFeedbackElement,
+  TouchableOpacityElement,
+  TouchableWithoutFeedbackElement,
+} from './elements-touchable';
+import {
+  HorizontalScrollContentElement,
+  HorizontalScrollViewElement,
+  ScrollContentElement,
+  ScrollViewElement,
+} from './elements-scroll';
 import type {
   IActivityIndicatorProps,
   IImageProps,
-  INativeFeedbackBackground,
   IInputAccessoryViewViewProps,
+  ILayoutConformanceMode,
   IModalViewProps,
   ISwitchProps,
   ITextInputProps,
@@ -82,193 +81,25 @@ import type {
 import type { IAngularRefreshControlProps } from './components/refresh-control-props';
 import type { IAngularScrollViewProps } from './components/scroll-view-props';
 
-/**
- * The shared half of every element directive: the prop surface all tags accept, and the ONE
- * generic forward that puts a claimed binding back on the engine node.
- *
- * The forward is the deciding fact of this whole route. A binding claimed by a directive input
- * never reaches `Renderer2.setProperty` on its own — Angular writes it to the directive instance
- * — so without this loop a bare tag commits nothing at all. It stays generic on purpose: per-prop
- * forwarding code is a component wrapper by another name, which is what this migration removes.
- * `renderer.setProperty` lands in the adapter's own renderer, which routes the value through the
- * engine's `routeProp` and applies the `id` -> `nativeID` alias.
- */
-@Directive()
-export abstract class SymbioteElement implements OnChanges {
-  private readonly renderer = inject(Renderer2);
-  protected readonly host = inject(ElementRef);
-
-  // NO `ChangeDetectorRef` HERE, and its absence is the point. This class is instantiated once per
-  // ELEMENT, so injecting one cost ~1.0-2.4 us on every tag of a screen to serve the few that carry
-  // an `on*` prop — ten thousand `ViewRef`s on a thousand-row create, read by none of them
-  // (`core/engine/cpp/tests/js/angular-directive-cost.itest.ts`). `SymbioteCallbackHost` owns one and
-  // MATCHES on the callback attributes instead, registering it against the node; `markViewFor` is how
-  // the wrapper reaches it. The inputs did not move, so nothing about this file's public surface did.
-
-  // No `on*` wrapper here: `SymbioteRenderer.setProperty` handles it. Most directives are withheld
-  // from runtime matching (`./runtime-matching`), so a binding reaches the renderer through
-  // `ɵɵproperty` without passing through any directive — the renderer is reached by every path.
-
-  @Input() testID?: IElementProps['testID'];
-  @Input() nativeID?: IElementProps['nativeID'];
-  @Input() id?: IElementProps['id'];
-  @Input() accessible?: IElementProps['accessible'];
-  @Input() accessibilityLabel?: IElementProps['accessibilityLabel'];
-  @Input() accessibilityHint?: IElementProps['accessibilityHint'];
-  @Input() accessibilityRole?: IElementProps['accessibilityRole'];
-  @Input() accessibilityState?: IElementProps['accessibilityState'];
-  @Input() accessibilityValue?: IElementProps['accessibilityValue'];
-  @Input() accessibilityActions?: IElementProps['accessibilityActions'];
-  @Input() accessibilityLabelledBy?: IElementProps['accessibilityLabelledBy'];
-  @Input()
-  importantForAccessibility?: IElementProps['importantForAccessibility'];
-  @Input() accessibilityLiveRegion?: IElementProps['accessibilityLiveRegion'];
-  @Input() screenReaderFocusable?: IElementProps['screenReaderFocusable'];
-  @Input() accessibilityViewIsModal?: IElementProps['accessibilityViewIsModal'];
-  @Input()
-  accessibilityElementsHidden?: IElementProps['accessibilityElementsHidden'];
-  @Input()
-  accessibilityIgnoresInvertColors?: IElementProps['accessibilityIgnoresInvertColors'];
-  @Input() accessibilityLanguage?: IElementProps['accessibilityLanguage'];
-  @Input()
-  accessibilityRespondsToUserInteraction?: IElementProps['accessibilityRespondsToUserInteraction'];
-  @Input()
-  accessibilityShowsLargeContentViewer?: IElementProps['accessibilityShowsLargeContentViewer'];
-  @Input()
-  accessibilityLargeContentTitle?: IElementProps['accessibilityLargeContentTitle'];
-  @Input() onAccessibilityAction?: IElementProps['onAccessibilityAction'];
-  @Input() onAccessibilityTap?: IElementProps['onAccessibilityTap'];
-  @Input() onMagicTap?: IElementProps['onMagicTap'];
-  @Input() onAccessibilityEscape?: IElementProps['onAccessibilityEscape'];
-
-  // The web aliases. Native reads only `accessibility*`; the engine folds these on the way in.
-  @Input() role?: IElementProps['role'];
-  @Input() 'aria-label'?: IElementProps['aria-label'];
-  @Input() 'aria-labelledby'?: IElementProps['aria-labelledby'];
-  @Input() 'aria-live'?: IElementProps['aria-live'];
-  @Input() 'aria-hidden'?: IElementProps['aria-hidden'];
-  @Input() 'aria-busy'?: IElementProps['aria-busy'];
-  @Input() 'aria-checked'?: IElementProps['aria-checked'];
-  @Input() 'aria-disabled'?: IElementProps['aria-disabled'];
-  @Input() 'aria-expanded'?: IElementProps['aria-expanded'];
-  @Input() 'aria-selected'?: IElementProps['aria-selected'];
-  @Input() 'aria-modal'?: IElementProps['aria-modal'];
-  @Input() 'aria-valuemax'?: IElementProps['aria-valuemax'];
-  @Input() 'aria-valuemin'?: IElementProps['aria-valuemin'];
-  @Input() 'aria-valuenow'?: IElementProps['aria-valuenow'];
-  @Input() 'aria-valuetext'?: IElementProps['aria-valuetext'];
-
-  // The responder gates return a boolean, which an Angular `(event)` binding cannot carry back to
-  // the caller — so the whole family is inputs, never outputs.
-  @Input()
-  onStartShouldSetResponder?: IElementProps['onStartShouldSetResponder'];
-  @Input()
-  onStartShouldSetResponderCapture?: IElementProps['onStartShouldSetResponderCapture'];
-  @Input() onMoveShouldSetResponder?: IElementProps['onMoveShouldSetResponder'];
-  @Input()
-  onMoveShouldSetResponderCapture?: IElementProps['onMoveShouldSetResponderCapture'];
-  @Input() onResponderGrant?: IElementProps['onResponderGrant'];
-  @Input() onResponderReject?: IElementProps['onResponderReject'];
-  @Input() onResponderStart?: IElementProps['onResponderStart'];
-  @Input() onResponderMove?: IElementProps['onResponderMove'];
-  @Input() onResponderEnd?: IElementProps['onResponderEnd'];
-  @Input() onResponderRelease?: IElementProps['onResponderRelease'];
-  @Input() onResponderTerminate?: IElementProps['onResponderTerminate'];
-  @Input()
-  onResponderTerminationRequest?: IElementProps['onResponderTerminationRequest'];
-
-  @Input() pointerEvents?: IElementProps['pointerEvents'];
-  @Input() hitSlop?: IElementProps['hitSlop'];
-  @Input() focusable?: IElementProps['focusable'];
-  @Input() collapsable?: IElementProps['collapsable'];
-  @Input() removeClippedSubviews?: IElementProps['removeClippedSubviews'];
-  @Input()
-  renderToHardwareTextureAndroid?: IElementProps['renderToHardwareTextureAndroid'];
-  @Input() shouldRasterizeIOS?: IElementProps['shouldRasterizeIOS'];
-  @Input()
-  needsOffscreenAlphaCompositing?: IElementProps['needsOffscreenAlphaCompositing'];
-  // `[style]` and `[class]` are declared for the TYPE CHECK only. Withheld from run-time matching, no
-  // input claims them, so Angular's own styling engine decomposes them into `setStyle`/`addClass`
-  // exactly as on a DOM element - which is why `style` is typed as the object/string that engine can
-  // hold. An RN style ARRAY or press-state FUNCTION throws in there ("indexOf is not a function",
-  // "Unsupported styling type: function"), so it is `[styleProp]`: an ordinary property binding the
-  // renderer routes to `style` whole. A claim would cost a directive instance per element.
-  //
-  // The press-state callback rides the BASE type rather than `PressableElement` alone: a subclass
-  // cannot widen an inherited property, and only the pressables have a `pressed` to read — so on
-  // any other tag the engine resolves it at `pressed: false`.
-  @Input() style?: IElementProps['style'];
-  @Input() styleProp?: IElementProps['styleProp'];
-
-  // `ɵɵclassMap` hands over a string after joining any static `class=` prefix; `[class.foo]` and
-  // `[ngClass]` arrive as `addClass`. The renderer unions both sources (`classStringFor`).
-  @Input() class?: string;
-
-  // The flat-bag spelling of the events below. `(press)` and `[onPress]` are both supported and
-  // land in the same place; an app that already holds a handler bag binds the props.
-  @Input() onPress?: IElementProps['onPress'];
-  @Input() onPressIn?: IElementProps['onPressIn'];
-  @Input() onPressOut?: IElementProps['onPressOut'];
-  @Input() onPressMove?: IElementProps['onPressMove'];
-  @Input() onLongPress?: IElementProps['onLongPress'];
-  @Input() onLayout?: IElementProps['onLayout'];
-  @Input() onFocus?: IElementProps['onFocus'];
-  @Input() onBlur?: IElementProps['onBlur'];
-
-  ngOnChanges(changes: SimpleChanges): void {
-    for (const name of Object.keys(changes)) {
-      this.renderer.setProperty(
-        this.host.nativeElement,
-        name,
-        // Unwrapped on purpose: `SymbioteRenderer.setProperty` is where an `on*` value is wrapped
-        // now, and it is the call this line makes.
-        changes[name]?.currentValue,
-      );
-    }
-  }
-}
-
-/**
- * The base for a tag whose app callback an engine behavior READS BACK inside the same microtask
- * turn — `<text-input>`, `<switch>`, `<refresh-control>`. Zoneless change detection is a macrotask,
- * so without this the behavior sees the PRE-event value and undoes the user; the full mechanism,
- * and why this is `detectChanges()` on one view rather than `ApplicationRef.tick()`, is in
- * `./change-detection-flush`.
- *
- * The directive is the only thing in the adapter that owns a `ChangeDetectorRef` for the view
- * holding the binding, so it hands one to the renderer keyed on its own node.
- */
-@Directive()
-abstract class ReadBackElement extends SymbioteElement implements OnDestroy {
-  // ITS OWN, now that the base has none. Three tags reach this class, so the injection is paid where
-  // it is read instead of on every element of a screen.
-  private readonly detector = inject(ChangeDetectorRef);
-  private readonly errorHandler = inject(ErrorHandler);
-
-  constructor() {
-    super();
-    const node: unknown = this.host.nativeElement;
-    if (typeof node === 'object' && node !== null) {
-      registerViewFlush(node, () => this.flush());
-    }
-  }
-
-  // REPORTED, NOT RETHROWN — Angular's own contract. Every other change detection runs inside
-  // `ApplicationRef.tick()`, caught by `ErrorHandler` (`SymbioteErrorHandler`); this flush instead
-  // runs from a native event dispatch, where an uncaught throw has nowhere to go but `RCTFatal`.
-  private flush(): void {
-    try {
-      this.detector.detectChanges();
-    } catch (error: unknown) {
-      this.errorHandler.handleError(error);
-    }
-  }
-
-  ngOnDestroy(): void {
-    const node: unknown = this.host.nativeElement;
-    if (typeof node === 'object' && node !== null) unregisterViewFlush(node);
-  }
-}
+// Defined in sibling files for size, re-exported so this stays the one place an app imports from
+export {
+  ButtonElement,
+  HorizontalScrollContentElement,
+  HorizontalScrollViewElement,
+  MultilineTextInputElement,
+  PressableElement,
+  ScrollContentElement,
+  ScrollViewElement,
+  SwitchElement,
+  SwitchValueAccessor,
+  SymbioteElement,
+  TextInputElement,
+  TextInputValueAccessor,
+  TouchableHighlightElement,
+  TouchableNativeFeedbackElement,
+  TouchableOpacityElement,
+  TouchableWithoutFeedbackElement,
+};
 
 // BOTH SPELLINGS ON THE SEVEN DASHLESS TAGS, and it is a correctness fix rather than a convenience.
 //
@@ -289,94 +120,6 @@ abstract class ReadBackElement extends SymbioteElement implements OnDestroy {
 @Directive({ selector: 'view, symbiote-view', standalone: true })
 export class ViewElement extends SymbioteElement {}
 
-@Directive({ selector: 'pressable, symbiote-pressable', standalone: true })
-export class PressableElement extends SymbioteElement {
-  @Input() disabled?: IAngularPressableProps['disabled'];
-  @Input() cancelable?: IAngularPressableProps['cancelable'];
-  @Input()
-  blockNativeResponder?: IAngularPressableProps['blockNativeResponder'];
-  @Input() delayLongPress?: IAngularPressableProps['delayLongPress'];
-  @Input() delayHoverIn?: IAngularPressableProps['delayHoverIn'];
-  @Input() delayHoverOut?: IAngularPressableProps['delayHoverOut'];
-  @Input() onHoverIn?: IAngularPressableProps['onHoverIn'];
-  @Input() onHoverOut?: IAngularPressableProps['onHoverOut'];
-  @Input()
-  pressRetentionOffset?: IAngularPressableProps['pressRetentionOffset'];
-  @Input() unstable_pressDelay?: IAngularPressableProps['unstable_pressDelay'];
-  @Input() android_ripple?: IAngularPressableProps['android_ripple'];
-  // ON THE BASE, so both touchables inherit it — the prop is Pressable's AND
-  // TouchableHighlight's upstream, and they extend this rather than repeat its surface.
-  @Input() testOnly_pressed?: IAngularPressableProps['testOnly_pressed'];
-  @Input()
-  android_disableSound?: IAngularPressableProps['android_disableSound'];
-  @Input() hasTVPreferredFocus?: IAngularPressableProps['hasTVPreferredFocus'];
-  @Input() nextFocusDown?: IAngularPressableProps['nextFocusDown'];
-  @Input() nextFocusForward?: IAngularPressableProps['nextFocusForward'];
-  @Input() nextFocusLeft?: IAngularPressableProps['nextFocusLeft'];
-  @Input() nextFocusRight?: IAngularPressableProps['nextFocusRight'];
-  @Input() nextFocusUp?: IAngularPressableProps['nextFocusUp'];
-}
-
-// RN's TouchableOpacity is a Pressable that also fades, and both halves are on the engine node —
-// so it takes the same inputs and adds only the fade's own knob.
-@Directive({ selector: 'touchable-opacity', standalone: true })
-export class TouchableOpacityElement extends PressableElement {
-  @Input() activeOpacity?: number;
-  @Input() delayPressIn?: number;
-  @Input() delayPressOut?: number;
-  @Input() minPressDuration?: number;
-}
-
-// RN's TouchableHighlight is a Pressable that swaps its own background while pressed
-// (TouchableHighlight.js), and the underlay machine runs on the engine node — so the tag takes the
-// press surface plus the two knobs that describe the underlay. `onShowUnderlay`/`onHideUnderlay`
-// need no @Input: they are events, bound as `(showUnderlay)` through the renderer's own listen.
-@Directive({ selector: 'touchable-highlight', standalone: true })
-export class TouchableHighlightElement extends PressableElement {
-  @Input() activeOpacity?: number;
-  @Input() underlayColor?: string;
-  @Input() delayPressIn?: number;
-  @Input() delayPressOut?: number;
-  @Input() minPressDuration?: number;
-  // TouchableHighlight.js:205 — forwarded to Pressability as `android_disableSound`.
-  @Input() touchSoundDisabled?: boolean;
-}
-
-// RN's TouchableNativeFeedback is a Pressable that CLONES onto its single child instead of
-// rendering anything (TouchableNativeFeedback.js:339) — so the tag takes the press surface plus the
-// two props that pick the Android ripple drawable. The tag itself commits no native view; the
-// behavior configures the child, which is why `elements.test.ts` reads it as an anchor.
-@Directive({ selector: 'touchable-native-feedback', standalone: true })
-export class TouchableNativeFeedbackElement extends PressableElement {
-  @Input() background?: INativeFeedbackBackground;
-  @Input() useForeground?: boolean;
-  // TouchableNativeFeedback.js:228 — forwarded to Pressability as `android_disableSound`.
-  @Input() touchSoundDisabled?: boolean;
-}
-
-// RN's TouchableWithoutFeedback clones onto its single child the same way
-// (TouchableWithoutFeedback.js:286) and installs no drawable, so it takes the press surface plus the
-// three timing knobs it forwards to Pressability (:186-190) and nothing else. Like the tag above it
-// commits no native view; `elements.test.ts` reads it as an anchor.
-@Directive({ selector: 'touchable-without-feedback', standalone: true })
-export class TouchableWithoutFeedbackElement extends PressableElement {
-  @Input() delayPressIn?: number;
-  @Input() delayPressOut?: number;
-  @Input() minPressDuration?: number;
-  // TouchableWithoutFeedback.js:199 — forwarded to Pressability as `android_disableSound`.
-  @Input() touchSoundDisabled?: boolean;
-}
-
-// RN's Button IS a TouchableOpacity (Button.js:384), and the behavior builds the view and the
-// label under it — so the tag takes the touchable's surface plus the four props Button owns. There
-// is no `style`: RN's Button has no such prop, and the label/background come from `color`.
-@Directive({ selector: 'button, symbiote-button', standalone: true })
-export class ButtonElement extends TouchableOpacityElement {
-  @Input() title?: string;
-  @Input() color?: string;
-  @Input() touchSoundDisabled?: boolean;
-}
-
 @Directive({ selector: 'text, symbiote-text', standalone: true })
 export class TextElement extends SymbioteElement {
   // Narrows the inherited input to a TEXT style so `fontSize`/`fontWeight` type-check here. The
@@ -393,6 +136,13 @@ export class TextElement extends SymbioteElement {
   @Input() maxFontSizeMultiplier?: ITextElementProps['maxFontSizeMultiplier'];
   @Input() selectionColor?: ITextElementProps['selectionColor'];
   @Input() disabled?: ITextElementProps['disabled'];
+  @Input() dynamicTypeRamp?: ITextElementProps['dynamicTypeRamp'];
+  @Input() lineBreakStrategyIOS?: ITextElementProps['lineBreakStrategyIOS'];
+  @Input() lineBreakMode?: ITextElementProps['lineBreakMode'];
+  @Input() textBreakStrategy?: ITextElementProps['textBreakStrategy'];
+  @Input() dataDetectorType?: ITextElementProps['dataDetectorType'];
+  @Input()
+  android_hyphenationFrequency?: ITextElementProps['android_hyphenationFrequency'];
 }
 
 @Directive({ selector: 'image, symbiote-image', standalone: true })
@@ -456,331 +206,6 @@ export class ImageBackgroundElement extends SymbioteElement {
   @Input() onPartialLoad?: IImageProps['onPartialLoad'];
 }
 
-@Directive({ selector: 'scroll-view', standalone: true })
-export class ScrollViewElement extends SymbioteElement {
-  // No `horizontal` @Input: the axis is the TAG you write, never a prop — see
-  // `../components/scroll-view-props.ts`'s header. `HorizontalScrollViewElement` below is the
-  // other spelling, not a variant of this one.
-  @Input() scrollEnabled?: IAngularScrollViewProps['scrollEnabled'];
-  @Input() scrollEventThrottle?: IAngularScrollViewProps['scrollEventThrottle'];
-  @Input()
-  contentContainerStyle?: IAngularScrollViewProps['contentContainerStyle'];
-  @Input() contentInset?: IAngularScrollViewProps['contentInset'];
-  @Input()
-  contentInsetAdjustmentBehavior?: IAngularScrollViewProps['contentInsetAdjustmentBehavior'];
-  @Input() contentOffset?: IAngularScrollViewProps['contentOffset'];
-  @Input()
-  scrollIndicatorInsets?: IAngularScrollViewProps['scrollIndicatorInsets'];
-  @Input()
-  showsHorizontalScrollIndicator?: IAngularScrollViewProps['showsHorizontalScrollIndicator'];
-  @Input()
-  showsVerticalScrollIndicator?: IAngularScrollViewProps['showsVerticalScrollIndicator'];
-  @Input()
-  alwaysBounceHorizontal?: IAngularScrollViewProps['alwaysBounceHorizontal'];
-  @Input()
-  alwaysBounceVertical?: IAngularScrollViewProps['alwaysBounceVertical'];
-  @Input() bounces?: IAngularScrollViewProps['bounces'];
-  @Input() bouncesZoom?: IAngularScrollViewProps['bouncesZoom'];
-  @Input() centerContent?: IAngularScrollViewProps['centerContent'];
-  @Input() decelerationRate?: IAngularScrollViewProps['decelerationRate'];
-  @Input()
-  directionalLockEnabled?: IAngularScrollViewProps['directionalLockEnabled'];
-  @Input()
-  disableIntervalMomentum?: IAngularScrollViewProps['disableIntervalMomentum'];
-  @Input() endFillColor?: IAngularScrollViewProps['endFillColor'];
-  @Input() fadingEdgeLength?: IAngularScrollViewProps['fadingEdgeLength'];
-  @Input() indicatorStyle?: IAngularScrollViewProps['indicatorStyle'];
-  @Input() invertStickyHeaders?: IAngularScrollViewProps['invertStickyHeaders'];
-  @Input() keyboardDismissMode?: IAngularScrollViewProps['keyboardDismissMode'];
-  @Input()
-  keyboardShouldPersistTaps?: IAngularScrollViewProps['keyboardShouldPersistTaps'];
-  @Input()
-  automaticallyAdjustKeyboardInsets?: IAngularScrollViewProps['automaticallyAdjustKeyboardInsets'];
-  @Input()
-  maintainVisibleContentPosition?: IAngularScrollViewProps['maintainVisibleContentPosition'];
-  @Input() maximumZoomScale?: IAngularScrollViewProps['maximumZoomScale'];
-  @Input() minimumZoomScale?: IAngularScrollViewProps['minimumZoomScale'];
-  @Input() zoomScale?: IAngularScrollViewProps['zoomScale'];
-  @Input() nestedScrollEnabled?: IAngularScrollViewProps['nestedScrollEnabled'];
-  @Input() overScrollMode?: IAngularScrollViewProps['overScrollMode'];
-  @Input() pagingEnabled?: IAngularScrollViewProps['pagingEnabled'];
-  @Input() persistentScrollbar?: IAngularScrollViewProps['persistentScrollbar'];
-  @Input() pinchGestureEnabled?: IAngularScrollViewProps['pinchGestureEnabled'];
-  @Input() snapToAlignment?: IAngularScrollViewProps['snapToAlignment'];
-  @Input() snapToEnd?: IAngularScrollViewProps['snapToEnd'];
-  @Input() snapToInterval?: IAngularScrollViewProps['snapToInterval'];
-  @Input() snapToOffsets?: IAngularScrollViewProps['snapToOffsets'];
-  @Input() snapToStart?: IAngularScrollViewProps['snapToStart'];
-  @Input() stickyHeaderIndices?: IAngularScrollViewProps['stickyHeaderIndices'];
-  @Input() onScroll?: IAngularScrollViewProps['onScroll'];
-  @Input() onScrollBeginDrag?: IAngularScrollViewProps['onScrollBeginDrag'];
-  @Input() onScrollEndDrag?: IAngularScrollViewProps['onScrollEndDrag'];
-  @Input()
-  onMomentumScrollBegin?: IAngularScrollViewProps['onMomentumScrollBegin'];
-  @Input() onMomentumScrollEnd?: IAngularScrollViewProps['onMomentumScrollEnd'];
-  @Input() onScrollToTop?: IAngularScrollViewProps['onScrollToTop'];
-  @Input() onContentSizeChange?: IAngularScrollViewProps['onContentSizeChange'];
-}
-
-@Directive({ selector: 'horizontal-scroll-view', standalone: true })
-export class HorizontalScrollViewElement extends ScrollViewElement {}
-
-@Directive({ selector: 'scroll-content', standalone: true })
-export class ScrollContentElement extends SymbioteElement {}
-
-@Directive({ selector: 'horizontal-scroll-content', standalone: true })
-export class HorizontalScrollContentElement extends SymbioteElement {}
-
-/**
- * The `[(value)]` half of a controlled tag — `<switch>` and `<text-input>`.
- *
- * The one `@Output` in this file, and it is FORCED rather than chosen. `[(value)]` desugars to
- * `[value]` + `(valueChange)`, and ngtsc requires both halves to resolve to the SAME target: a
- * declared `value` input beside an event no directive claims is NG8007, "the property and event
- * halves are not bound to the same target". So the sugar this adapter documents cannot work without
- * the output existing, whatever the file header says about events in general.
- *
- * The bridge below is NOT what makes the binding work today, and the comment says so because the
- * obvious reading is wrong: the file header's "an `@Output` CONSUMES the binding" holds for a
- * COMPONENT, and an element is the other case — Angular attaches the renderer listener for the
- * event as well, so `Renderer2.listen` still runs and the engine still hears the change. Measured
- * under JIT by deleting this whole hook: every case in `renderer/two-way-value.test.ts` stayed
- * green, delivery included, and exactly ONCE (nothing double-fires when both paths exist).
- *
- * It is kept because the measurement is JIT-only and this adapter has a recorded case of JIT and
- * AOT resolving a binding differently (`test-harness-false-greens.md` §21). If AOT routes the event
- * exclusively to the output, this hook is the only thing keeping `[(value)]` alive; if it routes to
- * both, it is one extra listener on a control an app explicitly bound. Delete it once something
- * executes the LINKED artifact and shows the renderer listener is attached there too.
- *
- * Opened only when something is SUBSCRIBED: the prop's PRESENCE is what a behavior reads to decide
- * it is controlled, so a `<switch>` given a handler nobody asked for changes how it snaps back.
- * `.observed` is readable from `ngOnInit` because Angular subscribes outputs in the creation pass,
- * before the update pass runs the hook — observed directly (true for the two bound tags, false for
- * an unbound one), not assumed.
- */
-@Directive()
-abstract class ValueChangeElement
-  extends ReadBackElement
-  implements OnInit, OnDestroy
-{
-  private readonly valueRenderer = inject(Renderer2);
-  private readonly valueHost = inject(ElementRef);
-  private unlistenValue?: () => void;
-
-  /** `this.valueChange.observed` — the subclass owns the emitter so its payload type stays exact. */
-  protected abstract hasValueSubscriber(): boolean;
-
-  /** Narrows the engine's unwrapped value to the type THIS tag emits, then emits it. */
-  protected abstract emitValue(value: unknown): void;
-
-  ngOnInit(): void {
-    if (!this.hasValueSubscriber()) return;
-    this.unlistenValue = this.valueRenderer.listen(
-      this.valueHost.nativeElement,
-      VALUE_CHANGE_EVENT,
-      (value: unknown) => {
-        this.emitValue(value);
-      },
-    );
-  }
-
-  override ngOnDestroy(): void {
-    super.ngOnDestroy();
-    this.unlistenValue?.();
-  }
-}
-
-@Directive({ selector: 'text-input', standalone: true })
-export class TextInputElement extends ValueChangeElement {
-  @Input() value?: ITextInputProps['value'];
-  @Input() defaultValue?: ITextInputProps['defaultValue'];
-  @Input() placeholder?: ITextInputProps['placeholder'];
-  @Input() placeholderTextColor?: ITextInputProps['placeholderTextColor'];
-  @Input() multiline?: ITextInputProps['multiline'];
-  @Input() numberOfLines?: ITextInputProps['numberOfLines'];
-  @Input() maxLength?: ITextInputProps['maxLength'];
-  @Input() editable?: ITextInputProps['editable'];
-  @Input() readOnly?: ITextInputProps['readOnly'];
-  @Input() autoFocus?: ITextInputProps['autoFocus'];
-  @Input() autoCapitalize?: ITextInputProps['autoCapitalize'];
-  @Input() autoComplete?: ITextInputProps['autoComplete'];
-  @Input() autoCorrect?: ITextInputProps['autoCorrect'];
-  @Input() blurOnSubmit?: ITextInputProps['blurOnSubmit'];
-  @Input() submitBehavior?: ITextInputProps['submitBehavior'];
-  @Input() cursorColor?: ITextInputProps['cursorColor'];
-  @Input() enterKeyHint?: ITextInputProps['enterKeyHint'];
-  @Input() returnKeyType?: ITextInputProps['returnKeyType'];
-  @Input() inputMode?: ITextInputProps['inputMode'];
-  @Input() keyboardType?: ITextInputProps['keyboardType'];
-  @Input() inputAccessoryViewID?: ITextInputProps['inputAccessoryViewID'];
-  @Input() scrollEnabled?: ITextInputProps['scrollEnabled'];
-  @Input() secureTextEntry?: ITextInputProps['secureTextEntry'];
-  @Input() selectTextOnFocus?: ITextInputProps['selectTextOnFocus'];
-  @Input() selection?: ITextInputProps['selection'];
-  @Input() selectionColor?: ITextInputProps['selectionColor'];
-  @Input() selectionHandleColor?: ITextInputProps['selectionHandleColor'];
-  @Input() showSoftInputOnFocus?: ITextInputProps['showSoftInputOnFocus'];
-  @Input() textAlign?: ITextInputProps['textAlign'];
-  @Input() textContentType?: ITextInputProps['textContentType'];
-  @Input() underlineColorAndroid?: ITextInputProps['underlineColorAndroid'];
-  @Input() onValueChange?: ITextInputProps['onValueChange'];
-  @Input() onChangeText?: ITextInputProps['onChangeText'];
-  @Input() onContentSizeChange?: ITextInputProps['onContentSizeChange'];
-  @Input() onEndEditing?: ITextInputProps['onEndEditing'];
-  @Input() onKeyPress?: ITextInputProps['onKeyPress'];
-  @Input() onSelectionChange?: ITextInputProps['onSelectionChange'];
-  @Input() onSubmitEditing?: ITextInputProps['onSubmitEditing'];
-
-  // NonNullable, not the prop type: `[(value)]="name"` binds a `string`, and an emitter that can
-  // also emit `undefined` fails the two-way assignability check ngtsc runs on the event half.
-  @Output() readonly valueChange = new EventEmitter<
-    NonNullable<ITextInputProps['value']>
-  >();
-
-  protected hasValueSubscriber(): boolean {
-    return this.valueChange.observed;
-  }
-
-  protected emitValue(value: unknown): void {
-    if (typeof value === 'string') this.valueChange.emit(value);
-  }
-}
-
-@Directive({ selector: 'text-input-multiline', standalone: true })
-export class MultilineTextInputElement extends TextInputElement {}
-
-@Directive({ selector: 'switch, symbiote-switch', standalone: true })
-export class SwitchElement extends ValueChangeElement {
-  @Input() value?: ISwitchProps['value'];
-  @Input() disabled?: ISwitchProps['disabled'];
-  @Input() trackColor?: ISwitchProps['trackColor'];
-  @Input() thumbColor?: ISwitchProps['thumbColor'];
-  @Input() ios_backgroundColor?: ISwitchProps['ios_backgroundColor'];
-  @Input() onValueChange?: ISwitchProps['onValueChange'];
-
-  @Output() readonly valueChange = new EventEmitter<
-    NonNullable<ISwitchProps['value']>
-  >();
-
-  protected hasValueSubscriber(): boolean {
-    return this.valueChange.observed;
-  }
-
-  protected emitValue(value: unknown): void {
-    if (typeof value === 'boolean') this.valueChange.emit(value);
-  }
-}
-
-/**
- * `[(ngModel)]` / `formControlName` on a `<text-input>` or a `<switch>`.
- *
- * The wrappers provided `NG_VALUE_ACCESSOR` themselves; a tag has no class for @angular/forms to
- * call into, so the accessor moves onto a directive of its own rather than being dropped — the
- * shape Angular's own `DefaultValueAccessor` takes for `<input>`. Providing it unconditionally is
- * safe: @angular/forms looks the accessor up only when an `ngModel` / `formControl*` directive sits
- * on the SAME element, so a plain `<switch [(value)]>` never reaches it.
- *
- * Everything below goes through `Renderer2`, which is the adapter's own — `setProperty` lands in
- * `routeProp` and `listen('valueChange')` is already unwrapped to a bare value there, so this
- * directive holds no fold of its own.
- */
-@Directive()
-abstract class SymbioteValueAccessor
-  implements ControlValueAccessor, OnDestroy
-{
-  private readonly renderer = inject(Renderer2);
-  private readonly host = inject(ElementRef);
-  private unlisten?: () => void;
-
-  // The prop that spells "not editable" for this tag: RN's TextInput has no `disabled`, it has
-  // `editable` (inverted), while Switch takes `disabled` straight.
-  protected abstract writeDisabled(isDisabled: boolean): void;
-
-  protected setProp(name: string, value: unknown): void {
-    this.renderer.setProperty(this.host.nativeElement, name, value);
-  }
-
-  writeValue(value: unknown): void {
-    this.setProp('value', value ?? undefined);
-  }
-
-  registerOnChange(fn: (value: unknown) => void): void {
-    this.unlisten?.();
-    this.unlisten = this.renderer.listen(
-      this.host.nativeElement,
-      VALUE_CHANGE_EVENT,
-      (value: unknown) => {
-        // THE HALF THE DOM DOES FOR FREE, and without it a controlled input undoes every
-        // keystroke. `<text-input>`'s behavior re-commands the native text whenever `props.value`
-        // disagrees with what native last reported — that is what makes it controlled — and the
-        // read-back flush exists so the app's new value is on the node by the time the commit runs.
-        // @angular/forms does not reach the node in that window: `NgModel.ngOnChanges` defers
-        // `_updateValue` through `resolvedPromise.then`, so `writeValue` lands a MICROTASK after
-        // the flush, and the commit in between still reads the value from before the keystroke.
-        //
-        // In a browser there is nothing to do here: `input.value` already holds what the user
-        // typed. `node.props.value` is the same slot, and nothing else writes it — so the accessor
-        // mirrors it, which is the shape rather than a workaround. A later `writeValue` still wins,
-        // so an app that transforms or refuses the value keeps doing so, one microtask on.
-        //
-        // Without this, every character snaps the field back to its mounted text.
-        this.setProp('value', value);
-        fn(value);
-      },
-    );
-  }
-
-  // Native has no blur-driven "touched" signal distinct from `blur`, and RN's own onBlur is what an
-  // app binds — so touched is driven off the same event rather than a second channel.
-  registerOnTouched(fn: () => void): void {
-    this.setProp('onBlur', () => fn());
-  }
-
-  setDisabledState(isDisabled: boolean): void {
-    this.writeDisabled(isDisabled);
-  }
-
-  ngOnDestroy(): void {
-    this.unlisten?.();
-  }
-}
-
-@Directive({
-  selector:
-    'text-input[ngModel], text-input[formControl], text-input[formControlName], text-input-multiline[ngModel], text-input-multiline[formControl], text-input-multiline[formControlName]',
-  standalone: true,
-  providers: [
-    {
-      provide: NG_VALUE_ACCESSOR,
-      useExisting: forwardRef(() => TextInputValueAccessor),
-      multi: true,
-    },
-  ],
-})
-export class TextInputValueAccessor extends SymbioteValueAccessor {
-  protected override writeDisabled(isDisabled: boolean): void {
-    this.setProp('editable', !isDisabled);
-  }
-}
-
-@Directive({
-  selector: 'switch[ngModel], switch[formControl], switch[formControlName]',
-  standalone: true,
-  providers: [
-    {
-      provide: NG_VALUE_ACCESSOR,
-      useExisting: forwardRef(() => SwitchValueAccessor),
-      multi: true,
-    },
-  ],
-})
-export class SwitchValueAccessor extends SymbioteValueAccessor {
-  protected override writeDisabled(isDisabled: boolean): void {
-    this.setProp('disabled', isDisabled);
-  }
-}
-
 // The HOST — RN's centering RCTView (ActivityIndicator.js:112), which is the tag an app writes.
 // The four spinner props are declared here because that is where the app writes them; the engine's
 // behavior redirects them onto the spinner it builds underneath (`slotProps`).
@@ -800,6 +225,12 @@ export class ActivityIndicatorSpinnerElement extends ActivityIndicatorElement {}
 
 @Directive({ selector: 'safe-area-view', standalone: true })
 export class SafeAreaViewElement extends SymbioteElement {}
+
+// RN's `experimental_LayoutConformance`: the tag paints as `display: contents` through its fold
+@Directive({ selector: 'layout-conformance', standalone: true })
+export class LayoutConformanceElement extends SymbioteElement {
+  @Input() mode?: ILayoutConformanceMode;
+}
 
 @Directive({ selector: 'modal, symbiote-modal', standalone: true })
 export class ModalElement extends SymbioteElement {
@@ -876,6 +307,7 @@ export const SYMBIOTE_ELEMENTS = [
   ActivityIndicatorElement,
   ActivityIndicatorSpinnerElement,
   SafeAreaViewElement,
+  LayoutConformanceElement,
   ModalElement,
   RefreshControlElement,
   StickyHeaderElement,

@@ -15,6 +15,10 @@
 
 #include "symbiote-host.h"
 
+#include <folly/json.h>
+#include <react/featureflags/ReactNativeFeatureFlags.h>
+#include <react/featureflags/ReactNativeFeatureFlagsDynamicProvider.h>
+
 #include <chrono>
 #include <cstdio>
 #include <fstream>
@@ -133,6 +137,104 @@ void install(Host &host) {
          return jsi::Value::undefined();
        });
 
+  // Fantom's `runWorkLoop`
+  bind("runWorkLoop", 0,
+       [&host](jsi::Runtime &, const jsi::Value &, const jsi::Value *, size_t) {
+         host.runWorkLoop();
+         return jsi::Value::undefined();
+       });
+
+  // `setViewport(width, height)`, Fantom's `createRoot({viewportWidth, viewportHeight})`
+  bind("setViewport", 2,
+       [&host](jsi::Runtime &runtime, const jsi::Value &, const jsi::Value *arguments,
+               size_t count) {
+         if (count < 2) throw jsi::JSError(runtime, "setViewport(width, height)");
+         host.setViewport(arguments[0].asNumber(), arguments[1].asNumber());
+         return jsi::Value::undefined();
+       });
+
+  // `setModalSize(tag, width, height)`, Fantom's `enqueueModalSizeUpdate`
+  bind("setModalSize", 3,
+       [&host](jsi::Runtime &runtime, const jsi::Value &, const jsi::Value *arguments,
+               size_t count) {
+         if (count < 3) throw jsi::JSError(runtime, "setModalSize(tag, width, height)");
+         const auto tag = static_cast<facebook::react::Tag>(arguments[0].asNumber());
+         if (!host.setModalSize(tag, arguments[1].asNumber(), arguments[2].asNumber())) {
+           throw jsi::JSError(runtime, "no mounted Modal with tag " + std::to_string(tag));
+         }
+         return jsi::Value::undefined();
+       });
+
+  // The flag a test branches on, the backend two Fantom arms of one file differ by
+  bind("usesSharedAnimatedBackend", 0,
+       [](jsi::Runtime &, const jsi::Value &, const jsi::Value *, size_t) {
+         return jsi::Value(facebook::react::ReactNativeFeatureFlags::useSharedAnimatedBackend());
+       });
+
+  // The C++ half of `Animated`, as the host object a `__turboModuleProxy` hands out
+  bind("animatedModule", 0,
+       [&host](jsi::Runtime &runtime, const jsi::Value &, const jsi::Value *, size_t) {
+         return host.animatedModule(runtime);
+       });
+
+  // `produceFrames(ms)`, Fantom's `unstable_produceFramesForDuration`
+  bind("produceFrames", 1,
+       [&host](jsi::Runtime &runtime, const jsi::Value &, const jsi::Value *arguments,
+               size_t count) {
+         if (count < 1) throw jsi::JSError(runtime, "produceFrames(milliseconds)");
+         host.produceFrames(arguments[0].asNumber());
+         return jsi::Value::undefined();
+       });
+
+  // `boundingClientRect(tag)`: the view's frame with its transform, from the committed tree
+  bind("boundingClientRect", 1,
+       [&host](jsi::Runtime &runtime, const jsi::Value &, const jsi::Value *arguments,
+               size_t count) {
+         if (count < 1) throw jsi::JSError(runtime, "boundingClientRect(tag)");
+         const auto tag = static_cast<facebook::react::Tag>(arguments[0].asNumber());
+         return dynamicToValue(runtime, host.boundingClientRect(tag));
+       });
+
+  // `directManipulationProps(tag)` / `fabricUpdateProps(tag)`: what a native animation wrote
+  bind("directManipulationProps", 1,
+       [&host](jsi::Runtime &runtime, const jsi::Value &, const jsi::Value *arguments,
+               size_t count) {
+         if (count < 1) throw jsi::JSError(runtime, "directManipulationProps(tag)");
+         const auto tag = static_cast<facebook::react::Tag>(arguments[0].asNumber());
+         return dynamicToValue(runtime, host.directManipulationProps(tag));
+       });
+  bind("fabricUpdateProps", 1,
+       [&host](jsi::Runtime &runtime, const jsi::Value &, const jsi::Value *arguments,
+               size_t count) {
+         if (count < 1) throw jsi::JSError(runtime, "fabricUpdateProps(tag)");
+         const auto tag = static_cast<facebook::react::Tag>(arguments[0].asNumber());
+         return dynamicToValue(runtime, host.fabricUpdateProps(tag));
+       });
+
+  // `enqueueScroll(tag, x, y)`, Fantom's `enqueueScrollEvent`: delivered by `runWorkLoop`
+  bind("enqueueScroll", 3,
+       [&host](jsi::Runtime &runtime, const jsi::Value &, const jsi::Value *arguments,
+               size_t count) {
+         if (count < 3) throw jsi::JSError(runtime, "enqueueScroll(tag, x, y)");
+         const auto tag = static_cast<facebook::react::Tag>(arguments[0].asNumber());
+         if (!host.enqueueScroll(tag, arguments[1].asNumber(), arguments[2].asNumber())) {
+           throw jsi::JSError(runtime, "no mounted ScrollView with tag " + std::to_string(tag));
+         }
+         return jsi::Value::undefined();
+       });
+
+  // `scrollTo(tag, x, y)`, Fantom's `scrollTo` on a mounted ScrollView
+  bind("scrollTo", 3,
+       [&host](jsi::Runtime &runtime, const jsi::Value &, const jsi::Value *arguments,
+               size_t count) {
+         if (count < 3) throw jsi::JSError(runtime, "scrollTo(tag, x, y)");
+         const auto tag = static_cast<facebook::react::Tag>(arguments[0].asNumber());
+         if (!host.scrollTo(tag, arguments[1].asNumber(), arguments[2].asNumber())) {
+           throw jsi::JSError(runtime, "no mounted ScrollView with tag " + std::to_string(tag));
+         }
+         return jsi::Value::undefined();
+       });
+
   bind("committedShape", 0,
        [&host](jsi::Runtime &runtime, const jsi::Value &, const jsi::Value *, size_t) {
          return jsi::String::createFromUtf8(runtime, host.committedShape());
@@ -184,11 +286,8 @@ void install(Host &host) {
          return jsi::Value(runtime, out);
        });
 
-  // What the real Differentiator told the platform to do since the last read, RN's own wording
-  // ("Create {...}", "Update {...}", …) — draws from whatever `mounted()`'s last `host.mount()`
-  // drained, so call `mounted()` first to populate it. An "Update" line is the real equivalent of
-  // the retired mirror's clone-protocol count: the Differentiator decided this node's props
-  // actually changed enough to need a native prop update, not merely that JS wrote to it.
+  // What the Differentiator told the platform to do, in RN's wording ("Create", "Update")
+  // Reads what the last `mounted()` drained, so call that first
   bind("mountingLogs", 0,
        [&host](jsi::Runtime &runtime, const jsi::Value &, const jsi::Value *, size_t) {
          const auto logs = host.mountingLogs();
@@ -227,7 +326,7 @@ void install(Host &host) {
          return jsi::Value::undefined();
        });
 
-  // Hermes's sampling profiler over a window; false on JavaScriptCore. The trace is Chrome's format.
+  // Hermes's sampling profiler over a window, false on JavaScriptCore
   bind("startProfiling", 1,
        [&host](jsi::Runtime &, const jsi::Value &, const jsi::Value *args, size_t count) {
          const double hz = count > 0 && args[0].isNumber() ? args[0].getNumber() : 1000;
@@ -253,16 +352,8 @@ void install(Host &host) {
          return jsi::Value::undefined();
        });
 
-  // A REAL monotonic clock, in fractional milliseconds.
-  //
-  // The runner's prelude used to define `performance.now()` off `Date.now()`, which is whole
-  // milliseconds — fine for a phase measured in tens of them, useless for splitting one. Measured
-  // 2026-09-17: the JS `fill` phase of a 10 001-node create is ~25 ms, and no sub-phase of it could
-  // be told apart at 1 ms granularity, so every question about where that 25 ms goes had to be
-  // answered by rewriting the fixture into separate bulk passes.
-  //
-  // `steady_clock` rather than `system_clock` for the same reason `TelemetryClock` is: a wall clock
-  // can step backwards and produce a negative duration.
+  // Monotonic clock in fractional milliseconds, `Date.now()` is too coarse to split a phase
+  // `steady_clock` since a wall clock can step backwards and give a negative duration
   bind("now", 0, [](jsi::Runtime &, const jsi::Value &, const jsi::Value *, size_t) {
     static const auto origin = std::chrono::steady_clock::now();
     return jsi::Value(std::chrono::duration<double, std::milli>(
@@ -290,27 +381,21 @@ int main(int argc, char **argv) {
   }
 
   try {
-    // Deliberately never destroyed. A retained node owns its JS handle, and JavaScriptCore aborts
-    // when its runtime is torn down while any API object is still alive ("dangling API object") —
-    // so a tree that is still standing, which is the normal state at the end of a test file, is
-    // enough to abort a run that has already passed. The process is one test file long and the OS
-    // reclaims everything; ordering a teardown nobody needs would be the only reason to model it.
+    // Fabric feature flags are read once on first access, so they go in before the host exists
+    if (const char *flags = std::getenv("SYMBIOTE_FLAGS")) {
+      facebook::react::ReactNativeFeatureFlags::override(
+          std::make_unique<facebook::react::ReactNativeFeatureFlagsDynamicProvider>(
+              folly::parseJson(flags)));
+    }
+    // Never destroyed: JavaScriptCore aborts on a runtime torn down while a retained node still
+    // owns its JS handle, and the OS reclaims everything at exit
     auto *host = new Host();
     install(*host);
     auto &runtime = host->runtime();
     runtime.evaluateJavaScript(std::make_shared<jsi::StringBuffer>(read(argv[1])), argv[1]);
 
-    // Cases may be ASYNC — most adapter tests are — and C++ cannot await. So the file collects its
-    // results and this drains until it says it is finished: run the queued timers, then let the
-    // engine drain its microtasks. Bounded, because a test that never settles has to fail rather
-    // than hang.
-    //
-    // THE EXPLICIT DRAIN IS NOT OPTIONAL, and which engine is hosting decides whether forgetting it
-    // shows. JavaScriptCore drains its microtask queue by itself whenever the JS stack empties, so
-    // this loop worked for years without asking. Hermes does not — the host owns the queue there,
-    // which is why React Native's own runtime drains it per tick — and without this call a Hermes
-    // run advances the case chain in the wrong interleaving and re-reports the last case instead of
-    // failing. A wrong ANSWER rather than an error, which is the worst shape a harness defect has.
+    // Cases may be async and C++ cannot await, so drain timers and microtasks until the file says
+    // it is done, bounded so a case that never settles fails instead of hanging
     constexpr int kDrainRounds = 1'000;
     for (int round = 0; round < kDrainRounds; round++) {
       auto done = runtime.global().getProperty(runtime, "__symbioteDone");
@@ -319,6 +404,8 @@ int main(int argc, char **argv) {
       if (flush.isObject() && flush.getObject(runtime).isFunction(runtime)) {
         flush.getObject(runtime).getFunction(runtime).call(runtime);
       }
+      // Hermes leaves its microtask queue to the host, and without this drain the case chain
+      // interleaves wrongly and re-reports the last case instead of failing
       runtime.drainMicrotasks();
     }
 

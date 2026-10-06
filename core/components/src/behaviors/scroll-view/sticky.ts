@@ -23,20 +23,15 @@
 import {
   AnimatedProps,
   AnimatedValue,
-  appendChild,
   appListenerFor,
-  createElement,
   dlog,
-  insertBefore,
-  isAnchor,
   isNativeAnimatedAvailable,
   Platform,
-  removeChild,
   requestCommitFor,
   setBehaviorListener,
   setProp,
   whenCommitted,
-  type AnimatedInterpolation,
+  type AnimatedNode,
   type IHostBehavior,
   type ISymbioteEvent,
   type ISymbioteNode,
@@ -45,7 +40,6 @@ import {
   parentOf,
 } from '@symbiote-native/engine';
 
-import { descriptorFor } from '../../component-names';
 import { attachStickyScroll } from '../../scroll-view-commands';
 import { markScrollObserved } from './responder';
 import {
@@ -55,6 +49,7 @@ import {
   type IStickyEffect,
   type IStickyHeaderState,
 } from '../../state/sticky-header-reducer';
+import { buildStickyPin } from '../../state/sticky-pin';
 import {
   readLayoutNumber,
   STICKY_HEADER_Z_INDEX,
@@ -72,7 +67,7 @@ export const STICKY_TRANSLATE_PROP = 'stickyTranslateY';
 // is the only route — a header may sit any depth below the content view.
 const scrollOwners = new WeakSet<ISymbioteNode>();
 
-interface IStickyOwnerState {
+type IStickyOwnerState = {
   // Shared by every header of this ScrollView: one value tracks the offset, each header
   // interpolates it into its own pin. Allocated with the first header, never before — a ScrollView
   // with no sticky child pays nothing.
@@ -87,19 +82,21 @@ interface IStickyOwnerState {
   // Detach for the NATIVE scroll attach, present only while the offset is riding the UI thread.
   // `undefined` means the JS fallback in `handleOwnerScroll` is what feeds `scrollValue`.
   detachNativeScroll: (() => void) | undefined;
-}
+  // `stickyHeaderHiddenOnScroll` as the headers were last told, so a flip re-derives their pins
+  hiddenOnScroll: boolean;
+};
 
 const stickyOwners = new WeakMap<ISymbioteNode, IStickyOwnerState>();
 
-interface IStickyHeaderRuntime {
+type IStickyHeaderRuntime = {
   state: IStickyHeaderState;
   owner: ISymbioteNode | undefined;
-  interpolation: AnimatedInterpolation | undefined;
+  interpolation: AnimatedNode | undefined;
   listenerId: string | undefined;
   debounceTimer: ReturnType<typeof setTimeout> | undefined;
   leaf: AnimatedProps | undefined;
   cancelBind: (() => void) | undefined;
-}
+};
 
 const headerRuntimes = new WeakMap<ISymbioteNode, IStickyHeaderRuntime>();
 
@@ -112,6 +109,22 @@ export function markScrollOwner(node: ISymbioteNode): void {
 export function hasStickyHeaders(owner: ISymbioteNode): boolean {
   const sticky = stickyOwners.get(owner);
   return sticky !== undefined && sticky.members.size > 0;
+}
+
+function isHiddenOnScroll(owner: ISymbioteNode): boolean {
+  return propOf(owner, 'stickyHeaderHiddenOnScroll') === true;
+}
+
+// Вызывается после каждого коммита владельца: флаг мог смениться, а заголовки
+// пересобирают пин только по `dispatch`
+export function syncHiddenOnScroll(owner: ISymbioteNode): void {
+  const sticky = stickyOwners.get(owner);
+  if (sticky === undefined) return;
+  const hidden = isHiddenOnScroll(owner);
+  if (sticky.hiddenOnScroll === hidden) return;
+  sticky.hiddenOnScroll = hidden;
+  for (const header of sticky.members)
+    dispatch(header, { kind: 'inputs-changed' });
 }
 
 // Only the INVERTED pin reads the viewport height (`computeStickyInterpolation` ignores it
@@ -134,6 +147,7 @@ function ownerSticky(owner: ISymbioteNode): IStickyOwnerState {
     viewportHeight: undefined,
     writtenThrottle: undefined,
     detachNativeScroll: undefined,
+    hiddenOnScroll: isHiddenOnScroll(owner),
   };
   stickyOwners.set(owner, created);
   return created;
@@ -276,7 +290,6 @@ export function handleOwnerScroll(
 // only thing owed here is the owner state — and cutting each header's back-reference with it, so a
 // header still in flight cannot dispatch into a registry that is gone.
 export function releaseStickyOwner(owner: ISymbioteNode): void {
-  ownersWithIndexWrappers.delete(owner);
   const sticky = stickyOwners.get(owner);
   if (sticky === undefined) return;
   sticky.detachNativeScroll?.();
@@ -288,115 +301,10 @@ export function releaseStickyOwner(owner: ISymbioteNode): void {
   stickyOwners.delete(owner);
 }
 
-// ---------------------------------------------------------------- the index form
+// The index form (`stickyHeaderIndices`) lives in ./sticky-index and wraps children in this tag
 
-// `stickyHeaderIndices` is deliberately NOT a second machine: a flagged child is MOVED into a
-// synthesized `sticky-header` node, so ordering, cross-talk, throttle, pin and teardown are all
-// the child form's, unchanged. Indices decide only WHICH children get one.
-
-// `StickyHeaderComponent` (RN's custom wrapper prop) is NOT honoured — a behavior can't instantiate
-// a framework component; an app that needs one composes it explicitly around `<sticky-header>`.
-
-// The wrap lands one commit late: afterCommit is the only hook seeing childHost.children complete,
-// and it runs past completeRoot, so a flagged child paints unwrapped for one frame.
-
-// Unsorted indices resolve by DOCUMENT ORDER, which orderedHeaders already gives: the value is a
-// COLLISION POINT (the y of the header that pushes this one off), so it must be the header BELOW
-// on screen — document order is also the only one under which both forms can share a scroll view.
-
-// The nodes this module synthesized, so a later walk can tell its own wrapper from an app's child.
-const indexWrappers = new WeakSet<ISymbioteNode>();
-// Owners currently holding one. The gate: a ScrollView that never used the prop pays one WeakSet
-// miss per commit and walks nothing.
-const ownersWithIndexWrappers = new WeakSet<ISymbioteNode>();
-
-function stickyIndexSet(value: unknown): Set<number> | undefined {
-  if (!Array.isArray(value)) return undefined;
-  const out = new Set<number>();
-  for (const entry of value) if (typeof entry === 'number') out.add(entry);
-  return out.size === 0 ? undefined : out;
-}
-
-function wrapForIndex(slot: ISymbioteNode, child: ISymbioteNode): void {
-  const descriptor = descriptorFor(STICKY_HEADER_TAG);
-  const wrapper = createElement(
-    descriptor.component,
-    descriptor.isText,
-    STICKY_HEADER_TAG,
-  );
-  indexWrappers.add(wrapper);
-  // The slot FIRST, then the child into it: the engine's appendChild detaches from the old parent,
-  // so the wrapper takes the position the child vacates and nothing has to be removed.
-  insertBefore(slot, wrapper, child);
-  appendChild(wrapper, child);
-  // AFTER both, or the anchor above would resolve to the wrapper itself: the framework keeps
-  // naming the row, while the tree holds the wrapper in its place, so a later removeChild(owner,
-  // row) takes the wrapper out with it.
-  child.wrapper = wrapper;
-}
-
-function unwrapIndex(slot: ISymbioteNode, wrapper: ISymbioteNode): void {
-  const child = childrenOf(wrapper)[0];
-  // Before the move, for the same reason it is set after one: `insertBefore` would otherwise put
-  // the wrapper back in the child's place.
-  if (child !== undefined) child.wrapper = undefined;
-  if (child !== undefined) insertBefore(slot, child, wrapper);
-  removeChild(slot, wrapper);
-}
-
-// Bring the synthesized wrappers in line with `stickyHeaderIndices`. Called from afterCommit, the
-// one beat where the app's children are all present. O(slot children) per commit, once, never
-// per mutation.
-export function reconcileStickyIndices(owner: ISymbioteNode): void {
-  const slot = owner.childHost;
-  if (slot === undefined) return;
-  const wanted = stickyIndexSet(propOf(owner, 'stickyHeaderIndices'));
-  if (wanted === undefined && !ownersWithIndexWrappers.has(owner)) return;
-
-  let paintIndex = 0;
-  let wrapped = 0;
-  let changed = false;
-  // Snapshot: wrapping and unwrapping both splice the list being walked. A claimed
-  // `<RefreshControl>` needs no filter here — hostFor keeps it on the OWNER, never the slot.
-  for (const child of [...childrenOf(slot)]) {
-    const wrapper = indexWrappers.has(child) ? child : undefined;
-    if (wrapper !== undefined) {
-      // The framework removes a child from the SLOT, because that is where it appended it — so the
-      // engine's `removeChild` finds nothing to splice and only clears `child.parent`, leaving a
-      // committed wrapper around a node nobody owns. This walk is the only thing that can see it.
-      const held = childrenOf(wrapper)[0];
-      if (held === undefined || parentOf(held) !== wrapper) {
-        removeChild(slot, wrapper);
-        changed = true;
-        continue;
-      }
-    } else if (isAnchor(child)) {
-      // An anchor paints nothing, so RN's own children walk never numbered one. Without this every
-      // index below an anchor addresses the wrong child, and a windowed list inserts them freely.
-      continue;
-    }
-    const index = paintIndex;
-    paintIndex += 1;
-    // A `<sticky-header>` the app wrote is a child like any other and counts — it just must not be
-    // wrapped in a second one.
-    if (wrapper === undefined && headerRuntimes.has(child)) continue;
-    const shouldWrap = wanted !== undefined && wanted.has(index);
-    if (shouldWrap && wrapper === undefined) {
-      wrapForIndex(slot, child);
-      changed = true;
-      wrapped += 1;
-    } else if (!shouldWrap && wrapper !== undefined) {
-      unwrapIndex(slot, wrapper);
-      changed = true;
-    } else if (wrapper !== undefined) wrapped += 1;
-  }
-
-  if (wrapped > 0) ownersWithIndexWrappers.add(owner);
-  else ownersWithIndexWrappers.delete(owner);
-  if (changed) {
-    dlog(`sticky indices reconciled (${wrapped} wrapped)`);
-    requestCommitFor(owner);
-  }
+export function isStickyHeader(node: ISymbioteNode): boolean {
+  return headerRuntimes.has(node);
 }
 
 // ---------------------------------------------------------------- the header half
@@ -434,6 +342,7 @@ function dispatch(node: ISymbioteNode, action: IStickyAction): void {
   const result = reduceSticky(runtime.state, action, {
     os: Platform.OS,
     inverted: propOf(runtime.owner, 'invertStickyHeaders') === true,
+    hiddenOnScroll: isHiddenOnScroll(runtime.owner),
     scrollViewHeight: sticky?.viewportHeight,
     nextHeaderLayoutY: nextHeaderY(runtime, node),
   });
@@ -448,12 +357,7 @@ function runEffects(
   for (const effect of effects) {
     switch (effect.kind) {
       case 'rebuild-interpolation':
-        rebuildInterpolation(
-          node,
-          runtime,
-          effect.inputRange,
-          effect.outputRange,
-        );
+        rebuildInterpolation(node, runtime, effect);
         break;
       case 'schedule-debounce':
         if (runtime.debounceTimer !== undefined)
@@ -481,11 +385,12 @@ function runEffects(
   }
 }
 
+type IRebuildEffect = Extract<IStickyEffect, { kind: 'rebuild-interpolation' }>;
+
 function rebuildInterpolation(
   node: ISymbioteNode,
   runtime: IStickyHeaderRuntime,
-  inputRange: readonly number[],
-  outputRange: readonly number[],
+  { inputRange, outputRange, hideOffset }: IRebuildEffect,
 ): void {
   const owner = runtime.owner;
   if (owner === undefined) return;
@@ -493,10 +398,11 @@ function rebuildInterpolation(
   if (sticky === undefined) return;
   if (runtime.interpolation !== undefined && runtime.listenerId !== undefined)
     runtime.interpolation.removeListener(runtime.listenerId);
-  const next = sticky.scrollValue.interpolate({
-    inputRange: [...inputRange],
-    outputRange: [...outputRange],
-  });
+  const next = buildStickyPin(
+    sticky.scrollValue,
+    { inputRange: [...inputRange], outputRange: [...outputRange] },
+    hideOffset,
+  );
   runtime.listenerId = next.addListener(({ value }) => {
     if (typeof value === 'number')
       dispatch(node, { kind: 'animated-tick', value });

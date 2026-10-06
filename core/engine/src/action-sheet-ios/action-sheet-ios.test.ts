@@ -1,31 +1,31 @@
-// Unit test for the ActionSheetIOS imperative module. A fake
-// ActionSheetManager native module records the options it receives and invokes the callback
-// with buttonIndex 1.
-//
-// ActionSheetIOS is deliberately non-throwing (like StatusBar/Alert): a missing native module
-// degrades to a logged no-op on every method, never a crash. So scenarios are grouped
-// "Positive" (module present, real behavior) / "no-op (native module unavailable)" rather than
-// Positive/Negative — there is no throwing contract to assert against.
+// Фейковый ActionSheetManager пишет опции и сразу вызывает callback с индексом 1
+// Как в RN, без нативного модуля методы бросают, а не молчат
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-interface ICapturedOptions {
+type ICapturedOptions = {
   options: string[];
   cancelButtonIndex?: number;
   destructiveButtonIndex?: number | number[];
-  destructiveButtonIndices?: number[];
-}
+  destructiveButtonIndices?: number[] | null;
+  tintColor?: unknown;
+  cancelButtonTintColor?: unknown;
+  disabledButtonTintColor?: unknown;
+};
 
-interface ICapturedShareOptions {
+type ICapturedShareOptions = {
   message?: string;
   url?: string;
-}
+  tintColor?: unknown;
+};
 
 let ActionSheetIOS: typeof import('./index').ActionSheetIOS;
 
 let captured: ICapturedOptions | null;
 let capturedShare: ICapturedShareOptions | null;
 let dismissCalled: boolean;
+
+const MISSING_MANAGER = "ActionSheetManager doesn't exist";
 
 function isPresent<T>(value: unknown): value is T {
   return value !== null && value !== undefined;
@@ -61,7 +61,6 @@ function defaultFakeManager(): Required<
       callback: (buttonIndex: number) => void,
     ): void {
       captured = options;
-      // Simulate the user tapping row index 1.
       callback(1);
     },
     showShareActionSheetWithOptions(
@@ -108,20 +107,13 @@ describe('ActionSheetIOS', () => {
         },
       );
 
-      expect(captured).not.toBeNull();
-      // Options + cancelButtonIndex pass straight through to native.
       expect(captured?.options).toEqual(['A', 'B', 'Cancel']);
       expect(captured?.cancelButtonIndex).toBe(2);
-      // A single destructiveButtonIndex normalizes to destructiveButtonIndices: [n].
       expect(captured?.destructiveButtonIndex).toBeUndefined();
       expect(captured?.destructiveButtonIndices).toEqual([1]);
-      // The callback delivers the chosen index back to JS.
       expect(chosen).toBe(1);
     });
 
-    // why: an already-array destructiveButtonIndex is the native-facing shape apps may pass
-    // directly (multi-row destructive UI) — normalization must pass it through unchanged, not
-    // just handle the legacy single-index form.
     it('an array destructiveButtonIndex passes through unchanged', () => {
       ActionSheetIOS.showActionSheetWithOptions(
         { options: ['A', 'B'], destructiveButtonIndex: [0, 1] },
@@ -130,14 +122,35 @@ describe('ActionSheetIOS', () => {
       expect(captured?.destructiveButtonIndices).toEqual([0, 1]);
     });
 
-    // why: when the caller supplies no destructiveButtonIndex at all, normalization must not
-    // invent one — an action sheet with no destructive row must reach native with none.
-    it('omitting destructiveButtonIndex leaves destructiveButtonIndices unset', () => {
+    // RN отдаёт native `null`, а не пропускает ключ
+    it('omitting destructiveButtonIndex sends destructiveButtonIndices as null', () => {
       ActionSheetIOS.showActionSheetWithOptions(
         { options: ['A', 'B'] },
         () => undefined,
       );
-      expect(captured?.destructiveButtonIndices).toBeUndefined();
+      expect(captured?.destructiveButtonIndices).toBeNull();
+    });
+
+    // RN прогоняет три цвета через `processColor`, в native уходит число
+    it('sends processed tint colors', async () => {
+      const { setColorProcessor } = await import('../platform-color');
+      setColorProcessor(value => (value === '#ff0000' ? 0xff_ff_00_00 : value));
+      try {
+        ActionSheetIOS.showActionSheetWithOptions(
+          {
+            options: ['A'],
+            tintColor: '#ff0000',
+            cancelButtonTintColor: '#ff0000',
+            disabledButtonTintColor: '#ff0000',
+          },
+          () => undefined,
+        );
+      } finally {
+        setColorProcessor(value => value);
+      }
+      expect(captured?.tintColor).toBe(0xff_ff_00_00);
+      expect(captured?.cancelButtonTintColor).toBe(0xff_ff_00_00);
+      expect(captured?.disabledButtonTintColor).toBe(0xff_ff_00_00);
     });
 
     it('showShareActionSheetWithOptions forwards options and delivers the success callback', () => {
@@ -151,17 +164,27 @@ describe('ActionSheetIOS', () => {
           activityTypeResult = activityType;
         },
       );
-      expect(capturedShare).toEqual({
-        message: 'hello',
-        url: 'https://example.com',
-      });
+      expect(capturedShare?.message).toBe('hello');
+      expect(capturedShare?.url).toBe('https://example.com');
       expect(completedResult).toBe(true);
       expect(activityTypeResult).toBe('com.apple.UIKit.activity.Mail');
     });
 
-    // why: showShareActionSheetWithOptions's contract is failure XOR success, exactly like
-    // RN's own share sheet — a rejected/cancelled share must reach the failure callback, not
-    // silently resolve as success.
+    it('showShareActionSheetWithOptions sends a processed tintColor', async () => {
+      const { setColorProcessor } = await import('../platform-color');
+      setColorProcessor(value => (value === '#ff0000' ? 0xff_ff_00_00 : value));
+      try {
+        ActionSheetIOS.showShareActionSheetWithOptions(
+          { message: 'hello', tintColor: '#ff0000' },
+          () => undefined,
+          () => undefined,
+        );
+      } finally {
+        setColorProcessor(value => value);
+      }
+      expect(capturedShare?.tintColor).toBe(0xff_ff_00_00);
+    });
+
     it('showShareActionSheetWithOptions delivers the failure callback on native error', () => {
       installFakeManager({
         showActionSheetWithOptions:
@@ -187,52 +210,80 @@ describe('ActionSheetIOS', () => {
     });
   });
 
-  describe('no-op (native module unavailable)', () => {
-    // why: ActionSheetManager may be absent on a real device build without the module linked —
-    // a missing module must degrade silently, never throw and never invoke the caller's callback.
-    it('showActionSheetWithOptions is a no-op and never invokes the callback', () => {
-      installFakeManager(null);
+  describe('invalid arguments', () => {
+    const notAnObject: unknown = JSON.parse('5');
+    const notAFunction: unknown = JSON.parse('"x"');
+
+    it('showActionSheetWithOptions needs an options object', () => {
+      expect(() =>
+        Reflect.apply(ActionSheetIOS.showActionSheetWithOptions, undefined, [
+          notAnObject,
+          () => undefined,
+        ]),
+      ).toThrow('Options must be a valid object');
+    });
+
+    it('showActionSheetWithOptions needs a callback', () => {
+      expect(() =>
+        Reflect.apply(ActionSheetIOS.showActionSheetWithOptions, undefined, [
+          { options: ['A'] },
+          notAFunction,
+        ]),
+      ).toThrow('Must provide a valid callback');
+    });
+
+    it('showShareActionSheetWithOptions needs options and both callbacks', () => {
+      const share = ActionSheetIOS.showShareActionSheetWithOptions;
+      const noop = () => undefined;
+      expect(() =>
+        Reflect.apply(share, undefined, [notAnObject, noop, noop]),
+      ).toThrow('Options must be a valid object');
+      expect(() =>
+        Reflect.apply(share, undefined, [{}, notAFunction, noop]),
+      ).toThrow('Must provide a valid failureCallback');
+      expect(() =>
+        Reflect.apply(share, undefined, [{}, noop, notAFunction]),
+      ).toThrow('Must provide a valid successCallback');
+    });
+  });
+
+  describe('native module unavailable', () => {
+    beforeEach(() => installFakeManager(null));
+
+    it('showActionSheetWithOptions throws and never invokes the callback', () => {
       let callbackCalled = false;
       expect(() =>
         ActionSheetIOS.showActionSheetWithOptions({ options: ['A'] }, () => {
           callbackCalled = true;
         }),
-      ).not.toThrow();
+      ).toThrow(MISSING_MANAGER);
       expect(callbackCalled).toBe(false);
     });
 
-    it('showShareActionSheetWithOptions is a no-op and never invokes either callback', () => {
-      installFakeManager(null);
-      let anyCallbackCalled = false;
+    it('showShareActionSheetWithOptions throws', () => {
       expect(() =>
         ActionSheetIOS.showShareActionSheetWithOptions(
           { message: 'hello' },
-          () => {
-            anyCallbackCalled = true;
-          },
-          () => {
-            anyCallbackCalled = true;
-          },
+          () => undefined,
+          () => undefined,
         ),
-      ).not.toThrow();
-      expect(anyCallbackCalled).toBe(false);
+      ).toThrow(MISSING_MANAGER);
     });
 
-    it('dismissActionSheet is a no-op when the native module is unresolved', () => {
-      installFakeManager(null);
-      expect(() => ActionSheetIOS.dismissActionSheet()).not.toThrow();
+    it('dismissActionSheet throws', () => {
+      expect(() => ActionSheetIOS.dismissActionSheet()).toThrow(
+        MISSING_MANAGER,
+      );
     });
+  });
 
-    // why: dismissActionSheet is declared optional on INativeActionSheetManager (older hosts may
-    // lack it even when the module itself resolves) — the `?.()` call must not throw "not a
-    // function" on such a host.
-    it('dismissActionSheet is a no-op when the module resolves but lacks dismissActionSheet', () => {
-      installFakeManager({
-        showActionSheetWithOptions:
-          defaultFakeManager().showActionSheetWithOptions,
-      });
-      expect(() => ActionSheetIOS.dismissActionSheet()).not.toThrow();
-      expect(dismissCalled).toBe(false);
+  // Старые хосты могут не иметь `dismissActionSheet`, RN проверяет typeof
+  it('dismissActionSheet is a no-op when the module lacks dismissActionSheet', () => {
+    installFakeManager({
+      showActionSheetWithOptions:
+        defaultFakeManager().showActionSheetWithOptions,
     });
+    expect(() => ActionSheetIOS.dismissActionSheet()).not.toThrow();
+    expect(dismissCalled).toBe(false);
   });
 });
