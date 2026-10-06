@@ -221,14 +221,138 @@ from each package's `expo-module.config.json`.
 
 ### Tier 3 — view-based, simple surface
 
+Scouted from vendor (sdk-55 snapshot). `clipboard` already ships a native view through
+`requireNativeViewManager` on all 5 adapters, so the view recipe is proven; only `children`
+is new. Decided: `checkbox` has no native code (Pressable+Image), so it goes to
+`core/components` (state/view/lifecycle), NOT a `@symbiote-native/checkbox` package. iOS-only
+`symbols`/`glass-effect`/`apple-authentication` mirror upstream on Android (stub/null/
+`UnavailabilityError`). `apple-authentication` is a hybrid: 1 view + 5 async functions + config plugin.
+
 | # | Package | Kind | Platforms |
 |---|---|---|---|
-| 49 | `expo-checkbox` | V | verify at implementation time — no native `ios`/`android` folders in current vendor snapshot, may already compose from existing platform checkbox views |
-| 50 | `expo-blur` | V | apple, android |
-| 51 | `expo-linear-gradient` | V | apple, android |
-| 52 | `expo-symbols` | V | apple only (SF Symbols) |
-| 53 | `expo-glass-effect` | V | apple only (iOS 26 Liquid Glass) |
-| 54 | `expo-apple-authentication` | V | apple only (Sign in with Apple button) |
+Progress, checkbox (in the working tree, nothing committed): core behavior `behaviors/checkbox.ts`
+with the C++ rule `foldCheckboxProps`/`foldCheckboxMarkProps` in `SymbioteFabricProps.cpp`, vitest
+and `checkbox-payload.itest.ts` written, per-adapter prop types and Angular `CheckboxElement`
+(`elements.ts` was split into `element-base`/`elements-press`/`elements-layout`/`elements-controls`
+to pass the 400-line gate). `onValueChange` takes an event with `value`, the Switch convention,
+because a Svelte on* attribute receives one object. Tag tests exist in all five adapters and an
+Android itest covers the teal. Itests pass (iOS 594, Android 29); the owner allowed building them.
+Still open: checkbox docs page.
+
+Progress, linear-gradient (`packages/linear-gradient`, uncommitted): core `renderLinearGradient`
+(iOS native root, Android View wrapper + absolute-fill leaf), all five adapters tested (37 tests),
+ngc and tsc clean, CLI layer, README, docs page, sidebar, changeset. Svelte uses `svelte:element`
++ `hostProps`; Angular keeps one component per platform (`index.ios.ts` static native tag with
+`NO_ERRORS_SCHEMA`, `index.android.ts` View + outlet + `ng-content`). Drift audit skips it (no
+config plugin). Unrelated red tests: `examples/.codegraph`, stale `packages/crypto/build`.
+
+Progress, blur (`packages/blur`, uncommitted): core `renderBlurView` (View + absolute-fill native
+leaf on both platforms) and `renderBlurTargetView` (native on Android, plain View on iOS), all five
+adapters tested, tsc and ngc clean, CLI layer, README, docs page, changeset. A multi-view module
+needs `expoViewManagerName(module, view)`. `blurTarget` is each adapter's own ref, resolved to a
+node and awaited with `whenCommitted` (`watchBlurTarget`), never read as a tag at mount: a Vue or
+Svelte commit lands after `mounted`. Shared bridges added for wrappers with children:
+`descriptorToVue(d, extra)`, `descriptorToSolid(d, children)`, Svelte `descriptor-host` subpath
+component, Angular `DescriptorHost`, `hostNodeOf` (Angular), `hostInstance` in the Svelte
+native-view-bridge. A package declares its Expo views once through `defineExpoNativeViews` (engine),
+and a Solid wrapper over one render function is `defineDescriptorComponent`. Angular cannot spell
+a dynamic tag, so a static native tag
+(`BlurTargetView` on Android, `LinearGradient` on iOS) warns via `warnIfViewNameIsDynamic` when
+`__expo_app_identifier__` makes the real name differ.
+
+Progress, glass-effect (`packages/glass-effect`, uncommitted): iOS-only native root with children,
+plain `View` without the glass props elsewhere, plus `isLiquidGlassAvailable` and
+`isGlassEffectAPIAvailable` (cached native constants, false off iOS). All five adapters tested
+(60 tests), tsc and ngc clean, CLI layer, README, docs page, changeset. `native-link.json` is
+`android.modules: []` because upstream has no Android folder.
+
+Progress, symbols (`packages/symbols`, uncommitted): iOS native `SymbolModule` view, Android and web
+glyph from the Material Symbols font (`symbols.json` and the seven weight files copied from
+upstream, `./androidWeights/*` subpath), loaded through `@symbiote-native/font`. All five adapters
+tested (51 tests), tsc and ngc clean, CLI layer, README, docs page, changeset. `watchSymbolFont` is
+the shared load lifecycle. The descriptor shape changes when the font loads (empty View, then a
+glyph), which Solid's bridge forbids, so its component rebuilds the node per shape key. The Svelte
+`descriptor-host` now renders the whole descriptor tree. No upstream tests exist, the suites are new.
+
+Progress, apple-authentication (`packages/apple-authentication`, uncommitted, the last Tier 3
+package): credential flow (`signInAsync`, `refreshAsync`, `signOutAsync`, `getCredentialStateAsync`,
+`formatFullName`, `addRevokeListener`) in the shared core over `requireOptionalNativeModule` with a
+stub, plus the button (`onPress` goes to the native `onButtonPress`, `null` and a dev warning off
+iOS). All five adapters tested (56 tests), tsc and ngc clean, CLI layer, README, docs page,
+changeset. The Solid adapter gained `defineOptionalDescriptorComponent` (clipboard and contacts
+still carry their own copy of that shape). Tooling this needed: `expo-modules-link` writes
+`ios.infoPlistBooleanKeys` and `ios.entitlements` (creates the `.entitlements` file and wires `CODE_SIGN_ENTITLEMENTS` when it is missing),
+and the audit takes `ios.upstreamPackage` for iOS-only packages (glass-effect and symbols declare
+it too). The lint rule now knows `requireNativeViewManager`, the new `ios` keys, and an iOS-only
+manifest is `{"ios": {...}}` with no empty `android` block. The link package was split into
+`common`, `ios-plist`, `android-paths`, `android-regions` and `android-manifest` modules.
+
+Order (decided): checkbox, linear-gradient, blur, glass-effect and symbols, apple-authentication.
+
+Tier 4 progress, live-photo (`packages/live-photo`, uncommitted, first of tier 4): `LivePhotoView`
+with `startPlayback`/`stopPlayback` on all five adapters (37 tests), CLI layer, README, docs page,
+changeset. A native Expo view's functions live on `ViewPrototypes` of its module and native finds
+the view by `this.nativeTag`; the engine's `defineExpoViewMethods(requireNativeModule, module, view?)`
+does that call, and the core `createLivePhotoViewHandle(getNode)` wraps it. Each adapter only hands
+over its host node: React and Vue a function `ref` in the descriptor props, Solid the same through
+`spread`, Svelte `bind:this` + `hostInstance`, Angular `DescriptorOutlet.rootNode` + `hostNodeOf`.
+The handle is a `ref` in React and Solid, `expose` in Vue, exported functions in Svelte, methods in
+Angular.
+
+Tier 4 progress, camera (`packages/camera`, uncommitted): `CameraView` (all view functions through
+`createCameraView(getNode)`, which owns the barcode throttle per view), `useCameraPermissions` and
+`useMicrophonePermissions` (Angular services), the statics of upstream's class as plain functions
+(`isCameraAvailableAsync`, `launchScanner`, ...), `PictureRef`, `scanFromURLAsync`. All five
+adapters tested (111 tests), tsc and ngc clean, audit clean, CLI layer, README, docs, changeset.
+`createHostNodeHolder` (components) is the shared way React, Vue and Solid reach the host node,
+`NativeViewBase.hostNode()` the Angular one. Web files and the `barcodeScannerEnabled` plugin switch
+are not ported.
+
+Tier 4 progress, video (`packages/video`, uncommitted): the player is the native `VideoPlayer`
+shared object, `useVideoPlayer` / `injectVideoPlayer` over `createVideoPlayerController` (the
+engine's new `createJsonKeyedResourceController`, audio uses it too), `VideoView` per platform
+(`VideoView` on iOS, `SurfaceVideoView` / `TextureVideoView` on Android, the view functions follow
+the surface the last render chose), `VideoAirPlayButton` (plain view off iOS, without the AirPlay
+props), thumbnails, cache functions. Shared adapter helpers: `useNativeViewController` (React),
+`defineNativeViewComponent` (Vue, Solid), `useNativeViewController` rune (Svelte subpath),
+`NativeViewBase.hostNode()` (Angular). Angular inputs come from one `inputs` list plus an
+interface merge, `as const satisfies` is not statically evaluable by ngc. `useEvent` and
+`useEventListener` are `expo` package exports: ported into every adapter over the engine's
+`bindEventListener` (Svelte subpath `runes/use-event`, Angular `injectEvent`), not into video.
+The CLI layer's bundles live in `expo-package-manifest-bundles.ts`.
+All five adapters tested, tsc and ngc clean.
+
+Tier 4 progress, image (`packages/image`, uncommitted): `Image` through `createImageView(getNode)`
+(style split in `native-style.ts`, colors through `processColor` by hand, platform shadow rules,
+SF Symbol props, events with payload guards), `ImageBackground` (`renderImageBackground`, a View
+with an absolute-fill image), `useImage` / `injectImage` over `createImageRefLoader` (cancel and
+`release()` per load), the statics of upstream's class as plain functions (`prefetchImages`,
+`loadImageAsync`, ...). Angular selectors are `ExpoImage` / `ExpoImageBackground` because `Image`
+and `ImageBackground` are tags of the adapter. React's `descriptorToReactWithChildren` is shared by
+`LinearGradient`, `BlurView` and `ImageBackground`. Web files, RSC snapshot tests and the
+`expo-observe` hook are not ported. All five adapters tested, tsc and ngc clean, audit clean.
+
+Tier 4 progress, gl (`packages/gl`, uncommitted, last of tier 4): `GLView` (a view wrapping the
+native surface, `onContextCreate` gets `global.__EXGLContexts[id]`, which the native module
+installs), the statics of upstream's class as functions (`createContextAsync`, `takeSnapshotAsync`,
+...), `configureLogging` (prints with `console.warn`, `console.log` is banned by a hook). A
+controller may now define `dispose`, which every adapter runs on unmount (React effect cleanup, Vue
+`onUnmounted`, Solid `onCleanup`, Svelte `$effect` teardown, Angular `NativeViewBase.disposeView`);
+`GLView` uses it to forget its context. No config plugin, no native-link permissions. The package
+tsconfig adds the DOM lib for the WebGL types. The hidden `nativeRef_EXPERIMENTAL` prop and web are
+not ported. All five adapters tested (55 tests), tsc and ngc clean.
+Numbers below are the old ranking, kept for reference.
+
+| # | Package | Kind | Platforms |
+|---|---|---|---|
+| 49 | `expo-checkbox` | C | no native code (Pressable+Image, 247 JS lines, has `.web`); goes to `core/components`, no package |
+| 51 | `expo-linear-gradient` | V | apple, android; 1 view `ExpoLinearGradient`, takes `children`; Android passes `borderRadius` by hand |
+| 50 | `expo-blur` | V | apple, android; 2 views `ExpoBlurView` + `ExpoBlurTargetView` (target is Android-only) |
+| 53 | `expo-glass-effect` | V | apple only (iOS 26 Liquid Glass); `GlassView` + `GlassContainer` + 2 availability checks |
+| 52 | `expo-symbols` | V | apple only (SF Symbols); Android has image sources per weight, no native view |
+| 54 | `expo-apple-authentication` | V+M | apple only; 1 view + 5 async functions + config plugin |
+
+Kind `C` = component, goes through `<components_split_logic_view_lifecycle>`, not a wrapper package.
 
 ### Tier 4 — view-based, complex (media pipelines, GPU context)
 
@@ -269,3 +393,22 @@ from each package's `expo-module.config.json`.
 4. Pin any new native npm dependency via a pnpm catalog entry, not a literal version - see `symbiote-dependency-catalog`.
 5. Update this table's tier/row (strike through or move to a "shipped" note) once a package
    lands - keep the queue reflecting reality, not the 2026-07-28 snapshot forever.
+6. **Demo screens in `examples/expo-*` style with CSS classes, never `StyleSheet.create`**
+   (owner's rule). A wrapper that reads a style value in JS (a radius, a color, `resizeMode`) must
+   read it through `styleOfProps(props)` from the engine, not `props.style`, or a class-styled
+   value is lost (found with `LinearGradient` on Android). Type-check screens against workspace
+   sources with a throwaway `paths` tsconfig, the installed `latest` copies are stale. Event hooks
+   cannot infer the event map from a class emitter: name it, `useEvent<IVideoPlayerEvents, 'x'>(...)`.
+7. **Demo media and GL loops, found on device (2026-10).** Probe every remote sample URL before
+   using it: the Google `gtv-videos-bucket` Big Buck Bunny answers 403, archive.org's
+   `BigBuckBunny_124` serves ranges. Animate one GL scene at a time: scenes share the GL thread
+   and the iOS simulator renders GLES in software, so two running contexts make each other jerk.
+   Use `highp` in animated fragment shaders (iOS `mediump` is fp16) and feed them time counted from
+   the first frame. Cap shader scenes at 30 fps, `msaaSamples={0}` for a full-screen shader.
+8. Porting demo screens to the other examples: `tests/expo-examples-parity.test.ts` is the red/green list (one case per route x example). Register all routes once per example (routes, navigation-lines, menu, App.css, ExpoViews.css, deps), then add screens. In Vue SFC pass callbacks as `@change` / `@press`, never `:onChange=` / `:onPress=`: Vue binds `@x` to a declared `onX` prop, and a new component declares `defineEmits`.
+9. **Angular `[style]="signal()"` on an OnPush view froze the bar (2026-10, `LinearGradient` progress).** Angular writes a `[style]` binding into a component's `style` input through the styling path, which skips `markDirtyIfOnPush` that a plain `[prop]` runs. The label bound with `[value]` moved, the bar bound with `[style]` stayed on its first width. `NativeViewBase` now takes `style` through a plain `@Input` plus an inherited `ngOnChanges` that calls `markForCheck` (an accessor clashed with `declare style` in `ExpoImage`, and a subclass with its own `ngOnChanges` must call `super` first); guard: `linear-gradient.test.ts` "style from a signal". A new OnPush component with its own `style` input needs the same, `KeyboardAvoidingView` and the lists were probed and are fine (host directive). Unverified: a dynamic `[class]` on a `NativeViewBase` view, its class style is read from the anchor at descriptor time.
+10. **Never wrap a `checkbox` in a `pressable` in a demo row (2026-10).** upstream `ExpoCheckbox` is itself a `Pressable`; the row `<pressable onPress={onChange(!value)}><checkbox onValueChange/>` toggled twice per tap (nested presses both fire in our engine, stock RN fires only the inner). React/Vue/Angular hid it behind a stale `value`, Svelte and Solid (synchronous props) cancelled the toggle. The row is a plain `<view>` + `<checkbox>` + `<text>` as in expo-checkbox docs. The nested-press divergence itself is an open rn-parity item, no test pins it.
+11. **Solid `<Show keyed>` re-keys only a callback that declares a parameter (2026-10).** `solid.js` treats a function child as a render function only when `child.length > 0`; `{() => <GLView/>}` is returned as is, so a changed key never recreates the view and the native surface never fires `onContextCreate` again (the GL effect chips did nothing). Write `{(name: IShaderName) => <GLView onContextCreate={gl => start(gl, name)} />}`. `FilterScenario` keeps the zero-arg form: its key changes once, null to the asset.
+12. **A KSP-based native module needs `kspVersion` in the app root (2026-10).** `expo-image`, `expo-app-metrics` (also `expo-observe`, `expo-updates`, not ported) read `rootProject["kspVersion"]`, which Expo's `expo-root-project` plugin defines and our root `build.gradle` does not apply: Android fails with `Could not get unknown property 'kspVersion'`. Set `android.requiresKsp: true` in the package's `native-link.json`; `expo-modules-link` then writes a `KSP` region under `kotlinVersion` in `android/build.gradle`, picking the pair from Expo's `KSPLookup.kt` (`latestKspVersion` from Kotlin 2.3.0), and removes it when no package needs it. It only runs at the app's `postinstall`, so after a package change republish and reinstall the example. Not verified on a device yet.
+13. **A vertical `scroll-view` inside a page scroll needs `nestedScrollEnabled` on Android (2026-10).** Without it the inner list ignores the drag, as in stock RN. Demo screens with a fixed-height inner list (`blur-feed`, `image-list`) set it; the engine passes an authored value through untouched.
+14. **A host node built inside `buildStructure` must declare `resolvesImageSources` when it is an image (2026-10).** The checkbox checkmark was committed with `source` as `{ uri }` and Android crashed (`ReadableNativeMap cannot be cast to ReadableArray`) while iOS accepted it. The flag is per tag, `image-background-image` repeats it for the same reason.

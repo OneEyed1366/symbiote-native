@@ -167,3 +167,14 @@ that was never wired up. Not re-attempted, matches the earlier conclusion that
 
 Every item from `vue-api-surface.md` is now `works` or a documented, decided
 deferral (`useCssVars`). Next: Solid, per the agreed adapter order.
+
+## Reopened (2026-10-06): a camelCase `@event` on a native tag was silently dead
+
+On a native tag (`isCustomElement`, so `<switch>`, `<text-input>`) Vue's template compiler keys
+`@valueChange` as `"on:valueChange"` to keep the case, not `onValueChange`. The renderer read only
+`onXxx`, so the handler never attached: no error, the controlled input snapped back every
+keystroke and the switch never flipped. `v-model` and `@value-change` compile differently and
+worked, which hid it. Fixed in `normalizeVueAttrKey`. Guard: `adapters/vue/src/template-event-keys.test.ts`
+compiles every `.vue` in the repo through the real `compileSfc` and fails on an event key the
+renderer would not read. Lesson: types cannot see this, the bug lives between the compiler's output
+and the runtime, so a fix there needs a test on the COMPILED output.
