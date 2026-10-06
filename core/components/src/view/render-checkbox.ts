@@ -14,7 +14,7 @@ export type ICheckboxChangeEvent = ISymbioteEvent & { value: boolean };
 export interface ICheckboxProps extends IAccessibilityProps, IAriaProps {
   value?: boolean;
   disabled?: boolean;
-  // Перекрашивает отмеченный бокс и рамку, приоритетнее серого вида disabled
+  // Перекрашивает отмеченный бокс и рамку, серый вид disabled идёт после него и перекрывает
   color?: IColorValue;
   // NOTE: upstream тоже его не вызывает, он деструктурируется и выбрасывается
   onChange?: (event: ISymbioteEvent) => void;
