@@ -59,7 +59,9 @@ function CanaryHero() {
 export function CanaryScreen() {
   const [count, setCount] = createSignal(0);
   const { isRefreshing, refreshes, onRefresh } = createPullRefresh();
-  const tap = (): void => setCount(value => value + 1);
+  const tap = (): void => {
+    setCount(value => value + 1);
+  };
   return (
     <safe-area-view class="screen">
       <scroll-view testID="canary-scroll" class="screen" contentContainerStyle="scroll-content">
