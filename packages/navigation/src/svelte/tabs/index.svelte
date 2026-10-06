@@ -1,16 +1,6 @@
 <script lang="ts" module>
-  // Tab, the Svelte lifecycle half. The focused-index router (tab-router-state) and the tab-bar
-  // Descriptor builder (render-tabs) live in @symbiote-native/navigation core, shared verbatim
-  // with the React/Vue/Angular entries; here Svelte supplies the lifecycle - `$state.raw` for the
-  // router (its twin of useReducer), a module counter for route-key generation, `export
-  // function`s for the jumpTo/setParams handle - plus the Descriptor bridge for the tab-bar leaf.
-  // Unlike Stack, a bottom-tabs bar is a PURE-JS UI: it paints ordinary `view`/
-  // `text` primitives via the shared render fn, so there is no react-native-screens
-  // ViewConfig to register here - Tab needs no `../../register` import.
-  //
-  // Screens are discovered through the context collector (../screen-registry.ts), not by reading
-  // `children` - see stack/index.svelte's header for why, and ../registry-host.ts for where the
-  // markers are rendered.
+  // The tab bar is pure JS, painted from ordinary `view`/`text` by the shared render function, so
+  // nothing from `../../register` is needed. Screens come through the collector, as in the stack
   let tabInstanceCounter = 0;
 
   const TAB_ROOT_PROPS: Record<string, unknown> = { style: { flex: 1 } };
@@ -19,27 +9,21 @@
 
 <script lang="ts">
   import type { Component } from 'svelte';
-  import { onDestroy, tick } from 'svelte';
   import { dlog } from '@symbiote-native/engine';
   import type { ShimElement } from '@symbiote-native/svelte/native-view-bridge';
   import {
-    NAVIGATION_EVENT_BLUR,
-    NAVIGATION_EVENT_FOCUS,
+    buildFixedRoutes,
+    buildTabBarItems,
+    createEmitterStore,
     createInitialTabState,
-    createNavigationEmitter,
-    diffFocusedRoute,
-    isFocusedRoute,
+    createTabHandle,
     reconcileTabRoutes,
     renderTabBar,
+    resolveFocusedTabOptions,
     tabRouterReducer,
   } from '../../core';
   import type {
     IDescriptor,
-    INavigationEmitter,
-    IRoute,
-    ITabBarItemView,
-    ITabNavigatorHandle,
-    ITabOptions,
     ITabRouterAction,
     ITabRouterState,
   } from '../../core';
@@ -54,13 +38,13 @@
     withoutScreen,
   } from '../screen-registry';
   import type { IRegisteredScreen } from '../screen-registry';
+  import { trackFocus } from '../track-focus.svelte';
   import type { ITabScreenProps } from '../tab-screen-props';
   import type { ITabProps } from './tab-props';
 
   let { initialRouteName, screenOptions, children }: ITabProps = $props();
 
-  // Read BEFORE this Tab establishes its own per-screen NavigationScope - becomes the `parent`
-  // link a nested screen's useNavigation().getParent() walks. undefined at the nesting root.
+  // Read BEFORE this Tab sets its own scope, as it becomes the `parent` of its screens
   const parentScope = getNavigationScope();
 
   const routeIdPrefix = `tab-${(tabInstanceCounter += 1)}`;
@@ -78,23 +62,11 @@
 
   const registry = $derived(toRegistry(screens));
 
-  // A tab's route list is a PROJECTION of the registry, not navigation history the way Stack's
-  // is: a marker registering or unregistering must add or drop its tab. Unlike Stack, a route key
-  // here is derived from the route NAME rather than an incrementing sequence, so re-deriving this
-  // list on every registry change re-keys nothing.
-  const registeredRoutes = $derived.by<IRoute<unknown>[]>(() =>
-    [...registry.entries()].map(([name, entry]) => ({
-      key: `${routeIdPrefix}-${name}`,
-      name,
-      params: entry.initialParams,
-    })),
-  );
+  // The routes are a projection of the registry, so a marker adding or dropping its tab changes
+  // them. Keys come from the route name, so deriving again re-keys nothing
+  const registeredRoutes = $derived(buildFixedRoutes(registry, routeIdPrefix));
 
-  // The dispatched half is the only STATE here; the registry half is re-derived and reconciled
-  // against it on every change (reconcileTabRoutes, core - it is what preserves each surviving
-  // route's key/params and keeps the focus on the same route NAME). Nothing needs memoizing
-  // inside the derivation, so there is no state write during a derivation to avoid in the first
-  // place. Until something dispatches there is nothing to reconcile against, hence the seed.
+  // Only the dispatched half is state: the rest is reconciled against it on every change
   let dispatchedState = $state.raw<ITabRouterState | null>(null);
 
   const state = $derived.by<ITabRouterState>(() => {
@@ -110,125 +82,35 @@
     dispatchedState = tabRouterReducer(state, action);
   }
 
-  export function jumpTo(name: string, params?: unknown): void {
-    dispatch({ type: 'jumpTo', name, params });
-  }
-  export function setParams(params: unknown, key: string): void {
-    dispatch({ type: 'setParams', key, params });
-  }
+  const handle = createTabHandle(dispatch);
+  export const { jumpTo, setParams } = handle;
 
-  const handle: ITabNavigatorHandle = { jumpTo, setParams };
+  const { emitterFor } = createEmitterStore();
+  trackFocus(() => state, emitterFor, 'Tab');
 
-  // One emitter per route.key, created lazily and cached for the navigator's whole lifetime -
-  // mirrors Stack's own `emitters` map. This decouples emitter IDENTITY (stable, looked up by
-  // key, read below when a route's NavigationScope is built) from emit TIMING (must wait until
-  // the focused screen has actually mounted and subscribed).
-  // Plain Map: a get/set/delete identity cache never read by the reactive graph, not rendered
-  // state — SvelteMap's tracking would be pure overhead here.
-  // eslint-disable-next-line svelte/prefer-svelte-reactivity
-  const emitters = new Map<string, INavigationEmitter>();
-  function emitterFor(routeKey: string): INavigationEmitter {
-    let emitter = emitters.get(routeKey);
-    if (emitter === undefined) {
-      emitter = createNavigationEmitter();
-      emitters.set(routeKey, emitter);
-    }
-    return emitter;
-  }
-
-  // Tab paints its own bar in pure JS - there is no native onAppear/onDisappear to hook (unlike
-  // Stack's RNSScreen), so focus/blur is synthesized here. Keyed on the route KEY (not the route
-  // object) so a setParams-only change doesn't spuriously re-fire focus/blur.
-  //
-  // The bookkeeping updates immediately, but the actual emit is deferred to `tick()` - Svelte's
-  // twin of Vue's nextTick, and needed for the same reason: the newly-focused screen's own
-  // `$effect`s (its useIsFocused/useFocusEffect subscriptions) are created during THIS flush,
-  // after this effect was, so emitting synchronously here would reach zero subscribers.
-  let previousFocusedKey: string | undefined;
-  $effect(() => {
-    const nextKey = state.routes[state.index]?.key;
-    const { blurKey, focusKey } = diffFocusedRoute(previousFocusedKey, nextKey);
-    if (blurKey === undefined && focusKey === undefined) return;
-    previousFocusedKey = nextKey;
-    void tick().then(() => {
-      if (blurKey !== undefined) {
-        dlog(`Tab: route "${blurKey}" blurred at t=${Date.now()}`);
-        emitterFor(blurKey).emit(NAVIGATION_EVENT_BLUR);
-      }
-      if (focusKey !== undefined) {
-        dlog(`Tab: route "${focusKey}" focused at t=${Date.now()}`);
-        emitterFor(focusKey).emit(NAVIGATION_EVENT_FOCUS);
-      }
-    });
+  const barInput = $derived({
+    state,
+    handle,
+    entryFor: (name: string) => registry.get(name),
+    optionsOf: (entry: IRegisteredScreen<ITabScreenProps['options']>) =>
+      entry.options,
+    screenOptions,
   });
-
-  onDestroy(() => {
-    if (previousFocusedKey !== undefined) {
-      emitterFor(previousFocusedKey).emit(NAVIGATION_EVENT_BLUR);
-    }
-  });
-
-  function resolveTabOptions(
-    entry: IRegisteredScreen<ITabScreenProps['options']> | undefined,
-    route: IRoute<unknown>,
-  ): ITabOptions {
-    const own =
-      entry === undefined
-        ? undefined
-        : typeof entry.options === 'function'
-          ? entry.options({ route, navigation: handle })
-          : entry.options;
-    return { ...screenOptions, ...own };
-  }
-
-  const items = $derived.by<ITabBarItemView[]>(() =>
-    state.routes.map((route, index) => {
-      const entry = registry.get(route.name);
-      const focused = isFocusedRoute(index, state.index);
-      if (entry === undefined) {
-        dlog(`Tab: no screen registered for route name "${route.name}"`);
-        return { key: route.key, focused, label: route.name, passthrough: {} };
-      }
-      const options = resolveTabOptions(entry, route);
-      return {
-        key: route.key,
-        focused,
-        label: options.tabBarLabel ?? options.title ?? route.name,
-        icon: options.tabBarIcon,
-        badge: options.tabBarBadge,
-        activeTintColor: options.tabBarActiveTintColor,
-        inactiveTintColor: options.tabBarInactiveTintColor,
-        passthrough: {
-          onPress: () => jumpTo(route.name),
-          accessibilityRole: 'tab',
-          accessibilityState: { selected: focused },
-        },
-      };
-    }),
-  );
-
-  const focusedRoute = $derived(state.routes[state.index]);
-  const focusedOptions = $derived(
-    focusedRoute === undefined
-      ? screenOptions
-      : resolveTabOptions(registry.get(focusedRoute.name), focusedRoute),
-  );
 
   const tabBar = $derived.by<IDescriptor>(() =>
     renderTabBar({
-      items,
-      style: focusedOptions?.tabBarStyle,
+      items: buildTabBarItems(barInput),
+      style: resolveFocusedTabOptions(barInput)?.tabBarStyle,
       passthrough: {},
     }),
   );
 
-  // Only the focused route's screen is ever mounted (unlike Stack, which keeps every pushed route
-  // alive), so a fresh NavigationScope per focus change is sufficient - the previous screen's
-  // whole subtree (and any listeners it registered) is torn down by an ordinary unmount when
-  // focus moves on.
+  // Only the focused screen is mounted, so a fresh scope per focus change is enough: the previous
+  // subtree and its listeners go with an ordinary unmount
   const focusedScreen = $derived.by<
     { scope: INavigationScopeValue; component: Component } | undefined
   >(() => {
+    const focusedRoute = state.routes[state.index];
     if (focusedRoute === undefined) return undefined;
     const entry = registry.get(focusedRoute.name);
     if (entry === undefined) return undefined;
@@ -243,10 +125,8 @@
     };
   });
 
-  // The bar's ROOT stays a literal template tag (so `bind:this` has a statically known tag) and
-  // only its children go through the Descriptor bridge - the uniform shape every Svelte component
-  // consuming a `render-*.ts` uses (svelte-adapter-dom-shim skill §19). The item count varies with
-  // the registry, hence the shape-change-tolerant wrapper rather than the raw bridge.
+  // The root stays a literal tag so `bind:this` has a known one, and only the children go through
+  // the bridge. Their count varies with the registry, hence the wrapper that tolerates a new shape
   let tabBarHost = $state.raw<ShimElement | null>(null);
   const syncTabBarChildren = createDescriptorSubtreeSync();
   $effect(() => {

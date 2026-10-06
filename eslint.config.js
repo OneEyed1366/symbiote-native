@@ -174,6 +174,26 @@ export default defineConfig(
     },
   },
 
+  // ── Angular native-view wrappers that declare their inputs through `inputs: [...]`. The class
+  // gets its input TYPES from an empty interface of the same name that `extends Partial<Pick<…>>`,
+  // because the `@Input()` decorators the interface stands in for would repeat every prop of the
+  // shared prop type once per wrapper. A mapped type can only be pulled into a class by merging, so
+  // both the empty interface and the merge are the point. Listed by file so ordinary Angular
+  // source still gets both rules. ──
+  {
+    files: [
+      'packages/gl/src/angular/gl-view/index.ts',
+      'packages/image/src/angular/image/index.ts',
+      'packages/image/src/angular/image-background/index.ts',
+      'packages/video/src/angular/video-view/index.ts',
+      'packages/video/src/angular/video-airplay-button/index.ts',
+    ],
+    rules: {
+      '@typescript-eslint/no-empty-object-type': 'off',
+      '@typescript-eslint/no-unsafe-declaration-merging': 'off',
+    },
+  },
+
   // Future adapters get their own block here, e.g.:
   // { files: ['adapters/angular/**/*.ts'], plugins: { ... }, rules: { ... } },
 

@@ -14,7 +14,7 @@
 // route" is a no-op the reducer already fails closed on (core's contract), observed here as an
 // unchanged screen count, not a thrown error.
 
-import { defineComponent, h, ref } from '@vue/runtime-core';
+import { Fragment, defineComponent, h, ref } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   mount,
@@ -36,7 +36,7 @@ import type { INavigatorHandle } from './index';
 import { useRoute } from '../composables';
 import type { INavigatorState, ISearchBarCommands } from '../../core';
 
-const ROOT_TAG = 4512;
+const ROOT_TAG = 4_512;
 const SCREEN_VIEW = 'RNSScreen';
 const STACK_VIEW = 'RNSScreenStack';
 const HEADER_CONFIG_VIEW = 'RNSScreenStackHeaderConfig';
@@ -223,8 +223,7 @@ function mountDynamicStack(
 
 describe('Vue Stack navigator', () => {
   describe('Positive', () => {
-    // why: only the initial route mounts as a real RNSScreen, at the focused activityState (2), and
-    // its header title reaches the native header config - the baseline every other case here builds on.
+    // Монтируется только начальный маршрут, с `activityState` 2, его title доходит до header config
     it('mounts only the initial route as an RNSScreen, focused', async () => {
       mount(
         ROOT_TAG,
@@ -248,10 +247,7 @@ describe('Vue Stack navigator', () => {
       expect(headerConfigOf(screens[0]).props.title).toBe('Home');
     });
 
-    // why: react-native-screens' native RNSScreen asserts an already-mounted NativeStack screen's
-    // activityState can never decrease, and @react-navigation/native-stack's real algorithm never
-    // demotes a route below the focused index to anything but 0 - both routes must stay
-    // activityState 2 after a push, not just the new top.
+    // `RNSScreen` не допускает снижения `activityState`, поэтому после push оба маршрута на 2
     it('push() mounts a second RNSScreen and keeps the first at activityState 2', async () => {
       const handleRef = ref<INavigatorHandle | null>(null);
       mountStack(handleRef, [
@@ -289,6 +285,42 @@ describe('Vue Stack navigator', () => {
       await tick();
       expect(screenNodes()).toHaveLength(1);
       expect(handleRef.value?.canGoBack()).toBe(false);
+    });
+
+    // `v-for` в слоте Stack компилируется во `Fragment`, его экраны остаются маршрутами
+    it('push() reaches a screen declared inside a Fragment (v-for)', async () => {
+      const handleRef = ref<INavigatorHandle | null>(null);
+      mountStack(handleRef, [
+        h(Stack.Screen, { name: 'Home', component: HomeScreen }),
+        h(Fragment, null, [
+          h(Stack.Screen, { name: 'Details', component: DetailsScreen }),
+        ]),
+      ]);
+      await tick();
+      handleRef.value?.push('Details');
+      await tick();
+      expect(screenNodes()).toHaveLength(2);
+    });
+
+    // Состояние экрана живёт между его обновлениями: экран не пересоздаётся при смене своего ref
+    it('keeps a screen mounted while its own state changes', async () => {
+      let setups = 0;
+      const count = ref(0);
+      const CounterScreen = defineComponent({
+        setup: () => {
+          setups += 1;
+          return () => h('text', {}, `count ${count.value}`);
+        },
+      });
+      mountStack(ref<INavigatorHandle | null>(null), [
+        h(Stack.Screen, { name: 'Home', component: CounterScreen }),
+      ]);
+      await tick();
+      count.value = 1;
+      await tick();
+      count.value = 2;
+      await tick();
+      expect(setups).toBe(1);
     });
 
     // why: popping the last route must be a silent no-op (fail closed), not an empty stack -
@@ -530,9 +562,7 @@ describe('Vue Stack navigator', () => {
       expect(receivedText).toBe('asdf');
     });
 
-    // why: every other search bar lifecycle event (focus/blur/cancel/searchButtonPress/close/open)
-    // must reach its own matching app-supplied callback - proven together since they share the same
-    // buildSearchBarPassthrough wiring and a per-event regression would otherwise need its own file.
+    // Остальные события search bar идут через общий `buildSearchBarPassthrough`, один кейс на все
     it('forwards every other native search bar event to its app-supplied callback', async () => {
       const received: {
         focus: number;
@@ -588,10 +618,8 @@ describe('Vue Stack navigator', () => {
       });
     });
 
-    // why: the app-supplied search bar ref must drive REAL imperative native commands
-    // (focus/setText/toggleCancelButton/clearText/cancelSearch/blur) on the committed RNSSearchBar
-    // node, proving the ref callback resolves to the actual host instance rather than a stale or
-    // null one.
+    // The app-supplied ref must send real native commands to the committed RNSSearchBar
+    // Proves it resolves to the live host instance, not a stale or null one
     it('drives imperative SearchBarCommands (focus/setText/…) through the app-supplied ref', async () => {
       const searchBarRef = ref<ISearchBarCommands | null>(null);
       mount(
@@ -673,10 +701,8 @@ describe('Vue Stack navigator', () => {
       expect(kidsOf(header)).toHaveLength(0);
     });
 
-    // why: the route list is navigation HISTORY, not a projection of the slot's markers, so a
-    // marker that leaves the slot while its route is still pushed used to leave a phantom entry -
-    // a route nothing can render, which the user cannot see but every back press has to walk
-    // through. Reconciling against the registry must drop it and leave the user on a real screen.
+    // The route list is history, not a projection of the slot's markers
+    // A pushed route whose marker left would be a phantom every back press walks through
     it('drops a pushed route whose <Stack.Screen> marker leaves the slot', async () => {
       const handleRef = ref<INavigatorHandle | null>(null);
       const isDetailsRegistered = ref(true);

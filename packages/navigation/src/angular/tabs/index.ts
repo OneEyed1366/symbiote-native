@@ -29,7 +29,6 @@ import {
   NO_ERRORS_SCHEMA,
   QueryList,
   signal,
-  untracked,
   type AfterContentInit,
   type OnDestroy,
   type Type,
@@ -39,33 +38,35 @@ import { dlog } from '@symbiote-native/engine';
 import { DescriptorOutlet } from '@symbiote-native/angular';
 import type { IDescriptor } from '@symbiote-native/components';
 import {
-  NAVIGATION_EVENT_BLUR,
-  NAVIGATION_EVENT_FOCUS,
+  buildFixedRoutes,
+  buildTabBarItems,
   createInitialTabState,
-  createNavigationEmitter,
-  diffFocusedRoute,
-  isFocusedRoute,
+  createTabHandle,
   reconcileTabRoutes,
   renderTabBar,
+  resolveFocusedTabOptions,
   tabRouterReducer,
 } from '../../core';
 import type {
   INavigationEmitter,
   IRoute,
-  ITabBarItemView,
+  ITabBarInput,
   ITabNavigatorHandle,
   ITabOptions,
   ITabRouterAction,
   ITabRouterState,
 } from '../../core';
+import { createFocusedEmitter } from '../focused-emitter';
 import { NavigationScopeDirective } from '../navigation-scope.directive';
 import { TabScreenDirective } from '../tab-screen.directive';
-import type { ITabScreenOptionsArgs } from '../tab-screen.directive';
 
 export type { ITabNavigatorHandle } from '../../core';
 
 const TAB_ROOT_STYLE = { flex: 1 };
 const TAB_CONTENT_STYLE = { flex: 1 };
+
+// Before the first screen registers there is no state, and the bar paints with no items
+const EMPTY_TAB_STATE: ITabRouterState = { routes: [], index: 0 };
 
 let tabInstanceCounter = 0;
 
@@ -114,13 +115,13 @@ export class Tab implements AfterContentInit, OnDestroy, ITabNavigatorHandle {
   private readonly stateSignal = signal<ITabRouterState | undefined>(undefined);
   readonly state = this.stateSignal.asReadonly();
 
-  private currentEmitterKey: string | undefined;
-  private currentEmitter: INavigationEmitter | undefined;
+  private readonly focused = createFocusedEmitter('Tab', () =>
+    this.focusedRoute(),
+  );
 
-  readonly jumpTo = (name: string, params?: unknown): void =>
-    this.dispatch({ type: 'jumpTo', name, params });
-  readonly setParams = (params: unknown, key: string): void =>
-    this.dispatch({ type: 'setParams', key, params });
+  private readonly handle = createTabHandle(action => this.dispatch(action));
+  readonly jumpTo = this.handle.jumpTo;
+  readonly setParams = this.handle.setParams;
 
   ngAfterContentInit(): void {
     this.syncRegistry();
@@ -132,7 +133,7 @@ export class Tab implements AfterContentInit, OnDestroy, ITabNavigatorHandle {
 
   ngOnDestroy(): void {
     this.tabScreenChildrenSubscription?.unsubscribe();
-    if (this.currentEmitter) this.currentEmitter.emit(NAVIGATION_EVENT_BLUR);
+    this.focused.dispose();
   }
 
   private rebuildRegistry(): void {
@@ -142,23 +143,11 @@ export class Tab implements AfterContentInit, OnDestroy, ITabNavigatorHandle {
     }
   }
 
-  private routesFromRegistry(): IRoute<unknown>[] {
-    return Array.from(this.registry.entries()).map(([name, entry]) => ({
-      key: `${this.routeIdPrefix}-${name}`,
-      name,
-      params: entry.initialParams,
-    }));
-  }
-
-  // A <ng-template symbioteTabScreen> can appear or disappear after mount (a marker behind an
-  // @if, a data-driven screen list), so the route list follows the LIVE query instead of staying
-  // frozen at whatever ngAfterContentInit first saw: reconcileTabRoutes (core) keeps each
-  // surviving route's key and accumulated params and moves focus only when the focused route is
-  // the one that left. Runs from the query's own `changes` subscription - an ordinary imperative
-  // callback, deliberately not a computed, since this writes the state signal.
+  // A marker can appear or leave after mount, so the routes follow the live query
+  // `reconcileTabRoutes` keeps each survivor's key and params. Not a computed: it writes a signal
   private syncRegistry(): void {
     this.rebuildRegistry();
-    const routes = this.routesFromRegistry();
+    const routes = buildFixedRoutes(this.registry, this.routeIdPrefix);
     if (routes.length === 0)
       dlog('Tab: no <ng-template symbioteTabScreen> children registered');
     const current = this.stateSignal();
@@ -166,8 +155,7 @@ export class Tab implements AfterContentInit, OnDestroy, ITabNavigatorHandle {
       this.stateSignal.set(reconcileTabRoutes(current, routes));
       return;
     }
-    // Seeding an empty list would resolve initialRouteName against nothing and lose it once the
-    // markers do arrive, so the state stays unseeded until at least one has registered.
+    // Seeding an empty list would lose `initialRouteName`, so wait for the first marker
     if (routes.length === 0) return;
     this.stateSignal.set(createInitialTabState(routes, this.initialRouteName));
   }
@@ -176,18 +164,6 @@ export class Tab implements AfterContentInit, OnDestroy, ITabNavigatorHandle {
     const current = this.stateSignal();
     if (current === undefined) return;
     this.stateSignal.set(tabRouterReducer(current, action));
-  }
-
-  private resolveTabOptions(
-    entry: TabScreenDirective,
-    route: IRoute<unknown>,
-  ): ITabOptions {
-    const props: ITabScreenOptionsArgs = { route, navigation: this };
-    const own =
-      typeof entry.options === 'function'
-        ? entry.options(props)
-        : entry.options;
-    return { ...this.screenOptions, ...own };
   }
 
   focusedRoute(): IRoute<unknown> | undefined {
@@ -199,95 +175,21 @@ export class Tab implements AfterContentInit, OnDestroy, ITabNavigatorHandle {
     return this.registry.get(route.name)?.component ?? null;
   }
 
-  // Lazily creates/replaces the focused route's emitter and synthesizes focus/blur - Tab paints
-  // its own bar in pure JS (no native onAppear/onDisappear the way Stack's RNSScreen has), so
-  // focus/blur is synthesized here exactly like react/tabs.ts's own useEffect does, just idempotent
-  // per read (called repeatedly with the same key during one CD pass) instead of dependency-array
-  // gated. Keyed on the route KEY, not the object, so a setParams-only change doesn't re-fire.
-  //
-  // Called from the template ([emitter]="focusedRouteEmitter()"), which runs inside Angular's
-  // reactive-read tracking context for the current CD pass - unlike React's useEffect, which runs
-  // in a separate post-commit phase. Two consequences of that, both fixed below:
-  //
-  // 1. Writing a signal from inside a tracked template read throws Angular's NG600 ("signal write
-  //    during a template execution") - untracked() opts this whole synthesis out of that tracking
-  //    context, matching what the post-commit useEffect phase gives React for free.
-  // 2. The NEW route's screen component (injectIsFocused's listener source) is created by
-  //    *ngComponentOutlet AFTER this binding is evaluated, but still within the SAME synchronous
-  //    template refresh - so emitting FOCUS right here fires to zero listeners and is silently
-  //    lost forever (isFocused stays false permanently, even for the very first-focused screen).
-  //    queueMicrotask defers the FOCUS emit past the end of the current synchronous refresh
-  //    (which includes the new screen's construction), guaranteeing its injectIsFocused()
-  //    listener is already attached by the time it fires. BLUR doesn't need this: the outgoing
-  //    screen's listener was already attached on an earlier tick, so it's safe to fire now.
   focusedRouteEmitter(): INavigationEmitter {
-    const key = this.focusedRoute()?.key;
-    return untracked(() => {
-      if (key === this.currentEmitterKey && this.currentEmitter)
-        return this.currentEmitter;
-      const { blurKey, focusKey } = diffFocusedRoute(
-        this.currentEmitterKey,
-        key,
-      );
-      if (blurKey !== undefined && this.currentEmitter) {
-        dlog('Tab: previous route blurred');
-        this.currentEmitter.emit(NAVIGATION_EVENT_BLUR);
-      }
-      const emitter = createNavigationEmitter();
-      this.currentEmitter = emitter;
-      this.currentEmitterKey = key;
-      if (focusKey !== undefined) {
-        queueMicrotask(() => {
-          if (this.currentEmitter !== emitter) return; // superseded by a later switch
-          dlog(`Tab: route "${this.focusedRoute()?.name}" focused`);
-          emitter.emit(NAVIGATION_EVENT_FOCUS);
-        });
-      }
-      return emitter;
-    });
+    return this.focused.emitter();
   }
 
   tabBarDescriptor(): IDescriptor {
-    const state = this.stateSignal();
-    const routes = state?.routes ?? [];
-    const focusedIndex = state?.index ?? 0;
-
-    const items: ITabBarItemView[] = routes.map((route, index) => {
-      const entry = this.registry.get(route.name);
-      const focused = isFocusedRoute(index, focusedIndex);
-      if (!entry) {
-        dlog(`Tab: no screen registered for route name "${route.name}"`);
-        return { key: route.key, focused, label: route.name, passthrough: {} };
-      }
-      const options = this.resolveTabOptions(entry, route);
-      return {
-        key: route.key,
-        focused,
-        label: options.tabBarLabel ?? options.title ?? route.name,
-        icon: options.tabBarIcon,
-        badge: options.tabBarBadge,
-        activeTintColor: options.tabBarActiveTintColor,
-        inactiveTintColor: options.tabBarInactiveTintColor,
-        passthrough: {
-          onPress: () => this.jumpTo(route.name),
-          accessibilityRole: 'tab',
-          accessibilityState: { selected: focused },
-        },
-      };
-    });
-
-    const focusedRoute = this.focusedRoute();
-    const focusedEntry = focusedRoute
-      ? this.registry.get(focusedRoute.name)
-      : undefined;
-    const focusedOptions =
-      focusedEntry && focusedRoute
-        ? this.resolveTabOptions(focusedEntry, focusedRoute)
-        : this.screenOptions;
-
+    const bar: ITabBarInput<TabScreenDirective> = {
+      state: this.stateSignal() ?? EMPTY_TAB_STATE,
+      handle: this,
+      entryFor: name => this.registry.get(name),
+      optionsOf: entry => entry.options,
+      screenOptions: this.screenOptions,
+    };
     return renderTabBar({
-      items,
-      style: focusedOptions?.tabBarStyle,
+      items: buildTabBarItems(bar),
+      style: resolveFocusedTabOptions(bar)?.tabBarStyle,
       passthrough: {},
     });
   }

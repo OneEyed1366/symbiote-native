@@ -77,6 +77,37 @@ export {
   resolveScreenRenderPlan,
 } from './render-stack';
 export type { IScreenRenderPlanInput, IScreenRenderPlan } from './render-stack';
+export { createDrawerController } from './drawer-controller';
+export type {
+  IDrawerAnimated,
+  IDrawerControllerInput,
+} from './drawer-controller';
+export { buildAnimatedSlotStyle } from './drawer-slot-style';
+export { findFocusedEntry, planDrawer } from './drawer-render-plan';
+export type {
+  IDrawerPlan,
+  IDrawerPlanInput,
+  IDrawerSlotPlan,
+} from './drawer-render-plan';
+export { buildDrawerDescriptors } from './drawer-descriptors';
+export {
+  buildFixedRoutes,
+  createFocusTracker,
+  routeByKey,
+} from './route-tracking';
+export { buildStackHostProps, resolveStackRoutePlan } from './screen-wiring';
+export type { IStackRoutePlanInput } from './screen-wiring';
+export {
+  buildInitialState,
+  createEmitterStore,
+  createRouteFactory,
+  createStackHandle,
+  mergeScreenOptions,
+} from './navigator-wiring';
+export type { ICreateRoute } from './navigator-wiring';
+export { buildTabBarItems, resolveFocusedTabOptions } from './tab-bar-model';
+export type { ITabBarInput } from './tab-bar-model';
+export { createTabHandle } from './tab-handle';
 
 export {
   serializeNavigatorState,

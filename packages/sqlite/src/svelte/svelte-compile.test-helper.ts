@@ -41,6 +41,7 @@ const COMPILE_OPTIONS = {
 const SVELTE_SPECIFIER_PATTERN = /(['"])(\.{1,2}\/[^'"]*\.svelte)\1/g;
 const BARE_SPECIFIER_PATTERN = /(\b(?:from|import)\s*)(['"])([^./'"][^'"]*)\2/g;
 const RUNE_MODULE_SUFFIX = '.svelte.ts';
+const SVELTE_SUFFIX = '.svelte';
 
 function relativeSpecifier(fromFile: string, target: string): string {
   const specifier = relative(dirname(fromFile), target);
@@ -48,13 +49,15 @@ function relativeSpecifier(fromFile: string, target: string): string {
 }
 
 // A bare specifier that lands on a `.svelte.ts` file (Metro's transformer compiles those from any
-// package). Returns the path without `.ts`, the shape `compileFile` expects, or null otherwise
+// package) or on a `.svelte` file shipped by another package. Returns the path in the shape
+// `compileFile` expects (without `.ts`), or null otherwise
 function resolveRuneModule(specifier: string, fromFile: string): string | null {
   try {
     const resolved = createRequire(fromFile).resolve(specifier);
-    return resolved.endsWith(RUNE_MODULE_SUFFIX)
-      ? resolved.slice(0, -'.ts'.length)
-      : null;
+    if (resolved.endsWith(RUNE_MODULE_SUFFIX)) {
+      return resolved.slice(0, -'.ts'.length);
+    }
+    return resolved.endsWith(SVELTE_SUFFIX) ? resolved : null;
   } catch {
     return null;
   }
