@@ -17,6 +17,7 @@ import { ROUTE_NAME } from './routes';
 import { LINE_COLOR } from './navigation-lines';
 import { hide } from '@symbiote-native/splash-screen/solid';
 import './App.css';
+import './ExpoViews.css';
 
 function App() {
   onMount(() => void hide());

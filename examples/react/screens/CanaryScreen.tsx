@@ -1,39 +1,5 @@
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type ReactElement,
-} from 'react';
-import {
-  Animated,
-  Modal,
-  FlatList,
-  KeyboardAvoidingView,
-  StatusBar,
-  Keyboard,
-  KEYBOARD_EVENT,
-  Platform,
-  StyleSheet,
-  PixelRatio,
-  useWindowDimensions,
-  useColorScheme,
-  AppState,
-  Alert,
-  ActionSheetIOS,
-  Linking,
-  Vibration,
-  Share,
-  createPortal,
-  createTunnel,
-  type IHostInstance,
-} from '@symbiote-native/react';
-// A real third-party native view, driven through symbiote's own wrapper (@symbiote-native/slider)
-// rather than the library's React component: the wrapper registers RNCSlider's ViewConfig and
-// renders the native leaf through the engine, so the SAME slider works on Vue/Angular too. App
-// code and the app manifest name only @symbiote-native/slider; the native package is the wrapper's dep.
-import { Slider } from '@symbiote-native/slider/react';
-import { ActionButton } from '../components/ActionButton';
+import { useState } from 'react';
+import type { IHostInstance } from '@symbiote-native/react';
 import { AnimatedDemo } from '../components/AnimatedDemo';
 import { AnimatedParityDemo } from '../components/AnimatedParityDemo';
 import { NativeModulesDemo } from '../components/NativeModulesDemo';
@@ -43,774 +9,114 @@ import { AccessibilityDemo } from '../components/AccessibilityDemo';
 import { ResponderDemo } from '../components/ResponderDemo';
 import { CompoundClassDemo } from '../components/CompoundClassDemo';
 import { ParityDemo } from '../components/ParityDemo';
-import { nativeNumber } from '../components/event-utils';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
+import { usePullRefresh } from './canary-hooks';
+import { overlayTunnel } from './canary-shared';
+import {
+  CanaryCheckbox,
+  CanaryCounter,
+  CanaryGreeting,
+  CanaryPressable,
+  CanarySpinner,
+  CanaryVolume,
+} from './CanaryControls';
+import { CanaryChips, CanaryMvcpList, CanaryRetentionCard } from './CanaryLists';
+import { CanaryNativeButtons } from './CanaryNativeButtons';
+import { CanaryModal, CanaryPortal, CanaryTunnel } from './CanaryOverlays';
+import { CanaryRuntimeNotes } from './CanaryRuntimeNotes';
+import { CanaryScrollHeader } from './CanaryScrollHeader';
+import { CanaryStatusBar } from './CanaryStatusBar';
+import { CanaryKeyboardAvoiding, CanaryStyleProps } from './CanaryStyleProps';
 
-// Hoisted, not inlined at the prop: a component identity that changes every render would remount
-// the dividers on every list update.
-const MvcpDivider = (): ReactElement => <view className="mvcp-divider" />;
+const COLOR = LINE_COLOR.primitives;
+const LOGO_URI = 'https://reactnative.dev/img/tiny_logo.png';
 
-const CHIP_WIDTH = 72;
-const CHIP_GAP = 12;
-const REFRESH_MS = 2000;
-
-const chips = Array.from({ length: 24 }, (_, index) => ({
-  id: `chip-${index}`,
-  index,
-  color: `hsl(${(index * 37) % 360} 70% 55%)`,
-}));
-
-// A module-level singleton (not created inside the component) — the whole point of createTunnel
-// is that its In/Out don't need to share a component instance, only this store.
-const overlayTunnel = createTunnel();
-
-/**
- * Symbiote canary screen. Every primitive here (View, Text, ScrollView, TextInput,
- * Image, Switch, ActivityIndicator, Button, Pressable, Modal, FlatList,
- * RefreshControl) comes from @symbiote-native/react, not react-native. The tree is
- * rendered by our own react-reconciler host config straight onto Fabric; React
- * Native's renderer is never involved. Run with DEBUG=1 to watch each interaction
- * commit incrementally (created=0, only the touched branch clones) in Metro's logs.
- */
-export function CanaryScreen() {
+function CanaryHero() {
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Canary];
+  return (
+    <>
+      <view className="line-tag line-tag-primitives">
+        <text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+      </view>
+      <view className="hero-card">
+        <view className="hero-badge" style={{ backgroundColor: COLOR }}>
+          <text className="hero-badge-text">CN</text>
+        </view>
+        <view className="hero-copy">
+          <text className="hero-title">All primitives</text>
+          <text className="hero-body">
+            Every @symbiote-native/react primitive, driven straight onto Fabric — no react-native
+            renderer in the path.
+          </text>
+        </view>
+      </view>
+    </>
+  );
+}
+
+// The native spinner only shows while iOS holds the scroll view pulled down, so ours follows the flag
+function RefreshStatus({ isRefreshing, refreshes }: { isRefreshing: boolean; refreshes: number }) {
+  if (!isRefreshing) {
+    return <text className="muted-center">{`pull to refresh · refreshed ${refreshes}×`}</text>;
+  }
+  return (
+    <view className="refresh-row">
+      <activity-indicator color={COLOR} />
+      <text className="accent-note">Refreshing…</text>
+    </view>
+  );
+}
+
+// Every primitive here comes from @symbiote-native/react, drawn by our own host config onto Fabric.
+// Run with DEBUG=1 to watch each interaction commit incrementally in Metro's logs
+export function CanaryScreen() {
   const [count, setCount] = useState(0);
-  const [name, setName] = useState('');
-  const [spinning, setSpinning] = useState(true);
-  const [volume, setVolume] = useState(0.5);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [toastVisible, setToastVisible] = useState(false);
-  const [tunnelToastVisible, setTunnelToastVisible] = useState(false);
-  // A ref callback (not useRef): refs attach during commit, after render returns, so
-  // useRef's .current would still read null on the very first render.
+  // A ref callback, not useRef: refs attach after render, so .current is null on the first one
   const [overlayHost, setOverlayHost] = useState<IHostInstance | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const [refreshes, setRefreshes] = useState(0);
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const [statusBarHidden, setStatusBarHidden] = useState(false);
-  const [darkStatusBar, setDarkStatusBar] = useState(false);
-  // #6 Android-only StatusBar window flags: the blank-risk pair (device-verify-pending).
-  const [statusBarRed, setStatusBarRed] = useState(false);
-  const [statusBarTranslucent, setStatusBarTranslucent] = useState(false);
-
-  // Feature-parity device checks: state for the cluster before the final logo.
-  const [retentionMove, setRetentionMove] = useState({ dx: 0, dy: 0 });
-  const [mvcpItems, setMvcpItems] = useState(() =>
-    Array.from({ length: 20 }, (_value, index) => ({
-      id: `row-${index}`,
-      label: `item ${index}`,
-    })),
-  );
-  const mvcpHead = useRef(0);
-  // native-driver scroll value: Animated.event attaches it on the UI thread, so the
-  // header opacity/translateY are driven without a JS frame per scroll tick.
-  const parityScrollY = useRef(new Animated.Value(0)).current;
-  const [kavEnabled, setKavEnabled] = useState(true);
-
-  // Tier B runtime modules, read live: the hooks pull from Dimensions/Appearance,
-  // appState tracks foreground/background through AppState's device events.
-  const window = useWindowDimensions();
-  const colorScheme = useColorScheme();
-  const [appState, setAppState] = useState<string>(
-    AppState.currentState ?? 'unknown',
-  );
-
-  // native -> JS: the device hub pushes keyboard frames; we read the height live.
-  useEffect(() => {
-    const onShow = (payload: unknown) => {
-      const height =
-        typeof payload === 'object' &&
-        payload !== null &&
-        'endCoordinates' in payload &&
-        typeof payload.endCoordinates === 'object' &&
-        payload.endCoordinates !== null &&
-        'height' in payload.endCoordinates &&
-        typeof payload.endCoordinates.height === 'number'
-          ? payload.endCoordinates.height
-          : 0;
-      setKeyboardHeight(height);
-    };
-    const subscriptions = [
-      Keyboard.addListener(KEYBOARD_EVENT.didShow, onShow),
-      Keyboard.addListener(KEYBOARD_EVENT.didHide, () => setKeyboardHeight(0)),
-    ];
-    return () => subscriptions.forEach(subscription => subscription.remove());
-  }, []);
-
-  // native -> JS: AppState pushes lifecycle changes; read the current phase live.
-  useEffect(() => {
-    const subscription = AppState.addEventListener(
-      'change',
-      (...args: unknown[]) => {
-        const next = args[0];
-        if (typeof next === 'string') setAppState(next);
-      },
-    );
-    return () => subscription.remove();
-  }, []);
-
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    setTimeout(() => {
-      setRefreshing(false);
-      setRefreshes(value => value + 1);
-    }, REFRESH_MS);
-  }, []);
-
-  // JS -> native imperative modules. A Promise reject (no native module / user
-  // cancel) is expected, so it's swallowed; this is a demo, not a flow to handle.
-  const onShare = useCallback(() => {
-    Share.share({
-      message: 'Sent from symbiote',
-      url: 'https://reactnative.dev',
-    }).catch(() => {});
-  }, []);
-  const onAlert = useCallback(() => {
-    Alert.alert('symbiote', 'Native AlertManager reached.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Vibrate', onPress: () => Vibration.vibrate() },
-    ]);
-  }, []);
-  const onActionSheet = useCallback(() => {
-    ActionSheetIOS.showActionSheetWithOptions(
-      { options: ['Share', 'Vibrate', 'Cancel'], cancelButtonIndex: 2 },
-      (index: number) => {
-        if (index === 0) onShare();
-        if (index === 1) Vibration.vibrate();
-      },
-    );
-  }, [onShare]);
-  const onOpenUrl = useCallback(() => {
-    Linking.openURL('https://reactnative.dev').catch(() => {});
-  }, []);
-
+  const { isRefreshing, refreshes, onRefresh } = usePullRefresh();
+  const tap = () => setCount(value => value + 1);
   return (
     <safe-area-view className="screen">
-      <scroll-view
-        testID="canary-scroll"
-        className="screen"
-        contentContainerStyle="scroll-content"
-      >
-        {/* The RefreshControl is a CHILD, not a prop: the scroll behavior claims it and places it
-          per platform — beside the content view on iOS, wrapping the whole scroll view on
-          Android. */}
-        <refresh-control
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          tintColor={LINE_COLOR.primitives}
-        />
-        {/* JS->native: StatusBar renders nothing; it drives the iOS status bar
-          (the top strip: clock, wi-fi, battery) imperatively from these props. */}
-        <StatusBar
-          barStyle={darkStatusBar ? 'dark-content' : 'light-content'}
-          hidden={statusBarHidden}
-          animated
-        />
-        <view className="line-tag line-tag-primitives">
-          <text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
-        </view>
-        <view className="hero-card">
-          <view
-            className="hero-badge"
-            style={{ backgroundColor: LINE_COLOR.primitives }}
-          >
-            <text className="hero-badge-text">CN</text>
-          </view>
-          <view className="hero-copy">
-            <text className="hero-title">All primitives</text>
-            <text className="hero-body">
-              Every @symbiote-native/react primitive, driven straight onto
-              Fabric — no react-native renderer in the path.
-            </text>
-          </view>
-        </view>
-        {/* native->JS: keyboard height pushed from the device hub, read live */}
-        <text className="header-note">
-          {keyboardHeight > 0
-            ? `keyboard up · ${keyboardHeight}px`
-            : 'keyboard down'}
-        </text>
-        {/* Tier A runtime modules, read live from the real native side. A non-empty
-          Version proves PlatformConstants resolved; a fractional hairline (e.g. 0.333
-          on @3x) proves DeviceInfo's scale resolved. The border below IS that hairline.
-          borderTopWidth stays dynamic (StyleSheet.hairlineWidth is a runtime constant). */}
-        <text
-          className="hairline-note"
-          style={{ borderTopWidth: StyleSheet.hairlineWidth }}
-        >
-          {`${Platform.OS} ${Platform.Version}` +
-            `${Platform.isPad ? ' · iPad' : ''}` +
-            ` · ${Platform.select({ ios: 'native ios', android: 'native android', default: '?' })}` +
-            ` · hairline ${StyleSheet.hairlineWidth.toFixed(3)}`}
-        </text>
-        {/* Tier B runtime modules, live. Real w×h@scale proves Dimensions + PixelRatio;
-          a colorScheme proves Appearance; appState flips when you background the app
-          (AppState's device events). */}
-        <text className="header-note">
-          {`${Math.round(window.width)}×${Math.round(window.height)} @${PixelRatio.get()}x` +
-            ` · ${colorScheme ?? 'no-scheme'} · ${appState}`}
-        </text>
-        {/* JS->native StatusBar controls: watch the top strip react */}
-        <view className="row">
-          <view className="flex1">
-            <ActionButton
-              title={statusBarHidden ? 'Show status bar' : 'Hide status bar'}
-              onPress={() => setStatusBarHidden(value => !value)}
-              color={LINE_COLOR.primitives}
-            />
-          </view>
-          <view className="flex1">
-            <ActionButton
-              title={darkStatusBar ? 'Light text' : 'Dark text'}
-              onPress={() => setDarkStatusBar(value => !value)}
-              color={LINE_COLOR.primitives}
-            />
-          </view>
-        </view>
-        {/* #6 Android-only window flags: the blank-risk pair. PASS: the top strip turns
-          red / goes translucent and the app STAYS rendered. FAIL: the surface blanks
-          (white screen); watch logcat for stopSurface / "reactInstance is null". */}
-        {Platform.OS === 'android' && (
-          <view className="row">
-            <view className="flex1">
-              <ActionButton
-                title={statusBarRed ? 'BG default' : 'BG red'}
-                onPress={() => {
-                  const next = !statusBarRed;
-                  setStatusBarRed(next);
-                  StatusBar.setBackgroundColor(
-                    next ? '#ff0000' : '#101a2c',
-                    true,
-                  );
-                }}
-                color={LINE_COLOR.primitives}
-              />
-            </view>
-            <view className="flex1">
-              <ActionButton
-                title={statusBarTranslucent ? 'Opaque' : 'Translucent'}
-                onPress={() => {
-                  const next = !statusBarTranslucent;
-                  setStatusBarTranslucent(next);
-                  StatusBar.setTranslucent(next);
-                }}
-                color={LINE_COLOR.primitives}
-              />
-            </view>
-          </view>
-        )}
-        {/* JS->native imperative modules: tap to fire the real native UI / haptics.
-          Each working button proves its module name resolved on the bridgeless host. */}
-        <view className="row">
-          <view className="flex1">
-            <ActionButton
-              title="Alert"
-              onPress={onAlert}
-              color={LINE_COLOR.primitives}
-            />
-          </view>
-          {/* ActionSheetIOS drives the iOS-only ActionSheetManager; no Android native
-            module exists, so the control is iOS-only by design (not a gap). */}
-          {Platform.OS !== 'android' && (
-            <view className="flex1">
-              <ActionButton
-                title="Action sheet"
-                onPress={onActionSheet}
-                color={LINE_COLOR.primitives}
-              />
-            </view>
-          )}
-        </view>
-        <view className="row">
-          <view className="flex1">
-            <ActionButton
-              title="Share"
-              onPress={onShare}
-              color={LINE_COLOR.primitives}
-            />
-          </view>
-          <view className="flex1">
-            <ActionButton
-              title="Vibrate"
-              onPress={() => Vibration.vibrate()}
-              color={LINE_COLOR.primitives}
-            />
-          </view>
-        </view>
-        <ActionButton
-          title="Open reactnative.dev"
-          onPress={onOpenUrl}
-          color={LINE_COLOR.primitives}
-        />
-
-        {/* The native UIRefreshControl spinner only shows while iOS holds the scroll
-          view pulled-down; our full re-commit snaps the offset back, so we drive
-          our OWN indicator from the same `refreshing` flag, guaranteed visible. */}
-        {refreshing ? (
-          <view className="refresh-row">
-            <activity-indicator color={LINE_COLOR.primitives} />
-            <text className="accent-note">Refreshing…</text>
-          </view>
-        ) : (
-          <text className="muted-center">
-            {`pull to refresh · refreshed ${refreshes}×`}
-          </text>
-        )}
-
-        {/* View + press-to-increment */}
-        <view
-          testID="counter-card"
-          onPress={() => setCount(value => value + 1)}
-          className="counter-card"
-        >
-          <text testID="counter-value" className="counter-text">
-            {`tapped ${count}×`}
-          </text>
-        </view>
-
-        {/* TextInput + greeting. text-input is shared with the KAV email field below. */}
-        <text-input
-          testID="greeting-input"
-          value={name}
-          onValueChange={event => setName(event.text)}
-          placeholder="type your name…"
-          placeholderTextColor="#41506a"
-          className="text-input"
-        />
-        <text testID="greeting-output" className="greeting">
-          {name ? `Hello, ${name}` : 'Hello, stranger'}
-        </text>
-
-        {/* Switch drives the ActivityIndicator */}
-        <view className="switch-row">
-          <text className="switch-label">spinner</text>
-          <switch
-            testID="spinner-switch"
-            value={spinning}
-            onValueChange={event => setSpinning(event.value)}
-            trackColor={{ false: '#334155', true: LINE_COLOR.primitives }}
-          />
-        </view>
-        <activity-indicator
-          testID="spinner-indicator"
-          animating={spinning}
-          color={LINE_COLOR.primitives}
-          size="large"
-        />
-
-        {/* Slider: a THIRD-PARTY native view (@react-native-community/slider) driven via the
-          @symbiote-native/slider native-proxy wrapper. The engine derives the onValueChange event and
-          the track/thumb tint processors from the library's own ViewConfig at runtime. Drag it:
-          the value updates live; the colored track proves color derivation. */}
-        <view className="section-tight">
-          <text className="switch-label">
-            {`volume · ${Math.round(volume * 100)}%`}
-          </text>
-          <Slider
-            value={volume}
-            onValueChange={setVolume}
-            minimumValue={0}
-            maximumValue={1}
-            step={0.01}
-            minimumTrackTintColor={LINE_COLOR.primitives}
-            maximumTrackTintColor="#334155"
-            thumbTintColor="#ffffff"
-            // Pin a height so the native track always has room in the flex column.
-            className="slider"
-          />
-        </view>
-
-        {/* Animated: JS driver vs native driver, side by side */}
+      <scroll-view testID="canary-scroll" className="screen" contentContainerStyle="scroll-content">
+        {/* A child, not a prop: the scroll behavior places it per platform */}
+        <refresh-control refreshing={isRefreshing} onRefresh={onRefresh} tintColor={COLOR} />
+        <CanaryHero />
+        <CanaryRuntimeNotes />
+        <CanaryStatusBar />
+        <CanaryNativeButtons />
+        <RefreshStatus isRefreshing={isRefreshing} refreshes={refreshes} />
+        <CanaryCounter count={count} onTap={tap} />
+        <CanaryGreeting />
+        <CanarySpinner />
+        <CanaryCheckbox />
+        <CanaryVolume />
         <AnimatedDemo />
-
-        {/* Animated: ValueXY, tracking, diffClamp */}
         <AnimatedParityDemo />
-
-        {/* Runtime modules: I18nManager, Settings, Image statics */}
         <NativeModulesDemo />
-
-        {/* Imperative host-ref API: measure / setNativeProps / findNodeHandle */}
         <RefApiDemo />
-
-        {/* PlatformColor / DynamicColorIOS: native semantic + appearance-aware colors */}
         <PlatformColorDemo />
-
-        {/* Accessibility: a11y props to native, aria/role transform, AccessibilityInfo */}
         <AccessibilityDemo />
-
-        {/* Responder: drag-vs-tap + mid-gesture transfer (move-should-set / takeover) */}
         <ResponderDemo />
-
-        {/* Compound class rule: `.badge.loud` layers over `.badge`, static and dynamic */}
         <CompoundClassDemo />
-
-        {/* Parity checks: longPress · Keyboard.dismiss · animated scroll · sticky · a11y focus */}
         <ParityDemo />
-
-        {/* Opens a Modal */}
-        <ActionButton
-          testID="modal-open"
-          title="Open modal"
-          onPress={() => setModalVisible(true)}
-          color={LINE_COLOR.primitives}
-        />
-
-        {/* Pressable's static look lives in .pressable-card; only the press-state-dependent
-          colors stay a style function. */}
-        <pressable
-          onPress={() => setCount(value => value + 1)}
-          className="pressable-card"
-          style={({ pressed }) => ({
-            backgroundColor: pressed ? '#0b1622' : '#13243a',
-            borderColor: LINE_COLOR.primitives,
-          })}
-        >
-          {({ pressed }) => (
-            <text
-              className="pressable-label"
-              style={{ color: pressed ? LINE_COLOR.primitives : '#cbd5e1' }}
-            >
-              {pressed ? 'holding…' : 'press me (also +1)'}
-            </text>
-          )}
-        </pressable>
-
-
-        {/* Horizontal FlatList: real windowing. */}
-        <text className="section-label">FlatList · 24 chips, windowed</text>
-        <FlatList
-          testID="chips-list"
-          data={chips}
-          horizontal
-          keyExtractor={item => item.id}
-          getItemLayout={(_data, index) => ({
-            length: CHIP_WIDTH + CHIP_GAP,
-            offset: (CHIP_WIDTH + CHIP_GAP) * index,
-            index,
-          })}
-          className="chip-list"
-          renderItem={({ item }) => (
-            // width/marginRight stay dynamic — they reference the CHIP_WIDTH/CHIP_GAP
-            // script consts (also used by getItemLayout above), which a CSS selector
-            // has no way to read; backgroundColor is per-chip (item.color).
-            <view
-              className="chip-card"
-              style={{
-                width: CHIP_WIDTH,
-                marginRight: CHIP_GAP,
-                backgroundColor: item.color,
-              }}
-            >
-              <text className="chip-number">{item.index}</text>
-            </view>
-          )}
-        />
-
-        {/* ===== feature-parity device checks ===== */}
-
-        {/* Press-retention measured rect. PASS: press, then drag DOWN ~100px: the panel
-          STAYS highlighted (inside the measured rect + 80px bottom retention). Drag UP
-          off the top: highlight drops. Proves measured-rect retention rather than a
-          symmetric-radius approximation. The dx/dy readout tracks the move offset. */}
-        {/* Pressable's static look lives in .retention-card; only the press-state-dependent
-          background stays a style function. */}
-        <pressable
-          hitSlop={{ top: 0, bottom: 40, left: 0, right: 0 }}
-          pressRetentionOffset={{ top: 0, bottom: 80, left: 0, right: 0 }}
-          onPressMove={event =>
-            setRetentionMove({
-              dx: Math.round(nativeNumber(event, 'locationX')),
-              dy: Math.round(nativeNumber(event, 'locationY')),
-            })
-          }
-          className="retention-card"
-          style={({ pressed }) => ({
-            backgroundColor: pressed ? LINE_COLOR.primitives : '#13243a',
-          })}
-        >
-          <text className="info-text">
-            {`drag me · dx ${retentionMove.dx} · dy ${retentionMove.dy}`}
-          </text>
-        </pressable>
-
-        {/* maintainVisibleContentPosition. PASS: scroll down a bit, tap Prepend: the rows
-          you are looking at DO NOT jump; new items appear above without shifting the
-          viewport. FAIL: the list jumps to the top. box-list160 is shared with the
-          scroll-driven header demo below. */}
-        <text className="section-label">MVCP · prepend without jump</text>
-        <FlatList
-          nestedScrollEnabled
-          data={mvcpItems}
-          keyExtractor={item => item.id}
-          maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
-          className="box-list160"
-          // This list measures its own cells (no getItemLayout), and the divider is CHROME the list
-          // renders BETWEEN them — so it belongs to the distance from one row to the next, not to
-          // either row's height. That is the case the offset table has to get right; a model built
-          // by summing heights alone is short by every divider it skipped, and the content below a
-          // windowed-out region slides up and back as the window moves (core/components
-          // buildOffsets). Deliberately on the MVCP list: prepend-without-jump is exactly where an
-          // offset being off by a few points is visible.
-          ItemSeparatorComponent={MvcpDivider}
-          renderItem={({ item }) => (
-            <view className="mvcp-row">
-              <text className="list-row-text">{item.label}</text>
-            </view>
-          )}
-        />
-        <ActionButton
-          title="Prepend 5"
-          color={LINE_COLOR.primitives}
-          onPress={() => {
-            mvcpHead.current -= 5;
-            const head = mvcpHead.current;
-            const prepended = Array.from({ length: 5 }, (_value, index) => {
-              const n = head + index;
-              return { id: `row-${n}`, label: `item ${n}` };
-            });
-            setMvcpItems(items => [...prepended, ...items]);
-          }}
-        />
-
-        {/* Scroll-driven header (native driver). PASS: drag INSIDE the box below (not the page):
-          the bright bar above SMOOTHLY fades to near-invisible and lifts, on the UI thread (no
-          jank, no per-frame JS). There is no `Animated.ScrollView` — `Animated.event` binds
-          natively on any host node, so the bare tag takes the handler directly. */}
-        <Animated.View
-          className="parity-header"
-          style={{
-            opacity: parityScrollY.interpolate({
-              inputRange: [0, 120],
-              outputRange: [1, 0.12],
-              extrapolate: 'clamp',
-            }),
-            transform: [
-              {
-                translateY: parityScrollY.interpolate({
-                  inputRange: [0, 120],
-                  outputRange: [0, -16],
-                  extrapolate: 'clamp',
-                }),
-              },
-            ],
-          }}
-        >
-          <text className="parity-header-text">
-            HEADER — fades as you scroll ↓
-          </text>
-        </Animated.View>
-        {/* box-list160 is shared with the MVCP FlatList above. */}
-        <scroll-view
-          nestedScrollEnabled
-          className="box-list160"
-          scrollEventThrottle={16}
-          onScroll={Animated.event(
-            [{ nativeEvent: { contentOffset: { y: parityScrollY } } }],
-            { useNativeDriver: true },
-          )}
-        >
-          {Array.from({ length: 6 }, (_value, index) => (
-            <view key={index} className="scroll-demo-row">
-              <text className="list-row-text">{`scroll me · row ${index}`}</text>
-            </view>
-          ))}
-        </scroll-view>
-        <text className="tiny-center">
-          ↑ drag inside the box — the bar above reacts
-        </text>
-        {/* Native-driver proof for Animated.event: tap to JAM the JS thread 3s, then drag
-          the box above DURING the freeze. If the bar keeps fading/lifting while JS is
-          frozen, the scroll event drives parityScrollY on the UI thread (native attach).
-          If it sticks until the thread frees, it was JS-driven. */}
-        <ActionButton
-          title="Freeze JS 3s — then scroll the box ↑"
-          color="#fc8181"
-          onPress={() => {
-            const until = Date.now() + 3000;
-            while (Date.now() < until) {
-              // Intentionally block the JS thread: no JS frame can run here, so any
-              // header motion during the freeze must be coming from the native driver.
-            }
-          }}
-        />
-        <text className="tiny-center">
-          tap Freeze, then immediately drag the box — bar should still move
-        </text>
-
-        {/* Modern style props reaching Fabric's C++ parser. Each is an A/B so the effect is
-          unmistakable on the dark theme. Kept as inline dynamic style, legacy demo wiring — the
-          CSS property works identically too (see .gradient-card, authored via CSS). */}
-        {/* boxShadow: a BLUE glow (a black shadow is invisible on the near-black bg).
-          PASS: a soft blue halo bleeds out around the panel. */}
-        <view
-          className="shadow-card"
-          style={{ boxShadow: '0px 0px 22px 3px rgba(20,158,202,0.85)' }}
-        >
-          <text className="note-text">boxShadow · glow</text>
-        </view>
-        {/* filter: same base colour both sides; the right one is darkened by
-          brightness(0.5). PASS: the right panel is clearly darker than the left. */}
-        <view className="row">
-          <view className="filter-tile">
-            <text className="tile-text">no filter</text>
-          </view>
-          <view
-            className="filter-tile"
-            style={{ filter: [{ brightness: 0.5 }] }}
-          >
-            <text className="tile-text">brightness 0.5</text>
-          </view>
-        </view>
-        {/* transformOrigin: the panel rotates around its TOP-LEFT corner, not its centre.
-          PASS: the left edge stays put while the bottom-right swings down. */}
-        <view
-          className="rotated-card"
-          style={{
-            transformOrigin: 'top left',
-            transform: [{ rotate: '4deg' }],
-          }}
-        >
-          <text className="tile-text">transformOrigin · top-left</text>
-        </view>
-
-        {/* background-image: a CSS `linear-gradient(...)` authored entirely in App.css
-          (.gradient-card), proving @symbiote-native/css-parser's `background-image` → RN's
-          `experimental_backgroundImage` raw passthrough works end to end (css-parser →
-          registerRules → routeProp → core/engine/src/process-background-image → Fabric).
-          PASS: the panel shows a blue-to-orange gradient sweeping left to right. */}
-        <view className="gradient-card">
-          <text className="tile-text">background-image · linear-gradient</text>
-        </view>
-
-        {/* Image web aliases. PASS: the logo loads via the web-alias fold (src→source uri,
-          width/height→style); a screen reader reads "React logo" (alt→accessibilityLabel). */}
-        <image
-          src="https://reactnative.dev/img/tiny_logo.png"
-          alt="React logo"
-          width={48}
-          height={48}
-          className="web-image"
-        />
-
-        {/* KeyboardAvoidingView enabled toggle. PASS: with enabled ON, focusing the field
-          lifts it above the keyboard AND the keyboard is the email layout (proves
-          autoComplete/inputMode fold); with enabled OFF the keyboard covers the field. */}
-        <view className="switch-row">
-          <text className="switch-label">avoid keyboard</text>
-          <switch
-            value={kavEnabled}
-            onValueChange={event => setKavEnabled(event.value)}
-            trackColor={{ false: '#334155', true: '#2b6cb0' }}
-          />
-        </view>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          enabled={kavEnabled}
-        >
-          <text-input
-            autoComplete="email"
-            inputMode="email"
-            enterKeyHint="done"
-            placeholder="email — focus me near the bottom…"
-            placeholderTextColor="#41506a"
-            className="text-input"
-          />
-        </KeyboardAvoidingView>
-
-        <image
-          source={{ uri: 'https://reactnative.dev/img/tiny_logo.png' }}
-          className="logo-image"
-        />
-
+        <CanaryModal />
+        <CanaryPressable onTap={tap} />
+        <CanaryChips />
+        <CanaryRetentionCard />
+        <CanaryMvcpList />
+        <CanaryScrollHeader />
+        <CanaryStyleProps />
+        <CanaryKeyboardAvoiding />
+        <image source={{ uri: LOGO_URI }} className="logo-image" />
         <view className="bottom-card">
           <text className="bottom-text">↑ you scrolled to the bottom</text>
         </view>
-
-        {/* Modal overlays its own window */}
-        <Modal
-          visible={modalVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setModalVisible(false)}
-        >
-          {/* transparent modal => paint our own dim layer (the RN pattern) */}
-          <view className="modal-overlay">
-            <view testID="modal-card" className="modal-card">
-              <text className="modal-title">It's a Modal</text>
-              <text className="modal-body">
-                Rendered through ModalHostView — its own native window, same
-                Fabric tree.
-              </text>
-              <ActionButton
-                testID="modal-close"
-                title="Close"
-                onPress={() => setModalVisible(false)}
-                color={LINE_COLOR.primitives}
-              />
-            </view>
-          </view>
-        </Modal>
-
-        {/* createPortal: moves the toast card OUT of this scroll content and INTO the
-            overlay-host View rendered as a sibling of ScrollView below — same surface, so it
-            repaints on the ONE commit this tree already does. */}
-        <ActionButton
-          testID="toast-open"
-          title="Show toast (createPortal)"
-          onPress={() => setToastVisible(true)}
-          color={LINE_COLOR.primitives}
-        />
-        {toastVisible &&
-          overlayHost &&
-          createPortal(
-            <view testID="toast-card" className="modal-card">
-              <text className="modal-body">Ported via createPortal ✦</text>
-              <ActionButton
-                testID="toast-dismiss"
-                title="Dismiss"
-                onPress={() => setToastVisible(false)}
-                color={LINE_COLOR.primitives}
-              />
-            </view>,
-            overlayHost,
-          )}
-
-        {/* createTunnel: no ref, no target node — In just registers its children from wherever
-            it's mounted; Out (rendered in the overlay host below) reads them back through its
-            OWN normal render, wherever that happens to be mounted, even a different surface. */}
-        <ActionButton
-          testID="tunnel-toast-open"
-          title="Show toast (createTunnel)"
-          onPress={() => setTunnelToastVisible(true)}
-          color={LINE_COLOR.primitives}
-        />
-        {tunnelToastVisible && (
-          <overlayTunnel.In>
-            <view testID="tunnel-toast-card" className="modal-card">
-              <text className="modal-body">Ported via createTunnel ✦</text>
-              <ActionButton
-                testID="tunnel-toast-dismiss"
-                title="Dismiss"
-                onPress={() => setTunnelToastVisible(false)}
-                color={LINE_COLOR.primitives}
-              />
-            </view>
-          </overlayTunnel.In>
-        )}
+        <CanaryPortal host={overlayHost} />
+        <CanaryTunnel />
       </scroll-view>
-
-      {/* The portal/tunnel target: a persistent, empty View sitting above the scroll content.
-          pointerEvents="box-none" lets touches pass through everywhere except an actual ported
-          child (the toast card). Rendered here — a sibling of ScrollView, same surface — so
-          createPortal above can reach it via the callback ref; createTunnel's Out below works
-          identically wherever it's mounted. */}
-      <view
-        testID="overlay-host"
-        ref={setOverlayHost}
-        pointerEvents="box-none"
-        className="overlay-host"
-      >
+      {/* The portal and tunnel target, a sibling of the scroll view on the same surface */}
+      <view testID="overlay-host" ref={setOverlayHost} pointerEvents="box-none" className="overlay-host">
         <overlayTunnel.Out />
       </view>
     </safe-area-view>

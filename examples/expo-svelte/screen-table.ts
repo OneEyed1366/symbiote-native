@@ -1,6 +1,17 @@
 import type { Component } from 'svelte';
 import type { INavLine } from './navigation-lines';
 import { ROUTE_NAME } from './routes';
+import GlScreen from './screens/GlScreen.svelte';
+import LivePhotoScreen from './screens/LivePhotoScreen.svelte';
+import CameraScreen from './screens/CameraScreen.svelte';
+import VideoScreen from './screens/VideoScreen.svelte';
+import ImageScreen from './screens/ImageScreen.svelte';
+import AppleAuthenticationScreen from './screens/AppleAuthenticationScreen.svelte';
+import SymbolsScreen from './screens/SymbolsScreen.svelte';
+import GlassEffectScreen from './screens/GlassEffectScreen.svelte';
+import BlurScreen from './screens/BlurScreen.svelte';
+import LinearGradientScreen from './screens/LinearGradientScreen.svelte';
+import CheckboxScreen from './screens/CheckboxScreen.svelte';
 import AgeRangeScreen from './screens/AgeRangeScreen.svelte';
 import AppIntegrityScreen from './screens/AppIntegrityScreen.svelte';
 import AppMetricsScreen from './screens/AppMetricsScreen.svelte';
@@ -331,5 +342,71 @@ export const SCREENS: readonly IScreenEntry[] = [
     component: AuthSessionScreen,
     title: 'Auth Session',
     line: 'auth-session',
+  },
+  {
+    name: ROUTE_NAME.Checkbox,
+    component: CheckboxScreen,
+    title: 'Checkbox',
+    line: 'checkbox',
+  },
+  {
+    name: ROUTE_NAME.LinearGradient,
+    component: LinearGradientScreen,
+    title: 'Linear Gradient',
+    line: 'linear-gradient',
+  },
+  {
+    name: ROUTE_NAME.Blur,
+    component: BlurScreen,
+    title: 'Blur',
+    line: 'blur',
+  },
+  {
+    name: ROUTE_NAME.GlassEffect,
+    component: GlassEffectScreen,
+    title: 'Glass Effect',
+    line: 'glass-effect',
+  },
+  {
+    name: ROUTE_NAME.Symbols,
+    component: SymbolsScreen,
+    title: 'Symbols',
+    line: 'symbols',
+  },
+  {
+    name: ROUTE_NAME.AppleAuthentication,
+    component: AppleAuthenticationScreen,
+    title: 'Apple Authentication',
+    line: 'apple-authentication',
+  },
+  {
+    name: ROUTE_NAME.Image,
+    component: ImageScreen,
+    title: 'Image',
+    line: 'expo-image',
+  },
+  {
+    name: ROUTE_NAME.Video,
+    component: VideoScreen,
+    title: 'Video',
+    line: 'video',
+  },
+  {
+    name: ROUTE_NAME.Camera,
+    component: CameraScreen,
+    title: 'Camera',
+    line: 'camera',
+  },
+  {
+    name: ROUTE_NAME.LivePhoto,
+    component: LivePhotoScreen,
+    title: 'Live Photo',
+    line: 'live-photo',
+  },
+  {
+    name: ROUTE_NAME.Gl,
+    component: GlScreen,
+    title: 'GL',
+    line: 'gl',
   },
 ];

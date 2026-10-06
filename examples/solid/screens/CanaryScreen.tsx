@@ -1,52 +1,7 @@
-// The Solid canary surface — the every-primitive tour stop, section for section the same screen
-// the React, Vue, Svelte and Angular canaries paint. Every visual here is a real component off
-// @symbiote-native/solid, driven straight onto Fabric; React Native's own renderer is never in the
-// path. Run with DEBUG=1 to watch each interaction commit incrementally in Metro's logs.
-//
-// SafeAreaView is the root and the scroll-view tag its only child, so the background paints the full
-// screen including the status-bar strip (the inset is padding on the children, not a smaller
-// frame) and the pull-to-refresh spinner lands below the notch instead of spinning behind it.
-//
-// THREE SOLID RULES THIS FILE OBEYS, all from .claude/rules/solid-descriptor-bridge.md:
-//   §3 every control-flow component is imported explicitly — an un-imported <Show>/<For> resolves
-//      against the renderer module and reads `undefined`, which fails at RUNTIME, not at build.
-//   §4 a render-prop (FlatList's renderItem, VirtualizedList's) takes an ACCESSOR and is called
-//      untracked, so a signal read at the callback's top level would be frozen; every info()/
-//      item() read below sits inside the returned JSX.
-//   §4 a ternary must stay INLINE in the JSX — babel-preset-solid memoizes the condition only
-//      there. Extracting one into a helper turns a leaf update into a subtree rebuild.
-//
-// Reached from MenuScreen's first row; it was the app root before the Stack navigator landed.
-
-import { For, Show, createSignal, onCleanup, onMount } from 'solid-js';
-import { createStore } from 'solid-js/store';
-import {
-  ActionSheetIOS,
-  Alert,
-  Animated,
-  AppState,
-  FlatList,
-  KEYBOARD_EVENT,
-  Keyboard,
-  KeyboardAvoidingView,
-  Linking,
-  Modal,
-  PixelRatio,
-  Platform,
-  Share,
-  StatusBar,
-  StyleSheet,
-  Vibration,
-  createColorScheme,
-  createWindowDimensions,
-} from '@symbiote-native/solid';
-// A real third-party native view, driven through symbiote's own wrapper (@symbiote-native/slider)
-// rather than the library's React component: the wrapper registers RNCSlider's ViewConfig and
-// renders the native leaf through the engine, so the SAME slider works on every adapter. App code
-// and the app manifest name only @symbiote-native/slider; the native package is the wrapper's dep.
-import { Slider } from '@symbiote-native/slider/solid';
+// The every-primitive tour, the same screen as in the other adapters
+// The Solid rules its sections obey are in .claude/rules/solid-descriptor-bridge.md
+import { Show, createSignal } from 'solid-js';
 import { AccessibilityDemo } from '../components/AccessibilityDemo';
-import { ActionButton } from '../components/ActionButton';
 import { AnimatedDemo } from '../components/AnimatedDemo';
 import { AnimatedParityDemo } from '../components/AnimatedParityDemo';
 import { CompoundClassDemo } from '../components/CompoundClassDemo';
@@ -55,780 +10,101 @@ import { ParityDemo } from '../components/ParityDemo';
 import { PlatformColorDemo } from '../components/PlatformColorDemo';
 import { RefApiDemo } from '../components/RefApiDemo';
 import { ResponderDemo } from '../components/ResponderDemo';
-import { nativeNumber } from '../components/event-utils';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
+import { createPullRefresh } from './canary-hooks';
+import { LOGO_URI } from './canary-shared';
+import {
+  CanaryCheckbox,
+  CanaryCounter,
+  CanaryGreeting,
+  CanaryPressable,
+  CanarySpinner,
+  CanaryVolume,
+} from './CanaryControls';
+import { CanaryChips, CanaryFillProbe, CanaryMvcpList, CanaryRetentionCard } from './CanaryLists';
+import { CanaryModal } from './CanaryModal';
+import { CanaryNativeButtons } from './CanaryNativeButtons';
+import { CanaryRuntimeNotes } from './CanaryRuntimeNotes';
+import { CanaryScrollHeader } from './CanaryScrollHeader';
+import { CanaryStatusBar } from './CanaryStatusBar';
+import { CanaryKeyboardAvoiding, CanaryStyleProps } from './CanaryStyleProps';
 import './CanaryScreen.css';
 
-// Hoisted, not inlined at the prop: a component identity that changes every render would remount
-// the dividers on every list update.
-function MvcpDivider() {
-  return <view class="mvcp-divider" />;
-}
+const COLOR = LINE_COLOR.primitives;
 
-const CHIP_WIDTH = 72;
-const CHIP_GAP = 12;
-const REFRESH_MS = 2000;
-const FREEZE_MS = 3000;
-
-interface IChip {
-  id: string;
-  index: number;
-  color: string;
-}
-
-const CHIPS: ReadonlyArray<IChip> = Array.from(
-  { length: 24 },
-  (_value, index) => ({
-    id: `chip-${index}`,
-    index,
-    color: `hsl(${(index * 37) % 360} 70% 55%)`,
-  }),
-);
-
-const SCROLL_ROWS: ReadonlyArray<number> = Array.from(
-  { length: 6 },
-  (_value, index) => index,
-);
-
-interface IMvcpRow {
-  id: string;
-  label: string;
-}
-
-function makeRows(from: number, count: number): ReadonlyArray<IMvcpRow> {
-  return Array.from({ length: count }, (_value, index) => {
-    const n = from + index;
-    return { id: `row-${n}`, label: `item ${n}` };
-  });
+function CanaryHero() {
+  const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Canary];
+  return (
+    <>
+      <view class="line-tag line-tag-primitives">
+        <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+      </view>
+      <view class="hero-card">
+        <view class="hero-badge" style={{ backgroundColor: COLOR }}>
+          <text class="hero-badge-text">CN</text>
+        </view>
+        <view class="hero-copy">
+          <text class="hero-title">All primitives</text>
+          <text class="hero-body">
+            Every @symbiote-native/solid primitive, driven straight onto Fabric — no react-native
+            renderer in the path.
+          </text>
+        </view>
+      </view>
+    </>
+  );
 }
 
 export function CanaryScreen() {
-  const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Canary];
-
   const [count, setCount] = createSignal(0);
-  // Mirrors the pressable-card's press state — a bare `pressable` tag has no render-prop channel.
-  const [cardPressed, setCardPressed] = createSignal(false);
-  const [name, setName] = createSignal('');
-  const [spinning, setSpinning] = createSignal(true);
-  const [volume, setVolume] = createSignal(0.5);
-  const [modalVisible, setModalVisible] = createSignal(false);
-  const [refreshing, setRefreshing] = createSignal(false);
-  const [refreshes, setRefreshes] = createSignal(0);
-  const [keyboardHeight, setKeyboardHeight] = createSignal(0);
-  const [statusBarHidden, setStatusBarHidden] = createSignal(false);
-  const [darkStatusBar, setDarkStatusBar] = createSignal(false);
-  // Android-only StatusBar window flags: the blank-risk pair.
-  const [statusBarRed, setStatusBarRed] = createSignal(false);
-  const [statusBarTranslucent, setStatusBarTranslucent] = createSignal(false);
-  const [kavEnabled, setKavEnabled] = createSignal(true);
-
-  // Feature-parity device checks: state for the cluster before the final logo. A store, not a
-  // signal holding an object — both fields land in one native event and a store updates them
-  // without minting a new object for the leaf to re-read.
-  const [retentionMove, setRetentionMove] = createStore({ dx: 0, dy: 0 });
-  const [mvcpItems, setMvcpItems] = createSignal<ReadonlyArray<IMvcpRow>>(
-    makeRows(0, 20),
-  );
-  // Plain `let`, not a ref: a Solid component body runs once, so a closure variable already has
-  // the identity-stable-across-renders property useRef exists to give React.
-  let mvcpHead = 0;
-
-  // native-driver scroll value: Animated.event attaches it on the UI thread, so the header
-  // opacity/translateY are driven without a JS frame per scroll tick.
-  const parityScrollY = new Animated.Value(0);
-
-  // Tier B runtime modules, read live: both are ACCESSORS over the engine's own
-  // Appearance / Dimensions event sources, spelled create* rather than use* because in Solid a
-  // function that creates its own state and owns a subscription is a createX.
-  const window = createWindowDimensions();
-  const colorScheme = createColorScheme();
-  const [appState, setAppState] = createSignal<string>(
-    AppState.currentState ?? 'unknown',
-  );
-
-  // native -> JS: the device hub pushes keyboard frames; we read the height live.
-  onMount(() => {
-    const onShow = (payload: unknown) => {
-      const height =
-        typeof payload === 'object' &&
-        payload !== null &&
-        'endCoordinates' in payload &&
-        typeof payload.endCoordinates === 'object' &&
-        payload.endCoordinates !== null &&
-        'height' in payload.endCoordinates &&
-        typeof payload.endCoordinates.height === 'number'
-          ? payload.endCoordinates.height
-          : 0;
-      setKeyboardHeight(height);
-    };
-    const subscriptions = [
-      Keyboard.addListener(KEYBOARD_EVENT.didShow, onShow),
-      Keyboard.addListener(KEYBOARD_EVENT.didHide, () => setKeyboardHeight(0)),
-    ];
-    onCleanup(() =>
-      subscriptions.forEach(subscription => subscription.remove()),
-    );
-  });
-
-  // native -> JS: AppState pushes lifecycle changes; read the current phase live.
-  onMount(() => {
-    const subscription = AppState.addEventListener(
-      'change',
-      (...args: unknown[]) => {
-        const next = args[0];
-        if (typeof next === 'string') setAppState(next);
-      },
-    );
-    onCleanup(() => subscription.remove());
-  });
-
-  const onRefresh = (): void => {
-    setRefreshing(true);
-    setTimeout(() => {
-      setRefreshing(false);
-      setRefreshes(value => value + 1);
-    }, REFRESH_MS);
-  };
-
-  // JS -> native imperative modules. A Promise reject (no native module / user cancel) is
-  // expected, so it's swallowed; this is a demo, not a flow to handle.
-  const onShare = (): void => {
-    void Share.share({
-      message: 'Sent from symbiote',
-      url: 'https://www.solidjs.com',
-    }).catch(() => {});
-  };
-  const onAlert = (): void => {
-    Alert.alert('symbiote', 'Native AlertManager reached.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Vibrate', onPress: () => Vibration.vibrate() },
-    ]);
-  };
-  const onActionSheet = (): void => {
-    ActionSheetIOS.showActionSheetWithOptions(
-      { options: ['Share', 'Vibrate', 'Cancel'], cancelButtonIndex: 2 },
-      (index: number) => {
-        if (index === 0) onShare();
-        if (index === 1) Vibration.vibrate();
-      },
-    );
-  };
-  const onOpenUrl = (): void => {
-    void Linking.openURL('https://www.solidjs.com').catch(() => {});
-  };
-
-  const prependRows = (): void => {
-    mvcpHead -= 5;
-    const prepended = makeRows(mvcpHead, 5);
-    setMvcpItems(items => [...prepended, ...items]);
-  };
-
+  const { isRefreshing, refreshes, onRefresh } = createPullRefresh();
+  const tap = (): void => setCount(value => value + 1);
   return (
     <safe-area-view class="screen">
-      <scroll-view
-        testID="canary-scroll"
-        class="screen"
-        contentContainerStyle="scroll-content"
-      >
-        <refresh-control
-          refreshing={refreshing()}
-          onRefresh={onRefresh}
-          tintColor={LINE_COLOR.primitives}
-        />
-        {/* JS->native: StatusBar renders nothing; it drives the iOS status bar (the top strip:
-            clock, wi-fi, battery) imperatively from these props. */}
-        <StatusBar
-          barStyle={darkStatusBar() ? 'dark-content' : 'light-content'}
-          hidden={statusBarHidden()}
-          animated
-        />
-        <view class="line-tag line-tag-primitives">
-          <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
-        </view>
-        <view class="hero-card">
-          <view
-            class="hero-badge"
-            style={{ backgroundColor: LINE_COLOR.primitives }}
-          >
-            <text class="hero-badge-text">CN</text>
-          </view>
-          <view class="hero-copy">
-            <text class="hero-title">All primitives</text>
-            <text class="hero-body">
-              Every @symbiote-native/solid primitive, driven straight onto
-              Fabric — no react-native renderer in the path.
-            </text>
-          </view>
-        </view>
-        {/* native->JS: keyboard height pushed from the device hub, read live */}
-        <text class="header-note">
-          {keyboardHeight() > 0
-            ? `keyboard up · ${keyboardHeight()}px`
-            : 'keyboard down'}
-        </text>
-        {/* Tier A runtime modules, read live from the real native side. A non-empty Version proves
-            PlatformConstants resolved; a fractional hairline (e.g. 0.333 on @3x) proves DeviceInfo's
-            scale resolved. The border below IS that hairline. borderTopWidth stays dynamic
-            (StyleSheet.hairlineWidth is a runtime constant). */}
-        <text
-          class="hairline-note"
-          style={{ borderTopWidth: StyleSheet.hairlineWidth }}
-        >
-          {`${Platform.OS} ${Platform.Version}` +
-            `${Platform.isPad ? ' · iPad' : ''}` +
-            ` · ${Platform.select({ ios: 'native ios', android: 'native android', default: '?' })}` +
-            ` · hairline ${StyleSheet.hairlineWidth.toFixed(3)}`}
-        </text>
-        {/* Tier B runtime modules, live. Real w×h@scale proves Dimensions + PixelRatio; a
-            colorScheme proves Appearance; appState flips when you background the app. */}
-        <text class="header-note">
-          {`${Math.round(window().width)}×${Math.round(window().height)} @${PixelRatio.get()}x` +
-            ` · ${colorScheme() ?? 'no-scheme'} · ${appState()}`}
-        </text>
-        {/* JS->native StatusBar controls: watch the top strip react */}
-        <view class="row">
-          <view class="flex1">
-            <ActionButton
-              title={statusBarHidden() ? 'Show status bar' : 'Hide status bar'}
-              onPress={() => setStatusBarHidden(value => !value)}
-              color={LINE_COLOR.primitives}
-            />
-          </view>
-          <view class="flex1">
-            <ActionButton
-              title={darkStatusBar() ? 'Light text' : 'Dark text'}
-              onPress={() => setDarkStatusBar(value => !value)}
-              color={LINE_COLOR.primitives}
-            />
-          </view>
-        </view>
-        {/* Android-only window flags: the blank-risk pair. PASS: the top strip turns red / goes
-            translucent and the app STAYS rendered. FAIL: the surface blanks (white screen); watch
-            logcat for stopSurface / "reactInstance is null". Platform.OS never changes, so a plain
-            && is right here — <Show> is for the reactive conditions. */}
-        {Platform.OS === 'android' && (
-          <view class="row">
-            <view class="flex1">
-              <ActionButton
-                title={statusBarRed() ? 'BG default' : 'BG red'}
-                onPress={() => {
-                  const next = !statusBarRed();
-                  setStatusBarRed(next);
-                  StatusBar.setBackgroundColor(
-                    next ? '#ff0000' : '#101a2c',
-                    true,
-                  );
-                }}
-                color={LINE_COLOR.primitives}
-              />
-            </view>
-            <view class="flex1">
-              <ActionButton
-                title={statusBarTranslucent() ? 'Opaque' : 'Translucent'}
-                onPress={() => {
-                  const next = !statusBarTranslucent();
-                  setStatusBarTranslucent(next);
-                  StatusBar.setTranslucent(next);
-                }}
-                color={LINE_COLOR.primitives}
-              />
-            </view>
-          </view>
-        )}
-        {/* JS->native imperative modules: tap to fire the real native UI / haptics. Each working
-            button proves its module name resolved on the bridgeless host. */}
-        <view class="row">
-          <view class="flex1">
-            <ActionButton
-              title="Alert"
-              onPress={onAlert}
-              color={LINE_COLOR.primitives}
-            />
-          </view>
-          {/* ActionSheetIOS drives the iOS-only ActionSheetManager; no Android native module
-              exists, so the control is iOS-only by design (not a gap). */}
-          {Platform.OS !== 'android' && (
-            <view class="flex1">
-              <ActionButton
-                title="Action sheet"
-                onPress={onActionSheet}
-                color={LINE_COLOR.primitives}
-              />
-            </view>
-          )}
-        </view>
-        <view class="row">
-          <view class="flex1">
-            <ActionButton
-              title="Share"
-              onPress={onShare}
-              color={LINE_COLOR.primitives}
-            />
-          </view>
-          <view class="flex1">
-            <ActionButton
-              title="Vibrate"
-              onPress={() => Vibration.vibrate()}
-              color={LINE_COLOR.primitives}
-            />
-          </view>
-        </view>
-        <ActionButton
-          title="Open solidjs.com"
-          onPress={onOpenUrl}
-          color={LINE_COLOR.primitives}
-        />
-
-        {/* The native UIRefreshControl spinner only shows while iOS holds the scroll view
-            pulled-down; our full re-commit snaps the offset back, so we drive our OWN indicator
-            from the same `refreshing` flag, guaranteed visible. */}
+      <scroll-view testID="canary-scroll" class="screen" contentContainerStyle="scroll-content">
+        <refresh-control refreshing={isRefreshing()} onRefresh={onRefresh} tintColor={COLOR} />
+        <CanaryHero />
+        <CanaryRuntimeNotes />
+        <CanaryStatusBar />
+        <CanaryNativeButtons />
+        {/* The native spinner shows only while iOS holds the pull, so ours follows the flag */}
         <Show
-          when={refreshing()}
-          fallback={
-            <text class="muted-center">
-              {`pull to refresh · refreshed ${refreshes()}×`}
-            </text>
-          }
+          when={isRefreshing()}
+          fallback={<text class="muted-center">{`pull to refresh · refreshed ${refreshes()}×`}</text>}
         >
           <view class="refresh-row">
-            <activity-indicator color={LINE_COLOR.primitives} />
+            <activity-indicator color={COLOR} />
             <text class="accent-note">Refreshing…</text>
           </view>
         </Show>
-
-        {/* View + press-to-increment */}
-        <view
-          testID="counter-card"
-          onPress={() => setCount(value => value + 1)}
-          class="counter-card"
-        >
-          <text testID="counter-value" class="counter-text">
-            {`tapped ${count()}×`}
-          </text>
-        </view>
-
-        {/* TextInput + greeting. text-input is shared with the KAV email field below. */}
-        <text-input
-          testID="greeting-input"
-          value={name()}
-          onValueChange={event => setName(event.text)}
-          placeholder="type your name…"
-          placeholderTextColor="#7f8db3"
-          class="text-input"
-        />
-        <text testID="greeting-output" class="greeting">
-          {name() ? `Hello, ${name()}` : 'Hello, stranger'}
-        </text>
-
-        {/* Switch drives the ActivityIndicator */}
-        <view class="switch-row">
-          <text class="switch-label">spinner</text>
-          <switch
-            testID="spinner-switch"
-            value={spinning()}
-            onValueChange={event => setSpinning(event.value)}
-            trackColor={{ false: '#334155', true: LINE_COLOR.primitives }}
-          />
-        </view>
-        <activity-indicator
-          testID="spinner-indicator"
-          animating={spinning()}
-          color={LINE_COLOR.primitives}
-          size="large"
-        />
-
-        {/* Slider: a THIRD-PARTY native view (@react-native-community/slider) driven via the
-            @symbiote-native/slider native-proxy wrapper. The engine derives the onValueChange event
-            and the track/thumb tint processors from the library's own ViewConfig at runtime. Drag
-            it: the value updates live; the colored track proves color derivation. */}
-        <view class="section-tight">
-          <text class="switch-label">
-            {`volume · ${Math.round(volume() * 100)}%`}
-          </text>
-          <Slider
-            value={volume()}
-            onValueChange={setVolume}
-            minimumValue={0}
-            maximumValue={1}
-            step={0.01}
-            minimumTrackTintColor={LINE_COLOR.primitives}
-            maximumTrackTintColor="#334155"
-            thumbTintColor="#ffffff"
-            class="slider"
-          />
-        </view>
-
-        {/* Animated: JS driver vs native driver, side by side */}
+        <CanaryCounter count={count()} onTap={tap} />
+        <CanaryGreeting />
+        <CanarySpinner />
+        <CanaryCheckbox />
+        <CanaryVolume />
         <AnimatedDemo />
-
-        {/* Animated: ValueXY, tracking, diffClamp */}
         <AnimatedParityDemo />
-
-        {/* Runtime modules: I18nManager, Settings, Image statics */}
         <NativeModulesDemo />
-
-        {/* Imperative host-ref API: measure / setNativeProps / findNodeHandle */}
         <RefApiDemo />
-
-        {/* PlatformColor / DynamicColorIOS: native semantic + appearance-aware colors */}
         <PlatformColorDemo />
-
-        {/* Accessibility: a11y props to native, aria/role transform, AccessibilityInfo */}
         <AccessibilityDemo />
-
-        {/* Responder: drag-vs-tap + mid-gesture transfer (move-should-set / takeover) */}
         <ResponderDemo />
-
-        {/* Compound class rule: `.badge.loud` layers over `.badge`, static and dynamic */}
         <CompoundClassDemo />
-
-        {/* Parity checks: longPress · Keyboard.dismiss · animated scroll · sticky · a11y focus */}
         <ParityDemo />
-
-        {/* Opens a Modal */}
-        <ActionButton
-          testID="modal-open"
-          title="Open modal"
-          onPress={() => setModalVisible(true)}
-          color={LINE_COLOR.primitives}
-        />
-
-        {/* Pressable's static look lives in .pressable-card; only the press-state-dependent colors
-            stay a style function. `style` still takes it directly — the engine resolves it at
-            both values of `pressed`. The child has no such channel any more (a bare tag has no
-            render-prop), so it reads a signal mirrored off onPressIn/onPressOut instead. */}
-        <pressable
-          onPress={() => setCount(value => value + 1)}
-          onPressIn={() => setCardPressed(true)}
-          onPressOut={() => setCardPressed(false)}
-          class="pressable-card"
-          style={state => ({
-            backgroundColor: state.pressed ? '#0b1020' : '#151c33',
-            borderColor: LINE_COLOR.primitives,
-          })}
-        >
-          <text
-            class="pressable-label"
-            style={{
-              color: cardPressed() ? LINE_COLOR.primitives : '#9aa6c4',
-            }}
-          >
-            {cardPressed() ? 'holding…' : 'press me (also +1)'}
-          </text>
-        </pressable>
-
-        {/* Horizontal FlatList: real windowing. */}
-        <text class="section-label">FlatList · 24 chips, windowed</text>
-        <FlatList<IChip>
-          testID="chips-list"
-          data={CHIPS}
-          horizontal
-          keyExtractor={item => item.id}
-          getItemLayout={(_data, index) => ({
-            length: CHIP_WIDTH + CHIP_GAP,
-            offset: (CHIP_WIDTH + CHIP_GAP) * index,
-            index,
-          })}
-          class="chip-list"
-          renderItem={info => (
-            // width/marginRight stay dynamic — they reference the CHIP_WIDTH/CHIP_GAP script
-            // consts (also used by getItemLayout above), which a CSS selector has no way to read;
-            // backgroundColor is per-chip (item.color).
-            <view
-              class="chip-card"
-              style={{
-                width: CHIP_WIDTH,
-                marginRight: CHIP_GAP,
-                backgroundColor: info().item.color,
-              }}
-            >
-              <text class="chip-number">{info().item.index}</text>
-            </view>
-          )}
-        />
-
-        {/* Five fills, five sources, one row. The chips above were invisible for a day because the
-            C++ payload builder parsed only `#hex` and comma-`rgb()` and let every other spelling
-            through as a STRING — and iOS answers a string colour with `clearColor()`. Squares 2 and
-            5 are the ones that were black; they are here so a colour grammar that quietly narrows
-            again shows up as a hole in a row rather than as a screen nobody can explain.
-            `SymbioteFabricProps.cpp` now uses React Native's own parser. */}
-        <text class="section-label">probe A · fill sources</text>
-        <view style={{ flexDirection: 'row', height: 56 }}>
-          {/* 1 inline hex */}
-          <view
-            style={{
-              width: 48,
-              height: 48,
-              marginRight: 8,
-              backgroundColor: '#ff5555',
-            }}
-          />
-          {/* 2 inline hsl, the spelling the chips use */}
-          <view
-            style={{
-              width: 48,
-              height: 48,
-              marginRight: 8,
-              backgroundColor: 'hsl(120 70% 55%)',
-            }}
-          />
-          {/* 3 fill from a class, no inline style at all */}
-          <view class="probe-fill" style={{ marginRight: 8 }} />
-          {/* 4 and 5 the same two fills, but produced inside a For */}
-          <For each={['#5599ff', 'hsl(280 70% 55%)']}>
-            {fill => (
-              <view
-                style={{
-                  width: 48,
-                  height: 48,
-                  marginRight: 8,
-                  backgroundColor: fill,
-                }}
-              />
-            )}
-          </For>
-        </view>
-
-        {/* ===== feature-parity device checks ===== */}
-
-        {/* Press-retention measured rect. PASS: press, then drag DOWN ~100px: the panel STAYS
-            highlighted (inside the measured rect + 80px bottom retention). Drag UP off the top:
-            highlight drops. Proves measured-rect retention rather than a symmetric-radius
-            approximation. The dx/dy readout tracks the move offset. */}
-        <pressable
-          hitSlop={{ top: 0, bottom: 40, left: 0, right: 0 }}
-          pressRetentionOffset={{ top: 0, bottom: 80, left: 0, right: 0 }}
-          onPressMove={event =>
-            setRetentionMove({
-              dx: Math.round(nativeNumber(event, 'locationX')),
-              dy: Math.round(nativeNumber(event, 'locationY')),
-            })
-          }
-          class="retention-card"
-          style={state => ({
-            backgroundColor: state.pressed ? LINE_COLOR.primitives : '#151c33',
-          })}
-        >
-          {() => (
-            <text class="info-text">
-              {`drag me · dx ${retentionMove.dx} · dy ${retentionMove.dy}`}
-            </text>
-          )}
-        </pressable>
-
-        {/* maintainVisibleContentPosition. PASS: scroll down a bit, tap Prepend: the rows you are
-            looking at DO NOT jump; new items appear above without shifting the viewport. FAIL: the
-            list jumps to the top. box-list160 is shared with the scroll-driven header demo below. */}
-        <text class="section-label">MVCP · prepend without jump</text>
-        <FlatList<IMvcpRow>
-          nestedScrollEnabled
-          data={mvcpItems()}
-          keyExtractor={item => item.id}
-          maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
-          class="box-list160"
-          // This list measures its own cells (no getItemLayout), and the divider is CHROME the list
-          // renders BETWEEN them — so it belongs to the distance from one row to the next, not to
-          // either row's height. That is the case the offset table has to get right; a model built
-          // by summing heights alone is short by every divider it skipped, and the content below a
-          // windowed-out region slides up and back as the window moves (core/components
-          // buildOffsets). Deliberately on the MVCP list: prepend-without-jump is exactly where an
-          // offset being off by a few points is visible.
-          ItemSeparatorComponent={MvcpDivider}
-          renderItem={info => (
-            <view class="mvcp-row">
-              <text class="list-row-text">{info().item.label}</text>
-            </view>
-          )}
-        />
-        <ActionButton
-          title="Prepend 5"
-          color={LINE_COLOR.primitives}
-          onPress={prependRows}
-        />
-
-        {/* Scroll-driven header (native driver). PASS: drag INSIDE the box below (not the page):
-            the bright bar above SMOOTHLY fades to near-invisible and lifts, on the UI thread (no
-            jank, no per-frame JS). Proves `<scroll-view onScroll={Animated.event(...)}>` native
-            attach — no `Animated.ScrollView` wrapper needed, `bindAnimatedEvent` resolves any
-            `on*` prop on any host node. */}
-        <view
-          class="parity-header"
-          style={{
-            opacity: parityScrollY.interpolate({
-              inputRange: [0, 120],
-              outputRange: [1, 0.12],
-              extrapolate: 'clamp',
-            }),
-            transform: [
-              {
-                translateY: parityScrollY.interpolate({
-                  inputRange: [0, 120],
-                  outputRange: [0, -16],
-                  extrapolate: 'clamp',
-                }),
-              },
-            ],
-          }}
-        >
-          <text class="parity-header-text">HEADER — fades as you scroll ↓</text>
-        </view>
-        {/* box-list160 is shared with the MVCP FlatList above. */}
-        <scroll-view
-          nestedScrollEnabled
-          class="box-list160"
-          scrollEventThrottle={16}
-          onScroll={Animated.event(
-            [{ nativeEvent: { contentOffset: { y: parityScrollY } } }],
-            { useNativeDriver: true },
-          )}
-        >
-          <For each={SCROLL_ROWS}>
-            {index => (
-              <view class="scroll-demo-row">
-                <text class="list-row-text">{`scroll me · row ${index}`}</text>
-              </view>
-            )}
-          </For>
-        </scroll-view>
-        <text class="tiny-center">
-          ↑ drag inside the box — the bar above reacts
-        </text>
-        {/* Native-driver proof for Animated.event: tap to JAM the JS thread 3s, then drag the box
-            above DURING the freeze. If the bar keeps fading/lifting while JS is frozen, the scroll
-            event drives parityScrollY on the UI thread (native attach). If it sticks until the
-            thread frees, it was JS-driven. */}
-        <ActionButton
-          title="Freeze JS 3s — then scroll the box ↑"
-          color="#fc8181"
-          onPress={() => {
-            const until = Date.now() + FREEZE_MS;
-            while (Date.now() < until) {
-              // Intentionally block the JS thread: no JS frame can run here, so any header motion
-              // during the freeze must be coming from the native driver.
-            }
-          }}
-        />
-        <text class="tiny-center">
-          tap Freeze, then immediately drag the box — bar should still move
-        </text>
-
-        {/* Modern style props reaching Fabric's C++ parser. Each is an A/B so the effect is
-            unmistakable on the dark theme. Kept as inline dynamic style here (not CSS) only because
-            these particular demos predate @symbiote-native/css-parser's `raw` passthrough for
-            transform/box-shadow/filter/transform-origin — the CSS property itself now works
-            identically (see .gradient-card below, which IS authored via CSS) — this is just legacy
-            demo wiring, not a remaining gap. */}
-        {/* boxShadow: a BLUE glow (a black shadow is invisible on the near-black bg). PASS: a soft
-            blue halo bleeds out around the panel. */}
-        <view
-          class="shadow-card"
-          style={{ boxShadow: '0px 0px 22px 3px rgba(118,179,225,0.85)' }}
-        >
-          <text class="note-text">boxShadow · glow</text>
-        </view>
-        {/* filter: same base colour both sides; the right one is darkened by brightness(0.5).
-            PASS: the right panel is clearly darker than the left. */}
-        <view class="row">
-          <view class="filter-tile">
-            <text class="tile-text">no filter</text>
-          </view>
-          <view class="filter-tile" style={{ filter: [{ brightness: 0.5 }] }}>
-            <text class="tile-text">brightness 0.5</text>
-          </view>
-        </view>
-        {/* transformOrigin: the panel rotates around its TOP-LEFT corner, not its centre. PASS: the
-            left edge stays put while the bottom-right swings down. */}
-        <view
-          class="rotated-card"
-          style={{
-            transformOrigin: 'top left',
-            transform: [{ rotate: '4deg' }],
-          }}
-        >
-          <text class="tile-text">transformOrigin · top-left</text>
-        </view>
-
-        {/* background-image: a CSS `linear-gradient(...)` authored entirely in CanaryScreen.css
-            (.gradient-card), proving @symbiote-native/css-parser's `background-image` → RN's
-            `experimental_backgroundImage` raw passthrough works end to end (css-parser →
-            registerRules → routeProp → core/engine/src/process-background-image → Fabric).
-            PASS: the panel shows a blue-to-blue gradient sweeping left to right. */}
-        <view class="gradient-card">
-          <text class="tile-text">background-image · linear-gradient</text>
-        </view>
-
-        {/* Image web aliases. PASS: the logo loads via the web-alias fold (src→source uri,
-            width/height→style); a screen reader reads "Solid logo" (alt→accessibilityLabel). */}
-        <image
-          src="https://www.solidjs.com/img/logo/without-wordmark/logo.png"
-          alt="Solid logo"
-          width={48}
-          height={48}
-          class="web-image"
-        />
-
-        {/* KeyboardAvoidingView enabled toggle. PASS: with enabled ON, focusing the field lifts it
-            above the keyboard AND the keyboard is the email layout (proves autoComplete/inputMode
-            fold); with enabled OFF the keyboard covers the field. */}
-        <view class="switch-row">
-          <text class="switch-label">avoid keyboard</text>
-          <switch
-            value={kavEnabled()}
-            onValueChange={event => setKavEnabled(event.value)}
-            trackColor={{ false: '#334155', true: '#2b6cb0' }}
-          />
-        </view>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          enabled={kavEnabled()}
-        >
-          <text-input
-            autoComplete="email"
-            inputMode="email"
-            enterKeyHint="done"
-            placeholder="email — focus me near the bottom…"
-            placeholderTextColor="#7f8db3"
-            class="text-input"
-          />
-        </KeyboardAvoidingView>
-
-        <image
-          source={{
-            uri: 'https://www.solidjs.com/img/logo/without-wordmark/logo.png',
-          }}
-          class="logo-image"
-        />
-
+        <CanaryModal />
+        <CanaryPressable onTap={tap} />
+        <CanaryChips />
+        <CanaryFillProbe />
+        <CanaryRetentionCard />
+        <CanaryMvcpList />
+        <CanaryScrollHeader />
+        <CanaryStyleProps />
+        <CanaryKeyboardAvoiding />
+        <image source={{ uri: LOGO_URI }} class="logo-image" />
         <view class="bottom-card">
           <text class="bottom-text">↑ you scrolled to the bottom</text>
         </view>
-
-        {/* Modal overlays its own window */}
-        <Modal
-          visible={modalVisible()}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setModalVisible(false)}
-        >
-          {/* transparent modal => paint our own dim layer (the RN pattern) */}
-          <view class="modal-overlay">
-            <view testID="modal-card" class="modal-card">
-              <text class="modal-title">It's a Modal</text>
-              <text class="modal-body">
-                Rendered through ModalHostView — its own native window, same
-                Fabric tree.
-              </text>
-              <ActionButton
-                testID="modal-close"
-                title="Close"
-                onPress={() => setModalVisible(false)}
-                color={LINE_COLOR.primitives}
-              />
-            </view>
-          </view>
-        </Modal>
       </scroll-view>
     </safe-area-view>
   );

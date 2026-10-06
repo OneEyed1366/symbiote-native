@@ -251,6 +251,61 @@ const MENU_ITEMS: readonly IMenuItem[] = [
     route: ROUTE_NAME.AuthSession,
     hint: '@symbiote-native/auth-session — OAuth 2 and OpenID Connect: discovery, AuthRequest with PKCE, token calls, Google and Facebook hooks',
   },
+  {
+    label: 'Checkbox',
+    route: ROUTE_NAME.Checkbox,
+    hint: 'Checkbox — native checkbox primitive: value, color, disabled, forms, terms and conditions, settings lists',
+  },
+  {
+    label: 'Linear Gradient',
+    route: ROUTE_NAME.LinearGradient,
+    hint: '@symbiote-native/linear-gradient — color stops, locations, start/end points as banners, scrims and progress fills',
+  },
+  {
+    label: 'Blur',
+    route: ROUTE_NAME.Blur,
+    hint: '@symbiote-native/blur — BlurView tints and intensity over live content, Android BlurTargetView',
+  },
+  {
+    label: 'Glass Effect',
+    route: ROUTE_NAME.GlassEffect,
+    hint: '@symbiote-native/glass-effect — iOS 26 Liquid Glass: styles, tint, interactive, container spacing',
+  },
+  {
+    label: 'Symbols',
+    route: ROUTE_NAME.Symbols,
+    hint: '@symbiote-native/symbols — SF Symbols on iOS, Material Symbols elsewhere: weight, scale, tint, animation',
+  },
+  {
+    label: 'Apple Authentication',
+    route: ROUTE_NAME.AppleAuthentication,
+    hint: '@symbiote-native/apple-authentication — Sign in with Apple button, sign-in, credential state, revoke events',
+  },
+  {
+    label: 'Image',
+    route: ROUTE_NAME.Image,
+    hint: '@symbiote-native/image — expo-image: caching, placeholders, blurhash, transitions, content fit, Image API and ImageBackground',
+  },
+  {
+    label: 'Video',
+    route: ROUTE_NAME.Video,
+    hint: '@symbiote-native/video — player, native controls, fullscreen, PiP, thumbnails, cache, subtitles',
+  },
+  {
+    label: 'Camera',
+    route: ROUTE_NAME.Camera,
+    hint: '@symbiote-native/camera — preview, photo, video recording, barcode scanning, zoom, torch, permissions',
+  },
+  {
+    label: 'Live Photo',
+    route: ROUTE_NAME.LivePhoto,
+    hint: '@symbiote-native/live-photo — iOS only: play Live Photos from the library with a touch',
+  },
+  {
+    label: 'GL',
+    route: ROUTE_NAME.Gl,
+    hint: '@symbiote-native/gl — GLView: raw WebGL context, shaders, textures from camera, snapshots',
+  },
 ];
 
 export function MenuScreen() {

@@ -4,6 +4,7 @@ import { Screen, Stack } from '@symbiote-native/navigation/vue';
 import type { IVueScreenOptions } from '@symbiote-native/navigation/vue';
 import { hide } from '@symbiote-native/splash-screen/vue';
 import './App.css';
+import './ExpoViews.css';
 
 import MenuScreen from './screens/MenuScreen.vue';
 import { SCREENS } from './screen-table';
