@@ -156,9 +156,11 @@ height.
   </TabItem>
 </Tabs>
 
-## Functions
+## API
 
-| Function                                  | Notes                                                                 |
+### Functions
+
+| Function                                  | Description                                                                 |
 | ----------------------------------------- | --------------------------------------------------------------------- |
 | `isAvailableAsync()`                      | `false` off iOS or on an old system                                   |
 | `signInAsync(options?)`                   | Rejects with `ERR_REQUEST_CANCELED` when the user cancels             |
@@ -170,9 +172,9 @@ height.
 
 The name and email come only the first time a user signs in, store the credential.
 
-## Button props
+### Button props
 
-| Prop           | Notes                                                           |
+| Prop           | Description                                                           |
 | -------------- | --------------------------------------------------------------- |
 | `onPress`      | Call `signInAsync` in here                                      |
 | `buttonType`   | `SIGN_IN`, `CONTINUE` or `SIGN_UP`                              |
@@ -181,3 +183,78 @@ The name and email come only the first time a user signs in, store the credentia
 | `style`        | No `backgroundColor` or `borderRadius`, the App Store forbids it |
 
 Plus `testID`, `nativeID`, `onLayout` and the accessibility and responder props every View takes.
+
+## Notes
+
+- **iOS only.** Off iOS `isAvailableAsync()` resolves `false`, every other function throws
+  `UnavailabilityError`, and the button renders nothing with a warning in development. Gate the
+  button on `isAvailableAsync()`.
+- **Cancelling is an error with a code.** `signInAsync` and `refreshAsync` reject with
+  `ERR_REQUEST_CANCELED` when the user dismisses the sheet. Any other code is a real failure.
+- **A credential without tokens is a failure.** If the result lacks `authorizationCode`,
+  `identityToken` or `user`, the call rejects with `ERR_REQUEST_FAILED`, so a resolved credential is
+  always usable.
+- **Name and email arrive once.** Apple returns `fullName` and `email` only the first time a user
+  signs in to your app, and only for the scopes you requested. Store them when you get them, for
+  example with [`@symbiote-native/secure-store`](/docs/packages/secure-store/) or on your server.
+- **The button label is drawn by iOS.** You pick `buttonType` and `buttonStyle`, the text follows the
+  app's localization, and the package sets `CFBundleAllowMixedLocalizations` for it.
+
+## Common questions
+
+**The button does not show up.** It needs a width and a height, since it has no intrinsic size.
+Render it only when `isAvailableAsync()` resolves `true`: on an unsupported system it draws nothing,
+and a missing entitlement or signing Team can leave the whole flow unavailable. Check that the
+postinstall wrote `com.apple.developer.applesignin` and that a Team is chosen in Xcode.
+
+**Sign in spins forever, or never resolves, on the iOS Simulator.** This is an Apple bug on the iOS
+14 era simulators and the flow is unreliable on simulators in general. Test on a real device.
+`getCredentialStateAsync` always throws on the simulator.
+
+**`ERR_REQUEST_FAILED` with `AuthorizationError error 1000` on a device build.** The app is not
+properly set up for Sign in with Apple. Check that the capability is enabled for the App ID on
+developer.apple.com, that the provisioning profile was regenerated after you turned it on, that a
+Team is selected in Xcode, and that the `.entitlements` file carries
+`com.apple.developer.applesignin`. A log line with `AKAuthenticationError` and code `-7026` points
+at the profile.
+
+**How do I tell a cancel from a failure?** Catch the error and compare `error.code` with
+`ERR_REQUEST_CANCELED`. A cancel is not an error to report to the user.
+
+**`fullName` and `email` are `null` on the second sign in.** That is how Apple works: they come back
+only the first time, and only for the scopes you asked for. If you did not save them then, the user
+has to revoke the app in Settings > Apple ID > Sign in with Apple and sign in again. If the user
+hides their email, the field holds a private relay address.
+
+**Can I change the button text?** Not from JavaScript. iOS draws the label, so the language follows
+the app's localizations. Add the languages to the Xcode project to get a translated label.
+
+**Does it work with Firebase, or a backend that checks `aud`?** The identity token's audience is the
+bundle identifier of the app that signed in. That is your app's own identifier in a development or
+release build, which is what a backend needs. The `host.exp.Exponent` audience that broke Firebase
+only happens inside Expo Go, which this project never uses.
+
+**What about Android and web?** Not supported by `expo-apple-authentication`, and not here. Use a
+web-based flow such as [`@symbiote-native/auth-session`](/docs/packages/auth-session/) for those.
+
+Sources: [Expo docs: AppleAuthentication](https://docs.expo.dev/versions/latest/sdk/apple-authentication/),
+[expo/expo#11476 unable to authenticate in the iOS simulator](https://github.com/expo/expo/issues/11476),
+[expo/expo#11995 signInAsync never resolves](https://github.com/expo/expo/issues/11995),
+[expo/expo#5781 AuthorizationError 1000 in a standalone app](https://github.com/expo/expo/issues/5781),
+[expo/expo#8341 never returns ERR_CANCELED](https://github.com/expo/expo/issues/8341),
+[expo/expo#5690 AppleAuthenticationButton not showing up](https://github.com/expo/expo/issues/5690),
+[expo/expo#7129 changing the button text](https://github.com/expo/expo/issues/7129),
+[expo/expo#16162 wrong audience in the identity token on Expo Go](https://github.com/expo/expo/issues/16162).
+
+## How the wrapper works
+
+`expo-apple-authentication`'s JS is hand-ported into this package's `core/`: the credential flow
+(`signInAsync`, `refreshAsync`, `signOutAsync`, `getCredentialStateAsync`, `formatFullName`,
+`addRevokeListener`) over `requireOptionalNativeModule` with a stub, and the button descriptor. Off
+iOS the module is missing, which is why the functions fail with `UnavailabilityError` instead of
+crashing at import. The button forwards `onPress` to the native `onButtonPress` event and is the same
+descriptor on every adapter. What upstream's config plugin writes is declared in `native-link.json`
+instead: `expo-modules-link` adds the `Info.plist` key and the entitlement at the app's postinstall,
+and creates the `.entitlements` file when the app has none. The native code is never vendored:
+`expo-modules-autolinking` resolves it from `node_modules` (see
+[the native setup guide](/docs/howtos/expo-native-module-setup/)).

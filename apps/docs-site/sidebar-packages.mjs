@@ -35,6 +35,7 @@ export const packagesSidebar = {
         { label: 'Calendar', slug: 'docs/packages/calendar' },
         { label: 'Camera', slug: 'docs/packages/camera' },
         { label: 'Cellular', slug: 'docs/packages/cellular' },
+        { label: 'Checkbox', slug: 'docs/packages/checkbox' },
         { label: 'Clipboard', slug: 'docs/packages/clipboard' },
         { label: 'Constants', slug: 'docs/packages/constants' },
         { label: 'Contacts', slug: 'docs/packages/contacts' },

@@ -98,9 +98,11 @@ Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --l
   </TabItem>
 </Tabs>
 
-## Props
+## API
 
-| Prop        | Notes                                                         |
+### Props
+
+| Prop        | Description                                                         |
 | ----------- | ------------------------------------------------------------- |
 | `colors`    | Two or more colors. For one color use `style.backgroundColor` |
 | `locations` | Stops from 0 to 1, ascending, same length as `colors`         |
@@ -110,3 +112,75 @@ Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --l
 
 Plus `style`, `testID`, `nativeID`, `onLayout` and the accessibility and responder props every View
 takes. Not ported: the web variant.
+
+## Notes
+
+- **Children go inside the gradient.** It paints behind them. On iOS the native gradient is the root
+  view. On Android the root is a plain `View` that carries your `style`, with the native gradient
+  filling it as a child, so `children`, `onLayout` and touches behave as on any `View`.
+- **Rounded corners go in `style`.** `borderRadius` and the four per-corner radii are read from
+  `style` and handed to the native gradient, because React Native does not clip a native view by a
+  radius on its own.
+- **A bad value warns instead of throwing.** A `start` or `end` that is not `[x, y]` or `{ x, y }` is
+  ignored, and a `locations` array of the wrong length is cut to the number of `colors`. Both log a
+  warning and the gradient still draws.
+- **`colors` takes anything `style` colors take.** Names, hex, `rgb()`/`rgba()` and `hsl()` all go
+  through the same color processing as every other view.
+- **Where the native view is missing, you get a plain `View`.** The package logs
+  `LinearGradient is not available on this platform` and renders your children without a gradient.
+
+## Common questions
+
+**`transparent` to white (or any color) looks gray on iOS.** Apple platforms interpolate
+`transparent` as transparent black, so the middle of the fade turns gray. Fade to a transparent
+version of the exact color instead: `['rgba(255, 255, 255, 0)', '#ffffff']` rather than
+`['transparent', '#ffffff']`. Android shows the same gradient either way, which is why the problem
+only appears on iOS.
+
+**The gradient looks different on iOS and Android.** Check `start` and `end` first. Setting both to
+the same point describes no direction at all, and that case is reported to render differently on the
+two platforms. Give them distinct points, for example `start={{ x: 0, y: 0 }}` and
+`end={{ x: 1, y: 1 }}` for a diagonal.
+
+**How do I get rounded corners?** Put `borderRadius` (or `borderTopLeftRadius` and the other three)
+in `style`, a class or a `StyleSheet`. On Android the radii are passed to the native gradient by hand
+and on iOS the root view applies them.
+
+**Can I fill text with a gradient?** Not with this package alone. The usual recipe masks a gradient
+with the text using `@react-native-masked-view/masked-view`, a third-party React Native component,
+so it runs only under the React adapter. SymbioteNative ships no masked view for Vue, Svelte, Solid
+or Angular. On Android the masked view needs a recent release: older ones showed a solid color
+instead of the gradient.
+
+**How do I animate the colors?** `colors` is an ordinary prop, so drive it from state, a signal or a
+rune and the gradient repaints. Do not expect a smooth tween that way: each change is a native view
+update, and reports of animating colors through Reanimated's `animatedProps` show it working on iOS
+and not on Android. For a fade between two looks, stack two gradients and animate the `opacity` of
+the top one.
+
+**Is it slow in a long list?** One gradient is cheap, many of them are not. A startup slowdown on
+Android was fixed upstream in SDK 49, but scrolling lists with a gradient in every row is still
+reported to stutter. Draw the gradient once behind the list rather than per row, keep the number
+that are on screen small, and try `dither={false}` on Android, which upstream says may speed up
+rendering at the cost of visible banding.
+
+**Why does `colors` need two entries?** A gradient needs two stops. For a single color set
+`style.backgroundColor` on a `View`.
+
+Sources: [Expo docs: LinearGradient](https://docs.expo.dev/versions/latest/sdk/linear-gradient/),
+[expo/expo#7418 LinearGradient transparent to white is wrong on iOS](https://github.com/expo/expo/issues/7418),
+[CSS-Tricks: what to know about gradients toward transparent black](https://css-tricks.com/thing-know-gradients-transparent-black/),
+[expo/expo#25595 start and end mismatch between iOS and Android](https://github.com/expo/expo/issues/25595),
+[expo/expo#32934 LinearGradient with MaskedView on Android](https://github.com/expo/expo/issues/32934),
+[expo/expo#29408 animating colors with Reanimated on Android](https://github.com/expo/expo/issues/29408),
+[expo/expo#23861 renders very slow on Android](https://github.com/expo/expo/issues/23861).
+
+## How the wrapper works
+
+`expo-linear-gradient`'s JS is hand-ported into this package's `core/`: the props type, point
+normalization, `locations` check and the per-platform descriptor. `renderLinearGradient` returns one
+descriptor and each adapter only turns it into its own element, so the five adapters cannot drift
+apart. The native view is registered when the first gradient renders, through
+`requireNativeViewManager`, and the engine derives its events and prop processors from that
+registration. The native code is never vendored: `expo-modules-autolinking` resolves it from
+`node_modules` (see [the native setup guide](/docs/howtos/expo-native-module-setup/)).

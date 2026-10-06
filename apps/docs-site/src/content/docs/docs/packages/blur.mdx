@@ -118,9 +118,11 @@ blurred. Without one `BlurView` falls back to `none` and warns. iOS ignores the 
   </TabItem>
 </Tabs>
 
-## Props
+## API
 
-| Prop                  | Notes                                                           |
+### Props
+
+| Prop                  | Description                                                           |
 | --------------------- | --------------------------------------------------------------- |
 | `tint`                | `default`, `light`, `dark`, `extraLight`, `regular`, system materials |
 | `intensity`           | 1 to 100, default 50                                            |
@@ -135,3 +137,79 @@ takes. Not ported: the web variant and the Reanimated `getAnimatableRef` hook.
   An Angular template spells the Android target tag statically. If the host sets an
   `__expo_app_identifier__`, `BlurTargetView` warns that the tag does not match instead of rendering.
 </Aside>
+
+## Notes
+
+- **Android blurs nothing until you ask for it.** `blurMethod` defaults to `none`, which is only a
+  translucent view. Pick `dimezisBlurView` (or `dimezisBlurViewSdk31Plus`) and pass a `blurTarget`.
+  Without a target the package warns and falls back to `none`.
+- **One `BlurTargetView` can serve many `BlurView`s**, as long as they all sit inside its bounds.
+  That is cheaper than one target per blur.
+- **The blur view must be above what it blurs.** Place it after the content in the tree (or give it
+  a higher `zIndex`), not beside or under it.
+- **Every iOS tint adds a translucent layer.** Each `tint` is a system material that sits over the
+  blur, and iOS exposes no plain blur radius. Android and the fallback can go without a tint.
+- **`blurReductionFactor` is Android only.** It divides the intensity to bring the Android blur
+  closer to iOS.
+- **Without the native view you get a plain `View`.** The package logs
+  `BlurView is not available on this platform` and renders your children without a blur.
+
+## Common questions
+
+**Nothing is blurred on Android.** The default `blurMethod` is `none`. Wrap the content in a
+`BlurTargetView`, pass its ref as `blurTarget` and set `blurMethod="dimezisBlurView"`. If the
+`blurTarget` is missing, the package warns and falls back to `none`.
+
+**The blur does not follow a scrolling list.** The blur view has to be rendered after the content it
+covers, as a later sibling or with a higher `zIndex`. A blur placed beside or below the list shows
+the list unblurred. Keep `tint` at `default` to drop the light wash.
+
+**How do I blur inside a `Modal` on Android?** A `Modal` is a separate native window, so the blur
+view inside it cannot reach a target that lives outside. The layout the Expo team confirmed puts the
+`Modal` itself inside the `BlurTargetView`, with the `BlurView` inside the `Modal` pointing at that
+target. Upstream will not bring back the old method that blurred the whole window, it is far slower.
+This layout is not demoed in the canary apps, so test it on your adapter before relying on it.
+
+**Corners are not rounded.** `borderRadius` alone does not clip the blur. Put `overflow: 'hidden'`
+in the same `style`, or wrap the blur in a view that has the radius and `overflow: 'hidden'`.
+
+**The blur is missing on some iPhones.** Check Settings > Accessibility > Display & Text Size >
+Reduce Transparency. When it is on, iOS turns blur effects off. It can differ between two phones of
+the same model, so a user report of a missing blur is often this switch. Render a solid translucent
+fallback for those users.
+
+**Can I get a blur with no tint?** On iOS, no: every system blur style composes a tint layer over
+the backdrop and the public API has no plain blur radius. Upstream documented this instead of
+changing it.
+
+**Can I animate `intensity`?** `intensity` is an ordinary prop, so drive it from state, a signal or a
+rune. Animating it through Reanimated's `animatedProps` was broken on the New Architecture by a
+Reanimated bug, since fixed there. SymbioteNative does not ship the Reanimated `getAnimatableRef`
+hook.
+
+**The Android build says it cannot find `BlurView`.** The native blur comes from the
+`com.github.Dimezis:BlurView` library on JitPack, and React Native's Gradle plugin adds JitPack to
+every project by default. The build fails if you set `react.includeJitpackRepository=false` in
+`gradle.properties`, or if JitPack served a broken build of the pinned version, which happened to
+BlurView 2.0.3. In that case update `expo-blur` through the package rather than pinning the library
+by hand.
+
+Sources: [Expo docs: BlurView](https://docs.expo.dev/versions/latest/sdk/blur-view/),
+[expo/expo#6613 BlurView does not update the blur](https://github.com/expo/expo/issues/6613),
+[expo/expo#44165 BlurView inside a Modal on Android](https://github.com/expo/expo/issues/44165),
+[expo/expo#18615 borderRadius on expo-blur](https://github.com/expo/expo/issues/18615),
+[expo/expo#34737 blur missing on a physical device](https://github.com/expo/expo/issues/34737),
+[expo/expo#49240 no option to render a blur without a tint](https://github.com/expo/expo/issues/49240),
+[expo/expo#32781 animating BlurView intensity with Reanimated](https://github.com/expo/expo/issues/32781),
+[expo/expo#34141 Android build cannot find BlurView 2.0.3](https://github.com/expo/expo/issues/34141).
+
+## How the wrapper works
+
+`expo-blur`'s JS is hand-ported into this package's `core/`: the props, the `blurMethod` warning
+and the descriptors. `renderBlurView` returns a `View` that carries your `style` with an
+absolute-fill native blur inside it, on both platforms, and `renderBlurTargetView` returns the
+native target on Android and a plain `View` on iOS. `blurTarget` is each adapter's own reference to
+a `BlurTargetView`: the package resolves it to a node and waits for the commit before telling
+native, so a Vue or Svelte render order cannot hand native a tag that does not exist yet. The native
+code is never vendored: `expo-modules-autolinking` resolves it from `node_modules` (see
+[the native setup guide](/docs/howtos/expo-native-module-setup/)).

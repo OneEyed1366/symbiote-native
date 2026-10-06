@@ -3,7 +3,7 @@ title: Live photo
 description: expo-live-photo wrapped for every SymbioteNative adapter, a Live Photo view with playback control on iOS.
 ---
 
-import { Aside } from '@astrojs/starlight/components';
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 
 `@symbiote-native/live-photo` wraps
 [`expo-live-photo`](https://docs.expo.dev/versions/latest/sdk/live-photo/), so every
@@ -38,25 +38,110 @@ Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --l
 
 ## Usage
 
-```tsx
-import { LivePhotoView, type ILivePhotoViewHandle } from '@symbiote-native/live-photo/react';
-
-const ref = useRef<ILivePhotoViewHandle>(null);
-
-<LivePhotoView
-  ref={ref}
-  style={{ width: 300, height: 400 }}
-  source={{ photoUri, pairedVideoUri }}
-  onLoadError={error => console.warn(error.message)}
-/>;
-
-ref.current?.startPlayback('hint');
-```
-
 The photo and the video must come from one unaltered live photo file, the pairing lives in their
-metadata.
+metadata. Keep the handle of the view to start and stop playback.
 
-## Reaching the playback functions
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { useRef } from 'react';
+    import { LivePhotoView, type ILivePhotoViewHandle } from '@symbiote-native/live-photo/react';
+
+    const handle = useRef<ILivePhotoViewHandle>(null);
+
+    <LivePhotoView
+      ref={handle}
+      style={{ width: 300, height: 400 }}
+      source={{ photoUri, pairedVideoUri }}
+      onLoadError={error => console.warn(error.message)}
+    />;
+    <button title="Play" onPress={() => handle.current?.startPlayback('hint')} />;
+    ```
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { ref } from 'vue';
+    import { LivePhotoView, type ILivePhotoViewHandle } from '@symbiote-native/live-photo/vue';
+
+    const handle = ref<ILivePhotoViewHandle | null>(null);
+    </script>
+
+    <template>
+      <LivePhotoView
+        ref="handle"
+        :style="{ width: 300, height: 400 }"
+        :source="{ photoUri, pairedVideoUri }"
+        @loadError="error => console.warn(error.message)"
+      />
+      <button title="Play" @press="handle?.startPlayback('hint')" />
+    </template>
+    ```
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component } from '@angular/core';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
+    import { LivePhotoView } from '@symbiote-native/live-photo/angular';
+
+    @Component({
+      standalone: true,
+      imports: [LivePhotoView, SYMBIOTE_ELEMENTS],
+      template: `
+        <LivePhotoView
+          #view
+          [style]="{ width: 300, height: 400 }"
+          [source]="{ photoUri, pairedVideoUri }"
+          [onLoadError]="onLoadError"
+        />
+        <button title="Play" (press)="view.startPlayback('hint')" />
+      `,
+    })
+    export class LivePhotoCard {
+      readonly photoUri = '...';
+      readonly pairedVideoUri = '...';
+      readonly onLoadError = (error: { message: string }): void => console.warn(error.message);
+    }
+    ```
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { LivePhotoView, type ILivePhotoViewHandle } from '@symbiote-native/live-photo/svelte';
+
+      let handle = $state<ILivePhotoViewHandle | undefined>();
+    </script>
+
+    <LivePhotoView
+      bind:this={handle}
+      style={{ width: 300, height: 400 }}
+      source={{ photoUri, pairedVideoUri }}
+      onLoadError={error => console.warn(error.message)}
+    />
+    <button title="Play" onPress={() => handle?.startPlayback('hint')} />
+    ```
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { createSignal } from 'solid-js';
+    import { LivePhotoView, type ILivePhotoViewHandle } from '@symbiote-native/live-photo/solid';
+
+    const [handle, setHandle] = createSignal<ILivePhotoViewHandle>();
+
+    <LivePhotoView
+      ref={setHandle}
+      style={{ width: 300, height: 400 }}
+      source={{ photoUri, pairedVideoUri }}
+      onLoadError={error => console.warn(error.message)}
+    />;
+    <button title="Play" onPress={() => handle()?.startPlayback('hint')} />;
+    ```
+  </TabItem>
+</Tabs>
+
+## API
+
+### Reaching the playback functions
 
 | Adapter | How                                              |
 | ------- | ------------------------------------------------ |
@@ -66,9 +151,9 @@ metadata.
 | Svelte  | `bind:this`, the component exports both functions |
 | Angular | `@ViewChild(LivePhotoView)`, both are methods    |
 
-## Props
+### Props
 
-| Prop                          | Notes                                              |
+| Prop                          | Description                                              |
 | ----------------------------- | -------------------------------------------------- |
 | `source`                      | `{ photoUri, pairedVideoUri }`                     |
 | `isMuted`                     | `true` by default                                  |
@@ -81,3 +166,62 @@ metadata.
 | `onPlaybackStart` / `onPlaybackStop` | Playback state changed                      |
 
 Plus `style`, `testID`, `nativeID`, `onLayout` and the accessibility and responder props every View takes.
+
+## Notes
+
+- **iOS only.** Off iOS the view renders nothing, with a warning in development, and the handle
+  throws `UnavailabilityError`. Check `Platform.OS` before you render it.
+- **A Live Photo is two files.** The still photo and the paired video, and they must stay a pair:
+  the pairing lives in their metadata, so editing or recompressing either one breaks it.
+- **Playback style.** `startPlayback()` plays the full clip, `startPlayback('hint')` plays the short
+  preview you see when you press a photo in the Photos app.
+- **Muted by default.** `isMuted` is `true`, unmute it when the sound is part of the content.
+- **Press and hold plays** while `useDefaultGestureRecognizer` is `true`. Turn it off and call
+  `startPlayback` yourself if the photo has its own gestures.
+
+## Common questions
+
+**Where do I get `photoUri` and `pairedVideoUri`?** From the picker. With
+[`@symbiote-native/image-picker`](/docs/packages/image-picker/), ask for
+`mediaTypes: ['livePhotos']` and read `assets[0].uri` for the photo and
+`assets[0].pairedVideoAsset?.uri` for the video. A photo stored in iCloud and not on the phone needs
+the picker's `shouldDownloadFromNetwork` option, or the pair may not arrive.
+
+**I cannot find a Live Photo in the Simulator.** Live Photos are made by the iPhone camera. The
+Simulator cannot take one, so test with a real device and a photo that has the Live badge.
+
+**`onLoadError` fires, or the photo shows but never plays.** The two files do not belong together.
+Pass the two URIs that came out of one pick, not a photo from one place and a video from another,
+and do not run either through an editor or an image manipulator first.
+
+**Can I get the pair from the media library?** The shared-object API of
+[`@symbiote-native/media-library`](/docs/packages/media-library/) resolves the paired video of a
+Live Photo, but resolving the still half as a local file was reported to throw for some assets, and
+`getAssetInfoAsync` crashed on Live Photos on iOS in SDK 56 before a fix. The picker is the safer
+way to get a ready pair.
+
+**It plays without sound.** `isMuted` defaults to `true`. Pass `isMuted={false}`.
+
+**How do I start playback from a button?** Keep the handle and call `startPlayback('full')` or
+`startPlayback('hint')`, and `stopPlayback()` to end it. `onPlaybackStart` and `onPlaybackStop` tell
+you when the state changes.
+
+**Does it work on Android?** No, Live Photo is an Apple format. The view renders nothing there.
+
+Sources: [Expo docs: LivePhoto](https://docs.expo.dev/versions/latest/sdk/live-photo/),
+[expo/expo#47730 Asset.getLivePhotoPhotoUri for Live Photo playback](https://github.com/expo/expo/issues/47730),
+[expo/expo#46512 getAssetInfoAsync crashes on Live Photos](https://github.com/expo/expo/issues/46512),
+[expo/expo#48658 iCloud-offloaded assets in the image picker](https://github.com/expo/expo/issues/48658).
+
+## How the wrapper works
+
+`expo-live-photo`'s JS is hand-ported into this package's `core/`. A native Expo view keeps its
+functions on its module's view prototypes and native finds the view by its native tag, so the
+engine's `defineExpoViewMethods` makes that call and the core `createLivePhotoViewHandle(getNode)`
+wraps it. Each adapter only hands over its host node: React and Vue a function `ref` in the
+descriptor props, Solid the same through `spread`, Svelte `bind:this`, Angular the outlet's root
+node. The handle is a `ref` in React and Solid, `expose` in Vue, exported functions in Svelte and
+methods in Angular. The package declares only `ios.upstreamPackage` in `native-link.json`, since
+upstream has no Android folder and no config plugin. The native code is never vendored:
+`expo-modules-autolinking` resolves it from `node_modules` (see
+[the native setup guide](/docs/howtos/expo-native-module-setup/)).

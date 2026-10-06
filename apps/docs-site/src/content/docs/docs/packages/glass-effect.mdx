@@ -114,9 +114,11 @@ Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --g
   </TabItem>
 </Tabs>
 
-## Props
+## API
 
-| Prop               | Notes                                                                    |
+### Props
+
+| Prop               | Description                                                                    |
 | ------------------ | ------------------------------------------------------------------------ |
 | `glassEffectStyle` | `regular` (default), `clear`, `none`, or `{ style, animate, animationDuration }` |
 | `tintColor`        | A color, a `PlatformColor` or a `DynamicColorIOS`                        |
@@ -131,3 +133,68 @@ takes.
   An Angular template spells the iOS native tag statically. If the host sets an
   `__expo_app_identifier__`, the components warn that the tag does not match instead of rendering.
 </Aside>
+
+## Notes
+
+- **iOS 26 and later only.** Older iOS, Android and the fallback render a plain `View` without the
+  glass props, and `isLiquidGlassAvailable()` reports `false` there.
+- **`isLiquidGlassAvailable()` checks the build, not only the phone.** It validates the system
+  version, the compiler version the app was built with and the `UIDesignRequiresCompatibility`
+  setting in `Info.plist`. `isGlassEffectAPIAvailable()` checks the API at runtime, because some iOS
+  26 betas lack it and crash.
+- **Glass does not survive an opacity of 0.** Setting `opacity` to `0` on a `GlassView` or on any
+  parent stops the glass from rendering at all. Fade it with the `animate` and `animationDuration`
+  fields of `glassEffectStyle` instead.
+- **Merge glass views with `GlassContainer`.** Views inside one container blend into each other when
+  they come within `spacing` of each other.
+- **The native view is the root and the children sit inside it**, so what you put in a `GlassView`
+  is laid out and touched like the content of any `View`.
+
+## Common questions
+
+**I see a plain view, no glass.** Check three things. The device runs iOS 26 or later, the app was
+built with the iOS 26 SDK (Xcode 26), and `UIDesignRequiresCompatibility` is not set to `true` in
+`Info.plist`. Log `isLiquidGlassAvailable()` to see which one fails. On Android and older iOS a
+plain view is the expected result.
+
+**The glass disappears when its parent fades.** This is a platform bug that came in with iOS 26.1:
+a glass view under an ancestor whose opacity reaches 0 never renders, which also hits Modal fade
+animations. Do not animate the opacity of a glass view or its ancestors. Use
+`glassEffectStyle={{ style: 'regular', animate: true, animationDuration: 0.3 }}` and switch between
+`regular` and `none`. If you must fade a wrapper, toggle the style to `none` while the wrapper is
+nearly invisible and back to `regular` once it is not. A reported side issue is a `zIndex` somewhere
+up the tree that also makes the glass vanish, so try removing it.
+
+**The glass does not follow my light and dark toggle.** `colorScheme` changes were applied one frame
+late upstream, so the material kept its old look until a remount or a tab change. It is fixed in
+`expo-glass-effect` 55.0.8 and this package pins a later release, so update the package.
+
+**Rounded corners on one side are ignored.** Per-corner radii such as `borderTopLeftRadius` were
+dropped in an SDK 55 canary and fixed before release. Update the package if you see it.
+
+**How do I make two glass shapes melt together?** Put them in one `GlassContainer` and set
+`spacing` to the distance at which they should merge.
+
+**Does it work on Android?** There is no Android implementation upstream. Both components render a
+plain `View`, so give it a background yourself if the design needs one.
+
+**The glass gets worse after many mounts.** Visual degradation after tens of mount and unmount
+cycles has been reported upstream without a fix. Keep the glass views you create and destroy to a
+minimum.
+
+Sources: [Expo docs: GlassEffect](https://docs.expo.dev/versions/latest/sdk/glass-effect/),
+[expo/expo#41024 glass does not work with animated parent opacity](https://github.com/expo/expo/issues/41024),
+[expo/expo#50097 glass that fades out leaves later views without glass](https://github.com/expo/expo/issues/50097),
+[expo/expo#43743 colorScheme does not update the glass](https://github.com/expo/expo/issues/43743),
+[expo/expo#40778 per-corner radius regression](https://github.com/expo/expo/issues/40778),
+[expo/expo#50466 degradation after repeated mount cycles](https://github.com/expo/expo/issues/50466),
+[Apple: set the correct alpha value on a visual effect view](https://developer.apple.com/documentation/uikit/uivisualeffectview#Set-the-correct-alpha-value).
+
+## How the wrapper works
+
+`expo-glass-effect`'s JS is hand-ported into this package's `core/`: the prop types, the two
+availability checks and the descriptors. On iOS `renderGlassView` and `renderGlassContainer` return
+the native view as the root with the children inside it, elsewhere a plain `View` that drops the
+glass props. The package declares `android.modules: []` because the upstream package has no Android
+folder, and it takes `expo-glass-effect` for its native iOS code only. Each adapter turns the same
+descriptor into its own element, so the five cannot drift apart.
