@@ -24,7 +24,7 @@ import { buildScrollViewHandle } from './scroll-view-commands';
 // A RECORDING host: this file asserts on the COMMANDS the engine sent, which is the engine's own
 // output, and never on a committed tree. Nothing here needs Fabric's tree rules re-implemented.
 const fabric = installRecordingFabric();
-let nextRootTag = 9800;
+let nextRootTag = 9_800;
 
 // A COMMITTED node, because every command resolves through the node's Fabric handle and no-ops
 // before its first commit — an uncommitted node makes every assertion below vacuously empty.
@@ -60,6 +60,17 @@ describe('the node sends RN ScrollViewCommands', () => {
     expect(scrollCommands()).toEqual([
       { commandName: 'scrollTo', args: [0, 0, true] },
       { commandName: 'scrollTo', args: [4, 8, false] },
+    ]);
+  });
+
+  // `Commands.scrollTo(component, x || 0, y || 0, animated !== false)`: NaN becomes 0 and only an
+  // explicit `false` stops the animation
+  it('scrollTo turns a NaN offset into 0 and animates unless told false', () => {
+    const node = mountScrollNode();
+    node.scrollTo({ x: Number.NaN, y: 5 });
+
+    expect(scrollCommands()).toEqual([
+      { commandName: 'scrollTo', args: [0, 5, true] },
     ]);
   });
 

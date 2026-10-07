@@ -5,8 +5,20 @@ import { dlog } from '../debug';
 import { invariant } from '../invariant';
 import { isDevBuild } from '../platform/shared';
 import type { IRootTag } from '../fabric';
+import type { IAppParameters } from './app-parameters';
+import { createContainerConfig } from './container-config';
+import type {
+  IComponentProviderInstrumentationHook,
+  IRootViewStyleProvider,
+} from './container-config';
 import { createHeadlessTasks } from './headless-tasks';
 import type { ITaskCancelProvider, ITaskProvider } from './headless-tasks';
+
+export type { IAppParameters } from './app-parameters';
+export type {
+  IComponentProviderInstrumentationHook,
+  IRootViewStyleProvider,
+} from './container-config';
 
 export { HeadlessJsTaskError } from './headless-tasks';
 export type {
@@ -15,12 +27,6 @@ export type {
   ITaskCanceller,
   ITaskProvider,
 } from './headless-tasks';
-
-// What the native host hands a runnable when it mounts a surface
-export type IAppParameters = {
-  rootTag: IRootTag;
-  initialProps?: object;
-};
 
 // What actually mounts an app onto a surface for a given app key
 export type IRunnable = (appParameters: IAppParameters) => void;
@@ -64,9 +70,23 @@ export type IAppRegistry<TComponentProvider, TWrapperComponentProvider> = {
   // A `run` registers as a runnable, a `component` as a (section) component
   registerConfig(config: IAppConfig<TComponentProvider>[]): void;
   // Throws for an unregistered key, as RN's invariant does
-  runApplication(appKey: string, appParameters: IAppParameters): void;
+  runApplication(
+    appKey: string,
+    appParameters: IAppParameters,
+    displayMode?: number,
+  ): void;
   // Runs the runnable again with new parameters for an already rendered surface
-  setSurfaceProps(appKey: string, appParameters: IAppParameters): void;
+  setSurfaceProps(
+    appKey: string,
+    appParameters: IAppParameters,
+    displayMode?: number,
+  ): void;
+  // Both configure the `AppContainer` RN renders, which has no counterpart here: a call is accepted
+  // and logged, so a library written against RN's typings finds the method
+  setRootViewStyleProvider(provider: IRootViewStyleProvider): void;
+  setComponentProviderInstrumentationHook(
+    hook: IComponentProviderInstrumentationHook<TComponentProvider>,
+  ): void;
   // Delegates to the host registrar, no-op headless
   unmountApplicationComponentAtRootTag(rootTag: IRootTag): void;
   setWrapperComponentProvider(provider: TWrapperComponentProvider): void;
@@ -122,6 +142,7 @@ export function createAppRegistry<
 ): ICreateAppRegistryResult<TComponentProvider, TWrapperComponentProvider> {
   let hostRegistrar: IHostRegistrar | undefined;
   let wrapperComponentProvider: TWrapperComponentProvider | undefined;
+  const containerConfig = createContainerConfig<TComponentProvider>();
   const runnables = new Map<string, IRunnable>();
   const sections = new Map<string, IRunnable>();
   const tasks = createHeadlessTasks(() => hostRegistrar);
@@ -165,19 +186,24 @@ export function createAppRegistry<
       registerConfig(config) {
         config.forEach(registerConfigEntry);
       },
-      runApplication(appKey, appParameters) {
+      runApplication(appKey, appParameters, displayMode) {
         const params = isDevBuild()
           ? ` with ${JSON.stringify(appParameters)}`
           : '';
         dlog(`Running "${appKey}"${params}`);
+        containerConfig.noteUnapplied(appKey, displayMode);
         requireRunnable(runnables, appKey)(appParameters);
       },
-      setSurfaceProps(appKey, appParameters) {
+      setSurfaceProps(appKey, appParameters, displayMode) {
         dlog(
           `Updating props for Surface "${appKey}" with ${JSON.stringify(appParameters)}`,
         );
+        containerConfig.noteUnapplied(appKey, displayMode);
         requireRunnable(runnables, appKey)(appParameters);
       },
+      setRootViewStyleProvider: containerConfig.setRootViewStyleProvider,
+      setComponentProviderInstrumentationHook:
+        containerConfig.setComponentProviderInstrumentationHook,
       unmountApplicationComponentAtRootTag(rootTag) {
         dlog(
           `AppRegistry.unmountApplicationComponentAtRootTag: rootTag ${String(rootTag)}`,

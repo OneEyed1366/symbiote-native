@@ -41,6 +41,22 @@ describe('what a pressable text sends native', () => {
     ).toBe('link');
   });
 
+  // `PressableText` шлёт `isPressable` и `isHighlighted` сразу, а не после первого нажатия
+  it('marks a pressable text as pressable and not highlighted', () => {
+    const payload = textPayload({ onPress: () => {} });
+
+    expect(payload?.isPressable).toBe(true);
+    expect(payload?.isHighlighted).toBe(false);
+  });
+
+  it('sends neither for a text that is not pressable or is disabled', () => {
+    for (const props of [{}, { onPress: () => {}, disabled: true }]) {
+      const payload = textPayload(props);
+      expect(payload?.isPressable).toBe(undefined);
+      expect(payload?.isHighlighted).toBe(undefined);
+    }
+  });
+
   // Без нажатия роли нет, у отключённого и у текста с авторской ролью остаётся ответ RN
   it('leaves the role alone when not pressable, disabled or already set', () => {
     expect(textPayload({})?.accessibilityRole).toBe(undefined);
@@ -53,11 +69,12 @@ describe('what a pressable text sends native', () => {
     ).toBe('button');
   });
 
-  // Авторский `role` тоже побеждает, W3C-имя переводится в роль RN
+  // Авторский `role` уходит нативу как есть, ссылочная роль не подставляется
   it('keeps an authored role prop', () => {
-    expect(
-      textPayload({ onPress: () => {}, role: 'button' })?.accessibilityRole,
-    ).toBe('button');
+    const payload = textPayload({ onPress: () => {}, role: 'button' });
+
+    expect(payload?.role).toBe('button');
+    expect(payload?.accessibilityRole).toBe(undefined);
   });
 
   // Вложенный `Text` с `onPress` получает роль на своём узле

@@ -227,6 +227,8 @@ export type {
   IClassToggleMap,
   IScopableClassValue,
 } from './style-registry/scope';
+export { EventEmitter } from './event-emitter';
+export type { IEmitterSubscription, IEventEmitter } from './event-emitter';
 export { Platform } from './platform';
 export { isDevBuild } from './platform/shared';
 export type {

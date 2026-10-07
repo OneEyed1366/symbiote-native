@@ -84,6 +84,8 @@ const deviceEventModule =
   createDeviceEventModule<INativeAccessibilityInfoAndroid>({
     moduleName: ACCESSIBILITY_MODULE,
     moduleLogPrefix: 'AccessibilityInfo(android): module',
+    // RN subscribes on the device bus directly, never through the module's observe counters
+    bindModuleToEmitter: false,
   });
 
 function getModule(): INativeAccessibilityInfoAndroid | null {

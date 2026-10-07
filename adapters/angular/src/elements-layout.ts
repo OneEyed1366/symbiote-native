@@ -130,6 +130,12 @@ export class ScrollViewElement extends SymbioteElement {
   @Input() onScrollToTop?: IAngularScrollViewProps['onScrollToTop'];
   @Input() onContentSizeChange?: IAngularScrollViewProps['onContentSizeChange'];
   @Input()
+  onKeyboardWillShow?: IAngularScrollViewProps['onKeyboardWillShow'];
+  @Input()
+  onKeyboardWillHide?: IAngularScrollViewProps['onKeyboardWillHide'];
+  @Input() onKeyboardDidShow?: IAngularScrollViewProps['onKeyboardDidShow'];
+  @Input() onKeyboardDidHide?: IAngularScrollViewProps['onKeyboardDidHide'];
+  @Input()
   automaticallyAdjustContentInsets?: IAngularScrollViewProps['automaticallyAdjustContentInsets'];
   @Input()
   automaticallyAdjustsScrollIndicatorInsets?: IAngularScrollViewProps['automaticallyAdjustsScrollIndicatorInsets'];

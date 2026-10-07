@@ -98,16 +98,13 @@ function applyChanges(values: Record<string, unknown>): void {
 
 let emitter: NativeEventEmitter | undefined;
 
-// Subscribe to native's `settingsUpdated` so external edits flow into the snapshot.
-// WHY lazy + module-gated: importing this file must have no native side effect, and
-// with no native module there is nothing native to observe, so a headless run that
-// never installs the device hub doesn't crash. Idempotent.
+// Lazy and gated on the module, so a headless run never installs the device hub
 function subscribeToNative(): void {
   if (emitter !== undefined) return;
-  const module = getModule();
-  if (module === null) return;
+  if (getModule() === null) return;
   installDeviceEventHub();
-  emitter = new NativeEventEmitter(module);
+  // RN listens on the device bus, so the module's observe counters stay untouched
+  emitter = new NativeEventEmitter();
   emitter.addListener(SETTINGS_UPDATED_EVENT, payload => {
     if (!isRecord(payload)) return;
     applyChanges(payload);

@@ -9,9 +9,9 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-interface IDeviceHub {
+type IDeviceHub = {
   emit: (eventType: string, ...args: unknown[]) => void;
-}
+};
 
 let Appearance: typeof import('./index').Appearance;
 
@@ -20,8 +20,10 @@ let appearanceRemoved: number;
 let currentNativeScheme: 'light' | 'dark';
 let deviceHub: IDeviceHub | undefined;
 let moduleLinked = true;
+let isNativeSchemeUnknown = false;
 
 beforeEach(async () => {
+  isNativeSchemeUnknown = false;
   appearanceAdded = 0;
   appearanceRemoved = 0;
   currentNativeScheme = 'light';
@@ -29,7 +31,8 @@ beforeEach(async () => {
   moduleLinked = true;
 
   const fakeAppearance = {
-    getColorScheme: (): 'light' | 'dark' => currentNativeScheme,
+    getColorScheme: (): 'light' | 'dark' | null =>
+      isNativeSchemeUnknown ? null : currentNativeScheme,
     setColorScheme: (scheme: 'light' | 'dark' | 'unspecified'): void => {
       if (scheme !== 'unspecified') currentNativeScheme = scheme;
     },
@@ -106,6 +109,14 @@ describe('Appearance', () => {
       currentNativeScheme = 'light'; // simulate the system's own current scheme
       Appearance.setColorScheme('unspecified');
       expect(Appearance.getColorScheme()).toBe('light');
+    });
+
+    // RN falls back to the passed value when native has no system scheme to re-read
+    it("keeps 'unspecified' when native has no system scheme to re-read", async () => {
+      await loadAppearance();
+      isNativeSchemeUnknown = true;
+      Appearance.setColorScheme('unspecified');
+      expect(Appearance.getColorScheme()).toBe('unspecified');
     });
 
     // why: without a linked module there is nothing to write to -- the call must

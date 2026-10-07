@@ -15,8 +15,10 @@ import { hostCall } from '../../host-call';
 import { getNativeModule } from '../../native-modules';
 import {
   NativeEventEmitter,
+  type IEventEmitterModule,
   type IEventSubscription,
 } from '../../native-events';
+import { Platform } from '../../platform';
 import { isRecord } from '../../type-guards';
 
 // Opaque per-platform tuning bag forwarded into a native node/animation config,
@@ -49,7 +51,7 @@ export type INativeEndResult = {
 export type INativeEndCallback = (result: INativeEndResult) => void;
 
 // Методы TurboModule без батчинга Android, форму гарантирует дженерик `getNativeModule`
-type INativeAnimatedSpec = {
+type INativeAnimatedSpec = IEventEmitterModule & {
   createAnimatedNode(tag: number, config: INativeNodeConfig): void;
   updateAnimatedNodeConfig?(tag: number, config: INativeNodeConfig): void;
   connectAnimatedNodes(parentTag: number, childTag: number): void;
@@ -141,17 +143,18 @@ let valueUpdateSubscription: IEventSubscription | undefined;
 
 function ensureValueUpdateSubscription(): void {
   if (valueUpdateSubscription !== undefined) return;
-  valueUpdateSubscription = new NativeEventEmitter().addListener(
-    VALUE_UPDATE_EVENT,
-    payload => {
-      if (!isRecord(payload)) return;
-      const tag = Reflect.get(payload, 'tag');
-      const value = Reflect.get(payload, 'value');
-      if (typeof tag === 'number' && typeof value === 'number') {
-        valueListeners.get(tag)?.(value);
-      }
-    },
+  // RN hands the module to the emitter on iOS only, where native emits only to counted observers
+  const emitter = new NativeEventEmitter(
+    Platform.select({ ios: module() ?? undefined, default: undefined }),
   );
+  valueUpdateSubscription = emitter.addListener(VALUE_UPDATE_EVENT, payload => {
+    if (!isRecord(payload)) return;
+    const tag = Reflect.get(payload, 'tag');
+    const value = Reflect.get(payload, 'value');
+    if (typeof tag === 'number' && typeof value === 'number') {
+      valueListeners.get(tag)?.(value);
+    }
+  });
 }
 
 // Очередь как в `NativeAnimatedHelper`: при `cxxNativeAnimatedEnabled` C++ модуль исполняет вызовы

@@ -17,6 +17,7 @@ import {
   IMAGE_SOURCE_PROPS,
   assertSinglePlaceholder,
   resolveImageSourceProp,
+  warnOnBadSrcSet,
   warnOnEmptyImageUri,
 } from './image-source-write';
 import { Platform } from './platform';
@@ -122,6 +123,8 @@ export function writeProp(
       value,
       key === 'source' && Platform.OS === 'android',
     );
+  } else if (node.resolvesImageSources) {
+    warnOnBadSrcSet(key, value);
   }
   if (typeof written === 'function') {
     let bag = functionProps.get(node);

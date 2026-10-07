@@ -317,7 +317,7 @@ export class FlatList<ItemT = unknown>
   flashScrollIndicators(): void {
     this.listRef?.flashScrollIndicators();
   }
-  getNativeScrollRef(): IScrollViewHandle | null {
+  getNativeScrollRef(): ISymbioteNode | null {
     return this.listRef?.getNativeScrollRef() ?? null;
   }
   getScrollableNode(): IScrollViewHandle | null {

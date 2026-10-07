@@ -1,6 +1,8 @@
 // Свойства `Text` и `ScrollView` из `.d.ts` RN, которые движок отдаёт native как есть
 // Логики у них нет, нужен только тип, общий для всех адаптеров
 
+import type { IKeyboardEvent } from '@symbiote-native/engine';
+
 export type ITextNativeOnlyProps = {
   dynamicTypeRamp?:
     | 'caption2'
@@ -30,4 +32,9 @@ export type IScrollViewNativeOnlyProps = {
   scrollsChildToFocus?: boolean;
   scrollPerfTag?: string;
   onScrollAnimationEnd?: () => void;
+  // Not native: the ScrollView behavior fires these off `Keyboard`, as RN's ScrollView does
+  onKeyboardWillShow?: (event: IKeyboardEvent) => void;
+  onKeyboardWillHide?: (event: IKeyboardEvent) => void;
+  onKeyboardDidShow?: (event: IKeyboardEvent) => void;
+  onKeyboardDidHide?: (event: IKeyboardEvent) => void;
 };

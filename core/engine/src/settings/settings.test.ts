@@ -38,8 +38,12 @@ function fakeSettingsManager(seed: unknown): {
     deleteValues(keys: string[]) {
       nativeCalls.push({ method: 'deleteValues', args: [keys] });
     },
-    addListener() {},
-    removeListeners() {},
+    addListener() {
+      nativeCalls.push({ method: 'addListener', args: [] });
+    },
+    removeListeners() {
+      nativeCalls.push({ method: 'removeListeners', args: [] });
+    },
   };
 }
 
@@ -223,6 +227,16 @@ describe('Settings', () => {
       const fresh = await import('./index');
 
       expect(fresh.Settings.get('foo')).toBeUndefined();
+    });
+
+    // RN слушает `settingsUpdated` прямо на шине устройства, счётчики модуля не пингуются
+    it('does not ping the module observe counters while watching', () => {
+      const id = Settings.watchKeys('foo', () => {});
+      Settings.clearWatch(id);
+
+      const methods = nativeCalls.map(call => call.method);
+      expect(methods).not.toContain('addListener');
+      expect(methods).not.toContain('removeListeners');
     });
 
     // why: headless / a host without SettingsManager linked must still let get/set/watchKeys

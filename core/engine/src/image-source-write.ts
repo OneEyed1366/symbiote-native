@@ -49,6 +49,25 @@ export function warnOnEmptyImageUri(key: string, value: unknown): void {
   }
 }
 
+// `ImageSourceUtils.js:57-77`: the rule that picks sources is in C++, only the warnings live here
+export function warnOnBadSrcSet(key: string, value: unknown): void {
+  if (key !== 'srcSet' || typeof value !== 'string') return;
+  let supported = 0;
+  for (const entry of value.split(', ')) {
+    const [, scale = '1x'] = entry.split(' ');
+    if (!scale.endsWith('x')) {
+      console.warn(
+        'The provided format for scale is not supported yet. Please use scales like 1x, 2x, etc.',
+      );
+    } else if (!Number.isNaN(parseInt(scale.split('x')[0] ?? '', 10))) {
+      supported += 1;
+    }
+  }
+  if (supported === 0) {
+    console.warn('The provided value for srcSet is not valid.');
+  }
+}
+
 const ANDROID_OS = 'android';
 
 const PLACEHOLDER_PARTNER: Readonly<Record<string, string>> = {

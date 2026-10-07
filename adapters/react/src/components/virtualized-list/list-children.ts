@@ -15,7 +15,11 @@ import {
   type ISpacerSegment,
 } from '@symbiote-native/components';
 import type { IListConfig } from './list-config';
-import { renderSeparatorElement, resolveElement } from './list-elements';
+import {
+  renderItemElement,
+  renderSeparatorElement,
+  resolveElement,
+} from './list-elements';
 import type { IListSeparators } from './use-separators';
 
 export type IChildrenArgs<ItemT> = {
@@ -62,7 +66,7 @@ function cellElement<ItemT>(
 ): ReactElement {
   const { config, separators } = args;
   const item = config.getItem(config.data, segment.index);
-  const content = config.renderItem({
+  const content = renderItemElement(config, {
     item,
     index: segment.index,
     separators: separators.makeSeparators(segment.index),

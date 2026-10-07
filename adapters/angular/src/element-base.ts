@@ -57,6 +57,8 @@ export abstract class SymbioteElement implements OnChanges {
   @Input() accessibilityState?: IElementProps['accessibilityState'];
   @Input() accessibilityValue?: IElementProps['accessibilityValue'];
   @Input() accessibilityActions?: IElementProps['accessibilityActions'];
+  @Input()
+  experimental_accessibilityOrder?: IElementProps['experimental_accessibilityOrder'];
   @Input() accessibilityLabelledBy?: IElementProps['accessibilityLabelledBy'];
   @Input()
   importantForAccessibility?: IElementProps['importantForAccessibility'];
@@ -114,6 +116,17 @@ export abstract class SymbioteElement implements OnChanges {
   @Input() onResponderTerminate?: IElementProps['onResponderTerminate'];
   @Input()
   onResponderTerminationRequest?: IElementProps['onResponderTerminationRequest'];
+  @Input() onTouchStart?: IElementProps['onTouchStart'];
+  @Input() onTouchStartCapture?: IElementProps['onTouchStartCapture'];
+  @Input() onTouchMove?: IElementProps['onTouchMove'];
+  @Input() onTouchMoveCapture?: IElementProps['onTouchMoveCapture'];
+  @Input() onTouchEnd?: IElementProps['onTouchEnd'];
+  @Input() onTouchEndCapture?: IElementProps['onTouchEndCapture'];
+  @Input() onTouchCancel?: IElementProps['onTouchCancel'];
+  @Input() onTouchCancelCapture?: IElementProps['onTouchCancelCapture'];
+  @Input() onFocusCapture?: IElementProps['onFocusCapture'];
+  @Input() onBlurCapture?: IElementProps['onBlurCapture'];
+  @Input() onClickCapture?: IElementProps['onClickCapture'];
 
   @Input() pointerEvents?: IElementProps['pointerEvents'];
   @Input() hitSlop?: IElementProps['hitSlop'];

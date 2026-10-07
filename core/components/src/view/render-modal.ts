@@ -135,10 +135,13 @@ export function renderModal(
     [],
   );
 
+  // RN ignores the deprecated `animated`, `animationType` replaces it
+  const { animated: _deprecated, ...passthrough } = view.passthrough;
+
   return el(
     'modal',
     {
-      ...view.passthrough,
+      ...passthrough,
       style: MODAL_HOST_STYLE,
       transparent: view.transparent,
       animationType: view.animationType ?? DEFAULT_ANIMATION_TYPE,

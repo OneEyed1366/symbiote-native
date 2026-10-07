@@ -7,7 +7,7 @@
 // syncs. Removing the last listener must stop native streaming.
 
 import { type ReactElement } from 'react';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount, Animated } from '@symbiote-native/react';
 import { setDeviceEventSource } from '@symbiote-native/engine';
 import { installRecordingFabric } from '@symbiote-native/test-utils';
@@ -33,10 +33,10 @@ function emitDevice(eventType: string, payload: unknown): void {
 
 // ---- fake NativeAnimatedTurboModule (records calls) ----------------------
 
-interface INativeCall {
+type INativeCall = {
   method: string;
   args: unknown[];
-}
+};
 const nativeCalls: INativeCall[] = [];
 
 function record(method: string): (...args: unknown[]) => void {
@@ -68,6 +68,8 @@ const fakeNativeAnimated = {
   getValue: record('getValue'),
   addAnimatedEventToView: record('addAnimatedEventToView'),
   removeAnimatedEventFromView: record('removeAnimatedEventFromView'),
+  addListener: record('addListener'),
+  removeListeners: record('removeListeners'),
 };
 Object.assign(globalThis, {
   nativeModuleProxy: { NativeAnimatedTurboModule: fakeNativeAnimated },
@@ -143,5 +145,45 @@ describe('Animated native value listener', () => {
     received = undefined;
     emitDevice('onAnimatedValueUpdate', { tag: valueTag, value: 0.9 });
     expect(received).toBeUndefined();
+  });
+
+  // На iOS `RCTEventEmitter` не шлёт событие без счётчика наблюдателей, RN передаёт ему модуль
+  it('pings the module observe counters around the shared device subscription', () => {
+    const node = new Animated.Value(0, { useNativeDriver: true });
+    node.__attach();
+    const listenerId = node.addListener(() => {});
+    expect(callsOf('addListener')).toHaveLength(1);
+
+    node.removeListener(listenerId);
+    expect(callsOf('removeListeners')).toHaveLength(1);
+    node.__detach();
+  });
+
+  // RN's `AnimatedValue-test` "listeners added after re-attach": detach drops the old listeners
+  it('streams to a listener added after a detach and re-attach, not to the old one', () => {
+    const node = new Animated.Value(0, { useNativeDriver: true });
+    node.__attach();
+    const callbackA = vi.fn();
+    node.addListener(callbackA);
+    emitDevice('onAnimatedValueUpdate', {
+      tag: node.__getNativeTag(),
+      value: 123,
+      offset: 50,
+    });
+    expect(callbackA).toHaveBeenCalledTimes(1);
+
+    node.__detach();
+    expect(callsOf('dropAnimatedNode')).toHaveLength(1);
+
+    const callbackB = vi.fn();
+    node.__attach();
+    node.addListener(callbackB);
+    emitDevice('onAnimatedValueUpdate', {
+      tag: node.__getNativeTag(),
+      value: 456,
+      offset: 60,
+    });
+    expect(callbackA).toHaveBeenCalledTimes(1);
+    expect(callbackB).toHaveBeenCalledTimes(1);
   });
 });

@@ -99,6 +99,14 @@ export function setDeviceEventSource(source: IDeviceEventSource): void {
   injectedSource = source;
 }
 
+function assertListener(listener: unknown): void {
+  if (typeof listener !== 'function') {
+    throw new TypeError(
+      'EventEmitter.addListener(...): 2nd argument must be a function.',
+    );
+  }
+}
+
 // The host bus delivers raw, so its listener is wrapped to land a `setState` on the sync lane
 function addBusListener(
   eventType: string,
@@ -150,6 +158,7 @@ export const DeviceEventEmitter = {
     listener: IDeviceListener,
     context?: unknown,
   ): IEventSubscription {
+    assertListener(listener);
     return addBusListener(eventType, (...args) => {
       listener.apply(context, args);
     });
@@ -172,7 +181,10 @@ export type IEventEmitterModule = {
 // The payload native emitted, untyped at this boundary: shared can't know an event's shape,
 // so the listener gets `unknown` and the consumer narrows with a runtime guard, same as
 // FabricEventHandler's raw native event.
-export type INativeEventListener = (payload: unknown) => void;
+export type INativeEventListener = (
+  payload: unknown,
+  ...rest: unknown[]
+) => void;
 
 // True only when the module carries both observe-counter methods. A spec that omits
 // addListener/removeListeners leaves them undefined, so calling through would throw —
@@ -233,8 +245,9 @@ export class NativeEventEmitter {
         `module-counter=${this.module ? 'pinged' : 'none'} via=${via}`,
     );
     this.module?.addListener(eventType);
+    assertListener(listener);
     const subscription = addBusListener(eventType, (...args) => {
-      listener.call(context, args[0]);
+      Reflect.apply(listener, context, args);
     });
     let removed = false;
     return {

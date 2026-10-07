@@ -15,6 +15,7 @@ import {
   dispatchViewCommand,
   dlog,
   focusTextInput,
+  isSymbioteNode,
   Platform,
   propOf,
   propsOf,
@@ -25,6 +26,7 @@ import {
   setNodeDispatch,
   setProp,
   type IEventDispatch,
+  type IPayloadFold,
   type ISymbioteEvent,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
@@ -278,6 +280,21 @@ function attach(node: ISymbioteNode): void {
   // AFTER the machine, which points the node at its own: a node holds exactly one dispatch, and
   // `TEXT_INPUT_DISPATCH` is the union that delegates the machine's seven back to it
   setNodeDispatch(node, TEXT_INPUT_DISPATCH);
+  putRnApiOnNode(node);
+}
+
+// A `<text-input>` ref IS its node, so RN's ref API (`TextInput.js` `ref` callback) sits on it
+// `focus`/`blur` replace the raw commands: RN routes them through `TextInputState`
+function putRnApiOnNode(node: ISymbioteNode): void {
+  const handle = buildTextInputHandle(node);
+  Object.assign(node, {
+    focus: handle.focus,
+    blur: handle.blur,
+    clear: handle.clear,
+    isFocused: handle.isFocused,
+    setSelection: handle.setSelection,
+    getNativeRef: handle.getNativeRef,
+  });
 }
 
 const OWN_HANDLERS: ReadonlyMap<
@@ -430,6 +447,24 @@ export function buildTextInputHandle(node: ISymbioteNode): ITextInputHandle {
   };
 }
 
+// The typed view of a `<text-input>` ref, which is the node with RN's methods on it
+export function textInputOf(value: unknown): ITextInputHandle | undefined {
+  if (!isSymbioteNode(value) || !states.has(value)) return undefined;
+  return buildTextInputHandle(value);
+}
+
+// Android's TextInput.js:737-741 throws for a `value` together with children. It is checked when a
+// child lands, so a `value` written after the children is not seen
+function rejectValueWithChildren(node: ISymbioteNode): void {
+  if (propOf(node, 'value') != null) {
+    throw new Error('Cannot specify both value and children.');
+  }
+}
+
+// RN forces `caretHidden` under `Platform.isTesting` (TextInput.js:623). The flag is native
+// state C++ cannot read, and it is fixed for the process, so the fold exists only in a test run
+const hideCaret: IPayloadFold = props => ({ ...props, caretHidden: true });
+
 // Idempotent: an adapter entry may be imported more than once in a bundle, and re-registering the
 // same tag with an equivalent behavior must not double-install anything.
 export function registerTextInputBehavior(): void {
@@ -440,6 +475,12 @@ export function registerTextInputBehavior(): void {
     attachAfterCommit,
     afterCommit,
     detach,
+    acceptsTextChildren: true,
+    ...(Platform.isTesting ? { foldPayload: hideCaret } : {}),
+    ...Platform.select({
+      android: { onChildInserted: rejectValueWithChildren },
+      default: {},
+    }),
     // The three the change/focus/blur machine needs as INPUTS, plus the press family the
     // tap-to-focus machine composes. Without the stash the app's own `onChange` would evict the
     // machine from the very event the controlled handshake runs on.

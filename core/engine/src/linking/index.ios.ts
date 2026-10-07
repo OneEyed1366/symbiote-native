@@ -9,5 +9,6 @@ export type { IUrlEvent, IIntentExtra } from './shared';
 
 export const Linking = createLinking({
   moduleName: 'LinkingManager',
+  isObservedByModule: true,
   sendIntent: () => Promise.reject(new Error('Unsupported')),
 });

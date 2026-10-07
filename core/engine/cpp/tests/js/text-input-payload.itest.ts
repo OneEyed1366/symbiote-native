@@ -183,6 +183,16 @@ describe('what a text input sends native, resolved by the engine', () => {
     expect(unknown.textContentType).toBe(undefined);
   });
 
+  // `TextInput-test` "should give precedence to `textContentType` when set"
+  it('keeps an authored textContentType over the autoComplete token', () => {
+    const payload = single({
+      autoComplete: 'tel',
+      textContentType: 'emailAddress',
+    }).payload;
+
+    expect(payload.textContentType).toBe('emailAddress');
+  });
+
   // why: TextInput.js:919-937 — the W3C spelling WINS over the native one when both are authored.
   it('lets the web alias beat the native prop', () => {
     expect(
@@ -232,21 +242,18 @@ describe('what a text input sends native, resolved by the engine', () => {
     expect(payload.textContentType).toBe('username');
   });
 
-  // `selectionColor` alone gets a matching caret and handle
+  // iOS RN takes `cursorColor` and `selectionHandleColor` out of the props (TextInput.js:368)
   // The payload holds ARGB integers, `processColor` runs over every colour key on the way out
   const RED = 0xff_ff_00_00;
-  const BLUE = 0xff_00_00_ff;
-  it('coalesces the selection colours', () => {
-    const one = single({ selectionColor: 'red' }).payload;
-    expect(one.cursorColor).toBe(RED);
-    expect(one.selectionHandleColor).toBe(RED);
-
-    const explicit = single({
+  it('sends only selectionColor of the three selection colours', () => {
+    const payload = single({
       selectionColor: 'red',
       cursorColor: 'blue',
+      selectionHandleColor: 'green',
     }).payload;
-    expect(explicit.cursorColor).toBe(BLUE);
-    expect(explicit.selectionHandleColor).toBe(RED);
+    expect(payload.selectionColor).toBe(RED);
+    expect(payload.cursorColor).toBe(undefined);
+    expect(payload.selectionHandleColor).toBe(undefined);
   });
 
   // why: `inputMode: 'none'` is how the web spells "focusable but no keyboard".

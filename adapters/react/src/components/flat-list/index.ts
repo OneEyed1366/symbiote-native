@@ -34,6 +34,8 @@ import {
 import {
   VirtualizedList,
   type ICellRendererComponent,
+  type IListItemInfo,
+  type IRenderItem,
   type ISeparators,
   type ISeparatorProps,
   type IViewabilityConfig,
@@ -41,18 +43,13 @@ import {
   type IViewableItemsChangedInfo,
   type IVirtualizedListHandle,
 } from '../virtualized-list';
+import { renderItemElement } from '../virtualized-list/list-elements';
 import type {
   IAccessibilityProps,
   IAriaProps,
   IInnerViewRef,
 } from '@symbiote-native/components';
 import type { IStyleProp, IViewStyle } from '../../utils/styles';
-
-type IRenderItem<ItemT> = (info: {
-  item: ItemT;
-  index: number;
-  separators: ISeparators;
-}) => ReactNode;
 
 // FlatList's imperative handle is exactly VirtualizedList's: scrollTo* forwarded
 // down to the underlying list.
@@ -61,7 +58,9 @@ export type IFlatListHandle = IVirtualizedListHandle;
 export type IFlatListProps<ItemT> = IAccessibilityProps &
   IAriaProps & {
     data: readonly ItemT[];
-    renderItem: IRenderItem<ItemT>;
+    // One of the two is required, `ListItemComponent` wins when both are given
+    renderItem?: IRenderItem<ItemT>;
+    ListItemComponent?: ComponentType<IListItemInfo<ItemT>>;
     keyExtractor?: (item: ItemT, index: number) => string;
     getItemLayout?: (
       data: unknown,
@@ -134,6 +133,7 @@ type IItemTyped<ItemT> = Pick<
   IFlatListProps<ItemT>,
   | 'data'
   | 'renderItem'
+  | 'ListItemComponent'
   | 'keyExtractor'
   | 'numColumns'
   | 'columnWrapperStyle'
@@ -154,6 +154,7 @@ function singleColumnList<ItemT>(
     getItem: (_source: unknown, index: number): ItemT => data[index],
     getItemCount: (): number => arrayLikeLength(data),
     renderItem: typed.renderItem,
+    ListItemComponent: typed.ListItemComponent,
     keyExtractor: typed.keyExtractor,
     onViewableItemsChanged: typed.onViewableItemsChanged,
     viewabilityConfigCallbackPairs: typed.viewabilityConfigCallbackPairs,
@@ -171,7 +172,8 @@ function rowRenderer<ItemT>(
   index: number;
   separators: ISeparators;
 }) => ReactNode {
-  const { renderItem, keyExtractor, columnWrapperStyle } = typed;
+  const { renderItem, ListItemComponent, keyExtractor, columnWrapperStyle } =
+    typed;
   const rowStyle: IStyleProp<IViewStyle> = [
     { flexDirection: 'row' },
     typeof columnWrapperStyle === 'string'
@@ -186,7 +188,10 @@ function rowRenderer<ItemT>(
       createElement(
         'view',
         { key, style: { flex: 1 } },
-        renderItem({ item, index, separators: info.separators }),
+        renderItemElement(
+          { renderItem, ListItemComponent },
+          { item, index, separators: info.separators },
+        ),
       ),
     );
     return createElement('view', { style: rowStyle }, ...cells);
@@ -261,6 +266,7 @@ export function FlatList<ItemT>(
     ref,
     data,
     renderItem,
+    ListItemComponent,
     keyExtractor,
     numColumns = SINGLE_COLUMN,
     columnWrapperStyle,
@@ -281,6 +287,7 @@ export function FlatList<ItemT>(
   const typed: IItemTyped<ItemT> = {
     data,
     renderItem,
+    ListItemComponent,
     keyExtractor,
     numColumns,
     columnWrapperStyle,

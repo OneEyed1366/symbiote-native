@@ -153,7 +153,7 @@
   export function flashScrollIndicators(): void {
     inner?.flashScrollIndicators();
   }
-  export function getNativeScrollRef(): IScrollViewHandle | null {
+  export function getNativeScrollRef(): ISymbioteNode | null {
     return inner?.getNativeScrollRef() ?? null;
   }
   export function getScrollableNode(): IScrollViewHandle | null {

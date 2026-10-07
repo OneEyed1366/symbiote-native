@@ -40,7 +40,7 @@ export const VIRTUALIZED_LIST_TEMPLATE = `
                 [style]="cellStyle"
               >
                 <ng-container
-                  [vListOutlet]="cellTemplate"
+                  [vListOutlet]="cellTemplate" [vListOutletComponent]="itemComponent"
                   [vListOutletContext]="row.cell.context"
                 ></ng-container>
                 @if (row.cell.separatorContext !== undefined) {
@@ -57,7 +57,7 @@ export const VIRTUALIZED_LIST_TEMPLATE = `
                 [style]="cellStyle"
               >
                 <ng-container
-                  [vListOutlet]="cellTemplate"
+                  [vListOutlet]="cellTemplate" [vListOutletComponent]="itemComponent"
                   [vListOutletContext]="row.cell.context"
                 ></ng-container>
                 @if (row.cell.separatorContext !== undefined) {
@@ -122,7 +122,7 @@ export const VIRTUALIZED_LIST_TEMPLATE = `
                 [style]="cellStyle"
               >
                 <ng-container
-                  [vListOutlet]="cellTemplate"
+                  [vListOutlet]="cellTemplate" [vListOutletComponent]="itemComponent"
                   [vListOutletContext]="row.cell.context"
                 ></ng-container>
                 @if (row.cell.separatorContext !== undefined) {
@@ -139,7 +139,7 @@ export const VIRTUALIZED_LIST_TEMPLATE = `
                 [style]="cellStyle"
               >
                 <ng-container
-                  [vListOutlet]="cellTemplate"
+                  [vListOutlet]="cellTemplate" [vListOutletComponent]="itemComponent"
                   [vListOutletContext]="row.cell.context"
                 ></ng-container>
                 @if (row.cell.separatorContext !== undefined) {
@@ -206,7 +206,7 @@ export const VIRTUALIZED_LIST_TEMPLATE = `
                 [style]="cellStyle"
               >
                 <ng-container
-                  [vListOutlet]="cellTemplate"
+                  [vListOutlet]="cellTemplate" [vListOutletComponent]="itemComponent"
                   [vListOutletContext]="row.cell.context"
                 ></ng-container>
                 @if (row.cell.separatorContext !== undefined) {
@@ -223,7 +223,7 @@ export const VIRTUALIZED_LIST_TEMPLATE = `
                 [style]="cellStyle"
               >
                 <ng-container
-                  [vListOutlet]="cellTemplate"
+                  [vListOutlet]="cellTemplate" [vListOutletComponent]="itemComponent"
                   [vListOutletContext]="row.cell.context"
                 ></ng-container>
                 @if (row.cell.separatorContext !== undefined) {
@@ -248,7 +248,7 @@ export const VIRTUALIZED_LIST_TEMPLATE = `
     <!-- What a \`vListCell\` wrapper stamps for its item and separator, once per list -->
     <ng-template #cellBody let-cell>
       <ng-container
-        [vListOutlet]="cellTemplate"
+        [vListOutlet]="cellTemplate" [vListOutletComponent]="itemComponent"
         [vListOutletContext]="cell.context"
       ></ng-container>
       @if (cell.separatorContext !== undefined) {

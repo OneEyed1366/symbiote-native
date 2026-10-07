@@ -20,24 +20,24 @@ const APPEARANCE_MODULE = 'Appearance';
 // INativeAppearance spec / Appearance.js.
 const APPEARANCE_CHANGED_EVENT = 'appearanceChanged';
 
-// The resolved color scheme. `setColorScheme` also accepts 'unspecified' (reset to
-// the system value); a read only ever yields a concrete scheme or null.
-export type IColorSchemeName = 'light' | 'dark';
-export type IColorSchemePreference = IColorSchemeName | 'unspecified';
+// RN's `ColorSchemeName`. `setColorScheme('unspecified')` resets to the system value, and a read
+// yields 'unspecified' only when native has no system scheme to give back
+export type IColorSchemeName = 'light' | 'dark' | 'unspecified';
+export type IColorSchemePreference = IColorSchemeName;
 
 // The Appearance native module. `getColorScheme`/`setColorScheme` plus the
 // observe-counters (so native starts/stops watching as JS subscribes).
-interface INativeAppearance extends IEventEmitterModule {
+type INativeAppearance = IEventEmitterModule & {
   getColorScheme(): IColorSchemeName | null;
   setColorScheme(colorScheme: IColorSchemePreference): void;
   addListener(eventType: string): void;
   removeListeners(count: number): void;
-}
+};
 
 // The change-event payload native delivers.
-interface IAppearancePreferences {
+type IAppearancePreferences = {
   colorScheme: IColorSchemeName | null;
-}
+};
 
 function isAppearancePreferences(
   value: unknown,
@@ -97,7 +97,7 @@ export const Appearance = {
     module.setColorScheme(colorScheme);
     cachedScheme =
       colorScheme === 'unspecified'
-        ? (module.getColorScheme() ?? null)
+        ? (module.getColorScheme() ?? colorScheme)
         : colorScheme;
   },
 

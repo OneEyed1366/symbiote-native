@@ -11,6 +11,7 @@ import {
   type INativeEventListener,
 } from '../native-events';
 import { dlog } from '../debug';
+import { Platform } from '../platform';
 import { blurTextInput, currentlyFocusedInput } from '../text-input-state';
 import { LayoutAnimation } from '../layout-animation';
 
@@ -34,23 +35,23 @@ export type IKeyboardEventName =
 
 // The soft-keyboard frame in screen coordinates. RN's IKeyboardMetrics: the shape
 // carried by a IKeyboardEvent's endCoordinates (and iOS startCoordinates).
-export interface IKeyboardMetrics {
+export type IKeyboardMetrics = {
   screenX: number;
   screenY: number;
   width: number;
   height: number;
-}
+};
 
 // The payload native delivers with each keyboard notification. RN's IKeyboardEvent;
 // the iOS-only fields (startCoordinates / isEventFromThisApp) are optional so the one
 // type covers both platforms. The consumer narrows beyond endCoordinates as needed.
-export interface IKeyboardEvent {
+export type IKeyboardEvent = {
   duration: number;
   easing: string;
   endCoordinates: IKeyboardMetrics;
   startCoordinates?: IKeyboardMetrics;
   isEventFromThisApp?: boolean;
-}
+};
 
 function isKeyboardEvent(payload: unknown): payload is IKeyboardEvent {
   return (
@@ -66,10 +67,10 @@ function isKeyboardEvent(payload: unknown): payload is IKeyboardEvent {
 // (so native starts/stops watching the keyboard as JS subscribes); it satisfies
 // EventEmitterModule. The spec carries no dismiss() (RN dismisses via a separate
 // utility), so dismiss() here is a no-op for the first cut (see Keyboard.dismiss).
-interface INativeKeyboardObserver extends IEventEmitterModule {
+type INativeKeyboardObserver = IEventEmitterModule & {
   addListener(eventType: string): void;
   removeListeners(count: number): void;
-}
+};
 
 // The latest keyboardDidShow event, or null when the keyboard is hidden. RN's
 // `_currentlyShowing`. Kept fresh by an internal self-subscription (see getEmitter):
@@ -88,6 +89,8 @@ let currentlyShowing: IKeyboardEvent | null = null;
 const deviceEventModule = createDeviceEventModule<INativeKeyboardObserver>({
   moduleName: KEYBOARD_OBSERVER_MODULE,
   moduleLogPrefix: 'Keyboard: KeyboardObserver module',
+  // RN hands the module to the emitter on iOS only
+  bindModuleToEmitter: Platform.select({ ios: true, default: false }),
   onEmitterCreated: emitter => {
     emitter.addListener(KEYBOARD_EVENT.didShow, payload => {
       if (isKeyboardEvent(payload)) currentlyShowing = payload;

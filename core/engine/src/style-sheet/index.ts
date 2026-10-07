@@ -7,6 +7,7 @@
 
 import { dlog } from '../debug';
 import { getNativeModule } from '../native-modules';
+import { isDevBuild } from '../platform/shared';
 import { flattenStyle } from '../style';
 import {
   preprocessFlatStyle,
@@ -129,6 +130,10 @@ export const StyleSheet = {
   create<T extends INamedStyles<T> | IStyleRecord>(
     styles: T & IStyleRecord,
   ): T {
+    // RN freezes each entry in a dev bundle, so a mutation fails at the line that makes it
+    if (isDevBuild()) {
+      for (const entry of Object.values(styles)) Object.freeze(entry);
+    }
     return styles;
   },
 

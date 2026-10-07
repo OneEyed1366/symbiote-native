@@ -48,7 +48,10 @@ export type IVirtualizedListProps<ItemT> = IAccessibilityProps &
     data: unknown;
     getItem: (data: unknown, index: number) => ItemT;
     getItemCount: (data: unknown) => number;
-    renderItem: IVirtualizedListRenderItem<ItemT>;
+    // One of the two is required, `ListItemComponent` wins when both are given
+    renderItem?: IVirtualizedListRenderItem<ItemT>;
+    // A component taking `item`, `index` and `separators` as props, RN's `ListItemComponent`
+    ListItemComponent?: (props: IVirtualizedListCellInfo<ItemT>) => JSX.Element;
     getItemLayout?: (
       data: unknown,
       index: number,
@@ -131,6 +134,7 @@ export const HANDLED_PROPS = [
   'getItem',
   'getItemCount',
   'renderItem',
+  'ListItemComponent',
   'getItemLayout',
   'initialNumToRender',
   'windowSize',

@@ -50,9 +50,9 @@ function nativeTimeStamp(nativeEvent: unknown): number | undefined {
 
 // The native DeviceEventManager: a single method that triggers Android's default
 // back behavior (finishing the activity / exiting the app).
-interface INativeDeviceEventManager extends IEventEmitterModule {
+type INativeDeviceEventManager = IEventEmitterModule & {
   invokeDefaultBackPressHandler(): void;
-}
+};
 
 // The registry, in registration order. Invoked in reverse on a back press.
 const backPressSubscriptions: IBackPressHandler[] = [];
@@ -71,6 +71,7 @@ function isHandled(result: ReturnType<IBackPressHandler>): boolean {
 const deviceEventModule = createDeviceEventModule<INativeDeviceEventManager>({
   moduleName: DEVICE_EVENT_MANAGER_MODULE,
   moduleLogPrefix: 'BackHandler: module',
+  bindModuleToEmitter: false,
   onEmitterCreated: emitter => {
     emitter.addListener(DEVICE_BACK_EVENT, dispatchBackPress);
   },
@@ -114,8 +115,7 @@ class BackHandlerImpl {
     module.invokeDefaultBackPressHandler();
   }
 
-  // Register a hardware-back handler. The returned subscription's remove()
-  // unregisters it. Idempotent on the same handler reference (RN semantics).
+  // Idempotent on the same handler reference, as in RN
   addEventListener(
     _eventName: IBackPressEventName,
     handler: IBackPressHandler,
@@ -123,7 +123,7 @@ class BackHandlerImpl {
     // Install the hub/emitter on first subscribe so native back presses reach the chain.
     getEmitter();
     dlog('BackHandler.addEventListener -> hardwareBackPress');
-    if (backPressSubscriptions.indexOf(handler) === -1) {
+    if (!backPressSubscriptions.includes(handler)) {
       backPressSubscriptions.push(handler);
     }
     return {

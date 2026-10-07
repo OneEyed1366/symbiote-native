@@ -22,6 +22,8 @@ import { useSeparators } from './use-separators';
 import type {
   ICellRendererComponent,
   ICellRendererProps,
+  IListItemInfo,
+  IRenderItem,
   IVirtualizedListProps,
 } from './virtualized-list-props';
 
@@ -39,6 +41,8 @@ export type {
 export type {
   ICellRendererComponent,
   ICellRendererProps,
+  IListItemInfo,
+  IRenderItem,
   IVirtualizedListProps,
 };
 

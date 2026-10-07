@@ -8,7 +8,7 @@
 // Snippet props are Svelte's idiomatic render-prop mechanism (closest cousin to React's
 // renderItem-as-a-prop, unlike Vue's scoped-slot form) — `item`/`separator`/`header`/`footer`/
 // `empty` all follow the same shape View.svelte's `children: Snippet` already uses.
-import type { Snippet } from 'svelte';
+import type { Component, Snippet } from 'svelte';
 import {
   ARIA_ALIAS_KEYS,
   type IStyleProp,
@@ -37,14 +37,23 @@ export type ICellRendererProps<ItemT> = ICellRendererBaseProps<ItemT> & {
   children: Snippet;
 };
 
+// What an `item` snippet and a `listItemComponent` are both handed
+export type IListItemInfo<ItemT> = {
+  item: ItemT;
+  index: number;
+  separators: ISeparators;
+};
+
 export type IVirtualizedListProps<ItemT> = IAccessibilityProps &
   IAriaProps & {
     data: unknown;
     getItem: (data: unknown, index: number) => ItemT;
     getItemCount: (data: unknown) => number;
-    // The cell renderer. Required, like React's `renderItem` (Vue's twin, #item, is likewise the
-    // one non-optional scoped slot).
-    item: Snippet<[{ item: ItemT; index: number; separators: ISeparators }]>;
+    // The cell renderer, like React's `renderItem`. One of `item` and `listItemComponent` is
+    // required, the component wins when both are given
+    item?: Snippet<[IListItemInfo<ItemT>]>;
+    // RN's `ListItemComponent`: a component taking `item`, `index` and `separators` as props
+    listItemComponent?: Component<IListItemInfo<ItemT>>;
     separator?: Snippet<[ISeparatorProps<ItemT>]>;
     // Replaces the view around each cell, it must wire `onLayout` and `onFocus` itself
     cellRenderer?: Snippet<[ICellRendererProps<ItemT>]>;

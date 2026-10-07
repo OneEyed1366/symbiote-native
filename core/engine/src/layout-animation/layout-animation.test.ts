@@ -154,6 +154,21 @@ describe('LayoutAnimation.configureNext dispatch', () => {
     expect(didEndCount).toBe(1);
   });
 
+  // A JS caller can leave the duration out, RN counts it as 0
+  it('times a config without a duration as 0 + 17ms', () => {
+    vi.useFakeTimers();
+    let didEndCount = 0;
+    const config = JSON.parse('{"create":{"type":"linear"}}');
+    LayoutAnimation.configureNext(config, () => {
+      didEndCount += 1;
+    });
+
+    vi.advanceTimersByTime(16);
+    expect(didEndCount).toBe(0);
+    vi.advanceTimersByTime(1);
+    expect(didEndCount).toBe(1);
+  });
+
   it('arms the timer even with no native UIManager (headless)', () => {
     vi.useFakeTimers();
     globalThis.__turboModuleProxy = <T>(_name: string): T | null => null;

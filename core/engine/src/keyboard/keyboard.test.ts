@@ -200,6 +200,32 @@ describe('Keyboard', () => {
       Keyboard.scheduleLayoutAnimation({ ...showEvent, duration: 0 });
       expect(layoutAnimationCalls).toHaveLength(0);
     });
+
+    // A known `LayoutAnimation` easing passes through, anything else becomes `keyboard`
+    it.each(['spring', 'linear'])(
+      'keeps the known easing %s as the update type',
+      easing => {
+        Keyboard.scheduleLayoutAnimation({
+          ...showEvent,
+          duration: 12,
+          easing,
+        });
+        expect(layoutAnimationCalls).toEqual([
+          { duration: 12, updateType: easing },
+        ]);
+      },
+    );
+
+    it('falls back to the keyboard update type for an unknown easing', () => {
+      Keyboard.scheduleLayoutAnimation({
+        ...showEvent,
+        duration: 12,
+        easing: 'some-unknown-animation-type',
+      });
+      expect(layoutAnimationCalls).toEqual([
+        { duration: 12, updateType: 'keyboard' },
+      ]);
+    });
   });
 
   describe('dismiss', () => {
@@ -280,6 +306,23 @@ describe('Keyboard', () => {
       emit('keyboardDidShow', showEvent);
       expect(seen).toEqual([]);
       expect(Keyboard.isVisible()).toBe(false);
+    });
+
+    // RN передаёт модуль эмиттеру только на iOS, поэтому на Android счётчики не пингуются
+    it('pings the observe counters on iOS and leaves them alone on Android', async () => {
+      Keyboard.addListener('keyboardDidShow', () => {}).remove();
+      const iosPings = observerAdded + observerRemoved;
+
+      observerAdded = 0;
+      observerRemoved = 0;
+      vi.resetModules();
+      vi.doMock('../platform', () => import('../platform/index.android'));
+      ({ Keyboard } = await import('./index'));
+      Keyboard.addListener('keyboardDidShow', () => {}).remove();
+
+      expect(iosPings).toBeGreaterThan(0);
+      expect(observerAdded + observerRemoved).toBe(0);
+      vi.doUnmock('../platform');
     });
   });
 });

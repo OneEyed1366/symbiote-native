@@ -148,7 +148,9 @@ export type IIndexOffsetParams = {
 // AFTER the clamp so a positive one on the first cell scrolls above the content
 export function offsetForIndex(params: IIndexOffsetParams): number {
   const { count, offsets, lengths } = params;
-  const clamped = Math.max(FIRST_INDEX, Math.min(params.index, count - 1));
+  // A fraction past the last cell's start still lands inside it, only an index at `count` clamps
+  const clamped =
+    params.index >= count ? count - 1 : Math.max(FIRST_INDEX, params.index);
   const cell = Math.floor(clamped);
   const cellLength = lengths[cell] ?? EMPTY_OFFSET;
   const cellOffset =

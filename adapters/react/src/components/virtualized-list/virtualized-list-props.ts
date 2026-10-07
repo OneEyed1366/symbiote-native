@@ -15,11 +15,14 @@ import type {
 } from '@symbiote-native/components';
 import type { IStyleProp, IViewStyle } from '../../utils/styles';
 
-export type IRenderItem<ItemT> = (info: {
+// What `renderItem` and `ListItemComponent` are both handed
+export type IListItemInfo<ItemT> = {
   item: ItemT;
   index: number;
   separators: ISeparators;
-}) => ReactNode;
+};
+
+export type IRenderItem<ItemT> = (info: IListItemInfo<ItemT>) => ReactNode;
 
 export type ICellRendererProps<ItemT> = ICellRendererBaseProps<ItemT> & {
   children?: ReactNode;
@@ -38,7 +41,9 @@ export type IVirtualizedListProps<ItemT> = IAccessibilityProps &
     data: unknown;
     getItem: (data: unknown, index: number) => ItemT;
     getItemCount: (data: unknown) => number;
-    renderItem: IRenderItem<ItemT>;
+    // One of the two is required, `ListItemComponent` wins when both are given
+    renderItem?: IRenderItem<ItemT>;
+    ListItemComponent?: ComponentType<IListItemInfo<ItemT>>;
     keyExtractor?: (item: ItemT, index: number) => string;
     getItemLayout?: (
       data: unknown,

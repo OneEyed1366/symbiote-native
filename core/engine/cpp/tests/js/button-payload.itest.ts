@@ -103,29 +103,33 @@ describe('what a button sends native', () => {
     expect(payload.touchSoundDisabled).toBe(undefined);
   });
 
+  // `accessibilityLabel={ariaLabel || accessibilityLabel}` (`Button.js:343`), `||` not `??`
+  it('falls back to accessibilityLabel for an empty aria-label', () => {
+    const payload = commit({
+      'aria-label': '',
+      accessibilityLabel: 'Save now',
+    }).payload;
+
+    expect(payload.accessibilityLabel).toBe('Save now');
+    expect(commit({ 'aria-label': 'Aria' }).payload.accessibilityLabel).toBe(
+      'Aria',
+    );
+  });
+
   // why: `color` is Button's own prop — it tints the LABEL on iOS and the view on Android — and is
   // consumed entirely by the derived folds. On the host node it is a key native does not know.
   it('keeps color off the host payload', () => {
     expect(commit({ color: '#ff0000' }).payload.color).toBe(undefined);
   });
 
-  // why: THE CONTROL for that strip, and the reason it is worth a case of its own. The engine's
-  // rule erases `color` from the PAYLOAD; the derived folds read it off the NODE. If a future change
-  // made the strip mutate the node's props instead, the label would silently lose its tint while
-  // every assertion above still passed.
+  // The strip erases `color` from the payload only, the derived folds read it off the node
   it('still tints the label from the color it stripped', () => {
     const payload = commit({ color: '#ff0000' }).payload;
     expect(payload.accessibilityRole).toBe('button');
     expect(payload.color).toBe(undefined);
   });
 
-  // why: THE PRICE, and it has read 4, then 3, then 1, then ZERO in three days. Off Android this
-  // primitive now binds no `payloadFold` on any of its four nodes.
-  //
-  // The last to go was the label text's, which needed `IAncestorLookup`: its style is a function of
-  // the BUTTON's `color` and `disabled` while its parent is the wrapping view, so `ownerProps` —
-  // which answers "my parent" — could not reach it. On Android the owner's fold survives for the
-  // view style and the ripple background.
+  // Off Android no node of the button binds a `payloadFold`, so a commit makes no trip into JS
   it('costs no trip into JS at all', () => {
     const one = commit({});
     print(`DEBUG button folds=${one.folds}`);

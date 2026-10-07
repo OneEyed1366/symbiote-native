@@ -71,6 +71,29 @@ describe('createSeparatorBoard', () => {
     expect(board.read('b').leadingOverride).toBeUndefined();
   });
 
+  // `updatePropsFor` hands the cell before a whole new props object (`setSeparatorProps`), so what
+  // that cell's own trailing update set earlier is gone
+  it('replaces the trailing override of the cell before on a routed leading update', () => {
+    const board = createSeparatorBoard<IProps & { tint?: string }>();
+    board.updateProps({
+      cellKey: 'a',
+      prevCellKey: undefined,
+      side: 'trailing',
+      has: { leading: false, trailing: true },
+      props: { tint: 'red' },
+    });
+
+    board.updateProps({
+      cellKey: 'b',
+      prevCellKey: 'a',
+      side: 'leading',
+      has: { leading: false, trailing: true },
+      props: { trailingItem: 'x' },
+    });
+
+    expect(board.read('a').trailingOverride).toEqual({ trailingItem: 'x' });
+  });
+
   it('keeps a leading update on its own cell when it paints a leading separator', () => {
     const board = createSeparatorBoard<IProps>();
 

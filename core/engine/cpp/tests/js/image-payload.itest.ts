@@ -100,6 +100,11 @@ describe('what an image sends native, resolved by the engine', () => {
     expect(sourceOf(payload)).toBe('[{uri:"https://a/1.png"}]');
   });
 
+  // Без источника RN шлёт одну пустую запись, т.к. нативу нужны scale 1 и type remote
+  it('sends one empty source for an image with none', () => {
+    expect(sourceOf(commit({}).payload)).toBe('[{}]');
+  });
+
   // why: ImageSourceUtils.js:81 — `src` is the W3C spelling and it wins over `source`. An app
   // migrating from the web writes `src` and would otherwise see nothing paint.
   it('prefers src over source, and carries the size hints with it', () => {

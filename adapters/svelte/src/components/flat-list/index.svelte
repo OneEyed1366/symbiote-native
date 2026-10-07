@@ -31,6 +31,7 @@
     type ISymbioteNode,
   } from '@symbiote-native/engine';
   import VirtualizedList from '../virtualized-list/index.svelte';
+  import { itemComponentOf } from '../virtualized-list/list-props';
   import { pickAccessibilityProps } from '../virtualized-list/virtualized-list-props';
   import type {
     IVirtualizedListHandle,
@@ -156,7 +157,7 @@
   export function flashScrollIndicators(): void {
     inner?.flashScrollIndicators();
   }
-  export function getNativeScrollRef(): IScrollViewHandle | null {
+  export function getNativeScrollRef(): ISymbioteNode | null {
     return inner?.getNativeScrollRef() ?? null;
   }
   export function getScrollableNode(): IScrollViewHandle | null {
@@ -191,12 +192,18 @@
 })}
   <view p={{ style: rowStyle }}>
     {#each row.items as rowItem, column (props.keyExtractor ? props.keyExtractor(rowItem, row.startIndex + column) : String(row.startIndex + column))}
+      {@const info = {
+        item: rowItem,
+        index: row.startIndex + column,
+        separators,
+      }}
+      {@const ListItem = itemComponentOf(props)}
       <view p={{ style: { flex: 1 } }}>
-        {@render props.item({
-          item: rowItem,
-          index: row.startIndex + column,
-          separators,
-        })}
+        {#if ListItem}
+          <ListItem {...info} />
+        {:else}
+          {@render props.item?.(info)}
+        {/if}
       </view>
     {/each}
   </view>
@@ -215,6 +222,7 @@
     getItem={getSingleItem}
     getItemCount={getSingleCount}
     item={props.item}
+    listItemComponent={props.listItemComponent}
     separator={props.separator}
     cellRenderer={props.cellRenderer}
     header={props.header}

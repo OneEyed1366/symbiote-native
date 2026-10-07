@@ -37,6 +37,7 @@ export function createInitialListState<ItemT>(): IListState<ItemT> {
     nestedContentLength: EMPTY_OFFSET,
     contentLength: undefined,
     measured: new Map<number, number>(),
+    measuredOrientation: { horizontal: false, rtl: false },
     measuredOffsets: new Map<number, number>(),
     focusedCell: null,
     highestMeasuredIndex: FIRST_INDEX,
@@ -59,6 +60,7 @@ export function createInitialListState<ItemT>(): IListState<ItemT> {
     hasInteracted: false,
     firstVisibleKey: null,
     appliedInitialScroll: false,
+    hasWarnedInitialScroll: false,
     metrics: {
       count: EMPTY_OFFSET,
       offsets: [],
@@ -195,6 +197,24 @@ function recordFrame<ItemT>(
   }));
 }
 
+// RN's `render` warning, once, until the initial scroll has happened
+function warnInvalidInitialScroll<ItemT>(
+  state: IListState<ItemT>,
+  inputs: IListReducerInputs<ItemT>,
+  count: number,
+): void {
+  const target = inputs.initialScrollIndex;
+  if (target === undefined || state.hasWarnedInitialScroll) return;
+  if (state.appliedInitialScroll) return;
+  const isInvalid =
+    target < FIRST_INDEX || (count > FIRST_INDEX && target >= count);
+  if (!isInvalid) return;
+  console.warn(
+    `initialScrollIndex "${target}" is not valid (list has ${count} items)`,
+  );
+  state.hasWarnedInitialScroll = true;
+}
+
 // Recomputes the window metrics off the current state and inputs
 // Owns the `committedWindow`, plain state grown one batch step at a time, so it triggers no
 // reactivity loop
@@ -203,6 +223,7 @@ export function deriveMetrics<ItemT>(
   inputs: IListReducerInputs<ItemT>,
 ): IListState<ItemT> {
   const count = inputs.getItemCount(inputs.data);
+  warnInvalidInitialScroll(state, inputs, count);
   refreshStaleMeasurements(state, inputs, count);
   const fixedLayout = wrapFixedLayout(inputs.data, inputs.getItemLayout);
   const averageLength = resolveAverageLength(

@@ -13,6 +13,7 @@ export type { IUrlEvent, IIntentExtra } from './shared';
 
 export const Linking = createLinking({
   moduleName: 'IntentAndroid',
+  isObservedByModule: false,
   // RN: `nullthrows(NativeIntentAndroid).sendIntent(action, extras)`.
   sendIntent: (requireModule, action, extras) => {
     const module = requireModule();

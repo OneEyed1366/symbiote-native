@@ -328,3 +328,107 @@ describe('RN Pressability: a frame that has not arrived yet', () => {
     expect(log).toContain('press');
   });
 });
+
+describe('RN Pressability: the long press delay', () => {
+  it('is called if pressed for 500ms', () => {
+    const { clock, handlers, log } = makeHarness(RN_DEFAULTS);
+
+    handlers.handlePressIn(eventAt());
+    handlers.handleResponderMove(eventAt());
+    clock.advance(499);
+    expect(log).not.toContain('long');
+
+    clock.advance(1);
+    expect(log).toContain('long');
+  });
+
+  // The behavior hands the machine `500 - delayPressIn`, so the sum stays 500
+  it('counts from the touch, not from the delayed press in', () => {
+    const { clock, handlers, log } = makeHarness({
+      ...RN_DEFAULTS,
+      unstable_pressDelay: 100,
+      delayLongPress: 400,
+    });
+
+    handlers.handlePressIn(eventAt());
+    handlers.handleResponderMove(eventAt());
+    clock.advance(499);
+    expect(log).not.toContain('long');
+
+    clock.advance(1);
+    expect(log).toContain('long');
+  });
+});
+
+describe('RN Pressability: onPressIn', () => {
+  it('is called after the grant', () => {
+    const { clock, handlers, log } = makeHarness(RN_DEFAULTS);
+
+    handlers.handlePressIn(eventAt());
+    clock.advance(0);
+
+    expect(log).toContain('in');
+  });
+
+  it('is called synchronously if the delay is 0ms', () => {
+    const { handlers, log } = makeHarness({
+      ...RN_DEFAULTS,
+      unstable_pressDelay: 0,
+    });
+
+    handlers.handlePressIn(eventAt());
+    handlers.handleResponderMove(eventAt());
+
+    expect(log).toContain('in');
+  });
+});
+
+describe('RN Pressability: onPressOut around the press delay', () => {
+  it('is called 130ms after a release that came before the delay', () => {
+    const { clock, handlers, log } = makeHarness({
+      ...RN_DEFAULTS,
+      unstable_pressDelay: 1,
+    });
+
+    handlers.handlePressIn(eventAt());
+    handlers.handleResponderMove(eventAt());
+    expect(log).not.toContain('in');
+    handlers.handlePress(eventAt());
+    handlers.handlePressOut(eventAt());
+
+    expect(log).not.toContain('out');
+    clock.advance(DEFAULT_MIN_PRESS_DURATION_MS);
+    expect(log).toContain('out');
+  });
+
+  it('is never called after a terminate that came before the delay', () => {
+    const { clock, handlers, log } = makeHarness({
+      ...RN_DEFAULTS,
+      unstable_pressDelay: 1,
+    });
+
+    handlers.handlePressIn(eventAt());
+    handlers.handleResponderMove(eventAt());
+    handlers.handlePressOut(eventAt());
+
+    expect(log).not.toContain('out');
+    clock.advance(DEFAULT_MIN_PRESS_DURATION_MS);
+    expect(log).not.toContain('out');
+  });
+
+  it('is called synchronously if the minimum press duration is 0ms', () => {
+    const { clock, handlers, log } = makeHarness({
+      ...RN_DEFAULTS,
+      minPressDuration: 0,
+    });
+
+    handlers.handlePressIn(eventAt());
+    handlers.handleResponderMove(eventAt());
+    clock.advance(0);
+    expect(log).toContain('in');
+    handlers.handlePress(eventAt());
+    handlers.handlePressOut(eventAt());
+
+    expect(log).toContain('out');
+  });
+});

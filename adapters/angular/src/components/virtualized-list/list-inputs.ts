@@ -8,12 +8,15 @@ import {
   Input,
   Output,
   TemplateRef,
+  type Type,
 } from '@angular/core';
 import {
   DEFAULT_INITIAL_NUM_TO_RENDER,
   DEFAULT_MAX_TO_RENDER_PER_BATCH,
   DEFAULT_UPDATE_CELLS_BATCHING_PERIOD,
   DEFAULT_WINDOW_SIZE,
+  ITEM_RENDERER,
+  pickItemRenderer,
   type IInnerViewRef,
   type IViewabilityConfig,
   type IViewabilityConfigCallbackPair,
@@ -95,6 +98,9 @@ export abstract class ListInputsBase<ItemT> extends ListEventsBase {
   @Input() listFooterComponentStyle?: IStyleProp<IViewStyle>;
   @Input() testID?: string;
   @Input() nativeID?: string;
+  // RN's `ListItemComponent`: a component taking `item`, `index` and `separators` inputs, in place
+  // of the `vListItem` template, and it wins when both are given
+  @Input() listItemComponent?: Type<unknown>;
 
   // The cell and slot templates the app authors, captured from projected <ng-template> content
   @ContentChild(VListItemDirective) itemDir?: VListItemDirective<ItemT>;
@@ -107,6 +113,22 @@ export abstract class ListInputsBase<ItemT> extends ListEventsBase {
 
   get isHorizontal(): boolean {
     return this.horizontal === true;
+  }
+
+  // The component to stamp per cell, RN's `_renderElement`: it wins over the item template, and a
+  // cell with neither throws
+  get itemComponent(): Type<unknown> | undefined {
+    const kind = pickItemRenderer({
+      hasRenderItem: this.hasItemTemplate,
+      hasComponent: this.listItemComponent !== undefined,
+    });
+    return kind === ITEM_RENDERER.component
+      ? this.listItemComponent
+      : undefined;
+  }
+
+  protected get hasItemTemplate(): boolean {
+    return this.itemDir !== undefined;
   }
 
   protected get isInverted(): boolean {
@@ -156,6 +178,10 @@ export abstract class VirtualizedListInputs<
 
   get cellTemplate(): TemplateRef<IVListItemContext<ItemT>> | undefined {
     return this.itemTemplate ?? this.itemDir?.templateRef;
+  }
+
+  protected override get hasItemTemplate(): boolean {
+    return this.cellTemplate !== undefined;
   }
 
   get separatorTemplate():

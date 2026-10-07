@@ -23,12 +23,15 @@ import {
   appListenerFor,
   createElement,
   dlog,
+  Keyboard,
   registerHostBehavior,
   setNodeDispatch,
   setEventListener,
   type IClaimMode,
   type IEventDispatch,
+  type IEventSubscription,
   type IHostBehavior,
+  type IKeyboardEventName,
   type ISymbioteEvent,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
@@ -136,6 +139,48 @@ function syncContentSizeWiring(owner: ISymbioteNode, wired: boolean): void {
   }
 }
 
+// `onKeyboard{Will,Did}{Show,Hide}` (ScrollView.js:1232-1257) get the keyboard event, subscribed
+// while the app has the callback where RN subscribes all four for every ScrollView
+const KEYBOARD_PROP_EVENTS = [
+  'keyboardWillShow',
+  'keyboardWillHide',
+  'keyboardDidShow',
+  'keyboardDidHide',
+] as const satisfies readonly IKeyboardEventName[];
+
+const keyboardSubscriptions = new WeakMap<
+  ISymbioteNode,
+  Map<string, IEventSubscription>
+>();
+
+function syncKeyboardListener(
+  owner: ISymbioteNode,
+  name: (typeof KEYBOARD_PROP_EVENTS)[number],
+  wired: boolean,
+): void {
+  const subscriptions = keyboardSubscriptions.get(owner) ?? new Map();
+  keyboardSubscriptions.set(owner, subscriptions);
+  const known = subscriptions.get(name);
+  if (!wired) {
+    known?.remove();
+    subscriptions.delete(name);
+  } else if (known === undefined) {
+    subscriptions.set(
+      name,
+      Keyboard.addListener(name, event => {
+        const handler = appListenerFor(owner, name);
+        if (typeof handler === 'function') handler(event);
+      }),
+    );
+  }
+}
+
+function releaseKeyboardListeners(owner: ISymbioteNode): void {
+  for (const subscription of keyboardSubscriptions.get(owner)?.values() ?? [])
+    subscription.remove();
+  keyboardSubscriptions.delete(owner);
+}
+
 // The nine names an owner answers, as ONE object for every ScrollView in the app. `scroll` is in
 // here unconditionally т.к. it drives the sticky `AnimatedValue`, and a header may register long
 // after the node was created
@@ -147,9 +192,8 @@ const OWNER_DISPATCH: IEventDispatch = {
   },
 };
 
-// Two owned names answer to a flip, and they answer on DIFFERENT nodes: `contentSizeChange` wires
-// the SLOT's layout, `layout` wires the owner's own — which an inverted sticky header also wants,
-// so the two claims are resolved in one place (`syncOwnerLayout`) rather than by whoever wrote last.
+// `contentSizeChange` wires the SLOT's layout, `layout` the owner's own, which an inverted sticky
+// header also wants, so `syncOwnerLayout` settles the claim instead of whoever wrote last
 function syncOwnedListener(
   owner: ISymbioteNode,
   name: string,
@@ -157,6 +201,13 @@ function syncOwnedListener(
 ): void {
   if (name === 'contentSizeChange') syncContentSizeWiring(owner, wired);
   else if (name === 'layout') syncOwnerLayout(owner);
+  else if (isKeyboardPropEvent(name)) syncKeyboardListener(owner, name, wired);
+}
+
+function isKeyboardPropEvent(
+  name: string,
+): name is (typeof KEYBOARD_PROP_EVENTS)[number] {
+  return KEYBOARD_PROP_EVENTS.some(event => event === name);
 }
 
 // The platform half is a CLAIM MODE and a dirty list — nothing else. iOS takes the RefreshControl
@@ -182,6 +233,7 @@ function scrollBehavior(
       'contentSizeChange',
       'scroll',
       'layout',
+      ...KEYBOARD_PROP_EVENTS,
       ...RESPONDER_OWNED_LISTENERS,
     ],
     slotProps: SLOT_PROPS,
@@ -203,6 +255,7 @@ function scrollBehavior(
       syncInnerViewRef(owner);
     },
     detach(node) {
+      releaseKeyboardListeners(node);
       releaseInnerViewRef(node);
       setNodeDispatch(node, undefined);
       forgetStickyIndexOwner(node);

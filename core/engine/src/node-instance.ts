@@ -134,17 +134,18 @@ class SymbioteNode implements ISymbioteNode {
   // The defaults live HERE and nowhere else, so `buildScrollViewHandle` delegating here cannot
   // drift on what `scrollTo()` with no argument means
   scrollTo(options?: { x?: number; y?: number; animated?: boolean }): void {
-    const x = options?.x ?? 0;
-    const y = options?.y ?? 0;
-    const animated = options?.animated ?? true;
-    dlog(`ScrollView.scrollTo x=${x} y=${y} animated=${animated}`);
-    dispatchViewCommand(this, SCROLL_TO_COMMAND, [x, y, animated]);
+    // RN writes `x || 0`, so a NaN offset reaches native as 0
+    const x = options?.x || 0;
+    const y = options?.y || 0;
+    const isAnimated = options?.animated !== false;
+    dlog(`ScrollView.scrollTo x=${x} y=${y} animated=${isAnimated}`);
+    dispatchViewCommand(this, SCROLL_TO_COMMAND, [x, y, isAnimated]);
   }
 
   scrollToEnd(options?: { animated?: boolean }): void {
-    const animated = options?.animated ?? true;
-    dlog(`ScrollView.scrollToEnd animated=${animated}`);
-    dispatchViewCommand(this, SCROLL_TO_END_COMMAND, [animated]);
+    const isAnimated = options?.animated !== false;
+    dlog(`ScrollView.scrollToEnd animated=${isAnimated}`);
+    dispatchViewCommand(this, SCROLL_TO_END_COMMAND, [isAnimated]);
   }
 
   flashScrollIndicators(): void {

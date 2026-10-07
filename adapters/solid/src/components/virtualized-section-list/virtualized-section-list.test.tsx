@@ -897,9 +897,9 @@ describe('Solid VirtualizedSectionList on the engine', () => {
       expect(scrollNode, 'the scroll node is the list host itself').toBe(
         committed(SCROLL_VIEW).instanceHandle,
       );
-      expect(list?.getNativeScrollRef()).not.toBeNull();
-      expect(list?.getScrollableNode()).toBe(list?.getNativeScrollRef());
-      expect(list?.getScrollResponder()).toBe(list?.getNativeScrollRef());
+      expect(list?.getNativeScrollRef()).toBe(scrollNode);
+      expect(list?.getScrollableNode()?.getScrollNode()).toBe(scrollNode);
+      expect(list?.getScrollResponder()?.getScrollNode()).toBe(scrollNode);
       expect(() => list?.recordInteraction()).not.toThrow();
     });
   });

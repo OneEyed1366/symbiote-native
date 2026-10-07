@@ -69,6 +69,29 @@ describe('Image on Android', () => {
   });
 });
 
+const RED = 0xff_ff_00_00;
+const BLUE = 0xff_00_00_ff;
+// A colour int is signed on Android (`processColor.js`: `| 0x0`)
+const signed = (argb: number): number => argb | 0;
+
+describe('the selection colours of a TextInput on Android', () => {
+  // `TextInput.js:745-752`: caret and handle follow `selectionColor` unless authored
+  it('give caret and handle the selectionColor, and keep an authored one', () => {
+    const coalesced = payloadFor('AndroidTextInput', 'text-input', {
+      selectionColor: 'red',
+    });
+    const authored = payloadFor('AndroidTextInput', 'text-input', {
+      selectionColor: 'red',
+      cursorColor: 'blue',
+    });
+
+    expect(coalesced.cursorColor).toBe(signed(RED));
+    expect(coalesced.selectionHandleColor).toBe(signed(RED));
+    expect(authored.cursorColor).toBe(signed(BLUE));
+    expect(authored.selectionHandleColor).toBe(signed(RED));
+  });
+});
+
 describe('a multiline TextInput on Android', () => {
   // 5pt сверху у RN только на iOS (`TextInput.js:767`)
   it('gets no top inset', () => {

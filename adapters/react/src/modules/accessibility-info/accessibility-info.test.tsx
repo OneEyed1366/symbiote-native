@@ -123,15 +123,15 @@ describe('AccessibilityInfo (iOS)', () => {
       },
     );
     expect(deviceHub).toBeDefined();
-    expect(a11yAdded).toBeGreaterThanOrEqual(1);
+    // RN listens on the device bus and never pings the native module's observe counters
+    expect(a11yAdded).toBe(0);
 
     deviceHub?.emit('screenReaderChanged', false);
     expect(received).toBe(false);
 
-    const removedBefore = a11yRemoved;
     received = undefined;
     sub.remove();
-    expect(a11yRemoved).toBe(removedBefore + 1);
+    expect(a11yRemoved).toBe(0);
 
     deviceHub?.emit('screenReaderChanged', true);
     expect(received).toBeUndefined();

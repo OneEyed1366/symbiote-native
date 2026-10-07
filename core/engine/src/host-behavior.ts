@@ -31,6 +31,8 @@ export type IPayloadFold = (
 export type IClaimMode = 'beside' | 'wrap';
 
 export type IHostBehavior = {
+  // The tag takes strings as children although it is not a `<text>`: RN's TextInput content
+  readonly acceptsTextChildren?: boolean;
   // Listener names this behavior owns on its tag — engine event names, not `onX` props (`press`,
   // `startShouldSetResponder`, ...). setEventListener stashes an app listener for an owned name
   // instead of writing it into node.listeners, so the machine's dispatcher keeps the slot.

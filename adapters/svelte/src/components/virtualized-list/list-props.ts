@@ -5,8 +5,21 @@ import {
   DEFAULT_MAX_TO_RENDER_PER_BATCH,
   DEFAULT_UPDATE_CELLS_BATCHING_PERIOD,
   DEFAULT_WINDOW_SIZE,
+  ITEM_RENDERER,
+  pickItemRenderer,
 } from '@symbiote-native/components';
 import type { IVirtualizedListProps } from './virtualized-list-props';
+
+// RN's `_renderElement`: the component wins over the `item` snippet, a cell with neither throws
+export function itemComponentOf<ItemT>(
+  props: Pick<IVirtualizedListProps<ItemT>, 'item' | 'listItemComponent'>,
+) {
+  const kind = pickItemRenderer({
+    hasRenderItem: props.item !== undefined,
+    hasComponent: props.listItemComponent !== undefined,
+  });
+  return kind === ITEM_RENDERER.component ? props.listItemComponent : undefined;
+}
 
 export function resolveListProps<ItemT>(props: IVirtualizedListProps<ItemT>) {
   return {

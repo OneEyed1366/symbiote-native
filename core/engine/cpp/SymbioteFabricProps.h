@@ -213,6 +213,8 @@ struct ISelf {
   // Text's pressability (`Text.js:145-163`): onPress or onLongPress, and onStartShouldSetResponder.
   bool hasPressOrLongPressListener = false;
   bool hasStartShouldSetResponder = false;
+  // A text under a text commits as `RCTVirtualText` and gets none of the outer text's defaults
+  bool isNestedText = false;
 };
 
 folly::dynamic fabricProps(

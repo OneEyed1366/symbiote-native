@@ -69,11 +69,12 @@ describe('the aria spelling, resolved by the engine', () => {
     expect(payload['aria-label']).toBe(undefined);
   });
 
-  it('lets role beat an explicit accessibilityRole', () => {
-    expect(
-      commit({ role: 'heading', accessibilityRole: 'button' })
-        .accessibilityRole,
-    ).toBe('header');
+  // RN 0.86 шлёт `role` и `accessibilityRole` нативу парой, `role` ничего не переписывает
+  it('keeps role and an explicit accessibilityRole side by side', () => {
+    const payload = commit({ role: 'heading', accessibilityRole: 'button' });
+
+    expect(payload.accessibilityRole).toBe('button');
+    expect(payload.role).toBe('heading');
   });
 
   it('lets aria-hidden beat both explicit hide flags', () => {
@@ -117,14 +118,14 @@ describe('the aria spelling, resolved by the engine', () => {
     expect(shown.importantForAccessibility).toBe(undefined);
   });
 
-  // why: the role table is W3C's vocabulary mapped onto RN's, and the two disagree on the names
-  // that matter (`heading` -> `header`, `img` -> `image`). An unmapped role is passed through as
-  // itself rather than dropped, which is what lets a future RN role work before the table knows it.
-  it('maps a role through RN’s table and passes an unmapped one through', () => {
-    expect(commit({ role: 'heading' }).accessibilityRole).toBe('header');
-    expect(commit({ role: 'img' }).accessibilityRole).toBe('image');
-    expect(commit({ role: 'button' }).accessibilityRole).toBe('button');
-    expect(commit({ role: 'summary' }).accessibilityRole).toBe('summary');
+  // Нативный слой сам мапит роли, прежняя таблица слала `dialog` как битый `accessibilityRole`
+  it('sends role to native as it is, with no accessibilityRole made from it', () => {
+    for (const role of ['heading', 'img', 'button', 'dialog']) {
+      const payload = commit({ role });
+
+      expect(payload.role).toBe(role);
+      expect(payload.accessibilityRole).toBe(undefined);
+    }
   });
 
   // Inside a composite the alias wins per field, read field by field since this harness compares
@@ -138,7 +139,17 @@ describe('the aria spelling, resolved by the engine', () => {
 
     expect(state.disabled).toBe(true);
     expect(state.busy).toBe(true);
-    expect(state.checked).toBe(null);
+    expect(state.checked).toBe(undefined);
+  });
+
+  // A null `selected` / `expanded` / `disabled` makes stock Fabric drop the whole composite
+  it('leaves an unset field out of the state and the value composites', () => {
+    const state = commit({ 'aria-busy': true }).accessibilityState;
+    const value = commit({ 'aria-valuenow': 4 }).accessibilityValue;
+    if (!isRecord(state) || !isRecord(value)) throw new Error('no composite');
+
+    expect(Object.keys(state)).toEqual(['busy']);
+    expect(Object.keys(value)).toEqual(['now']);
   });
 
   // The composite is rebuilt from the known fields only, so an unknown one is dropped

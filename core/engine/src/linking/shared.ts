@@ -59,6 +59,8 @@ export type ILinkingStatic = {
 // Платформа задаёт имя модуля и `sendIntent`: на Android это intent, на iOS отказ `Unsupported`
 export type ILinkingPlatform = {
   moduleName: string;
+  // RN builds the emitter over the module on iOS only: IntentAndroid has no observe counters
+  isObservedByModule: boolean;
   sendIntent(
     requireModule: () => INativeLinkingModule,
     action: string,
@@ -110,7 +112,9 @@ export function createLinking(platform: ILinkingPlatform): ILinkingStatic {
       // Lazy install on first subscribe: the hub exists before native emits without a
       // hard bootstrap-order dependency. Idempotent.
       installDeviceEventHub();
-      emitter = new NativeEventEmitter(getModule() ?? undefined);
+      emitter = new NativeEventEmitter(
+        platform.isObservedByModule ? (getModule() ?? undefined) : undefined,
+      );
     }
     return emitter;
   }

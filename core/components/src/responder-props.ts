@@ -12,7 +12,20 @@ import type { ISymbioteEvent } from '@symbiote-native/engine';
 type IResponderGate = (event: ISymbioteEvent) => boolean;
 type IResponderHandler = (event: ISymbioteEvent) => void;
 
-export interface IResponderProps {
+export type IResponderProps = {
+  // RN's View touch props, run after the responder and with a `Capture` twin each
+  onTouchStart?: IResponderHandler;
+  onTouchStartCapture?: IResponderHandler;
+  onTouchMove?: IResponderHandler;
+  onTouchMoveCapture?: IResponderHandler;
+  onTouchEnd?: IResponderHandler;
+  onTouchEndCapture?: IResponderHandler;
+  onTouchCancel?: IResponderHandler;
+  onTouchCancelCapture?: IResponderHandler;
+  // The capture twins of the bubbling focus, blur and click events on RN's base ViewConfig
+  onFocusCapture?: IResponderHandler;
+  onBlurCapture?: IResponderHandler;
+  onClickCapture?: IResponderHandler;
   onStartShouldSetResponder?: IResponderGate;
   onStartShouldSetResponderCapture?: IResponderGate;
   onMoveShouldSetResponder?: IResponderGate;
@@ -25,4 +38,4 @@ export interface IResponderProps {
   onResponderRelease?: IResponderHandler;
   onResponderTerminate?: IResponderHandler;
   onResponderTerminationRequest?: IResponderGate;
-}
+};

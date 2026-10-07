@@ -1,16 +1,7 @@
-<script lang="ts" module>
+<script lang="ts" generics="ItemT">
   // Windowed list over the shared `reduceList` machine, this file owns only Svelte's lifecycle
   // The scroll tag is authored directly so the cell walk can mark sticky cells itself
   // No content node: `registerScrollViewBehavior()` builds it and takes `contentContainerStyle`
-  import type {
-    IVirtualizedListProps,
-    IVirtualizedListHandle,
-  } from './virtualized-list-props';
-
-  export type { IVirtualizedListProps, IVirtualizedListHandle };
-</script>
-
-<script lang="ts" generics="ItemT">
   import {
     EMPTY_OFFSET,
     FIRST_INDEX,
@@ -52,9 +43,14 @@
   import type { ShimElement } from '../../dom-shim';
   import {
     pickAccessibilityProps,
+    type IVirtualizedListHandle,
     type IVirtualizedListProps as IProps,
   } from './virtualized-list-props';
-  import { refreshControlPropsOf, resolveListProps } from './list-props';
+  import {
+    itemComponentOf,
+    refreshControlPropsOf,
+    resolveListProps,
+  } from './list-props';
   import {
     getVirtualizedListScope,
     setVirtualizedListScope,
@@ -244,7 +240,7 @@
   export function recordInteraction(): void {
     handle.recordInteraction();
   }
-  export function getNativeScrollRef(): IScrollViewHandle | null {
+  export function getNativeScrollRef(): ISymbioteNode | null {
     return handle.getNativeScrollRef();
   }
   export function getScrollableNode(): IScrollViewHandle | null {
@@ -340,11 +336,17 @@
 </script>
 
 {#snippet cellContent(index: number)}
-  {@render props.item({
+  {@const info = {
     item: narrowed.getItem(narrowed.data, index),
     index,
     separators: separatorsFor(index),
-  })}
+  }}
+  {@const ListItem = itemComponentOf(props)}
+  {#if ListItem}
+    <ListItem {...info} />
+  {:else}
+    {@render props.item?.(info)}
+  {/if}
   {#if props.separator && index < metrics.count - 1}
     <view p={{}}>
       {@render props.separator(separatorPropsFor(index))}

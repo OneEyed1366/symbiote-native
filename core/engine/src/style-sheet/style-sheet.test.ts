@@ -22,6 +22,7 @@ function installFakeDeviceInfo(getConstants: () => unknown): void {
 
 afterEach(() => {
   globalThis.__turboModuleProxy = undefined;
+  vi.unstubAllGlobals();
 });
 
 describe('StyleSheet', () => {
@@ -31,6 +32,25 @@ describe('StyleSheet', () => {
       const created = StyleSheet.create(input);
       expect(created).toEqual(input);
       expect(created.box.flex).toBe(1);
+    });
+
+    // RN freezes each entry under `__DEV__`, so a write to one fails where it is made
+    it('freezes every entry in a dev bundle', () => {
+      vi.stubGlobal('__DEV__', true);
+      const created = StyleSheet.create({
+        box: { flex: 1 },
+        title: { top: 2 },
+      });
+
+      expect(Object.isFrozen(created.box)).toBe(true);
+      expect(Object.isFrozen(created.title)).toBe(true);
+    });
+
+    it('leaves the entries writable in a release bundle', () => {
+      vi.stubGlobal('__DEV__', false);
+      const created = StyleSheet.create({ box: { flex: 1 } });
+
+      expect(Object.isFrozen(created.box)).toBe(false);
     });
   });
 

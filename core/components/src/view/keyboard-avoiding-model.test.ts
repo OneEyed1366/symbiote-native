@@ -153,4 +153,15 @@ describe('the height behavior reads the inset it already applied', () => {
 
     expect(insets).toEqual([200]);
   });
+
+  // RN adds `state.bottom`, which a disabled view never sets, so a repeated event settles
+  it('does not stack the overlap again while the view is disabled', () => {
+    const { model, insets } = setup({ behavior: 'height', enabled: false });
+    model.laidOut(FRAME);
+
+    model.keyboardShown(keyboardEvent());
+    model.keyboardShown(keyboardEvent());
+
+    expect(insets).toEqual([200]);
+  });
 });

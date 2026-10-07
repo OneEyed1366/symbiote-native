@@ -40,10 +40,7 @@ function reject(error: Error): void {
 }
 
 function toError(value: unknown): Error {
-  if (value instanceof Error) return value;
-  return new Error(
-    typeof value === 'string' ? value : 'Unknown InteractionManager task error',
-  );
+  return value instanceof Error ? value : new Error(String(value));
 }
 
 function hasMethod(task: object, name: string): boolean {

@@ -51,6 +51,12 @@ export const TOUCH_END = 'topTouchEnd';
 export const TOUCH_CANCEL = 'topTouchCancel';
 export const PRESS = 'press';
 
+// What an app's `onTouchStart` and its siblings listen for, `<name>Capture` is the capture twin
+export const TOUCH_START_PROP = 'touchStart';
+export const TOUCH_MOVE_PROP = 'touchMove';
+export const TOUCH_END_PROP = 'touchEnd';
+export const TOUCH_CANCEL_PROP = 'touchCancel';
+
 // The responder protocol (PanResponder / Touchable), post-`on` names: `onResponderMove` is
 // `responderMove` here. RN's negotiation and its two-phase walk live in `./responder`
 export const RESPONDER_GRANT = 'responderGrant';

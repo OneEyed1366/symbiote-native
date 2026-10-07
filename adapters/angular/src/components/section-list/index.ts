@@ -315,7 +315,7 @@ export class SectionList<ItemT = unknown>
     this.list?.flashScrollIndicators();
   }
 
-  getNativeScrollRef(): IScrollViewHandle | null {
+  getNativeScrollRef(): ISymbioteNode | null {
     return this.list?.getNativeScrollRef() ?? null;
   }
 

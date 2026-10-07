@@ -43,6 +43,9 @@ export type IVirtualizedListProps<ItemT> = {
   // Replaces the view around each cell, a component taking `ICellRendererProps` with the item and
   // its separator in its default slot, it must wire `onLayout` and `onFocus` itself
   cellRendererComponent?: Component;
+  // RN's `ListItemComponent`: draws a cell from `item`, `index` and `separators` props instead of
+  // the `#item` slot, and wins when both are given
+  listItemComponent?: Component;
   // Mounts every cell from the top and paints no spacer, the window only grows toward the end
   disableVirtualization?: boolean;
   stickyHeaderIndices?: number[];
@@ -120,6 +123,7 @@ export const PROP_KEYS = [
   'updateCellsBatchingPeriod',
   'windowSize',
   'cellRendererComponent',
+  'listItemComponent',
   'disableVirtualization',
   'stickyHeaderIndices',
   'maintainVisibleContentPosition',

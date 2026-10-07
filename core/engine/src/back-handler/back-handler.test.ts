@@ -279,4 +279,34 @@ describe('BackHandler', () => {
       sub.remove();
     });
   });
+
+  // RN listens on the device bus, so the module's observe counters are never pinged
+  describe('the native module observe counters', () => {
+    it('stay untouched while handlers come and go', async () => {
+      const addListener = vi.fn();
+      const removeListeners = vi.fn();
+      globalThis.__turboModuleProxy = <T>(name: string): T | null => {
+        const module: unknown =
+          name === 'DeviceEventManager'
+            ? {
+                invokeDefaultBackPressHandler: (): void => {},
+                addListener,
+                removeListeners,
+              }
+            : undefined;
+        return isPresent<T>(module) ? module : null;
+      };
+      vi.resetModules();
+      await loadBackHandler();
+      const handler = vi.fn(() => true);
+
+      const sub = BackHandler.addEventListener('hardwareBackPress', handler);
+      emitBack();
+      sub.remove();
+
+      expect(handler).toHaveBeenCalledTimes(1);
+      expect(addListener).not.toHaveBeenCalled();
+      expect(removeListeners).not.toHaveBeenCalled();
+    });
+  });
 });

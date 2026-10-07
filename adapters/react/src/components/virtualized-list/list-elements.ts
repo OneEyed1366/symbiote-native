@@ -3,9 +3,34 @@
 import { createElement, type ComponentType, type ReactNode } from 'react';
 import {
   buildSeparatorProps,
+  drawItem,
   type ISeparatorProps,
 } from '@symbiote-native/components';
-import type { IListSlot } from './virtualized-list-props';
+import type {
+  IListItemInfo,
+  IListSlot,
+  IRenderItem,
+} from './virtualized-list-props';
+
+type IItemRenderers<ItemT> = {
+  renderItem?: IRenderItem<ItemT>;
+  ListItemComponent?: ComponentType<IListItemInfo<ItemT>>;
+};
+
+// RN's `_renderElement`: the component wins over `renderItem`, one of the two has to be there
+export function renderItemElement<ItemT>(
+  renderers: IItemRenderers<ItemT>,
+  info: IListItemInfo<ItemT>,
+): ReactNode {
+  return drawItem(
+    {
+      renderItem: renderers.renderItem,
+      component: renderers.ListItemComponent,
+    },
+    info,
+    (Component, given) => createElement(Component, given),
+  );
+}
 
 export function resolveElement(component: IListSlot): ReactNode {
   if (component === undefined) return undefined;

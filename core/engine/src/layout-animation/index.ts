@@ -50,7 +50,7 @@ export type ILayoutAnimationAnim = {
 };
 
 export type ILayoutAnimationConfig = {
-  duration: number;
+  duration?: number;
   create?: ILayoutAnimationAnim;
   update?: ILayoutAnimationAnim;
   delete?: ILayoutAnimationAnim;
@@ -181,7 +181,7 @@ function configureNext(
   };
   const raceTimer = setTimeout(
     onComplete,
-    config.duration + COMPLETION_RACE_SLACK_MS,
+    (config.duration ?? 0) + COMPLETION_RACE_SLACK_MS,
   );
 
   const manager = resolveUIManager();

@@ -25,11 +25,15 @@ import type {
   IVirtualizedListSlots,
 } from './virtualized-list-props';
 
-type IRenderItem<ItemT> = (info: {
+export type IListItemInfo<ItemT> = {
   item: ItemT;
   index: number;
   separators: ISeparators;
-}) => VNode | VNode[] | undefined;
+};
+
+export type IRenderItem<ItemT> = (
+  info: IListItemInfo<ItemT>,
+) => VNode | VNode[] | undefined;
 
 type IScrollHandler = (event: ISymbioteEvent) => void;
 
@@ -45,6 +49,7 @@ export type INarrowedProps<ItemT> = {
   getItemCount: (data: unknown) => number;
   // Absent when the consumer gave no `#item` slot, the render logs instead of throwing
   renderItem?: IRenderItem<ItemT>;
+  listItemComponent?: Component;
   keyExtractor?: (item: ItemT, index: number) => string;
   getItemLayout?: (
     data: unknown,
@@ -164,6 +169,7 @@ export function narrowProps<ItemT>(
     // `#item` IS the render fn, `#separator` carries scope props so it becomes a component, the
     // scopeless header, footer and empty slots are handed over bare
     renderItem: slots.item,
+    listItemComponent: props.listItemComponent,
     keyExtractor: props.keyExtractor,
     getItemLayout: props.getItemLayout,
     itemSeparatorComponent: componentFromSlot(slots.separator),

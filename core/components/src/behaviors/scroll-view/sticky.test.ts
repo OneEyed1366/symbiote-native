@@ -183,6 +183,33 @@ describe('a sticky header child is what the index array could not be', () => {
   });
 });
 
+// The shared value starts at `contentOffset.y` and carries `contentInset.top` as its offset
+describe('the scroll value of the pin', () => {
+  it('adds the top contentInset to the scroll offset', () => {
+    const { headers, commit, scroll, measure } = mountSticky(1, {
+      contentInset: { top: 50 },
+    });
+    measure(headers[0] as ISymbioteNode, 0, 50);
+    scroll(70);
+    vi.advanceTimersByTime(DEBOUNCE_MS);
+
+    expect(
+      committedTranslateY(committedHeaders(commit())[0] as ILiveNode),
+    ).toBe(120);
+  });
+
+  it('starts at the initial contentOffset before any scroll event', () => {
+    const { headers, measure } = mountSticky(1, {
+      contentOffset: { x: 0, y: 30 },
+    });
+    const [header] = headers as [ISymbioteNode];
+    measure(header, 0, 50);
+    vi.advanceTimersByTime(DEBOUNCE_MS);
+
+    expect(propsOf(header)[STICKY_TRANSLATE_PROP]).toBe(30);
+  });
+});
+
 describe('the pin', () => {
   it('translates with the offset once the header has measured', () => {
     const { headers, commit, scroll, measure } = mountSticky(1);

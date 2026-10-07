@@ -12,6 +12,7 @@ import {
   type IListSegment,
 } from '@symbiote-native/components';
 import type { ISymbioteEvent } from '@symbiote-native/engine';
+import { renderItemContent } from './item-content';
 import type { IListWindow } from './list-window';
 import { ScrollViewStickyHeader } from './sticky-header';
 import type { IStickyState } from './sticky-state';
@@ -60,7 +61,7 @@ function cellPartsOf<ItemT>(
   const { props } = deps;
   // Called once and untracked, a tracked call would rebuild the subtree on every window step
   const content = untrack(() =>
-    props.renderItem(() => ({
+    renderItemContent(props, () => ({
       item: props.getItem(props.data, index()),
       index: index(),
       separators: deps.separators.makeSeparators(index()),

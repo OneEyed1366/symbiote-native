@@ -215,6 +215,28 @@ describe('Linking (Android build -> IntentAndroid)', () => {
     });
   });
 
+  // `super(Platform.OS === 'ios' ? nullthrows(NativeLinkingManager) : undefined)`: the Android
+  // emitter never sees IntentAndroid, which has no observe counters to warn about
+  describe('subscribing to url', () => {
+    it('hands the emitter no module, so there is no missing-counter warning', async () => {
+      const intent = fakeIntentAndroid();
+      const counters: string[] = [];
+      Reflect.deleteProperty(intent, 'addListener');
+      Reflect.deleteProperty(intent, 'removeListeners');
+      installModules({ IntentAndroid: intent });
+      vi.resetModules();
+      ({ Linking: androidLinking } = await import('./index.android'));
+      const warn = vi.spyOn(console, 'warn').mockImplementation(message => {
+        counters.push(String(message));
+      });
+
+      androidLinking.addEventListener('url', () => {});
+
+      expect(counters).toEqual([]);
+      warn.mockRestore();
+    });
+  });
+
   describe('module unavailable', () => {
     beforeEach(async () => {
       installModules({ LinkingManager: fakeLinkingManager() });

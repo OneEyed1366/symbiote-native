@@ -87,6 +87,33 @@ describe('DeviceEventEmitter', () => {
   });
 });
 
+describe('addListener with a non-function', () => {
+  const MESSAGE =
+    'EventEmitter.addListener(...): 2nd argument must be a function.';
+  const notAFunction: unknown = 'listener';
+
+  it('throws the TypeError of RN from DeviceEventEmitter', () => {
+    expect(() =>
+      Reflect.apply(DeviceEventEmitter.addListener, DeviceEventEmitter, [
+        'rnDeviceBad',
+        notAFunction,
+      ]),
+    ).toThrow(new TypeError(MESSAGE));
+  });
+
+  it('throws it from NativeEventEmitter too, and registers nothing', () => {
+    const emitter = new NativeEventEmitter();
+
+    expect(() =>
+      Reflect.apply(emitter.addListener, emitter, [
+        'rnNativeBad',
+        notAFunction,
+      ]),
+    ).toThrow(new TypeError(MESSAGE));
+    expect(DeviceEventEmitter.listenerCount('rnNativeBad')).toBe(0);
+  });
+});
+
 describe('NativeAppEventEmitter', () => {
   it('is the same emitter, as in RN', () => {
     expect(NativeAppEventEmitter).toBe(DeviceEventEmitter);

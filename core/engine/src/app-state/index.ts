@@ -12,6 +12,7 @@ import {
   type IEventSubscription,
 } from '../native-events';
 import { dlog } from '../debug';
+import { Platform } from '../platform';
 
 // The native module name RN registers AppState under, confirmed from its spec
 // (specs_DEPRECATED/modules/INativeAppState.js, `TurboModuleRegistry.getEnforcing('AppState')`).
@@ -38,7 +39,7 @@ export type IAppStateEvent =
   (typeof APP_STATE_EVENT)[keyof typeof APP_STATE_EVENT];
 
 // The AppState native module: constants, the live-state query, and the observe-counters.
-interface INativeAppState extends IEventEmitterModule {
+type INativeAppState = IEventEmitterModule & {
   getConstants(): { initialAppState: string };
   getCurrentAppState(
     onSuccess: (data: { app_state: string }) => void,
@@ -46,7 +47,7 @@ interface INativeAppState extends IEventEmitterModule {
   ): void;
   addListener(eventType: string): void;
   removeListeners(count: number): void;
-}
+};
 
 // `appStateData.app_state`, read the way RN reads it: no shape check, `undefined` when absent,
 // and a TypeError on a null payload as the property read would throw.
@@ -69,6 +70,8 @@ let currentState: string | null | undefined = null;
 const deviceEventModule = createDeviceEventModule<INativeAppState>({
   moduleName: APP_STATE_MODULE,
   moduleLogPrefix: 'AppState: module',
+  // RN hands the module to the emitter on iOS only
+  bindModuleToEmitter: Platform.select({ ios: true, default: false }),
   onEmitterCreated: (emitter, module) => {
     if (module === null) return;
     currentState = module.getConstants().initialAppState;

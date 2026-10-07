@@ -33,6 +33,16 @@ const BASE_EVENTS: readonly string[] = [
   'focus',
   'blur',
   'click',
+  // Every bubbling event of RN's base ViewConfig declares a `captured` registration name, and an
+  // ancestor of any view can listen for it
+  'pressCapture',
+  'focusCapture',
+  'blurCapture',
+  'clickCapture',
+  'changeCapture',
+  'submitEditingCapture',
+  'endEditingCapture',
+  'keyPressCapture',
   ...A11Y_EVENTS,
 ];
 
@@ -69,6 +79,12 @@ const SCROLL_EVENTS: readonly string[] = [
   // iOS-only: emitted when the user taps the status bar to scroll to top. Inert on
   // Android (no native producer), so keying it here is harmless cross-platform.
   'scrollToTop',
+  // Not native events: the ScrollView behavior fires them off `Keyboard`, they are listed so the
+  // `onKeyboard*` props reach it
+  'keyboardWillShow',
+  'keyboardWillHide',
+  'keyboardDidShow',
+  'keyboardDidHide',
 ];
 
 // Text emits a glyph-layout event (onTextLayout) beyond the base press/layout set.

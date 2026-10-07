@@ -56,7 +56,7 @@ export type IAccessibilityRole =
   | 'drawerlayout'
   | 'slidingdrawer'
   | 'iconmenu'
-  | (string & {});
+  | (string & Record<never, never>);
 
 // The web-aligned role values accepted by the `role` alias (RN's `Role`).
 export type IRole =
@@ -126,27 +126,27 @@ export type IRole =
   | 'treegrid'
   | 'treeitem';
 
-export interface IAccessibilityStateValue {
+export type IAccessibilityStateValue = {
   disabled?: boolean;
   selected?: boolean;
   checked?: boolean | 'mixed';
   busy?: boolean;
   expanded?: boolean;
-}
+};
 
-export interface IAccessibilityValue {
+export type IAccessibilityValue = {
   min?: number;
   max?: number;
   now?: number;
   text?: string;
-}
+};
 
-export interface IAccessibilityActionInfo {
+export type IAccessibilityActionInfo = {
   name: string;
   label?: string;
-}
+};
 
-export interface IAccessibilityProps {
+export type IAccessibilityProps = {
   // --- host-node identity anchors ---
   // Not accessibility props per se, but RN puts them on ViewProps so EVERY host view
   // carries them; symbiote's one shared base is this interface, so they live here to
@@ -165,6 +165,8 @@ export interface IAccessibilityProps {
   accessibilityState?: IAccessibilityStateValue;
   accessibilityValue?: IAccessibilityValue;
   accessibilityActions?: ReadonlyArray<IAccessibilityActionInfo>;
+  // The `nativeID` of each view, in the order a screen reader visits them (RN's experimental prop)
+  experimental_accessibilityOrder?: string[];
 
   // --- Android-only (harmless on iOS: native ignores unknown props) ---
   accessibilityLabelledBy?: string | string[];
@@ -190,12 +192,12 @@ export interface IAccessibilityProps {
   onMagicTap?: (event: ISymbioteEvent) => void;
   // iOS-only
   onAccessibilityEscape?: (event: ISymbioteEvent) => void;
-}
+};
 
 // Web-alias props. A component opts into these by including AriaProps; the
 // `resolveAccessibilityProps` transform folds them into the canonical
 // `accessibility*` props before they reach native (which never reads `aria-*`).
-export interface IAriaProps {
+export type IAriaProps = {
   role?: IRole;
   'aria-label'?: string;
   'aria-labelledby'?: string;
@@ -211,14 +213,13 @@ export interface IAriaProps {
   'aria-valuemin'?: number;
   'aria-valuenow'?: number;
   'aria-valuetext'?: string;
-}
+};
 
 // The gate's key list, typed against `IAriaProps` so a new alias added to that interface and
 // forgotten here is a type error. The engine carries its own untyped copy;
 // `core/engine/src/accessibility-props.ts` is the single implementation of the FOLD, this is only
 // the cheap probe that decides whether to call it.
 const ARIA_KEYS: ReadonlyArray<keyof IAriaProps> = [
-  'role',
   'aria-label',
   'aria-labelledby',
   'aria-live',

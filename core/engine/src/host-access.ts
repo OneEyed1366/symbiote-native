@@ -169,7 +169,7 @@ export function nextSiblingOf(
 // "can I write a string into this": a raw text node answers false here, and so does an anchor —
 // use isRawTextNode for that question.
 export function isTextContainer(node: ISymbioteNode): boolean {
-  return node.isText;
+  return node.isText || node.hostBehavior?.acceptsTextChildren === true;
 }
 
 // Whether the node is a raw text node — one a string can be written into. The question

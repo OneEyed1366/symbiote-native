@@ -7,6 +7,7 @@ import {
   viewabilityEffects,
   viewableDueEffects,
 } from './list-commit';
+import { FIRST_INDEX } from './list-constants';
 import { deriveMetrics } from './list-derive';
 import { keyForOf } from './list-keys';
 import { isSettledLayout } from './list-metrics';
@@ -109,6 +110,23 @@ function flowMeasure<ItemT>(
   };
 }
 
+// RN's `_invalidateIfOrientationChanged`: lengths along another axis or direction mean nothing
+function dropMeasurementsOfOtherOrientation<ItemT>(
+  state: IListState<ItemT>,
+  inputs: IListReducerInputs<ItemT>,
+): void {
+  const isRtl = inputs.rtl === true;
+  const known = state.measuredOrientation;
+  if (known.horizontal === inputs.horizontal && known.rtl === isRtl) return;
+  state.measuredOrientation = { horizontal: inputs.horizontal, rtl: isRtl };
+  state.measured.clear();
+  state.measuredOffsets.clear();
+  state.measuredKeys.clear();
+  state.staleMeasured.clear();
+  state.highestMeasuredIndex = FIRST_INDEX;
+  state.measureVersion += 1;
+}
+
 // Each half is stored only if IT moved, so a cell that slid without resizing keeps its length
 // A settled re-report bails WITHOUT storing: byte-identical values stop the spacer moving
 function applyMeasure<ItemT>(
@@ -186,6 +204,7 @@ function reduceAction<ItemT>(
     case 'layout':
       return applyLayout(state, action.length);
     case 'content-size':
+      dropMeasurementsOfOtherOrientation(state, inputs);
       state.contentLength = action.length;
       return settle(state, true);
     case 'parent-scroll':
@@ -193,6 +212,7 @@ function reduceAction<ItemT>(
     case 'parent-layout':
       return applyParentLayout(state, action);
     case 'measure':
+      dropMeasurementsOfOtherOrientation(state, inputs);
       return applyMeasure(state, inputs, flowMeasure(state, inputs, action));
     case 'batch-tick':
       // The refill timer fired, the render it asks for grows the window one step

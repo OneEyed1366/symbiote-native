@@ -15,7 +15,7 @@ import {
   type ISeparators,
 } from '@symbiote-native/components';
 import type { ISymbioteEvent } from '@symbiote-native/engine';
-import { resolveElement } from './list-elements';
+import { renderCellContent, resolveElement } from './list-elements';
 import type { INarrowedProps } from './narrow-props';
 
 export type IChildrenArgs<ItemT> = {
@@ -56,7 +56,7 @@ function cellVNode<ItemT>(
   stickySet: ReadonlySet<number> | undefined,
 ): VNode {
   const { props } = args;
-  const content = props.renderItem?.({
+  const content = renderCellContent(props, {
     item: props.getItem(props.data, segment.index),
     index: segment.index,
     separators: args.makeSeparators(segment.index),

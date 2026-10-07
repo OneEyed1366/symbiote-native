@@ -9,39 +9,6 @@
 // signature. The typed resolveAccessibilityProps<T> in core/components delegates here.
 import { dlog } from './debug';
 
-// A role that falls through here passes unmapped, reaching Fabric under the wrong name with
-// nothing red anywhere. Diff against RN's View.js, don't just read for plausibility.
-const ROLE_TO_ACCESSIBILITY_ROLE: Readonly<Record<string, string>> = {
-  alert: 'alert',
-  button: 'button',
-  checkbox: 'checkbox',
-  combobox: 'combobox',
-  grid: 'grid',
-  heading: 'header',
-  img: 'image',
-  link: 'link',
-  list: 'list',
-  listitem: 'list',
-  menu: 'menu',
-  menubar: 'menubar',
-  menuitem: 'menuitem',
-  none: 'none',
-  presentation: 'none',
-  progressbar: 'progressbar',
-  radio: 'radio',
-  radiogroup: 'radiogroup',
-  scrollbar: 'scrollbar',
-  searchbox: 'search',
-  slider: 'adjustable',
-  spinbutton: 'spinbutton',
-  summary: 'summary',
-  switch: 'switch',
-  tab: 'tab',
-  tablist: 'tablist',
-  timer: 'timer',
-  toolbar: 'toolbar',
-};
-
 // Exported so a behavior folding a different node's bag can name these without restating the
 // list — slotDerived (host-behavior.ts) takes prop names, so a derived primitive enumerates them.
 
@@ -66,11 +33,15 @@ export const ARIA_ALIAS_KEYS = [
   'aria-valuetext',
 ] as const;
 
+// `role` is forwarded with the aliases but never folded: RN 0.86's View.js leaves it alone and
+// native maps it next to a separate `accessibilityRole`
+const FOLDED_ARIA_KEYS = ARIA_ALIAS_KEYS.filter(key => key !== 'role');
+
 // An indexed loop rather than `.some(key => …)`: the callback captures `props`, so a closure is
 // allocated per call, and this is the gate on a path that runs once per node.
 function hasAnyAriaKey(props: Readonly<Record<string, unknown>>): boolean {
-  for (let index = 0; index < ARIA_ALIAS_KEYS.length; index += 1) {
-    if (props[ARIA_ALIAS_KEYS[index]] !== undefined) return true;
+  for (let index = 0; index < FOLDED_ARIA_KEYS.length; index += 1) {
+    if (props[FOLDED_ARIA_KEYS[index]] !== undefined) return true;
   }
   return false;
 }
@@ -96,7 +67,6 @@ function foldScalarAliases(
   bag: Record<string, unknown>,
   props: Readonly<Record<string, unknown>>,
 ): void {
-  const role = props.role;
   const ariaLabelledBy = props['aria-labelledby'];
   const ariaLive = props['aria-live'];
   const ariaHidden = props['aria-hidden'];
@@ -118,9 +88,6 @@ function foldScalarAliases(
   }
   if (props['aria-modal'] !== undefined) {
     bag.accessibilityViewIsModal = props['aria-modal'];
-  }
-  if (typeof role === 'string') {
-    bag.accessibilityRole = ROLE_TO_ACCESSIBILITY_ROLE[role] ?? role;
   }
 }
 
@@ -179,8 +146,8 @@ export function foldAriaProps(
 
   dlog('foldAriaProps: folding aria/role aliases into accessibility* props');
 
-  for (let index = 0; index < ARIA_ALIAS_KEYS.length; index += 1) {
-    bag[ARIA_ALIAS_KEYS[index]] = undefined;
+  for (let index = 0; index < FOLDED_ARIA_KEYS.length; index += 1) {
+    bag[FOLDED_ARIA_KEYS[index]] = undefined;
   }
 
   // Each helper reads the original props, the loop above has already blanked the aliases in bag

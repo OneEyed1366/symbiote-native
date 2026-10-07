@@ -55,6 +55,7 @@ import {
   type IStyleProp,
   type IViewStyle,
 } from '@symbiote-native/engine';
+import { renderItemContent } from '../virtualized-list/item-content';
 import {
   VirtualizedList,
   type ICellRendererComponent,
@@ -91,6 +92,7 @@ const OWN_PROPS = [
   'numColumns',
   'columnWrapperStyle',
   'renderItem',
+  'ListItemComponent',
   'keyExtractor',
   'ItemSeparatorComponent',
   'onViewableItemsChanged',
@@ -143,7 +145,7 @@ export function FlatList<ItemT>(props: IFlatListProps<ItemT>): JSX.Element {
             // tracked call would put every signal renderItem reads into this column's insert
             // effect and rebuild the subtree instead of updating its leaf.
             const content = untrack(() =>
-              props.renderItem(() => ({
+              renderItemContent(props, () => ({
                 item: item(),
                 index: info().item.startIndex + column,
                 // The row IS the virtualized cell, so every column in it shares the row's
@@ -214,6 +216,7 @@ export function FlatList<ItemT>(props: IFlatListProps<ItemT>): JSX.Element {
           }
           getItemCount={(): number => arrayLikeLength(props.data)}
           renderItem={props.renderItem}
+          ListItemComponent={props.ListItemComponent}
           keyExtractor={props.keyExtractor}
           ItemSeparatorComponent={props.ItemSeparatorComponent}
           onViewableItemsChanged={props.onViewableItemsChanged}

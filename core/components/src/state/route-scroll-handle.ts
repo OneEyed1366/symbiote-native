@@ -12,7 +12,7 @@ export function routeScrollHandle(
     flashScrollIndicators: (): void => {
       getInner()?.flashScrollIndicators();
     },
-    getNativeScrollRef: (): IScrollViewHandle | null =>
+    getNativeScrollRef: (): ISymbioteNode | null =>
       getInner()?.getNativeScrollRef() ?? null,
     getScrollableNode: (): IScrollViewHandle | null =>
       getInner()?.getScrollableNode() ?? null,

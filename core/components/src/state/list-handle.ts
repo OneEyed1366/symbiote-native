@@ -58,7 +58,7 @@ export function buildListHandle<ItemT>(
     flashScrollIndicators: () => {
       scrollHandle.flashScrollIndicators?.();
     },
-    getNativeScrollRef: handleOrNull,
+    getNativeScrollRef: getNode,
     getScrollableNode: handleOrNull,
     getScrollResponder: handleOrNull,
     getScrollNode: getNode,

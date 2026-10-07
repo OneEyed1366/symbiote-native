@@ -450,6 +450,8 @@ export { viewPropsOf } from './state/list-scroll-props';
 export { createListHandlers } from './state/list-handlers';
 export { createKeyboardAvoidingModel } from './view/keyboard-avoiding-model';
 export { warnAboutModalProps } from './state/modal-warnings';
+export { ITEM_RENDERER, pickItemRenderer } from './state/list-item-renderer';
+export { drawItem } from './state/list-draw-item';
 export type { IListHandlers, IUserScrollHandlers } from './state/list-handlers';
 export { listHasMore } from './state/list-derive';
 export type {
@@ -560,6 +562,7 @@ export type { ILayoutConformanceMode } from './behaviors/layout-conformance';
 export {
   registerTextInputBehavior,
   buildTextInputHandle,
+  textInputOf,
   TEXT_INPUT_TAG,
   TEXT_INPUT_MULTILINE_TAG,
 } from './behaviors/text-input';

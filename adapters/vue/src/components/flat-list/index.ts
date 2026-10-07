@@ -15,6 +15,7 @@ import {
   getCurrentInstance,
   h,
   shallowRef,
+  type Component,
   type FunctionalComponent,
   type VNode,
 } from '@vue/runtime-core';
@@ -43,6 +44,7 @@ import {
   type IViewStyle,
 } from '@symbiote-native/engine';
 import { VirtualizedList } from '../virtualized-list';
+import { renderCellContent } from '../virtualized-list/list-elements';
 import { normalizeVueAttrs } from '../../utils/normalize-attrs';
 import type { ICtx } from '../../utils/component-helpers';
 
@@ -61,6 +63,8 @@ export type IFlatListProps<ItemT> = {
   // The cell renderer + separator are Vue scoped slots (#item / #separator / #header / #footer /
   // #empty), typed by IFlatListSlots - not renderItem / ItemSeparatorComponent props.
   keyExtractor?: (item: ItemT, index: number) => string;
+  // RN's `ListItemComponent`, a component that draws a cell instead of the `#item` slot
+  listItemComponent?: Component;
   numColumns?: number;
   // A bare string is a class name, resolved through the shared style registry; a style
   // object/array flows through unchanged.
@@ -101,6 +105,7 @@ export type IFlatListEmits<ItemT> = {
 const PROP_KEYS = [
   'data',
   'keyExtractor',
+  'listItemComponent',
   'numColumns',
   'columnWrapperStyle',
   'viewabilityConfigCallbackPairs',
@@ -173,6 +178,7 @@ export const FlatList = defineComponent(
       // RN takes any array-like, and a null or a non-list as an empty one
       const data: ArrayLike<ItemT> | null | undefined = props.data;
       const keyExtractor = props.keyExtractor;
+      const listItemComponent = props.listItemComponent;
       const numColumns =
         typeof props.numColumns === 'number' ? props.numColumns : SINGLE_COLUMN;
       const viewabilityPairs = props.viewabilityConfigCallbackPairs;
@@ -228,6 +234,7 @@ export const FlatList = defineComponent(
             getItem: (_source: unknown, index: number): unknown => data[index],
             getItemCount: (): number => arrayLikeLength(data),
             keyExtractor,
+            listItemComponent: props.listItemComponent,
             onEndReached: endReached,
             onStartReached: startReached,
             onRefresh: refresh,
@@ -260,9 +267,10 @@ export const FlatList = defineComponent(
           return h(
             'view',
             { key, style: { flex: 1 } },
-            slots.item === undefined
-              ? []
-              : slots.item({ item, index, separators: info.separators }),
+            renderCellContent(
+              { renderItem: slots.item, listItemComponent },
+              { item, index, separators: info.separators },
+            ) ?? [],
           );
         });
         return [h('view', { style: rowStyle }, cells)];

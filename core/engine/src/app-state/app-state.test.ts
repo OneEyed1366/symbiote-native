@@ -10,9 +10,9 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-interface IDeviceHub {
+type IDeviceHub = {
   emit: (eventType: string, ...args: unknown[]) => void;
-}
+};
 
 let AppState: typeof import('./index').AppState;
 
@@ -268,6 +268,26 @@ describe('AppState', () => {
       deviceHub?.emit('appStateDidChange', { app_state: 'inactive' });
       pendingCurrentState?.({ app_state: 'background' });
       expect(AppState.currentState).toBe('inactive');
+    });
+  });
+
+  describe('RN parity — observe counters (AppState.js)', () => {
+    // RN передаёт модуль эмиттеру только на iOS, поэтому на Android счётчики не пингуются
+    it('pings them on iOS and leaves them alone on Android', async () => {
+      await loadAppState();
+      AppState.addEventListener('change', () => {}).remove();
+      const iosPings = appStateAdded + appStateRemoved;
+
+      appStateAdded = 0;
+      appStateRemoved = 0;
+      vi.resetModules();
+      vi.doMock('../platform', () => import('../platform/index.android'));
+      await loadAppState();
+      AppState.addEventListener('change', () => {}).remove();
+
+      expect(iosPings).toBeGreaterThan(0);
+      expect(appStateAdded + appStateRemoved).toBe(0);
+      vi.doUnmock('../platform');
     });
   });
 });

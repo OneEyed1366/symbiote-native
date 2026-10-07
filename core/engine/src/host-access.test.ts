@@ -4,6 +4,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { installRecordingFabric } from '@symbiote-native/test-utils';
+import { clearHostBehaviors, registerHostBehavior } from './host-behavior';
 import {
   appendChild,
   createAnchor,
@@ -95,6 +96,25 @@ describe('engine host navigation', () => {
 
     expect(isTextContainer(anchor)).toBe(false);
     expect(isRawTextNode(anchor)).toBe(false);
+  });
+
+  // `TextInput.js:736-743`: a text input takes its content as text children
+  it('answers true for a tag whose behavior takes text children', () => {
+    registerHostBehavior('text-holder', {
+      attach: () => {},
+      detach: () => {},
+      acceptsTextChildren: true,
+    });
+    const holder = createElement(
+      'RCTSinglelineTextInputView',
+      false,
+      'text-holder',
+    );
+    const plain = createElement('RCTView');
+
+    expect(isTextContainer(holder)).toBe(true);
+    expect(isTextContainer(plain)).toBe(false);
+    clearHostBehaviors();
   });
 
   it('reflects a view-name change under an unchanged identity', () => {

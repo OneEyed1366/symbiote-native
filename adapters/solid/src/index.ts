@@ -298,12 +298,15 @@ export {
 export {
   DeviceEventEmitter,
   Easing,
+  EventEmitter,
   NativeAppEventEmitter,
   NativeEventEmitter,
 } from '@symbiote-native/engine';
 export type {
   IEasing,
   IEasingFunction,
+  IEmitterSubscription,
+  IEventEmitter,
   IEventEmitterModule,
   IEventSubscription,
   INativeEventListener,

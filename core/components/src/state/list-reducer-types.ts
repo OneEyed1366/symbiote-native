@@ -55,6 +55,8 @@ export type IListState<ItemT> = {
   // RTL turns it into flow-relative offsets and back, RN's `ListMetricsAggregator._contentLength`
   contentLength: number | undefined;
   measured: Map<number, number>;
+  // The axis and direction the maps below were measured along, RN's `_orientation`
+  measuredOrientation: { horizontal: boolean; rtl: boolean };
   // Raw host offset per measured cell, stored verbatim beside its length
   measuredOffsets: Map<number, number>;
   // RN's `_lastFocusedCellKey` with the index it had, it stays after a blur like in RN
@@ -93,6 +95,7 @@ export type IListState<ItemT> = {
   hasInteracted: boolean;
   firstVisibleKey: string | null;
   appliedInitialScroll: boolean;
+  hasWarnedInitialScroll: boolean;
   metrics: IListMetrics;
 };
 

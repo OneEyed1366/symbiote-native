@@ -72,4 +72,15 @@ describe('NativeEventEmitter listeners', () => {
 
     expect(seen).toEqual([context]);
   });
+
+  it('calls a listener with every argument of an emit', () => {
+    const emitter = new NativeEventEmitter();
+    const seen: unknown[][] = [];
+    emitter.addListener('rnParityArgs', (...args) => {
+      seen.push(args);
+    });
+    emitter.emit('rnParityArgs', 'a', 2);
+
+    expect(seen).toEqual([['a', 2]]);
+  });
 });

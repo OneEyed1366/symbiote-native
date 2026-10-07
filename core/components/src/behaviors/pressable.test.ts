@@ -28,7 +28,7 @@ import { PRESSABLE_TAG, registerPressableBehavior } from './pressable';
 
 const fabric = installRecordingFabric();
 const live = createLiveTree(fabric);
-let nextRootTag = 5000;
+let nextRootTag = 5_000;
 
 // A pressable resolves to a plain view — there is no native pressable component. Which is exactly
 // why the registry cannot be keyed by Fabric name: it would attach the press machine to every
@@ -355,6 +355,25 @@ describe('pressable host behavior', () => {
 
     press(node);
     vi.advanceTimersByTime(499);
+    expect(onLongPress).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(1);
+    expect(onLongPress).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
+
+  // Минимум в 10ms из `Pressability-test`, нулевая задержка не стреляет сразу
+  it('floors delayLongPress at 10ms', () => {
+    vi.useFakeTimers();
+    registerPressableBehavior();
+    const onLongPress = vi.fn();
+    const node = makePressable();
+    routeProp(node, 'onLongPress', onLongPress);
+    routeProp(node, 'delayLongPress', 0);
+    mount(node);
+
+    press(node);
+    vi.advanceTimersByTime(9);
     expect(onLongPress).not.toHaveBeenCalled();
 
     vi.advanceTimersByTime(1);

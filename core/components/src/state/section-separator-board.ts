@@ -88,9 +88,8 @@ export function createSeparatorBoard<P>(): ISeparatorBoard<P> {
           leadingOverride: { ...read(cellKey).leadingOverride, ...props },
         });
       } else if (prevCellKey !== undefined) {
-        patch(prevCellKey, {
-          trailingOverride: { ...read(prevCellKey).trailingOverride, ...props },
-        });
+        // RN sets the cell before to a whole new props object, so its earlier override is dropped
+        patch(prevCellKey, { trailingOverride: { ...props } });
       }
     },
     release(cellKey) {

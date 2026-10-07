@@ -47,32 +47,37 @@ export function createKeyboardAvoidingModel(
   let keyboardEvent: unknown;
   let firstHeight: number | undefined;
   let bottom = 0;
+  // RN's `state.bottom`: only an enabled view renders a new value, `height` adds it back
+  let rendered = 0;
 
-  const setBottom = (value: number): void => {
+  const setBottom = (value: number, enabled: boolean): void => {
     bottom = value;
+    if (enabled) rendered = value;
     host.setInset(value);
   };
 
   // RN's `_updateBottomIfNecessary`
   const update = (): void => {
+    const { behavior, enabled, keyboardVerticalOffset } = host.options();
     if (keyboardEvent === undefined) {
-      setBottom(0);
+      setBottom(0, enabled);
       return;
     }
-    const { behavior, enabled, keyboardVerticalOffset } = host.options();
+    // RN's `componentDidUpdate` catches the rendered value up once the view is enabled again
+    if (enabled) rendered = bottom;
     const height = computeInset(
       frame,
       readKeyboardFrame(keyboardEvent),
       keyboardVerticalOffset,
       {
         behavior,
-        previousInset: bottom,
+        previousInset: rendered,
         prefersCrossFadeTransitions: host.prefersCrossFade(),
         os: host.os,
       },
     );
     if (bottom === height) return;
-    setBottom(height);
+    setBottom(height, enabled);
     configureKeyboardAvoidingAnimation(
       readKeyboardAnimationTiming(keyboardEvent),
       enabled,

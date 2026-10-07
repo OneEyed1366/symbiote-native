@@ -1069,15 +1069,16 @@ IOwner ownerOf(const Node &node) {
       (node.parent->pressListeners & kPressListenerMask) != 0};
 }
 
-/** The node's own non-prop bits, unpacked from the mask the ops maintain. See `ISelf`. */
-ISelf selfOf(const Node &node) {
+/** The node's own non-prop bits, unpacked from the ops' mask (see `ISelf`) */
+ISelf selfOf(const Node &node, bool hasTextAncestor) {
   return ISelf{
       (node.pressListeners & kPressListenerPress) != 0,
       (node.pressListeners & kPressListenerMask) != 0,
       node.underlayShown,
       (node.pressListeners & kMomentumListenerMask) != 0,
       (node.pressListeners & kTextPressMask) != 0,
-      (node.pressListeners & kStartShouldSetResponder) != 0};
+      (node.pressListeners & kStartShouldSetResponder) != 0,
+      node.isText && hasTextAncestor};
 }
 
 /**
@@ -1376,7 +1377,7 @@ std::shared_ptr<const react::ShadowNode> materialize(
         node.props,
         fold,
         ownerOf(node),
-        selfOf(node),
+        selfOf(node, hasTextAncestor),
         IAncestorLookup{&ancestorPropsOf, &node},
         firstChildOf(node));
     walkCost_.propsNs += nanosSince(startedAt);
@@ -1430,7 +1431,7 @@ std::shared_ptr<const react::ShadowNode> materialize(
           node.props,
           fold,
           ownerOf(node),
-          selfOf(node),
+          selfOf(node, hasTextAncestor),
           IAncestorLookup{&ancestorPropsOf, &node},
           firstChildOf(node));
       walkCost_.propsNs += nanosSince(startedAt);

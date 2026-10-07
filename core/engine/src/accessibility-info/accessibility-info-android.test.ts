@@ -77,6 +77,31 @@ describe('AccessibilityInfo (android)', () => {
     });
   });
 
+  describe('high text contrast and the iOS-only getters', () => {
+    it('isHighTextContrastEnabled asks the native module', async () => {
+      nativeModule = {
+        ...nativeModule,
+        isHighTextContrastEnabled: (resolve: (enabled: boolean) => void) =>
+          resolve(true),
+      };
+      const info = await load();
+      await expect(info.isHighTextContrastEnabled()).resolves.toBe(true);
+    });
+
+    it('isHighTextContrastEnabled rejects naming the method when native lacks it', async () => {
+      const info = await load();
+      await expect(info.isHighTextContrastEnabled()).rejects.toThrow(
+        'NativeAccessibilityInfoAndroid.isHighTextContrastEnabled is not available',
+      );
+    });
+
+    it('isDarkerSystemColorsEnabled and prefersCrossFadeTransitions resolve false', async () => {
+      const info = await load();
+      await expect(info.isDarkerSystemColorsEnabled()).resolves.toBe(false);
+      await expect(info.prefersCrossFadeTransitions()).resolves.toBe(false);
+    });
+  });
+
   describe('Positive', () => {
     // why: RN still maps the deprecated `change` event to touchExplorationDidChange on Android.
     it('delivers the deprecated change event from touchExplorationDidChange', async () => {
@@ -89,6 +114,32 @@ describe('AccessibilityInfo (android)', () => {
       deviceHub.emit('touchExplorationDidChange', true);
       expect(received).toEqual([true]);
       sub.remove();
+    });
+
+    // RN listens on `RCTDeviceEventEmitter` directly, so native never sees an observe counter
+    it('subscribes without touching the native observe counters', async () => {
+      const pinged: string[] = [];
+      nativeModule = {
+        isTouchExplorationEnabled: (resolve: (enabled: boolean) => void) =>
+          resolve(true),
+        addListener: () => pinged.push('addListener'),
+        removeListeners: () => pinged.push('removeListeners'),
+      };
+      const info = await load();
+      info.addEventListener('change', () => {}).remove();
+      expect(pinged).toEqual([]);
+    });
+
+    it('draws no missing-counter warning from a module without them', async () => {
+      nativeModule = {
+        isTouchExplorationEnabled: (resolve: (enabled: boolean) => void) =>
+          resolve(true),
+      };
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const info = await load();
+      info.addEventListener('change', () => {});
+      expect(warn).not.toHaveBeenCalled();
+      warn.mockRestore();
     });
 
     // why: RN (bridgeless) resolves the tag to a shadow node and sends a `focus` accessibility

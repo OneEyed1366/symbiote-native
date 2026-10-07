@@ -26,6 +26,7 @@ function withoutDataAndSlots<ItemT>(
     getItem,
     getItemCount,
     renderItem,
+    ListItemComponent,
     keyExtractor,
     getItemLayout,
     ItemSeparatorComponent,

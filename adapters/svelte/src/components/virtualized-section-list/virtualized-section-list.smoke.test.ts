@@ -10,6 +10,7 @@ import { compile } from 'svelte/compiler';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
+import type { ISeparators } from '@symbiote-native/components';
 import {
   createLiveTree,
   installRecordingFabric,
@@ -78,6 +79,24 @@ const OVERRIDE_ROOT_OUT = join(
   __dirname,
   '.section-smoke-compiled-override-root.mjs',
 );
+
+const HIGHLIGHT_ROOT_OUT = join(
+  __dirname,
+  '.section-smoke-compiled-highlight-root.mjs',
+);
+
+function isSeparators(value: unknown): value is ISeparators {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'highlight' in value &&
+    typeof value.highlight === 'function' &&
+    'unhighlight' in value &&
+    typeof value.unhighlight === 'function' &&
+    'updateProps' in value &&
+    typeof value.updateProps === 'function'
+  );
+}
 
 const COMPILE_OPTIONS = {
   generate: 'client',
@@ -174,6 +193,7 @@ afterEach(() => {
   rmSync(CLIPPED_ROOT_OUT, { force: true });
   rmSync(SEPARATOR_ROOT_OUT, { force: true });
   rmSync(OVERRIDE_ROOT_OUT, { force: true });
+  rmSync(HIGHLIGHT_ROOT_OUT, { force: true });
 });
 
 // Mount, then report a real viewport so the windowing math runs off real geometry — the path that
@@ -282,8 +302,11 @@ describe('VirtualizedSectionList getItemLayout (real compiled index.svelte)', ()
   describe('separators', () => {
     const live = createLiveTree(fabric);
 
-    async function streamOf(root: Component): Promise<string[]> {
-      mount(ROOT_TAG, root, { sections: SECTIONS });
+    async function streamOf(
+      root: Component,
+      props: Record<string, unknown> = {},
+    ): Promise<string[]> {
+      mount(ROOT_TAG, root, { sections: SECTIONS, ...props });
       await tick();
       const scrollView = fabric.find(node => node.viewName === 'RCTScrollView');
       if (scrollView !== undefined) {
@@ -293,6 +316,10 @@ describe('VirtualizedSectionList getItemLayout (real compiled index.svelte)', ()
       }
       await tick();
       await tick();
+      return paintedTexts();
+    }
+
+    function paintedTexts(): string[] {
       const texts: string[] = [];
       live.walkLive(live.appRoot(), node => {
         const text = payloadOf(node.handle).text;
@@ -300,6 +327,41 @@ describe('VirtualizedSectionList getItemLayout (real compiled index.svelte)', ()
       });
       return texts;
     }
+
+    // `highlight()` of a cell also lights the trailing separator of the cell before it
+    it('lights the separator of the cell before on highlight and routes a leading updateProps to it', async () => {
+      const grabbed = new Map<string, unknown>();
+      const root = await loadRoot(
+        `<script>
+           import VirtualizedSectionList from './.section-smoke-compiled-virtualized-section-list.mjs';
+           let { sections, grab } = $props();
+         </script>
+         {#snippet cell({ item, separators })}{@const mark = grab(item, separators)}<text p={{ text: 'row-' + item + mark }}></text>{/snippet}
+         {#snippet sep({ highlighted, tint })}<text p={{ text: (highlighted ? 'lit' : 'sep') + (tint ?? '') }}></text>{/snippet}
+         <VirtualizedSectionList {sections} item={cell} separator={sep} />`,
+        'HighlightRoot.svelte',
+        HIGHLIGHT_ROOT_OUT,
+      );
+      await streamOf(root, {
+        grab: (key: string, value: unknown) => {
+          grabbed.set(key, value);
+          return '';
+        },
+      });
+      const second = grabbed.get('a1');
+      if (!isSeparators(second)) throw new Error('a1 handed no separators');
+
+      second.highlight();
+      await tick();
+      await tick();
+      expect(paintedTexts().slice(0, 3)).toEqual(['row-a0', 'lit', 'row-a1']);
+
+      second.unhighlight();
+      second.updateProps('leading', { tint: '!' });
+      await tick();
+      await tick();
+      expect(paintedTexts().slice(0, 3)).toEqual(['row-a0', 'sep!', 'row-a1']);
+    });
 
     it('paints section separators around the items and item separators between them', async () => {
       const root = await loadRoot(

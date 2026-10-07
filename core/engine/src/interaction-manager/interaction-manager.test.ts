@@ -76,6 +76,21 @@ describe('InteractionManager.runAfterInteractions', () => {
       'Task "broken" missing gen or run.',
     ],
     ['an invalid task', 42, 'Invalid task of type: number'],
+    // RN `toError`: a thrown non-Error becomes `new Error(String(value))`
+    [
+      'a function that throws a number',
+      () => {
+        throw 7;
+      },
+      '7',
+    ],
+    [
+      'a function that throws an object',
+      () => {
+        throw { code: 1 };
+      },
+      '[object Object]',
+    ],
   ])('throws asynchronously for %s', async (_label, task, message) => {
     Reflect.apply(InteractionManager.runAfterInteractions, InteractionManager, [
       task,

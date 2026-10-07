@@ -639,6 +639,11 @@ describe('offsetForIndex', () => {
   it('interpolates a fractional index inside its cell', () => {
     expect(indexOffset(5.5)).toBe(550);
   });
+
+  // RN allows an index below `count`, so 9.5 lands halfway through the last cell
+  it('interpolates a fraction inside the last cell', () => {
+    expect(indexOffset(9.5)).toBe(950);
+  });
 });
 
 describe('averageMeasuredLength', () => {

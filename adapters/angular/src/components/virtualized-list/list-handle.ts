@@ -75,8 +75,8 @@ export abstract class VirtualizedListHandleBase<ItemT>
     return this.scrollNode === null ? null : this.scrollHandle;
   }
 
-  getNativeScrollRef(): IScrollViewHandle | null {
-    return this.handleOrNull();
+  getNativeScrollRef(): ISymbioteNode | null {
+    return this.scrollHandle.getScrollNode();
   }
 
   getScrollableNode(): IScrollViewHandle | null {

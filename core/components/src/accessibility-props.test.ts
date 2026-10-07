@@ -50,15 +50,20 @@ describe('resolveAccessibilityProps: simple aliases', () => {
 });
 
 describe('resolveAccessibilityProps: transformed values', () => {
-  it('maps a web role onto its RN spelling', () => {
-    expect(fold({ role: 'heading' }).accessibilityRole).toBe('header');
-    expect(fold({ role: 'img' }).accessibilityRole).toBe('image');
-    expect(fold({ role: 'presentation' }).accessibilityRole).toBe('none');
-    expect(fold({ role: 'slider' }).accessibilityRole).toBe('adjustable');
+  // RN 0.86's View.js never touches `role`: native reads it next to `accessibilityRole`
+  it('leaves role to native and returns the input untouched', () => {
+    const input = { role: 'heading' } as const;
+
+    expect(fold(input)).toBe(input);
+    expect(fold(input).accessibilityRole).toBeUndefined();
   });
 
-  it('passes a role with no mapping straight through', () => {
-    expect(fold({ role: 'button' }).accessibilityRole).toBe('button');
+  it('keeps role beside an alias that does fold', () => {
+    const out = fold({ role: 'img', 'aria-label': 'Logo' });
+
+    expect(out.role).toBe('img');
+    expect(out.accessibilityLabel).toBe('Logo');
+    expect(out.accessibilityRole).toBeUndefined();
   });
 
   // COMMA, not whitespace — and this is the one that reads wrong to anyone who knows the HTML
@@ -106,10 +111,12 @@ describe('resolveAccessibilityProps: an alias beats its explicit prop', () => {
     expect(out.accessibilityLabel).toBe('alias');
   });
 
-  it('lets role override accessibilityRole', () => {
+  // The pair reaches native as two props, `accessibilityRole` is not rewritten by `role`
+  it('does not let role rewrite accessibilityRole', () => {
     const out = fold({ accessibilityRole: 'button', role: 'heading' });
 
-    expect(out.accessibilityRole).toBe('header');
+    expect(out.accessibilityRole).toBe('button');
+    expect(out.role).toBe('heading');
   });
 
   it('lets aria-hidden override both hide flags', () => {
@@ -246,12 +253,10 @@ describe('resolveAccessibilityProps: idempotence', () => {
       'aria-valuetext': 't',
     });
 
-    // Present-but-undefined is fine — `setProp` and `fabricProps` both treat that as absent. What
-    // must not survive is a VALUE. Read through a Record view rather than a cast: the keys are
-    // dynamic, so there is no key type to narrow to.
+    // Undefined counts as absent for `setProp`, only a value must not survive
     const bag: Record<string, unknown> = { ...out };
     for (const key of Object.keys(bag)) {
-      if (key !== 'role' && !key.startsWith('aria-')) continue;
+      if (!key.startsWith('aria-')) continue;
       expect(bag[key], `${key} still carries a value`).toBeUndefined();
     }
   });

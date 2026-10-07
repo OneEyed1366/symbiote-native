@@ -62,6 +62,7 @@ export const FLAT_LIST_TEMPLATE = `
             <view [style]="columnCellStyle">
               <ng-container
                 [vListOutlet]="itemDir?.templateRef"
+                [vListOutletComponent]="itemComponent"
                 [vListOutletContext]="cell.context"
               ></ng-container>
             </view>
@@ -150,6 +151,7 @@ export const FLAT_LIST_TEMPLATE = `
       [listFooterComponentStyle]="listFooterComponentStyle"
       [cellRendererTemplate]="cellDir?.templateRef"
       [itemTemplate]="itemDir?.templateRef"
+      [listItemComponent]="listItemComponent"
       [itemSeparatorTemplate]="separatorDir?.templateRef"
       ${LIST_ACCESSIBILITY_FORWARD}
     >

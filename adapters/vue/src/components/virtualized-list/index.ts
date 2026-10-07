@@ -271,7 +271,7 @@ export const VirtualizedList = defineComponent(
       // Reading the version makes a separator bump re-render
       void separatorVersion.value;
 
-      if (p.renderItem === undefined) {
+      if (p.renderItem === undefined && p.listItemComponent === undefined) {
         dlog('Vue VirtualizedList: no #item slot provided, cells render empty');
       }
       if (isDebug()) {

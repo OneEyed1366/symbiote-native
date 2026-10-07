@@ -43,6 +43,10 @@ import {
 import { attachStickyScroll } from '../../scroll-view-commands';
 import { markScrollObserved } from './responder';
 import {
+  createStickyScrollValue,
+  syncInsetOffset,
+} from './sticky-scroll-value';
+import {
   createInitialStickyState,
   reduceSticky,
   type IStickyAction,
@@ -72,6 +76,7 @@ type IStickyOwnerState = {
   // interpolates it into its own pin. Allocated with the first header, never before — a ScrollView
   // with no sticky child pays nothing.
   scrollValue: AnimatedValue;
+  insetTop: number;
   members: Set<ISymbioteNode>;
   // Document order, rebuilt lazily from the content subtree. `undefined` = owed a walk.
   ordered: ISymbioteNode[] | undefined;
@@ -120,6 +125,7 @@ function isHiddenOnScroll(owner: ISymbioteNode): boolean {
 export function syncHiddenOnScroll(owner: ISymbioteNode): void {
   const sticky = stickyOwners.get(owner);
   if (sticky === undefined) return;
+  syncInsetOffset(owner, sticky);
   const hidden = isHiddenOnScroll(owner);
   if (sticky.hiddenOnScroll === hidden) return;
   sticky.hiddenOnScroll = hidden;
@@ -140,7 +146,7 @@ function ownerSticky(owner: ISymbioteNode): IStickyOwnerState {
   const existing = stickyOwners.get(owner);
   if (existing !== undefined) return existing;
   const created: IStickyOwnerState = {
-    scrollValue: new AnimatedValue(0),
+    ...createStickyScrollValue(owner),
     members: new Set(),
     ordered: undefined,
     layoutYs: new Map(),
@@ -420,6 +426,10 @@ function rebuildInterpolation(
   runtime.leaf = leaf;
   runtime.cancelBind?.();
   runtime.cancelBind = whenCommitted(node, () => leaf.setNativeView(node));
+  // RN renders the pin from the value as it stands, so a list opened past offset 0 starts pinned
+  const standing = next.__getValue();
+  if (typeof standing === 'number' && standing !== 0)
+    dispatch(node, { kind: 'animated-tick', value: standing });
 }
 
 function handleHeaderLayout(node: ISymbioteNode, event: ISymbioteEvent): void {

@@ -1,8 +1,7 @@
-// RN's `experimental_LayoutConformance`: a native wrapper that takes `mode`, paints as
-// `display: contents` and holds its children. Here it is the `layout-conformance` tag
+// RN's `experimental_LayoutConformance`: a native wrapper that takes `mode` and holds its children.
+// `display: contents` is a C++ tag rule, asserted in `layout-conformance-payload.itest.ts`
 import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { hostBehaviorFor } from '@symbiote-native/engine';
 import { mount, unmount } from '@symbiote-native/react';
 import { installRecordingFabric } from '@symbiote-native/test-utils';
 
@@ -38,22 +37,5 @@ describe('the layout-conformance tag', () => {
     await tick();
 
     expect(fabric.find(node => node.props.testID === 'inner')).toBeDefined();
-  });
-});
-
-describe('the layout-conformance payload fold', () => {
-  const fold = hostBehaviorFor(TAG)?.foldPayload;
-
-  it('paints as `display: contents`', () => {
-    expect(fold?.({ mode: 'strict' })).toEqual({
-      mode: 'strict',
-      style: { display: 'contents' },
-    });
-  });
-
-  it('keeps the rest of the app style and wins on `display`', () => {
-    expect(fold?.({ style: { display: 'flex', opacity: 0.5 } })).toMatchObject({
-      style: { display: 'contents', opacity: 0.5 },
-    });
   });
 });

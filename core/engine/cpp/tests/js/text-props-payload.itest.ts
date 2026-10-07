@@ -144,9 +144,146 @@ describe('accessibility folds', () => {
   });
 });
 
+// `Text.js:289-300`: только внешний текст получает эти дефолты, вложенный это virtual text без них
+describe('nested text', () => {
+  it('carries none of the outer text defaults', () => {
+    const surface = createSurface(ROOT_TAG);
+    const outer: ISymbioteNode = createElement('RCTText', true, 'text');
+    const inner: ISymbioteNode = createElement('RCTText', true, 'text');
+    appendChild(inner, createRawText('inner'));
+    appendChild(outer, inner);
+    surface.appendChild(outer);
+    surface.commit();
+    mounted();
+
+    const payload = committedPayloadOf(inner);
+    expect(payload?.accessible).toBe(undefined);
+    expect(payload?.allowFontScaling).toBe(undefined);
+    expect(payload?.ellipsizeMode).toBe(undefined);
+    expect(committedPayloadOf(outer)?.allowFontScaling).toBe(true);
+  });
+
+  // `allowFontScaling` is not destructured in `Text.js`, so a nested text's own value rides
+  // through `restProps` untouched
+  it('keeps an allowFontScaling the author wrote on it', () => {
+    const surface = createSurface(ROOT_TAG);
+    const outer: ISymbioteNode = createElement('RCTText', true, 'text');
+    const inner: ISymbioteNode = createElement('RCTText', true, 'text');
+    routeProp(inner, 'allowFontScaling', false);
+    appendChild(inner, createRawText('inner'));
+    appendChild(outer, inner);
+    surface.appendChild(outer);
+    surface.commit();
+    mounted();
+
+    expect(committedPayloadOf(inner)?.allowFontScaling).toBe(false);
+  });
+});
+
 describe('ids', () => {
   it('lets id win over nativeID', () => {
     expect(commitText({ id: 'one', nativeID: 'two' }).nativeID).toBe('one');
+  });
+});
+
+// `Text-test` "renders aria-* props": what the fold takes, what rides through under its W3C name
+describe('aria bag', () => {
+  const consumed = {
+    'aria-busy': true,
+    'aria-checked': true,
+    'aria-disabled': true,
+    'aria-expanded': true,
+    'aria-hidden': true,
+    'aria-label': 'label',
+    'aria-selected': true,
+  };
+  const forwarded = {
+    'aria-activedescendant': 'activedescendant',
+    'aria-atomic': true,
+    'aria-autocomplete': 'list',
+    'aria-columncount': 5,
+    'aria-controls': 'controls',
+    'aria-current': 'current',
+    'aria-describedby': 'describedby',
+    'aria-haspopup': true,
+    'aria-keyshortcuts': 'Cmd+S',
+    'aria-level': 3,
+    'aria-orientation': 'portrait',
+    'aria-pressed': true,
+    'aria-sort': 'ascending',
+  };
+  // `Text.js` hands these on raw and stock `AccessibilityProps.cpp` folds them, we fold them first
+  const nativeFolded = {
+    'aria-labelledby': 'labelledby',
+    'aria-live': 'polite',
+    'aria-modal': true,
+    'aria-valuenow': 3,
+    'aria-valuetext': '3',
+  };
+
+  it('folds the state and label ones into the RN props', () => {
+    const payload = commitText({ ...consumed, ...forwarded });
+
+    expect(payload.accessibilityLabel).toBe('label');
+    expect(payload.accessibilityElementsHidden).toBe(true);
+    expect(payload.importantForAccessibility).toBe('no-hide-descendants');
+    expect(payload.disabled).toBe(true);
+    for (const key of ['busy', 'checked', 'disabled', 'expanded', 'selected'])
+      expect(fieldOf(payload.accessibilityState, key)).toBe(true);
+    for (const key of Object.keys(consumed))
+      expect(payload[key]).toBe(undefined);
+  });
+
+  it('forwards every other one under its own name', () => {
+    const payload = commitText({ ...consumed, ...forwarded });
+
+    for (const [key, value] of Object.entries(forwarded))
+      expect([key, payload[key]]).toEqual([key, value]);
+  });
+
+  it('folds the ones stock native would fold into the RN names', () => {
+    const payload = commitText(nativeFolded);
+
+    expect(payload.accessibilityLabelledBy).toEqual(['labelledby']);
+    expect(payload.accessibilityLiveRegion).toBe('polite');
+    expect(payload.accessibilityViewIsModal).toBe(true);
+    expect(fieldOf(payload.accessibilityValue, 'now')).toBe(3);
+    expect(fieldOf(payload.accessibilityValue, 'text')).toBe('3');
+  });
+
+  it('sends the authored role as it is', () => {
+    expect(commitText({ role: 'main' }).role).toBe('main');
+  });
+});
+
+// `Text-test` "renders core props" and "renders styles"
+describe('web-shaped props', () => {
+  it('carries id as nativeID, testID and tabIndex', () => {
+    const payload = commitText({ id: 'id', tabIndex: 0, testID: 'testID' });
+
+    expect(payload.nativeID).toBe('id');
+    expect(payload.testID).toBe('testID');
+    expect(payload.tabIndex).toBe(0);
+  });
+
+  it('keeps the web style keys it understands and drops userSelect and verticalAlign', () => {
+    const payload = commitText({
+      style: {
+        display: 'flex',
+        flex: 1,
+        backgroundColor: 'white',
+        marginInlineStart: 10,
+        userSelect: 'none',
+        verticalAlign: 'middle',
+      },
+    });
+
+    expect(payload.selectable).toBe(false);
+    expect(payload.textAlignVertical).toBe('center');
+    expect(payload.userSelect).toBe(undefined);
+    expect(payload.verticalAlign).toBe(undefined);
+    expect(payload.marginInlineStart).toBe(10);
+    expect(payload.display).toBe('flex');
   });
 });
 
