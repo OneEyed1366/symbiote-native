@@ -1363,7 +1363,12 @@ describe.each(SCREENS)(
     it('is a registered route reachable from the menu', () => {
       expect(read('routes.ts')).toContain(`${route}: '${route}'`);
       expect(read('navigation-lines.ts')).toContain(`[ROUTE_NAME.${route}]`);
-      expect(read('App.tsx')).toContain(`component={${route}Screen}`);
+      // App.tsx renders the rows of screen-registry.ts, so the route is tied to its screen there
+      expect(read('screen-registry.ts')).toMatch(
+        new RegExp(
+          `route: ROUTE_NAME\\.${route},\\s+component: ${route}Screen,`,
+        ),
+      );
       expect(read('screens/MenuScreen.tsx')).toContain(
         `route: ROUTE_NAME.${route}`,
       );

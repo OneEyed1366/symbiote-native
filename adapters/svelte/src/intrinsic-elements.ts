@@ -29,6 +29,7 @@ import type { IImageProps } from './components/image/image-props';
 import type { IImageBackgroundProps } from './components/image-background-props';
 import type { IPressableProps } from './components/pressable/pressable-props';
 import type { IButtonProps } from './components/button-props';
+import type { ICheckboxProps } from './components/checkbox-props';
 import type { IActivityIndicatorProps } from './components/activity-indicator-props';
 import type { ISafeAreaViewProps } from './components/safe-area-view-props';
 import type { IRefreshControlProps } from './components/refresh-control-props';
@@ -75,6 +76,7 @@ export interface ICrossedPrimitiveProps {
   text: ITextProps;
   pressable: IPressableProps;
   button: IButtonProps;
+  checkbox: ICheckboxProps;
   image: IImageProps;
   'image-background': IImageBackgroundProps;
   'input-accessory-view': IInputAccessoryViewProps;

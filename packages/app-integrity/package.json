@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/app-integrity",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "@expo/app-integrity wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, Svelte, Solid, and Angular adapters. Apple's App Attest, Android's Play Integrity, and Android hardware-attested key generation.",
   "license": "MIT",
   "keywords": [

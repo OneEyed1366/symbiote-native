@@ -1,5 +1,21 @@
 # @symbiote-native/expo-modules-link
 
+## 0.7.0
+
+### Minor Changes
+
+- [#93](https://github.com/OneEyed1366/symbiote-native/pull/93) [`5435556`](https://github.com/OneEyed1366/symbiote-native/commit/5435556869929fe5fd4798ac8f3dedb2fe893851) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Add `@symbiote-native/apple-authentication`: the Sign in with Apple flow (`signInAsync`, `refreshAsync`, `signOutAsync`, `getCredentialStateAsync`, `formatFullName`, `addRevokeListener`) and `AppleAuthenticationButton` on React, Vue, Svelte, Solid and Angular, and an `--apple-authentication` layer in the CLI. `expo-modules-link` learns two manifest keys, `ios.infoPlistBooleanKeys` and `ios.entitlements`, and the Solid adapter gains `defineOptionalDescriptorComponent`.
+
+- [#93](https://github.com/OneEyed1366/symbiote-native/pull/93) [`5435556`](https://github.com/OneEyed1366/symbiote-native/commit/5435556869929fe5fd4798ac8f3dedb2fe893851) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Add `android.services` to the `native-link.json` schema, for a native `Service` a package needs registered in `AppContext`'s `ServicesRegistry` (distinct from `manifestServices`' `<service>` manifest element). Generates `ExpoModulesProvider.getServices()`, adds the required `expo.modules.kotlin.services.Service` import, and includes each service's own Gradle subproject in `build.gradle` even when it belongs to a different package than the one declaring it.
+
+- [#93](https://github.com/OneEyed1366/symbiote-native/pull/93) [`5435556`](https://github.com/OneEyed1366/symbiote-native/commit/5435556869929fe5fd4798ac8f3dedb2fe893851) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Add `ios.infoPlistArrayKeys` to the `native-link.json` schema for array-valued Info.plist keys (`UIBackgroundModes`, `BGTaskSchedulerPermittedIdentifiers`) that `infoPlistKeys` couldn't express, plus `android.manifestPermissions` and `android.manifestServices` for Android `<uses-permission>`/`<service>` entries. All three merge additively across packages with no duplication. Wired for `background-task`, `background-fetch`, `task-manager`, `location`, and `audio`.
+
+- [#93](https://github.com/OneEyed1366/symbiote-native/pull/93) [`5435556`](https://github.com/OneEyed1366/symbiote-native/commit/5435556869929fe5fd4798ac8f3dedb2fe893851) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - `native-link.json` accepts `android.requiresKsp`. The linker then writes `kspVersion` into the app's root `android/build.gradle`, picked from Expo's KSP table for the app's Kotlin version, so `expo-image` and `expo-app-metrics` build without a hand-written line.
+
+### Patch Changes
+
+- [#93](https://github.com/OneEyed1366/symbiote-native/pull/93) [`5435556`](https://github.com/OneEyed1366/symbiote-native/commit/5435556869929fe5fd4798ac8f3dedb2fe893851) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - When a package declares `ios.entitlements` and the app has no `.entitlements` file, the linker now creates `<App>/<App>.entitlements` next to `Info.plist` and wires it into the Xcode project (a file reference, a group entry and `CODE_SIGN_ENTITLEMENTS` on the app target only). Without an Xcode project to anchor on it creates nothing and warns. An empty `<dict/>` written by Xcode is filled in as well.
+
 ## 0.6.0
 
 ### Minor Changes

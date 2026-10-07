@@ -1,0 +1,12 @@
+{
+  "android": {
+    "gradleProjectName": "expo-linear-gradient",
+    "modules": [
+      {
+        "importPath": "expo.modules.lineargradient.LinearGradientModule",
+        "className": "LinearGradientModule",
+        "nativeName": "ExpoLinearGradient"
+      }
+    ]
+  }
+}

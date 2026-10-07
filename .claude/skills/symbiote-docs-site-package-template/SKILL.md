@@ -136,3 +136,15 @@ needs a better name or a code comment first.
 - **No dates in package docs.** README and mdx text never carry a date or "as of" time, not in a
   heading and not in a parenthesis ("Scope decision (2026-09-28)"). State the condition instead,
   such as the version a limit holds for. A date goes stale and says nothing a reader can act on.
+- **Tier 3 and 4 view packages (2026-10).** A view package page also gets `## API` with `###` sub-sections
+  (Props, Reaching the view functions, Functions), never a loose `## Props`, and its Usage is Tabs for all five
+  adapters taken from the real `examples/expo-*` screens, with the handle and hook shapes checked against
+  `packages/<pkg>/src/<adapter>/`. The README follows `symbiote-package-readme-template`
+  (Install, Shape, Use it, API, Notes, Common questions, Test it), so write the page first and lift Usage and
+  Notes from it. Question sources that worked: `gh search issues --repo expo/expo "<name>" --match title
+  --sort comments` (read-only), then `gh issue view <n> --json title,body,comments` for the outcome, and the
+  local `.vendors/expo/docs/pages/versions/unversioned/sdk/<name>.mdx` for known-issues text. Drop an issue whose
+  fix is already in the pinned version, and say "reported" for one without a confirmed cause.
+- **MDX traps.** A `{` or a bare `<tag>` in prose outside backticks breaks the build, check with a script that strips
+  fences and inline code first. Do not leave an unused `Aside` import.
+

@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/screen-capture",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "expo-screen-capture wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, Svelte, Solid, and Angular adapters. Blocks or detects screenshots/screen recordings and offers an app-switcher privacy blur.",
   "license": "MIT",
   "keywords": [

@@ -10,6 +10,7 @@ const {
   linkApp,
   collectManifests,
   patchBuildGradle,
+  patchRootBuildGradle,
   patchMainApplication,
   patchAndroidManifest,
   patchAndroidManifestPermissions,
@@ -17,6 +18,8 @@ const {
   patchMainActivityConfigChanges,
   patchInfoPlist,
   patchInfoPlistArrays,
+  patchInfoPlistBooleans,
+  patchEntitlements,
 } = require('./index.cjs');
 
 // Trimmed to exercise every anchor: the react-android dependency line, the last import, the
@@ -752,6 +755,181 @@ test('patchInfoPlistArrays is byte-stable on re-run', () => {
   assert.equal(read(appRoot, PLIST_PATH), afterFirst, 're-running must be a no-op');
 });
 
+const MIXED_LOCALIZATIONS_MANIFEST = {
+  ios: { infoPlistBooleanKeys: { CFBundleAllowMixedLocalizations: true } },
+};
+
+test('patchInfoPlistBooleans writes a true key as <true/> in the outer dict', () => {
+  const appRoot = makeAppRoot();
+
+  patchInfoPlistBooleans(appRoot, entriesOf(MIXED_LOCALIZATIONS_MANIFEST));
+  const content = read(appRoot, PLIST_PATH);
+
+  assert.match(content, /<key>CFBundleAllowMixedLocalizations<\/key>\s*<true\/>/);
+  assert.match(content, /<key>CFBundleDisplayName<\/key>/, 'pre-existing keys survive');
+});
+
+test('patchInfoPlistBooleans writes a false key as <false/>', () => {
+  const appRoot = makeAppRoot();
+
+  patchInfoPlistBooleans(appRoot, entriesOf({ ios: { infoPlistBooleanKeys: { SomeFlag: false } } }));
+
+  assert.match(read(appRoot, PLIST_PATH), /<key>SomeFlag<\/key>\s*<false\/>/);
+});
+
+test('patchInfoPlistBooleans keeps a value the app already declares, even a different one', () => {
+  const appRoot = makeAppRoot();
+  fs.writeFileSync(
+    path.join(appRoot, ...PLIST_PATH),
+    INFO_PLIST_FIXTURE.replace('</dict>\n</plist>', '\t<key>CFBundleAllowMixedLocalizations</key>\n\t<false/>\n</dict>\n</plist>'),
+  );
+
+  patchInfoPlistBooleans(appRoot, entriesOf(MIXED_LOCALIZATIONS_MANIFEST));
+  const content = read(appRoot, PLIST_PATH);
+
+  assert.match(content, /<key>CFBundleAllowMixedLocalizations<\/key>\s*<false\/>/);
+  assert.equal(content.match(/CFBundleAllowMixedLocalizations/g).length, 1, 'no duplicate key');
+});
+
+test('patchInfoPlistBooleans is byte-stable on re-run', () => {
+  const appRoot = makeAppRoot();
+  const entries = entriesOf(MIXED_LOCALIZATIONS_MANIFEST);
+
+  patchInfoPlistBooleans(appRoot, entries);
+  const afterFirst = read(appRoot, PLIST_PATH);
+
+  patchInfoPlistBooleans(appRoot, entries);
+  assert.equal(read(appRoot, PLIST_PATH), afterFirst);
+});
+
+const ENTITLEMENTS_PATH = ['ios', 'CanaryExpo', 'CanaryExpo.entitlements'];
+const ENTITLEMENTS_FIXTURE = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>aps-environment</key>
+	<string>development</string>
+</dict>
+</plist>
+`;
+const APPLE_SIGN_IN_MANIFEST = {
+  ios: { entitlements: { 'com.apple.developer.applesignin': ['Default'] } },
+};
+
+function addEntitlements(appRoot) {
+  fs.writeFileSync(path.join(appRoot, ...ENTITLEMENTS_PATH), ENTITLEMENTS_FIXTURE);
+}
+
+test('patchEntitlements adds an array entitlement to the app entitlements file', () => {
+  const appRoot = makeAppRoot();
+  addEntitlements(appRoot);
+
+  patchEntitlements(appRoot, entriesOf(APPLE_SIGN_IN_MANIFEST));
+  const content = read(appRoot, ENTITLEMENTS_PATH);
+
+  assert.match(content, /<key>com\.apple\.developer\.applesignin<\/key>\s*<array>\s*<string>Default<\/string>\s*<\/array>/);
+  assert.match(content, /<key>aps-environment<\/key>/, 'pre-existing entitlements survive');
+});
+
+test('patchEntitlements merges array items from several packages and keeps existing ones', () => {
+  const appRoot = makeAppRoot();
+  addEntitlements(appRoot);
+  const groups = (items) => ({ ios: { entitlements: { 'com.apple.security.application-groups': items } } });
+
+  patchEntitlements(appRoot, entriesOf(groups(['group.a']), groups(['group.b', 'group.a'])));
+  const content = read(appRoot, ENTITLEMENTS_PATH);
+
+  const array = /<key>com\.apple\.security\.application-groups<\/key>\s*<array>([\s\S]*?)<\/array>/.exec(content);
+  assert.ok(array, 'array must exist');
+  assert.equal(array[1].match(/<string>/g).length, 2, 'group.a is not repeated');
+});
+
+test('patchEntitlements writes a boolean entitlement', () => {
+  const appRoot = makeAppRoot();
+  addEntitlements(appRoot);
+
+  patchEntitlements(appRoot, entriesOf({ ios: { entitlements: { 'com.apple.developer.associated-domains.mdm-managed': true } } }));
+
+  assert.match(read(appRoot, ENTITLEMENTS_PATH), /<key>com\.apple\.developer\.associated-domains\.mdm-managed<\/key>\s*<true\/>/);
+});
+
+test('patchEntitlements is byte-stable on re-run', () => {
+  const appRoot = makeAppRoot();
+  addEntitlements(appRoot);
+  const entries = entriesOf(APPLE_SIGN_IN_MANIFEST);
+
+  patchEntitlements(appRoot, entries);
+  const afterFirst = read(appRoot, ENTITLEMENTS_PATH);
+
+  patchEntitlements(appRoot, entries);
+  assert.equal(read(appRoot, ENTITLEMENTS_PATH), afterFirst);
+});
+
+test('patchEntitlements leaves the app alone when there is no Xcode project to wire a new file into', () => {
+  const appRoot = makeAppRoot();
+
+  patchEntitlements(appRoot, entriesOf(APPLE_SIGN_IN_MANIFEST));
+
+  assert.equal(fs.existsSync(path.join(appRoot, ...ENTITLEMENTS_PATH)), false, 'no unwired file is invented');
+});
+
+const PBXPROJ_PATH = ['ios', 'CanaryExpo.xcodeproj', 'project.pbxproj'];
+const PBXPROJ_FIXTURE = fs.readFileSync(path.join(__dirname, '..', 'test-fixtures', 'app.pbxproj'), 'utf8');
+
+function addXcodeProject(appRoot, content = PBXPROJ_FIXTURE) {
+  fs.mkdirSync(path.join(appRoot, 'ios', 'CanaryExpo.xcodeproj'), { recursive: true });
+  fs.writeFileSync(path.join(appRoot, ...PBXPROJ_PATH), content);
+}
+
+test('patchEntitlements creates the missing file and wires it into the app target only', () => {
+  const appRoot = makeAppRoot();
+  addXcodeProject(appRoot);
+
+  patchEntitlements(appRoot, entriesOf(APPLE_SIGN_IN_MANIFEST));
+  const project = read(appRoot, PBXPROJ_PATH);
+
+  assert.match(read(appRoot, ENTITLEMENTS_PATH), /<key>com\.apple\.developer\.applesignin<\/key>\s*<array>\s*<string>Default<\/string>/);
+  assert.match(project, /\w{24} \/\* CanaryExpo\.entitlements \*\/ = \{isa = PBXFileReference;[^\n]*path = CanaryExpo\/CanaryExpo\.entitlements;/);
+  assert.match(project, /\/\* Info\.plist \*\/,\n\t+\w{24} \/\* CanaryExpo\.entitlements \*\/,\n/, 'listed in the app group');
+  assert.equal(project.match(/CODE_SIGN_ENTITLEMENTS = CanaryExpo\/CanaryExpo\.entitlements;/g).length, 2, 'Debug and Release, not the tests target');
+});
+
+test('patchEntitlements fills the self-closed empty dict Xcode writes for a fresh file', () => {
+  const appRoot = makeAppRoot();
+  fs.writeFileSync(
+    path.join(appRoot, ...ENTITLEMENTS_PATH),
+    ENTITLEMENTS_FIXTURE.replace(/<dict>[\s\S]*<\/dict>/, '<dict/>'),
+  );
+
+  patchEntitlements(appRoot, entriesOf(APPLE_SIGN_IN_MANIFEST));
+
+  assert.match(read(appRoot, ENTITLEMENTS_PATH), /<dict>\s*<key>com\.apple\.developer\.applesignin<\/key>\s*<array>\s*<string>Default<\/string>\s*<\/array>\s*<\/dict>/);
+});
+
+test('patchEntitlements wiring is byte-stable on re-run', () => {
+  const appRoot = makeAppRoot();
+  addXcodeProject(appRoot);
+  const entries = entriesOf(APPLE_SIGN_IN_MANIFEST);
+
+  patchEntitlements(appRoot, entries);
+  const project = read(appRoot, PBXPROJ_PATH);
+  const entitlements = read(appRoot, ENTITLEMENTS_PATH);
+
+  patchEntitlements(appRoot, entries);
+  assert.equal(read(appRoot, PBXPROJ_PATH), project);
+  assert.equal(read(appRoot, ENTITLEMENTS_PATH), entitlements);
+});
+
+test('patchEntitlements creates nothing when the project has no Info.plist reference to anchor on', () => {
+  const appRoot = makeAppRoot();
+  addXcodeProject(appRoot, PBXPROJ_FIXTURE.replace('path = CanaryExpo/Info.plist;', 'path = Elsewhere/Info.plist;'));
+
+  patchEntitlements(appRoot, entriesOf(APPLE_SIGN_IN_MANIFEST));
+
+  assert.equal(fs.existsSync(path.join(appRoot, ...ENTITLEMENTS_PATH)), false, 'a file nothing signs with is not left behind');
+  assert.equal(read(appRoot, PBXPROJ_PATH).includes('CODE_SIGN_ENTITLEMENTS'), false, 'project untouched');
+});
+
 test('linkApp wires every installed package end to end from one scan', () => {
   const appRoot = makeAppRoot();
   installPackage(appRoot, '@symbiote-native/local-auth', LOCAL_AUTH_MANIFEST);
@@ -786,4 +964,177 @@ test('linkApp on an app with no linkable packages leaves empty regions, not junk
   assert.match(gradle, /SYMBIOTE-EXPO-LINK:END DEPENDENCIES/);
   assert.doesNotMatch(gradle, /implementation project/);
   assert.match(gradle, /hermesEnabled\.toBoolean\(\)/);
+});
+
+const IMAGE_MANIFEST = {
+  android: {
+    gradleProjectName: 'expo-image',
+    requiresKsp: true,
+    modules: [
+      { importPath: 'expo.modules.image.ExpoImageModule', className: 'ExpoImageModule', nativeName: 'ExpoImage' },
+    ],
+  },
+};
+
+const ROOT_GRADLE_PATH = ['android', 'build.gradle'];
+const KSP_LOOKUP_PATH = [
+  'node_modules',
+  'expo-modules-autolinking',
+  'android',
+  'expo-gradle-plugin',
+  'expo-autolinking-plugin',
+  'src',
+  'main',
+  'kotlin',
+  'expo',
+  'modules',
+  'plugin',
+  'KSPLookup.kt',
+];
+
+// Тот же вид, что у файла Expo: константа `latestKspVersion` и таблица пар Kotlin -> KSP
+const KSP_LOOKUP_FIXTURE = `package expo.modules.plugin
+
+const val latestKspVersion = "2.3.7"
+
+val KSPLookup = mapOf(
+  "2.2.0" to "2.2.0-2.0.2",
+  "2.1.20" to "2.1.20-2.0.1"
+)
+`;
+
+function rootGradleWith(kotlinVersion) {
+  return `buildscript {
+    ext {
+        minSdkVersion = 24
+        kotlinVersion = "${kotlinVersion}"
+    }
+    dependencies {
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin")
+    }
+}
+`;
+}
+
+function addRootGradle(appRoot, kotlinVersion = '2.1.20', { withLookup = true } = {}) {
+  fs.writeFileSync(path.join(appRoot, ...ROOT_GRADLE_PATH), rootGradleWith(kotlinVersion));
+  if (!withLookup) return;
+  const lookupPath = path.join(appRoot, ...KSP_LOOKUP_PATH);
+  fs.mkdirSync(path.dirname(lookupPath), { recursive: true });
+  fs.writeFileSync(lookupPath, KSP_LOOKUP_FIXTURE);
+}
+
+function warningsDuring(t, run) {
+  const warn = t.mock.method(console, 'warn', () => {});
+  run();
+  return warn.mock.calls.map((call) => call.arguments.join(' '));
+}
+
+test('patchRootBuildGradle writes the KSP build of the app Kotlin under kotlinVersion, byte-stable on re-run', () => {
+  const appRoot = makeAppRoot();
+  addRootGradle(appRoot);
+  const entries = entriesOf(IMAGE_MANIFEST);
+
+  patchRootBuildGradle(appRoot, entries);
+  const afterFirst = read(appRoot, ROOT_GRADLE_PATH);
+
+  assert.match(afterFirst, /kotlinVersion = "2\.1\.20"\n\s*\/\/ SYMBIOTE-EXPO-LINK:BEGIN KSP/);
+  assert.match(afterFirst, /^\s*kspVersion = "2\.1\.20-2\.0\.1"$/m);
+  assert.match(afterFirst, /classpath\("org\.jetbrains\.kotlin:kotlin-gradle-plugin"\)/, 'unrelated content stays');
+
+  patchRootBuildGradle(appRoot, entries);
+  assert.equal(read(appRoot, ROOT_GRADLE_PATH), afterFirst, 're-running must be a no-op');
+});
+
+test('patchRootBuildGradle picks the latest KSP for a Kotlin newer than the table, which KSP no longer ties to', () => {
+  const appRoot = makeAppRoot();
+  addRootGradle(appRoot, '2.3.1');
+
+  patchRootBuildGradle(appRoot, entriesOf(IMAGE_MANIFEST));
+
+  assert.match(read(appRoot, ROOT_GRADLE_PATH), /kspVersion = "2\.3\.7"/);
+});
+
+// Остаток `kspVersion` Gradle не мешает, но перестаёт следовать за обновлением Kotlin
+test('patchRootBuildGradle removes the region once no installed package needs KSP', () => {
+  const appRoot = makeAppRoot();
+  addRootGradle(appRoot);
+
+  patchRootBuildGradle(appRoot, entriesOf(IMAGE_MANIFEST));
+  assert.match(read(appRoot, ROOT_GRADLE_PATH), /kspVersion/);
+
+  patchRootBuildGradle(appRoot, entriesOf(LOCAL_AUTH_MANIFEST));
+
+  assert.equal(read(appRoot, ROOT_GRADLE_PATH), rootGradleWith('2.1.20'), 'the file is back to what the developer wrote');
+});
+
+test('patchRootBuildGradle adds nothing while no package needs KSP', () => {
+  const appRoot = makeAppRoot();
+  addRootGradle(appRoot);
+
+  patchRootBuildGradle(appRoot, entriesOf(LOCAL_AUTH_MANIFEST));
+
+  assert.equal(read(appRoot, ROOT_GRADLE_PATH), rootGradleWith('2.1.20'));
+});
+
+test('patchRootBuildGradle leaves a hand-written kspVersion alone', () => {
+  const appRoot = makeAppRoot();
+  const handWritten = rootGradleWith('2.1.20').replace('minSdkVersion = 24', 'kspVersion = "2.1.20-2.0.1"');
+  addRootGradle(appRoot);
+  fs.writeFileSync(path.join(appRoot, ...ROOT_GRADLE_PATH), handWritten);
+
+  patchRootBuildGradle(appRoot, entriesOf(IMAGE_MANIFEST));
+
+  assert.equal(read(appRoot, ROOT_GRADLE_PATH), handWritten, 'the developer value wins, no second definition');
+});
+
+test('patchRootBuildGradle warns and writes nothing for a Kotlin with no KSP build', (t) => {
+  const appRoot = makeAppRoot();
+  addRootGradle(appRoot, '1.9.0');
+
+  const warnings = warningsDuring(t, () => patchRootBuildGradle(appRoot, entriesOf(IMAGE_MANIFEST)));
+
+  assert.equal(read(appRoot, ROOT_GRADLE_PATH), rootGradleWith('1.9.0'));
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /1\.9\.0/);
+  assert.match(warnings[0], /kspVersion/, 'the message names what to set by hand');
+});
+
+test('patchRootBuildGradle warns when Expo\'s KSP table is not installed', (t) => {
+  const appRoot = makeAppRoot();
+  addRootGradle(appRoot, '2.1.20', { withLookup: false });
+
+  const warnings = warningsDuring(t, () => patchRootBuildGradle(appRoot, entriesOf(IMAGE_MANIFEST)));
+
+  assert.equal(read(appRoot, ROOT_GRADLE_PATH), rootGradleWith('2.1.20'));
+  assert.match(warnings.join('\n'), /KSPLookup\.kt/);
+});
+
+test('patchRootBuildGradle warns when the root build.gradle has no kotlinVersion to anchor below', (t) => {
+  const appRoot = makeAppRoot();
+  addRootGradle(appRoot);
+  const noKotlin = 'buildscript {\n    ext {\n        minSdkVersion = 24\n    }\n}\n';
+  fs.writeFileSync(path.join(appRoot, ...ROOT_GRADLE_PATH), noKotlin);
+
+  const warnings = warningsDuring(t, () => patchRootBuildGradle(appRoot, entriesOf(IMAGE_MANIFEST)));
+
+  assert.equal(read(appRoot, ROOT_GRADLE_PATH), noKotlin);
+  assert.match(warnings.join('\n'), /kotlinVersion/);
+});
+
+test('patchRootBuildGradle skips an app with no root build.gradle', () => {
+  const appRoot = makeAppRoot();
+
+  assert.doesNotThrow(() => patchRootBuildGradle(appRoot, entriesOf(IMAGE_MANIFEST)));
+});
+
+test('linkApp wires KSP for an installed package that needs it', () => {
+  const appRoot = makeAppRoot();
+  addRootGradle(appRoot);
+  installPackage(appRoot, '@symbiote-native/image', IMAGE_MANIFEST);
+
+  linkApp(appRoot);
+
+  assert.match(read(appRoot, ROOT_GRADLE_PATH), /kspVersion = "2\.1\.20-2\.0\.1"/);
+  assert.match(read(appRoot, GRADLE_PATH), /implementation project\(':expo-image'\)/);
 });

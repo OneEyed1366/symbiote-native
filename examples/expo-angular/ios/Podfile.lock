@@ -27,27 +27,115 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
+  - ExpoAgeRange (57.0.5):
+    - ExpoModulesCore
+  - ExpoAppIntegrity (57.0.2):
+    - ExpoModulesCore
+  - ExpoAppleAuthentication (57.0.2):
+    - ExpoModulesCore
+  - ExpoAppMetrics (57.0.21):
+    - ExpoModulesCore
+    - EXUpdatesInterface
+    - hermes-engine
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-Core-prebuilt
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - ReactNativeDependencies
+    - Yoga
+  - ExpoAsset (57.0.18):
+    - ExpoModulesCore
+  - ExpoAudio (57.0.4):
+    - ExpoModulesCore
+  - ExpoBackgroundFetch (57.0.15):
+    - ExpoModulesCore
+  - ExpoBackgroundTask (57.0.15):
+    - ExpoModulesCore
+    - ExpoTaskManager
   - ExpoBattery (57.0.1):
+    - ExpoModulesCore
+  - ExpoBlob (57.0.2):
+    - ExpoModulesCore
+  - ExpoBlur (57.0.3):
     - ExpoModulesCore
   - ExpoBrightness (57.0.1):
     - ExpoModulesCore
+  - ExpoCalendar (57.0.5):
+    - ExpoModulesCore
+  - ExpoCamera (57.0.6):
+    - ExpoModulesCore
+  - ExpoCameraBarcodeScanning (57.0.6):
+    - ExpoCamera
+    - ZXingObjC/OneD
+    - ZXingObjC/PDF417
   - ExpoCellular (57.0.1):
     - ExpoModulesCore
   - ExpoClipboard (57.0.1):
+    - ExpoModulesCore
+  - ExpoContacts (57.0.6):
     - ExpoModulesCore
   - ExpoCrypto (57.0.1):
     - ExpoModulesCore
   - ExpoDevice (57.0.1):
     - ExpoModulesCore
+  - ExpoDocumentPicker (57.0.2):
+    - ExpoModulesCore
+  - ExpoFileSystem (57.0.6):
+    - ExpoModulesCore
+  - ExpoFont (57.0.4):
+    - ExpoModulesCore
+  - ExpoGL (57.0.2):
+    - ExpoModulesCore
+    - ExpoModulesJSI
+    - ReactCommon/turbomodule/core
+  - ExpoGlassEffect (57.0.4):
+    - ExpoModulesCore
   - ExpoHaptics (57.0.1):
     - ExpoModulesCore
+  - ExpoImage (57.0.5):
+    - ExpoModulesCore
+    - libavif/libdav1d
+    - SDWebImage (~> 5.21.0)
+    - SDWebImageAVIFCoder (~> 0.11.0)
+    - SDWebImageSVGCoder (~> 1.7.0)
+    - SDWebImageWebPCoder (~> 0.14.6)
+  - ExpoImageManipulator (57.0.20):
+    - ExpoModulesCore
+    - SDWebImageWebPCoder
+  - ExpoImagePicker (57.0.20):
+    - ExpoModulesCore
   - ExpoKeepAwake (57.0.1):
+    - ExpoModulesCore
+  - ExpoLinearGradient (57.0.2):
+    - ExpoModulesCore
+  - ExpoLivePhoto (57.0.2):
     - ExpoModulesCore
   - ExpoLocalAuthentication (57.0.2):
     - ExpoModulesCore
   - ExpoLocalization (57.0.1):
     - ExpoModulesCore
-  - ExpoModulesCore (57.0.5):
+  - ExpoLocation (57.0.15):
+    - ExpoModulesCore
+  - ExpoMailComposer (57.0.2):
+    - ExpoModulesCore
+  - ExpoMediaLibrary (57.0.4):
+    - ExpoModulesCore
+    - React-Core
+  - ExpoModulesCore (57.0.20):
     - ExpoModulesJSI
     - hermes-engine
     - RCTRequired
@@ -71,13 +159,19 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - ExpoModulesJSI (57.0.7):
+  - ExpoModulesJSI (57.1.1):
     - React-Core
     - ReactCommon
-  - ExpoModulesWorklets (57.0.5):
+  - ExpoModulesWorklets (57.0.20):
     - ExpoModulesCore
     - ExpoModulesJSI
   - ExpoNetwork (57.0.1):
+    - ExpoModulesCore
+  - ExpoNotifications (57.0.17):
+    - ExpoModulesCore
+  - ExpoPrint (57.0.2):
+    - ExpoModulesCore
+  - ExpoScreenCapture (57.0.3):
     - ExpoModulesCore
   - ExpoScreenOrientation (57.0.1):
     - ExpoModulesCore
@@ -110,7 +204,13 @@ PODS:
     - ExpoModulesCore
   - ExpoSMS (57.0.1):
     - ExpoModulesCore
+  - ExpoSpeech (57.0.3):
+    - ExpoModulesCore
+  - ExpoSQLite (57.0.2):
+    - ExpoModulesCore
   - ExpoStoreReview (57.0.1):
+    - ExpoModulesCore
+  - ExpoSymbols (57.0.3):
     - ExpoModulesCore
   - ExpoSystemUI (57.0.2):
     - ExpoModulesCore
@@ -119,12 +219,35 @@ PODS:
     - UMAppLoader
   - ExpoTrackingTransparency (57.0.1):
     - ExpoModulesCore
+  - ExpoVideo (57.0.5):
+    - ExpoModulesCore
+  - ExpoVideoThumbnails (57.0.2):
+    - ExpoModulesCore
   - ExpoWebBrowser (57.0.2):
+    - ExpoModulesCore
+  - EXUpdatesInterface (57.0.2):
     - ExpoModulesCore
   - FBLazyVector (0.86.0)
   - hermes-engine (250829098.0.14):
     - hermes-engine/Pre-built (= 250829098.0.14)
   - hermes-engine/Pre-built (250829098.0.14)
+  - libavif/core (1.0.0)
+  - libavif/libdav1d (1.0.0):
+    - libavif/core
+    - libdav1d (>= 0.6.0)
+  - libdav1d (1.2.0)
+  - libwebp (1.6.0):
+    - libwebp/demux (= 1.6.0)
+    - libwebp/mux (= 1.6.0)
+    - libwebp/sharpyuv (= 1.6.0)
+    - libwebp/webp (= 1.6.0)
+  - libwebp/demux (1.6.0):
+    - libwebp/webp
+  - libwebp/mux (1.6.0):
+    - libwebp/demux
+  - libwebp/sharpyuv (1.6.0)
+  - libwebp/webp (1.6.0):
+    - libwebp/sharpyuv
   - RCTDeprecation (0.86.0)
   - RCTRequired (0.86.0)
   - RCTSwiftUI (0.86.0)
@@ -1945,7 +2068,40 @@ PODS:
     - React-utils (= 0.86.0)
     - ReactNativeDependencies
   - ReactNativeDependencies (0.86.0)
-  - symbiote-navigation (3.0.0):
+  - SDWebImage (5.21.7):
+    - SDWebImage/Core (= 5.21.7)
+  - SDWebImage/Core (5.21.7)
+  - SDWebImageAVIFCoder (0.11.1):
+    - libavif/core (>= 0.11.0)
+    - SDWebImage (~> 5.10)
+  - SDWebImageSVGCoder (1.7.0):
+    - SDWebImage/Core (~> 5.6)
+  - SDWebImageWebPCoder (0.14.6):
+    - libwebp (~> 1.0)
+    - SDWebImage/Core (~> 5.17)
+  - symbiote-engine (1.5.0):
+    - hermes-engine
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-Core-prebuilt
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - ReactNativeDependencies
+    - Yoga
+  - symbiote-navigation (5.0.6):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -1967,9 +2123,9 @@ PODS:
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
-    - symbiote-navigation/common (= 3.0.0)
+    - symbiote-navigation/common (= 5.0.6)
     - Yoga
-  - symbiote-navigation/common (3.0.0):
+  - symbiote-navigation/common (5.0.6):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -1992,7 +2148,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - symbiote-splash-screen (4.0.0):
+  - symbiote-splash-screen (6.0.6):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -2016,34 +2172,75 @@ PODS:
     - Yoga
   - UMAppLoader (57.0.1)
   - Yoga (0.0.0)
+  - ZXingObjC/Core (3.6.9)
+  - ZXingObjC/OneD (3.6.9):
+    - ZXingObjC/Core
+  - ZXingObjC/PDF417 (3.6.9):
+    - ZXingObjC/Core
 
 DEPENDENCIES:
   - "EXApplication (from `../node_modules/@symbiote-native/application/node_modules/expo-application/ios`)"
   - Expo (from `../node_modules/expo`)
+  - "ExpoAgeRange (from `../node_modules/@symbiote-native/age-range/node_modules/expo-age-range/ios`)"
+  - "ExpoAppIntegrity (from `../node_modules/@symbiote-native/app-integrity/node_modules/@expo/app-integrity/ios`)"
+  - "ExpoAppleAuthentication (from `../node_modules/@symbiote-native/apple-authentication/node_modules/expo-apple-authentication/ios`)"
+  - "ExpoAppMetrics (from `../node_modules/@symbiote-native/app-metrics/node_modules/expo-app-metrics/ios`)"
+  - "ExpoAsset (from `../node_modules/@symbiote-native/asset/node_modules/expo-asset/ios`)"
+  - "ExpoAudio (from `../node_modules/@symbiote-native/audio/node_modules/expo-audio/ios`)"
+  - "ExpoBackgroundFetch (from `../node_modules/@symbiote-native/background-fetch/node_modules/expo-background-fetch/ios`)"
+  - "ExpoBackgroundTask (from `../node_modules/@symbiote-native/background-task/node_modules/expo-background-task/ios`)"
   - "ExpoBattery (from `../node_modules/@symbiote-native/battery/node_modules/expo-battery/ios`)"
+  - "ExpoBlob (from `../node_modules/@symbiote-native/blob/node_modules/expo-blob/ios`)"
+  - "ExpoBlur (from `../node_modules/@symbiote-native/blur/node_modules/expo-blur/ios`)"
   - "ExpoBrightness (from `../node_modules/@symbiote-native/brightness/node_modules/expo-brightness/ios`)"
+  - "ExpoCalendar (from `../node_modules/@symbiote-native/calendar/node_modules/expo-calendar/ios`)"
+  - "ExpoCamera (from `../node_modules/@symbiote-native/camera/node_modules/expo-camera/ios`)"
+  - "ExpoCameraBarcodeScanning (from `../node_modules/@symbiote-native/camera/node_modules/expo-camera/ios`)"
   - "ExpoCellular (from `../node_modules/@symbiote-native/cellular/node_modules/expo-cellular/ios`)"
   - "ExpoClipboard (from `../node_modules/@symbiote-native/clipboard/node_modules/expo-clipboard/ios`)"
+  - "ExpoContacts (from `../node_modules/@symbiote-native/contacts/node_modules/expo-contacts/ios`)"
   - "ExpoCrypto (from `../node_modules/@symbiote-native/crypto/node_modules/expo-crypto/ios`)"
   - "ExpoDevice (from `../node_modules/@symbiote-native/device/node_modules/expo-device/ios`)"
+  - "ExpoDocumentPicker (from `../node_modules/@symbiote-native/document-picker/node_modules/expo-document-picker/ios`)"
+  - "ExpoFileSystem (from `../node_modules/@symbiote-native/file-system/node_modules/expo-file-system/ios`)"
+  - "ExpoFont (from `../node_modules/@symbiote-native/font/node_modules/expo-font/ios`)"
+  - "ExpoGL (from `../node_modules/@symbiote-native/gl/node_modules/expo-gl`)"
+  - "ExpoGlassEffect (from `../node_modules/@symbiote-native/glass-effect/node_modules/expo-glass-effect/ios`)"
   - "ExpoHaptics (from `../node_modules/@symbiote-native/haptics/node_modules/expo-haptics/ios`)"
+  - "ExpoImage (from `../node_modules/@symbiote-native/image/node_modules/expo-image/ios`)"
+  - "ExpoImageManipulator (from `../node_modules/@symbiote-native/image-manipulator/node_modules/expo-image-manipulator/ios`)"
+  - "ExpoImagePicker (from `../node_modules/@symbiote-native/image-picker/node_modules/expo-image-picker/ios`)"
   - "ExpoKeepAwake (from `../node_modules/@symbiote-native/keep-awake/node_modules/expo-keep-awake/ios`)"
+  - "ExpoLinearGradient (from `../node_modules/@symbiote-native/linear-gradient/node_modules/expo-linear-gradient/ios`)"
+  - "ExpoLivePhoto (from `../node_modules/@symbiote-native/live-photo/node_modules/expo-live-photo/ios`)"
   - "ExpoLocalAuthentication (from `../node_modules/@symbiote-native/local-auth/node_modules/expo-local-authentication/ios`)"
   - "ExpoLocalization (from `../node_modules/@symbiote-native/localization/node_modules/expo-localization/ios`)"
+  - "ExpoLocation (from `../node_modules/@symbiote-native/location/node_modules/expo-location/ios`)"
+  - "ExpoMailComposer (from `../node_modules/@symbiote-native/mail-composer/node_modules/expo-mail-composer/ios`)"
+  - "ExpoMediaLibrary (from `../node_modules/@symbiote-native/media-library/node_modules/expo-media-library/ios`)"
   - ExpoModulesCore (from `../node_modules/expo-modules-core`)
   - ExpoModulesJSI (from `../node_modules/expo-modules-jsi/apple`)
   - ExpoModulesWorklets (from `../node_modules/expo-modules-core`)
   - "ExpoNetwork (from `../node_modules/@symbiote-native/network/node_modules/expo-network/ios`)"
+  - "ExpoNotifications (from `../node_modules/@symbiote-native/notifications/node_modules/expo-notifications/ios`)"
+  - "ExpoPrint (from `../node_modules/@symbiote-native/print/node_modules/expo-print/ios`)"
+  - "ExpoScreenCapture (from `../node_modules/@symbiote-native/screen-capture/node_modules/expo-screen-capture/ios`)"
   - "ExpoScreenOrientation (from `../node_modules/@symbiote-native/screen-orientation/node_modules/expo-screen-orientation/ios`)"
   - "ExpoSecureStore (from `../node_modules/@symbiote-native/secure-store/node_modules/expo-secure-store/ios`)"
   - "ExpoSensors (from `../node_modules/@symbiote-native/sensors/node_modules/expo-sensors/ios`)"
   - "ExpoSharing (from `../node_modules/@symbiote-native/sharing/node_modules/expo-sharing/ios`)"
   - "ExpoSMS (from `../node_modules/@symbiote-native/sms/node_modules/expo-sms/ios`)"
+  - "ExpoSpeech (from `../node_modules/@symbiote-native/speech/node_modules/expo-speech/ios`)"
+  - "ExpoSQLite (from `../node_modules/@symbiote-native/sqlite/node_modules/expo-sqlite/ios`)"
   - "ExpoStoreReview (from `../node_modules/@symbiote-native/store-review/node_modules/expo-store-review/ios`)"
+  - "ExpoSymbols (from `../node_modules/@symbiote-native/symbols/node_modules/expo-symbols/ios`)"
   - "ExpoSystemUI (from `../node_modules/@symbiote-native/system-ui/node_modules/expo-system-ui/ios`)"
   - "ExpoTaskManager (from `../node_modules/@symbiote-native/task-manager/node_modules/expo-task-manager/ios`)"
   - "ExpoTrackingTransparency (from `../node_modules/@symbiote-native/tracking-transparency/node_modules/expo-tracking-transparency/ios`)"
+  - "ExpoVideo (from `../node_modules/@symbiote-native/video/node_modules/expo-video/ios`)"
+  - "ExpoVideoThumbnails (from `../node_modules/@symbiote-native/video-thumbnails/node_modules/expo-video-thumbnails/ios`)"
   - "ExpoWebBrowser (from `../node_modules/@symbiote-native/web-browser/node_modules/expo-web-browser/ios`)"
+  - "EXUpdatesInterface (from `../node_modules/@symbiote-native/app-metrics/node_modules/expo-app-metrics/node_modules/expo-updates-interface/ios`)"
   - FBLazyVector (from `../node_modules/react-native/Libraries/FBLazyVector`)
   - hermes-engine (from `../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec`)
   - RCTDeprecation (from `../node_modules/react-native/ReactApple/Libraries/RCTFoundation/RCTDeprecation`)
@@ -2119,36 +2316,102 @@ DEPENDENCIES:
   - ReactCodegen (from `build/generated/ios/ReactCodegen`)
   - ReactCommon/turbomodule/core (from `../node_modules/react-native/ReactCommon`)
   - ReactNativeDependencies (from `../node_modules/react-native/third-party-podspecs/ReactNativeDependencies.podspec`)
+  - "symbiote-engine (from `../node_modules/@symbiote-native/engine`)"
   - "symbiote-navigation (from `../node_modules/@symbiote-native/navigation`)"
   - "symbiote-splash-screen (from `../node_modules/@symbiote-native/splash-screen`)"
   - UMAppLoader (from `../node_modules/unimodules-app-loader/ios`)
   - Yoga (from `../node_modules/react-native/ReactCommon/yoga`)
+
+SPEC REPOS:
+  trunk:
+    - libavif
+    - libdav1d
+    - libwebp
+    - SDWebImage
+    - SDWebImageAVIFCoder
+    - SDWebImageSVGCoder
+    - SDWebImageWebPCoder
+    - ZXingObjC
 
 EXTERNAL SOURCES:
   EXApplication:
     :path: "../node_modules/@symbiote-native/application/node_modules/expo-application/ios"
   Expo:
     :path: "../node_modules/expo"
+  ExpoAgeRange:
+    :path: "../node_modules/@symbiote-native/age-range/node_modules/expo-age-range/ios"
+  ExpoAppIntegrity:
+    :path: "../node_modules/@symbiote-native/app-integrity/node_modules/@expo/app-integrity/ios"
+  ExpoAppleAuthentication:
+    :path: "../node_modules/@symbiote-native/apple-authentication/node_modules/expo-apple-authentication/ios"
+  ExpoAppMetrics:
+    :path: "../node_modules/@symbiote-native/app-metrics/node_modules/expo-app-metrics/ios"
+  ExpoAsset:
+    :path: "../node_modules/@symbiote-native/asset/node_modules/expo-asset/ios"
+  ExpoAudio:
+    :path: "../node_modules/@symbiote-native/audio/node_modules/expo-audio/ios"
+  ExpoBackgroundFetch:
+    :path: "../node_modules/@symbiote-native/background-fetch/node_modules/expo-background-fetch/ios"
+  ExpoBackgroundTask:
+    :path: "../node_modules/@symbiote-native/background-task/node_modules/expo-background-task/ios"
   ExpoBattery:
     :path: "../node_modules/@symbiote-native/battery/node_modules/expo-battery/ios"
+  ExpoBlob:
+    :path: "../node_modules/@symbiote-native/blob/node_modules/expo-blob/ios"
+  ExpoBlur:
+    :path: "../node_modules/@symbiote-native/blur/node_modules/expo-blur/ios"
   ExpoBrightness:
     :path: "../node_modules/@symbiote-native/brightness/node_modules/expo-brightness/ios"
+  ExpoCalendar:
+    :path: "../node_modules/@symbiote-native/calendar/node_modules/expo-calendar/ios"
+  ExpoCamera:
+    :path: "../node_modules/@symbiote-native/camera/node_modules/expo-camera/ios"
+  ExpoCameraBarcodeScanning:
+    :path: "../node_modules/@symbiote-native/camera/node_modules/expo-camera/ios"
   ExpoCellular:
     :path: "../node_modules/@symbiote-native/cellular/node_modules/expo-cellular/ios"
   ExpoClipboard:
     :path: "../node_modules/@symbiote-native/clipboard/node_modules/expo-clipboard/ios"
+  ExpoContacts:
+    :path: "../node_modules/@symbiote-native/contacts/node_modules/expo-contacts/ios"
   ExpoCrypto:
     :path: "../node_modules/@symbiote-native/crypto/node_modules/expo-crypto/ios"
   ExpoDevice:
     :path: "../node_modules/@symbiote-native/device/node_modules/expo-device/ios"
+  ExpoDocumentPicker:
+    :path: "../node_modules/@symbiote-native/document-picker/node_modules/expo-document-picker/ios"
+  ExpoFileSystem:
+    :path: "../node_modules/@symbiote-native/file-system/node_modules/expo-file-system/ios"
+  ExpoFont:
+    :path: "../node_modules/@symbiote-native/font/node_modules/expo-font/ios"
+  ExpoGL:
+    :path: "../node_modules/@symbiote-native/gl/node_modules/expo-gl"
+  ExpoGlassEffect:
+    :path: "../node_modules/@symbiote-native/glass-effect/node_modules/expo-glass-effect/ios"
   ExpoHaptics:
     :path: "../node_modules/@symbiote-native/haptics/node_modules/expo-haptics/ios"
+  ExpoImage:
+    :path: "../node_modules/@symbiote-native/image/node_modules/expo-image/ios"
+  ExpoImageManipulator:
+    :path: "../node_modules/@symbiote-native/image-manipulator/node_modules/expo-image-manipulator/ios"
+  ExpoImagePicker:
+    :path: "../node_modules/@symbiote-native/image-picker/node_modules/expo-image-picker/ios"
   ExpoKeepAwake:
     :path: "../node_modules/@symbiote-native/keep-awake/node_modules/expo-keep-awake/ios"
+  ExpoLinearGradient:
+    :path: "../node_modules/@symbiote-native/linear-gradient/node_modules/expo-linear-gradient/ios"
+  ExpoLivePhoto:
+    :path: "../node_modules/@symbiote-native/live-photo/node_modules/expo-live-photo/ios"
   ExpoLocalAuthentication:
     :path: "../node_modules/@symbiote-native/local-auth/node_modules/expo-local-authentication/ios"
   ExpoLocalization:
     :path: "../node_modules/@symbiote-native/localization/node_modules/expo-localization/ios"
+  ExpoLocation:
+    :path: "../node_modules/@symbiote-native/location/node_modules/expo-location/ios"
+  ExpoMailComposer:
+    :path: "../node_modules/@symbiote-native/mail-composer/node_modules/expo-mail-composer/ios"
+  ExpoMediaLibrary:
+    :path: "../node_modules/@symbiote-native/media-library/node_modules/expo-media-library/ios"
   ExpoModulesCore:
     :path: "../node_modules/expo-modules-core"
   ExpoModulesJSI:
@@ -2157,6 +2420,12 @@ EXTERNAL SOURCES:
     :path: "../node_modules/expo-modules-core"
   ExpoNetwork:
     :path: "../node_modules/@symbiote-native/network/node_modules/expo-network/ios"
+  ExpoNotifications:
+    :path: "../node_modules/@symbiote-native/notifications/node_modules/expo-notifications/ios"
+  ExpoPrint:
+    :path: "../node_modules/@symbiote-native/print/node_modules/expo-print/ios"
+  ExpoScreenCapture:
+    :path: "../node_modules/@symbiote-native/screen-capture/node_modules/expo-screen-capture/ios"
   ExpoScreenOrientation:
     :path: "../node_modules/@symbiote-native/screen-orientation/node_modules/expo-screen-orientation/ios"
   ExpoSecureStore:
@@ -2167,16 +2436,28 @@ EXTERNAL SOURCES:
     :path: "../node_modules/@symbiote-native/sharing/node_modules/expo-sharing/ios"
   ExpoSMS:
     :path: "../node_modules/@symbiote-native/sms/node_modules/expo-sms/ios"
+  ExpoSpeech:
+    :path: "../node_modules/@symbiote-native/speech/node_modules/expo-speech/ios"
+  ExpoSQLite:
+    :path: "../node_modules/@symbiote-native/sqlite/node_modules/expo-sqlite/ios"
   ExpoStoreReview:
     :path: "../node_modules/@symbiote-native/store-review/node_modules/expo-store-review/ios"
+  ExpoSymbols:
+    :path: "../node_modules/@symbiote-native/symbols/node_modules/expo-symbols/ios"
   ExpoSystemUI:
     :path: "../node_modules/@symbiote-native/system-ui/node_modules/expo-system-ui/ios"
   ExpoTaskManager:
     :path: "../node_modules/@symbiote-native/task-manager/node_modules/expo-task-manager/ios"
   ExpoTrackingTransparency:
     :path: "../node_modules/@symbiote-native/tracking-transparency/node_modules/expo-tracking-transparency/ios"
+  ExpoVideo:
+    :path: "../node_modules/@symbiote-native/video/node_modules/expo-video/ios"
+  ExpoVideoThumbnails:
+    :path: "../node_modules/@symbiote-native/video-thumbnails/node_modules/expo-video-thumbnails/ios"
   ExpoWebBrowser:
     :path: "../node_modules/@symbiote-native/web-browser/node_modules/expo-web-browser/ios"
+  EXUpdatesInterface:
+    :path: "../node_modules/@symbiote-native/app-metrics/node_modules/expo-app-metrics/node_modules/expo-updates-interface/ios"
   FBLazyVector:
     :path: "../node_modules/react-native/Libraries/FBLazyVector"
   hermes-engine:
@@ -2326,6 +2607,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon"
   ReactNativeDependencies:
     :podspec: "../node_modules/react-native/third-party-podspecs/ReactNativeDependencies.podspec"
+  symbiote-engine:
+    :path: "../node_modules/@symbiote-native/engine"
   symbiote-navigation:
     :path: "../node_modules/@symbiote-native/navigation"
   symbiote-splash-screen:
@@ -2338,32 +2621,71 @@ EXTERNAL SOURCES:
 SPEC CHECKSUMS:
   EXApplication: bbd517d50878ca1d121fb3843392beb210181e28
   Expo: 74ca681cd7a77385ac0ba805ba9b188cc8dd81c3
+  ExpoAgeRange: b11aaa28e58e736da224be95f5c213444a2b619f
+  ExpoAppIntegrity: 6d9a55f47108c742db83df98e06f50ed3c599763
+  ExpoAppleAuthentication: 16c2955d33ec7315e5a99d17fb5d62ed33cdb5b9
+  ExpoAppMetrics: ddb5f26db76d10e78620370c06e6c727c13f1862
+  ExpoAsset: a917b756b2e4fe12cef1ac3bca5fd849ddb2b919
+  ExpoAudio: bd075db379c5a70b7f9a7b5b541d5c67f59b5dca
+  ExpoBackgroundFetch: d31fb6cc7f3872ad9a8693fbaf239491a8a6d234
+  ExpoBackgroundTask: ae2e24e462217f8d91650d1f70a6dd22f00bdaf5
   ExpoBattery: cb4f978965f2d14d06f2d36293c2deedee6616b0
+  ExpoBlob: 6ee4581e2c742293d2ef973d62db709fab7b37c7
+  ExpoBlur: 975b78b65b3c8f475c44bd8f8b53948146b1ff9b
   ExpoBrightness: bd5b283f0ccd168d6c5b7ff1e95bc3999972a54a
+  ExpoCalendar: 2d0158aed7f0615cda318d3761025c3218b2fd6f
+  ExpoCamera: d3d3c6c6ddca5088d4eed2df010c0f33e78bebd1
+  ExpoCameraBarcodeScanning: e20737140da28cfd614abccd86ef50b47f0f94b5
   ExpoCellular: e78a2fe5ac3239ec7252f3451e170560c8e25dcd
   ExpoClipboard: 95055b11758f339b61d4d8064dd799df1cf03b7f
+  ExpoContacts: b32641ee8018ceec37e85ad2de9ce5e4266cb200
   ExpoCrypto: 366380ffafeb22cc9795438cddcbfa299e1aaf42
   ExpoDevice: 93a72d7c2bd656a4f0c0d580523e390e9ee7fba5
+  ExpoDocumentPicker: fe03a24855e39af0f9b5aee17e7eb4813f6e44a6
+  ExpoFileSystem: cc500f33804065aacc7b3366007267b84deca8c8
+  ExpoFont: f8198a952ba2ff53c9b393b5269ea435f232cfc3
+  ExpoGL: 4f9233cd8fcbbd4d4eab2665d1fa600362eeae09
+  ExpoGlassEffect: 310dc75c8d862de1c4b3ff15a90439ba51a39798
   ExpoHaptics: 4503d2da51ff7109712ccdfe0e4939f66818183e
+  ExpoImage: abe60c6c68d08d837b2c51fb9e8b6c6e320b9125
+  ExpoImageManipulator: e795a8d623905815a335edda5c967a88e25b5539
+  ExpoImagePicker: 661e13a7616fbcea630cfb9409b7483094978e02
   ExpoKeepAwake: c26f14275017370cc8a4b7b43a0e23361f2053a5
+  ExpoLinearGradient: f08a0dea5ad3fe23042d15b1ced831312c9141b8
+  ExpoLivePhoto: 7b15bcd0999bb56f4723d6305c13e9549161aa62
   ExpoLocalAuthentication: 96989637e567a10cdeabe61e5c6026d30c0dc53f
   ExpoLocalization: 659243b03b3a3e9589793cee2f728a899e181329
-  ExpoModulesCore: 9df645bbfcfe4fec54e6597aee756f7820ac8e0e
-  ExpoModulesJSI: 52f43ddb01b1db76ccfcff4c4df4fed39e31ba7d
-  ExpoModulesWorklets: 18419b65da3b14a8df484baccec7dd6dad15387a
+  ExpoLocation: 8ff9d333424065fdb779429d9a69e163e8c23796
+  ExpoMailComposer: 664b85b27b64b4cfadc982a58c83272c080b04b7
+  ExpoMediaLibrary: 344f5b528a71f34794e9d7396e32589531df146e
+  ExpoModulesCore: c94975c83c43a8e6f95dda76c7537a4f24eeffff
+  ExpoModulesJSI: 383849017851b1ebacbd78cfaa32b18b6152585e
+  ExpoModulesWorklets: 40d29262efc034e4357f2713e6037a41a27218d6
   ExpoNetwork: 973d523fe9b1f99223dd945fed9ad1226ae64920
+  ExpoNotifications: 42cba361a6b378e6e54b795f55932e4eba058829
+  ExpoPrint: 460476a4b6291114e4d515e8df4c0225b92161b0
+  ExpoScreenCapture: bd0a12b12fb7f487d8d2ce7b7c780145d308d420
   ExpoScreenOrientation: 17fd81b2bdb7615b4b540335673aaf98a358281f
   ExpoSecureStore: 94793113049a2d7478dfe1a13aa15081e9f61755
   ExpoSensors: e71c7b6cb0c09d3427ef6ae29c69532a10c86b05
   ExpoSharing: dcf5cb459c99f344aabf126b171eb61d2e49276f
   ExpoSMS: ac35f6c85b72ee5b18a7c6bb06550fbd4a683775
+  ExpoSpeech: ab83f97ede99c65a23fd4c228122deadc430de01
+  ExpoSQLite: 57b23ab9fbb72215fa33763246d00ce6e6e531b4
   ExpoStoreReview: 2a0f6b8e04112aea2f6e3e1cb84109d78f4d041f
+  ExpoSymbols: 37a3a6e5847edb08b83a5ee04d3b46525e205f00
   ExpoSystemUI: ff3142b323ae7b4d11dc0b1dc4acfa30d92be7dc
   ExpoTaskManager: 4cbfc5d2ffb59b6d35023bd062bdf80f39534253
   ExpoTrackingTransparency: 43401b22cf6aed3a4a35e0c24d0b320905acc477
+  ExpoVideo: 31d5dc617d913808aeba05c3ab900712637b0e47
+  ExpoVideoThumbnails: da5d471c170bf4110f681b6649524eace9c95b5b
   ExpoWebBrowser: 9b98d939d5f1c5dd8f523f0a0683056fb1204434
+  EXUpdatesInterface: 4c96533f11c8cefe879bd506564cc2d537f56804
   FBLazyVector: b3e7ad108f0d882e30445c5527d774e3fd432f3d
-  hermes-engine: d4eb676d7bc1cf9e8578ad44e0b4c59c5c0192ab
+  hermes-engine: a0115f405c0ba94af605db7a352aa920ca7a0f17
+  libavif: 5f8e715bea24debec477006f21ef9e95432e254d
+  libdav1d: 23581a4d8ec811ff171ed5e2e05cd27bad64c39f
+  libwebp: af5937a13536ef73f3784d69cc342b98961acf33
   RCTDeprecation: 2a74a2c57675e64419bd89078efde81f7c1de90b
   RCTRequired: 30451112e6fef4e6f31b4e7eee0845156e35e4b0
   RCTSwiftUI: 5aaf0b07e747ba749dc6acc94d8bd41eea4b570f
@@ -2436,11 +2758,17 @@ SPEC CHECKSUMS:
   ReactCodegen: afe0d436ee089d7bea6418429d8312b1d23a6801
   ReactCommon: d5c1bb4427bf51c443de5926aac332c89ddd9363
   ReactNativeDependencies: fa0a54b3f5319ae0e3b9aff32bfee7a424b88e66
-  symbiote-navigation: 902e540b70e1c6b0ab1345a0f55f050f2e34424a
-  symbiote-splash-screen: 082b03d52ce7abc1d965eb356d808eae3cccba66
+  SDWebImage: e9fc87c1aab89a8ab1bbd74eba378c6f53be8abf
+  SDWebImageAVIFCoder: afe194a084e851f70228e4be35ef651df0fc5c57
+  SDWebImageSVGCoder: 15a300a97ec1c8ac958f009c02220ac0402e936c
+  SDWebImageWebPCoder: e38c0a70396191361d60c092933e22c20d5b1380
+  symbiote-engine: f663f470533b1e40ac9ff277da0f02434e20a48f
+  symbiote-navigation: 4c86ec4504d52e78d952492815111419707d4071
+  symbiote-splash-screen: 2028fb7d9c7e1de02c67da5672db8bfb7d12de5f
   UMAppLoader: 173cb90a3039aa9c1b84bace4487e1907a4a5a39
   Yoga: fe50ab299e578f397fef753cf309c6703a4db29b
+  ZXingObjC: 8898711ab495761b2dbbdec76d90164a6d7e14c5
 
-PODFILE CHECKSUM: 8ca2aaf6aed00e243bb8ba82747472aca424ac86
+PODFILE CHECKSUM: 71fe01a023c14b5cc7ffb8cce6afc233d52983e5
 
 COCOAPODS: 1.16.2

@@ -1,0 +1,1191 @@
+{
+  "extends": "@react-native/typescript-config",
+  "compilerOptions": {
+    "types": [],
+    "lib": ["ES2022", "DOM"],
+    "jsxImportSource": "@symbiote-native/react",
+    "paths": {
+      "@symbiote-native/angular": ["../../adapters/angular/src/index.ts"],
+      "@symbiote-native/angular/bootstrap": [
+        "../../adapters/angular/src/bootstrap.ts"
+      ],
+      "@symbiote-native/react": ["../../adapters/react/src/index.ts"],
+      "@symbiote-native/react/bootstrap": [
+        "../../adapters/react/src/bootstrap.ts"
+      ],
+      "@symbiote-native/react/jsx-runtime": [
+        "../../adapters/react/src/jsx-runtime.ts"
+      ],
+      "@symbiote-native/react/jsx-dev-runtime": [
+        "../../adapters/react/src/jsx-dev-runtime.ts"
+      ],
+      "@symbiote-native/solid": ["../../adapters/solid/src/index.ts"],
+      "@symbiote-native/solid/bootstrap": [
+        "../../adapters/solid/src/bootstrap.ts"
+      ],
+      "@symbiote-native/solid/renderer": [
+        "../../adapters/solid/src/renderer.ts"
+      ],
+      "@symbiote-native/solid/jsx-runtime": [
+        "../../adapters/solid/src/jsx-runtime.ts"
+      ],
+      "@symbiote-native/solid/jsx-dev-runtime": [
+        "../../adapters/solid/src/jsx-runtime.ts"
+      ],
+      "@symbiote-native/svelte": ["../../adapters/svelte/src/index.ts"],
+      "@symbiote-native/svelte/bootstrap": [
+        "../../adapters/svelte/src/bootstrap.ts"
+      ],
+      "@symbiote-native/svelte/native-view-bridge": [
+        "../../adapters/svelte/src/native-view-bridge.ts"
+      ],
+      "@symbiote-native/svelte/descriptor-host": [
+        "../../adapters/svelte/src/descriptor-host.svelte"
+      ],
+      "@symbiote-native/svelte/preprocessor": [
+        "../../adapters/svelte/src/preprocessor/forbid-web-only-constructs.ts"
+      ],
+      "@symbiote-native/svelte/scoped-styles": [
+        "../../adapters/svelte/src/preprocessor/scoped-styles.ts"
+      ],
+      "@symbiote-native/svelte/collapse-text-whitespace": [
+        "../../adapters/svelte/src/preprocessor/collapse-text-whitespace.ts"
+      ],
+      "@symbiote-native/svelte/style-scope": [
+        "../../adapters/svelte/src/style-scope.ts"
+      ],
+      "@symbiote-native/svelte/scope-token": [
+        "../../adapters/svelte/src/scope-token.ts"
+      ],
+      "@symbiote-native/svelte/runes/create-permission-hook": [
+        "../../adapters/svelte/src/runes/create-permission-hook.svelte.ts"
+      ],
+      "@symbiote-native/svelte/runes/create-resource-hook": [
+        "../../adapters/svelte/src/runes/create-resource-hook.svelte.ts"
+      ],
+      "@symbiote-native/svelte/runes/create-event-value-hook": [
+        "../../adapters/svelte/src/runes/create-event-value-hook.svelte.ts"
+      ],
+      "@symbiote-native/svelte/runes/use-native-view-controller": [
+        "../../adapters/svelte/src/runes/use-native-view-controller.svelte.ts"
+      ],
+      "@symbiote-native/svelte/runes/use-event": [
+        "../../adapters/svelte/src/runes/use-event.svelte.ts"
+      ],
+      "@symbiote-native/vue": ["../../adapters/vue/src/index.ts"],
+      "@symbiote-native/vue/bootstrap": ["../../adapters/vue/src/bootstrap.ts"],
+      "@symbiote-native/vue/runtime-helpers": [
+        "../../adapters/vue/src/runtime-helpers/index.ts"
+      ],
+      "@symbiote-native/vue/jsx-runtime": [
+        "../../adapters/vue/src/jsx-runtime.ts"
+      ],
+      "@symbiote-native/vue/jsx-dev-runtime": [
+        "../../adapters/vue/src/jsx-runtime.ts"
+      ],
+      "@symbiote-native/components": ["../../core/components/src/index.ts"],
+      "@symbiote-native/components/bootstrap": [
+        "../../core/components/src/bootstrap/index.ts"
+      ],
+      "@symbiote-native/components/resolve-intrinsic": [
+        "../../core/components/src/resolve-intrinsic.ts"
+      ],
+      "@symbiote-native/components/register": [
+        "../../core/components/src/register.ts"
+      ],
+      "@symbiote-native/css-parser": ["../../core/css-parser/src/index.ts"],
+      "@symbiote-native/engine": ["../../core/engine/src/index.ts"],
+      "@symbiote-native/engine/mutation-buffer": [
+        "../../core/engine/src/mutation-buffer.ts"
+      ],
+      "@symbiote-native/test-utils": ["../../core/test-utils/src/index.ts"],
+      "@symbiote-native/age-range": [
+        "../../packages/age-range/src/core/index.ts"
+      ],
+      "@symbiote-native/age-range/vue": [
+        "../../packages/age-range/src/core/index.ts"
+      ],
+      "@symbiote-native/age-range/react": [
+        "../../packages/age-range/src/core/index.ts"
+      ],
+      "@symbiote-native/age-range/svelte": [
+        "../../packages/age-range/src/core/index.ts"
+      ],
+      "@symbiote-native/age-range/solid": [
+        "../../packages/age-range/src/core/index.ts"
+      ],
+      "@symbiote-native/age-range/angular": [
+        "../../packages/age-range/src/angular/index.ts"
+      ],
+      "@symbiote-native/app-integrity": [
+        "../../packages/app-integrity/src/core/index.ts"
+      ],
+      "@symbiote-native/app-integrity/vue": [
+        "../../packages/app-integrity/src/core/index.ts"
+      ],
+      "@symbiote-native/app-integrity/react": [
+        "../../packages/app-integrity/src/core/index.ts"
+      ],
+      "@symbiote-native/app-integrity/svelte": [
+        "../../packages/app-integrity/src/core/index.ts"
+      ],
+      "@symbiote-native/app-integrity/solid": [
+        "../../packages/app-integrity/src/core/index.ts"
+      ],
+      "@symbiote-native/app-integrity/angular": [
+        "../../packages/app-integrity/src/angular/index.ts"
+      ],
+      "@symbiote-native/app-metrics": [
+        "../../packages/app-metrics/src/core/index.ts"
+      ],
+      "@symbiote-native/app-metrics/react": [
+        "../../packages/app-metrics/src/react/index.ts"
+      ],
+      "@symbiote-native/app-metrics/vue": [
+        "../../packages/app-metrics/src/vue/index.ts"
+      ],
+      "@symbiote-native/app-metrics/svelte": [
+        "../../packages/app-metrics/src/svelte/index.ts"
+      ],
+      "@symbiote-native/app-metrics/solid": [
+        "../../packages/app-metrics/src/solid/index.ts"
+      ],
+      "@symbiote-native/app-metrics/angular": [
+        "../../packages/app-metrics/src/angular/index.ts"
+      ],
+      "@symbiote-native/apple-authentication": [
+        "../../packages/apple-authentication/src/core/index.ts"
+      ],
+      "@symbiote-native/apple-authentication/vue": [
+        "../../packages/apple-authentication/src/vue/index.ts"
+      ],
+      "@symbiote-native/apple-authentication/react": [
+        "../../packages/apple-authentication/src/react/index.ts"
+      ],
+      "@symbiote-native/apple-authentication/svelte": [
+        "../../packages/apple-authentication/src/svelte/index.ts"
+      ],
+      "@symbiote-native/apple-authentication/solid": [
+        "../../packages/apple-authentication/src/solid/index.ts"
+      ],
+      "@symbiote-native/apple-authentication/angular": [
+        "../../packages/apple-authentication/src/angular/index.ts"
+      ],
+      "@symbiote-native/application": [
+        "../../packages/application/src/core/index.ts"
+      ],
+      "@symbiote-native/application/vue": [
+        "../../packages/application/src/core/index.ts"
+      ],
+      "@symbiote-native/application/react": [
+        "../../packages/application/src/core/index.ts"
+      ],
+      "@symbiote-native/application/svelte": [
+        "../../packages/application/src/core/index.ts"
+      ],
+      "@symbiote-native/application/solid": [
+        "../../packages/application/src/core/index.ts"
+      ],
+      "@symbiote-native/application/angular": [
+        "../../packages/application/src/angular/index.ts"
+      ],
+      "@symbiote-native/asset": ["../../packages/asset/src/core/index.ts"],
+      "@symbiote-native/asset/vue": ["../../packages/asset/src/vue/index.ts"],
+      "@symbiote-native/asset/react": [
+        "../../packages/asset/src/react/index.ts"
+      ],
+      "@symbiote-native/asset/svelte": [
+        "../../packages/asset/src/svelte/index.ts"
+      ],
+      "@symbiote-native/asset/solid": [
+        "../../packages/asset/src/solid/index.ts"
+      ],
+      "@symbiote-native/asset/angular": [
+        "../../packages/asset/src/angular/index.ts"
+      ],
+      "@symbiote-native/audio": ["../../packages/audio/src/core/index.ts"],
+      "@symbiote-native/audio/vue": ["../../packages/audio/src/vue/index.ts"],
+      "@symbiote-native/audio/react": [
+        "../../packages/audio/src/react/index.ts"
+      ],
+      "@symbiote-native/audio/svelte": [
+        "../../packages/audio/src/svelte/index.ts"
+      ],
+      "@symbiote-native/audio/solid": [
+        "../../packages/audio/src/solid/index.ts"
+      ],
+      "@symbiote-native/audio/angular": [
+        "../../packages/audio/src/angular/index.ts"
+      ],
+      "@symbiote-native/auth-session": [
+        "../../packages/auth-session/src/core/index.ts"
+      ],
+      "@symbiote-native/auth-session/vue": [
+        "../../packages/auth-session/src/vue/index.ts"
+      ],
+      "@symbiote-native/auth-session/react": [
+        "../../packages/auth-session/src/react/index.ts"
+      ],
+      "@symbiote-native/auth-session/svelte": [
+        "../../packages/auth-session/src/svelte/index.ts"
+      ],
+      "@symbiote-native/auth-session/solid": [
+        "../../packages/auth-session/src/solid/index.ts"
+      ],
+      "@symbiote-native/auth-session/angular": [
+        "../../packages/auth-session/src/angular/index.ts"
+      ],
+      "@symbiote-native/background-fetch": [
+        "../../packages/background-fetch/src/core/index.ts"
+      ],
+      "@symbiote-native/background-fetch/vue": [
+        "../../packages/background-fetch/src/core/index.ts"
+      ],
+      "@symbiote-native/background-fetch/react": [
+        "../../packages/background-fetch/src/core/index.ts"
+      ],
+      "@symbiote-native/background-fetch/svelte": [
+        "../../packages/background-fetch/src/core/index.ts"
+      ],
+      "@symbiote-native/background-fetch/solid": [
+        "../../packages/background-fetch/src/core/index.ts"
+      ],
+      "@symbiote-native/background-fetch/angular": [
+        "../../packages/background-fetch/src/angular/index.ts"
+      ],
+      "@symbiote-native/background-task": [
+        "../../packages/background-task/src/core/index.ts"
+      ],
+      "@symbiote-native/background-task/vue": [
+        "../../packages/background-task/src/core/index.ts"
+      ],
+      "@symbiote-native/background-task/react": [
+        "../../packages/background-task/src/core/index.ts"
+      ],
+      "@symbiote-native/background-task/svelte": [
+        "../../packages/background-task/src/core/index.ts"
+      ],
+      "@symbiote-native/background-task/solid": [
+        "../../packages/background-task/src/core/index.ts"
+      ],
+      "@symbiote-native/background-task/angular": [
+        "../../packages/background-task/src/angular/index.ts"
+      ],
+      "@symbiote-native/battery": ["../../packages/battery/src/core/index.ts"],
+      "@symbiote-native/battery/vue": [
+        "../../packages/battery/src/vue/index.ts"
+      ],
+      "@symbiote-native/battery/react": [
+        "../../packages/battery/src/react/index.ts"
+      ],
+      "@symbiote-native/battery/svelte": [
+        "../../packages/battery/src/svelte/index.ts"
+      ],
+      "@symbiote-native/battery/solid": [
+        "../../packages/battery/src/solid/index.ts"
+      ],
+      "@symbiote-native/battery/angular": [
+        "../../packages/battery/src/angular/index.ts"
+      ],
+      "@symbiote-native/blob": ["../../packages/blob/src/core/index.ts"],
+      "@symbiote-native/blob/vue": ["../../packages/blob/src/core/index.ts"],
+      "@symbiote-native/blob/react": ["../../packages/blob/src/core/index.ts"],
+      "@symbiote-native/blob/svelte": ["../../packages/blob/src/core/index.ts"],
+      "@symbiote-native/blob/solid": ["../../packages/blob/src/core/index.ts"],
+      "@symbiote-native/blob/angular": [
+        "../../packages/blob/src/angular/index.ts"
+      ],
+      "@symbiote-native/blur": ["../../packages/blur/src/core/index.ts"],
+      "@symbiote-native/blur/vue": ["../../packages/blur/src/vue/index.ts"],
+      "@symbiote-native/blur/react": ["../../packages/blur/src/react/index.ts"],
+      "@symbiote-native/blur/svelte": [
+        "../../packages/blur/src/svelte/index.ts"
+      ],
+      "@symbiote-native/blur/solid": ["../../packages/blur/src/solid/index.ts"],
+      "@symbiote-native/blur/angular": [
+        "../../packages/blur/src/angular/index.ts"
+      ],
+      "@symbiote-native/brightness": [
+        "../../packages/brightness/src/core/index.ts"
+      ],
+      "@symbiote-native/brightness/vue": [
+        "../../packages/brightness/src/vue/index.ts"
+      ],
+      "@symbiote-native/brightness/react": [
+        "../../packages/brightness/src/react/index.ts"
+      ],
+      "@symbiote-native/brightness/svelte": [
+        "../../packages/brightness/src/svelte/index.ts"
+      ],
+      "@symbiote-native/brightness/solid": [
+        "../../packages/brightness/src/solid/index.ts"
+      ],
+      "@symbiote-native/brightness/angular": [
+        "../../packages/brightness/src/angular/index.ts"
+      ],
+      "@symbiote-native/calendar": [
+        "../../packages/calendar/src/core/index.ts"
+      ],
+      "@symbiote-native/calendar/vue": [
+        "../../packages/calendar/src/vue/index.ts"
+      ],
+      "@symbiote-native/calendar/react": [
+        "../../packages/calendar/src/react/index.ts"
+      ],
+      "@symbiote-native/calendar/svelte": [
+        "../../packages/calendar/src/svelte/index.ts"
+      ],
+      "@symbiote-native/calendar/solid": [
+        "../../packages/calendar/src/solid/index.ts"
+      ],
+      "@symbiote-native/calendar/angular": [
+        "../../packages/calendar/src/angular/index.ts"
+      ],
+      "@symbiote-native/calendar/legacy": [
+        "../../packages/calendar/src/legacy/index.ts"
+      ],
+      "@symbiote-native/camera": ["../../packages/camera/src/core/index.ts"],
+      "@symbiote-native/camera/vue": ["../../packages/camera/src/vue/index.ts"],
+      "@symbiote-native/camera/react": [
+        "../../packages/camera/src/react/index.ts"
+      ],
+      "@symbiote-native/camera/svelte": [
+        "../../packages/camera/src/svelte/index.ts"
+      ],
+      "@symbiote-native/camera/solid": [
+        "../../packages/camera/src/solid/index.ts"
+      ],
+      "@symbiote-native/camera/angular": [
+        "../../packages/camera/src/angular/index.ts"
+      ],
+      "@symbiote-native/cellular": [
+        "../../packages/cellular/src/core/index.ts"
+      ],
+      "@symbiote-native/cellular/vue": [
+        "../../packages/cellular/src/vue/index.ts"
+      ],
+      "@symbiote-native/cellular/react": [
+        "../../packages/cellular/src/react/index.ts"
+      ],
+      "@symbiote-native/cellular/svelte": [
+        "../../packages/cellular/src/svelte/index.ts"
+      ],
+      "@symbiote-native/cellular/solid": [
+        "../../packages/cellular/src/solid/index.ts"
+      ],
+      "@symbiote-native/cellular/angular": [
+        "../../packages/cellular/src/angular/index.ts"
+      ],
+      "@symbiote-native/cli": ["../../packages/cli/src/index.ts"],
+      "@symbiote-native/clipboard": [
+        "../../packages/clipboard/src/core/index.ts"
+      ],
+      "@symbiote-native/clipboard/vue": [
+        "../../packages/clipboard/src/vue/index.ts"
+      ],
+      "@symbiote-native/clipboard/react": [
+        "../../packages/clipboard/src/react/index.ts"
+      ],
+      "@symbiote-native/clipboard/svelte": [
+        "../../packages/clipboard/src/svelte/index.ts"
+      ],
+      "@symbiote-native/clipboard/solid": [
+        "../../packages/clipboard/src/solid/index.ts"
+      ],
+      "@symbiote-native/clipboard/angular": [
+        "../../packages/clipboard/src/angular/index.ts"
+      ],
+      "@symbiote-native/constants": [
+        "../../packages/constants/src/core/index.ts"
+      ],
+      "@symbiote-native/constants/vue": [
+        "../../packages/constants/src/core/index.ts"
+      ],
+      "@symbiote-native/constants/react": [
+        "../../packages/constants/src/core/index.ts"
+      ],
+      "@symbiote-native/constants/svelte": [
+        "../../packages/constants/src/core/index.ts"
+      ],
+      "@symbiote-native/constants/solid": [
+        "../../packages/constants/src/core/index.ts"
+      ],
+      "@symbiote-native/constants/angular": [
+        "../../packages/constants/src/angular/index.ts"
+      ],
+      "@symbiote-native/contacts": [
+        "../../packages/contacts/src/core/index.ts"
+      ],
+      "@symbiote-native/contacts/vue": [
+        "../../packages/contacts/src/vue/index.ts"
+      ],
+      "@symbiote-native/contacts/react": [
+        "../../packages/contacts/src/react/index.ts"
+      ],
+      "@symbiote-native/contacts/svelte": [
+        "../../packages/contacts/src/svelte/index.ts"
+      ],
+      "@symbiote-native/contacts/solid": [
+        "../../packages/contacts/src/solid/index.ts"
+      ],
+      "@symbiote-native/contacts/angular": [
+        "../../packages/contacts/src/angular/index.ts"
+      ],
+      "@symbiote-native/contacts/legacy": [
+        "../../packages/contacts/src/legacy/index.ts"
+      ],
+      "@symbiote-native/crypto": ["../../packages/crypto/src/core/index.ts"],
+      "@symbiote-native/crypto/vue": [
+        "../../packages/crypto/src/core/index.ts"
+      ],
+      "@symbiote-native/crypto/react": [
+        "../../packages/crypto/src/core/index.ts"
+      ],
+      "@symbiote-native/crypto/svelte": [
+        "../../packages/crypto/src/core/index.ts"
+      ],
+      "@symbiote-native/crypto/solid": [
+        "../../packages/crypto/src/core/index.ts"
+      ],
+      "@symbiote-native/crypto/angular": [
+        "../../packages/crypto/src/angular/index.ts"
+      ],
+      "@symbiote-native/device": ["../../packages/device/src/core/index.ts"],
+      "@symbiote-native/device/vue": [
+        "../../packages/device/src/core/index.ts"
+      ],
+      "@symbiote-native/device/react": [
+        "../../packages/device/src/core/index.ts"
+      ],
+      "@symbiote-native/device/svelte": [
+        "../../packages/device/src/core/index.ts"
+      ],
+      "@symbiote-native/device/solid": [
+        "../../packages/device/src/core/index.ts"
+      ],
+      "@symbiote-native/device/angular": [
+        "../../packages/device/src/angular/index.ts"
+      ],
+      "@symbiote-native/document-picker": [
+        "../../packages/document-picker/src/core/index.ts"
+      ],
+      "@symbiote-native/document-picker/vue": [
+        "../../packages/document-picker/src/core/index.ts"
+      ],
+      "@symbiote-native/document-picker/react": [
+        "../../packages/document-picker/src/core/index.ts"
+      ],
+      "@symbiote-native/document-picker/svelte": [
+        "../../packages/document-picker/src/core/index.ts"
+      ],
+      "@symbiote-native/document-picker/solid": [
+        "../../packages/document-picker/src/core/index.ts"
+      ],
+      "@symbiote-native/document-picker/angular": [
+        "../../packages/document-picker/src/angular/index.ts"
+      ],
+      "@symbiote-native/expo-modules-link": [
+        "../../packages/expo-modules-link/src/index.d.ts"
+      ],
+      "@symbiote-native/file-system": [
+        "../../packages/file-system/src/next/index.ts"
+      ],
+      "@symbiote-native/file-system/vue": [
+        "../../packages/file-system/src/next/index.ts"
+      ],
+      "@symbiote-native/file-system/react": [
+        "../../packages/file-system/src/next/index.ts"
+      ],
+      "@symbiote-native/file-system/svelte": [
+        "../../packages/file-system/src/next/index.ts"
+      ],
+      "@symbiote-native/file-system/solid": [
+        "../../packages/file-system/src/next/index.ts"
+      ],
+      "@symbiote-native/file-system/angular": [
+        "../../packages/file-system/src/angular/index.ts"
+      ],
+      "@symbiote-native/file-system/legacy": [
+        "../../packages/file-system/src/core/index.ts"
+      ],
+      "@symbiote-native/font": ["../../packages/font/src/core/index.ts"],
+      "@symbiote-native/font/vue": ["../../packages/font/src/vue/index.ts"],
+      "@symbiote-native/font/react": ["../../packages/font/src/react/index.ts"],
+      "@symbiote-native/font/svelte": [
+        "../../packages/font/src/svelte/index.ts"
+      ],
+      "@symbiote-native/font/solid": ["../../packages/font/src/solid/index.ts"],
+      "@symbiote-native/font/angular": [
+        "../../packages/font/src/angular/index.ts"
+      ],
+      "@symbiote-native/gl": ["../../packages/gl/src/core/index.ts"],
+      "@symbiote-native/gl/vue": ["../../packages/gl/src/vue/index.ts"],
+      "@symbiote-native/gl/react": ["../../packages/gl/src/react/index.ts"],
+      "@symbiote-native/gl/svelte": ["../../packages/gl/src/svelte/index.ts"],
+      "@symbiote-native/gl/solid": ["../../packages/gl/src/solid/index.ts"],
+      "@symbiote-native/gl/angular": ["../../packages/gl/src/angular/index.ts"],
+      "@symbiote-native/glass-effect": [
+        "../../packages/glass-effect/src/core/index.ts"
+      ],
+      "@symbiote-native/glass-effect/vue": [
+        "../../packages/glass-effect/src/vue/index.ts"
+      ],
+      "@symbiote-native/glass-effect/react": [
+        "../../packages/glass-effect/src/react/index.ts"
+      ],
+      "@symbiote-native/glass-effect/svelte": [
+        "../../packages/glass-effect/src/svelte/index.ts"
+      ],
+      "@symbiote-native/glass-effect/solid": [
+        "../../packages/glass-effect/src/solid/index.ts"
+      ],
+      "@symbiote-native/glass-effect/angular": [
+        "../../packages/glass-effect/src/angular/index.ts"
+      ],
+      "@symbiote-native/haptics": ["../../packages/haptics/src/core/index.ts"],
+      "@symbiote-native/haptics/vue": [
+        "../../packages/haptics/src/core/index.ts"
+      ],
+      "@symbiote-native/haptics/react": [
+        "../../packages/haptics/src/core/index.ts"
+      ],
+      "@symbiote-native/haptics/svelte": [
+        "../../packages/haptics/src/core/index.ts"
+      ],
+      "@symbiote-native/haptics/solid": [
+        "../../packages/haptics/src/core/index.ts"
+      ],
+      "@symbiote-native/haptics/angular": [
+        "../../packages/haptics/src/angular/index.ts"
+      ],
+      "@symbiote-native/image": ["../../packages/image/src/core/index.ts"],
+      "@symbiote-native/image/vue": ["../../packages/image/src/vue/index.ts"],
+      "@symbiote-native/image/react": [
+        "../../packages/image/src/react/index.ts"
+      ],
+      "@symbiote-native/image/svelte": [
+        "../../packages/image/src/svelte/index.ts"
+      ],
+      "@symbiote-native/image/solid": [
+        "../../packages/image/src/solid/index.ts"
+      ],
+      "@symbiote-native/image/angular": [
+        "../../packages/image/src/angular/index.ts"
+      ],
+      "@symbiote-native/image-manipulator": [
+        "../../packages/image-manipulator/src/core/index.ts"
+      ],
+      "@symbiote-native/image-manipulator/vue": [
+        "../../packages/image-manipulator/src/vue/index.ts"
+      ],
+      "@symbiote-native/image-manipulator/react": [
+        "../../packages/image-manipulator/src/react/index.ts"
+      ],
+      "@symbiote-native/image-manipulator/svelte": [
+        "../../packages/image-manipulator/src/svelte/index.ts"
+      ],
+      "@symbiote-native/image-manipulator/solid": [
+        "../../packages/image-manipulator/src/solid/index.ts"
+      ],
+      "@symbiote-native/image-manipulator/angular": [
+        "../../packages/image-manipulator/src/angular/index.ts"
+      ],
+      "@symbiote-native/image-picker": [
+        "../../packages/image-picker/src/core/index.ts"
+      ],
+      "@symbiote-native/image-picker/vue": [
+        "../../packages/image-picker/src/vue/index.ts"
+      ],
+      "@symbiote-native/image-picker/react": [
+        "../../packages/image-picker/src/react/index.ts"
+      ],
+      "@symbiote-native/image-picker/svelte": [
+        "../../packages/image-picker/src/svelte/index.ts"
+      ],
+      "@symbiote-native/image-picker/solid": [
+        "../../packages/image-picker/src/solid/index.ts"
+      ],
+      "@symbiote-native/image-picker/angular": [
+        "../../packages/image-picker/src/angular/index.ts"
+      ],
+      "@symbiote-native/intent-launcher": [
+        "../../packages/intent-launcher/src/core/index.ts"
+      ],
+      "@symbiote-native/intent-launcher/vue": [
+        "../../packages/intent-launcher/src/core/index.ts"
+      ],
+      "@symbiote-native/intent-launcher/react": [
+        "../../packages/intent-launcher/src/core/index.ts"
+      ],
+      "@symbiote-native/intent-launcher/svelte": [
+        "../../packages/intent-launcher/src/core/index.ts"
+      ],
+      "@symbiote-native/intent-launcher/solid": [
+        "../../packages/intent-launcher/src/core/index.ts"
+      ],
+      "@symbiote-native/intent-launcher/angular": [
+        "../../packages/intent-launcher/src/angular/index.ts"
+      ],
+      "@symbiote-native/keep-awake": [
+        "../../packages/keep-awake/src/core/index.ts"
+      ],
+      "@symbiote-native/keep-awake/vue": [
+        "../../packages/keep-awake/src/vue/index.ts"
+      ],
+      "@symbiote-native/keep-awake/react": [
+        "../../packages/keep-awake/src/react/index.ts"
+      ],
+      "@symbiote-native/keep-awake/svelte": [
+        "../../packages/keep-awake/src/svelte/index.ts"
+      ],
+      "@symbiote-native/keep-awake/solid": [
+        "../../packages/keep-awake/src/solid/index.ts"
+      ],
+      "@symbiote-native/keep-awake/angular": [
+        "../../packages/keep-awake/src/angular/index.ts"
+      ],
+      "@symbiote-native/linear-gradient": [
+        "../../packages/linear-gradient/src/core/index.ts"
+      ],
+      "@symbiote-native/linear-gradient/vue": [
+        "../../packages/linear-gradient/src/vue/index.ts"
+      ],
+      "@symbiote-native/linear-gradient/react": [
+        "../../packages/linear-gradient/src/react/index.ts"
+      ],
+      "@symbiote-native/linear-gradient/svelte": [
+        "../../packages/linear-gradient/src/svelte/index.ts"
+      ],
+      "@symbiote-native/linear-gradient/solid": [
+        "../../packages/linear-gradient/src/solid/index.ts"
+      ],
+      "@symbiote-native/linear-gradient/angular": [
+        "../../packages/linear-gradient/src/angular/index.ts"
+      ],
+      "@symbiote-native/live-photo": [
+        "../../packages/live-photo/src/core/index.ts"
+      ],
+      "@symbiote-native/live-photo/vue": [
+        "../../packages/live-photo/src/vue/index.ts"
+      ],
+      "@symbiote-native/live-photo/react": [
+        "../../packages/live-photo/src/react/index.ts"
+      ],
+      "@symbiote-native/live-photo/svelte": [
+        "../../packages/live-photo/src/svelte/index.ts"
+      ],
+      "@symbiote-native/live-photo/solid": [
+        "../../packages/live-photo/src/solid/index.ts"
+      ],
+      "@symbiote-native/live-photo/angular": [
+        "../../packages/live-photo/src/angular/index.ts"
+      ],
+      "@symbiote-native/local-auth": [
+        "../../packages/local-auth/src/core/index.ts"
+      ],
+      "@symbiote-native/local-auth/vue": [
+        "../../packages/local-auth/src/core/index.ts"
+      ],
+      "@symbiote-native/local-auth/react": [
+        "../../packages/local-auth/src/core/index.ts"
+      ],
+      "@symbiote-native/local-auth/svelte": [
+        "../../packages/local-auth/src/core/index.ts"
+      ],
+      "@symbiote-native/local-auth/solid": [
+        "../../packages/local-auth/src/core/index.ts"
+      ],
+      "@symbiote-native/local-auth/angular": [
+        "../../packages/local-auth/src/angular/index.ts"
+      ],
+      "@symbiote-native/localization": [
+        "../../packages/localization/src/core/index.ts"
+      ],
+      "@symbiote-native/localization/vue": [
+        "../../packages/localization/src/vue/index.ts"
+      ],
+      "@symbiote-native/localization/react": [
+        "../../packages/localization/src/react/index.ts"
+      ],
+      "@symbiote-native/localization/svelte": [
+        "../../packages/localization/src/svelte/index.ts"
+      ],
+      "@symbiote-native/localization/solid": [
+        "../../packages/localization/src/solid/index.ts"
+      ],
+      "@symbiote-native/localization/angular": [
+        "../../packages/localization/src/angular/index.ts"
+      ],
+      "@symbiote-native/location": [
+        "../../packages/location/src/core/index.ts"
+      ],
+      "@symbiote-native/location/vue": [
+        "../../packages/location/src/vue/index.ts"
+      ],
+      "@symbiote-native/location/react": [
+        "../../packages/location/src/react/index.ts"
+      ],
+      "@symbiote-native/location/svelte": [
+        "../../packages/location/src/svelte/index.ts"
+      ],
+      "@symbiote-native/location/solid": [
+        "../../packages/location/src/solid/index.ts"
+      ],
+      "@symbiote-native/location/angular": [
+        "../../packages/location/src/angular/index.ts"
+      ],
+      "@symbiote-native/mail-composer": [
+        "../../packages/mail-composer/src/core/index.ts"
+      ],
+      "@symbiote-native/mail-composer/vue": [
+        "../../packages/mail-composer/src/core/index.ts"
+      ],
+      "@symbiote-native/mail-composer/react": [
+        "../../packages/mail-composer/src/core/index.ts"
+      ],
+      "@symbiote-native/mail-composer/svelte": [
+        "../../packages/mail-composer/src/core/index.ts"
+      ],
+      "@symbiote-native/mail-composer/solid": [
+        "../../packages/mail-composer/src/core/index.ts"
+      ],
+      "@symbiote-native/mail-composer/angular": [
+        "../../packages/mail-composer/src/angular/index.ts"
+      ],
+      "@symbiote-native/media-library": [
+        "../../packages/media-library/src/next/index.ts"
+      ],
+      "@symbiote-native/media-library/vue": [
+        "../../packages/media-library/src/next/index.ts"
+      ],
+      "@symbiote-native/media-library/react": [
+        "../../packages/media-library/src/next/index.ts"
+      ],
+      "@symbiote-native/media-library/svelte": [
+        "../../packages/media-library/src/next/index.ts"
+      ],
+      "@symbiote-native/media-library/solid": [
+        "../../packages/media-library/src/next/index.ts"
+      ],
+      "@symbiote-native/media-library/angular": [
+        "../../packages/media-library/src/angular/index.ts"
+      ],
+      "@symbiote-native/media-library/legacy": [
+        "../../packages/media-library/src/core/index.ts"
+      ],
+      "@symbiote-native/navigation": [
+        "../../packages/navigation/src/core/index.ts"
+      ],
+      "@symbiote-native/navigation/react": [
+        "../../packages/navigation/src/react/index.ts"
+      ],
+      "@symbiote-native/navigation/vue": [
+        "../../packages/navigation/src/vue/index.ts"
+      ],
+      "@symbiote-native/navigation/svelte": [
+        "../../packages/navigation/src/svelte/index.ts"
+      ],
+      "@symbiote-native/navigation/solid": [
+        "../../packages/navigation/src/solid/index.ts"
+      ],
+      "@symbiote-native/navigation/angular": [
+        "../../packages/navigation/src/angular/index.ts"
+      ],
+      "@symbiote-native/navigation-bar": [
+        "../../packages/navigation-bar/src/core/index.ts"
+      ],
+      "@symbiote-native/navigation-bar/vue": [
+        "../../packages/navigation-bar/src/vue/index.ts"
+      ],
+      "@symbiote-native/navigation-bar/react": [
+        "../../packages/navigation-bar/src/react/index.ts"
+      ],
+      "@symbiote-native/navigation-bar/svelte": [
+        "../../packages/navigation-bar/src/svelte/index.ts"
+      ],
+      "@symbiote-native/navigation-bar/solid": [
+        "../../packages/navigation-bar/src/solid/index.ts"
+      ],
+      "@symbiote-native/navigation-bar/angular": [
+        "../../packages/navigation-bar/src/angular/index.ts"
+      ],
+      "@symbiote-native/network": ["../../packages/network/src/core/index.ts"],
+      "@symbiote-native/network/vue": [
+        "../../packages/network/src/vue/index.ts"
+      ],
+      "@symbiote-native/network/react": [
+        "../../packages/network/src/react/index.ts"
+      ],
+      "@symbiote-native/network/svelte": [
+        "../../packages/network/src/svelte/index.ts"
+      ],
+      "@symbiote-native/network/solid": [
+        "../../packages/network/src/solid/index.ts"
+      ],
+      "@symbiote-native/network/angular": [
+        "../../packages/network/src/angular/index.ts"
+      ],
+      "@symbiote-native/notifications": [
+        "../../packages/notifications/src/core/index.ts"
+      ],
+      "@symbiote-native/notifications/vue": [
+        "../../packages/notifications/src/vue/index.ts"
+      ],
+      "@symbiote-native/notifications/react": [
+        "../../packages/notifications/src/react/index.ts"
+      ],
+      "@symbiote-native/notifications/svelte": [
+        "../../packages/notifications/src/svelte/index.ts"
+      ],
+      "@symbiote-native/notifications/solid": [
+        "../../packages/notifications/src/solid/index.ts"
+      ],
+      "@symbiote-native/notifications/angular": [
+        "../../packages/notifications/src/angular/index.ts"
+      ],
+      "@symbiote-native/print": ["../../packages/print/src/core/index.ts"],
+      "@symbiote-native/print/vue": ["../../packages/print/src/core/index.ts"],
+      "@symbiote-native/print/react": [
+        "../../packages/print/src/core/index.ts"
+      ],
+      "@symbiote-native/print/svelte": [
+        "../../packages/print/src/core/index.ts"
+      ],
+      "@symbiote-native/print/solid": [
+        "../../packages/print/src/core/index.ts"
+      ],
+      "@symbiote-native/print/angular": [
+        "../../packages/print/src/angular/index.ts"
+      ],
+      "@symbiote-native/screen-capture": [
+        "../../packages/screen-capture/src/core/index.ts"
+      ],
+      "@symbiote-native/screen-capture/vue": [
+        "../../packages/screen-capture/src/vue/index.ts"
+      ],
+      "@symbiote-native/screen-capture/react": [
+        "../../packages/screen-capture/src/react/index.ts"
+      ],
+      "@symbiote-native/screen-capture/svelte": [
+        "../../packages/screen-capture/src/svelte/index.ts"
+      ],
+      "@symbiote-native/screen-capture/solid": [
+        "../../packages/screen-capture/src/solid/index.ts"
+      ],
+      "@symbiote-native/screen-capture/angular": [
+        "../../packages/screen-capture/src/angular/index.ts"
+      ],
+      "@symbiote-native/screen-orientation": [
+        "../../packages/screen-orientation/src/core/index.ts"
+      ],
+      "@symbiote-native/screen-orientation/vue": [
+        "../../packages/screen-orientation/src/vue/index.ts"
+      ],
+      "@symbiote-native/screen-orientation/react": [
+        "../../packages/screen-orientation/src/react/index.ts"
+      ],
+      "@symbiote-native/screen-orientation/svelte": [
+        "../../packages/screen-orientation/src/svelte/index.ts"
+      ],
+      "@symbiote-native/screen-orientation/solid": [
+        "../../packages/screen-orientation/src/solid/index.ts"
+      ],
+      "@symbiote-native/screen-orientation/angular": [
+        "../../packages/screen-orientation/src/angular/index.ts"
+      ],
+      "@symbiote-native/secure-store": [
+        "../../packages/secure-store/src/core/index.ts"
+      ],
+      "@symbiote-native/secure-store/vue": [
+        "../../packages/secure-store/src/core/index.ts"
+      ],
+      "@symbiote-native/secure-store/react": [
+        "../../packages/secure-store/src/core/index.ts"
+      ],
+      "@symbiote-native/secure-store/svelte": [
+        "../../packages/secure-store/src/core/index.ts"
+      ],
+      "@symbiote-native/secure-store/solid": [
+        "../../packages/secure-store/src/core/index.ts"
+      ],
+      "@symbiote-native/secure-store/angular": [
+        "../../packages/secure-store/src/angular/index.ts"
+      ],
+      "@symbiote-native/sensors": ["../../packages/sensors/src/core/index.ts"],
+      "@symbiote-native/sensors/vue": [
+        "../../packages/sensors/src/vue/index.ts"
+      ],
+      "@symbiote-native/sensors/react": [
+        "../../packages/sensors/src/react/index.ts"
+      ],
+      "@symbiote-native/sensors/svelte": [
+        "../../packages/sensors/src/svelte/index.ts"
+      ],
+      "@symbiote-native/sensors/solid": [
+        "../../packages/sensors/src/solid/index.ts"
+      ],
+      "@symbiote-native/sensors/angular": [
+        "../../packages/sensors/src/angular/index.ts"
+      ],
+      "@symbiote-native/sharing": ["../../packages/sharing/src/core/index.ts"],
+      "@symbiote-native/sharing/vue": [
+        "../../packages/sharing/src/vue/index.ts"
+      ],
+      "@symbiote-native/sharing/react": [
+        "../../packages/sharing/src/react/index.ts"
+      ],
+      "@symbiote-native/sharing/svelte": [
+        "../../packages/sharing/src/svelte/index.ts"
+      ],
+      "@symbiote-native/sharing/solid": [
+        "../../packages/sharing/src/solid/index.ts"
+      ],
+      "@symbiote-native/sharing/angular": [
+        "../../packages/sharing/src/angular/index.ts"
+      ],
+      "@symbiote-native/slider": ["../../packages/slider/src/core/index.ts"],
+      "@symbiote-native/slider/vue": ["../../packages/slider/src/vue/index.ts"],
+      "@symbiote-native/slider/react": [
+        "../../packages/slider/src/react/index.ts"
+      ],
+      "@symbiote-native/slider/svelte": [
+        "../../packages/slider/src/svelte/index.ts"
+      ],
+      "@symbiote-native/slider/solid": [
+        "../../packages/slider/src/solid/index.ts"
+      ],
+      "@symbiote-native/slider/angular": [
+        "../../packages/slider/src/angular/index.ts"
+      ],
+      "@symbiote-native/sms": ["../../packages/sms/src/core/index.ts"],
+      "@symbiote-native/sms/vue": ["../../packages/sms/src/core/index.ts"],
+      "@symbiote-native/sms/react": ["../../packages/sms/src/core/index.ts"],
+      "@symbiote-native/sms/svelte": ["../../packages/sms/src/core/index.ts"],
+      "@symbiote-native/sms/solid": ["../../packages/sms/src/core/index.ts"],
+      "@symbiote-native/sms/angular": [
+        "../../packages/sms/src/angular/index.ts"
+      ],
+      "@symbiote-native/speech": ["../../packages/speech/src/core/index.ts"],
+      "@symbiote-native/speech/vue": [
+        "../../packages/speech/src/core/index.ts"
+      ],
+      "@symbiote-native/speech/react": [
+        "../../packages/speech/src/core/index.ts"
+      ],
+      "@symbiote-native/speech/svelte": [
+        "../../packages/speech/src/core/index.ts"
+      ],
+      "@symbiote-native/speech/solid": [
+        "../../packages/speech/src/core/index.ts"
+      ],
+      "@symbiote-native/speech/angular": [
+        "../../packages/speech/src/angular/index.ts"
+      ],
+      "@symbiote-native/splash-screen": [
+        "../../packages/splash-screen/src/core/index.ts"
+      ],
+      "@symbiote-native/splash-screen/vue": [
+        "../../packages/splash-screen/src/vue/index.ts"
+      ],
+      "@symbiote-native/splash-screen/react": [
+        "../../packages/splash-screen/src/react/index.ts"
+      ],
+      "@symbiote-native/splash-screen/svelte": [
+        "../../packages/splash-screen/src/svelte/index.ts"
+      ],
+      "@symbiote-native/splash-screen/solid": [
+        "../../packages/splash-screen/src/solid/index.ts"
+      ],
+      "@symbiote-native/splash-screen/angular": [
+        "../../packages/splash-screen/src/angular/index.ts"
+      ],
+      "@symbiote-native/sqlite": ["../../packages/sqlite/src/core/index.ts"],
+      "@symbiote-native/sqlite/kv-store": [
+        "../../packages/sqlite/src/core/storage.ts"
+      ],
+      "@symbiote-native/sqlite/react": [
+        "../../packages/sqlite/src/react/index.ts"
+      ],
+      "@symbiote-native/sqlite/vue": ["../../packages/sqlite/src/vue/index.ts"],
+      "@symbiote-native/sqlite/svelte": [
+        "../../packages/sqlite/src/svelte/index.ts"
+      ],
+      "@symbiote-native/sqlite/solid": [
+        "../../packages/sqlite/src/solid/index.ts"
+      ],
+      "@symbiote-native/sqlite/angular": [
+        "../../packages/sqlite/src/angular/index.ts"
+      ],
+      "@symbiote-native/standard-web-crypto": [
+        "../../packages/standard-web-crypto/src/core/index.ts"
+      ],
+      "@symbiote-native/standard-web-crypto/vue": [
+        "../../packages/standard-web-crypto/src/core/index.ts"
+      ],
+      "@symbiote-native/standard-web-crypto/react": [
+        "../../packages/standard-web-crypto/src/core/index.ts"
+      ],
+      "@symbiote-native/standard-web-crypto/svelte": [
+        "../../packages/standard-web-crypto/src/core/index.ts"
+      ],
+      "@symbiote-native/standard-web-crypto/solid": [
+        "../../packages/standard-web-crypto/src/core/index.ts"
+      ],
+      "@symbiote-native/standard-web-crypto/angular": [
+        "../../packages/standard-web-crypto/src/angular/index.ts"
+      ],
+      "@symbiote-native/store-review": [
+        "../../packages/store-review/src/core/index.ts"
+      ],
+      "@symbiote-native/store-review/vue": [
+        "../../packages/store-review/src/core/index.ts"
+      ],
+      "@symbiote-native/store-review/react": [
+        "../../packages/store-review/src/core/index.ts"
+      ],
+      "@symbiote-native/store-review/svelte": [
+        "../../packages/store-review/src/core/index.ts"
+      ],
+      "@symbiote-native/store-review/solid": [
+        "../../packages/store-review/src/core/index.ts"
+      ],
+      "@symbiote-native/store-review/angular": [
+        "../../packages/store-review/src/angular/index.ts"
+      ],
+      "@symbiote-native/symbols": ["../../packages/symbols/src/core/index.ts"],
+      "@symbiote-native/symbols/androidWeights/*": [
+        "../../packages/symbols/src/core/android/weights/*/index.ts"
+      ],
+      "@symbiote-native/symbols/vue": [
+        "../../packages/symbols/src/vue/index.ts"
+      ],
+      "@symbiote-native/symbols/react": [
+        "../../packages/symbols/src/react/index.ts"
+      ],
+      "@symbiote-native/symbols/svelte": [
+        "../../packages/symbols/src/svelte/index.ts"
+      ],
+      "@symbiote-native/symbols/solid": [
+        "../../packages/symbols/src/solid/index.ts"
+      ],
+      "@symbiote-native/symbols/angular": [
+        "../../packages/symbols/src/angular/index.ts"
+      ],
+      "@symbiote-native/system-ui": [
+        "../../packages/system-ui/src/core/index.ts"
+      ],
+      "@symbiote-native/system-ui/vue": [
+        "../../packages/system-ui/src/core/index.ts"
+      ],
+      "@symbiote-native/system-ui/react": [
+        "../../packages/system-ui/src/core/index.ts"
+      ],
+      "@symbiote-native/system-ui/svelte": [
+        "../../packages/system-ui/src/core/index.ts"
+      ],
+      "@symbiote-native/system-ui/solid": [
+        "../../packages/system-ui/src/core/index.ts"
+      ],
+      "@symbiote-native/system-ui/angular": [
+        "../../packages/system-ui/src/angular/index.ts"
+      ],
+      "@symbiote-native/task-manager": [
+        "../../packages/task-manager/src/core/index.ts"
+      ],
+      "@symbiote-native/task-manager/vue": [
+        "../../packages/task-manager/src/core/index.ts"
+      ],
+      "@symbiote-native/task-manager/react": [
+        "../../packages/task-manager/src/core/index.ts"
+      ],
+      "@symbiote-native/task-manager/svelte": [
+        "../../packages/task-manager/src/core/index.ts"
+      ],
+      "@symbiote-native/task-manager/solid": [
+        "../../packages/task-manager/src/core/index.ts"
+      ],
+      "@symbiote-native/task-manager/angular": [
+        "../../packages/task-manager/src/angular/index.ts"
+      ],
+      "@symbiote-native/tracking-transparency": [
+        "../../packages/tracking-transparency/src/core/index.ts"
+      ],
+      "@symbiote-native/tracking-transparency/vue": [
+        "../../packages/tracking-transparency/src/vue/index.ts"
+      ],
+      "@symbiote-native/tracking-transparency/react": [
+        "../../packages/tracking-transparency/src/react/index.ts"
+      ],
+      "@symbiote-native/tracking-transparency/svelte": [
+        "../../packages/tracking-transparency/src/svelte/index.ts"
+      ],
+      "@symbiote-native/tracking-transparency/solid": [
+        "../../packages/tracking-transparency/src/solid/index.ts"
+      ],
+      "@symbiote-native/tracking-transparency/angular": [
+        "../../packages/tracking-transparency/src/angular/index.ts"
+      ],
+      "@symbiote-native/video": ["../../packages/video/src/core/index.ts"],
+      "@symbiote-native/video/vue": ["../../packages/video/src/vue/index.ts"],
+      "@symbiote-native/video/react": [
+        "../../packages/video/src/react/index.ts"
+      ],
+      "@symbiote-native/video/svelte": [
+        "../../packages/video/src/svelte/index.ts"
+      ],
+      "@symbiote-native/video/solid": [
+        "../../packages/video/src/solid/index.ts"
+      ],
+      "@symbiote-native/video/angular": [
+        "../../packages/video/src/angular/index.ts"
+      ],
+      "@symbiote-native/video-thumbnails": [
+        "../../packages/video-thumbnails/src/core/index.ts"
+      ],
+      "@symbiote-native/video-thumbnails/vue": [
+        "../../packages/video-thumbnails/src/core/index.ts"
+      ],
+      "@symbiote-native/video-thumbnails/react": [
+        "../../packages/video-thumbnails/src/core/index.ts"
+      ],
+      "@symbiote-native/video-thumbnails/svelte": [
+        "../../packages/video-thumbnails/src/core/index.ts"
+      ],
+      "@symbiote-native/video-thumbnails/solid": [
+        "../../packages/video-thumbnails/src/core/index.ts"
+      ],
+      "@symbiote-native/video-thumbnails/angular": [
+        "../../packages/video-thumbnails/src/angular/index.ts"
+      ],
+      "@symbiote-native/web-browser": [
+        "../../packages/web-browser/src/core/index.ts"
+      ],
+      "@symbiote-native/web-browser/vue": [
+        "../../packages/web-browser/src/core/index.ts"
+      ],
+      "@symbiote-native/web-browser/react": [
+        "../../packages/web-browser/src/core/index.ts"
+      ],
+      "@symbiote-native/web-browser/svelte": [
+        "../../packages/web-browser/src/core/index.ts"
+      ],
+      "@symbiote-native/web-browser/solid": [
+        "../../packages/web-browser/src/core/index.ts"
+      ],
+      "@symbiote-native/web-browser/angular": [
+        "../../packages/web-browser/src/angular/index.ts"
+      ]
+    },
+    "noEmit": true,
+    "skipLibCheck": true
+  },
+  "include": [
+    "screens/**/*.tsx",
+    "components/**/*.tsx",
+    "App.tsx",
+    "routes.ts",
+    "navigation-lines.ts",
+    "*.d.ts"
+  ],
+  "exclude": ["**/node_modules", "**/Pods"]
+}

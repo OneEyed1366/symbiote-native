@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/app-metrics",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "expo-app-metrics wrapped for SymbioteNative — one framework-agnostic core plus a React adapter, reachable from every framework's core surface and React's additional AppMetricsRoot/AppMetricsErrorBoundary/useNetworkRequestObserver. App startup, frame rate, memory, crash reporting, and session metrics.",
   "license": "MIT",
   "keywords": [

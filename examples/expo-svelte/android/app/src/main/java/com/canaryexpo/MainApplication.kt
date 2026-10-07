@@ -21,9 +21,11 @@ import expo.modules.backgroundfetch.BackgroundFetchModule
 import expo.modules.backgroundtask.BackgroundTaskModule
 import expo.modules.battery.BatteryModule
 import expo.modules.blob.BlobModule
+import expo.modules.blur.BlurModule
 import expo.modules.brightness.BrightnessModule
 import expo.modules.calendar.CalendarModule
 import expo.modules.calendar.next.CalendarNextModule
+import expo.modules.camera.CameraViewModule
 import expo.modules.cellular.CellularModule
 import expo.modules.clipboard.ClipboardModule
 import expo.modules.constants.ConstantsService
@@ -37,13 +39,16 @@ import expo.modules.filesystem.FileSystemModule
 import expo.modules.filesystem.legacy.FileSystemLegacyModule
 import expo.modules.font.FontLoaderModule
 import expo.modules.font.FontUtilsModule
+import expo.modules.gl.GLModule
 import expo.modules.haptics.HapticsModule
+import expo.modules.image.ExpoImageModule
 import expo.modules.imagemanipulator.ImageManipulatorModule
 import expo.modules.imagepicker.ImagePickerModule
 import expo.modules.integrity.IntegrityModule
 import expo.modules.intentlauncher.IntentLauncherModule
 import expo.modules.keepawake.KeepAwakeModule
 import expo.modules.kotlin.services.Service
+import expo.modules.lineargradient.LinearGradientModule
 import expo.modules.localauthentication.LocalAuthenticationModule
 import expo.modules.localization.LocalizationModule
 import expo.modules.location.LocationModule
@@ -86,6 +91,7 @@ import expo.modules.storereview.StoreReviewModule
 import expo.modules.systemui.SystemUIModule
 import expo.modules.taskManager.TaskManagerModule
 import expo.modules.trackingtransparency.TrackingTransparencyModule
+import expo.modules.video.VideoModule
 import expo.modules.videothumbnails.VideoThumbnailsModule
 import expo.modules.webbrowser.WebBrowserModule
 // SYMBIOTE-EXPO-LINK:END IMPORTS
@@ -117,9 +123,11 @@ private class ExpoModulesProvider : ModulesProvider {
     BarometerModule::class.java to "ExpoBarometer",
     BatteryModule::class.java to "ExpoBattery",
     BlobModule::class.java to "ExpoBlob",
+    BlurModule::class.java to "ExpoBlur",
     BrightnessModule::class.java to "ExpoBrightness",
     CalendarModule::class.java to "ExpoCalendar",
     CalendarNextModule::class.java to "CalendarNext",
+    CameraViewModule::class.java to "ExpoCamera",
     CellularModule::class.java to "ExpoCellular",
     ClipboardModule::class.java to "ExpoClipboard",
     ContactsModule::class.java to "ExpoContacts",
@@ -129,12 +137,14 @@ private class ExpoModulesProvider : ModulesProvider {
     DeviceMotionModule::class.java to "ExponentDeviceMotion",
     DocumentPickerModule::class.java to "ExpoDocumentPicker",
     ExpoBackgroundNotificationTasksModule::class.java to "ExpoBackgroundNotificationTasksModule",
+    ExpoImageModule::class.java to "ExpoImage",
     ExpoNotificationCategoriesModule::class.java to "ExpoNotificationCategoriesModule",
     ExpoNotificationPresentationModule::class.java to "ExpoNotificationPresenter",
     FileSystemLegacyModule::class.java to "ExponentFileSystem",
     FileSystemModule::class.java to "FileSystem",
     FontLoaderModule::class.java to "ExpoFontLoader",
     FontUtilsModule::class.java to "ExpoFontUtils",
+    GLModule::class.java to "ExpoGL",
     GyroscopeModule::class.java to "ExponentGyroscope",
     HapticsModule::class.java to "ExpoHaptics",
     ImageManipulatorModule::class.java to "ExpoImageManipulator",
@@ -143,6 +153,7 @@ private class ExpoModulesProvider : ModulesProvider {
     IntentLauncherModule::class.java to "ExpoIntentLauncher",
     KeepAwakeModule::class.java to "ExpoKeepAwake",
     LightSensorModule::class.java to "ExpoLightSensor",
+    LinearGradientModule::class.java to "ExpoLinearGradient",
     LocalAuthenticationModule::class.java to "ExpoLocalAuthentication",
     LocalizationModule::class.java to "ExpoLocalization",
     LocationModule::class.java to "ExpoLocation",
@@ -175,6 +186,7 @@ private class ExpoModulesProvider : ModulesProvider {
     TaskManagerModule::class.java to "ExpoTaskManager",
     TopicSubscriptionModule::class.java to "ExpoTopicSubscriptionModule",
     TrackingTransparencyModule::class.java to "ExpoTrackingTransparency",
+    VideoModule::class.java to "ExpoVideo",
     VideoThumbnailsModule::class.java to "ExpoVideoThumbnails",
     WebBrowserModule::class.java to "ExpoWebBrowser",
     // SYMBIOTE-EXPO-LINK:END MODULES-MAP

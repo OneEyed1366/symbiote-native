@@ -1,0 +1,12 @@
+{
+  "android": {
+    "gradleProjectName": "expo-blur",
+    "modules": [
+      {
+        "importPath": "expo.modules.blur.BlurModule",
+        "className": "BlurModule",
+        "nativeName": "ExpoBlur"
+      }
+    ]
+  }
+}

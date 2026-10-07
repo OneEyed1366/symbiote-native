@@ -1,6 +1,7 @@
 {
   "android": {
     "gradleProjectName": "expo-app-metrics",
+    "requiresKsp": true,
     "modules": [
       {
         "importPath": "expo.modules.appmetrics.AppMetricsModule",

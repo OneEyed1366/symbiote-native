@@ -1,5 +1,15 @@
 # @symbiote-native/media-library
 
+## 0.1.4
+
+### Patch Changes
+
+- [#93](https://github.com/OneEyed1366/symbiote-native/pull/93) [`5435556`](https://github.com/OneEyed1366/symbiote-native/commit/5435556869929fe5fd4798ac8f3dedb2fe893851) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Add `@symbiote-native/media-library`, wrapping `expo-media-library` — both the shared-object `Query`/`Asset`/`Album` API and the legacy function-based API (`/legacy` subpath), usable from every adapter.
+
+- [#93](https://github.com/OneEyed1366/symbiote-native/pull/93) [`5435556`](https://github.com/OneEyed1366/symbiote-native/commit/5435556869929fe5fd4798ac8f3dedb2fe893851) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Rewrite the README of every Expo wrapper package around the problem it solves, and add a Common questions section with cited sources.
+
+- [#93](https://github.com/OneEyed1366/symbiote-native/pull/93) [`5435556`](https://github.com/OneEyed1366/symbiote-native/commit/5435556869929fe5fd4798ac8f3dedb2fe893851) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Backfill `native-link.json` fields a plugin-introspection audit sweep found missing against each wrapped `expo-*` package's own config plugin: `android.manifestPermissions` (brightness, cellular, haptics, local-auth, media-library, tracking-transparency), `android.mainActivityConfigChanges` (localization's locale/layoutDirection), and `ios.infoPlistKeys.UIUserInterfaceStyle` (system-ui, matching the vendor default). `location` also gains a signed-off `reviewedNonIntrospectableMods` entry for its no-op `dangerous` mod.
+
 ## 0.1.3
 
 ### Patch Changes

@@ -165,6 +165,7 @@ export type { ITouchableNativeFeedbackProps } from './components/touchable-nativ
 // statics (unlike `TouchableNativeFeedback` next to it), so the name exports nothing at all now;
 // the prop type stays, for a component forwarding a bag.
 export type { IButtonProps } from './components/button-props';
+export type { ICheckboxProps } from './components/checkbox-props';
 
 // Both take `children`, a framework value, so their public prop types are declared per-adapter
 // over the shared agnostic field base — never imported from another adapter.

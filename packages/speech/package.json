@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/speech",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "expo-speech wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, Svelte, Solid, and Angular adapters. Text-to-speech.",
   "license": "MIT",
   "keywords": [

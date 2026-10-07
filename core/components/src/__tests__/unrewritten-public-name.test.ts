@@ -31,6 +31,7 @@ const IOS_NAMES: Record<ISymbioteIntrinsic, string> = {
   'touchable-opacity': 'RCTView',
   'touchable-native-feedback': ANCHOR_COMPONENT,
   button: 'RCTView',
+  checkbox: 'RCTView',
   text: 'RCTText',
   image: 'RCTImageView',
   'scroll-view': 'RCTScrollView',

@@ -43,10 +43,10 @@ export type IClassNameValue =
 // renaming the token; the names only borrow their vocabulary.
 const SCOPE_TAIL_PATTERN = /__((?:data-v|svelte)-[0-9a-z]+|module__[0-9a-z]+)$/;
 
-interface IScopedToken {
+type IScopedToken = {
   readonly base: string;
   readonly scope: string;
-}
+};
 
 function splitScopedToken(token: string): IScopedToken | null {
   const match = SCOPE_TAIL_PATTERN.exec(token);
@@ -58,22 +58,22 @@ function splitScopedToken(token: string): IScopedToken | null {
 // A selector as the compiler hands it over: the tokens themselves, not a name built out of
 // them. `.card.big` is `{ tokens: ['card', 'big'], specificity: [0, 2, 0] }` - and it matches an
 // element whose class list is a SUPERSET of `tokens`, in any order and at any length.
-export interface IStyleRule {
+export type IStyleRule = {
   /** Class names AS AUTHORED / as renamed by the scoping pass. No normalization. */
   readonly tokens: readonly string[];
   readonly specificity: readonly [number, number, number];
   /** Source order within its file; the registry adds a per-registration epoch on top. */
   readonly order: number;
   readonly style: IResolvedStyle;
-}
+};
 
 // `order` is only meaningful inside one file, so a rule from a later import has to outrank an
 // equally-specific one from an earlier import regardless of its own number - that is what the
 // epoch counts. It is CSS's "later import wins" rewritten as a comparable value.
-interface IIndexedRule {
+type IIndexedRule = {
   readonly rule: IStyleRule;
   readonly epoch: number;
-}
+};
 
 // Inverted index, ONE bucket per rule rather than one per token: a rule can only match when the
 // element carries every one of its tokens, so any single token of it is a sufficient hook. The
@@ -278,6 +278,16 @@ export function resolveClassName(className: IClassNameValue): IResolvedStyle {
   return resolved;
 }
 
+// Класс и inline-стиль для обёртки, читающей значения в JS, т.к. один `style` не видит класс
+export function styleOfProps(props: object): readonly [unknown, unknown] {
+  const className: unknown =
+    Reflect.get(props, 'className') ?? Reflect.get(props, 'class');
+  const classStyle = isClassNameValue(className)
+    ? resolveClassName(canonicalClassName(className))
+    : undefined;
+  return [classStyle, Reflect.get(props, 'style')];
+}
+
 // The same element's style with `:active` added to its token list — so a `.btn:active` rule joins
 // the cascade exactly as its specificity says, merged by the SAME matcher. That makes the result a
 // complete REPLACEMENT for the unpressed style rather than an overlay, which is why no extra style
@@ -324,10 +334,10 @@ function resolveClassString(className: string): IResolvedStyle {
 // `class="card svelte-h"` and the component's rule is `.card.svelte-h`, one class MORE specific
 // than App.css's `.card`. We express the scope by renaming the token instead, so the two rules
 // arrive with the same declared (a,b,c) and the tie has to be broken here.
-interface IRuleMatch {
+type IRuleMatch = {
   readonly indexed: IIndexedRule;
   readonly derivedTokens: number;
-}
+};
 
 // `null` rather than `{}` for "nothing matched", so the caller can skip the empty-object churn on
 // every class-prop set that has no rules.

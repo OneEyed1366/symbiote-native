@@ -10,6 +10,7 @@
  */
 
 import './App.css';
+import './ExpoViews.css';
 import { defineComponent, onMounted } from 'vue';
 import { Stack } from '@symbiote-native/navigation/vue';
 import { MenuScreen } from './screens/MenuScreen';

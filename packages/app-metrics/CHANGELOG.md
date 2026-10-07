@@ -1,5 +1,19 @@
 # @symbiote-native/app-metrics
 
+## 0.1.2
+
+### Patch Changes
+
+- [#93](https://github.com/OneEyed1366/symbiote-native/pull/93) [`5435556`](https://github.com/OneEyed1366/symbiote-native/commit/5435556869929fe5fd4798ac8f3dedb2fe893851) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Add `@symbiote-native/app-metrics`, wrapping `expo-app-metrics`: startup, frame rate, memory, crash and session metrics from every adapter's core surface, plus `AppMetricsRoot`, `AppMetricsErrorBoundary` and `useNetworkRequestObserver` on the adapters.
+
+- [#93](https://github.com/OneEyed1366/symbiote-native/pull/93) [`5435556`](https://github.com/OneEyed1366/symbiote-native/commit/5435556869929fe5fd4798ac8f3dedb2fe893851) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - README no longer carries dates in the scope decision.
+
+- [#93](https://github.com/OneEyed1366/symbiote-native/pull/93) [`5435556`](https://github.com/OneEyed1366/symbiote-native/commit/5435556869929fe5fd4798ac8f3dedb2fe893851) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - `native-link.json` accepts `android.requiresKsp`. The linker then writes `kspVersion` into the app's root `android/build.gradle`, picked from Expo's KSP table for the app's Kotlin version, so `expo-image` and `expo-app-metrics` build without a hand-written line.
+
+- [#93](https://github.com/OneEyed1366/symbiote-native/pull/93) [`5435556`](https://github.com/OneEyed1366/symbiote-native/commit/5435556869929fe5fd4798ac8f3dedb2fe893851) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Rewrite the README of every Expo wrapper package around the problem it solves, and add a Common questions section with cited sources.
+
+- [#93](https://github.com/OneEyed1366/symbiote-native/pull/93) [`5435556`](https://github.com/OneEyed1366/symbiote-native/commit/5435556869929fe5fd4798ac8f3dedb2fe893851) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Internal cleanup for lint: the crypto AES module files carry unique names, and the Svelte `AppMetricsRoot` passes its children straight through.
+
 ## 0.1.1
 
 ### Patch Changes

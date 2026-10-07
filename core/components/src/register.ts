@@ -14,6 +14,7 @@
 // `register.test.ts` is what stops a later tidy-up from turning this back into an export.
 import { registerActivityIndicatorBehavior } from './behaviors/activity-indicator';
 import { registerButtonBehavior } from './behaviors/button';
+import { registerCheckboxBehavior } from './behaviors/checkbox';
 import { registerImageBackgroundBehavior } from './behaviors/image-background';
 import { registerImageBehavior } from './behaviors/image';
 import { registerInputAccessoryViewBehavior } from './behaviors/input-accessory-view';
@@ -37,6 +38,8 @@ registerTouchableHighlightBehavior();
 // The whole subtree is the behavior's — RN's Button takes no children and builds
 // touchable > view > text > raw text itself (Button.js:363-388).
 registerButtonBehavior();
+// A pressable box plus the checkmark image it builds under itself (expo-checkbox)
+registerCheckboxBehavior();
 // Two nodes, both the behavior's: RN wraps its native spinner in a centering View
 // (ActivityIndicator.js:112), so the tag is that View and `buildStructure` builds the spinner.
 registerActivityIndicatorBehavior();
