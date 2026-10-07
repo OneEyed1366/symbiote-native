@@ -1,0 +1,11 @@
+{
+  "ios": {
+    "upstreamPackage": "expo-apple-authentication",
+    "infoPlistBooleanKeys": {
+      "CFBundleAllowMixedLocalizations": true
+    },
+    "entitlements": {
+      "com.apple.developer.applesignin": ["Default"]
+    }
+  }
+}

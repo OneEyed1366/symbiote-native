@@ -30,6 +30,7 @@ import type { Key } from 'react';
 import type { IViewProps, ITextProps } from './components';
 import type { IPressableProps } from './components/pressable/pressable-props';
 import type { IButtonProps } from './components/button-props';
+import type { ICheckboxProps } from './components/checkbox-props';
 import type { IImageProps } from './components/image/image-props';
 import type { IImageBackgroundProps } from './components/image-background-props';
 import type { IInputAccessoryViewProps } from './components/input-accessory-view-props';
@@ -67,6 +68,7 @@ export interface ICrossedPrimitiveProps {
   text: ITextProps;
   pressable: IPressableProps;
   button: IButtonProps;
+  checkbox: ICheckboxProps;
   image: IImageProps;
   'image-background': IImageBackgroundProps;
   'input-accessory-view': IInputAccessoryViewProps;

@@ -1,6 +1,17 @@
 import type { Component } from 'vue';
 import type { INavLine } from './navigation-lines';
 import { ROUTE_NAME } from './routes';
+import GlScreen from './screens/GlScreen.vue';
+import LivePhotoScreen from './screens/LivePhotoScreen.vue';
+import CameraScreen from './screens/CameraScreen.vue';
+import VideoScreen from './screens/VideoScreen.vue';
+import ImageScreen from './screens/ImageScreen.vue';
+import AppleAuthenticationScreen from './screens/AppleAuthenticationScreen.vue';
+import SymbolsScreen from './screens/SymbolsScreen.vue';
+import GlassEffectScreen from './screens/GlassEffectScreen.vue';
+import BlurScreen from './screens/BlurScreen.vue';
+import LinearGradientScreen from './screens/LinearGradientScreen.vue';
+import CheckboxScreen from './screens/CheckboxScreen.vue';
 import AgeRangeScreen from './screens/AgeRangeScreen.vue';
 import AppIntegrityScreen from './screens/AppIntegrityScreen.vue';
 import AppMetricsScreen from './screens/AppMetricsScreen.vue';
@@ -331,5 +342,71 @@ export const SCREENS: readonly IScreenEntry[] = [
     component: AuthSessionScreen,
     title: 'Auth Session',
     line: 'auth-session',
+  },
+  {
+    name: ROUTE_NAME.Checkbox,
+    component: CheckboxScreen,
+    title: 'Checkbox',
+    line: 'checkbox',
+  },
+  {
+    name: ROUTE_NAME.LinearGradient,
+    component: LinearGradientScreen,
+    title: 'Linear Gradient',
+    line: 'linear-gradient',
+  },
+  {
+    name: ROUTE_NAME.Blur,
+    component: BlurScreen,
+    title: 'Blur',
+    line: 'blur',
+  },
+  {
+    name: ROUTE_NAME.GlassEffect,
+    component: GlassEffectScreen,
+    title: 'Glass Effect',
+    line: 'glass-effect',
+  },
+  {
+    name: ROUTE_NAME.Symbols,
+    component: SymbolsScreen,
+    title: 'Symbols',
+    line: 'symbols',
+  },
+  {
+    name: ROUTE_NAME.AppleAuthentication,
+    component: AppleAuthenticationScreen,
+    title: 'Apple Authentication',
+    line: 'apple-authentication',
+  },
+  {
+    name: ROUTE_NAME.Image,
+    component: ImageScreen,
+    title: 'Image',
+    line: 'expo-image',
+  },
+  {
+    name: ROUTE_NAME.Video,
+    component: VideoScreen,
+    title: 'Video',
+    line: 'video',
+  },
+  {
+    name: ROUTE_NAME.Camera,
+    component: CameraScreen,
+    title: 'Camera',
+    line: 'camera',
+  },
+  {
+    name: ROUTE_NAME.LivePhoto,
+    component: LivePhotoScreen,
+    title: 'Live Photo',
+    line: 'live-photo',
+  },
+  {
+    name: ROUTE_NAME.Gl,
+    component: GlScreen,
+    title: 'GL',
+    line: 'gl',
   },
 ];

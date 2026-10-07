@@ -21,14 +21,14 @@ import {
 
 export type { IHostInstance } from '@symbiote-native/engine';
 
-function resolveHostNode(candidate: unknown): ISymbioteNode | null {
+export function hostNodeOf(candidate: unknown): ISymbioteNode | null {
   if (candidate === null || candidate === undefined) return null;
   if (isSymbioteNode(candidate)) return candidate;
   if (candidate instanceof ElementRef)
-    return resolveHostNode(candidate.nativeElement);
+    return hostNodeOf(candidate.nativeElement);
   const maybeHost = candidate as { nativeElement?: unknown };
   if (typeof maybeHost.nativeElement !== 'undefined') {
-    return resolveHostNode(maybeHost.nativeElement);
+    return hostNodeOf(maybeHost.nativeElement);
   }
   return null;
 }
@@ -37,6 +37,6 @@ export function findNodeHandle(componentOrHandle: unknown): number | null {
   if (componentOrHandle === null || componentOrHandle === undefined)
     return null;
   if (typeof componentOrHandle === 'number') return componentOrHandle;
-  const node = resolveHostNode(componentOrHandle);
+  const node = hostNodeOf(componentOrHandle);
   return node ? (getNativeTag(node) ?? null) : null;
 }

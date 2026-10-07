@@ -1,0 +1,224 @@
+---
+title: GL
+description: expo-gl wrapped for every SymbioteNative adapter, a GLView that gives a WebGL context to draw into.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+`@symbiote-native/gl` wraps [`expo-gl`](https://docs.expo.dev/versions/latest/sdk/gl-view/), so
+every SymbioteNative adapter gets a `GLView` with a WebGL2 context, headless contexts and
+snapshots, not just React.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | live    |
+| Android     | live    |
+
+| Framework adapter | Support |
+| ----------------- | ------- |
+| React             | live    |
+| Vue               | live    |
+| Angular           | live    |
+| Svelte            | live    |
+| Solid             | live    |
+
+## Installation
+
+```sh
+npm install @symbiote-native/gl
+```
+
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --gl`
+(or `add --gl` in an existing app) installs and wires this for you.
+
+<Aside type="danger" title="Native setup is required before first use">
+  `expo-gl`'s native code is discovered by `expo-modules-autolinking`. Follow
+  [How to: wire up an Expo native module](/docs/howtos/expo-native-module-setup/) once per app first.
+</Aside>
+
+## Usage
+
+`onContextCreate` receives the context once the native surface exists. Draw in it and finish each
+frame with `gl.endFrameEXP()`.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { GLView, type IExpoWebGLRenderingContext } from '@symbiote-native/gl/react';
+
+    function onContextCreate(gl: IExpoWebGLRenderingContext) {
+      gl.clearColor(0, 1, 1, 1);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.endFrameEXP();
+    }
+
+    <GLView style={{ flex: 1 }} onContextCreate={onContextCreate} />;
+    ```
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { GLView, type IExpoWebGLRenderingContext } from '@symbiote-native/gl/vue';
+
+    function onContextCreate(gl: IExpoWebGLRenderingContext) {
+      gl.clearColor(0, 1, 1, 1);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.endFrameEXP();
+    }
+    </script>
+
+    <template>
+      <GLView :style="{ flex: 1 }" @contextCreate="onContextCreate" />
+    </template>
+    ```
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component } from '@angular/core';
+    import { GLView, type IExpoWebGLRenderingContext } from '@symbiote-native/gl/angular';
+
+    @Component({
+      standalone: true,
+      imports: [GLView],
+      template: `<GLView [style]="{ flex: 1 }" [onContextCreate]="onContextCreate" />`,
+    })
+    export class Surface {
+      readonly onContextCreate = (gl: IExpoWebGLRenderingContext): void => {
+        gl.clearColor(0, 1, 1, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.endFrameEXP();
+      };
+    }
+    ```
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { GLView, type IExpoWebGLRenderingContext } from '@symbiote-native/gl/svelte';
+
+      function onContextCreate(gl: IExpoWebGLRenderingContext) {
+        gl.clearColor(0, 1, 1, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.endFrameEXP();
+      }
+    </script>
+
+    <GLView style={{ flex: 1 }} {onContextCreate} />
+    ```
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { GLView, type IExpoWebGLRenderingContext } from '@symbiote-native/gl/solid';
+
+    function onContextCreate(gl: IExpoWebGLRenderingContext) {
+      gl.clearColor(0, 1, 1, 1);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.endFrameEXP();
+    }
+
+    <GLView style={{ flex: 1 }} onContextCreate={onContextCreate} />;
+    ```
+  </TabItem>
+</Tabs>
+
+`gl` is a WebGL2 context. `endFrameEXP()` presents the drawing buffer, call it at the end of each
+frame.
+
+## API
+
+### Functions
+
+The statics of upstream's `GLView` class are plain functions: `createContextAsync` (a headless
+context, take a snapshot to see it), `destroyContextAsync`, `takeSnapshotAsync` and
+`getWorkletContext`. `GLLoggingOption` and `gl.__expoSetLogging(option)` print the GL calls with
+`console.warn`.
+
+### Reaching the view functions
+
+| Adapter | How                                                                       |
+| ------- | ------------------------------------------------------------------------- |
+| React   | `ref` gets an `IGLViewHandle`                                             |
+| Solid   | `ref={handle => ...}` gets the handle                                     |
+| Vue     | a template ref, the functions are exposed                                 |
+| Svelte  | `bind:this`, the component exports the functions                          |
+| Angular | `@ViewChild(GLView)`, the functions are methods                           |
+
+The handle has `exglCtxId`, `createCameraTextureAsync(camera)` (a native tag or a host node),
+`destroyObjectAsync` and `takeSnapshotAsync`. The context of a view is forgotten when the view
+unmounts.
+
+## Notes
+
+- **Nothing reaches the screen until `endFrameEXP()`.** Call it at the end of every frame, including
+  the first. The drawing buffer is presented only then.
+- **`onContextCreate` runs once per surface.** Start your loop in it and stop it when the view
+  unmounts. The package forgets the context of the view when it unmounts.
+- **Texture images must be files on disk.** `gl.texImage2D` reads a file path, so load a bundled image
+  with [`@symbiote-native/asset`](/docs/packages/asset/) and pass its `localUri` after
+  `downloadAsync()` resolves.
+- **Reanimated stays optional.** `getWorkletContext` and `enableExperimentalWorkletSupport` need
+  `react-native-reanimated` in your app, the package does not depend on it.
+- **Logging is printed with `console.warn`.** `gl.__expoSetLogging(option)` prints every GL call, which
+  is slow, so switch it off once you have the answer.
+- **Not ported.** The web build, the `nativeRef_EXPERIMENTAL` prop (hidden upstream) and upstream's one test, which is skipped there.
+
+## Common questions
+
+**The view is black, or shows only the clear color.** Check that `gl.endFrameEXP()` runs after the
+draw calls. Then look for shader errors: `gl.getShaderInfoLog(shader)` and
+`gl.getProgramInfoLog(program)` say why a program did not compile or link, and a failed program draws
+nothing without throwing. `gl.__expoSetLogging` prints each call when you need to see the sequence.
+
+**The animation stutters.** Three things found on devices while building the canary apps. Scenes
+share one GL thread, so animate one scene at a time. The iOS Simulator renders OpenGL ES in software,
+so judge speed on a device. For a full-screen shader pass `msaaSamples={0}` and cap the loop at 30
+frames per second. Use `precision highp float` in animated fragment shaders: iOS `mediump` is
+16-bit, and a time value that keeps growing turns into visible banding.
+
+**The app crashes when it goes to the background on iOS.** Apple forbids GL calls once the app is no
+longer active, and calls that arrive late crash. Stop your frame loop when `AppState` leaves
+`active` and start it again on return. An equivalent crash was reported on Android when a call lands
+after the activity pauses.
+
+**A texture from an image is blank, or missing in a release build.** The asset's `localUri` must be
+a real file path. An asset that has not been downloaded yet reports a name instead of a path, so
+`gl.texImage2D` draws nothing, which shows up in production builds first. Call
+`await asset.downloadAsync()` and use `asset.localUri`.
+
+**Can I update uniforms from a Reanimated worklet?** It is experimental upstream: pass
+`enableExperimentalWorkletSupport` to the view, read the context id from `gl.contextId` and call
+`getWorkletContext(contextId)` inside a worklet to get the context on the UI thread. Needs
+`react-native-reanimated`. Without it GL calls run on the JavaScript thread, so a busy JavaScript
+thread slows the animation.
+
+**Multi-touch on top of a `GLView` only reports one touch.** Reported for `PanResponder` on the New
+Architecture, which is the only one here. For multi-touch gestures put a gesture library's view over
+the GL view instead of handling touches on the surface.
+
+**Does camera texture memory grow?** `createCameraTextureAsync` allocates a native texture. Call the
+handle's `destroyObjectAsync(texture)` when you are done, and again when the view unmounts. A leak of
+about 10 MB per reload was reported when textures were never destroyed.
+
+**How do I see a result without a view?** `createContextAsync()` makes a headless context. Draw into
+it and read the picture back with `takeSnapshotAsync`, then `destroyContextAsync` it.
+
+Sources: [Expo docs: GLView](https://docs.expo.dev/versions/latest/sdk/gl-view/),
+[expo/expo#7367 expo-gl crashes calling OpenGL ES in the background on iOS](https://github.com/expo/expo/issues/7367),
+[expo/expo#18483 text and images missing in production](https://github.com/expo/expo/issues/18483),
+[expo/expo#2693 texImage2D and asset localUri](https://github.com/expo/expo/issues/2693),
+[expo/expo#11267 animation values as uniforms](https://github.com/expo/expo/issues/11267),
+[expo/expo#25375 PanResponder on GLView](https://github.com/expo/expo/issues/25375),
+[expo/expo#12468 memory leak with createCameraTextureAsync](https://github.com/expo/expo/issues/12468).
+
+## How the wrapper works
+
+`expo-gl`'s JS is hand-ported into this package's `core/`. `GLView` is a view that wraps the native
+surface, and `onContextCreate` receives `global.__EXGLContexts[id]`, which the native module
+installs. The statics of upstream's class are plain functions of the package. A controller may define
+a `dispose`, which every adapter runs on unmount (a React effect cleanup, Vue `onUnmounted`, Solid
+`onCleanup`, a Svelte `$effect` teardown, Angular's `disposeView`), and `GLView` uses it to forget its
+context. The optional worklet context manager lives in its own file so that an import of
+Reanimated inside a `try` does not break under Metro's inline requires. The package declares no
+permissions in `native-link.json` and has no config plugin. The native code is never vendored:
+`expo-modules-autolinking` resolves it from `node_modules` (see
+[the native setup guide](/docs/howtos/expo-native-module-setup/)).

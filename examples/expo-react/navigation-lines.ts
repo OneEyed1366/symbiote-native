@@ -55,6 +55,17 @@ export const NAV_LINE = {
   Asset: 'asset',
   AppMetrics: 'app-metrics',
   AuthSession: 'auth-session',
+  Gl: 'gl',
+  LivePhoto: 'live-photo',
+  Camera: 'camera',
+  Video: 'video',
+  Image: 'expo-image',
+  AppleAuthentication: 'apple-authentication',
+  Symbols: 'symbols',
+  GlassEffect: 'glass-effect',
+  Blur: 'blur',
+  LinearGradient: 'linear-gradient',
+  Checkbox: 'checkbox',
 } as const;
 
 export type INavLine = (typeof NAV_LINE)[keyof typeof NAV_LINE];
@@ -170,6 +181,28 @@ export const LINE_COLOR: Record<INavLine, string> = {
   [NAV_LINE.AppMetrics]: '#e11d48',
   // @symbiote-native/auth-session.
   [NAV_LINE.AuthSession]: '#65a30d',
+  // @symbiote-native/gl.
+  [NAV_LINE.Gl]: '#3b82f6',
+  // @symbiote-native/live-photo.
+  [NAV_LINE.LivePhoto]: '#facc15',
+  // @symbiote-native/camera.
+  [NAV_LINE.Camera]: '#a855f7',
+  // @symbiote-native/video.
+  [NAV_LINE.Video]: '#ef4444',
+  // @symbiote-native/image.
+  [NAV_LINE.Image]: '#22c55e',
+  // @symbiote-native/apple-authentication.
+  [NAV_LINE.AppleAuthentication]: '#64748b',
+  // @symbiote-native/symbols.
+  [NAV_LINE.Symbols]: '#ec4899',
+  // @symbiote-native/glass-effect.
+  [NAV_LINE.GlassEffect]: '#14b8a6',
+  // @symbiote-native/blur.
+  [NAV_LINE.Blur]: '#6366f1',
+  // @symbiote-native/linear-gradient.
+  [NAV_LINE.LinearGradient]: '#f97316',
+  // checkbox primitive.
+  [NAV_LINE.Checkbox]: '#0ea5e9',
 };
 
 export type INavLineInfo = {
@@ -413,5 +446,60 @@ export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
     line: NAV_LINE.AuthSession,
     code: 'AU',
     label: 'AUTH SESSION LINE',
+  },
+  [ROUTE_NAME.Gl]: {
+    line: NAV_LINE.Gl,
+    code: 'GL',
+    label: 'GL LINE',
+  },
+  [ROUTE_NAME.LivePhoto]: {
+    line: NAV_LINE.LivePhoto,
+    code: 'LP',
+    label: 'LIVE PHOTO LINE',
+  },
+  [ROUTE_NAME.Camera]: {
+    line: NAV_LINE.Camera,
+    code: 'CM',
+    label: 'CAMERA LINE',
+  },
+  [ROUTE_NAME.Video]: {
+    line: NAV_LINE.Video,
+    code: 'VD',
+    label: 'VIDEO LINE',
+  },
+  [ROUTE_NAME.Image]: {
+    line: NAV_LINE.Image,
+    code: 'EI',
+    label: 'IMAGE LINE',
+  },
+  [ROUTE_NAME.AppleAuthentication]: {
+    line: NAV_LINE.AppleAuthentication,
+    code: 'AA',
+    label: 'APPLE AUTHENTICATION LINE',
+  },
+  [ROUTE_NAME.Symbols]: {
+    line: NAV_LINE.Symbols,
+    code: 'SY',
+    label: 'SYMBOLS LINE',
+  },
+  [ROUTE_NAME.GlassEffect]: {
+    line: NAV_LINE.GlassEffect,
+    code: 'GE',
+    label: 'GLASS EFFECT LINE',
+  },
+  [ROUTE_NAME.Blur]: {
+    line: NAV_LINE.Blur,
+    code: 'BU',
+    label: 'BLUR LINE',
+  },
+  [ROUTE_NAME.LinearGradient]: {
+    line: NAV_LINE.LinearGradient,
+    code: 'LG',
+    label: 'LINEAR GRADIENT LINE',
+  },
+  [ROUTE_NAME.Checkbox]: {
+    line: NAV_LINE.Checkbox,
+    code: 'CX',
+    label: 'CHECKBOX LINE',
   },
 };

@@ -1,0 +1,180 @@
+---
+title: Checkbox
+description: The expo-checkbox control as a built-in SymbioteNative primitive, a boolean box for consent forms, checklists and bulk selection on every adapter.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+A boolean box for consent forms, checklists and bulk selection. `checkbox` is a port of
+[`expo-checkbox`](https://docs.expo.dev/versions/latest/sdk/checkbox/) that ships inside the
+framework, so there is nothing to install and no native setup: it is a pressable box with a
+checkmark image, styled by one rule in the engine so every adapter commits the same view.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | live    |
+| Android     | live    |
+
+| Framework adapter | Support |
+| ----------------- | ------- |
+| React             | live    |
+| Vue               | live    |
+| Angular           | live    |
+| Svelte            | live    |
+| Solid             | live    |
+
+## Installation
+
+Nothing to install. `checkbox` is an intrinsic element of `@symbiote-native/react`,
+`@symbiote-native/vue`, `@symbiote-native/svelte`, `@symbiote-native/solid` and
+`@symbiote-native/angular`, the same way `switch` is. It has no `native-link.json` and needs no
+autolinking step.
+
+## Usage
+
+The box is controlled: you own `value` and update it in `onValueChange`. The handler receives an
+event with the new value in `event.value`, not a bare boolean.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    const [isAccepted, setIsAccepted] = useState(false);
+
+    <view className="row">
+      <checkbox value={isAccepted} onValueChange={event => setIsAccepted(event.value)} />
+      <text>I accept the terms</text>
+    </view>;
+    ```
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { ref } from 'vue';
+
+    const isAccepted = ref(false);
+    </script>
+
+    <template>
+      <view class="row">
+        <checkbox :value="isAccepted" @value-change="event => (isAccepted = event.value)" />
+        <text>I accept the terms</text>
+      </view>
+    </template>
+    ```
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component, signal } from '@angular/core';
+    import { SYMBIOTE_ELEMENTS, type ICheckboxProps } from '@symbiote-native/angular';
+
+    @Component({
+      standalone: true,
+      imports: [SYMBIOTE_ELEMENTS],
+      template: `
+        <view class="row">
+          <checkbox [value]="isAccepted()" [onValueChange]="onChange" />
+          <text>I accept the terms</text>
+        </view>
+      `,
+    })
+    export class Terms {
+      readonly isAccepted = signal(false);
+
+      readonly onChange: NonNullable<ICheckboxProps['onValueChange']> = event =>
+        this.isAccepted.set(event.value);
+    }
+    ```
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      let isAccepted = $state(false);
+    </script>
+
+    <view class="row">
+      <checkbox value={isAccepted} onValueChange={event => (isAccepted = event.value)}></checkbox>
+      <text>I accept the terms</text>
+    </view>
+    ```
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    const [isAccepted, setIsAccepted] = createSignal(false);
+
+    <view class="row">
+      <checkbox value={isAccepted()} onValueChange={event => setIsAccepted(event.value)} />
+      <text>I accept the terms</text>
+    </view>;
+    ```
+  </TabItem>
+</Tabs>
+
+## API
+
+### Props
+
+| Prop            | Description                                                                              |
+| --------------- | ---------------------------------------------------------------------------------- |
+| `value`         | Whether the box is ticked                                                          |
+| `onValueChange` | Called on a tap with an event, the new value is `event.value`                      |
+| `disabled`      | Greys the box out and ignores taps                                                 |
+| `color`         | The color of a ticked box and of the border, a color string                        |
+| `style`         | Merged over the default 20 by 20 box, so margins and sizes can be overridden       |
+| `testID`        | For tests                                                                          |
+
+Plus the accessibility and ARIA props every view takes. `onChange` is accepted and never called, as
+upstream. There is no indeterminate state.
+
+## Notes
+
+- **The default look is the platform's.** A ticked box is filled with `#007AFF` on iOS and
+  `#009688` on Android, an unticked one has a `#657786` border, and the box is 20 by 20 with a
+  2-point radius and border.
+- **`disabled` wins over `color`.** The grey disabled look is applied after your color, so a
+  disabled box is grey whatever `color` says. A ticked disabled box is a darker grey.
+- **The role is fixed to `checkbox`**, and the screen reader hears the ticked state from `value`.
+  `aria-checked`, when you pass it, takes precedence.
+- **The box is the touch target.** The label next to it is plain text, as in `expo-checkbox`.
+
+## Common questions
+
+**Tapping the box toggles it twice, or not at all.** The box sits inside a pressable. A tap on a
+nested pressable fires both the inner and the outer `onPress` here, while stock React Native fires
+only the inner one, so a row like `<pressable onPress={toggle}><checkbox /></pressable>` runs the
+toggle twice and cancels it. Make the row a plain `view` and let the checkbox handle its own tap.
+
+**How do I make the label tappable?** Give the `text` its own `onPress` that flips the same state,
+and keep it a sibling of the checkbox rather than a wrapper around it:
+`<text onPress={() => setIsAccepted(!isAccepted)}>I accept the terms</text>`.
+
+**`onValueChange` gets an object instead of a boolean.** On purpose. Upstream passes the boolean,
+but a Svelte `on*` attribute is called with one event object, so a bare boolean would break there.
+All adapters use the same shape and read `event.value`.
+
+**The box does not change when I tap it.** It is controlled. Update the state you pass as `value`
+inside `onValueChange`, and the box follows. Without that, the tap fires and nothing changes.
+
+**`color` does nothing on a disabled box.** The disabled style is applied after `color`, as upstream.
+Enable the box to see the color, or draw your own disabled state.
+
+**How do I tick all with a parent box?** Derive the parent's `value` from the children, and make its
+`onValueChange` set every child. The canary apps show it: `value` is true only while every child is
+ticked, and a tap sets all of them to `event.value`.
+
+**Can I show an indeterminate dash?** No, `expo-checkbox` has none and neither does this port.
+Render two icons yourself if you need a third state.
+
+**Is there a Checkbox for web?** Not ported. The web variant of `expo-checkbox` is not included, only
+the native look.
+
+Sources: [Expo docs: Checkbox](https://docs.expo.dev/versions/latest/sdk/checkbox/),
+[expo-checkbox source](https://github.com/expo/expo/blob/main/packages/expo-checkbox/src/ExpoCheckbox.tsx).
+
+## How it works
+
+`checkbox` is a host behavior in `@symbiote-native/components`, not a wrapper package. The engine
+builds one pressable node with the checkmark image under it, and a rule keyed on the `checkbox` tag in
+the native engine (`foldCheckboxProps`) sets the size, border, colors and the fixed role. A second
+rule on the checkmark hides it while `value` is false. Because the rule runs in C++ for every adapter,
+React, Vue, Svelte, Solid and Angular commit the same payload, and each adapter only declares its
+prop types. `onValueChange` is wired to the press, so the tap reads `value` at the moment it happens.

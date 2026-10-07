@@ -1,0 +1,12 @@
+{
+  "android": {
+    "gradleProjectName": "expo-gl",
+    "modules": [
+      {
+        "importPath": "expo.modules.gl.GLModule",
+        "className": "GLModule",
+        "nativeName": "ExpoGL"
+      }
+    ]
+  }
+}

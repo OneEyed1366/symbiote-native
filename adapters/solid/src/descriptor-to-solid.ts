@@ -21,7 +21,7 @@
 // Svelte bridge depends on (svelte-adapter-dom-shim skill §15/§19); a violation throws here rather
 // than silently painting a half-updated tree.
 
-import { createMemo, createRenderEffect } from 'solid-js';
+import { createMemo, createRenderEffect, type JSX } from 'solid-js';
 import { isSymbioteNode, type ISymbioteNode } from '@symbiote-native/engine';
 import { createDescriptorShapeGuard } from '@symbiote-native/components';
 import type {
@@ -31,6 +31,7 @@ import type {
 import {
   createElement,
   createTextNode,
+  insert,
   insertNode,
   replaceText,
   spread,
@@ -118,8 +119,12 @@ function mountChildren(
 
 // The memo is what keeps the render fn running ONCE per change no matter how many accessors read
 // it — the root's props, every child's props, every text child all derive from the same call.
+// `children` is a component's own slot, inserted after the descriptor's children
 export function descriptorToSolid(
   descriptor: () => IDescriptor,
+  children?: () => JSX.Element,
 ): ISymbioteNode {
-  return buildNode(createMemo(descriptor));
+  const root = buildNode(createMemo(descriptor));
+  if (children) insert(root, children);
+  return root;
 }

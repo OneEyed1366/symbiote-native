@@ -13,6 +13,7 @@
   import type { ISvelteScreenOptions } from '@symbiote-native/navigation/svelte';
   import { hide } from '@symbiote-native/splash-screen/svelte';
   import './App.css';
+  import './ExpoViews.css';
 
   import MenuScreen from './screens/MenuScreen.svelte';
   import { SCREENS } from './screen-table';

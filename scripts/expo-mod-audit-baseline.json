@@ -278,5 +278,40 @@
     "package": "@symbiote-native/contacts",
     "path": "android.manifest.manifest.uses-permission.6",
     "verdict": "WRITE_CONTACTS - already declared in native-link.json android.manifestPermissions"
+  },
+  {
+    "package": "@symbiote-native/apple-authentication",
+    "path": "ios.infoPlist.CFBundleAllowMixedLocalizations",
+    "verdict": "already declared in native-link.json ios.infoPlistBooleanKeys"
+  },
+  {
+    "package": "@symbiote-native/apple-authentication",
+    "path": "ios.entitlements.com.apple.developer.applesignin",
+    "verdict": "already declared in native-link.json ios.entitlements"
+  },
+  {
+    "package": "@symbiote-native/camera",
+    "path": "ios.infoPlist.NSCameraUsageDescription",
+    "verdict": "already declared in native-link.json ios.infoPlistKeys"
+  },
+  {
+    "package": "@symbiote-native/camera",
+    "path": "ios.infoPlist.NSMicrophoneUsageDescription",
+    "verdict": "already declared in native-link.json ios.infoPlistKeys"
+  },
+  {
+    "package": "@symbiote-native/camera",
+    "path": "android.manifest.manifest.uses-permission.5",
+    "verdict": "CAMERA - already declared in native-link.json android.manifestPermissions"
+  },
+  {
+    "package": "@symbiote-native/camera",
+    "path": "android.manifest.manifest.uses-permission.6",
+    "verdict": "RECORD_AUDIO - already declared in native-link.json android.manifestPermissions"
+  },
+  {
+    "package": "@symbiote-native/image",
+    "path": "ios.podfileProperties.expo-image.disable-libdav1d",
+    "verdict": "default 'false' is what the podspec does for an absent property, libdav1d stays linked"
   }
 ]

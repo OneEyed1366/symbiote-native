@@ -105,8 +105,9 @@ export class LocalizationScreen {
   private readonly locales = inject(LocalesService).connect();
   private readonly calendars = inject(CalendarsService).connect();
 
-  readonly locale = computed(() => this.locales()[0] ?? null);
-  readonly calendar = computed(() => this.calendars()[0] ?? null);
+  // `at` types the empty list as `undefined`, an index read does not
+  readonly locale = computed(() => this.locales().at(0) ?? null);
+  readonly calendar = computed(() => this.calendars().at(0) ?? null);
 
   readonly uses24hourClockText = computed(() => {
     const value = this.calendar()?.uses24hourClock;

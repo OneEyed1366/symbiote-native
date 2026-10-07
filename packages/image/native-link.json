@@ -1,0 +1,13 @@
+{
+  "android": {
+    "gradleProjectName": "expo-image",
+    "requiresKsp": true,
+    "modules": [
+      {
+        "importPath": "expo.modules.image.ExpoImageModule",
+        "className": "ExpoImageModule",
+        "nativeName": "ExpoImage"
+      }
+    ]
+  }
+}

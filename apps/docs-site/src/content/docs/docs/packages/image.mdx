@@ -1,0 +1,283 @@
+---
+title: Image
+description: expo-image wrapped for every SymbioteNative adapter, an image view with caching, placeholders and SF Symbols.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+`@symbiote-native/image` wraps [`expo-image`](https://docs.expo.dev/versions/latest/sdk/image/),
+so every SymbioteNative adapter gets the same image view, cache functions and hash generators, not
+just React.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | live    |
+| Android     | live    |
+
+| Framework adapter | Support |
+| ----------------- | ------- |
+| React             | live    |
+| Vue               | live    |
+| Angular           | live    |
+| Svelte            | live    |
+| Solid             | live    |
+
+## Installation
+
+```sh
+npm install @symbiote-native/image
+```
+
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --image`
+(or `add --image` in an existing app) installs and wires this for you.
+
+<Aside type="danger" title="Native setup is required before first use">
+  `expo-image`'s native code is discovered by `expo-modules-autolinking`. Follow
+  [How to: wire up an Expo native module](/docs/howtos/expo-native-module-setup/) once per app first.
+</Aside>
+
+## Usage
+
+`Image` shows a picture with a placeholder and a transition. `useImage` loads one into an
+`ImageRef` you can pass to `source`, which is `null` until it is ready.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { Image, useImage } from '@symbiote-native/image/react';
+
+    const image = useImage('https://picsum.photos/1000/800', { maxWidth: 800 });
+
+    <Image
+      source="https://picsum.photos/400"
+      placeholder="blurhash:/L6PZfSi_.AyE_3t7t7R**0o#DgR4"
+      contentFit="cover"
+      transition={200}
+      style={{ width: 200, height: 200 }}
+    />;
+    {image && <Image source={image} style={{ width: 200, height: 160 }} />}
+    ```
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { Image, useImage } from '@symbiote-native/image/vue';
+
+    const image = useImage('https://picsum.photos/1000/800', { maxWidth: 800 });
+    </script>
+
+    <template>
+      <Image
+        source="https://picsum.photos/400"
+        placeholder="blurhash:/L6PZfSi_.AyE_3t7t7R**0o#DgR4"
+        contentFit="cover"
+        :transition="200"
+        :style="{ width: 200, height: 200 }"
+      />
+      <Image v-if="image" :source="image" :style="{ width: 200, height: 160 }" />
+    </template>
+    ```
+
+    `image` is a shallow ref, so a template reads it unwrapped and a script reads `image.value`.
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component } from '@angular/core';
+    import { ExpoImage, injectImage } from '@symbiote-native/image/angular';
+
+    @Component({
+      standalone: true,
+      imports: [ExpoImage],
+      template: `
+        <ExpoImage
+          source="https://picsum.photos/400"
+          placeholder="blurhash:/L6PZfSi_.AyE_3t7t7R**0o#DgR4"
+          contentFit="cover"
+          [transition]="200"
+          [style]="{ width: 200, height: 200 }"
+        />
+        @if (image(); as ref) {
+          <ExpoImage [source]="ref" [style]="{ width: 200, height: 160 }" />
+        }
+      `,
+    })
+    export class Photo {
+      readonly image = injectImage(() => 'https://picsum.photos/1000/800', () => ({ maxWidth: 800 }));
+    }
+    ```
+
+    The selector is `ExpoImage`, because `Image` is already a tag of the adapter. `image` is a signal.
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Image, useImage } from '@symbiote-native/image/svelte';
+
+      const image = useImage(() => 'https://picsum.photos/1000/800', () => ({ maxWidth: 800 }));
+    </script>
+
+    <Image
+      source="https://picsum.photos/400"
+      placeholder="blurhash:/L6PZfSi_.AyE_3t7t7R**0o#DgR4"
+      contentFit="cover"
+      transition={200}
+      style={{ width: 200, height: 200 }}
+    />
+    {#if image.current}
+      <Image source={image.current} style={{ width: 200, height: 160 }} />
+    {/if}
+    ```
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { Show } from 'solid-js';
+    import { Image, useImage } from '@symbiote-native/image/solid';
+
+    const image = useImage(() => 'https://picsum.photos/1000/800', () => ({ maxWidth: 800 }));
+
+    <Image
+      source="https://picsum.photos/400"
+      placeholder="blurhash:/L6PZfSi_.AyE_3t7t7R**0o#DgR4"
+      contentFit="cover"
+      transition={200}
+      style={{ width: 200, height: 200 }}
+    />;
+    <Show when={image()}>{ref => <Image source={ref()} style={{ width: 200, height: 160 }} />}</Show>;
+    ```
+  </TabItem>
+</Tabs>
+
+`ImageBackground` is a view with an image filling it, its children paint over the image, and
+`imageStyle` styles the image itself.
+
+## API
+
+### Props
+
+The ones you reach for first. The full list is in the
+[Expo docs](https://docs.expo.dev/versions/latest/sdk/image/).
+
+| Prop                  | Description                                                                          |
+| --------------------- | ------------------------------------------------------------------------------ |
+| `source`              | A uri, an object with `headers`, `require('./a.png')`, an `ImageRef` or an SF Symbol |
+| `placeholder`         | A source, or `blurhash:` and `thumbhash:` strings, shown until the image loads |
+| `contentFit`          | `cover` (default), `contain`, `fill`, `none`, `scale-down`                     |
+| `contentPosition`     | Where the image sits inside its box, like CSS `object-position`                |
+| `transition`          | A number of milliseconds or an object, how the content changes on a new source |
+| `cachePolicy`         | `disk` (default), `memory`, `memory-disk` or `none`                            |
+| `recyclingKey`        | Resets the view to blank or the placeholder when it changes, for recycling lists |
+| `priority`            | `low`, `normal` or `high`, best effort                                         |
+| `tintColor`           | Tints a template image, every opaque pixel takes the color                     |
+| `allowDownscaling`    | Decode smaller than the source when the box is smaller, default on             |
+| `autoplay`            | Animated images play on their own, default on                                  |
+| `alt`                 | The screen reader text, an alias of `accessibilityLabel`                       |
+
+Events are `onLoadStart`, `onProgress`, `onLoad`, `onError` and `onDisplay`.
+
+### Names per adapter
+
+| Adapter | View and background          | Load into an `ImageRef` |
+| ------- | ---------------------------- | ----------------------- |
+| React   | `Image`, `ImageBackground`   | `useImage`              |
+| Vue     | `Image`, `ImageBackground`   | `useImage`              |
+| Solid   | `Image`, `ImageBackground`   | `useImage`              |
+| Svelte  | `Image`, `ImageBackground`   | `useImage`              |
+| Angular | `ExpoImage`, `ExpoImageBackground` | `injectImage`     |
+
+Angular selectors differ because `Image` and `ImageBackground` are already tags of the adapter.
+
+### Reaching the view functions
+
+| Adapter | How                                                              |
+| ------- | ---------------------------------------------------------------- |
+| React   | `ref` gets an `IImageViewHandle`                                 |
+| Solid   | `ref={handle => ...}` gets the handle                            |
+| Vue     | a template ref, the functions are exposed                        |
+| Svelte  | `bind:this`, the component exports the functions                 |
+| Angular | `@ViewChild(ExpoImage)`, the functions are methods               |
+
+The handle has `startAnimating`, `stopAnimating`, `lockResourceAsync`, `unlockResourceAsync` and
+`reloadAsync`.
+
+### Functions
+
+The static functions of upstream's `Image` class are plain functions here: `prefetchImages`,
+`clearMemoryCache`, `clearDiskCache`, `getCachePathAsync`, `writeToCacheAsync`,
+`readFromCacheAsync`, `configureCache`, `generateBlurhashAsync`, `generateThumbhashAsync` and
+`loadImageAsync`.
+
+## Notes
+
+- **It is not React Native's `Image`.** The default fit is `contentFit="cover"`. The old `resizeMode`,
+  `fadeDuration` and `defaultSource` props still work but log a warning once, and `resizeMode:
+  'repeat'` is not supported at all. Use `contentFit`, `transition` and `placeholder`.
+- **Caching is on by default.** `cachePolicy` is `disk`. `memory` and `memory-disk` keep decoded
+  images in RAM, which the system purges quickly under pressure.
+- **A new source keeps the old picture until the new one loads**, and `transition` blends them. That
+  is the point of the library, and it is why recycling lists need `recyclingKey`.
+- **`require('./a.png')` works.** Asset numbers go through Metro's asset registry before reaching
+  native, the same as for any image view.
+- **SVG is decoded by the system on iOS.** An elliptical arc command with more than one parameter
+  set and packed flags can draw distorted or not at all. Simplify the path if one looks wrong.
+- **Colors go through `processColor` by hand**, so `tintColor` and the style colors accept names,
+  hex and `rgb()`.
+- **Not ported.** The web build, the RSC render tests of upstream (snapshot tests of a server renderer) and the `expo-observe` integration.
+
+## Common questions
+
+**A list shows the previous row's picture for a moment.** The view keeps the old image until the new
+one is ready, and a list that recycles rows (FlashList and similar) hands the same view a new source.
+Give each image a `recyclingKey` that identifies the item, for example the item id, and the view
+resets to blank or the placeholder first. Do not put a `key` on the image instead: it destroys the
+view and defeats the recycling.
+
+**Memory climbs and the app is killed when I show many images.** Rendering a hundred or more large
+pictures in a list is a reported open problem. Decode at the size you show: request a thumbnail from
+your server instead of the original, keep `cachePolicy` at `disk` unless you need `memory`, leave
+`allowDownscaling` on, and use `useImage` with `maxWidth` when you load a picture yourself. Call
+`clearMemoryCache()` when the app reports memory pressure.
+
+**An animated WebP freezes or plays in slow motion on iOS.** Apple's image decoding takes very long
+for some WebP files, so the cause is in the file and the platform rather than the view. Test your
+files before shipping them, re-encode a problem file, or show a still frame. `autoplay={false}`
+together with `startAnimating()` from the view handle lets you control when the work starts.
+
+**Android crashes with `NoSuchMethodError`, or a build cannot find `expo-modules-core` classes.** The
+native code of `expo-image` and `expo-modules-core` has to come from matching releases. This package
+pins both to exact versions, so do not install either yourself and do not add the `expo` meta-package.
+A crash on devices with 16 KB memory pages was a bundled image-loader problem fixed upstream by
+updating, so keep the package current.
+
+**The placeholder flickers when the picture arrives.** A `placeholder` is fitted with
+`placeholderContentFit`, which defaults to `scale-down`, a different mode from the picture's
+`contentFit`. A low-resolution placeholder scaled differently flickers at the swap. Set
+`placeholderContentFit` to the same value as `contentFit`.
+
+**How do I show a blurred preview first?** Pass a BlurHash or ThumbHash as the placeholder, for
+example `placeholder="blurhash:/L6PZfSi_.AyE_3t7t7R**0o#DgR4"`. Make one for your own pictures with
+`generateBlurhashAsync` or `generateThumbhashAsync`.
+
+**How do I clear the cache?** `clearMemoryCache()` and `clearDiskCache()` resolve `true` when the
+operation succeeds. `getCachePathAsync(cacheKey)` resolves the path of a cached file, or `null` when
+the image is not cached. The cache key is the source URL unless you set `cacheKey` on the source.
+
+**Why is it called `ExpoImage` in Angular?** `Image` and `ImageBackground` are already tags of the
+Angular adapter, so the selectors are `ExpoImage` and `ExpoImageBackground`.
+
+Sources: [Expo docs: Image](https://docs.expo.dev/versions/latest/sdk/image/),
+[expo/expo#21211 expo-image and FlashList component recycling](https://github.com/expo/expo/issues/21211),
+[expo/expo#26781 RAM usage when many images are rendered](https://github.com/expo/expo/issues/26781),
+[expo/expo#24557 animated WebP freezes on iOS](https://github.com/expo/expo/issues/24557),
+[expo/expo#25920 animated WebP plays in slow motion on iOS](https://github.com/expo/expo/issues/25920),
+[expo/expo#37229 Android crash on 16 KB page size devices](https://github.com/expo/expo/issues/37229).
+
+## How the wrapper works
+
+`expo-image`'s JS is hand-ported into this package's `core/`: the prop normalization with its
+deprecation warnings, source resolution, the style split in `native-style.ts`, the events with their
+payload guards, and the static functions. `createImageView(getNode)` owns the view functions, each
+adapter only hands it its host node. `ImageBackground` is a `View` with an absolute-fill image, so
+its children paint over the picture, and `useImage` and `injectImage` load an `ImageRef` through
+`createImageRefLoader`, which cancels a stale load and releases the old reference. The native code is
+never vendored: `expo-modules-autolinking` resolves it from `node_modules` (see
+[the native setup guide](/docs/howtos/expo-native-module-setup/)).

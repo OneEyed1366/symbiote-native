@@ -1,4 +1,9 @@
 import type { ISymbioteExpoLinkOptionalBundle } from '@symbiote-native/expo-modules-link';
+import {
+  AUDIO_BUNDLES,
+  LOCATION_BUNDLES,
+  VIDEO_BUNDLES,
+} from './expo-package-manifest-bundles';
 
 // The individually-selectable @symbiote-native/* packages that are thin wrappers over an Expo
 // module (expo-modules-core + one expo-<x> package — see each package's own package.json). Every
@@ -15,6 +20,7 @@ export type IExpoPackageLayerName =
   | 'age-range'
   | 'app-integrity'
   | 'app-metrics'
+  | 'apple-authentication'
   | 'application'
   | 'asset'
   | 'audio'
@@ -23,8 +29,10 @@ export type IExpoPackageLayerName =
   | 'background-task'
   | 'battery'
   | 'blob'
+  | 'blur'
   | 'brightness'
   | 'calendar'
+  | 'camera'
   | 'cellular'
   | 'clipboard'
   | 'constants'
@@ -34,11 +42,16 @@ export type IExpoPackageLayerName =
   | 'document-picker'
   | 'file-system'
   | 'font'
+  | 'gl'
+  | 'glass-effect'
   | 'haptics'
+  | 'image'
   | 'image-manipulator'
   | 'image-picker'
   | 'intent-launcher'
   | 'keep-awake'
+  | 'linear-gradient'
+  | 'live-photo'
   | 'local-auth'
   | 'localization'
   | 'location'
@@ -58,9 +71,11 @@ export type IExpoPackageLayerName =
   | 'sqlite'
   | 'standard-web-crypto'
   | 'store-review'
+  | 'symbols'
   | 'system-ui'
   | 'task-manager'
   | 'tracking-transparency'
+  | 'video'
   | 'video-thumbnails'
   | 'web-browser';
 
@@ -95,6 +110,11 @@ export const EXPO_PACKAGE_LAYERS: readonly IExpoPackageLayer[] = [
     symbiotePackage: '@symbiote-native/app-metrics',
   },
   {
+    id: 'apple-authentication',
+    label: 'Sign in with Apple',
+    symbiotePackage: '@symbiote-native/apple-authentication',
+  },
+  {
     id: 'application',
     label: 'Application info',
     symbiotePackage: '@symbiote-native/application',
@@ -104,26 +124,7 @@ export const EXPO_PACKAGE_LAYERS: readonly IExpoPackageLayer[] = [
     id: 'audio',
     label: 'Audio',
     symbiotePackage: '@symbiote-native/audio',
-    optionalManifestBundles: [
-      {
-        id: 'recording',
-        label: 'Background audio recording',
-        warning:
-          'Requesting FOREGROUND_SERVICE_MICROPHONE triggers Play Console policy review — Google requires a clear, prominent in-app disclosure and justification before you can publish.',
-        nextSteps:
-          'Pass `allowsBackgroundRecording: true` to setAudioModeAsync so recording keeps running with the app backgrounded.',
-        manifestPermissions: [
-          'android.permission.FOREGROUND_SERVICE_MICROPHONE',
-          'android.permission.POST_NOTIFICATIONS',
-        ],
-        manifestServices: [
-          {
-            name: 'expo.modules.audio.service.AudioRecordingService',
-            foregroundServiceType: 'microphone',
-          },
-        ],
-      },
-    ],
+    optionalManifestBundles: AUDIO_BUNDLES,
   },
   {
     id: 'auth-session',
@@ -151,6 +152,11 @@ export const EXPO_PACKAGE_LAYERS: readonly IExpoPackageLayer[] = [
     symbiotePackage: '@symbiote-native/blob',
   },
   {
+    id: 'blur',
+    label: 'Blur',
+    symbiotePackage: '@symbiote-native/blur',
+  },
+  {
     id: 'brightness',
     label: 'Brightness',
     symbiotePackage: '@symbiote-native/brightness',
@@ -159,6 +165,11 @@ export const EXPO_PACKAGE_LAYERS: readonly IExpoPackageLayer[] = [
     id: 'calendar',
     label: 'Calendar',
     symbiotePackage: '@symbiote-native/calendar',
+  },
+  {
+    id: 'camera',
+    label: 'Camera',
+    symbiotePackage: '@symbiote-native/camera',
   },
   {
     id: 'cellular',
@@ -197,10 +208,21 @@ export const EXPO_PACKAGE_LAYERS: readonly IExpoPackageLayer[] = [
     symbiotePackage: '@symbiote-native/file-system',
   },
   { id: 'font', label: 'Font', symbiotePackage: '@symbiote-native/font' },
+  { id: 'gl', label: 'GL', symbiotePackage: '@symbiote-native/gl' },
+  {
+    id: 'glass-effect',
+    label: 'Glass effect',
+    symbiotePackage: '@symbiote-native/glass-effect',
+  },
   {
     id: 'haptics',
     label: 'Haptics',
     symbiotePackage: '@symbiote-native/haptics',
+  },
+  {
+    id: 'image',
+    label: 'Image',
+    symbiotePackage: '@symbiote-native/image',
   },
   {
     id: 'image-manipulator',
@@ -223,6 +245,16 @@ export const EXPO_PACKAGE_LAYERS: readonly IExpoPackageLayer[] = [
     symbiotePackage: '@symbiote-native/keep-awake',
   },
   {
+    id: 'linear-gradient',
+    label: 'Linear gradient',
+    symbiotePackage: '@symbiote-native/linear-gradient',
+  },
+  {
+    id: 'live-photo',
+    label: 'Live Photo',
+    symbiotePackage: '@symbiote-native/live-photo',
+  },
+  {
     id: 'local-auth',
     label: 'Local authentication',
     symbiotePackage: '@symbiote-native/local-auth',
@@ -236,21 +268,7 @@ export const EXPO_PACKAGE_LAYERS: readonly IExpoPackageLayer[] = [
     id: 'location',
     label: 'Location',
     symbiotePackage: '@symbiote-native/location',
-    optionalManifestBundles: [
-      {
-        id: 'background',
-        label: 'Background location tracking',
-        warning:
-          'Requesting ACCESS_BACKGROUND_LOCATION and the location foreground-service permissions triggers Play Console policy review — Google requires a clear, prominent in-app disclosure and justification before you can publish.',
-        nextSteps:
-          "Pass a `foregroundService` option to `startLocationUpdatesAsync` (notification title/body) so the OS keeps tracking alive outside the app. expo-location's own LocationTaskService is already declared in its AndroidManifest.xml and merges automatically — this only adds the permissions it needs.",
-        manifestPermissions: [
-          'android.permission.ACCESS_BACKGROUND_LOCATION',
-          'android.permission.FOREGROUND_SERVICE',
-          'android.permission.FOREGROUND_SERVICE_LOCATION',
-        ],
-      },
-    ],
+    optionalManifestBundles: LOCATION_BUNDLES,
   },
   {
     id: 'mail-composer',
@@ -321,6 +339,11 @@ export const EXPO_PACKAGE_LAYERS: readonly IExpoPackageLayer[] = [
     symbiotePackage: '@symbiote-native/store-review',
   },
   {
+    id: 'symbols',
+    label: 'Symbols',
+    symbiotePackage: '@symbiote-native/symbols',
+  },
+  {
     id: 'system-ui',
     label: 'System UI',
     symbiotePackage: '@symbiote-native/system-ui',
@@ -334,6 +357,12 @@ export const EXPO_PACKAGE_LAYERS: readonly IExpoPackageLayer[] = [
     id: 'tracking-transparency',
     label: 'Tracking transparency',
     symbiotePackage: '@symbiote-native/tracking-transparency',
+  },
+  {
+    id: 'video',
+    label: 'Video',
+    symbiotePackage: '@symbiote-native/video',
+    optionalManifestBundles: VIDEO_BUNDLES,
   },
   {
     id: 'video-thumbnails',

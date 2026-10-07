@@ -1,0 +1,208 @@
+---
+title: Symbols
+description: expo-symbols wrapped for every SymbioteNative adapter, SF Symbols on iOS and Material Symbols on Android.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+`@symbiote-native/symbols` wraps [`expo-symbols`](https://docs.expo.dev/versions/latest/sdk/symbols/),
+so every SymbioteNative adapter can draw SF Symbols on iOS and Material Symbols on Android, not just
+React. On Android the glyph comes from a font loaded through
+[`@symbiote-native/font`](/docs/packages/font/).
+
+| OS platform | Support                       |
+| ----------- | ----------------------------- |
+| iOS         | live, native SF Symbols       |
+| Android     | live, Material Symbols font   |
+
+| Framework adapter | Support |
+| ----------------- | ------- |
+| React             | live    |
+| Vue               | live    |
+| Angular           | live    |
+| Svelte            | live    |
+| Solid             | live    |
+
+## Installation
+
+```sh
+npm install @symbiote-native/symbols
+```
+
+Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --symbols` (or
+`add --symbols` in an existing app) installs and wires this for you.
+
+<Aside type="danger" title="Native setup is required before first use">
+  `expo-symbols`' native code is discovered by `expo-modules-autolinking`. Follow [How to: wire up an
+  Expo native module](/docs/howtos/expo-native-module-setup/) once per app first.
+</Aside>
+
+## Usage
+
+`name` is an SF Symbols name, or an object with an entry per platform. When the current platform has
+no entry the component renders its fallback.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { SymbolView } from '@symbiote-native/symbols/react';
+
+    <SymbolView
+      name={{ ios: 'star.fill', android: 'star' }}
+      tintColor="orange"
+      size={32}
+      fallback={<Text>star</Text>}
+    />;
+    ```
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { SymbolView } from '@symbiote-native/symbols/vue';
+    </script>
+
+    <template>
+      <SymbolView :name="{ ios: 'star.fill', android: 'star' }" tint-color="orange" :size="32">
+        <template #fallback><text>star</text></template>
+      </SymbolView>
+    </template>
+    ```
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { SymbolView } from '@symbiote-native/symbols/svelte';
+    </script>
+
+    <SymbolView name={{ ios: 'star.fill', android: 'star' }} tintColor="orange" size={32}>
+      {#snippet fallback()}<text>star</text>{/snippet}
+    </SymbolView>
+    ```
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { SymbolView } from '@symbiote-native/symbols/solid';
+
+    <SymbolView
+      name={{ ios: 'star.fill', android: 'star' }}
+      tintColor="orange"
+      size={32}
+      fallback={<text>star</text>}
+    />;
+    ```
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { SymbolView } from '@symbiote-native/symbols/angular';
+
+    @Component({
+      imports: [SymbolView],
+      template: `
+        <SymbolView [name]="{ ios: 'star.fill', android: 'star' }" tintColor="orange" [size]="32">
+          <text>star</text>
+        </SymbolView>
+      `,
+    })
+    export class Card {}
+    ```
+  </TabItem>
+</Tabs>
+
+## API
+
+### Props
+
+| Prop            | Description                                                                     |
+| --------------- | ------------------------------------------------------------------------- |
+| `name`          | An SF Symbols name or `{ ios, android, web }`                             |
+| `type`          | iOS: `monochrome` (default), `hierarchical`, `palette`, `multicolor`      |
+| `scale`         | iOS symbol scale                                                          |
+| `weight`        | A weight name, or `{ ios, android }` with an Android weight import        |
+| `colors`        | iOS palette colors                                                        |
+| `size`          | Default 24                                                                |
+| `tintColor`     | Android default is the system primary color                               |
+| `resizeMode`    | iOS content mode                                                          |
+| `animationSpec` | iOS symbol effects                                                        |
+
+Plus `style`, `testID`, `nativeID`, `onLayout` and the accessibility and responder props every View
+takes. On Android only `style` reaches the drawn View, as in upstream.
+
+`unstable_getMaterialSymbolSourceAsync(symbol, size, color)` renders a Material Symbol to an image
+source for APIs that take an image, such as tab bar icons.
+
+### Android weights
+
+The Android font weight is imported from a subpath, so only the weights an app uses are bundled:
+
+```ts
+import bold from '@symbiote-native/symbols/androidWeights/bold';
+
+// weight={{ ios: 'bold', android: bold }}
+```
+
+Available: `thin`, `extraLight`, `light`, `regular`, `medium`, `semiBold`, `bold`.
+
+## Notes
+
+- **`name` is per platform.** SF Symbols and Material Symbols use different names, so pass
+  `{ ios: 'heart.fill', android: 'favorite' }`. A platform with no entry renders your `fallback`.
+- **Android draws a glyph, not an image.** The view is an empty sized `View` until the font loads,
+  then the glyph is a `Text` in the Material Symbols font. If loading fails it stays empty.
+- **`size` sets width and height** (24 by default). On Android `style` goes to that wrapping `View`,
+  so margins and backgrounds apply there too.
+- **Only the weights you import are bundled on Android.** `regular` is the default, any other comes
+  from the `androidWeights` subpath. Do not import weights you do not use.
+- **`tintColor` goes through the same color processing as every other view**, so names, hex,
+  `rgb()` and `rgba()` all work. On Android it is the text color, and the default is the system
+  primary color.
+
+## Common questions
+
+**The icon is blank on Android.** The Material Symbols font loads asynchronously, and until it does
+the view is an empty box of `size` by `size`. If it stays empty, the font failed to load or the name
+does not exist as a Material Symbol: check the spelling against the Material Symbols list, and that
+you passed an `android` entry in `name`. Render a `fallback` for the in-between state if the layout
+cannot tolerate an empty box.
+
+**Symbols look stretched on iOS.** SF Symbols are not square, so a fixed width and height squeezes
+the wide ones, which is why the lens of the `camera` symbol turns oval. Set `resizeMode`
+(`scaleAspectFit` keeps the proportions) instead of forcing both dimensions.
+
+**Filled and outline states do not switch on Android.** The bundled Material Symbols fonts are
+static instances without the `FILL` axis, and the legacy `*_filled` code points are aliased to the
+outline glyph. Switching `favorite_border` and `favorite` therefore shows the outline both times.
+This is open upstream. Pick two icons that differ in shape, or draw the filled state yourself.
+
+**Does an `rgb()` color work?** Yes, `tintColor` and `colors` go through the same color processing
+as every other view. A report that `SymbolView` ignored `rgb()` in a tab bar was traced upstream to
+the custom `tabBarIcon` not reacting to the tint change, not to the color format. If a symbol keeps
+an old color, check that the tint reaches the component again when it changes.
+
+**How big is the Android font?** Each weight is its own file, around a megabyte, and the weights are
+separate subpaths, so only those you import reach the bundle. Upstream's `expo-router` pulls all
+seven weights in even when unused, a problem that does not apply to this package.
+
+**Can I use a symbol as an image, for a tab bar?** `unstable_getMaterialSymbolSourceAsync(symbol,
+size, color)` renders a Material Symbol to an image source for APIs that take an image.
+
+**Can I use my own SF Symbol?** The native view takes system SF Symbol names. Custom symbols
+exported from the SF Symbols app are not covered by this package.
+
+Sources: [Expo docs: Symbols](https://docs.expo.dev/versions/latest/sdk/symbols/),
+[expo/expo#29889 symbols are stretched](https://github.com/expo/expo/issues/29889),
+[expo/expo#46850 filled Material Symbols on Android and web](https://github.com/expo/expo/issues/46850),
+[expo/expo#36847 SymbolView does not accept rgb colors](https://github.com/expo/expo/issues/36847),
+[expo/expo#43614 symbol fonts bundled although unused](https://github.com/expo/expo/issues/43614),
+[expo/expo#48552 SymbolView ignores style on Android and web](https://github.com/expo/expo/issues/48552).
+
+## How the wrapper works
+
+`expo-symbols`' JS is hand-ported into this package's `core/`: the prop types, the per-platform name
+resolution, the Material Symbols table and the descriptors. On iOS `renderSymbolView` returns the
+native `SymbolView` with every prop forwarded. Elsewhere it returns a sized `View` holding a `Text`
+in the Material Symbols font, loaded once on mount through
+[`@symbiote-native/font`](/docs/packages/font/). The descriptor shape changes when the font arrives,
+from an empty `View` to a `View` with a glyph, so each adapter rebuilds the node for that change,
+and `fallback` is each framework's own idiom (a prop, a slot, a snippet, projected content). The
+native code is never vendored: `expo-modules-autolinking` resolves it from `node_modules` (see
+[the native setup guide](/docs/howtos/expo-native-module-setup/)).

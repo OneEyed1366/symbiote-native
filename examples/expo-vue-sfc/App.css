@@ -57,6 +57,17 @@
   --line-asset: #0d9488;
   --line-app-metrics: #e11d48;
   --line-auth-session: #65a30d;
+  --line-gl: #3b82f6;
+  --line-live-photo: #facc15;
+  --line-camera: #a855f7;
+  --line-video: #ef4444;
+  --line-expo-image: #22c55e;
+  --line-apple-authentication: #64748b;
+  --line-symbols: #ec4899;
+  --line-glass-effect: #14b8a6;
+  --line-blur: #6366f1;
+  --line-linear-gradient: #f97316;
+  --line-checkbox: #0ea5e9;
 }
 
 .info-text {
@@ -1086,4 +1097,147 @@
   height: 88px;
   border-radius: 8px;
   background-color: var(--ink);
+}
+.line-tag-checkbox {
+  background-color: var(--line-checkbox);
+}
+.menu-row-checkbox {
+  border-left-width: 3px;
+  border-left-color: var(--line-checkbox);
+}
+.menu-badge-checkbox {
+  background-color: var(--line-checkbox);
+}
+.menu-row-hint-checkbox {
+  color: var(--line-checkbox);
+}
+.line-tag-linear-gradient {
+  background-color: var(--line-linear-gradient);
+}
+.menu-row-linear-gradient {
+  border-left-width: 3px;
+  border-left-color: var(--line-linear-gradient);
+}
+.menu-badge-linear-gradient {
+  background-color: var(--line-linear-gradient);
+}
+.menu-row-hint-linear-gradient {
+  color: var(--line-linear-gradient);
+}
+.line-tag-blur {
+  background-color: var(--line-blur);
+}
+.menu-row-blur {
+  border-left-width: 3px;
+  border-left-color: var(--line-blur);
+}
+.menu-badge-blur {
+  background-color: var(--line-blur);
+}
+.menu-row-hint-blur {
+  color: var(--line-blur);
+}
+.line-tag-glass-effect {
+  background-color: var(--line-glass-effect);
+}
+.menu-row-glass-effect {
+  border-left-width: 3px;
+  border-left-color: var(--line-glass-effect);
+}
+.menu-badge-glass-effect {
+  background-color: var(--line-glass-effect);
+}
+.menu-row-hint-glass-effect {
+  color: var(--line-glass-effect);
+}
+.line-tag-symbols {
+  background-color: var(--line-symbols);
+}
+.menu-row-symbols {
+  border-left-width: 3px;
+  border-left-color: var(--line-symbols);
+}
+.menu-badge-symbols {
+  background-color: var(--line-symbols);
+}
+.menu-row-hint-symbols {
+  color: var(--line-symbols);
+}
+.line-tag-apple-authentication {
+  background-color: var(--line-apple-authentication);
+}
+.menu-row-apple-authentication {
+  border-left-width: 3px;
+  border-left-color: var(--line-apple-authentication);
+}
+.menu-badge-apple-authentication {
+  background-color: var(--line-apple-authentication);
+}
+.menu-row-hint-apple-authentication {
+  color: var(--line-apple-authentication);
+}
+.line-tag-expo-image {
+  background-color: var(--line-expo-image);
+}
+.menu-row-expo-image {
+  border-left-width: 3px;
+  border-left-color: var(--line-expo-image);
+}
+.menu-badge-expo-image {
+  background-color: var(--line-expo-image);
+}
+.menu-row-hint-expo-image {
+  color: var(--line-expo-image);
+}
+.line-tag-video {
+  background-color: var(--line-video);
+}
+.menu-row-video {
+  border-left-width: 3px;
+  border-left-color: var(--line-video);
+}
+.menu-badge-video {
+  background-color: var(--line-video);
+}
+.menu-row-hint-video {
+  color: var(--line-video);
+}
+.line-tag-camera {
+  background-color: var(--line-camera);
+}
+.menu-row-camera {
+  border-left-width: 3px;
+  border-left-color: var(--line-camera);
+}
+.menu-badge-camera {
+  background-color: var(--line-camera);
+}
+.menu-row-hint-camera {
+  color: var(--line-camera);
+}
+.line-tag-live-photo {
+  background-color: var(--line-live-photo);
+}
+.menu-row-live-photo {
+  border-left-width: 3px;
+  border-left-color: var(--line-live-photo);
+}
+.menu-badge-live-photo {
+  background-color: var(--line-live-photo);
+}
+.menu-row-hint-live-photo {
+  color: var(--line-live-photo);
+}
+.line-tag-gl {
+  background-color: var(--line-gl);
+}
+.menu-row-gl {
+  border-left-width: 3px;
+  border-left-color: var(--line-gl);
+}
+.menu-badge-gl {
+  background-color: var(--line-gl);
+}
+.menu-row-hint-gl {
+  color: var(--line-gl);
 }
