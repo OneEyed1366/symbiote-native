@@ -1,5 +1,47 @@
 # @symbiote-native/components
 
+## 3.2.0
+
+### Minor Changes
+
+- [#93](https://github.com/OneEyed1366/symbiote-native/pull/93) [`5435556`](https://github.com/OneEyed1366/symbiote-native/commit/5435556869929fe5fd4798ac8f3dedb2fe893851) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Add `@symbiote-native/camera`: `CameraView` with its picture, recording and preview functions, the camera and microphone permission hooks, the system barcode scanner and `scanFromURLAsync` on React, Vue, Svelte, Solid and Angular, and a `--camera` layer in the CLI. `@symbiote-native/components` gains `createHostNodeHolder`, which a component uses to reach the host node of its descriptor, and Angular's `NativeViewBase` gains `hostNode()` for the same.
+
+- [#93](https://github.com/OneEyed1366/symbiote-native/pull/93) [`5435556`](https://github.com/OneEyed1366/symbiote-native/commit/5435556869929fe5fd4798ac8f3dedb2fe893851) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Add the `checkbox` primitive, a port of `expo-checkbox` on every adapter: a pressable box with a checkmark image, `value`, `color`, `disabled` and `onValueChange`, styled by a tag rule in the engine so all adapters commit the same payload.
+
+- [#93](https://github.com/OneEyed1366/symbiote-native/pull/93) [`5435556`](https://github.com/OneEyed1366/symbiote-native/commit/5435556869929fe5fd4798ac8f3dedb2fe893851) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Add `@symbiote-native/gl`: `GLView` with a WebGL2 context, headless contexts and snapshots on React, Vue, Svelte, Solid and Angular, and a `--gl` layer in the CLI. A native view controller can now define `dispose`, which every adapter runs when the view unmounts.
+
+### Patch Changes
+
+- [#93](https://github.com/OneEyed1366/symbiote-native/pull/93) [`5435556`](https://github.com/OneEyed1366/symbiote-native/commit/5435556869929fe5fd4798ac8f3dedb2fe893851) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Export the hook factories the Expo wrapper packages are built on: `createPermissionHook`, `createResourceHook` and `createEventValueHook` on React, Vue, Svelte and Solid, and `createResourceHook`, `createEventValueHook`, `PermissionsServiceBase` and `connectWatchedSignal` on Angular. The shared logic lives once in `@symbiote-native/engine` (`createPermissionApi`, `createResourceController` and friends). Angular also exports `AccessibilityInputsBase`, `NativeViewBase` and `anchorStyleProp`, which the slider now builds on, and splits its list components into smaller files without changing their API.
+
+- [#93](https://github.com/OneEyed1366/symbiote-native/pull/93) [`5435556`](https://github.com/OneEyed1366/symbiote-native/commit/5435556869929fe5fd4798ac8f3dedb2fe893851) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - TouchableWithoutFeedback builds its press-timing runtime on the first gesture instead of when it
+  adopts a child, so a list of them nobody touches stops paying for it: 383 bytes per item,
+  7 183 -> 6 800 KB per thousand.
+
+- [#93](https://github.com/OneEyed1366/symbiote-native/pull/93) [`5435556`](https://github.com/OneEyed1366/symbiote-native/commit/5435556869929fe5fd4798ac8f3dedb2fe893851) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - README: the Usage example called `renderSwitch()`, a function that no longer exists — Switch's render function was retired when painting moved to a host behavior. Replaced with `renderModal()`/`modalReducer`/`createInitialModalState`, the real current three-layer reference component, and corrected the surrounding claim that Switch is the canonical example.
+
+- [#93](https://github.com/OneEyed1366/symbiote-native/pull/93) [`5435556`](https://github.com/OneEyed1366/symbiote-native/commit/5435556869929fe5fd4798ac8f3dedb2fe893851) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - The press machine builds its gesture runtime on the first event instead of at mount, so a pressable
+  nobody touches pays for its dispatchers and nothing else. Every tag carrying the machine drops
+  ~1 KB per node: `button` 8 259 -> 7 259 KB / 1 000, `touchable-opacity` 7 992 -> 6 992,
+  `pressable` 3 561 -> 2 559, `text-input` 6 090 -> 5 168.
+
+- [#93](https://github.com/OneEyed1366/symbiote-native/pull/93) [`5435556`](https://github.com/OneEyed1366/symbiote-native/commit/5435556869929fe5fd4798ac8f3dedb2fe893851) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - ScrollView, RefreshControl, Switch and TextInput answer their events through the shared dispatch
+  too, so no behavior installs a listener closure per node any more except where the name is
+  Fabric-gated. Per thousand items: scroll-view 3 878 -> 2 276 KB, refresh-control 5 906 -> 3 937,
+  text-input 3 824 -> 3 105, switch 2 461 -> 2 015.
+
+- [#93](https://github.com/OneEyed1366/symbiote-native/pull/93) [`5435556`](https://github.com/OneEyed1366/symbiote-native/commit/5435556869929fe5fd4798ac8f3dedb2fe893851) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - TouchableOpacity and Button bind their animated opacity layer on the first press instead of at
+  mount. Mounting a thousand touchables drops from 65 ms / 25 MB to 27 ms / 8 MB, a button from
+  74 ms / 26 MB to 43 ms / 8 MB. An untouched touchable now commits no `opacity` key, matching
+  vendor (`TouchableOpacity-itest.js`); `collapsable: false` is still forced from mount.
+
+- [#93](https://github.com/OneEyed1366/symbiote-native/pull/93) [`5435556`](https://github.com/OneEyed1366/symbiote-native/commit/5435556869929fe5fd4798ac8f3dedb2fe893851) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Bring the README of every Tier 3 and Tier 4 Expo package to the package README template, with per-adapter examples, API signatures and a Common questions section with cited sources. Correct the comment on `ICheckboxProps.color`: the grey disabled look is applied after it.
+
+- [#93](https://github.com/OneEyed1366/symbiote-native/pull/93) [`5435556`](https://github.com/OneEyed1366/symbiote-native/commit/5435556869929fe5fd4798ac8f3dedb2fe893851) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - A host behavior answers its events through one shared dispatch instead of installing a closure per
+  name, and TouchableOpacity builds its fade runtime on the first press rather than at attach. Per
+  thousand items: pressable 2 559 -> 1 263 KB, touchable-opacity 6 992 -> 3 584, button 7 259 ->
+  4 068, text-input 5 167 -> 3 824.
+
 ## 3.1.4
 
 ### Patch Changes

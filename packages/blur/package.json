@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/blur",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "expo-blur wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, Svelte, Solid, and Angular adapters. A native view that blurs the content behind it, plus the Android blur target.",
   "license": "MIT",
   "repository": {

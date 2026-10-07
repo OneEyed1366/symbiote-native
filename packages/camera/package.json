@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/camera",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "expo-camera wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, Svelte, Solid, and Angular adapters. The camera preview, pictures, video recording and barcode scanning.",
   "license": "MIT",
   "repository": {

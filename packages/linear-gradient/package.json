@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/linear-gradient",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "expo-linear-gradient wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, Svelte, Solid, and Angular adapters. A native view that paints a multi-color linear gradient behind its children.",
   "license": "MIT",
   "repository": {

@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/contacts",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "expo-contacts wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, Svelte, Solid, and Angular adapters. Both surfaces: the modern SharedObject-class Contact/Group/Container API (default entry) and the legacy function-based API (/legacy subpath).",
   "license": "MIT",
   "keywords": [

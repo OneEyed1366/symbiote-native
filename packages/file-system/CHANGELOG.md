@@ -1,5 +1,13 @@
 # @symbiote-native/file-system
 
+## 0.1.4
+
+### Patch Changes
+
+- [#93](https://github.com/OneEyed1366/symbiote-native/pull/93) [`5435556`](https://github.com/OneEyed1366/symbiote-native/commit/5435556869929fe5fd4798ac8f3dedb2fe893851) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Add `@symbiote-native/file-system`, wrapping `expo-file-system` — both the shared-object `File`/`Directory`/`Paths` API and the legacy function-based API (`/legacy` subpath), usable from every adapter.
+
+- [#93](https://github.com/OneEyed1366/symbiote-native/pull/93) [`5435556`](https://github.com/OneEyed1366/symbiote-native/commit/5435556869929fe5fd4798ac8f3dedb2fe893851) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Rewrite the README of every Expo wrapper package around the problem it solves, and add a Common questions section with cited sources.
+
 ## 0.1.3
 
 ### Patch Changes

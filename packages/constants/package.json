@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/constants",
-  "version": "3.0.3",
+  "version": "3.0.4",
   "description": "expo-constants wrapped for SymbioteNative, trimmed to its native fields — one framework-agnostic core, built once and reachable from the React, Vue, Svelte, Solid, and Angular adapters. Session ID, status bar height, system fonts, linking URI, execution environment, device name and year class, the Android/iOS platform block and the WebView user agent. The Expo manifest (`expoConfig`, `manifest`, `easConfig`) is not ported.",
   "license": "MIT",
   "repository": {

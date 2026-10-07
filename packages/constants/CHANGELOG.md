@@ -1,5 +1,13 @@
 # @symbiote-native/constants
 
+## 3.0.4
+
+### Patch Changes
+
+- [#93](https://github.com/OneEyed1366/symbiote-native/pull/93) [`5435556`](https://github.com/OneEyed1366/symbiote-native/commit/5435556869929fe5fd4798ac8f3dedb2fe893851) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Add `@symbiote-native/constants`, wrapping the native fields of `expo-constants` (session ID, status bar height, system fonts, linking URI, execution environment, platform block, WebView user agent), usable from every adapter. The Expo manifest family is not ported.
+
+- [#93](https://github.com/OneEyed1366/symbiote-native/pull/93) [`5435556`](https://github.com/OneEyed1366/symbiote-native/commit/5435556869929fe5fd4798ac8f3dedb2fe893851) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Rewrite the README of every Expo wrapper package around the problem it solves, and add a Common questions section with cited sources.
+
 ## 3.0.3
 
 ### Patch Changes

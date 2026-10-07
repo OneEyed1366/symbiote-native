@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/gl",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "expo-gl wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, Svelte, Solid, and Angular adapters. A GLView that gives a WebGL context to draw into, headless contexts and snapshots.",
   "license": "MIT",
   "repository": {

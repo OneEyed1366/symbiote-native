@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/live-photo",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "expo-live-photo wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, Svelte, Solid, and Angular adapters. Displays a Live Photo, iOS only.",
   "license": "MIT",
   "repository": {

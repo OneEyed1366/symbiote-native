@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/glass-effect",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "expo-glass-effect wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, Svelte, Solid, and Angular adapters. Liquid Glass native views for iOS 26 and a plain View elsewhere.",
   "license": "MIT",
   "repository": {

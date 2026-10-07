@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/apple-authentication",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "expo-apple-authentication wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, Svelte, Solid, and Angular adapters. Sign in with Apple: the credential flow and the native button, iOS only.",
   "license": "MIT",
   "repository": {
