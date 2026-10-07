@@ -421,6 +421,17 @@ describe('VirtualizedList (real compiled index.svelte)', () => {
       expect(typeof getScrollRef?.()?.scrollTo).toBe('function');
     });
 
+    it('exports setNativeProps as a function, like the shared list handle', async () => {
+      const ListRoot = await loadMountableWithHandle();
+      mount(ROOT_TAG, ListRoot, { data: ['item-0'] });
+      await tick();
+      await tick();
+
+      const handle = (globalThis as { __listHandle?: Record<string, unknown> })
+        .__listHandle;
+      expect(typeof handle?.setNativeProps).toBe('function');
+    });
+
     // RN paints the separator inside the cell's measuring wrapper, a sibling would be an extra flex
     // child, so the assertion asks which node contains one
     it('renders the separator inside its cell rather than beside it', async () => {

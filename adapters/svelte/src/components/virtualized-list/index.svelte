@@ -240,6 +240,9 @@
   export function recordInteraction(): void {
     handle.recordInteraction();
   }
+  export function setNativeProps(props: Record<string, unknown>): void {
+    handle.setNativeProps(props);
+  }
   export function getNativeScrollRef(): ISymbioteNode | null {
     return handle.getNativeScrollRef();
   }

@@ -64,6 +64,9 @@
   export function recordInteraction(): void {
     inner?.recordInteraction();
   }
+  export function setNativeProps(props: Record<string, unknown>): void {
+    inner?.setNativeProps(props);
+  }
 
   // `{@attach}` arrives as a symbol-keyed prop, which naming individual props below drops.
   // Re-spread just those onto the inner list, which owns the real host node.
