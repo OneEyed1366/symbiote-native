@@ -1,0 +1,9 @@
+{
+  "allow": [
+    {
+      "path": "examples/react/components/parity/**",
+      "id": "jsx-button-type",
+      "why": "`<button>` here is the React Native Button tag, not an HTML form button, and takes no `type`"
+    }
+  ]
+}
