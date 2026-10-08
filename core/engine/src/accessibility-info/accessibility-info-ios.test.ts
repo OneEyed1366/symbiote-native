@@ -38,7 +38,6 @@ async function load() {
 }
 
 const NO_MANAGER = 'NativeAccessibilityManagerIOS is not available';
-const NO_MODULE = 'AccessibilityInfo native module is not available';
 
 describe('AccessibilityInfo (ios)', () => {
   describe('native getters', () => {
@@ -82,8 +81,8 @@ describe('AccessibilityInfo (ios)', () => {
       ['isReduceMotionEnabled', NO_MANAGER],
       ['isBoldTextEnabled', NO_MANAGER],
       ['isReduceTransparencyEnabled', NO_MANAGER],
-      ['isGrayscaleEnabled', NO_MODULE],
-      ['isInvertColorsEnabled', NO_MODULE],
+      ['isGrayscaleEnabled', NO_MANAGER],
+      ['isInvertColorsEnabled', NO_MANAGER],
     ] as const)('%s rejects', async (method, message) => {
       nativeModule = null;
       const info = await load();

@@ -127,7 +127,6 @@ function getEmitter() {
 }
 
 const MANAGER_MISSING = 'NativeAccessibilityManagerIOS is not available';
-const MODULE_MISSING = 'AccessibilityInfo native module is not available';
 const SERVICE_ANDROID_ONLY =
   'isAccessibilityServiceEnabled is only available on Android';
 
@@ -167,11 +166,11 @@ class AccessibilityInfoIOS implements IAccessibilityInfoStatic {
   }
 
   isGrayscaleEnabled(): Promise<boolean> {
-    return queryState(m => m.getCurrentGrayscaleState, MODULE_MISSING);
+    return queryState(m => m.getCurrentGrayscaleState, MANAGER_MISSING);
   }
 
   isInvertColorsEnabled(): Promise<boolean> {
-    return queryState(m => m.getCurrentInvertColorsState, MODULE_MISSING);
+    return queryState(m => m.getCurrentInvertColorsState, MANAGER_MISSING);
   }
 
   isReduceTransparencyEnabled(): Promise<boolean> {

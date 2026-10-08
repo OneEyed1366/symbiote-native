@@ -97,8 +97,6 @@ function getEmitter() {
 }
 
 const MODULE_UNAVAILABLE = 'NativeAccessibilityInfoAndroid is not available';
-const REDUCE_MOTION_UNAVAILABLE =
-  'AccessibilityInfo native module is not available';
 
 // Отклоняем, если геттер не запустить, как RN: по умолчанию ошибка называет метод,
 // обязательные геттеры передают свой текст
@@ -134,7 +132,7 @@ class AccessibilityInfoAndroid implements IAccessibilityInfoStatic {
     return queryState(
       m => m.isReduceMotionEnabled,
       'isReduceMotionEnabled',
-      REDUCE_MOTION_UNAVAILABLE,
+      MODULE_UNAVAILABLE,
     );
   }
 

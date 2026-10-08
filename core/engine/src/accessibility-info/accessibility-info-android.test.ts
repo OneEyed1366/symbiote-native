@@ -59,12 +59,12 @@ describe('AccessibilityInfo (android)', () => {
       );
     });
 
-    // RN называет здесь не нативный модуль, а `AccessibilityInfo`
+    // RN 0.86 называет нативный модуль, до 0.86 тут стояло общее `AccessibilityInfo`
     it('rejects isReduceMotionEnabled when the native module is missing', async () => {
       nativeModule = null;
       const info = await load();
       await expect(info.isReduceMotionEnabled()).rejects.toThrow(
-        'AccessibilityInfo native module is not available',
+        'NativeAccessibilityInfoAndroid is not available',
       );
     });
 
