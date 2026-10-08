@@ -14,6 +14,7 @@ export class ImageElement extends SymbioteElement {
   @Input() height?: IImageProps['height'];
   @Input() resizeMode?: IImageProps['resizeMode'];
   @Input() resizeMethod?: IImageProps['resizeMethod'];
+  @Input() resizeMultiplier?: IImageProps['resizeMultiplier'];
   @Input() defaultSource?: IImageProps['defaultSource'];
   @Input() loadingIndicatorSource?: IImageProps['loadingIndicatorSource'];
   @Input() blurRadius?: IImageProps['blurRadius'];
@@ -47,6 +48,7 @@ export class ImageBackgroundElement extends SymbioteElement {
   @Input() height?: IImageProps['height'];
   @Input() resizeMode?: IImageProps['resizeMode'];
   @Input() resizeMethod?: IImageProps['resizeMethod'];
+  @Input() resizeMultiplier?: IImageProps['resizeMultiplier'];
   @Input() defaultSource?: IImageProps['defaultSource'];
   @Input() loadingIndicatorSource?: IImageProps['loadingIndicatorSource'];
   @Input() blurRadius?: IImageProps['blurRadius'];
