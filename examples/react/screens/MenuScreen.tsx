@@ -21,6 +21,11 @@ const MENU_ITEMS: readonly IMenuItem[] = [
     hint: 'React hooks, Suspense, Context, refs, error boundaries — live',
   },
   {
+    label: 'RN behavior parity',
+    route: ROUTE_NAME.RnParity,
+    hint: 'one card per behavior matched to React Native 0.86',
+  },
+  {
     label: 'Styling showcase',
     route: ROUTE_NAME.StyleShowcase,
     hint: 'CSS · Modules · SCSS/Less/Stylus — and what is refused',

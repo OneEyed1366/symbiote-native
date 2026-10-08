@@ -1,0 +1,204 @@
+/* RN parity screen: every card pairs what React Native does with what the device must show.
+   Colours come from the shared tokens in App.css, the badge hues are the verdict itself.
+   Sizes are rem, which the css-parser reads as 16 per unit. */
+
+/* var() resolves at build time from the SAME file, so the App.css tokens are repeated here */
+:root {
+  --ink: #0b1622;
+  --paper: #13243a;
+  --mist: #41506a;
+  --chalk: #cbd5e1;
+  --chalk-bright: #ffffff;
+  --line-primitives: #149eca;
+  --line-presentation: #5ec8f2;
+  --line-structure: #4fd1a5;
+  --line-introspection: #b18cf5;
+  --line-routing: #f2789a;
+  --line-performance: #f5a524;
+}
+
+.parity-hero-badge {
+  width: 2.75rem;
+  height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background-color: var(--line-introspection);
+}
+.parity-section {
+  color: var(--line-introspection);
+  font-size: 0.8125rem;
+  font-weight: bold;
+  letter-spacing: 1px;
+  padding-top: 0.5rem;
+}
+
+.parity-card {
+  gap: 0.5rem;
+  padding: 0.875rem;
+  border-radius: 14px;
+  background-color: var(--paper);
+}
+.parity-card-head {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.625rem;
+}
+.parity-card-title {
+  flex: 1;
+  color: var(--chalk-bright);
+  font-size: 0.9375rem;
+  font-weight: bold;
+}
+.parity-rn {
+  color: var(--chalk);
+  font-size: 0.75rem;
+}
+.parity-look {
+  color: var(--line-structure);
+  font-size: 0.75rem;
+}
+.parity-detail {
+  color: var(--chalk);
+  font-size: 0.75rem;
+}
+
+.parity-badge {
+  padding-top: 0.1875rem;
+  padding-bottom: 0.1875rem;
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+  border-radius: 8px;
+}
+.parity-badge-text {
+  color: var(--ink);
+  font-size: 0.6875rem;
+  font-weight: bold;
+}
+.parity-badge-look {
+  background-color: var(--mist);
+}
+.parity-badge-pass {
+  background-color: var(--line-structure);
+}
+.parity-badge-fail {
+  background-color: #ff453a;
+}
+
+.parity-text {
+  color: var(--chalk);
+  font-size: 0.9375rem;
+}
+.parity-text-accent {
+  color: var(--line-presentation);
+  font-size: 0.9375rem;
+}
+.parity-tall {
+  height: 3.75rem;
+  background-color: var(--ink);
+}
+
+.parity-box {
+  height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background-color: var(--line-introspection);
+}
+.parity-box-text {
+  color: var(--ink);
+  font-size: 0.8125rem;
+  font-weight: bold;
+}
+.parity-touch-outer {
+  padding: 0.75rem;
+  border-radius: 12px;
+  background-color: var(--mist);
+}
+.parity-touch-inner {
+  height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background-color: var(--line-primitives);
+}
+.parity-swatch {
+  width: 4rem;
+  height: 4rem;
+  border-radius: 10px;
+}
+.parity-swatch-a {
+  background-color: var(--line-routing);
+}
+.parity-swatch-b {
+  background-color: var(--line-performance);
+}
+.parity-grow {
+  border-radius: 10px;
+  background-color: var(--line-structure);
+}
+.parity-grow-small {
+  height: 2.5rem;
+}
+.parity-grow-large {
+  height: 7.5rem;
+}
+.parity-role-row {
+  padding: 0.625rem;
+  border-radius: 10px;
+  background-color: var(--ink);
+}
+.parity-image {
+  width: 5rem;
+  height: 5rem;
+  border-radius: 10px;
+  border-width: 1px;
+  border-color: var(--mist);
+}
+
+.parity-list {
+  height: 9.375rem;
+  border-radius: 10px;
+  background-color: var(--ink);
+}
+.parity-list-wide {
+  height: 4.375rem;
+  border-radius: 10px;
+  background-color: var(--ink);
+}
+.parity-list-row {
+  height: 2.75rem;
+  justify-content: center;
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+}
+.parity-tint-a {
+  background-color: #1b3350;
+}
+.parity-tint-b {
+  background-color: #24456b;
+}
+.parity-slot {
+  color: var(--line-presentation);
+  font-size: 0.8125rem;
+  padding: 0.5rem;
+}
+.parity-section-head {
+  color: var(--line-presentation);
+  font-size: 0.8125rem;
+  padding: 0.5rem;
+  background-color: var(--paper);
+}
+.parity-cell-frame {
+  border-width: 2px;
+  border-color: var(--line-structure);
+}
+.parity-sep-item {
+  height: 1px;
+  background-color: #ff453a;
+}
+.parity-sep-section {
+  height: 0.375rem;
+  background-color: var(--line-primitives);
+}
