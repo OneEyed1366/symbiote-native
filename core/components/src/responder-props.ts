@@ -26,6 +26,11 @@ export type IResponderProps = {
   onFocusCapture?: IResponderHandler;
   onBlurCapture?: IResponderHandler;
   onClickCapture?: IResponderHandler;
+  // Android base ViewConfig (RN 0.84), `nativeEvent` carries key, code and the four modifier flags
+  onKeyDown?: IResponderHandler;
+  onKeyDownCapture?: IResponderHandler;
+  onKeyUp?: IResponderHandler;
+  onKeyUpCapture?: IResponderHandler;
   onStartShouldSetResponder?: IResponderGate;
   onStartShouldSetResponderCapture?: IResponderGate;
   onMoveShouldSetResponder?: IResponderGate;

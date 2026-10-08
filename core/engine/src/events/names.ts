@@ -11,6 +11,9 @@ export const BUBBLING_EVENTS: Readonly<Record<string, string>> = {
   topEndEditing: 'endEditing',
   topSubmitEditing: 'submitEditing',
   topKeyPress: 'keyPress',
+  // Android base ViewConfig (RN 0.84), native sends them only with `enableKeyEvents`, iOS never
+  topKeyDown: 'keyDown',
+  topKeyUp: 'keyUp',
   // RN's base ViewConfig: an accessibility activation arrives as a click, not as a touch sequence
   topClick: 'click',
 };
@@ -50,6 +53,7 @@ export const TOUCH_MOVE = 'topTouchMove';
 export const TOUCH_END = 'topTouchEnd';
 export const TOUCH_CANCEL = 'topTouchCancel';
 export const PRESS = 'press';
+export const SELECTION_CHANGE = 'topSelectionChange';
 
 // What an app's `onTouchStart` and its siblings listen for, `<name>Capture` is the capture twin
 export const TOUCH_START_PROP = 'touchStart';
@@ -70,11 +74,10 @@ export const RESPONDER_TERMINATION_REQUEST = 'responderTerminationRequest';
 
 // The should-set pair asked per phase, as one table т.к. the only thing separating a start
 // negotiation from a move one is which two names get asked
+export type IShouldSetPhase = 'start' | 'move' | 'selectionChange';
+
 export const SHOULD_SET_NAMES: Readonly<
-  Record<
-    'start' | 'move',
-    { readonly capture: string; readonly bubble: string }
-  >
+  Record<IShouldSetPhase, { readonly capture: string; readonly bubble: string }>
 > = {
   start: {
     capture: 'startShouldSetResponderCapture',
@@ -83,6 +86,10 @@ export const SHOULD_SET_NAMES: Readonly<
   move: {
     capture: 'moveShouldSetResponderCapture',
     bubble: 'moveShouldSetResponder',
+  },
+  selectionChange: {
+    capture: 'selectionChangeShouldSetResponderCapture',
+    bubble: 'selectionChangeShouldSetResponder',
   },
 };
 

@@ -42,6 +42,7 @@ import {
   RESPONDER_RELEASE,
   RESPONDER_START,
   RESPONDER_TERMINATE,
+  SELECTION_CHANGE,
   TOUCH_CANCEL,
   TOUCH_CANCEL_PROP,
   TOUCH_END,
@@ -297,6 +298,11 @@ function deliverNonTouch(
   nativeEvent: Record<string, unknown>,
 ): boolean {
   const direct = DIRECT_EVENTS[topLevelType];
+  // RN's `canTriggerTransfer`: a selection change only moves the responder while a touch is down
+  if (topLevelType === SELECTION_CHANGE && touchHistory.numberActiveTouches > 0)
+    runWrapped(() =>
+      negotiateResponder(target, 'selectionChange', nativeEvent),
+    );
   if (direct !== undefined) {
     if (isDebug()) dlog(`event ${topLevelType} -> ${direct} (direct)`);
     runWrapped(() => deliverDirect(target, direct, nativeEvent));

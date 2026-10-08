@@ -297,14 +297,21 @@ function putRnApiOnNode(node: ISymbioteNode): void {
   });
 }
 
+// TextInput.js passes `onSelectionChangeShouldSetResponder` on its iOS branch only, so a drag on
+// the selection handles keeps the gesture
+function claimsSelectionDrag(): boolean {
+  return Platform.OS === 'ios';
+}
+
 const OWN_HANDLERS: ReadonlyMap<
   string,
-  (node: ISymbioteNode, event: ISymbioteEvent) => void
+  (node: ISymbioteNode, event: ISymbioteEvent) => unknown
 > = new Map([
   ['change', onChange],
   ['focus', onFocus],
   ['blur', onBlur],
   ['selectionChange', onSelectionChange],
+  ['selectionChangeShouldSetResponder', claimsSelectionDrag],
 ]);
 
 const TEXT_INPUT_DISPATCH: IEventDispatch = {

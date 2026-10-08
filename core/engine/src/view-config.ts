@@ -33,6 +33,8 @@ const BASE_EVENTS: readonly string[] = [
   'focus',
   'blur',
   'click',
+  'keyDown',
+  'keyUp',
   // Every bubbling event of RN's base ViewConfig declares a `captured` registration name, and an
   // ancestor of any view can listen for it
   'pressCapture',
@@ -43,6 +45,8 @@ const BASE_EVENTS: readonly string[] = [
   'submitEditingCapture',
   'endEditingCapture',
   'keyPressCapture',
+  'keyDownCapture',
+  'keyUpCapture',
   ...A11Y_EVENTS,
 ];
 

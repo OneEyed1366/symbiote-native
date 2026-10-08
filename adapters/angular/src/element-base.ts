@@ -127,6 +127,10 @@ export abstract class SymbioteElement implements OnChanges {
   @Input() onFocusCapture?: IElementProps['onFocusCapture'];
   @Input() onBlurCapture?: IElementProps['onBlurCapture'];
   @Input() onClickCapture?: IElementProps['onClickCapture'];
+  @Input() onKeyDown?: IElementProps['onKeyDown'];
+  @Input() onKeyDownCapture?: IElementProps['onKeyDownCapture'];
+  @Input() onKeyUp?: IElementProps['onKeyUp'];
+  @Input() onKeyUpCapture?: IElementProps['onKeyUpCapture'];
 
   @Input() pointerEvents?: IElementProps['pointerEvents'];
   @Input() hitSlop?: IElementProps['hitSlop'];

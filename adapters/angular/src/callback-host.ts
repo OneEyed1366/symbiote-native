@@ -50,7 +50,11 @@ const CALLBACK_INPUTS = [
   'onFocusCapture',
   'onHoverIn',
   'onHoverOut',
+  'onKeyDown',
+  'onKeyDownCapture',
   'onKeyPress',
+  'onKeyUp',
+  'onKeyUpCapture',
   'onKeyboardDidHide',
   'onKeyboardDidShow',
   'onKeyboardWillHide',
@@ -113,7 +117,8 @@ export const CALLBACK_ATTRIBUTE_SELECTOR =
   '[onAccessibilityAction],[onAccessibilityEscape],[onAccessibilityTap],[onBlur],' +
   '[onBlurCapture],[onChangeText],[onClickCapture],[onContentSizeChange],[onEndEditing],[onError],' +
   '[onFocus],[onFocusCapture],[onHoverIn],[onHoverOut],' +
-  '[onKeyPress],[onKeyboardDidHide],[onKeyboardDidShow],[onKeyboardWillHide],[onKeyboardWillShow],' +
+  '[onKeyDown],[onKeyDownCapture],[onKeyPress],[onKeyUp],[onKeyUpCapture],' +
+  '[onKeyboardDidHide],[onKeyboardDidShow],[onKeyboardWillHide],[onKeyboardWillShow],' +
   '[onLayout],[onLoad],[onLoadEnd],[onLoadStart],[onLongPress],[onMagicTap],' +
   '[onMomentumScrollBegin],[onMomentumScrollEnd],[onMoveShouldSetResponder],' +
   '[onMoveShouldSetResponderCapture],[onPartialLoad],[onPress],[onPressIn],[onPressMove],' +
@@ -132,7 +137,8 @@ export const CALLBACK_INPUT_NAMES: readonly string[] = CALLBACK_INPUTS;
     '[onAccessibilityAction],[onAccessibilityEscape],[onAccessibilityTap],[onBlur],' +
     '[onBlurCapture],[onClickCapture],[onContentSizeChange],[onEndEditing],[onError],' +
     '[onFocus],[onFocusCapture],[onHoverIn],[onHoverOut],' +
-    '[onKeyPress],[onKeyboardDidHide],[onKeyboardDidShow],[onKeyboardWillHide],' +
+    '[onKeyDown],[onKeyDownCapture],[onKeyPress],[onKeyUp],[onKeyUpCapture],' +
+    '[onKeyboardDidHide],[onKeyboardDidShow],[onKeyboardWillHide],' +
     '[onKeyboardWillShow],[onLayout],[onLoad],[onLoadEnd],[onLoadStart],[onLongPress],[onMagicTap],' +
     '[onMomentumScrollBegin],[onMomentumScrollEnd],[onMoveShouldSetResponder],' +
     '[onMoveShouldSetResponderCapture],[onPartialLoad],[onPress],[onPressIn],[onPressMove],' +
@@ -167,7 +173,11 @@ export const CALLBACK_INPUT_NAMES: readonly string[] = CALLBACK_INPUTS;
     'onFocusCapture',
     'onHoverIn',
     'onHoverOut',
+    'onKeyDown',
+    'onKeyDownCapture',
     'onKeyPress',
+    'onKeyUp',
+    'onKeyUpCapture',
     'onKeyboardDidHide',
     'onKeyboardDidShow',
     'onKeyboardWillHide',
