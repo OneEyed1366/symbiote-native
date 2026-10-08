@@ -322,6 +322,9 @@ export type ITextStyle = IViewStyle & {
   // Per-text override of the layout writing direction.
   writingDirection?: 'auto' | 'ltr' | 'rtl';
   includeFontPadding?: boolean;
+  // The Text fold maps these onto `selectable` and `textAlignVertical`
+  userSelect?: 'auto' | 'text' | 'none' | 'contain' | 'all';
+  verticalAlign?: 'auto' | 'top' | 'bottom' | 'middle';
 };
 
 // A style "slot" exactly as RN callers pass it: a style object, a (possibly nested) array of
