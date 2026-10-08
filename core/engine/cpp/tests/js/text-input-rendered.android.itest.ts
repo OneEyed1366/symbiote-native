@@ -82,6 +82,24 @@ describe('<TextInput> props', () => {
     expect(Reflect.get(Object(received[0]), 'text')).toBe('Hello World');
   });
 
+  // RN 0.85: the change event carries the cursor `selection` on both platforms
+  it('onChange keeps the selection the change event carries', () => {
+    const received: unknown[] = [];
+    const { tag } = mountInput({
+      onChange: (event: { nativeEvent: unknown }) =>
+        received.push(event.nativeEvent),
+    });
+
+    dispatchEvent(tag, 'change', {
+      text: 'Hello',
+      selection: { start: 5, end: 5 },
+    });
+
+    const selection = Reflect.get(Object(received[0]), 'selection');
+    expect(Reflect.get(Object(selection), 'start')).toBe(5);
+    expect(Reflect.get(Object(selection), 'end')).toBe(5);
+  });
+
   // RN passes the bare string, the tag passes the event with `text` on it (user ruling: one
   // contract on five adapters, Svelte's `target_handler` takes an object only)
   it('onChangeText is called when the change native event is dispatched', () => {
@@ -113,6 +131,72 @@ describe('<TextInput> props', () => {
     dispatchEvent(tag, 'blur', {});
 
     expect(blurred).toBe(1);
+  });
+});
+
+function hostProps(props: Record<string, unknown>): Record<string, unknown> {
+  render(createElement(TEXT_INPUT, props));
+  return { ...mounted().children[0]?.props };
+}
+
+// Кейсы добавлены в RN 0.86 (#56559, TextInput-test переехал на Fantom)
+describe('<TextInput> props on the mounting layer', () => {
+  beforeEach(() => createRoot(200, 200));
+
+  it("has 'id' propagated as 'nativeID'", () => {
+    expect(hostProps({ id: 'alpha' }).nativeID).toBe('alpha');
+  });
+
+  it("has 'nativeID' propagated correctly", () => {
+    expect(hostProps({ nativeID: 'alpha' }).nativeID).toBe('alpha');
+  });
+
+  it("has a precedence of 'id' over 'nativeID'", () => {
+    expect(hostProps({ id: 'alpha', nativeID: 'gamma' }).nativeID).toBe(
+      'alpha',
+    );
+  });
+
+  it('propagates testID', () => {
+    expect(hostProps({ testID: 'my-test-id' }).testID).toBe('my-test-id');
+  });
+
+  it("has 'aria-label' propagated as 'accessibilityLabel'", () => {
+    expect(hostProps({ 'aria-label': 'label' }).accessibilityLabel).toBe(
+      'label',
+    );
+  });
+
+  it("has 'accessibilityLabel' propagated correctly", () => {
+    expect(hostProps({ accessibilityLabel: 'label' }).accessibilityLabel).toBe(
+      'label',
+    );
+  });
+
+  it("maps 'aria-*' state props to 'accessibilityState'", () => {
+    const props = hostProps({
+      'aria-busy': true,
+      'aria-checked': true,
+      'aria-disabled': true,
+      'aria-expanded': true,
+      'aria-selected': true,
+    });
+
+    expect(props.accessibilityState).toBe(
+      '{disabled:true,selected:true,checked:Checked,busy:true,expanded:true}',
+    );
+  });
+
+  it('propagates accessibilityRole', () => {
+    expect(hostProps({ accessibilityRole: 'button' }).accessibilityRole).toBe(
+      'button',
+    );
+  });
+
+  it('propagates style values', () => {
+    const props = hostProps({ style: { backgroundColor: 'white' } });
+
+    expect(props.backgroundColor).toBe('rgba(255, 255, 255, 1)');
   });
 });
 
@@ -238,6 +322,37 @@ describe('<TextInput> ref', () => {
 
     expect(currentlyFocusedInput()).toBe(null);
     expect(input.isFocused()).toBe(false);
+  });
+
+  it('unfocuses any previously focused TextInput when a new one is focused', () => {
+    const first = createRef<ITextInputHandle>();
+    const second = createRef<ITextInputHandle>();
+    render(
+      createElement(
+        'view',
+        null,
+        createElement(TEXT_INPUT, { nativeID: 'text-input-1', ref: first }),
+        createElement(TEXT_INPUT, { nativeID: 'text-input-2', ref: second }),
+      ),
+    );
+    const one = textInputOf(first.current);
+    const two = textInputOf(second.current);
+    if (one === undefined || two === undefined)
+      throw new Error('no TextInput API');
+    expect(one.isFocused()).toBe(false);
+    expect(two.isFocused()).toBe(false);
+
+    one.focus();
+
+    expect(one.isFocused()).toBe(true);
+    expect(two.isFocused()).toBe(false);
+    expect(currentlyFocusedInput()).toBe(first.current);
+
+    two.focus();
+
+    expect(one.isFocused()).toBe(false);
+    expect(two.isFocused()).toBe(true);
+    expect(currentlyFocusedInput()).toBe(second.current);
   });
 
   it('setSelection() dispatches the setTextAndSelection command', () => {
