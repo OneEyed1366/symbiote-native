@@ -270,6 +270,47 @@ describe('what an image sends native, resolved by the engine', () => {
     expect(payload.height).toBe(99);
   });
 
+  // RN считает размер по умолчанию как `source.width ?? props.width`
+  it('takes the default size from the source when it carries one', () => {
+    const payload = commit({
+      source: { uri: 'https://a/1.png', width: 64, height: 32 },
+    }).payload;
+
+    expect(payload.width).toBe(64);
+    expect(payload.height).toBe(32);
+  });
+
+  it('lets the size inside the source beat the width and height props', () => {
+    const payload = commit({
+      source: { uri: 'https://a/1.png', width: 64, height: 32 },
+      width: 40,
+      height: 20,
+    }).payload;
+
+    expect(payload.width).toBe(64);
+    expect(payload.height).toBe(32);
+  });
+
+  it('falls back to the props for a dimension the source lacks', () => {
+    const payload = commit({
+      source: { uri: 'https://a/1.png', width: 64 },
+      height: 20,
+    }).payload;
+
+    expect(payload.width).toBe(64);
+    expect(payload.height).toBe(20);
+  });
+
+  it('keeps an explicit style size over the size inside the source', () => {
+    const payload = commit({
+      source: { uri: 'https://a/1.png', width: 64, height: 32 },
+      style: { width: 10 },
+    }).payload;
+
+    expect(payload.width).toBe(10);
+    expect(payload.height).toBe(32);
+  });
+
   // why: `alt` is the accessibility text (Image.ios.js / Image.android.js) — it sets
   // `accessibilityLabel` AND marks the image accessible, which is what puts it in the reader's
   // order at all. An explicit label still wins.

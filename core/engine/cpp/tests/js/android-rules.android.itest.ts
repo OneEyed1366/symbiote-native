@@ -163,6 +163,19 @@ describe('the rules that only an Android build compiles', () => {
     expect(fieldOf(background, 'color')).toEqual(platformColor);
   });
 
+  // RN 0.86: PlatformColor рядом с alpha, нерезолвящийся тоже, commit не падает
+  for (const resourcePath of ['?attr/colorAccent', '?attr/doesNotExist']) {
+    it(`keeps a PlatformColor ${resourcePath} next to the ripple alpha`, () => {
+      const platformColor = { resource_paths: [resourcePath] };
+      const background = commitOne('RCTView', 'pressable', {
+        android_ripple: { color: platformColor, alpha: 0.3 },
+      }).nativeBackgroundAndroid;
+
+      expect(fieldOf(background, 'color')).toEqual(platformColor);
+      expect(fieldOf(background, 'alpha')).toBe(0.3);
+    });
+  }
+
   // Material-вид из `Button.js:394-437`, на iOS это `{}`, читается по поднятым ключам payload
   it('paints the Material button style', () => {
     const payload = commitOne('RCTView', 'button', { title: 'Save' });
@@ -490,6 +503,26 @@ describe('srcSet on an Android image', () => {
         'Access-Control-Allow-Credentials',
       ),
     ).toBe('true');
+  });
+});
+
+// RN #57890: `tabbar` is in the public role union but Android's role enum has no entry for it, so
+// stock 0.86.0 throws on mount. RN fixed it natively after the pin, here the role is just dropped
+describe('accessibilityRole on Android', () => {
+  it('drops the iOS-only tabbar role instead of crashing the mount', () => {
+    const payload = commitOne('RCTView', 'view', {
+      accessibilityRole: 'tabbar',
+    });
+
+    expect(payload.accessibilityRole).toBe(undefined);
+  });
+
+  it('keeps a role Android knows', () => {
+    const payload = commitOne('RCTView', 'view', {
+      accessibilityRole: 'tablist',
+    });
+
+    expect(payload.accessibilityRole).toBe('tablist');
   });
 });
 

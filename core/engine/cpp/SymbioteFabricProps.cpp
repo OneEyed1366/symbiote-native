@@ -113,6 +113,9 @@ const std::unordered_set<std::string> kColorProps = {
     "trackTintColor",
     // ScrollView's Android fill below the content (`ScrollViewNativeComponent.js`: colorAttribute).
     "endFillColor",
+    // The pull-to-refresh views (`PullToRefreshView`, `AndroidSwipeRefreshLayout`)
+    "titleColor",
+    "progressBackgroundColor",
 };
 
 // ── COLOUR ───────────────────────────────────────────────────────────────────────────────────────
@@ -218,6 +221,12 @@ dynamic processColorValue(const dynamic &value) {
 }
 
 dynamic processValue(const std::string &key, const dynamic &value) {
+  // `colors` is the swipe-refresh array, RN's `processColorArray` maps each entry
+  if (key == "colors" && value.isArray()) {
+    dynamic processed = dynamic::array();
+    for (const auto &color : value) processed.push_back(processColorValue(color));
+    return processed;
+  }
   if (kColorProps.count(key) == 0) return value;
   return processColorValue(value);
 }
@@ -2382,6 +2391,15 @@ dynamic foldImageProps(const dynamic &props, bool ariaHiddenIsTrue) {
   // RN spells it `{width, height}, ...style`, so they go UNDER.
   const dynamic *width = props.get_ptr("width");
   const dynamic *height = props.get_ptr("height");
+  // A lone source's own size beats the props: `source.width ?? props.width` (`Image.ios.js:133`)
+  const dynamic &resolvedSources = out["source"];
+  if (resolvedSources.isArray() && resolvedSources.size() == 1 &&
+      resolvedSources.at(0).isObject()) {
+    const dynamic *sourceWidth = resolvedSources.at(0).get_ptr("width");
+    const dynamic *sourceHeight = resolvedSources.at(0).get_ptr("height");
+    if (sourceWidth != nullptr && sourceWidth->isNumber()) width = sourceWidth;
+    if (sourceHeight != nullptr && sourceHeight->isNumber()) height = sourceHeight;
+  }
   const dynamic *style = props.get_ptr("style");
 
   // `Image.ios.js:141`: `objectFit`, then the prop, then the style key, then `cover`
@@ -2739,6 +2757,18 @@ dynamic fabricProps(
     aliasFolded = foldAriaProps(ariaSource);
     bag = &aliasFolded;
   }
+
+#ifdef ANDROID
+  // `tabbar` has no entry in Android's role enum and stock 0.86.0 throws on mount (RN #57890)
+  dynamic roleStripped;
+  const dynamic *authoredRole = bag->get_ptr("accessibilityRole");
+  if (authoredRole != nullptr && authoredRole->isString() &&
+      authoredRole->getString() == "tabbar") {
+    roleStripped = *bag;
+    roleStripped.erase("accessibilityRole");
+    bag = &roleStripped;
+  }
+#endif
 
   // The TAG's own platform props, in the slot the behavior's JS fold used to occupy — after the aria
   // fold and before anything else, because that order is load-bearing and always was: the aria fold
