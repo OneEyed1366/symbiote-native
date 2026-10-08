@@ -122,9 +122,4 @@ export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
     code: 'ST',
     label: 'STYLING LINE',
   },
-  [ROUTE_NAME.RnParity]: {
-    line: NAV_LINE.Introspection,
-    code: 'RN',
-    label: 'INTROSPECTION LINE',
-  },
 };

@@ -42,7 +42,6 @@ import { ApiPlaygroundScreen } from './screens/ApiPlaygroundScreen';
 import { BenchmarkScreen } from './screens/BenchmarkScreen';
 import { JsiNavigationCostScreen } from './screens/JsiNavigationCostScreen';
 import { StyleShowcaseScreen } from './screens/StyleShowcaseScreen';
-import { RnParityScreen } from './screens/RnParityScreen';
 import { APP_LINKING_CONFIG } from './navigation-linking';
 import { ROUTE_NAME } from './routes';
 import { LINE_COLOR } from './navigation-lines';
@@ -250,19 +249,6 @@ function App() {
             title: 'Styling showcase',
             headerShown: true,
             headerTintColor: LINE_COLOR.styling,
-            headerTranslucent: true,
-            headerTitleColor: '#ffffff',
-            headerStyle: { backgroundColor: '#0b1622' },
-            headerUserInterfaceStyle: 'dark',
-          }}
-        />
-        <Stack.Screen
-          name={ROUTE_NAME.RnParity}
-          component={RnParityScreen}
-          options={{
-            title: 'RN behavior parity',
-            headerShown: true,
-            headerTintColor: LINE_COLOR.introspection,
             headerTranslucent: true,
             headerTitleColor: '#ffffff',
             headerStyle: { backgroundColor: '#0b1622' },

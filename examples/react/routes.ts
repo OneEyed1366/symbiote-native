@@ -18,7 +18,6 @@ export const ROUTE_NAME = {
   Benchmark: 'Benchmark',
   StyleShowcase: 'StyleShowcase',
   JsiNavigationCost: 'JsiNavigationCost',
-  RnParity: 'RnParity',
 } as const;
 
 export type IRouteName = (typeof ROUTE_NAME)[keyof typeof ROUTE_NAME];
