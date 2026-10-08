@@ -37,6 +37,7 @@ import type {
 } from '@symbiote-native/components';
 import type {
   IClassNameValue,
+  IColorValue,
   IStyleProp,
   IViewStyle,
 } from '@symbiote-native/engine';
@@ -123,7 +124,7 @@ export type IScrollViewProps = IAccessibilityProps &
     overScrollMode?: 'auto' | 'always' | 'never';
     fadingEdgeLength?: number;
     persistentScrollbar?: boolean;
-    endFillColor?: string;
+    endFillColor?: IColorValue;
     onLayout?: IScrollHandler;
     onScroll?: IScrollHandler;
     onScrollBeginDrag?: IScrollHandler;

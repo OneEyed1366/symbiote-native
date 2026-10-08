@@ -11,8 +11,7 @@ import {
   createStatusBarEntry,
   statusBarImperative,
   statusBarCurrentHeight,
-  isOpaqueColorValue,
-  type IColorValue,
+  isProcessableColor,
   type IStatusBarAnimation,
   type IStatusBarProps,
   type IStatusBarStyle,
@@ -42,12 +41,6 @@ function asTransition(value: unknown): IStatusBarAnimation | undefined {
   return TRANSITIONS.find(transition => transition === value);
 }
 
-function asColorValue(value: unknown): IColorValue | undefined {
-  if (typeof value === 'string') return value;
-  if (isOpaqueColorValue(value)) return value;
-  return undefined;
-}
-
 function buildProps(attrs: Record<string, unknown>): IStatusBarProps {
   return {
     barStyle: asBarStyle(attrs.barStyle),
@@ -57,7 +50,9 @@ function buildProps(attrs: Record<string, unknown>): IStatusBarProps {
     networkActivityIndicatorVisible: asBoolean(
       attrs.networkActivityIndicatorVisible,
     ),
-    backgroundColor: asColorValue(attrs.backgroundColor),
+    backgroundColor: isProcessableColor(attrs.backgroundColor)
+      ? attrs.backgroundColor
+      : undefined,
     translucent: asBoolean(attrs.translucent),
   };
 }

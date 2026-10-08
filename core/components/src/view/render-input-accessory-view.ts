@@ -8,7 +8,11 @@
 // apart and put it back unchanged, so nothing calls it any more. Angular still names the type for
 // its `@Input()` declarations (`adapters/angular/src/elements.ts`); the fold does not exist.
 
-import type { IStyleProp, IViewStyle } from '@symbiote-native/engine';
+import type {
+  IColorValue,
+  IStyleProp,
+  IViewStyle,
+} from '@symbiote-native/engine';
 
 // The pre-resolved inputs the fold reads. The adapter narrows the typed fields (nativeID /
 // backgroundColor / style) and folds everything else (accessibility*, testID) into `passthrough`,
@@ -16,7 +20,7 @@ import type { IStyleProp, IViewStyle } from '@symbiote-native/engine';
 export type IInputAccessoryViewViewProps = {
   // The id a TextInput's inputAccessoryViewID points at to dock above its keyboard.
   nativeID?: string;
-  backgroundColor?: string;
+  backgroundColor?: IColorValue;
   style?: IStyleProp<IViewStyle>;
   passthrough: Record<string, unknown>;
 };

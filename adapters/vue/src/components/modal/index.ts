@@ -38,8 +38,10 @@ import {
 } from '@symbiote-native/components';
 import {
   dlog,
+  isProcessableColor,
   Platform,
   type IClassNameValue,
+  type IColorValue,
   type IStyleProp,
   type ISymbioteEvent,
   type IViewStyle,
@@ -60,7 +62,7 @@ export type IModalProps = IAccessibilityProps &
   IAriaProps & {
     visible?: boolean;
     transparent?: boolean;
-    backdropColor?: string;
+    backdropColor?: IColorValue;
     animationType?: IModalAnimationType;
     presentationStyle?: IModalPresentationStyle;
     supportedOrientations?: ReadonlyArray<IModalOrientation>;
@@ -86,10 +88,6 @@ export type IModalEmits = {
 
 function asBoolean(value: unknown): boolean | undefined {
   return typeof value === 'boolean' ? value : undefined;
-}
-
-function asString(value: unknown): string | undefined {
-  return typeof value === 'string' ? value : undefined;
 }
 
 function asAnimationType(value: unknown): IModalAnimationType | undefined {
@@ -199,7 +197,9 @@ function modalRootOf(
   return renderModal({
     ...modalFlagsOf(attrs),
     visible: asBoolean(attrs.visible),
-    backdropColor: asString(attrs.backdropColor),
+    backdropColor: isProcessableColor(attrs.backdropColor)
+      ? attrs.backdropColor
+      : undefined,
     animationType: asAnimationType(attrs.animationType),
     supportedOrientations: asSupportedOrientations(attrs.supportedOrientations),
     hardwareAccelerated: asBoolean(attrs.hardwareAccelerated),

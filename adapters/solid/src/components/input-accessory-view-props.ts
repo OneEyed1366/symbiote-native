@@ -10,6 +10,7 @@ import type {
 } from '@symbiote-native/components';
 import type {
   IClassNameValue,
+  IColorValue,
   IStyleProp,
   IViewStyle,
 } from '@symbiote-native/engine';
@@ -19,15 +20,15 @@ import type {
 // (IAccessibilityProps / IAriaProps, IStyleProp) is shared, the framework-flavoured field is not.
 // React's, Vue's and Svelte's IInputAccessoryViewProps are separate declarations for the same
 // reason, and an adapter never imports another adapter's types.
-export interface IInputAccessoryViewProps
-  extends IAccessibilityProps, IAriaProps {
-  // The id a TextInput's inputAccessoryViewID points at to dock above its keyboard. Native pairs
-  // the two by string alone; there is no JS-side linking.
-  nativeID?: string;
-  backgroundColor?: string;
-  style?: IStyleProp<IViewStyle>;
-  // Solid's own spelling for a registered class name — `class`, matching every other primitive
-  // here (React's is `className`). routeProp's class+style merge resolves it.
-  class?: IClassNameValue;
-  children?: JSX.Element;
-}
+export type IInputAccessoryViewProps = IAccessibilityProps &
+  IAriaProps & {
+    // The id a TextInput's inputAccessoryViewID points at to dock above its keyboard. Native pairs
+    // the two by string alone; there is no JS-side linking.
+    nativeID?: string;
+    backgroundColor?: IColorValue;
+    style?: IStyleProp<IViewStyle>;
+    // Solid's own spelling for a registered class name — `class`, matching every other primitive
+    // here (React's is `className`). routeProp's class+style merge resolves it.
+    class?: IClassNameValue;
+    children?: JSX.Element;
+  };

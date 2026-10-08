@@ -10,6 +10,7 @@ import {
   dlog,
   Platform,
   SoundManager,
+  type IColorValue,
   type ISymbioteEvent,
 } from '@symbiote-native/engine';
 import {
@@ -55,19 +56,21 @@ export type IPressHandler = (event: ISymbioteEvent) => void;
 // Android). `foreground` routes it to the foreground slot. Inert on iOS. RN's
 // PressableAndroidRippleConfig (Pressable.js / useAndroidRippleForView).
 export type IPressableAndroidRippleConfig = {
-  color?: string;
+  color?: IColorValue;
   borderless?: boolean;
   radius?: number;
   foreground?: boolean;
+  alpha?: number;
 };
 
 // The RippleAndroid background dict Android resolves: the same shape TouchableNativeFeedback's
 // Ripple factory produces.
 export type IRippleBackground = {
   type: 'RippleAndroid';
-  color: string | null;
+  color: IColorValue | null;
   borderless: boolean;
   rippleRadius?: number;
+  alpha?: number | null;
 };
 
 // IRippleBackground above describes the shape the engine emits (applyAndroidRipple in

@@ -19,7 +19,7 @@
 // `children` is a `ReactNode`, so this type is per-adapter by construction
 // (<prop_types_split_agnostic_vs_per_adapter>).
 import type { ReactNode } from 'react';
-import type { ISymbioteEvent } from '@symbiote-native/engine';
+import type { IColorValue, ISymbioteEvent } from '@symbiote-native/engine';
 import type {
   IAccessibilityProps,
   IAriaProps,
@@ -115,7 +115,7 @@ export type IScrollViewProps = IAccessibilityProps &
     overScrollMode?: 'auto' | 'always' | 'never';
     fadingEdgeLength?: number;
     persistentScrollbar?: boolean;
-    endFillColor?: string;
+    endFillColor?: IColorValue;
     onLayout?: IScrollHandler;
     onScroll?: IScrollHandler;
     onScrollBeginDrag?: IScrollHandler;

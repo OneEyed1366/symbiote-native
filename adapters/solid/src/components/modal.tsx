@@ -58,6 +58,7 @@ import {
   dlog,
   Platform,
   type IClassNameValue,
+  type IColorValue,
   type IStyleProp,
   type ISymbioteEvent,
   type IViewStyle,
@@ -82,7 +83,7 @@ export type IModalProps = IAccessibilityProps &
   IAriaProps & {
     visible?: boolean;
     transparent?: boolean;
-    backdropColor?: string;
+    backdropColor?: IColorValue;
     animationType?: IModalAnimationType;
     presentationStyle?: IModalPresentationStyle;
     supportedOrientations?: ReadonlyArray<IModalOrientation>;

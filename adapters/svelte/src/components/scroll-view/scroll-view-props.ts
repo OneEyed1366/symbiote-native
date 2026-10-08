@@ -15,6 +15,7 @@
 // reads it off the owner when it builds a pin.
 import type { Snippet } from 'svelte';
 import type {
+  IColorValue,
   IStyleProp,
   ISymbioteEvent,
   IViewStyle,
@@ -110,7 +111,7 @@ export type IScrollViewProps = IAccessibilityProps &
     overScrollMode?: 'auto' | 'always' | 'never';
     fadingEdgeLength?: number;
     persistentScrollbar?: boolean;
-    endFillColor?: string;
+    endFillColor?: IColorValue;
     onLayout?: IScrollHandler;
     onScroll?: IScrollHandler;
     onScrollBeginDrag?: IScrollHandler;

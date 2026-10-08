@@ -20,7 +20,12 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react';
-import { dlog, Platform, type ISymbioteEvent } from '@symbiote-native/engine';
+import {
+  dlog,
+  Platform,
+  type IColorValue,
+  type ISymbioteEvent,
+} from '@symbiote-native/engine';
 import {
   createInitialModalState,
   isModalVisible,
@@ -50,7 +55,7 @@ export type IModalProps = IAccessibilityProps &
   IAriaProps & {
     visible?: boolean;
     transparent?: boolean;
-    backdropColor?: string;
+    backdropColor?: IColorValue;
     animationType?: IModalAnimationType;
     presentationStyle?: IModalPresentationStyle;
     supportedOrientations?: ReadonlyArray<IModalOrientation>;

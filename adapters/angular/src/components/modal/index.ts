@@ -43,6 +43,7 @@ import {
   dlog,
   isSymbioteEvent,
   Platform,
+  type IColorValue,
   type IStyleProp,
   type ISymbioteEvent,
   type IViewStyle,
@@ -72,7 +73,7 @@ export type IAngularModalProps = IAccessibilityProps &
   IAriaProps & {
     visible?: boolean;
     transparent?: boolean;
-    backdropColor?: string;
+    backdropColor?: IColorValue;
     animationType?: IModalAnimationType;
     presentationStyle?: IModalPresentationStyle;
     supportedOrientations?: ReadonlyArray<IModalOrientation>;
@@ -141,7 +142,7 @@ export class Modal
   @Output() readonly requestClose = new EventEmitter<void>();
   @Input() visible?: boolean;
   @Input() transparent?: boolean;
-  @Input() backdropColor?: string;
+  @Input() backdropColor?: IColorValue;
   @Input() animationType?: IModalAnimationType;
   @Input() presentationStyle?: IModalPresentationStyle;
   @Input() supportedOrientations?: ReadonlyArray<IModalOrientation>;

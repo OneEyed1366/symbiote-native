@@ -19,6 +19,7 @@ import {
   appendChild,
   createElement,
   registerHostBehavior,
+  type IColorValue,
   type IHostBehavior,
   type IStyleProp,
   type ISymbioteEvent,
@@ -43,18 +44,18 @@ export type IActivityIndicatorSize = 'small' | 'large' | number;
 
 // Author-facing props: the framework-agnostic public surface every adapter re-exports (no
 // framework element/ref/callback, `<prop_types_split_agnostic_vs_per_adapter>`).
-export interface IActivityIndicatorProps
-  extends IAccessibilityProps, IAriaProps {
-  animating?: boolean;
-  color?: string;
-  size?: IActivityIndicatorSize;
-  hidesWhenStopped?: boolean;
-  style?: IStyleProp<IViewStyle>;
-  // testID / nativeID / the accessibility surface land on the SPINNER, where RN spreads
-  // `...restProps` (`ActivityIndicator.js:99`). `onLayout` is the exception RN itself makes
-  // (`:113`): it measures the box the spinner is centred IN, so it belongs to the host.
-  onLayout?: (event: ISymbioteEvent) => void;
-}
+export type IActivityIndicatorProps = IAccessibilityProps &
+  IAriaProps & {
+    animating?: boolean;
+    color?: IColorValue;
+    size?: IActivityIndicatorSize;
+    hidesWhenStopped?: boolean;
+    style?: IStyleProp<IViewStyle>;
+    // testID / nativeID / the accessibility surface land on the SPINNER, where RN spreads
+    // `...restProps` (`ActivityIndicator.js:99`). `onLayout` is the exception RN itself makes
+    // (`:113`): it measures the box the spinner is centred IN, so it belongs to the host.
+    onLayout?: (event: ISymbioteEvent) => void;
+  };
 
 // The per-platform pieces: the default spinner colour and any extra native props the platform's
 // spinner requires.

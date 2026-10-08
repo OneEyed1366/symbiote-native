@@ -19,6 +19,7 @@ import type {
   IScrollViewNativeOnlyProps,
 } from '@symbiote-native/components';
 import type {
+  IColorValue,
   IStyleProp,
   ISymbioteEvent,
   IViewStyle,
@@ -95,7 +96,7 @@ export type IAngularScrollViewProps = IAccessibilityProps &
     overScrollMode?: 'auto' | 'always' | 'never';
     fadingEdgeLength?: number;
     persistentScrollbar?: boolean;
-    endFillColor?: string;
+    endFillColor?: IColorValue;
     onLayout?: IScrollHandler;
     onScroll?: IScrollHandler;
     onScrollBeginDrag?: IScrollHandler;

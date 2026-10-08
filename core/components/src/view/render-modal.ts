@@ -9,6 +9,7 @@
 import {
   dlog,
   I18nManager,
+  type IColorValue,
   type IStyleProp,
   type IViewStyle,
 } from '@symbiote-native/engine';
@@ -76,7 +77,7 @@ const PRESENTATION_OVER_FULL_SCREEN: IModalPresentationStyle = 'overFullScreen';
 export type IModalViewProps = {
   visible?: boolean;
   transparent?: boolean;
-  backdropColor?: string;
+  backdropColor?: IColorValue;
   animationType?: IModalAnimationType;
   presentationStyle?: IModalPresentationStyle;
   supportedOrientations?: ReadonlyArray<IModalOrientation>;
@@ -96,18 +97,8 @@ function backdropOverrideOf(view: IModalViewProps): IViewStyle {
   return { backgroundColor: view.backdropColor };
 }
 
-// `isRTL` is injectable purely for testability, the same shape `computeInset`'s `os` option
-// takes: `I18nManager`'s constants are resolved once at module load with no setter, so a test
-// exercising the RTL branch cannot toggle the real module and must pass the value in.
-export function renderModal(
-  view: IModalViewProps,
-  isRTL: boolean = I18nManager.isRTL,
-): IDescriptor {
-  // Only override backgroundColor when transparent or backdropColor are explicitly set, so these
-  // Modal-specific props take precedence over the generic style prop (Modal.js: containerStyles
-  // composed LAST in [styles.container, props.style, containerStyles]).
-  const backdropOverride = backdropOverrideOf(view);
-
+// The backdrop override goes last, so `transparent` and `backdropColor` win over `style`
+function containerOf(view: IModalViewProps, isRTL: boolean): IDescriptor {
   const containerStyle: IStyleProp<IViewStyle> = [
     {
       ...CONTAINER_STYLE_BASE,
@@ -115,28 +106,28 @@ export function renderModal(
       backgroundColor: OPAQUE_BACKDROP,
     },
     view.style,
-    backdropOverride,
+    backdropOverrideOf(view),
   ];
+  return el('view', { style: containerStyle, collapsable: false }, []);
+}
+
+// `isRTL` is injectable purely for testability, the same shape `computeInset`'s `os` option
+// takes: `I18nManager`'s constants are resolved once at module load with no setter, so a test
+// exercising the RTL branch cannot toggle the real module and must pass the value in.
+export function renderModal(
+  view: IModalViewProps,
+  isRTL: boolean = I18nManager.isRTL,
+): IDescriptor {
+  dlog('Modal visible -> committing ModalHostView(container View)');
+
+  // RN ignores the deprecated `animated`, `animationType` replaces it
+  const { animated: _deprecated, ...passthrough } = view.passthrough;
 
   const resolvedPresentationStyle =
     view.presentationStyle ??
     (view.transparent === true
       ? PRESENTATION_OVER_FULL_SCREEN
       : PRESENTATION_FULL_SCREEN);
-
-  dlog('Modal visible -> committing ModalHostView(container View)');
-
-  // collapsable:false keeps the container as a real shadow node (RN sets this so the wrapper is
-  // never flattened away under the host). Empty structural children: the adapter injects the
-  // user children UNDER this container, never as a direct sibling of the host.
-  const container = el(
-    'view',
-    { style: containerStyle, collapsable: false },
-    [],
-  );
-
-  // RN ignores the deprecated `animated`, `animationType` replaces it
-  const { animated: _deprecated, ...passthrough } = view.passthrough;
 
   return el(
     'modal',
@@ -158,6 +149,8 @@ export function renderModal(
       visible: view.visible ?? true,
       onStartShouldSetResponder: claimResponder,
     },
-    [container],
+    // `collapsable: false` keeps the container a real shadow node, the adapter injects the user
+    // children under it, never as a direct sibling of the host
+    [containerOf(view, isRTL)],
   );
 }

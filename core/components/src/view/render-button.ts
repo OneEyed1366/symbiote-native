@@ -10,29 +10,30 @@
 // fold RN performs in `Button.js:326-331`. The engine folds those for every node
 // (`core/engine/src/accessibility-props.ts`), so repeating it here would fold twice.
 
-import type { ISymbioteEvent } from '@symbiote-native/engine';
+import type { IColorValue, ISymbioteEvent } from '@symbiote-native/engine';
 import type { IAccessibilityProps, IAriaProps } from '../accessibility-props';
 
 // Author-facing props: the framework-agnostic public surface every adapter exposes. Button has
 // no children (it takes a `title` string), so the whole surface is agnostic and lives here once.
-export interface IButtonProps extends IAccessibilityProps, IAriaProps {
-  title: string;
-  onPress?: (event: ISymbioteEvent) => void;
-  color?: string;
-  disabled?: boolean;
-  // Suppress the native tap sound (Button.js:50). Forwarded to the pressable, which owns sound
-  // suppression via android_disableSound.
-  touchSoundDisabled?: boolean;
-  // Locate this button in end-to-end tests (Button.js:144). Forwarded to the root.
-  testID?: string;
-  // tvOS / Android-TV focus props (Button.js:68,79). Typed and forwarded; inert on a phone host.
-  hasTVPreferredFocus?: boolean;
-  nextFocusDown?: number;
-  nextFocusForward?: number;
-  nextFocusLeft?: number;
-  nextFocusRight?: number;
-  nextFocusUp?: number;
-}
+export type IButtonProps = IAccessibilityProps &
+  IAriaProps & {
+    title: string;
+    onPress?: (event: ISymbioteEvent) => void;
+    color?: IColorValue;
+    disabled?: boolean;
+    // Suppress the native tap sound (Button.js:50). Forwarded to the pressable, which owns sound
+    // suppression via android_disableSound.
+    touchSoundDisabled?: boolean;
+    // Locate this button in end-to-end tests (Button.js:144). Forwarded to the root.
+    testID?: string;
+    // tvOS / Android-TV focus props (Button.js:68,79). Typed and forwarded; inert on a phone host.
+    hasTVPreferredFocus?: boolean;
+    nextFocusDown?: number;
+    nextFocusForward?: number;
+    nextFocusLeft?: number;
+    nextFocusRight?: number;
+    nextFocusUp?: number;
+  };
 
 // `BUTTON_ACCESSIBILITY_ROLE`, `resolveButtonImportantForAccessibility`, and the Android style
 // constants are `foldButtonProps`/`foldButtonLabelStyle` in `SymbioteFabricProps.cpp` now — no JS

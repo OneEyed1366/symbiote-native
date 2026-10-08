@@ -16,6 +16,7 @@
 //   nestedScrollEnabled   defaults to `true` only under an Android RefreshControl, as in RN.
 import type {
   IClassNameValue,
+  IColorValue,
   ISymbioteEvent,
   IStyleProp,
   IViewStyle,
@@ -113,7 +114,7 @@ export type IScrollViewProps = IAccessibilityProps &
     overScrollMode?: 'auto' | 'always' | 'never';
     fadingEdgeLength?: number;
     persistentScrollbar?: boolean;
-    endFillColor?: string;
+    endFillColor?: IColorValue;
     onLayout?: IScrollHandler;
     onScroll?: IScrollHandler;
     onScrollBeginDrag?: IScrollHandler;

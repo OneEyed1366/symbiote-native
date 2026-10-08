@@ -66,7 +66,7 @@ export { isEventFor } from './view-config';
 export { registerComponent, setNativeViewConfigSource } from './registry';
 // Real cross-package consumer: core/components' KeyboardAvoidingView render narrows
 // raw native payloads with this same guard, so it needs it off the package root.
-export { isRecord } from './type-guards';
+export { isBoolean, isNumber, isRecord, isString } from './type-guards';
 // InteractionManager: pure JS (timers + emitter), framework-agnostic, so it lives
 // here; every adapter re-exports it.
 export {
@@ -171,6 +171,7 @@ export {
   PlatformColor,
   DynamicColorIOS,
   isOpaqueColorValue,
+  isProcessableColor,
 } from './platform-color';
 export type {
   IColorValue,
