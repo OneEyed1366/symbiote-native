@@ -7,7 +7,6 @@ import {
   isValidElement,
   useEffect,
   useSyncExternalStore,
-  type ComponentType,
   type ReactElement,
   type ReactNode,
 } from 'react';
@@ -16,10 +15,7 @@ import {
   type ISeparatorBoard,
   type ISeparatorGap,
 } from '@symbiote-native/components';
-import type { ISeparatorProps, ISeparators } from '../virtualized-list';
-
-export type ISeparatorComponent<ItemT> =
-  ComponentType<ISeparatorProps<ItemT>> | ReactElement;
+import type { ISeparatorComponent, ISeparators } from '../virtualized-list';
 
 export type ISectionItemCellProps<ItemT, SectionT> = {
   board: ISeparatorBoard<Record<string, unknown>>;

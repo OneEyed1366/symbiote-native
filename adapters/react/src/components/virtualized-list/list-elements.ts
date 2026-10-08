@@ -1,6 +1,11 @@
 // Small element builders shared by the list's child walk
 
-import { createElement, type ComponentType, type ReactNode } from 'react';
+import {
+  createElement,
+  isValidElement,
+  type ComponentType,
+  type ReactNode,
+} from 'react';
 import {
   buildSeparatorProps,
   drawItem,
@@ -10,6 +15,7 @@ import type {
   IListItemInfo,
   IListSlot,
   IRenderItem,
+  ISeparatorComponent,
 } from './virtualized-list-props';
 
 type IItemRenderers<ItemT> = {
@@ -41,12 +47,13 @@ export function resolveElement(component: IListSlot): ReactNode {
 // The `ItemSeparatorComponent` element for the gap between two items, with the highlight flag and
 // any handle-pushed overrides merged on top, RN renders `<ItemSeparatorComponent {...props} />`
 export function renderSeparatorElement<ItemT>(
-  component: ComponentType<ISeparatorProps<ItemT>> | undefined,
+  component: ISeparatorComponent<ItemT> | undefined,
   leadingItem: ItemT,
   trailingItem: ItemT,
   overrides: Partial<ISeparatorProps<ItemT>> | undefined,
 ): ReactNode {
   if (component === undefined) return undefined;
+  if (isValidElement(component)) return component;
   return createElement(
     component,
     buildSeparatorProps(leadingItem, trailingItem, overrides),

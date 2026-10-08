@@ -37,8 +37,8 @@ import {
 import {
   VirtualizedList,
   type ICellRendererComponent,
+  type ISeparatorComponent,
   type ISeparators,
-  type ISeparatorProps,
   type IVirtualizedListHandle,
 } from '../virtualized-list';
 import type {
@@ -47,7 +47,7 @@ import type {
   IInnerViewRef,
 } from '@symbiote-native/components';
 import type { IStyleProp, IViewStyle } from '../../utils/styles';
-import { SectionItemCell, type ISeparatorComponent } from './section-item-cell';
+import { SectionItemCell } from './section-item-cell';
 
 // Re-export the shared handle type so section-list imports it from '../virtualized-section-list'.
 export type { IVirtualizedSectionListHandle };
@@ -60,7 +60,7 @@ export type ISection<ItemT> = ICoreSection<ItemT> & {
     section: ISection<ItemT>;
     separators: ISeparators;
   }) => ReactNode;
-  ItemSeparatorComponent?: ComponentType<ISeparatorProps<ItemT>>;
+  ItemSeparatorComponent?: ISeparatorComponent<ItemT>;
 };
 
 export type IVirtualizedSectionListProps<ItemT> = IAccessibilityProps &
@@ -92,7 +92,7 @@ export type IVirtualizedSectionListProps<ItemT> = IAccessibilityProps &
     // SectionList.js:243-244); Android does not stick by default. Pass true/false to override.
     stickySectionHeadersEnabled?: boolean;
     extraData?: unknown;
-    ItemSeparatorComponent?: ComponentType<ISeparatorProps<ItemT>>;
+    ItemSeparatorComponent?: ISeparatorComponent<ItemT>;
     // The cell's `item` is the list's own entry (an item, header or footer), not an `ItemT`
     CellRendererComponent?: ICellRendererComponent<unknown>;
     ListHeaderComponent?: ComponentType<Record<string, never>> | ReactElement;

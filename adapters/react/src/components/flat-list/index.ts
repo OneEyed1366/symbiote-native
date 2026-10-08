@@ -8,6 +8,7 @@
 
 import {
   createElement,
+  isValidElement,
   type ComponentType,
   type ReactElement,
   type ReactNode,
@@ -36,6 +37,7 @@ import {
   type ICellRendererComponent,
   type IListItemInfo,
   type IRenderItem,
+  type ISeparatorComponent,
   type ISeparators,
   type ISeparatorProps,
   type IViewabilityConfig,
@@ -70,7 +72,7 @@ export type IFlatListProps<ItemT> = IAccessibilityProps &
     // Style for the auto-generated row View when numColumns > 1 (RN's columnWrapperStyle). A bare
     // string resolves through the shared style registry, like `className` below.
     columnWrapperStyle?: IStyleProp<IViewStyle> | string;
-    ItemSeparatorComponent?: ComponentType<ISeparatorProps<ItemT>>;
+    ItemSeparatorComponent?: ISeparatorComponent<ItemT>;
     // The cell's `item` is the list's own, a row of items when `numColumns` is above 1
     CellRendererComponent?: ICellRendererComponent<unknown>;
     ListHeaderComponent?: ComponentType<Record<string, never>> | ReactElement;
@@ -225,9 +227,9 @@ function rowViewability<ItemT>(typed: IItemTyped<ItemT>): {
 // The divider between rows shows the last item above and the first below, not the `IRow`
 function rowSeparator<ItemT>(
   separator: IItemTyped<ItemT>['ItemSeparatorComponent'],
-): ComponentType<ISeparatorProps<IRow<ItemT>>> | undefined {
-  if (separator === undefined) return undefined;
-  return (rowProps): ReactNode =>
+): ISeparatorComponent<IRow<ItemT>> | undefined {
+  if (separator === undefined || isValidElement(separator)) return separator;
+  return (rowProps: ISeparatorProps<IRow<ItemT>>): ReactNode =>
     createElement(separator, {
       ...rowProps,
       leadingItem: lastItemOfRow(rowProps.leadingItem),

@@ -249,13 +249,8 @@ describe('React FlatList virtualization on the engine (Positive)', () => {
   });
 });
 
-// The multi-column (numColumns > 1) path packs items into rows and virtualizes ROWS, not
-// items — chunkIntoRows/rowKeyExtractor/expandRowViewability/firstItemOfRow/lastItemOfRow
-// (core/components/src/state/flat-list.ts) are the pure transform behind it, shared by every
-// adapter, but have NO dedicated core/components test yet — a gap in core coverage, not
-// something this suite should paper over by skipping the composition. The row-element creation
-// itself (the flex-row wrapper + per-cell flex:1 View) is genuinely React-adapter-only code
-// (index.ts's renderRow), never delegated to a shared render fn.
+// При `numColumns` больше 1 список виртуализирует строки, а не элементы
+// Элемент строки (flex-row обёртка, ячейка с `flex: 1`) только у React, преобразования общие
 describe('React FlatList multi-column composition (Positive)', () => {
   const COLUMN_COUNT = 2;
   const MULTI_COLUMN_ROOT_TAG = 24;
@@ -307,15 +302,16 @@ describe('React FlatList multi-column composition (Positive)', () => {
   function findRowWrappers(): ILiveNode[] {
     const rows: ILiveNode[] = [];
     live.walkLive(live.appRoot(), node => {
-      if (node.viewName === 'view' || node.viewName === 'RCTView') {
-        if (node.payload.flexDirection === 'row') rows.push(node);
-      }
+      const isView = node.viewName === 'view' || node.viewName === 'RCTView';
+      if (isView && node.payload.flexDirection === 'row') rows.push(node);
     });
     return rows;
   }
 
-  function mountMultiColumnWithViewport(): IAuthoredNode {
-    mount(MULTI_COLUMN_ROOT_TAG, <MultiColumnApp />);
+  function mountMultiColumnWithViewport(
+    app: ReactElement = <MultiColumnApp />,
+  ): IAuthoredNode {
+    mount(MULTI_COLUMN_ROOT_TAG, app);
     const scrollView = fabric.find(n => n.viewName === 'RCTScrollView');
     expect(scrollView, 'an RCTScrollView was created').toBeDefined();
     fabric.fireEvent(scrollView!.instanceHandle, 'topLayout', {
@@ -359,6 +355,27 @@ describe('React FlatList multi-column composition (Positive)', () => {
       leadingLabel: 'row-1',
       trailingLabel: 'row-2',
     });
+  });
+
+  // RN 0.83: `ItemSeparatorComponent` may be a ready element, it is rendered as it is
+  it('renders a separator given as a ready element between rows', () => {
+    mountMultiColumnWithViewport(
+      createElement(FlatList<IRow>, {
+        data: multiColumnData,
+        numColumns: COLUMN_COUNT,
+        keyExtractor: (item: IRow) => `mc-${item.id}`,
+        ItemSeparatorComponent: createElement('text', {}, 'ELEMENT-DIVIDER'),
+        getItemLayout: (_data: unknown, index: number) => ({
+          length: ITEM_HEIGHT,
+          offset: ITEM_HEIGHT * index,
+          index,
+        }),
+        renderItem: ({ item }: { item: IRow }) =>
+          createElement('text', { key: item.id }, item.label),
+      }),
+    );
+
+    expect(hasText('ELEMENT-DIVIDER')).toBe(true);
   });
 
   it('expands row-level viewability to one token per real item, not one per row', () => {

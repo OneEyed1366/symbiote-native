@@ -24,6 +24,7 @@ import type {
   ICellRendererProps,
   IListItemInfo,
   IRenderItem,
+  ISeparatorComponent,
   IVirtualizedListProps,
 } from './virtualized-list-props';
 
@@ -43,6 +44,7 @@ export type {
   ICellRendererProps,
   IListItemInfo,
   IRenderItem,
+  ISeparatorComponent,
   IVirtualizedListProps,
 };
 

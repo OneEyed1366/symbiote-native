@@ -36,6 +36,10 @@ export type ICellRendererComponent<ItemT> = (
 export type IListSlot =
   ComponentType<Record<string, never>> | ReactElement | undefined;
 
+// RN renders a ready element as it is and builds a component with the separator props
+export type ISeparatorComponent<ItemT> =
+  ComponentType<ISeparatorProps<ItemT>> | ReactElement;
+
 export type IVirtualizedListProps<ItemT> = IAccessibilityProps &
   IAriaProps & {
     data: unknown;
@@ -49,7 +53,7 @@ export type IVirtualizedListProps<ItemT> = IAccessibilityProps &
       data: unknown,
       index: number,
     ) => { length: number; offset: number; index: number };
-    ItemSeparatorComponent?: ComponentType<ISeparatorProps<ItemT>>;
+    ItemSeparatorComponent?: ISeparatorComponent<ItemT>;
     // Replaces the view wrapped around each cell, it must wire `onLayout` and `onFocus` itself
     CellRendererComponent?: ICellRendererComponent<ItemT>;
     ListHeaderComponent?: IListSlot;

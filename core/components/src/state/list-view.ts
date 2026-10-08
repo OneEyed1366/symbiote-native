@@ -34,12 +34,14 @@ export function listStyleOf(
 
 // A horizontal list pins the content container to the full row width so the row overflows for iOS
 // to scroll, the flip rides ONLY the outer ScrollView style and each cell, never this container
+// Nothing measured yet means no width to pin, a 0 here would fold every cell onto the origin
 export function contentContainerStyleOf(
   horizontal: boolean,
   style: IStyleProp<IViewStyle> | undefined,
   total: number,
 ): IStyleProp<IViewStyle> | undefined {
-  return horizontal ? [style, { width: total }] : style;
+  if (!horizontal || total <= 0) return style;
+  return [style, { width: total }];
 }
 
 export function spacerStyleOf(extent: number, horizontal: boolean): IViewStyle {
