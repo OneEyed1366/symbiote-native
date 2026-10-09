@@ -1,7 +1,11 @@
-// Linking: base / default build (web, headless tsx, any target without a dedicated
-// platform file). Metro overrides this with linking.ios.ts / linking.android.ts on a
-// real iOS/Android host; off those, the iOS build is the fallback (its LinkingManager
-// resolves null elsewhere → graceful no-op). The barrel imports './linking', which
-// resolves here under tsc/tsx and to the platform file under Metro.
+// The runtime is RN's own `Linking`, forwarded through `react-native-host`
 
-export * from './index.ios';
+export type IUrlEvent = {
+  url: string;
+};
+
+// Android `sendIntent` extra, RN's `{ key, value }` pair
+export type IIntentExtra = {
+  key: string;
+  value: string | number | boolean;
+};
