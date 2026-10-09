@@ -73,7 +73,11 @@ export function useNativeAnimated(): void {
       : found;
   });
   const bus = createDeviceBus();
-  Reflect.set(globalThis, '__rctDeviceEventEmitter', bus);
+  // RN defines this global read-only, a plain `Reflect.set` would silently keep RN's own emitter
+  Object.defineProperty(globalThis, '__rctDeviceEventEmitter', {
+    configurable: true,
+    value: bus,
+  });
   setReactNativeHost({
     ...stubHost,
     DeviceEventEmitter: bus,
