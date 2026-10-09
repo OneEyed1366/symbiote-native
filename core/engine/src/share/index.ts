@@ -1,7 +1,18 @@
-// Share: base / default build (web, headless tsx, any target without a dedicated
-// platform file). Metro overrides this with share.ios.ts / share.android.ts on a real
-// iOS/Android host; off those, the iOS build is the fallback (its ActionSheetManager
-// resolves null elsewhere → graceful reject). The barrel imports './share', which
-// resolves here under tsc/tsx and to the platform file under Metro.
+// The runtime is RN's own `Share`, forwarded through `react-native-host`
 
-export * from './index.ios';
+export type IShareContent =
+  | { title?: string; url: string; message?: string }
+  | { title?: string; url?: string; message: string };
+
+export type IShareOptions = {
+  dialogTitle?: string;
+  subject?: string;
+  excludedActivityTypes?: string[];
+  tintColor?: unknown;
+  anchor?: number;
+};
+
+export type IShareAction = {
+  action: string;
+  activityType?: string | null;
+};
