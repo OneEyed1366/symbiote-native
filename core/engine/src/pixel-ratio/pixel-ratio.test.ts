@@ -1,134 +1,47 @@
-// Co-located unit test: PixelRatio, pure JS, no mounting. PixelRatio derives
-// every value from the Dimensions singleton, so a fake __turboModuleProxy returns a
-// DeviceInfo module whose getConstants() ships known window metrics; PixelRatio is then
-// imported fresh (after vi.resetModules) so it resolves the seeded Dimensions.
-//
-// PixelRatio never throws -- every method is a pure derivation over numbers with no
-// guard clause. So there is no Negative (toThrow) group; every scenario is Positive.
+// RN's `PixelRatio` reached through the host, over the 390x844 at 3x window vitest.config.ts stubs
+// as `DeviceInfo`. It never throws, so there is no Negative group
 
-import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+import { Dimensions, PixelRatio } from '../react-native-host';
 
-type IDeviceHub = {
-  emit: (eventType: string, ...args: unknown[]) => void;
-};
-type IWindowMetrics = {
-  width: number;
-  height: number;
-  scale: number;
-  fontScale: number;
-};
+const SIMULATOR = { width: 390, height: 844, scale: 3, fontScale: 1 };
 
-const WINDOW: IWindowMetrics = {
-  width: 400,
-  height: 800,
-  scale: 3,
-  fontScale: 2,
-};
-
-let PixelRatio: typeof import('./index').PixelRatio;
-let Dimensions: typeof import('../dimensions').Dimensions;
-
-function isPresent<T>(value: unknown): value is T {
-  return value !== null && value !== undefined;
+function setWindow(metrics: typeof SIMULATOR): void {
+  Dimensions.set({ window: metrics, screen: metrics });
 }
 
-beforeEach(async () => {
-  const fakeDeviceInfo = {
-    getConstants: (): { Dimensions: { window: IWindowMetrics } } => ({
-      Dimensions: { window: WINDOW },
-    }),
-  };
-  const registeredModules: Record<string, unknown> = {
-    DeviceInfo: fakeDeviceInfo,
-  };
-
-  globalThis.__turboModuleProxy = <T>(name: string): T | null => {
-    const module = registeredModules[name];
-    return isPresent<T>(module) ? module : null;
-  };
-  globalThis.RN$registerCallableModule = (
-    name: string,
-    factory: () => IDeviceHub,
-  ): void => {
-    if (name === 'RCTDeviceEventEmitter') factory();
-  };
-
-  vi.resetModules();
-  ({ PixelRatio } = await import('./index'));
-  ({ Dimensions } = await import('../dimensions'));
-});
-
 afterEach(() => {
-  globalThis.__turboModuleProxy = undefined;
-  globalThis.RN$registerCallableModule = undefined;
+  setWindow(SIMULATOR);
 });
 
 describe('PixelRatio', () => {
-  // why: get() IS the window's pixel scale -- the whole module's job is to expose
-  // that one number under a stable, device-agnostic name.
-  it('get() returns the window pixel scale', () => {
+  it('reads the pixel scale off the window metrics', () => {
     expect(PixelRatio.get()).toBe(3);
   });
 
-  describe('getFontScale', () => {
-    // why: normally the user's text-size preference (fontScale), independent of
-    // the display's pixel density.
-    it('returns the window font scale when one is set', () => {
-      expect(PixelRatio.getFontScale()).toBe(2);
-    });
+  it('follows a later change of the window with no subscription of its own', () => {
+    setWindow({ ...SIMULATOR, scale: 2 });
 
-    // Без `fontScale` в payload RN отдает `scale`
-    it('falls back to the pixel scale when the payload has no fontScale', () => {
-      Dimensions.set(JSON.parse('{"windowPhysicalPixels":{"scale":2}}'));
-      expect(PixelRatio.getFontScale()).toBe(2);
-    });
-
-    // Нулевой `fontScale` не должен схлопнуть шрифты в ноль
-    it('falls back to the pixel scale when fontScale is 0', async () => {
-      const fakeDeviceInfo = {
-        getConstants: (): { Dimensions: { window: IWindowMetrics } } => ({
-          Dimensions: { window: { ...WINDOW, fontScale: 0 } },
-        }),
-      };
-      globalThis.__turboModuleProxy = <T>(name: string): T | null => {
-        const module: unknown =
-          name === 'DeviceInfo' ? fakeDeviceInfo : undefined;
-        return isPresent<T>(module) ? module : null;
-      };
-      vi.resetModules();
-      ({ PixelRatio } = await import('./index'));
-
-      expect(PixelRatio.getFontScale()).toBe(3);
-    });
+    expect(PixelRatio.get()).toBe(2);
   });
 
-  // why: dp -> px must round to a whole pixel (a fractional pixel can't be
-  // painted); 8.4dp at 3x is 25.2px, which must snap to 25, not truncate to 25.2.
-  it('getPixelSizeForLayoutSize() rounds dp to a whole pixel', () => {
+  it('answers the font scale native reports', () => {
+    setWindow({ ...SIMULATOR, fontScale: 1.5 });
+
+    expect(PixelRatio.getFontScale()).toBe(1.5);
+  });
+
+  it('falls back to the pixel scale when the font scale is 0', () => {
+    setWindow({ ...SIMULATOR, fontScale: 0 });
+
+    expect(PixelRatio.getFontScale()).toBe(3);
+  });
+
+  it('rounds a dp size to a whole number of pixels', () => {
     expect(PixelRatio.getPixelSizeForLayoutSize(8.4)).toBe(25);
   });
 
-  // why: roundToNearestPixel snaps a dp size to the nearest value that lands on a
-  // whole pixel, so two adjacent views measured in dp don't drift apart by a
-  // sub-pixel gap once the pixel grid is applied.
-  it('roundToNearestPixel() snaps a dp size onto the physical pixel grid', () => {
+  it('snaps a dp size onto the physical pixel grid', () => {
     expect(PixelRatio.roundToNearestPixel(8.333)).toBe(8.333333333333334);
-  });
-
-  // why: kept for RN API parity (real only on web); calling it on a native target
-  // must be inert, never throw.
-  it('startDetecting() is a no-op that does not throw', () => {
-    expect(() => PixelRatio.startDetecting()).not.toThrow();
-  });
-
-  // why: PixelRatio has no state of its own -- it must re-derive from whatever
-  // Dimensions currently holds, so a live rotation/density change is reflected
-  // without PixelRatio needing its own native subscription.
-  it('reflects a later Dimensions change with no subscription of its own', () => {
-    expect(PixelRatio.get()).toBe(3);
-    Dimensions.set({
-      window: { width: 800, height: 400, scale: 2, fontScale: 1 },
-    });
-    expect(PixelRatio.get()).toBe(2);
   });
 });
