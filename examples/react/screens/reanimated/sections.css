@@ -1,0 +1,204 @@
+.ra-screen {
+  flex: 1;
+  background-color: #0b1622;
+}
+.ra-scroll {
+  flex: 1;
+}
+.ra-content {
+  padding: 1rem;
+  gap: 1.25rem;
+}
+.ra-title {
+  color: #ffffff;
+  font-size: 1.5rem;
+}
+
+/* One titled block */
+.ra-section {
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 12px;
+  background-color: #12263a;
+}
+.ra-section-title {
+  color: #ffffff;
+  font-size: 1.125rem;
+}
+.ra-note {
+  color: #9fb3c8;
+  font-size: 0.75rem;
+}
+.ra-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.75rem;
+}
+.ra-wrap {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.ra-track {
+  height: 4.375rem;
+}
+.ra-stage {
+  min-height: 4.375rem;
+  justify-content: center;
+}
+.ra-box {
+  width: 3.75rem;
+  height: 3.75rem;
+  border-radius: 8px;
+  background-color: #4ea1ff;
+}
+.ra-tile {
+  width: 3.75rem;
+  height: 3.75rem;
+  border-radius: 8px;
+  background-color: #6ad48b;
+}
+.ra-tile-small {
+  width: 2.5rem;
+  height: 2.5rem;
+}
+.ra-readout {
+  flex: 1;
+  padding: 0.5rem;
+  border-radius: 8px;
+  background-color: #0b1622;
+  color: #ffffff;
+  font-size: 0.875rem;
+}
+.ra-field {
+  padding: 0.5rem;
+  border-width: 1px;
+  border-color: #2d4157;
+  border-radius: 8px;
+  color: #ffffff;
+  transition: border-color 200ms;
+}
+/* A state of the node, served by Reanimated */
+.ra-field:focus {
+  border-color: #4ea1ff;
+}
+
+/* Lists */
+.ra-list {
+  gap: 0.375rem;
+}
+.ra-item {
+  padding: 0.625rem;
+  border-radius: 8px;
+  background-color: #1d3a57;
+}
+.ra-item-text {
+  color: #ffffff;
+  font-size: 0.875rem;
+}
+.ra-header {
+  height: 3rem;
+  border-radius: 8px;
+  background-color: #bb86fc;
+}
+.ra-scroller {
+  height: 12rem;
+  border-radius: 8px;
+  background-color: #0b1622;
+}
+
+/* A CSS animation whose keyframes live in keyframes.css */
+.ra-spinner {
+  width: 3.75rem;
+  height: 3.75rem;
+  border-radius: 8px;
+  background-color: #6ad48b;
+  animation: ra-spin 2s linear infinite;
+}
+
+/* A CSS animation with its keyframes in the same file */
+@keyframes ra-pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+.ra-pulse {
+  width: 3.75rem;
+  height: 3.75rem;
+  border-radius: 8px;
+  background-color: #f2c94c;
+  animation: ra-pulse 1.2s ease-in-out infinite;
+}
+.ra-ball {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 20px;
+  background-color: #ff7a59;
+}
+
+/* A transition runs when the width changes */
+.ra-bar {
+  height: 1.5rem;
+  border-radius: 8px;
+  background-color: #bb86fc;
+  transition: width 400ms ease-in-out;
+}
+.ra-bar-short {
+  width: 25%;
+}
+.ra-bar-long {
+  width: 90%;
+}
+
+/* A state of the node, served by Reanimated */
+.ra-press {
+  padding: 0.75rem;
+  border-radius: 8px;
+  background-color: #ff7a59;
+  transition: opacity 150ms;
+}
+.ra-press:active {
+  opacity: 0.4;
+}
+.ra-press-text {
+  color: #0b1622;
+  font-size: 1rem;
+}
+
+.ra-log {
+  color: #6ad48b;
+  font-size: 0.75rem;
+}
+
+/* The parity checklist */
+.ra-group {
+  gap: 0.375rem;
+}
+.ra-group-title {
+  color: #ffffff;
+  font-size: 0.875rem;
+}
+.ra-chips {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+.ra-chip {
+  padding: 0.25rem 0.5rem;
+  border-radius: 10px;
+  font-size: 0.6875rem;
+}
+.ra-chip-ok {
+  color: #0b1622;
+  background-color: #6ad48b;
+}
+.ra-chip-missing {
+  color: #ffffff;
+  background-color: #ff5c5c;
+}
