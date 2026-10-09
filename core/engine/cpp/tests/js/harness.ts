@@ -9,6 +9,8 @@
  * The protocol is one line per result on stdout. That is what makes the runner replaceable.
  */
 
+import './rn-host-stub';
+
 /** A command a test dispatched at a mounted view — `dispatchCommand`'s own three arguments. */
 export type IRecordedCommand = {
   tag: number;
@@ -347,32 +349,16 @@ export function commands(): IRecordedCommand[] {
 }
 
 /**
- * What the real Differentiator told the mounting platform to do since the last read, in React
- * Native's own wording ("Create {...}", "Update {...}", "Insert {...}", …).
- *
- * Populated by `mounted()`'s own `host.mount()` drain, so call `mounted()` first — this only
- * reads what that drain produced, it does not trigger one of its own. An "Update" line is the
- * real equivalent of the retired TypeScript mirror's clone-protocol count: the Differentiator
- * decided this node's props changed enough to need a native prop update, not merely that JS wrote
- * to it (`setProp`'s own `Object.is` dedupe can still turn a write away before it ever reaches
- * here — see `core/engine/src/node.ts`).
+ * What the real Differentiator told the mounting platform to do since the last read
+ * Populated by the `host.mount()` drain in `mounted()`, so call `mounted()` first, this only reads
  */
 export function mountingLogs(): string[] {
   return __symbioteTester.mountingLogs();
 }
 
 /**
- * The shadow tree's running commit number — a step's own commit count is the delta across it.
- *
- * The one headless instrument that speaks about a cost living PAST `completeRoot`, where the
- * device's overhead sits and where the mutation oracle goes blind: each commit signals the mounting
- * thread, and on a device that is `RCTMountingManager` creating and configuring `UIView`s on the
- * main thread. Two renderers can emit an identical mutation list and still cost differently there
- * if one of them splits it across more commits.
- *
- * NOT a transaction count, which reads 1 whatever happens — `MountingCoordinator::pullTransaction`
- * diffs the base revision against the latest, so intermediate commits collapse and the loop that
- * pulls them counts the caller's own drains.
+ * The shadow tree's running commit number, a step's own commit count is the delta across it
+ * It sees cost PAST `completeRoot`, unlike a transaction count, which reads 1 whatever happens
  */
 export function commitNumber(): number {
   return __symbioteTester.commitNumber();
@@ -517,6 +503,13 @@ export function expect(actual: unknown): {
   };
 }
 
+function runInOrder(hooks: ReadonlyArray<() => unknown>): Promise<void> {
+  return hooks.reduce<Promise<void>>(async (previous, hook) => {
+    await previous;
+    await hook();
+  }, Promise.resolve());
+}
+
 /**
  * Run everything registered and print one line per case.
  *
@@ -536,20 +529,22 @@ export function report(): void {
       // left standing. The runtime is NOT reset: module state belongs to the file.
       __symbioteTester.reset();
       try {
-        for (const hook of beforeEachHooks) await hook();
+        await runInOrder(beforeEachHooks);
         await one.run();
         results.push(`PASS ${one.name}`);
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error);
         results.push(`FAIL ${one.name} :: ${detail}`);
       }
-      for (const hook of afterEachHooks) {
-        try {
-          await hook();
-        } catch {
-          // An afterEach that throws must not rewrite the verdict of the case it followed.
-        }
-      }
+      await runInOrder(
+        afterEachHooks.map(hook => async () => {
+          try {
+            await hook();
+          } catch {
+            // An afterEach that throws must not rewrite the verdict of the case it followed.
+          }
+        }),
+      );
     });
   }
 

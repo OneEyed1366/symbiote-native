@@ -1,11 +1,9 @@
 // Строительные блоки портов `Animated-itest`: поиск вью по `testID`, чтение прямых изменений
 
-import {
-  isRecord,
-  setDeviceEventSource,
-  type IEventSubscription,
-} from '@symbiote-native/engine';
+import { isRecord, type IEventSubscription } from '@symbiote-native/engine';
 
+import { setReactNativeHost } from '../../../src/react-native-host';
+import { stubHost } from './rn-host-stub';
 import {
   expect,
   findByTestId,
@@ -76,7 +74,13 @@ export function useNativeAnimated(): void {
   });
   const bus = createDeviceBus();
   Reflect.set(globalThis, '__rctDeviceEventEmitter', bus);
-  setDeviceEventSource(bus);
+  setReactNativeHost({
+    ...stubHost,
+    DeviceEventEmitter: bus,
+    NativeEventEmitter: class {
+      addListener = bus.addListener;
+    },
+  });
 }
 
 // Jest's `toBeCloseTo(expected, 0.001)`: the difference stays under half a unit

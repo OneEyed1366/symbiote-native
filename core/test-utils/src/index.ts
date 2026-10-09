@@ -33,4 +33,10 @@ export {
   type IHostCrossingTracker,
 } from './host-crossings';
 export * from './wait-for';
-export { seedWindowDimensions, TEST_WINDOW } from './window-dimensions';
+export { nativeCallsTo } from './native-calls';
+export { emitRnDeviceEvent } from './rn-device-event';
+export {
+  emitWindowDimensions,
+  seedWindowDimensions,
+  TEST_WINDOW,
+} from './window-dimensions';
