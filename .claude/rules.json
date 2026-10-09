@@ -1,0 +1,9 @@
+{
+  "allow": [
+    {
+      "path": "core/css-parser/src/golden-corpus/fixtures/**",
+      "id": "css-px",
+      "why": "the fixtures feed the unit conversion under test, so px is the input"
+    }
+  ]
+}
