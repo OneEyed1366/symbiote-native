@@ -23,8 +23,9 @@ describe('UTFSequence', () => {
     });
   });
 
-  it('refuses a write', () => {
-    expect(Reflect.set(UTFSequence, 'PIZZA', '')).toBe(false);
+  // RN freezes it and throws on a write in dev, an object frozen by hand only answers false
+  it('throws on a write', () => {
+    expect(() => Reflect.set(UTFSequence, 'PIZZA', '')).toThrow();
     expect(UTFSequence.PIZZA).toBe('🍕');
   });
 });

@@ -1,6 +1,6 @@
 // Кейсы из `processAspectRatio-test.js` RN, где RN бросает invariant, мы возвращаем `undefined`
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { processAspectRatio } from './process-aspect-ratio';
 
 // Значение вне типа параметра, как его передал бы JS-вызов
@@ -53,5 +53,16 @@ describe('processAspectRatio', () => {
   it('drops non-string truthy values instead of throwing', () => {
     expect(processUntyped('[1,2,3]')).toBeUndefined();
     expect(processUntyped('{}')).toBeUndefined();
+  });
+
+  describe('in a release build (__DEV__ off)', () => {
+    afterEach(() => {
+      Object.assign(globalThis, { __DEV__: true });
+    });
+
+    it('keeps the first number of a three-part ratio, as RN does', () => {
+      Object.assign(globalThis, { __DEV__: false });
+      expect(processAspectRatio('1/2/3')).toBe(1);
+    });
   });
 });

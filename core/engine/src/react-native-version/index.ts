@@ -1,29 +1,14 @@
-// `ReactNativeVersion.js` of RN, read from the `PlatformConstants` the host reports
+// RN's own `ReactNativeVersion`, the version of the `react-native` package in the JS bundle
+// @ts-expect-error - untyped Flow source
+import ReactNativeVersionUpstream from 'react-native/Libraries/Core/ReactNativeVersion';
 
-import { Platform } from '../platform';
-
-const UNKNOWN_PART = 0;
-
-// Read per access, the constants resolve on the first read and a late host is still picked up
-const version = () => Platform.constants?.reactNativeVersion;
-
-export const ReactNativeVersion = {
-  get major(): number {
-    return version()?.major ?? UNKNOWN_PART;
-  },
-  get minor(): number {
-    return version()?.minor ?? UNKNOWN_PART;
-  },
-  get patch(): number {
-    return version()?.patch ?? UNKNOWN_PART;
-  },
-  get prerelease(): string | null {
-    const prerelease = version()?.prerelease;
-    return prerelease == null ? null : `${prerelease}`;
-  },
-  getVersionString(): string {
-    const prerelease = this.prerelease;
-    const suffix = prerelease == null ? '' : `-${prerelease}`;
-    return `${this.major}.${this.minor}.${this.patch}${suffix}`;
-  },
+export type IReactNativeVersion = {
+  readonly major: number;
+  readonly minor: number;
+  readonly patch: number;
+  readonly prerelease: string | null;
+  getVersionString(): string;
 };
+
+export const ReactNativeVersion: IReactNativeVersion =
+  ReactNativeVersionUpstream;

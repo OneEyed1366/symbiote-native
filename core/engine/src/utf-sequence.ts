@@ -1,19 +1,23 @@
-// `UTFSequence.js` of RN: named Unicode sequences, so source code can stay ASCII
+// RN's own `UTFSequence`, named Unicode sequences so source code can stay ASCII
+// @ts-expect-error - untyped Flow source
+import UTFSequenceUpstream from 'react-native/Libraries/UTFSequence';
 
-export const UTFSequence = Object.freeze({
-  BOM: '﻿',
-  BULLET: '•',
-  BULLET_SP: ' • ',
-  MIDDOT: '·',
-  MIDDOT_SP: ' · ',
-  MIDDOT_KATAKANA: '・',
-  MDASH: '—',
-  MDASH_SP: ' — ',
-  NDASH: '–',
-  NDASH_SP: ' – ',
-  NEWLINE: '\u000A',
-  NBSP: ' ',
-  PIZZA: '🍕',
-  TRIANGLE_LEFT: '◀',
-  TRIANGLE_RIGHT: '▶',
-});
+export type IUTFSequence = {
+  readonly BOM: string;
+  readonly BULLET: string;
+  readonly BULLET_SP: string;
+  readonly MIDDOT: string;
+  readonly MIDDOT_SP: string;
+  readonly MIDDOT_KATAKANA: string;
+  readonly MDASH: string;
+  readonly MDASH_SP: string;
+  readonly NDASH: string;
+  readonly NDASH_SP: string;
+  readonly NEWLINE: string;
+  readonly NBSP: string;
+  readonly PIZZA: string;
+  readonly TRIANGLE_LEFT: string;
+  readonly TRIANGLE_RIGHT: string;
+};
+
+export const UTFSequence: IUTFSequence = UTFSequenceUpstream;

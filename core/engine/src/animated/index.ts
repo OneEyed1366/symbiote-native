@@ -1,6 +1,6 @@
-// @symbiote-native/engine/animated: the framework-agnostic, JS-driven Animated engine.
-// The value graph, easing, interpolation and drivers are pure JS with no React
-// and no native dependency; every adapter re-exports them.
+// The framework-agnostic Animated engine, every adapter re-exports it
+// TODO(rn-port): the node graph stays ours, RN's `Animation.js` imports `AnimatedProps`
+// And that imports `RendererProxy`, which would put React's renderer into every other adapter
 
 export {
   AnimatedNode,

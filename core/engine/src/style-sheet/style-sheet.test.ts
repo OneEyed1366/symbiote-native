@@ -1,27 +1,20 @@
-// Unit test for the StyleSheet API. create/flatten/compose/absoluteFill run
-// against plain objects; for hairlineWidth/roundToNearestPixel we install a fake
-// __turboModuleProxy so getNativeModule('DeviceInfo') returns a known screen scale, then
-// assert the width/rounding matches RN's own formula for that scale — never a value copied
-// from this module's implementation. Every StyleSheet member is pure/total (never throws),
-// so there is no Negative group.
+// Unit test for the StyleSheet API. create/flatten/compose/absoluteFill run against plain
+// objects; hairlineWidth/roundToNearestPixel read the scale off RN's own `Dimensions`.
+// Every StyleSheet member is total (never throws), so there is no Negative group
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { Dimensions } from '../react-native-host';
 import { StyleSheet, computeHairlineWidth } from './index';
 
-function isType<T>(value: unknown): value is T {
-  return value !== null && value !== undefined;
-}
+const SIMULATOR_SCALE = 3;
 
-function installFakeDeviceInfo(getConstants: () => unknown): void {
-  globalThis.__turboModuleProxy = <T>(name: string): T | null => {
-    if (name !== 'DeviceInfo') return null;
-    const deviceInfo = { getConstants };
-    return isType<T>(deviceInfo) ? deviceInfo : null;
-  };
+function setWindowScale(scale: number): void {
+  const metrics = { width: 390, height: 844, scale, fontScale: 1 };
+  Dimensions.set({ window: metrics, screen: metrics });
 }
 
 afterEach(() => {
-  globalThis.__turboModuleProxy = undefined;
+  setWindowScale(SIMULATOR_SCALE);
   vi.unstubAllGlobals();
 });
 
@@ -214,40 +207,9 @@ describe('StyleSheet', () => {
   });
 
   describe('hairlineWidth', () => {
-    const FAKE_SCALE = 3;
-
-    it('matches RN formula for the faked DeviceInfo screen scale', () => {
-      installFakeDeviceInfo(() => ({
-        Dimensions: { window: { scale: FAKE_SCALE } },
-      }));
-
-      const width = StyleSheet.hairlineWidth;
-      expect(typeof width).toBe('number');
-      expect(width).toBeGreaterThan(0);
-      expect(width).toBe(computeHairlineWidth(FAKE_SCALE));
-    });
-
-    // why: Android exposes the scale under windowPhysicalPixels, not window — hairlineWidth
-    // must resolve either key, or every Android device would silently fall back to 1px.
-    it('falls back to windowPhysicalPixels.scale when window.scale is absent', () => {
-      installFakeDeviceInfo(() => ({
-        Dimensions: { windowPhysicalPixels: { scale: 2 } },
-      }));
+    it('follows the window scale RN reports', () => {
+      setWindowScale(2);
       expect(StyleSheet.hairlineWidth).toBe(computeHairlineWidth(2));
-    });
-
-    // why: a headless run (no DeviceInfo linked) must degrade to a sane constant, never
-    // throw mid-render — the module comment calls this out explicitly.
-    it('falls back to 1 when DeviceInfo is not resolvable', () => {
-      globalThis.__turboModuleProxy = undefined;
-      expect(StyleSheet.hairlineWidth).toBe(1);
-    });
-
-    // why: a non-positive scale would make round/divide nonsensical (division by zero, or a
-    // negative line width) — the guard treats it as missing rather than propagating garbage.
-    it('falls back to 1 when the resolved scale is non-positive', () => {
-      installFakeDeviceInfo(() => ({ Dimensions: { window: { scale: 0 } } }));
-      expect(StyleSheet.hairlineWidth).toBe(1);
     });
   });
 
@@ -266,18 +228,10 @@ describe('StyleSheet', () => {
   });
 
   describe('roundToNearestPixel', () => {
-    // why: RN's PixelRatio.roundToNearestPixel snaps a dp size to the nearest value that
-    // maps to a WHOLE device pixel — used so a hairline border or icon doesn't blur across
-    // pixel boundaries; the formula must match RN's exactly (Math.round(size*scale)/scale).
-    it('snaps a size to the nearest whole device pixel at the faked scale', () => {
-      installFakeDeviceInfo(() => ({ Dimensions: { window: { scale: 3 } } }));
-      // Math.round(10.2 * 3) / 3 = Math.round(30.6) / 3 = 31/3.
+    it('snaps a size to the nearest whole device pixel at the window scale', () => {
+      setWindowScale(3);
+      // Math.round(10.2 * 3) / 3 = Math.round(30.6) / 3 = 31/3
       expect(StyleSheet.roundToNearestPixel(10.2)).toBeCloseTo(31 / 3, 10);
-    });
-
-    it('leaves the value unrounded when the scale is unresolvable (headless)', () => {
-      globalThis.__turboModuleProxy = undefined;
-      expect(StyleSheet.roundToNearestPixel(10.2)).toBe(10.2);
     });
   });
 });

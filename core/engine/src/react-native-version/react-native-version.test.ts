@@ -1,79 +1,26 @@
-// `ReactNativeVersion.js` of RN: the version of the react-native the app runs on. RN bakes it into
-// its JS, here it is read from the `PlatformConstants` native module that carries the same number
-import { afterEach, describe, expect, it, vi } from 'vitest';
+// RN's own `ReactNativeVersion` is baked into its JS, so it is the installed package's version
 
-type IVersionParts = {
-  major: number;
-  minor: number;
-  patch: number;
-  prerelease?: number | string | null;
-};
+import { createRequire } from 'node:module';
+import { describe, expect, it } from 'vitest';
+import { ReactNativeVersion } from './index';
 
-async function versionWith(parts: IVersionParts | undefined) {
-  globalThis.nativeModuleProxy =
-    parts === undefined
-      ? undefined
-      : {
-          PlatformConstants: {
-            getConstants: () => ({
-              osVersion: '18.0',
-              interfaceIdiom: 'phone',
-              systemName: 'iOS',
-              forceTouchAvailable: false,
-              isTesting: false,
-              reactNativeVersion: parts,
-            }),
-          },
-        };
-  vi.resetModules();
-  const loaded = await import('./index');
-  return loaded.ReactNativeVersion;
-}
-
-afterEach(() => {
-  globalThis.nativeModuleProxy = undefined;
-});
+const installed: { version: string } = createRequire(import.meta.url)(
+  'react-native/package.json',
+);
 
 describe('ReactNativeVersion', () => {
-  it('reads the parts the host reports', async () => {
-    const version = await versionWith({ major: 0, minor: 86, patch: 1 });
-
-    expect([version.major, version.minor, version.patch]).toEqual([0, 86, 1]);
-    expect(version.prerelease).toBeNull();
+  it('is the version of the installed react-native package', () => {
+    expect(ReactNativeVersion.getVersionString()).toBe(installed.version);
   });
 
-  it('prints a release as major.minor.patch', async () => {
-    const version = await versionWith({ major: 0, minor: 86, patch: 1 });
+  it('exposes the parts as numbers and no prerelease on a release', () => {
+    const [major, minor, patch] = installed.version.split('.').map(Number);
 
-    expect(version.getVersionString()).toBe('0.86.1');
-  });
-
-  it('appends a prerelease with a dash', async () => {
-    const version = await versionWith({
-      major: 0,
-      minor: 87,
-      patch: 0,
-      prerelease: 'rc.2',
-    });
-
-    expect(version.prerelease).toBe('rc.2');
-    expect(version.getVersionString()).toBe('0.87.0-rc.2');
-  });
-
-  it('keeps a numeric prerelease as a string, as the RN type says', async () => {
-    const version = await versionWith({
-      major: 0,
-      minor: 87,
-      patch: 0,
-      prerelease: 1,
-    });
-
-    expect(version.prerelease).toBe('1');
-  });
-
-  it('reads 0.0.0 when no host reports it', async () => {
-    const version = await versionWith(undefined);
-
-    expect(version.getVersionString()).toBe('0.0.0');
+    expect([
+      ReactNativeVersion.major,
+      ReactNativeVersion.minor,
+      ReactNativeVersion.patch,
+    ]).toEqual([major, minor, patch]);
+    expect(ReactNativeVersion.prerelease).toBeNull();
   });
 });
