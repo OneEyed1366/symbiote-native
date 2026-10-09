@@ -75,13 +75,15 @@
     "format": "prettier --write \"src/**/*.{ts,tsx}\""
   },
   "dependencies": {
-    "@react-native/normalize-colors": "catalog:"
+    "@react-native/normalize-colors": "catalog:",
+    "invariant": "catalog:"
   },
   "peerDependencies": {
     "react-native": ">=0.86"
   },
   "peerDependenciesMeta": {},
   "devDependencies": {
-    "@symbiote-native/test-utils": "workspace:*"
+    "@symbiote-native/test-utils": "workspace:*",
+    "@types/invariant": "catalog:"
   }
 }

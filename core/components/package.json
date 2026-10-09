@@ -71,6 +71,9 @@
     "typecheck": "tsc --build",
     "format": "prettier --write \"src/**/*.{ts,tsx}\""
   },
+  "dependencies": {
+    "@react-native/virtualized-lists": "catalog:"
+  },
   "peerDependencies": {
     "@symbiote-native/engine": "workspace:^",
     "react-native": ">=0.86"

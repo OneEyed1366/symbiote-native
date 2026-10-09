@@ -1,17 +1,6 @@
-# React Native's autolinking CLI assumes a flat, hoisted node_modules — a native dependency
-# nested several levels deep (e.g. a third-party RN library that is only a dependency of one
-# of our own packages, never the consuming app's own package.json) never gets hoisted to the
-# app's own node_modules root under pnpm's default isolated store, so the RN CLI's autolinking
-# scan (which only walks the app's own tree) never finds it.
-#
-# Deliberately NOT nodeLinker: hoisted + shamefullyHoist (tried and reverted — see git history):
-# that switches pnpm's whole linking algorithm to npm-classic-style deduplication, which also
-# stops guaranteeing a package's OWN direct dependencies a local symlink in its own
-# node_modules. React Native's generated `android/settings.gradle` hardcodes a literal relative
-# path (`../node_modules/@react-native/gradle-plugin`) assuming exactly that guarantee, so full
-# hoisting broke every app's Android build the moment a direct devDependency stopped getting
-# its own local copy. publicHoistPattern only ADDS extra root-level symlinks for matching
-# packages on top of the normal per-package isolated behavior — it does not touch that guarantee.
+# RN autolinking only scans the app's own tree, so a deeply nested native dep is never found.
+# Not `nodeLinker: hoisted`: it breaks the per-package symlinks `android/settings.gradle` expects
+# `publicHoistPattern` only adds root symlinks on top of the isolated layout
 publicHoistPattern:
   - '*react-native*'
 packages:
@@ -93,27 +82,13 @@ catalog:
   '@vue/babel-plugin-jsx': ^1.5.0
   vue: ^3.5.38
   vue-tsc: ^2.2.12
-  # PINNED to 22.0.x, deliberately — NOT a lazy pin, and do not widen it back to `^22` without
-  # reading the next paragraph. `@angular/compiler-cli@22.1.0` moved its own `@babel/core`
-  # dependency 7.29.7 -> 8.0.1 and flipped the linker plugin to `api.assertVersion(8)`
-  # (bundles/linker/babel/index.js). Metro/`@react-native/babel-preset` 0.86 is Babel 7.29.7, so
-  # the linker — which we load INSIDE Metro's Babel as stage B of Angular AOT — refuses to run:
-  #   [BABEL] Requires Babel "^8.0.0-0", but was loaded with "7.29.7"
-  # This is not just a version guard we could stub out: the bundle does `import { types } from
-  # '@babel/core'`, resolving to compiler-cli's OWN nested @babel/core@8, so a stubbed
-  # assertVersion would have Babel-8-built AST nodes spliced into a Babel-7 program.
-  # All four must move in lock-step — compiler-cli peer-requires @angular/compiler at an EXACT
-  # version. The unpin condition is RN shipping a Babel 8 preset, or moving the linker out of
-  # Metro into a post-`ngc` pass run under Angular's own Babel 8 (see the angular-adapter skill).
-  # Re-tried 2026-09-28 for `@boundary`/`@error` (@symbiote-native/app-metrics's README) -
-  # `assertVersion(8)` still throws under the real `@babel/core@7.29.7`, no legacy linker exists
+  # Pinned to 22.0.x: compiler-cli 22.1 needs Babel 8 (`assertVersion(8)`), Metro ships 7.29.7.
+  # All four move in lock-step, unpin once RN ships a Babel 8 preset (angular-adapter skill)
   '@angular/core': ~22.0.8
   '@angular/common': ~22.0.8
   '@angular/compiler': ~22.0.8
   '@angular/compiler-cli': ~22.0.8
-  # Same lock-step family as the four above — @angular/forms has no runtime Babel/linker
-  # entanglement of its own, but pinning it to the same patch avoids a second, independent
-  # version drift source on top of the one already being managed here.
+  # Same lock-step family as the four above, the same patch avoids a second source of version drift
   '@angular/forms': ~22.0.8
   # Measured against 5.56.8 in svelte-adapter-dom-shim (2026-08-10) — `fragments: 'tree'`
   # (mandatory, §2 of that skill) needs >=5.33. Confirmed a real published npm release:
@@ -123,13 +98,8 @@ catalog:
   # Same library `svelte-package` uses for the job; it is also what `svelte-check` runs on internally,
   # so it moves with `svelte` above, not independently.
   svelte2tsx: ^0.7.61
-  # 1.9 stable, deliberately NOT 2.0 (RC as of 2026-08). The universal-renderer contract differs
-  # non-cosmetically between the two, so this is a rewrite of adapters/solid/src/renderer.ts, not a
-  # range widening: 2.0 moved the package (`solid-js/universal` -> `@solidjs/universal`), added
-  # `createSentinel`/`cleanupNodes` to RendererOptions, gave `createElement` a second staticProps
-  # argument, replaced `use()` with `applyRef`/`ref`, and changed `effect(fn, init)` to
-  # `effect(fn, effectFn)` — i.e. both the options we implement AND the compiled-output shape our
-  # `/renderer` subpath must satisfy. Full diff recorded in the solid-adapter skill.
+  # Not 2.0 (RC as of 2026-08): it moves to `@solidjs/universal` and changes the renderer contract.
+  # Moving means rewriting `adapters/solid/src/renderer.ts` (solid-adapter skill has the full diff)
   solid-js: ^1.9.14
   # Compiles our JSX into universal-renderer calls (`generate: 'universal'` + our `moduleName`).
   # Moves in lock-step with `solid-js` above — which functions the compiled output imports is a
@@ -155,10 +125,8 @@ catalog:
   vitest: ^4.1.9
   eslint: ^10.6.0
   prettier: ^3.9.1
-  # Root needs it only to READ examples/svelte/.prettierrc.js: prettier loads a resolved
-  # config's `plugins` for EVERY file it covers, not just the .svelte ones, so the root
-  # format sweep over examples/ cannot even reach that tree's .ts files without it. The
-  # sweep's glob still excludes *.svelte (.claude/rules/svelte-prettier-whitespace-safety.md).
+  # Root reads `examples/svelte/.prettierrc.js`; prettier loads its `plugins` for every covered file
+  # Without it the format sweep cannot reach that tree's .ts files (it still excludes *.svelte)
   prettier-plugin-svelte: ^4.1.1
   # Same reason as the svelte plugin, for apps/docs-site's .astro pages: without it the
   # format sweep aborts with `No parser could be inferred` on the first one.
@@ -240,42 +208,23 @@ catalog:
   # decomposes colors through it instead of hand-rolling a parser that knew no named colors.
   # Versioned independently of the 0.86.0 family above - react-native 0.86.0 itself ships 0.86.2.
   '@react-native/normalize-colors': 0.86.2
+  # `core/components` imports RN's list helpers from it instead of keeping hand copies
+  '@react-native/virtualized-lists': 0.86.0
   '@react-native/new-app-screen': 0.86.0
   '@react-native-community/cli': 20.1.0
   '@react-native-community/cli-platform-android': 20.1.0
   '@react-native-community/cli-platform-ios': 20.1.0
-  # Exact pins, not caret ranges — same reason as react-native-screens below: packages/slider and
-  # packages/splash-screen vendor these libraries' codegen JS specs into a published
-  # codegen-specs/ snapshot (scripts/vendor-codegen-specs.cjs), and a caret range lets a
-  # standalone examples/* consumer's own npm install silently drift its NATIVE side ahead of
-  # that snapshot. No drift observed yet (both examples/* and this workspace currently resolve
-  # the same 5.2.0/7.3.2), but the class of failure is proven (react-native-screens, 2026-07-15)
-  # and silent at both ends until a real device/simulator build — pin here to close it off before
-  # it happens, not after.
+  # Exact pins, same reason as `react-native-screens` below: a caret range lets a standalone
+  # `examples/*` install drift its native side ahead of the vendored `codegen-specs/` snapshot
   '@react-native-community/slider': 5.2.0
   react-native-bootsplash: 7.3.2
   react-native-is-edge-to-edge: ^1.3.1
-  # Exact pin, not a caret range: @symbiote-native/navigation vendors this library's codegen JS
-  # specs into its own published codegen-specs/ at prepare time (see
-  # scripts/vendor-codegen-specs.cjs) — a floating range let a standalone `npm install` consumer
-  # (examples/*, outside this pnpm workspace) resolve a NEWER react-native-screens than whatever
-  # this workspace last vendored from, so the consumer's native .rn-screens (podspec-vendored
-  # fresh from THEIR install) referenced codegen types (e.g. RNSSplitHostColorScheme, added in
-  # 4.26.0) that our stale 4.25.2-vendored codegen-specs never generated Props.h entries for —
-  # `error: no type named 'RNSSplitHostColorScheme' in namespace 'facebook::react'` at pod-install
-  # time, with zero warning at either version's own install. An exact pin here + republishing
-  # @symbiote-native/navigation on every bump keeps codegen-specs and any consumer's native source
-  # permanently in lockstep — see .claude/rules/native-proxy-package-files.md.
+  # Exact pin: `@symbiote-native/navigation` vendors its codegen specs, so a newer consumer install
+  # would use native types our snapshot never generated (rule `native-proxy-package-files`)
   react-native-screens: 4.26.0
   react-native-safe-area-context: ^5.5.2
-  # Exact pins: packages/sensors depends on expo-sensors ONLY for its native ios/android folders
-  # (its JS is hand-ported into our own core, never imported — see the
-  # symbiote-expo-native-module skill and .claude/rules/expo-native-module-packaging.md). A caret
-  # range on expo-sensors could resolve a newer native module than the one our hand-ported core
-  # was written against, silently drifting the two apart the same way the codegen-specs libraries
-  # above do. expo-modules-core is expo-sensors' own peer/runtime and must match the same sdk-57
-  # line (expo-sensors 57.0.2 / expo-modules-core 57.0.5, verified against .vendors/expo at
-  # origin/sdk-57).
+  # Exact pins for every `expo-*` entry below: the package is used ONLY for its native folders.
+  # Its JS is hand-ported into our own core, so a caret range could drift the two apart
   expo-sensors: 57.0.2
   expo-modules-core: 57.0.20
   # Same exact-pin reasoning as expo-sensors above: packages/local-auth depends on
@@ -283,18 +232,11 @@ catalog:
   # own core). Version verified against .vendors/expo at origin/sdk-57 — matches the version
   # already published to npm (57.0.2), same expo-modules-core 57.0.5 peer/runtime as sensors.
   expo-local-authentication: 57.0.2
-  # Same exact-pin reasoning again: packages/haptics, packages/clipboard, packages/battery each
-  # depend on their matching expo-* package ONLY for its native ios/android folders (JS
-  # hand-ported into our own core). Versions are the real npm-published `latest` as of 2026-07-28
-  # (registry.npmjs.org, not a guess from the .vendors/expo snapshot, which is pinned to an older
-  # 55.0.8 for these three specific packages) — same expo-modules-core 57.0.5 peer/runtime line.
+  # Versions are the npm `latest` as of 2026-07-28, the `.vendors/expo` snapshot has an older 55.0.8
   expo-haptics: 57.0.1
   expo-clipboard: 57.0.1
   expo-battery: 57.0.1
-  # Same exact-pin reasoning as the trio above: packages/brightness, packages/cellular,
-  # packages/network each depend on their matching expo-* package ONLY for its native
-  # ios/android folders (JS hand-ported into our own core). Versions are the real npm-published
-  # `latest` as of 2026-07-29, same expo-modules-core 57.0.5 peer/runtime line.
+  # Versions are the npm `latest` as of 2026-07-29
   expo-brightness: 57.0.1
   expo-cellular: 57.0.1
   expo-network: 57.0.1
@@ -307,19 +249,10 @@ catalog:
   # its native ios/android folders (JS hand-ported into our own core). Version verified against
   # .vendors/expo at origin/sdk-57 (57.0.1), same expo-modules-core 57.0.5 peer/runtime line.
   expo-device: 57.0.1
-  # Same exact-pin reasoning as the trio above: packages/crypto depends on expo-crypto ONLY for
-  # its native ios/android folders (JS hand-ported into our own core, skipping the aes/ AES
-  # subfolder — out of scope for this pass). Version verified against .vendors/expo at
-  # origin/sdk-57 (57.0.1), same expo-modules-core 57.0.5 peer/runtime line.
+  # The hand-ported JS skips the `aes/` subfolder, out of scope for this pass
   expo-crypto: 57.0.1
-  # Same exact-pin reasoning as the trio above — this batch closes out tier-1 of the
-  # symbiote-expo-package-catalog priority queue: packages/localization, packages/keep-awake,
-  # packages/screen-orientation, packages/tracking-transparency, packages/store-review, and
-  # packages/system-ui each depend on their matching expo-* package ONLY for its native
-  # ios/android folders (JS hand-ported into our own core). Versions verified against
-  # .vendors/expo at origin/sdk-57, same expo-modules-core 57.0.5 peer/runtime line.
-  # (expo-standard-web-crypto has no native ios/android folders at all — it delegates entirely
-  # to packages/crypto's own getRandomValues — so it needs no catalog entry here.)
+  # Tier-1 of the `symbiote-expo-package-catalog` queue, versions verified at origin/sdk-57
+  # `expo-standard-web-crypto` has no native folders, so it needs no entry
   expo-localization: 57.0.1
   expo-keep-awake: 57.0.1
   expo-screen-orientation: 57.0.1
@@ -356,11 +289,7 @@ catalog:
   # Version verified against .vendors/expo at origin/sdk-57 (57.0.1) and matches the real
   # npm-published `latest`, same expo-modules-core 57.0.5 peer/runtime line.
   expo-secure-store: 57.0.1
-  # Same exact-pin reasoning, continuing tier-2: packages/sharing, packages/web-browser and
-  # packages/sms each depend on their matching expo-* package ONLY for its native ios/android
-  # folders (JS hand-ported into our own core). Versions verified against .vendors/expo at
-  # origin/sdk-57 and against the real npm-published `latest`, same expo-modules-core 57.0.5
-  # peer/runtime line.
+  # Tier-2 versions are verified at origin/sdk-57 and against the npm `latest`
   expo-sharing: 57.0.8
   expo-web-browser: 57.0.2
   expo-sms: 57.0.1
@@ -393,13 +322,9 @@ catalog:
   # its native ios/android folders. Version verified against .vendors/expo at origin/sdk-57
   # (57.0.2) and npm-published `latest`, same expo-modules-core 57.0.5 peer/runtime line.
   expo-video-thumbnails: 57.0.2
-  # Same exact-pin reasoning: packages/intent-launcher depends on expo-intent-launcher ONLY for
-  # its native android folder (Android-only package), version 57.0.1 matching the real
-  # npm-published `latest`, same expo-modules-core 57.0.5 peer/runtime line
+  # Android-only package, native folder only
   expo-intent-launcher: 57.0.1
-  # Same exact-pin reasoning: packages/navigation-bar depends on expo-navigation-bar ONLY for
-  # its native android folder (Android-only package), version 57.0.2 matching the real
-  # npm-published `latest`, same expo-modules-core 57.0.5 peer/runtime line
+  # Android-only package, native folder only
   expo-navigation-bar: 57.0.2
   # Same exact-pin reasoning: packages/blob depends on expo-blob ONLY for its native
   # ios/android folders. Version verified against .vendors/expo at origin/sdk-57 (57.0.2)
@@ -421,13 +346,8 @@ catalog:
   # ios/android folders. Version verified against .vendors/expo at origin/sdk-57 (57.0.6)
   # and npm-published `latest`, same expo-modules-core 57.0.5 peer/runtime line.
   expo-contacts: 57.0.6
-  # Same exact-pin reasoning, continuing tier-2: packages/task-manager depends on
-  # expo-task-manager ONLY for its native ios/android folders (JS hand-ported into our own
-  # core). Version verified against .vendors/expo at origin/sdk-57 (57.0.15) and matches the
-  # real npm-published `latest`, same expo-modules-core 57.0.5 peer/runtime line.
-  # unimodules-app-loader is expo-task-manager's own real runtime dependency (not a
-  # devDependency) — Android's headless-boot path (RNHeadlessAppLoader) needs its native folder
-  # too, so it is pinned here for the same "native folder only, autolinks unmodified" reason.
+  # `unimodules-app-loader` is a runtime dependency of `expo-task-manager`
+  # Android's headless boot (`RNHeadlessAppLoader`) needs its native folder, so it is pinned too
   expo-task-manager: 57.0.15
   unimodules-app-loader: 57.0.1
   # packages/task-manager depends on expo-constants only for its native ConstantsService: legacy
@@ -435,79 +355,33 @@ catalog:
   # appScopeKey and throws (NPE) if nothing provides it. Safe standalone - its only real dep is
   # @expo/env, no metro-config/babel-preset-expo; matches npm latest and the expo-modules-core peer.
   expo-constants: 57.0.19
-  # Same exact-pin reasoning, continuing tier-2: packages/background-fetch and
-  # packages/background-task depend on their matching expo-* package ONLY for its native
-  # ios/android folders (JS hand-ported into our own core, registration driven through
-  # @symbiote-native/task-manager). Vendored source matches origin/sdk-57 57.0.16, but pinned to
-  # 57.0.15 here: npm's published 57.0.16 of BOTH packages declares a dependency on
-  # expo-task-manager@~57.0.16, a version npm never published (57.0.15 is npm's real latest) —
-  # confirmed via `npm view expo-background-fetch@57.0.16 dependencies` 2026-09-07. That makes
-  # 57.0.16 permanently unresolvable by any pnpm/npm install, workspace-wide, regardless of
-  # --filter scope. 57.0.15's own dependency is expo-task-manager@~57.0.15, matching our
-  # expo-task-manager pin above — same expo-modules-core 57.0.5 peer/runtime line.
+  # Pinned to 57.0.15, not the vendored 57.0.16: that one needs an unpublished
+  # `expo-task-manager@~57.0.16`, so nothing in the workspace can install it
   expo-background-fetch: 57.0.15
   expo-background-task: 57.0.15
-  # Same exact-pin reasoning, continuing tier-2: packages/location depends on expo-location ONLY
-  # for its native ios/android folders (JS hand-ported into our own core). Version verified
-  # against .vendors/expo at origin/sdk-57 (57.0.15) and matches the real npm-published `latest`,
-  # same expo-modules-core 57.0.5 peer/runtime line. Its Android build.gradle also declares a
-  # real Maven dependency (com.google.android.gms:play-services-location) — resolved by Gradle
-  # itself once the package is autolinked, nothing to pin here for that.
+  # Its Android `build.gradle` also pulls `play-services-location` from Maven, Gradle resolves it
   expo-location: 57.0.15
-  # Same exact-pin reasoning, continuing tier-2: packages/media-library depends on
-  # expo-media-library ONLY for its native ios/android folders (JS hand-ported into our own
-  # core — legacy function-based API only, the shared-object "Next" API is out of scope, see
-  # the package's own README). Version verified against .vendors/expo at origin/sdk-57
-  # (57.0.4) and matches the real npm-published `latest`, same expo-modules-core 57.0.5
-  # peer/runtime line.
+  # The port covers the legacy function-based API only, the shared-object "Next" API is out of scope
   expo-media-library: 57.0.4
-  # Same exact-pin reasoning, continuing tier-2: packages/file-system depends on
-  # expo-file-system ONLY for its native ios/android folders (JS hand-ported into our own
-  # core — legacy function-based API only, the newer shared-object File/Directory/Paths API is
-  # out of scope, see the package's own README). Version verified against .vendors/expo at
-  # origin/sdk-57 (57.0.6) and matches the real npm-published `latest`, same expo-modules-core
-  # 57.0.5 peer/runtime line.
+  # The port covers the legacy function-based API only
+  # The shared-object `File`/`Directory`/`Paths` API is out of scope
   expo-file-system: 57.0.6
-  # Same exact-pin reasoning, continuing tier-2: packages/audio depends on expo-audio ONLY for
-  # its native ios/android folders (JS hand-ported into our own core — the shared-object
-  # AudioPlayer/AudioRecorder/AudioPlaylist/AudioStream classes, sourced without the `expo-asset`
-  # peer, see the package's own README). Version verified against .vendors/expo at origin/sdk-57
-  # (57.0.4) and matches the real npm-published `latest`, same expo-modules-core 57.0.5
-  # peer/runtime line.
+  # The port carries the shared-object `AudioPlayer` and `AudioRecorder` classes
+  # It is sourced without the `expo-asset` peer
   expo-audio: 57.0.4
-  # Same exact-pin reasoning, continuing tier-2: packages/notifications depends on
-  # expo-notifications ONLY for its native ios/android folders (JS hand-ported into our own
-  # core — permissions, tokens, scheduling, presentation, badges, Android channels/categories,
-  # and the background-task hook; see the package's own README for what upstream's auto push-
-  # token server-resync daemon and expo-constants/expo-application defaults were deliberately
-  # dropped in favor of). Version verified against .vendors/expo at origin/sdk-57 (57.0.17) and
-  # matches the real npm-published `latest`, same expo-modules-core 57.0.5 peer/runtime line.
+  # The port drops upstream's push-token auto-resync daemon, see the package README for the rest
   expo-notifications: 57.0.17
-  # Same exact-pin reasoning, continuing tier-2: packages/sqlite depends on expo-sqlite ONLY for
-  # its native ios/android folders (JS hand-ported into our own core — Database/Statement/Session/
-  # TaggedQuery/kv-store; the JSI SharedObject scare from expo-file-system's "next" surface does
-  # NOT apply here, expo-sqlite's native classes are plain `requireNativeModule` constructors).
-  # Version verified against .vendors/expo at origin/sdk-57 (57.0.2) and matches the real
-  # npm-published `latest`, same expo-modules-core 57.0.5 peer/runtime line. No unpublished-peer
-  # trap like background-fetch/task — its own peerDependencies are all wildcard.
+  # Its native classes are plain `requireNativeModule` constructors, no JSI shared objects
+  # Its `peerDependencies` are all wildcards, so no unpublished-peer trap like background-fetch
   expo-sqlite: 57.0.2
-  # Same exact-pin reasoning, continuing tier-2: packages/asset depends on expo-asset ONLY for
-  # its native ios/android folders (JS hand-ported into our own core, dropping the classic-
-  # updates/Expo-Go branches — see the package's own README). Version verified against
-  # .vendors/expo at origin/sdk-57 (57.0.18) and matches the real npm-published `latest`, same
-  # expo-modules-core 57.0.5 peer/runtime line.
+  # The port drops the classic-updates and Expo Go branches
   expo-asset: 57.0.18
   # react-native's own dependency (its asset registry) — pinned as a direct dependency of
   # packages/asset for the same "explicit over transitive" reason as the invariant pin below.
   '@react-native/assets-registry': 0.86.0
-  # Same exact-pin reasoning, continuing tier-2: packages/font depends on expo-font ONLY for
-  # its native ios/android folders (JS hand-ported into our own core, full FontSource parity via
-  # packages/asset). Version verified against .vendors/expo at origin/sdk-57 (57.0.4) and matches
-  # the real npm-published `latest`, same expo-modules-core 57.0.5 peer/runtime line.
+  # Full `FontSource` parity comes via `packages/asset`
   expo-font: 57.0.4
-  # Same exact-pin reasoning: packages/age-range depends on expo-age-range ONLY for its native
-  # ios/android folders (JS hand-ported into our own core), version 57.0.5 matching the real
-  # npm-published `latest`, same expo-modules-core 57.0.5 peer/runtime line
+  # Version matches the npm `latest`
   expo-age-range: 57.0.5
   # Same exact-pin reasoning: packages/app-integrity depends on @expo/app-integrity ONLY for its
   # native folders, version 57.0.2 matching npm-published `latest`. Scoped, unlike the rest of
@@ -517,9 +391,7 @@ catalog:
   # native folders, version 57.0.21 matching npm-published `latest`. Its own real dependency
   # expo-updates-interface resolves transitively, no separate catalog entry needed for it
   expo-app-metrics: 57.0.21
-  # expo-sqlite's own real runtime dependency (its kv-store's write-serialization lock) —
-  # pinned to match .vendors/expo's exact vendored version rather than a newer semver-compatible
-  # release, same reasoning as unimodules-app-loader above.
+  # Runtime dependency of `expo-sqlite` (its kv-store write lock), kept on the vendored version
   await-lock: ^2.2.2
   # Test-only: backs the headless fakes for expo-sqlite's native Database/Statement/Session
   # constructors in packages/sqlite's vitest suite (user's explicit choice over node:sqlite).
@@ -530,10 +402,8 @@ catalog:
   # apps/docs-site's expo-native-module-setup howto. Version verified against .vendors/expo at
   # origin/sdk-57.
   expo-modules-autolinking: 57.0.8
-  # react-native's own dependency (react-native/package.json pins "^2.2.4") — already present in
-  # every install via that transitive edge; packages/local-auth just makes its own use of it
-  # (authenticateAsync's promptMessage runtime guard, matching expo-local-authentication's own
-  # upstream code 1:1) an explicit direct dependency instead of relying on the transitive one.
+  # Already installed via `react-native` (pins `^2.2.4`)
+  # `packages/local-auth` uses it in `authenticateAsync`, so it is declared directly
   invariant: ^2.2.4
   '@types/invariant': ^2.2.37
   '@babel/core': ^7.25.2
