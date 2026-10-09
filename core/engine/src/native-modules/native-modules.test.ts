@@ -1,33 +1,17 @@
-// Co-located unit test for `createDeviceEventModule`, the Pure Fabrication that
-// factors out the lazy-resolve + lazy-emitter shape duplicated across
-// AccessibilityInfo/AppState/Appearance/BackHandler/Keyboard/Dimensions. A fake
-// __turboModuleProxy stands in for the native module; a fake RN$registerCallableModule
-// captures the device hub so installDeviceEventHub() doesn't throw.
+// `createDeviceEventModule` factors out the lazy-resolve and lazy-emitter shape shared by
+// `AccessibilityInfo`, `AppState`, `Appearance`, `BackHandler`, `Keyboard` and `Dimensions`
+// A fake `__turboModuleProxy` stands in for the native module
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   createDeviceEventModule,
   getEnforcingNativeModule,
   getNativeModule,
 } from './index';
 
-type IDeviceHub = {
-  emit: (eventType: string, ...args: unknown[]) => void;
-};
-
-beforeEach(() => {
-  globalThis.RN$registerCallableModule = (
-    name: string,
-    factory: () => IDeviceHub,
-  ): void => {
-    if (name === 'RCTDeviceEventEmitter') factory();
-  };
-});
-
 afterEach(() => {
   globalThis.__turboModuleProxy = undefined;
   globalThis.nativeModuleProxy = undefined;
-  globalThis.RN$registerCallableModule = undefined;
 });
 
 function isPresent<T>(value: unknown): value is T {
@@ -57,9 +41,8 @@ describe('getNativeModule (Positive)', () => {
     );
   });
 
-  // why: a HostObject access for an unlinked name can THROW natively (per the
-  // module's own comment) -- that throw must be swallowed here, or a single missing
-  // module would blank the whole render tree instead of degrading to null.
+  // A HostObject access for an unlinked name can throw natively
+  // The throw is swallowed, or one missing module would blank the render tree instead of null
   it('swallows a throw from the bridgeless proxy and resolves to null', () => {
     globalThis.nativeModuleProxy = new Proxy(
       {},
@@ -179,11 +162,8 @@ describe('createDeviceEventModule', () => {
     expect(fakeModule.removeListeners).toHaveBeenCalledWith(1);
   });
 
-  // why: hasEventEmitterShape is a RUNTIME guard, distinct from the `bindModuleToEmitter:
-  // false` config below -- a module that resolves but genuinely lacks addListener/
-  // removeListeners (e.g. Dimensions' DeviceInfo, which only has getConstants) must
-  // not be bound even when binding is requested (the default), since calling a
-  // missing method would crash.
+  // `hasEventEmitterShape` is a runtime guard, separate from `bindModuleToEmitter: false`
+  // A module without `addListener`/`removeListeners` (`Dimensions`' DeviceInfo) is never bound
   it('does not bind a resolved module that lacks the observe-counter methods', () => {
     const shapelessModule = { getConstants: (): Record<string, never> => ({}) };
     globalThis.__turboModuleProxy = <T>(name: string): T | null =>

@@ -1,11 +1,6 @@
-// AccessibilityInfo on iOS wraps the `AccessibilityManager` native module: callback-
-// based state getters (VoiceOver / reduce-motion / bold-text / grayscale / invert-colors /
-// reduce-transparency / darker-system-colors), announce + focus side effects, and the
-// observe-counters for the device-event subscription. Subscribes to iOS device events
-// (`screenReaderChanged` / `reduceMotionChanged` / `boldTextChanged` / ...) via a
-// NativeEventEmitter and re-broadcasts to JS listeners. Metro picks this on an iOS host;
-// the bare accessibility-info.ts re-exports it as the default for tsc / tsx / headless.
-// Mirrors RN's AccessibilityInfo.js iOS branches.
+// AccessibilityInfo on iOS over the `AccessibilityManager` native module, Metro picks this file
+// TODO(rn-port): a copy of RN's iOS branches, RN's module imports `RendererProxy` for
+// `sendAccessibilityEvent`, which loads React's renderer, so a non-React adapter cannot use it
 
 import { createDeviceEventModule } from '../native-modules';
 import {

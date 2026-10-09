@@ -1,11 +1,6 @@
-// AccessibilityInfo on Android wraps the stock RN `AccessibilityInfo` native module
-// (NO native code added; it ships with react-native). Android's getters take a SINGLE
-// success callback (no error callback) and a different method set than iOS: screen-reader
-// is `isTouchExplorationEnabled`, plus reduce-motion / invert-colors / grayscale /
-// high-text-contrast / accessibility-service, and `getRecommendedTimeoutMillis`. The
-// device-event NAMES also differ from iOS (e.g. screen-reader is `touchExplorationDidChange`,
-// reduce-motion is `reduceMotionDidChange`). Metro picks this on an Android host. Mirrors
-// RN's AccessibilityInfo.js Android branches.
+// AccessibilityInfo on Android over the stock `AccessibilityInfo` native module
+// TODO(rn-port): a copy of RN's Android branches, RN's module imports `RendererProxy` for
+// `sendAccessibilityEvent`, which loads React's renderer, so a non-React adapter cannot use it
 
 import { createDeviceEventModule } from '../native-modules';
 import {

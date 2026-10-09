@@ -24,18 +24,10 @@ beforeEach(() => {
     const module: unknown = name === 'AccessibilityInfo' ? nativeModule : null;
     return isPresent<T>(module) ? module : null;
   };
-  globalThis.RN$registerCallableModule = (
-    name: string,
-    factory: () => IDeviceHub,
-  ): void => {
-    if (name === 'RCTDeviceEventEmitter') deviceHub = factory();
-  };
-  vi.resetModules();
 });
 
 afterEach(() => {
   globalThis.__turboModuleProxy = undefined;
-  globalThis.RN$registerCallableModule = undefined;
   Reflect.deleteProperty(globalThis, 'nativeFabricUIManager');
 });
 
@@ -43,7 +35,23 @@ function isPresent<T>(value: unknown): value is T {
   return value !== null && value !== undefined;
 }
 
+// A fresh module registry gets a fresh RN device bus, handed to the fresh host
 async function load() {
+  vi.resetModules();
+  const { default: bus } = await import(
+    /* @vite-ignore */ 'react-native/Libraries/EventEmitter/RCTDeviceEventEmitter'
+  );
+  const { default: nativeEventEmitter } = await import(
+    /* @vite-ignore */ 'react-native/Libraries/EventEmitter/NativeEventEmitter'
+  );
+  deviceHub = {
+    emit: (eventType, ...args) =>
+      Reflect.apply(Reflect.get(bus, 'emit'), bus, [eventType, ...args]),
+  };
+  (await import('../react-native-host')).setReactNativeHost({
+    DeviceEventEmitter: bus,
+    NativeEventEmitter: nativeEventEmitter,
+  });
   return (await import('./index.android')).AccessibilityInfo;
 }
 

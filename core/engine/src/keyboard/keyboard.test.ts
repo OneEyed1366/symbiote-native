@@ -1,13 +1,6 @@
-// Co-located unit test for the Keyboard module. A fake __turboModuleProxy returns
-// a KeyboardObserver (observe-counters only) and a UIManager (configureNextLayoutAnimation,
-// for scheduleLayoutAnimation); a fake RN$registerCallableModule captures the device hub so
-// the test can play "native" and emit keyboardDidShow / keyboardDidHide. dismiss() is driven
-// through the real text-input-state + a committed Fabric node, since that is the actual
-// mechanism RN's dismissKeyboard() uses (blur the focused input).
-//
-// Keyboard never throws: every public method degrades to a documented no-op (dismiss with
-// nothing focused, removeAllListeners for an event nobody's listening to, scheduleLayoutAnimation
-// with a zero duration). So there is no Negative (toThrow) group; every scenario is Positive.
+// Fakes: `__turboModuleProxy` for `KeyboardObserver`, a Fabric slot recording layout animations
+// and `RN$registerCallableModule` capturing the device hub, so the test emits keyboard events
+// Keyboard degrades to no-ops instead of throwing, so every scenario is Positive
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IKeyboardEvent } from './index';
@@ -21,17 +14,15 @@ type ILayoutAnimationCall = {
 };
 
 const ROOT_TAG = 88;
+const RN_LAYOUT_ANIMATION =
+  'react-native/Libraries/LayoutAnimation/LayoutAnimation';
+const RN_DEVICE_BUS =
+  'react-native/Libraries/EventEmitter/RCTDeviceEventEmitter';
+const RN_NATIVE_EVENT_EMITTER =
+  'react-native/Libraries/EventEmitter/NativeEventEmitter';
 
-// vi.resetModules() in beforeEach discards the ENTIRE module registry, not just
-// './index' -- Keyboard's own imports of '../text-input-state' and '../commit'
-// (via createSurface/createElement) get fresh instances too. A statically
-// top-level-imported binding for any of these would point at a stale module
-// instance disconnected from the one Keyboard resolves internally after reset, so
-// everything Keyboard touches is re-imported fresh, in beforeEach, same as Keyboard itself.
-//
-// installRecordingFabric() is in that set, and it has to be: the tree host is module state on the engine,
-// so a host installed on the pre-reset instance leaves the fresh one holding no tree at all — the
-// ops for the input below stay pending and dismiss() finds nothing focused to blur.
+// `resetModules` drops the whole registry, so everything Keyboard touches is imported fresh
+// A tree host installed before the reset leaves the fresh engine with no tree to blur
 let Keyboard: typeof import('./index').Keyboard;
 let fabric: ReturnType<
   typeof import('@symbiote-native/test-utils').installRecordingFabric
@@ -52,6 +43,26 @@ const showEvent: IKeyboardEvent = {
   endCoordinates: { screenX: 0, screenY: 300, width: 390, height: 346 },
 };
 
+// A fresh module registry gets fresh RN modules, wired into the fresh host
+async function wireHost(): Promise<void> {
+  const { default: layoutAnimation } = await import(
+    /* @vite-ignore */ RN_LAYOUT_ANIMATION
+  );
+  const { default: bus } = await import(/* @vite-ignore */ RN_DEVICE_BUS);
+  const { default: nativeEventEmitter } = await import(
+    /* @vite-ignore */ RN_NATIVE_EVENT_EMITTER
+  );
+  deviceHub = {
+    emit: (eventType, ...args) =>
+      Reflect.apply(Reflect.get(bus, 'emit'), bus, [eventType, ...args]),
+  };
+  (await import('../react-native-host')).setReactNativeHost({
+    LayoutAnimation: layoutAnimation,
+    DeviceEventEmitter: bus,
+    NativeEventEmitter: nativeEventEmitter,
+  });
+}
+
 beforeEach(async () => {
   observerAdded = 0;
   observerRemoved = 0;
@@ -66,38 +77,33 @@ beforeEach(async () => {
       observerRemoved += count;
     },
   };
-  const fakeUIManager = {
-    configureNextLayoutAnimation: (
-      config: { duration: number; update?: { type?: unknown } },
-      onSuccess: () => void,
-    ): void => {
-      layoutAnimationCalls.push({
-        duration: config.duration,
-        updateType: config.update?.type,
-      });
-      onSuccess();
-    },
-  };
   const registeredModules: Record<string, unknown> = {
     KeyboardObserver: fakeKeyboardObserver,
-    UIManager: fakeUIManager,
   };
 
   globalThis.__turboModuleProxy = <T>(name: string): T | null => {
     const module = registeredModules[name];
     return isPresent<T>(module) ? module : null;
   };
-  globalThis.RN$registerCallableModule = (
-    name: string,
-    factory: () => IDeviceHub,
-  ): void => {
-    if (name === 'RCTDeviceEventEmitter') deviceHub = factory();
-  };
-
   vi.resetModules();
   fabric = (
     await import('@symbiote-native/test-utils')
   ).installRecordingFabric();
+  const slot = globalThis.nativeFabricUIManager;
+  if (slot === undefined) throw new Error('no Fabric slot installed');
+  Object.assign(slot, {
+    configureNextLayoutAnimation(
+      config: { duration: number; update?: { type?: unknown } },
+      onSuccess: () => void,
+    ): void {
+      layoutAnimationCalls.push({
+        duration: config.duration,
+        updateType: config.update?.type,
+      });
+      onSuccess();
+    },
+  });
+  await wireHost();
   ({ Keyboard } = await import('./index'));
   ({ createElement, createSurface } = await import('@symbiote-native/engine'));
   ({ currentlyFocusedInput, setInputFocused } =
@@ -106,7 +112,6 @@ beforeEach(async () => {
 
 afterEach(() => {
   globalThis.__turboModuleProxy = undefined;
-  globalThis.RN$registerCallableModule = undefined;
 });
 
 function isPresent<T>(value: unknown): value is T {
@@ -141,9 +146,7 @@ describe('Keyboard', () => {
       expect(observerRemoved).toBe(removedBefore + 1);
     });
 
-    // why: isKeyboardEvent guards a malformed native payload (missing
-    // endCoordinates) -- the cache must not be corrupted by garbage, so isVisible()
-    // must not flip on a bad event.
+    // A payload without `endCoordinates` must not flip `isVisible`
     it('ignores a malformed keyboardDidShow payload missing endCoordinates', () => {
       Keyboard.addListener('keyboardDidShow', () => {});
       deviceHub?.emit('keyboardDidShow', { duration: 250, easing: 'keyboard' });
@@ -170,12 +173,11 @@ describe('Keyboard', () => {
       expect(firstCount).toBe(1);
       expect(secondCount).toBe(1);
 
-      // The internal cache feed is untracked, so it still updated on that last emit.
+      // The internal cache feed is untracked, so it still updated on that last emit
       expect(Keyboard.isVisible()).toBe(true);
     });
 
-    // why: removeAllListeners for an event type nobody ever subscribed to (e.g. an
-    // app that calls it defensively on unmount) must not throw on the missing set.
+    // An app may call `removeAllListeners` on unmount with nothing subscribed
     it('removeAllListeners is a no-op for an event type with no subscriptions', () => {
       expect(() =>
         Keyboard.removeAllListeners('keyboardWillHide'),
@@ -184,9 +186,7 @@ describe('Keyboard', () => {
   });
 
   describe('scheduleLayoutAnimation', () => {
-    // why: this is how a keyboard accessory view syncs its own layout animation to
-    // the keyboard's real transition -- duration/easing must be forwarded verbatim
-    // (through coerceType) to LayoutAnimation.configureNext, reaching native.
+    // An accessory view syncs to the keyboard transition, duration and easing reach native verbatim
     it('configures the next commit with the keyboard event duration and coerced easing type', () => {
       Keyboard.scheduleLayoutAnimation(showEvent);
       expect(layoutAnimationCalls).toEqual([
@@ -194,8 +194,7 @@ describe('Keyboard', () => {
       ]);
     });
 
-    // why: a zero-duration event is documented as a no-op (an instant keyboard
-    // change has nothing to animate) -- it must not reach native at all.
+    // An instant keyboard change has nothing to animate
     it('is a no-op when duration is 0', () => {
       Keyboard.scheduleLayoutAnimation({ ...showEvent, duration: 0 });
       expect(layoutAnimationCalls).toHaveLength(0);
@@ -229,9 +228,7 @@ describe('Keyboard', () => {
   });
 
   describe('dismiss', () => {
-    // why: this is the actual mechanism RN's dismissKeyboard() uses -- blurring the
-    // focused input is what retracts the soft keyboard, so dismiss() must drive a
-    // real native blur command at the currently-focused node.
+    // Blurring the focused input is what retracts the soft keyboard, as in RN
     it('blurs the currently-focused input and clears the tracked focus', () => {
       const surface = createSurface(ROOT_TAG);
       const input = createElement('AndroidTextInput');
@@ -247,8 +244,7 @@ describe('Keyboard', () => {
       expect(currentlyFocusedInput()).toBeNull();
     });
 
-    // why: dismiss() with nothing focused (no input ever reported focus) must not
-    // throw or dispatch a stray blur command.
+    // Nothing focused means no throw and no stray blur command
     it('is a no-op when nothing is focused', () => {
       expect(() => Keyboard.dismiss()).not.toThrow();
       expect(fabric.commands).toHaveLength(0);
@@ -261,8 +257,7 @@ describe('Keyboard', () => {
       deviceHub.emit(eventType, payload);
     }
 
-    // why: RN's KeyboardImpl subscribes to didShow/didHide in its constructor, i.e. the first
-    // time Keyboard is touched — isVisible/metrics work with no listener of the app's own.
+    // RN tracks show and hide from the first touch of Keyboard, with no listener of the app's own
     it('tracks the keyboard from the first Keyboard call, with no app listener', () => {
       expect(Keyboard.isVisible()).toBe(false);
       emit('keyboardDidShow', showEvent);
@@ -270,7 +265,7 @@ describe('Keyboard', () => {
       expect(Keyboard.metrics()).toEqual(showEvent.endCoordinates);
     });
 
-    // why: RN animates only when `duration != null && duration !== 0`.
+    // RN animates only when `duration != null && duration !== 0`
     it('schedules no layout animation for an event without a duration', () => {
       const noDuration: IKeyboardEvent = JSON.parse(
         '{"easing":"keyboard","endCoordinates":{"screenX":0,"screenY":0,"width":1,"height":1}}',
@@ -297,8 +292,7 @@ describe('Keyboard', () => {
       },
     );
 
-    // why: RN's removeAllListeners goes to the device emitter itself, so it also drops
-    // Keyboard's own didShow tracking — a later show is no longer seen.
+    // RN goes to the device emitter itself, so the tracking subscription goes too
     it('removeAllListeners drops every listener of the event, the tracking one included', () => {
       const seen: unknown[] = [];
       Keyboard.addListener('keyboardDidShow', payload => seen.push(payload));
@@ -317,6 +311,7 @@ describe('Keyboard', () => {
       observerRemoved = 0;
       vi.resetModules();
       vi.doMock('../platform', () => import('../platform/index.android'));
+      await wireHost();
       ({ Keyboard } = await import('./index'));
       Keyboard.addListener('keyboardDidShow', () => {}).remove();
 
