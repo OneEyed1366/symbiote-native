@@ -268,6 +268,10 @@ catalog:
   # permanently in lockstep — see .claude/rules/native-proxy-package-files.md.
   react-native-screens: 4.26.0
   react-native-safe-area-context: ^5.5.2
+  # Exact pins: packages/reanimated imports hook helpers that Reanimated does not publish
+  # (`src/hook/*Common`), so a caret range could resolve a release where they moved
+  react-native-reanimated: 4.7.1
+  react-native-worklets: 0.13.0
   # Exact pins: packages/sensors depends on expo-sensors ONLY for its native ios/android folders
   # (its JS is hand-ported into our own core, never imported — see the
   # symbiote-expo-native-module skill and .claude/rules/expo-native-module-packaging.md). A caret

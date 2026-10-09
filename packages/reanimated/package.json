@@ -1,0 +1,85 @@
+{
+  "name": "@symbiote-native/reanimated",
+  "version": "0.0.1",
+  "description": "react-native-reanimated 4 and react-native-worklets for SymbioteNative — one framework-agnostic core over the upstream hook helpers, reachable from the adapters. Shared values, animated styles, layout animations and CSS animations on the UI thread.",
+  "license": "MIT",
+  "keywords": [
+    "react-native",
+    "symbiote-native",
+    "reanimated",
+    "worklets",
+    "animation"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OneEyed1366/symbiote-native.git",
+    "directory": "packages/reanimated"
+  },
+  "homepage": "https://github.com/OneEyed1366/symbiote-native/tree/master/packages/reanimated#readme",
+  "bugs": {
+    "url": "https://github.com/OneEyed1366/symbiote-native/issues"
+  },
+  "author": "Andrey Prokopenko <psevdoproger@gmail.com>",
+  "type": "module",
+  "main": "src/core/index.ts",
+  "module": "src/core/index.ts",
+  "types": "src/core/index.ts",
+  "exports": {
+    ".": "./src/core/index.ts",
+    "./react": "./src/react/index.ts"
+  },
+  "files": [
+    "src",
+    "build",
+    "!src/**/*.test.*",
+    "!src/**/*.spec.*"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "main": "./build/core/index.js",
+    "module": "./build/core/index.js",
+    "types": "./build/core/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./build/core/index.d.ts",
+        "default": "./build/core/index.js"
+      },
+      "./react": {
+        "types": "./build/react/index.d.ts",
+        "default": "./build/react/index.js"
+      }
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --build",
+    "build": "node scripts/rewrite-upstream-declarations.mjs build",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\""
+  },
+  "peerDependencies": {
+    "@symbiote-native/engine": "workspace:^",
+    "@symbiote-native/react": "workspace:^",
+    "react": ">=19.0.0",
+    "react-native": ">=0.86",
+    "react-native-reanimated": "~4.7.1",
+    "react-native-worklets": "~0.13.0"
+  },
+  "peerDependenciesMeta": {
+    "@symbiote-native/react": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@symbiote-native/engine": "workspace:*",
+    "@symbiote-native/react": "workspace:*",
+    "@symbiote-native/test-utils": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "react": "catalog:",
+    "react-native-reanimated": "catalog:",
+    "react-native-worklets": "catalog:",
+    "typescript": "catalog:"
+  }
+}

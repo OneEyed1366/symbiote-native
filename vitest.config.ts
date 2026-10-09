@@ -1,5 +1,6 @@
 import babel from '@babel/core';
 import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
 import { defineConfig } from 'vitest/config';
 import solidPlugin from 'vite-plugin-solid';
 
@@ -57,13 +58,8 @@ const SOLID_TESTS = [
   'packages/**/src/solid/**/*.test.{ts,tsx}',
 ];
 
-// `dev: false` is NOT a production-mode nicety — without it this project loads TWO solid-js
-// builds (dist/dev.js for the plugin's own path, dist/solid.js elsewhere), so signals live in one
-// runtime and the renderer's prop effects in the other and THEY NEVER SEE EACH OTHER.
-//
-// `conditions: ['browser']` picks solid-js's client build over its `node` -> dist/server.js entry,
-// and BOTH resolve and ssr.resolve are needed for the reason the svelte project states below:
-// Vitest runs test files through Vite's SSR module graph.
+// `dev: false` keeps one solid-js build, otherwise signals and the renderer's effects never meet
+// `conditions: ['browser']` picks the client build, in both `resolve` and `ssr.resolve`
 const SOLID_TRANSFORM = solidPlugin({
   dev: false,
   hot: false,
@@ -170,21 +166,15 @@ const RN_PLATFORM_IOS = require_.resolve(
   'react-native/Libraries/Utilities/Platform.ios.js',
 );
 
-// Platform.ios then reaches `TurboModuleRegistry.getEnforcing('PlatformConstants')` at MODULE
-// scope, so the import throws without a native host - and satisfying that through
-// `global.__turboModuleProxy` is the wrong lever, because that global is itself the SUBJECT of
-// several tests: platform.test.ts sets it to undefined to prove Platform degrades gracefully, and
-// a dozen others install a single-module proxy of their own. A host fake living there either
-// breaks those tests or gets broken by them, depending on load order.
+// `Platform.ios` calls `TurboModuleRegistry.getEnforcing` at module scope and throws without a host
+// `global.__turboModuleProxy` is no place for a fake, since many tests set it themselves
 //
 // Resolving the spec module instead keeps the two apart entirely: RN's chain is satisfied at the
 // import boundary, and `__turboModuleProxy` keeps meaning exactly what every existing test already
 // assumes. The values are an iOS simulator's.
 //
-// `isTesting: false` is the one that is not cosmetic. It stands in for a DEVICE, not for a test
-// runner, and core/engine/src/platform/index.ios.ts:92 derives `isDisableAnimations` from it - set
-// it true and animations switch off engine-wide, which took the native Animated driver down with
-// it in ten tests across three adapters, none of them near this file.
+// `isTesting` must stay false: the engine derives `isDisableAnimations` from it
+// and `true` switches animations off for every adapter
 const RN_PLATFORM_CONSTANTS = '\0symbiote:rn-platform-constants';
 const PLATFORM_CONSTANTS = {
   forceTouchAvailable: false,
@@ -234,19 +224,99 @@ const SHARED = {
 // not the plain `resolve.conditions`. Metro needs the equivalent `conditionNames` fix for a real
 // device build; tracked in the svelte-adapter-dom-shim skill.
 //
-// Scoped to the svelte project, not global: `less`/`sass`/`stylus` each declare a `browser` key
-// first in their own exports, so a global condition would resolve them to browser bundles that
-// fail under Node — Node/Vite pick the first matching key in the PACKAGE's own declaration order.
+// Scoped to the svelte project, not global. `less`/`sass`/`stylus` declare a `browser` key first,
+// so a global condition would load their browser bundles, which fail under Node
 const BROWSER_CONDITIONS = {
   resolve: { conditions: ['browser'] },
   ssr: { resolve: { conditions: ['browser'] } },
 };
+
+// Reanimated reads `react-native` and `react-native-worklets` at module scope, so the bare names
+// move to a stub and to the worklets Jest mock while deep `react-native/...` imports stay real
+const REANIMATED_TESTS = ['packages/reanimated/**/*.test.{ts,tsx}'];
+
+// The package source and the demo screens of examples/react get the plugin an app's Metro runs,
+// so a test drives them as written. Tests stay out: they build their worklets by hand
+const REANIMATED_SOURCE =
+  /\/(packages\/reanimated\/src|examples\/react\/screens\/reanimated)\/.*\.tsx?$/;
+const WORKLETS_PLUGIN = require_.resolve('react-native-worklets/plugin');
+
+const REANIMATED_WORKLETS = {
+  name: 'worklets-plugin-for-reanimated-source',
+  enforce: 'pre' as const,
+  async transform(code: string, id: string) {
+    const file = id.split('?')[0];
+    if (!REANIMATED_SOURCE.test(file) || /\.test\.tsx?$/.test(file)) {
+      return null;
+    }
+    const out = await babel.transformAsync(code, {
+      filename: file,
+      babelrc: false,
+      configFile: false,
+      sourceMaps: true,
+      parserOpts: { plugins: ['typescript', 'jsx'] },
+      plugins: [WORKLETS_PLUGIN],
+    });
+    return out?.code == null ? null : { code: out.code, map: out.map };
+  },
+};
+
+// The demo sits in a tree that installs its own react and published packages, so its imports
+// go to the workspace here, or it would render against a second react
+const REANIMATED_ALIAS = [
+  { find: /^react$/, replacement: require_.resolve('react') },
+  {
+    find: /^@symbiote-native\/react\/jsx-runtime$/,
+    replacement: require_.resolve('./adapters/react/src/jsx-runtime.ts'),
+  },
+  {
+    find: /^@symbiote-native\/react\/jsx-dev-runtime$/,
+    replacement: require_.resolve('./adapters/react/src/jsx-dev-runtime.ts'),
+  },
+  {
+    find: /^@symbiote-native\/reanimated\/react$/,
+    replacement: require_.resolve('./packages/reanimated/src/react/index.ts'),
+  },
+  {
+    find: /^@symbiote-native\/reanimated$/,
+    replacement: require_.resolve('./packages/reanimated/src/core/index.ts'),
+  },
+  {
+    find: /^react-native$/,
+    replacement: require_.resolve(
+      './packages/reanimated/test-support/react-native.ts',
+    ),
+  },
+  {
+    find: /^react-native-worklets$/,
+    replacement: join(
+      dirname(require_.resolve('react-native-worklets/package.json')),
+      'src',
+      'mock.ts',
+    ),
+  },
+];
 
 export default defineConfig({
   ...SHARED,
   test: {
     ...SHARED.test,
     projects: [
+      {
+        ...SHARED,
+        plugins: [
+          REACT_NATIVE_FLOW,
+          REACT_NATIVE_PLATFORM,
+          REANIMATED_WORKLETS,
+        ],
+        resolve: { alias: REANIMATED_ALIAS },
+        test: {
+          ...SHARED.test,
+          name: 'reanimated',
+          include: REANIMATED_TESTS,
+          exclude: EXCLUDE_ALL,
+        },
+      },
       {
         ...SHARED,
         ...BROWSER_CONDITIONS,
@@ -278,7 +348,12 @@ export default defineConfig({
           ...SHARED.test,
           name: 'default',
           include: INCLUDE_ALL,
-          exclude: [...EXCLUDE_ALL, ...SVELTE_TESTS, ...SOLID_TESTS],
+          exclude: [
+            ...EXCLUDE_ALL,
+            ...SVELTE_TESTS,
+            ...SOLID_TESTS,
+            ...REANIMATED_TESTS,
+          ],
           benchmark: {
             include: BENCH_ALL,
             exclude: [...EXCLUDE_ALL, ...SVELTE_BENCH],

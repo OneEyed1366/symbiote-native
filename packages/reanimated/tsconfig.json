@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "build",
+    "paths": {
+      "react-native-reanimated/src/*": [
+        "./node_modules/react-native-reanimated/lib/typescript/*"
+      ]
+    }
+  },
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"],
+  "references": [
+    { "path": "../../core/engine" },
+    { "path": "../../adapters/react" }
+  ]
+}
