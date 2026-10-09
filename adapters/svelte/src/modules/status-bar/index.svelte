@@ -1,23 +1,21 @@
 <script lang="ts">
-  // StatusBar, the Svelte lifecycle half. The native StatusBarManager driving
-  // (applyStatusBarProps), the imperative statics, and the Android bar-height constant all
-  // live in @symbiote-native/engine, shared verbatim with React/Vue; Metro selects the
-  // engine's status-bar.ios.ts / status-bar.android.ts per host, so the platform divergence
-  // never reaches this file. Svelte supplies only the declarative shape: a component that
-  // renders no Fabric view (empty template) and re-applies the props through an `$effect` on
-  // mount + every prop change — the Svelte twin of Vue's watchEffect / React's useEffect.
-  //
-  // Unlike Vue's twin (status-bar.ts), no untyped-attrs guard layer is needed: Svelte's
-  // `$props()` already destructures real typed fields straight from the compiler, so there is
-  // no kebab-case-attrs normalization step to run first.
+  // Svelte half of StatusBar, the props stack, statics and Android bar-height constant live in
+  // @symbiote-native/engine. It renders no Fabric view, applies its props to one stack entry from
+  // an `$effect` and releases the entry when the component is destroyed
   import {
-    applyStatusBarProps,
+    createStatusBarEntry,
     type IStatusBarProps,
   } from '@symbiote-native/engine';
 
   let props: IStatusBarProps = $props();
 
+  const entry = createStatusBarEntry();
+
+  // Reads every field of `props`, so any prop change replaces the entry
   $effect(() => {
-    applyStatusBarProps(props);
+    entry.apply(props);
   });
+
+  // Popping restores what the stack held below this entry
+  $effect(() => () => entry.release());
 </script>

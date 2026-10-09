@@ -14,6 +14,7 @@ export class ImageElement extends SymbioteElement {
   @Input() height?: IImageProps['height'];
   @Input() resizeMode?: IImageProps['resizeMode'];
   @Input() resizeMethod?: IImageProps['resizeMethod'];
+  @Input() resizeMultiplier?: IImageProps['resizeMultiplier'];
   @Input() defaultSource?: IImageProps['defaultSource'];
   @Input() loadingIndicatorSource?: IImageProps['loadingIndicatorSource'];
   @Input() blurRadius?: IImageProps['blurRadius'];
@@ -47,6 +48,7 @@ export class ImageBackgroundElement extends SymbioteElement {
   @Input() height?: IImageProps['height'];
   @Input() resizeMode?: IImageProps['resizeMode'];
   @Input() resizeMethod?: IImageProps['resizeMethod'];
+  @Input() resizeMultiplier?: IImageProps['resizeMultiplier'];
   @Input() defaultSource?: IImageProps['defaultSource'];
   @Input() loadingIndicatorSource?: IImageProps['loadingIndicatorSource'];
   @Input() blurRadius?: IImageProps['blurRadius'];
@@ -129,6 +131,31 @@ export class ScrollViewElement extends SymbioteElement {
   @Input() onMomentumScrollEnd?: IAngularScrollViewProps['onMomentumScrollEnd'];
   @Input() onScrollToTop?: IAngularScrollViewProps['onScrollToTop'];
   @Input() onContentSizeChange?: IAngularScrollViewProps['onContentSizeChange'];
+  @Input()
+  onKeyboardWillShow?: IAngularScrollViewProps['onKeyboardWillShow'];
+  @Input()
+  onKeyboardWillHide?: IAngularScrollViewProps['onKeyboardWillHide'];
+  @Input() onKeyboardDidShow?: IAngularScrollViewProps['onKeyboardDidShow'];
+  @Input() onKeyboardDidHide?: IAngularScrollViewProps['onKeyboardDidHide'];
+  @Input()
+  automaticallyAdjustContentInsets?: IAngularScrollViewProps['automaticallyAdjustContentInsets'];
+  @Input()
+  automaticallyAdjustsScrollIndicatorInsets?: IAngularScrollViewProps['automaticallyAdjustsScrollIndicatorInsets'];
+  @Input()
+  canCancelContentTouches?: IAngularScrollViewProps['canCancelContentTouches'];
+  @Input()
+  experimental_endDraggingSensitivityMultiplier?: IAngularScrollViewProps['experimental_endDraggingSensitivityMultiplier'];
+  @Input() innerViewRef?: IAngularScrollViewProps['innerViewRef'];
+  @Input()
+  onScrollAnimationEnd?: IAngularScrollViewProps['onScrollAnimationEnd'];
+  @Input() scrollPerfTag?: IAngularScrollViewProps['scrollPerfTag'];
+  @Input()
+  scrollToOverflowEnabled?: IAngularScrollViewProps['scrollToOverflowEnabled'];
+  @Input()
+  scrollsChildToFocus?: IAngularScrollViewProps['scrollsChildToFocus'];
+  @Input() scrollsToTop?: IAngularScrollViewProps['scrollsToTop'];
+  @Input()
+  stickyHeaderHiddenOnScroll?: IAngularScrollViewProps['stickyHeaderHiddenOnScroll'];
 }
 
 @Directive({ selector: 'horizontal-scroll-view', standalone: true })

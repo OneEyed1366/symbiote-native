@@ -183,6 +183,16 @@ describe('what a text input sends native, resolved by the engine', () => {
     expect(unknown.textContentType).toBe(undefined);
   });
 
+  // `TextInput-test` "should give precedence to `textContentType` when set"
+  it('keeps an authored textContentType over the autoComplete token', () => {
+    const payload = single({
+      autoComplete: 'tel',
+      textContentType: 'emailAddress',
+    }).payload;
+
+    expect(payload.textContentType).toBe('emailAddress');
+  });
+
   // why: TextInput.js:919-937 — the W3C spelling WINS over the native one when both are authored.
   it('lets the web alias beat the native prop', () => {
     expect(
@@ -232,26 +242,18 @@ describe('what a text input sends native, resolved by the engine', () => {
     expect(payload.textContentType).toBe('username');
   });
 
-  // why: RN's three selection colours coalesce onto one authored value, so an app that writes
-  // `selectionColor` alone gets a matching caret and handle.
-  //
-  // The values are ARGB INTEGERS here, not the authored strings: this read shows the payload, and
-  // the builder runs RN's own `processColor` over every colour key on the way out. Asserting the
-  // string would be asserting a stage that never reaches native — and it is the reason `.props`
-  // (what the adapter said) and this (what we sent) have to stay two different reads.
+  // iOS RN takes `cursorColor` and `selectionHandleColor` out of the props (TextInput.js:368)
+  // The payload holds ARGB integers, `processColor` runs over every colour key on the way out
   const RED = 0xff_ff_00_00;
-  const BLUE = 0xff_00_00_ff;
-  it('coalesces the selection colours', () => {
-    const one = single({ selectionColor: 'red' }).payload;
-    expect(one.cursorColor).toBe(RED);
-    expect(one.selectionHandleColor).toBe(RED);
-
-    const explicit = single({
+  it('sends only selectionColor of the three selection colours', () => {
+    const payload = single({
       selectionColor: 'red',
       cursorColor: 'blue',
+      selectionHandleColor: 'green',
     }).payload;
-    expect(explicit.cursorColor).toBe(BLUE);
-    expect(explicit.selectionHandleColor).toBe(RED);
+    expect(payload.selectionColor).toBe(RED);
+    expect(payload.cursorColor).toBe(undefined);
+    expect(payload.selectionHandleColor).toBe(undefined);
   });
 
   // why: `inputMode: 'none'` is how the web spells "focusable but no keyboard".
@@ -267,9 +269,7 @@ describe('what a text input sends native, resolved by the engine', () => {
     ).toBe(false);
   });
 
-  // why: the aliases are INERT at native, and leaving them in the payload is how a reader concludes
-  // the rule ran when it did not. `underlineColorAndroid` is absent on this platform for the reason
-  // F-76 records: iOS's ViewConfig does not declare it, so sending it costs a wire slot for nothing.
+  // The aliases are inert at native, and iOS's ViewConfig does not declare `underlineColorAndroid`
   it('sends no alias and no android-only key', () => {
     const payload = single({
       inputMode: 'numeric',
@@ -286,27 +286,20 @@ describe('what a text input sends native, resolved by the engine', () => {
     expect(payload.underlineColorAndroid).toBe(undefined);
   });
 
-  // why: the Android default must not be hardcoded PAST an explicit choice — a designer who wants
-  // the underline back must be able to ask for it, on either platform. Travelled here from
-  // `adapters/react/src/components/text-input/text-input.test.tsx`, which could no longer see it.
+  // The Android default must not be hardcoded past an explicit choice
   it('lets an explicit underlineColorAndroid through', () => {
     const payload = single({ underlineColorAndroid: '#00ff00' }).payload;
     expect(payload.underlineColorAndroid).toBe(0xff_00_ff_00);
   });
 
-  // why: the controlled value, which is a SEPARATE rule that already lived in the builder — asserted
-  // here so the port cannot quietly break it while moving the fold that used to run beside it.
+  // The controlled value is a separate rule that lives in the builder
   it('still folds the controlled value into the private text prop', () => {
     const payload = single({ value: 'hello' }).payload;
     expect(payload.text).toBe('hello');
     expect(payload.value).toBe(undefined);
   });
 
-  // why: RN HAS NO `value` FABRIC PROP — the controlled value rides as the private `text`. The four
-  // cases below pin only the TypeScript twin of this rule, in a vitest that builds payloads
-  // through `fabric-props.ts` and therefore cannot see the C++ copy at all. The
-  // device rule could have broken with every one of them green. Same shape as the disabled
-  // `touchable-highlight` that committed `focusable: true` for as long as it did.
+  // RN has no `value` Fabric prop, the controlled value rides as the private `text`
   it('folds an uncontrolled defaultValue the same way', () => {
     const payload = single({ defaultValue: 'initial' }).payload;
     expect(payload.text).toBe('initial');
@@ -331,17 +324,37 @@ describe('what a text input sends native, resolved by the engine', () => {
     expect(payload.value).toBe(undefined);
   });
 
-  // why: THE CONTROL, and the reason the fold is keyed on the COMPONENT rather than on the prop
-  // name — `value` is an ordinary prop of Switch and Slider, and a name-keyed fold would write a
-  // bogus `text` onto both. Travelled from `core/engine/src/__tests__/text-input-value-fold.test.ts`,
-  // which could only ever assert it against the headless builder's copy of the rule.
-  //
-  // A Switch rather than a view, which is the stronger subject: a view declares no `value` at all,
-  // so it cannot tell a component-keyed rule from one that simply found nothing to do.
+  // The fold is keyed on the component, `value` is an ordinary prop of Switch and Slider
   it('does not touch value on a component that is not a text input', () => {
     const payload = commit('Switch', 'switch-probe', { value: true }).payload;
     expect(payload.value).toBe(true);
     expect(payload.text).toBe(undefined);
+  });
+
+  // `TextInput.js:549-558`, the style overrides shared with Text
+  it('turns a numeric fontWeight into a string', () => {
+    expect(single({ style: { fontWeight: 700 } }).payload.fontWeight).toBe(
+      '700',
+    );
+  });
+
+  it('turns verticalAlign into textAlignVertical', () => {
+    const payload = single({ style: { verticalAlign: 'middle' } }).payload;
+    expect(payload.textAlignVertical).toBe('center');
+    expect(payload.verticalAlign).toBe(undefined);
+  });
+
+  // `TextInput.js:677-684,767-768`, iOS only: a multiline input with no vertical padding of its own
+  // gets a 5pt top inset so it sits like a singleline one
+  it('gives a multiline input a top inset only when it has no padding of its own', () => {
+    expect(multi({}).payload.paddingTop).toBe(5);
+    expect(multi({ style: { color: 'red' } }).payload.paddingTop).toBe(5);
+    expect(multi({ style: { padding: 8 } }).payload.paddingTop).toBe(undefined);
+    expect(multi({ style: { paddingVertical: 8 } }).payload.paddingTop).toBe(
+      undefined,
+    );
+    expect(multi({ style: { paddingTop: 2 } }).payload.paddingTop).toBe(2);
+    expect(single({}).payload.paddingTop).toBe(undefined);
   });
 
   // why: multiline is a different Fabric component with its own name, and the gate names both. A

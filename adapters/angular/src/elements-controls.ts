@@ -14,12 +14,14 @@ import { VALUE_CHANGE_EVENT } from './renderer/value-change';
 import type {
   IActivityIndicatorProps,
   IInputAccessoryViewViewProps,
+  ILayoutConformanceMode,
   IModalViewProps,
   ISwitchProps,
   ITextInputProps,
 } from '@symbiote-native/components';
 import type { IStickyHeaderElementProps } from './element-props';
 import type { IAngularRefreshControlProps } from './components/refresh-control-props';
+import { TextInputNativeInputs } from './element-text-input-native';
 import {
   ReadBackElement,
   SymbioteElement,
@@ -27,7 +29,7 @@ import {
 } from './element-base';
 
 @Directive({ selector: 'text-input', standalone: true })
-export class TextInputElement extends ValueChangeElement {
+export class TextInputElement extends TextInputNativeInputs {
   @Input() value?: ITextInputProps['value'];
   @Input() defaultValue?: ITextInputProps['defaultValue'];
   @Input() placeholder?: ITextInputProps['placeholder'];
@@ -235,6 +237,12 @@ export class ActivityIndicatorSpinnerElement extends ActivityIndicatorElement {}
 
 @Directive({ selector: 'safe-area-view', standalone: true })
 export class SafeAreaViewElement extends SymbioteElement {}
+
+// RN's `experimental_LayoutConformance`: the tag paints as `display: contents` through its fold
+@Directive({ selector: 'layout-conformance', standalone: true })
+export class LayoutConformanceElement extends SymbioteElement {
+  @Input() mode?: ILayoutConformanceMode;
+}
 
 @Directive({ selector: 'modal, symbiote-modal', standalone: true })
 export class ModalElement extends SymbioteElement {

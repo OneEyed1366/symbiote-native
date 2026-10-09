@@ -8,9 +8,9 @@
 //
 // Unit under test: adapters/vue/src/components/virtualized-section-list/index.ts's lifecycle
 // wiring — dispatching each flattened entry (header/item/footer/section-separator) to the right
-// scoped slot via `renderEntry`, and the handle's `scrollToLocation` delegating to
-// `scrollLocationToFlatIndex` + the inner VirtualizedList's `scrollToIndex`. The flattening
-// itself (`flattenSections`) and the offset math (`scrollLocationToFlatIndex`) are shared
+// scoped slot via `entryRendererFor`, and the handle's `scrollToLocation` delegating to
+// `resolveScrollLocation` + the inner VirtualizedList's `scrollToIndex`. The flattening
+// itself (`flattenSections`) and the offset math (`resolveScrollLocation`) are shared
 // @symbiote-native/components logic — asserted here only end-to-end (the right text in the right
 // order, the right scrollTo args), not re-derived independently.
 //
@@ -177,6 +177,7 @@ describe('Vue VirtualizedSectionList flattens sections into one windowed stream'
         ROOT_TAG,
         sectionList({
           ref: listRef,
+          stickySectionHeadersEnabled: false,
           getItemLayout: (_data: unknown, index: number) => ({
             length: ITEM_HEIGHT,
             offset: ITEM_HEIGHT * index,
@@ -200,11 +201,35 @@ describe('Vue VirtualizedSectionList flattens sections into one windowed stream'
       expect(scrolls[0].args[2]).toBe(false);
     });
 
+    it('leaves room for the stuck section header when it covers the target item', async () => {
+      // A sticky header covers the item it sits over, so RN adds its length to the view offset
+      const listRef = ref<IVirtualizedSectionListHandle | null>(null);
+      mount(
+        ROOT_TAG,
+        sectionList({
+          ref: listRef,
+          stickySectionHeadersEnabled: true,
+          getItemLayout: (_data: unknown, index: number) => ({
+            length: ITEM_HEIGHT,
+            offset: ITEM_HEIGHT * index,
+            index,
+          }),
+        }),
+      );
+      await tick();
+
+      listRef.value!.scrollToLocation({
+        sectionIndex: 1,
+        itemIndex: 1,
+        animated: false,
+      });
+      const scroll = fabric.commands.find(c => c.commandName === 'scrollTo');
+      expect(scroll?.args[1]).toBe(5 * ITEM_HEIGHT - ITEM_HEIGHT);
+    });
+
     it('calls getItemLayout with the sections array, not the flattened entries', async () => {
-      // why: RN hands its inner VirtualizedList `data={this.props.sections}`, so a user's
-      // getItemLayout receives the SECTIONS. Ours streams the flattened entries as `data`, so
-      // without the wrapper the very same callback would be handed a different first argument
-      // here than on RN — silently, since the layout it returns still looks plausible.
+      // RN hands the inner list `data={this.props.sections}`, so the callback gets the sections
+      // Ours streams the flattened entries, a missing wrapper would pass those instead
       const seen: unknown[] = [];
       await mountWithViewport({
         getItemLayout: (data: unknown, index: number) => {
@@ -220,6 +245,24 @@ describe('Vue VirtualizedSectionList flattens sections into one windowed stream'
           'getItemLayout receives the sections array by identity',
         ).toBe(SECTIONS);
       }
+    });
+
+    // RN takes `horizontal` through VirtualizedListProps: the content is pinned to the row width
+    it('pins a horizontal list content to the full row width', async () => {
+      await mountWithViewport({
+        horizontal: true,
+        getItemLayout: (_data: unknown, index: number) => ({
+          length: ITEM_HEIGHT,
+          offset: ITEM_HEIGHT * index,
+          index,
+        }),
+      });
+
+      const content = live.findLive(
+        live.appRoot(),
+        node => node.viewName === 'RCTScrollContentView',
+      );
+      expect(content?.payload.width).toBe(EXPECTED.length * ITEM_HEIGHT);
     });
   });
 });

@@ -16,9 +16,12 @@ import {
   type INativeNodeConfig,
   type IPlatformConfig,
 } from './native/native-animated';
+import { validateInterpolation } from './native/validation';
+import type { IOpaqueColorValue } from '../platform-color';
 import {
   checkValidRanges,
   createInterpolation,
+  nativeOutput,
   type IInterpolationConfig,
 } from './interpolation';
 import { dlog } from '../debug';
@@ -26,7 +29,8 @@ import { dlog } from '../debug';
 // Most nodes emit a scalar; a composite node (AnimatedColor) emits its rasterized
 // string (an rgba() value). The payload is the union so one listener map serves
 // both. Scalar nodes only ever pass a number.
-export type IValueListener = (state: { value: number | string }) => void;
+export type IListenerValue = number | string | IOpaqueColorValue;
+export type IValueListener = (state: { value: IListenerValue }) => void;
 
 let nextListenerId = 1;
 
@@ -151,6 +155,11 @@ export class AnimatedNode {
     return this.__getValue();
   }
 
+  // `JSON.stringify(new AnimatedValue(10))` даёт `10`, как в RN
+  toJSON(): unknown {
+    return this.__getValue();
+  }
+
   // Map this node's value before it reaches a prop, e.g. 0..1 -> 0..10. Defined once
   // here (Information Expert: every node subclass wants the identical one-liner)
   // instead of duplicated per subclass. AnimatedInterpolation lives at the bottom of
@@ -185,7 +194,7 @@ export class AnimatedNode {
     return this.listeners.size > 0;
   }
 
-  __callListeners(value: number | string): void {
+  __callListeners(value: IListenerValue): void {
     if (this.suspendCallbacks > 0) return;
     const event = { value };
     this.listeners.forEach(listener => {
@@ -261,16 +270,10 @@ export class AnimatedWithChildren extends AnimatedNode {
     return this.children;
   }
 
-  override __callListeners(value: number | string): void {
+  override __callListeners(value: IListenerValue): void {
     super.__callListeners(value);
-    // A native-driven node's children are updated natively; don't also walk them
-    // here (their values aren't tracked in JS while native owns the animation).
-    //
-    // Diagnostic seam, permanent: this early return is what silences a JS listener sitting on a
-    // CHILD of a value that was made native (a sticky header's interpolation under a natively
-    // attached scroll value). A consumer whose only driver is that listener then goes dead with no
-    // other symptom - see the sticky-header bootstrap notes. Logged only when children are
-    // actually being skipped, so a childless native value stays quiet.
+    // У native-узла дети обновляются в native, JS-слушатели детей молчат
+    // NOTE: лог остаётся, так тихо умирает слушатель на интерполяции под native-значением
     if (this.isNative) {
       if (this.children.length > 0) {
         dlog(
@@ -301,22 +304,25 @@ function leafUpdate(node: AnimatedNode): (() => void) | undefined {
     : undefined;
 }
 
-// Top-down walk to the leaves, then re-pull each leaf (deduped by node identity,
-// so a diamond in the graph still updates a leaf once). Suppressed inside a
-// withSuspendedCallbacks block: the composite setter issues the one flush that
-// actually rebuilds the leaves after all its channel writes land.
+// Обход вниз до листьев, лист обновляется один раз даже в ромбе графа
+// Внутри `withSuspendedCallbacks` молчит, составной сеттер сам делает итоговый flush
 export function flushValue(rootNode: AnimatedNode): void {
+  flushValues([rootNode]);
+}
+
+// Несколько корней с одним общим набором листьев, лист обновляется один раз
+export function flushValues(rootNodes: readonly AnimatedNode[]): void {
   if (flushSuspendDepth > 0) return;
   const leaves = new Map<AnimatedNode, () => void>();
   function collect(node: AnimatedNode): void {
     const update = leafUpdate(node);
-    if (update !== undefined) {
-      leaves.set(node, update);
-    } else {
+    if (update === undefined) {
       node.__getChildren().forEach(collect);
+    } else {
+      leaves.set(node, update);
     }
   }
-  collect(rootNode);
+  rootNodes.forEach(collect);
   leaves.forEach(update => update());
 }
 
@@ -344,29 +350,25 @@ export function flushValue(rootNode: AnimatedNode): void {
 export class AnimatedInterpolation extends AnimatedWithChildren {
   private readonly parent: AnimatedNode;
   private readonly config: IInterpolationConfig;
-  private interpolation: ((input: number) => number | string) | undefined;
+  private readonly interpolation: (
+    input: number,
+  ) => number | string | IOpaqueColorValue;
 
   constructor(parent: AnimatedNode, config: IInterpolationConfig) {
     super();
     this.parent = parent;
     this.config = config;
-    // Validate eagerly so a bad range fails at construction, not first frame.
+    // Плохой диапазон или разный шаблон строк падают сразу, а не на первом кадре
     checkValidRanges(config.inputRange, config.outputRange);
+    this.interpolation = createInterpolation(config);
   }
 
-  private getInterpolation(): (input: number) => number | string {
-    if (this.interpolation === undefined) {
-      this.interpolation = createInterpolation(this.config);
-    }
-    return this.interpolation;
-  }
-
-  override __getValue(): number | string {
+  override __getValue(): number | string | IOpaqueColorValue {
     const parentValue = this.parent.__getValue();
     if (typeof parentValue !== 'number') {
       throw new Error('Cannot interpolate an input which is not a number');
     }
-    return this.getInterpolation()(parentValue);
+    return this.interpolation(parentValue);
   }
 
   override __attach(): void {
@@ -387,10 +389,13 @@ export class AnimatedInterpolation extends AnimatedWithChildren {
   }
 
   override __getNativeConfig(): INativeNodeConfig {
+    validateInterpolation(this.config);
+    const { outputRange, outputType } = nativeOutput(this.config.outputRange);
     return {
       type: 'interpolation',
       inputRange: this.config.inputRange,
-      outputRange: this.config.outputRange,
+      outputRange,
+      outputType,
       extrapolateLeft:
         this.config.extrapolateLeft ?? this.config.extrapolate ?? 'extend',
       extrapolateRight:

@@ -1,16 +1,23 @@
-// AnimatedColor: animate a color by driving four channel values (r, g, b, a). Its
-// __getValue() is an `rgba(...)` string, which the commit layer's injected color
-// processor turns into the platform int Fabric wants. Ported from RN's
-// AnimatedColor.js: the {r,g,b,a} and CSS-color input forms are supported; named
-// colors and platform (Native) colors are deferred (they need RN's full
-// normalizeColor / processColorObject, which live outside shared).
+// AnimatedColor: animates a color through four channel values (r, g, b, a), ported from RN's
+// AnimatedColor.js. `__getValue()` is an `rgba(...)` string the injected color processor turns
+// into the platform int
 
-import { AnimatedWithChildren, flushValue } from './graph';
-import { AnimatedValue } from './value';
-import type {
-  INativeNodeConfig,
-  IPlatformConfig,
+import {
+  AnimatedWithChildren,
+  flushValues,
+  type IListenerValue,
+} from './graph';
+import { AnimatedValue, type IAnimatedValueConfig } from './value';
+import {
+  nativeAnimated,
+  type INativeNodeConfig,
+  type IPlatformConfig,
 } from './native/native-animated';
+import {
+  isOpaqueColorValue,
+  processColor,
+  type IOpaqueColorValue,
+} from '../platform-color';
 
 import { DEFAULT_COLOR, normalizeColor, type IRgbaValue } from './rgba';
 
@@ -19,13 +26,24 @@ import { DEFAULT_COLOR, normalizeColor, type IRgbaValue } from './rgba';
 export { normalizeColor, type IRgbaValue };
 
 type IChannel = number | AnimatedValue;
-interface IRgbaInput {
+type IRgbaInput = {
   r: IChannel;
   g: IChannel;
   b: IChannel;
   a: IChannel;
+};
+type IColorCallback = (value: string | IOpaqueColorValue) => void;
+
+// Обычный цвет раскладывается на каналы, непрозрачный отдаётся как есть
+function toRgbaOrOpaque(
+  value: IRgbaValue | string | number | IOpaqueColorValue,
+): IRgbaValue | IOpaqueColorValue {
+  if (isOpaqueColorValue(value)) return value;
+  if (typeof value === 'object') return value;
+  return normalizeColor(value) ?? DEFAULT_COLOR;
 }
-export type IColorInput = IRgbaInput | IRgbaValue | string | number;
+export type IColorInput =
+  IRgbaInput | IRgbaValue | string | number | IOpaqueColorValue;
 
 function isRgbaInput(value: IColorInput): value is IRgbaInput {
   return (
@@ -40,7 +58,7 @@ function toChannel(value: IChannel): AnimatedValue {
 // Resolve any input form to four concrete channel values (numbers or pre-built
 // AnimatedValues), so the constructor can wrap each in an AnimatedValue.
 function resolveInput(value?: IColorInput): IRgbaInput {
-  if (value === undefined) return DEFAULT_COLOR;
+  if (value === undefined || isOpaqueColorValue(value)) return DEFAULT_COLOR;
   if (typeof value === 'string' || typeof value === 'number') {
     return normalizeColor(value) ?? DEFAULT_COLOR;
   }
@@ -54,18 +72,24 @@ export class AnimatedColor extends AnimatedWithChildren {
   readonly b: AnimatedValue;
   readonly a: AnimatedValue;
 
-  constructor(value?: IColorInput) {
+  // Непрозрачный платформенный цвет (`PlatformColor`) живёт вне каналов, пока не задан обычный
+  private nativeColor: IOpaqueColorValue | null = null;
+
+  constructor(value?: IColorInput, config?: IAnimatedValueConfig) {
     super();
+    if (isOpaqueColorValue(value)) this.nativeColor = value;
     const input = resolveInput(value);
     this.r = toChannel(input.r);
     this.g = toChannel(input.g);
     this.b = toChannel(input.b);
     this.a = toChannel(input.a);
+    if (config?.useNativeDriver) this.__makeNative();
   }
 
   // The CSS color string the commit layer's color processor converts to a platform
   // int. Channels are rounded; alpha stays fractional.
-  override __getValue(): string {
+  override __getValue(): string | IOpaqueColorValue {
+    if (this.nativeColor !== null) return this.nativeColor;
     const r = Math.round(numericValue(this.r));
     const g = Math.round(numericValue(this.g));
     const b = Math.round(numericValue(this.b));
@@ -73,27 +97,39 @@ export class AnimatedColor extends AnimatedWithChildren {
     return `rgba(${r}, ${g}, ${b}, ${a})`;
   }
 
-  // Each per-channel setValue/setOffset flushes bound props and walks the graph
-  // up to this color node's listeners. Driving four channels in a row would
-  // otherwise commit the bound view four times and fire color listeners four
-  // times, each with an intermediate rgba() that never logically existed. So we
-  // suspend this node's listeners across all four writes, then do ONE flush and
-  // ONE listener fire with the final composed color (RN's _withSuspendedCallbacks
-  // pattern). flushValue dedupes by leaf identity, so a single flush rebuilds
-  // every bound prop once even though four channels changed.
-  setValue(value: IRgbaValue | string | number): void {
-    const rgba =
-      typeof value === 'object'
-        ? value
-        : (normalizeColor(value) ?? DEFAULT_COLOR);
+  // Четыре канала подряд дали бы четыре коммита и четыре вызова слушателей с промежуточным `rgba()`
+  // Поэтому запись подавлена, потом один flush по всем каналам и один вызов слушателей
+  setValue(value: IRgbaValue | string | number | IOpaqueColorValue): void {
+    const processed = toRgbaOrOpaque(value);
+    const wasOpaque = this.nativeColor !== null;
     this.withSuspendedCallbacks(() => {
-      this.r.setValue(rgba.r);
-      this.g.setValue(rgba.g);
-      this.b.setValue(rgba.b);
-      this.a.setValue(rgba.a);
+      if (isOpaqueColorValue(processed)) {
+        this.nativeColor = processed;
+        return;
+      }
+      this.nativeColor = null;
+      this.r.setValue(processed.r);
+      this.g.setValue(processed.g);
+      this.b.setValue(processed.b);
+      this.a.setValue(processed.a);
     });
-    flushValue(this);
+    if (this.isNative && wasOpaque !== (this.nativeColor !== null)) {
+      nativeAnimated.updateAnimatedNodeConfig(
+        this.__getNativeTag(),
+        this.__getNativeConfig(),
+      );
+    }
+    flushValues([this.r, this.g, this.b, this.a]);
     this.__callListeners(this.__getValue());
+  }
+
+  resetAnimation(callback?: IColorCallback): void {
+    for (const channel of this.channels()) channel.resetAnimation();
+    callback?.(this.__getValue());
+  }
+
+  private channels(): readonly AnimatedValue[] {
+    return [this.r, this.g, this.b, this.a];
   }
 
   // setOffset / flattenOffset / extractOffset do NOT flush or fire listeners in
@@ -120,20 +156,14 @@ export class AnimatedColor extends AnimatedWithChildren {
     this.a.extractOffset();
   }
 
-  stopAnimation(callback?: (value: string) => void): void {
-    this.r.stopAnimation();
-    this.g.stopAnimation();
-    this.b.stopAnimation();
-    this.a.stopAnimation();
+  stopAnimation(callback?: IColorCallback): void {
+    for (const channel of this.channels()) channel.stopAnimation();
     callback?.(this.__getValue());
   }
 
-  // A color listener wants the composed rgba() string, not the bare channel number
-  // the child-walk arrives with. So we ignore the incoming value and re-pull
-  // __getValue(). super.__callListeners honors the suspend counter, so during
-  // setValue's four channel writes this is a no-op and the only fire is the
-  // explicit final one below.
-  override __callListeners(_value: number | string): void {
+  // Слушателю цвета нужна собранная строка, а не число канала, поэтому берём `__getValue()`
+  // Пока `setValue` пишет каналы, счётчик подавления делает вызов пустым
+  override __callListeners(_value: IListenerValue): void {
     super.__callListeners(this.__getValue());
   }
 
@@ -168,6 +198,8 @@ export class AnimatedColor extends AnimatedWithChildren {
       g: this.g.__getNativeTag(),
       b: this.b.__getNativeTag(),
       a: this.a.__getNativeTag(),
+      nativeColor:
+        this.nativeColor === null ? null : processColor(this.nativeColor),
     };
   }
 }

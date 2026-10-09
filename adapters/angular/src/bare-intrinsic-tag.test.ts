@@ -24,6 +24,7 @@ import { createRequire } from 'node:module';
 import {
   createLiveTree,
   installRecordingFabric,
+  seedWindowDimensions,
   type ILiveNode,
 } from '@symbiote-native/test-utils';
 import { ANCHOR_COMPONENT, parentOf } from '@symbiote-native/engine';
@@ -42,10 +43,10 @@ const require_ = createRequire(import.meta.url);
 const { HOST_PRIMITIVES }: { HOST_PRIMITIVES: Record<string, unknown> } =
   require_('@symbiote-native/components/host-primitives');
 
-interface IPrimitiveSpec {
+type IPrimitiveSpec = {
   intrinsic: string;
   intrinsicWhen?: { intrinsic: string };
-}
+};
 
 function isPrimitive(value: unknown): value is IPrimitiveSpec {
   if (typeof value !== 'object' || value === null) return false;
@@ -62,17 +63,19 @@ const tick = (): Promise<void> =>
 // the assertions below. The cap is a failure, not a fallback.
 const MAX_SETTLE_TICKS = 20;
 
-async function flushUntilSettled(): Promise<void> {
-  let previous = -1;
-  for (let index = 0; index < MAX_SETTLE_TICKS; index += 1) {
-    await tick();
-    const current = fabric.commits;
-    if (current === previous && current > 0) return;
-    previous = current;
+async function flushUntilSettled(
+  previous = -1,
+  ticksLeft = MAX_SETTLE_TICKS,
+): Promise<void> {
+  if (ticksLeft === 0) {
+    throw new Error(
+      `the tree never settled: completeRoot still moving after ${MAX_SETTLE_TICKS} ticks`,
+    );
   }
-  throw new Error(
-    `the tree never settled: completeRoot still moving after ${MAX_SETTLE_TICKS} ticks`,
-  );
+  await tick();
+  const current = fabric.commits;
+  if (current === previous && current > 0) return;
+  await flushUntilSettled(current, ticksLeft - 1);
 }
 
 // Root included, the same shape `fabric.committed`'s flatten had — a `find` across children alone
@@ -104,17 +107,14 @@ function committedViewNames(probe: ILiveNode | undefined): string[] {
 
 let nextRoot = 8_600;
 
-interface IMounted {
+type IMounted = {
   node: ILiveNode | undefined;
   all: ILiveNode[];
   thrown: string;
-  // `node?.payload` snapshotted BEFORE `unmount()`, for the one thing unmount changes: `onLayout`
-  // and its five siblings are cleared by the listener's own teardown
-  // (`setEventListener(target, name, undefined)`), so `.payload` — a live getter — would re-run
-  // `propsOf` and see the clear too if read after `unmount()` returns. Structural props (`nativeID`,
-  // `testID`, `style`…) are unaffected; only a gated event flag needs the pre-unmount snapshot.
+  // Snapshotted before `unmount()`, which clears the gated event flags the live getter would
+  // then miss, structural props are unaffected
   payload: Record<string, unknown> | undefined;
-}
+};
 
 // A fixture per case, compiled at run time, so a case differs from its neighbour by exactly its
 // template and schema instead of by a hand-written class that can drift.
@@ -172,7 +172,10 @@ async function mountTemplate(
   return { node, all, thrown, payload };
 }
 
-beforeEach(() => fabric.reset());
+beforeEach(() => {
+  fabric.reset();
+  seedWindowDimensions();
+});
 
 describe('a bare intrinsic tag, hand-written', () => {
   it('commits a real native view and folds id -> nativeID', async () => {

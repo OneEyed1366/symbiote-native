@@ -216,6 +216,41 @@ describe('what the fold-only touchables send native', () => {
   });
 });
 
+// Neither render reads `role` or `aria-labelledby` (`accessibilityRole` is taken as authored), and
+// the highlight reads no aria state alias either: its state is the authored object plus `disabled`
+describe('the aria props the touchables never read', () => {
+  it('leaves role and aria-labelledby unmapped on both tags', () => {
+    for (const make of [opacity, highlight]) {
+      const payload = make({ role: 'button', 'aria-labelledby': 'a' }).payload;
+      expect(payload.accessibilityRole).toBe(undefined);
+      expect(payload.accessibilityLabelledBy).toBe(undefined);
+    }
+  });
+
+  it('still maps the aliases the opacity render does read', () => {
+    const payload = opacity({ 'aria-label': 'x', 'aria-busy': true }).payload;
+    expect(payload.accessibilityLabel).toBe('x');
+    expect(fieldOf(payload.accessibilityState, 'busy')).toBe(true);
+  });
+
+  it('builds no state from the aria state aliases on the highlight', () => {
+    const payload = highlight({
+      'aria-checked': true,
+      'aria-busy': true,
+    }).payload;
+    expect(payload.accessibilityState).toBe(undefined);
+  });
+
+  it('still maps aria-label and aria-hidden on the highlight', () => {
+    const payload = highlight({
+      'aria-label': 'x',
+      'aria-hidden': true,
+    }).payload;
+    expect(payload.accessibilityLabel).toBe('x');
+    expect(payload.importantForAccessibility).toBe('no-hide-descendants');
+  });
+});
+
 describe('what an input accessory view sends native', () => {
   // why: THE WHOLE POINT of this one. Its fold reassembled a bag it had just taken apart, so
   // deleting it changes no payload and removes a JSI round trip per node.

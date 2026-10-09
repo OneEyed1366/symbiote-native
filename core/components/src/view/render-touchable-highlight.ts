@@ -2,7 +2,7 @@
 // highlight with setState, not Animated — while shown it paints underlayColor and lowers the child
 // opacity; at rest it is the bare style (TouchableHighlight.js).
 
-import type { IViewStyle } from '@symbiote-native/engine';
+import type { IColorValue, IViewStyle } from '@symbiote-native/engine';
 import {
   DEFAULT_HIGHLIGHT_CHILD_OPACITY,
   DEFAULT_UNDERLAY_COLOR,
@@ -16,26 +16,26 @@ import {
 // keep using cloneElement; an adapter with no element-cloning decides for itself (and records what
 // it chose). Baking the one-node assumption into the shared layer is what went wrong the first time.
 
-export interface ITouchableHighlightExtraStyles {
+export type ITouchableHighlightExtraStyles = {
   // The container (the responder view): RN's `underlay`.
   underlay: IViewStyle;
   // The single child: RN's `child`.
   child: IViewStyle;
-}
+};
 
-export interface ITouchableHighlightUnderlayView {
+export type ITouchableHighlightUnderlayView = {
   // Whether the underlay is currently shown. NOT simply "pressed" — RN holds it past the tap for
   // delayPressOut (createHighlightUnderlayHandlers owns that timing).
   shown: boolean;
   // RN's _hasPressHandler gate: no press handler, no underlay.
   hasPressHandler: boolean;
-  underlayColor?: string;
+  underlayColor?: IColorValue;
   activeOpacity?: number;
   // RN's snapshot affordance (`Pressable.js:151`, `TouchableHighlight.js:61`): render the control in
   // its pressed state with no gesture, so a test can capture it. Consumed by the engine and stripped
   // before the payload — no ViewConfig declares it.
   testOnly_pressed?: boolean;
-}
+};
 
 // undefined = paint nothing extra, which is RN's `extraStyles: null` state.
 export function resolveHighlightExtraStyles(

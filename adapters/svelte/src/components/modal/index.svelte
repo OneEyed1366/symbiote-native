@@ -28,12 +28,17 @@
     renderModal,
     resolveAccessibilityProps,
     shouldRenderModal,
+    warnAboutModalProps,
   } from '@symbiote-native/components';
   import { dlog, Platform } from '@symbiote-native/engine';
   import { createAttachmentsSync } from '../../runes/attachments';
   import type { ShimElement } from '../../dom-shim';
+  import { setVirtualizedListScope } from '../virtualized-list/nested-scope';
 
   let rawProps: IModalProps = $props();
+
+  // The content sits outside the list's scroll, so a list in it is not nested in that list
+  setVirtualizedListScope(null);
 
   // Not a $derived candidate despite the $state+$effect shape below: modalReducer folds over the
   // PREVIOUS `state` (self-referential — $derived can't read the value it's replacing) and must
@@ -60,6 +65,18 @@
 
   $effect(() => {
     if (!shouldRender) dlog('Modal hidden -> no node committed');
+  });
+
+  // RN checks on mount and on every update, a dev build only
+  $effect(() => {
+    warnAboutModalProps({
+      presentationStyle: rawProps.presentationStyle,
+      transparent: rawProps.transparent,
+      navigationBarTranslucent: rawProps.navigationBarTranslucent,
+      statusBarTranslucent: rawProps.statusBarTranslucent,
+      allowSwipeDismissal: rawProps.allowSwipeDismissal,
+      onRequestClose: rawProps.onRequestClose,
+    });
   });
 
   // Owns its host element (modal), so it folds aria/role via `resolved` above; the

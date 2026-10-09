@@ -1,14 +1,14 @@
-// React-driven test proving the iOS AccessibilityInfo module, no simulator needed.
-// A fake __turboModuleProxy returns an
-// AccessibilityManager native module (state getters that invoke their success callback with known
-// values, plus observe-counters); a fake RN$registerCallableModule captures the device hub so the
-// test can play "native" and emit `screenReaderChanged`. iOS routes non-'click' accessibility events
-// through the shared Fabric slot, so case 6 augments the slot to record sendAccessibilityEvent.
+// The iOS `AccessibilityInfo` module without a simulator: a fake `__turboModuleProxy` returns the
+// `AccessibilityManager` module, `emitRnDeviceEvent` plays "native" for `screenReaderChanged`
+// iOS routes non-'click' events through the Fabric slot, which the recording host records
 
 import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount, AccessibilityInfo } from '@symbiote-native/react';
-import { installRecordingFabric } from '@symbiote-native/test-utils';
+import {
+  emitRnDeviceEvent,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 
 // The a11y event sink needed a hand-written slot override under the stand-in. The recording host
 // records it natively — `sendAccessibilityEvent` is one of the three imperative calls it keeps,
@@ -76,10 +76,6 @@ const registeredModules: Record<string, unknown> = {
   AccessibilityManager: fakeAccessibilityInfo,
 };
 
-// The device hub our code registers, captured so the test can act as "native".
-let deviceHub:
-  { emit: (eventType: string, ...args: unknown[]) => void } | undefined;
-
 function isType<T>(value: unknown): value is T {
   return value !== null && value !== undefined;
 }
@@ -90,12 +86,6 @@ Object.assign(globalThis, {
     if (module === undefined || module === null) return null;
     if (!isType<T>(module)) return null;
     return module;
-  },
-  RN$registerCallableModule: (
-    name: string,
-    factory: () => { emit: (eventType: string, ...args: unknown[]) => void },
-  ): void => {
-    if (name === 'RCTDeviceEventEmitter') deviceHub = factory();
   },
 });
 
@@ -122,18 +112,18 @@ describe('AccessibilityInfo (iOS)', () => {
         received = state;
       },
     );
-    expect(deviceHub).toBeDefined();
-    expect(a11yAdded).toBeGreaterThanOrEqual(1);
+    expect(typeof sub.remove).toBe('function');
+    // RN listens on the device bus and never pings the native module's observe counters
+    expect(a11yAdded).toBe(0);
 
-    deviceHub?.emit('screenReaderChanged', false);
+    emitRnDeviceEvent('screenReaderChanged', false);
     expect(received).toBe(false);
 
-    const removedBefore = a11yRemoved;
     received = undefined;
     sub.remove();
-    expect(a11yRemoved).toBe(removedBefore + 1);
+    expect(a11yRemoved).toBe(0);
 
-    deviceHub?.emit('screenReaderChanged', true);
+    emitRnDeviceEvent('screenReaderChanged', true);
     expect(received).toBeUndefined();
   });
 
@@ -142,11 +132,13 @@ describe('AccessibilityInfo (iOS)', () => {
     expect(await AccessibilityInfo.isInvertColorsEnabled()).toBe(false);
     expect(await AccessibilityInfo.isReduceTransparencyEnabled()).toBe(true);
 
-    // Android-only queries resolve false on the iOS build (no throw, RN parity).
+    // На iOS запрос high text contrast даёт `false`, а запрос сервиса отклоняется
     expect(await AccessibilityInfo.isHighTextContrastEnabled()).toBe(false);
-    expect(await AccessibilityInfo.isAccessibilityServiceEnabled()).toBe(false);
+    await expect(
+      AccessibilityInfo.isAccessibilityServiceEnabled(),
+    ).rejects.toThrow('only available on Android');
 
-    // The newer iOS getters resolve to their module's values (optional methods, present here).
+    // Новые iOS-геттеры опциональны, но в этом fake они есть
     expect(await AccessibilityInfo.isDarkerSystemColorsEnabled()).toBe(true);
     expect(await AccessibilityInfo.prefersCrossFadeTransitions()).toBe(false);
   });
@@ -166,6 +158,35 @@ describe('AccessibilityInfo (iOS)', () => {
     expect(focusedTag).toBe(42);
   });
 
+  // RN вызывает `announceForAccessibilityWithOptions` с теми же options, когда он есть у хоста
+  it('announceForAccessibilityWithOptions forwards options to a host that has it', () => {
+    const received: { announcement: string; options: unknown }[] = [];
+    Object.assign(fakeAccessibilityInfo, {
+      announceForAccessibilityWithOptions: (
+        announcement: string,
+        options: unknown,
+      ): void => {
+        received.push({ announcement, options });
+      },
+    });
+    announced = undefined;
+    try {
+      AccessibilityInfo.announceForAccessibilityWithOptions('queued', {
+        queue: true,
+        priority: 'high',
+      });
+    } finally {
+      Reflect.deleteProperty(
+        fakeAccessibilityInfo,
+        'announceForAccessibilityWithOptions',
+      );
+    }
+    expect(received).toEqual([
+      { announcement: 'queued', options: { queue: true, priority: 'high' } },
+    ]);
+    expect(announced).toBeUndefined();
+  });
+
   it('getRecommendedTimeoutMillis returns the original on iOS', async () => {
     expect(await AccessibilityInfo.getRecommendedTimeoutMillis(3_000)).toBe(
       3_000,
@@ -173,8 +194,7 @@ describe('AccessibilityInfo (iOS)', () => {
   });
 
   it('sendAccessibilityEvent routes a host ref through the Fabric slot, click is a no-op', () => {
-    // Mount a View and capture its host ref, the public-instance handle RN's Fabric
-    // sendAccessibilityEvent expects. iOS routes every non-'click' event through the slot.
+    // Host ref вью, его ждёт `sendAccessibilityEvent` в Fabric
     let box: unknown;
     function App(): ReactElement {
       return (
@@ -182,7 +202,6 @@ describe('AccessibilityInfo (iOS)', () => {
           ref={instance => {
             box = instance;
           }}
-          style={{ width: 10, height: 10 }}
         />
       );
     }
@@ -195,7 +214,7 @@ describe('AccessibilityInfo (iOS)', () => {
     expect(focus).toBeDefined();
     expect(focus.eventType).toBe('focus');
 
-    // RN early-returns 'click' on iOS (VoiceOver has no click producer) -> nothing reaches the slot.
+    // RN на iOS выходит раньше для `click`, до slot событие не доходит
     const before = a11yEvents.length;
     AccessibilityInfo.sendAccessibilityEvent(box, 'click');
     expect(a11yEvents.length).toBe(before);

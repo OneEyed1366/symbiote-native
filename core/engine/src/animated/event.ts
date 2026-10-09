@@ -3,7 +3,7 @@
 // `[{nativeEvent: {contentOffset: {y: scrollY}}}]` names, at its leaf positions,
 // the AnimatedValues to drive; the path to each leaf is the key path inside the
 // event object. Ported from RN's AnimatedEvent.js (JS + native paths), with the
-// native-driver branches kept and AnimatedValueXY deferred.
+// native-driver branches kept
 //
 // Two ways the mapping is consumed:
 //   - JS path: __getHandler() returns a callback the adapter wires as the view's
@@ -15,6 +15,10 @@
 //     the view with zero JS per event.
 
 import { dlog } from '../debug';
+import { isDevBuild } from '../platform/shared';
+import { MISSING_DRIVER_WARNING } from './animations/base';
+import { AnimatedEventBase } from './event-base';
+import { validateMapping } from './event-validation';
 import { getNativeTag, whenCommitted } from '../imperative';
 import { isSymbioteNode, type ISymbioteNode } from '../node';
 import { AnimatedNode, flushValue } from './graph';
@@ -24,11 +28,22 @@ import {
 } from './native/native-animated';
 import { isRecord } from '../type-guards';
 
-// A leaf in the mapping is an AnimatedNode; every interior position is a nested
-// record of further mappings. We never name AnimatedValueXY here (deferred).
-type IMapping = AnimatedNode | { readonly [key: string]: IMapping };
+// Лист маппинга - `AnimatedNode`, AnimatedValueXY - запись с листьями `x` и `y`
+type IMapping =
+  | AnimatedNode
+  | { readonly x: AnimatedNode; readonly y: AnimatedNode }
+  | { readonly [key: string]: IMapping };
 
-export interface IEventConfig {
+// `null` пропускает аргумент события, как в RN
+type IArgMapping = readonly (IMapping | null)[];
+
+// Позиция элемента маппинга: номер аргумента события и путь внутри него
+type IMappingLocation = {
+  readonly argIndex: number;
+  readonly path: readonly string[];
+};
+
+export type IEventConfig = {
   readonly listener?: (...args: unknown[]) => void;
   // Honored, despite what this comment used to claim: __isNative() below gates the
   // native attach on this flag plus a present native module, and the adapter's leaf
@@ -37,12 +52,25 @@ export interface IEventConfig {
   // attachNativeEvent path (ScrollView wires it internally) reaches the same place for
   // a handler that is never passed as a prop.
   readonly useNativeDriver?: boolean;
-}
+};
 
-// One resolved leaf: the AnimatedValue at `path` inside the event's `nativeEvent`.
-interface IMappedValue {
-  readonly path: readonly string[];
+// Один лист маппинга: AnimatedValue по `path` внутри аргумента события `argIndex`
+type IMappedValue = IMappingLocation & {
   readonly node: AnimatedNode;
+};
+
+// The native driver accepts only leaves under the first argument's `nativeEvent`
+const NATIVE_EVENT_KEY = 'nativeEvent';
+const NATIVE_ARG_INDEX = 0;
+const NATIVE_PATH_MESSAGE =
+  'Native driven events only support animated values contained inside `nativeEvent`.';
+const MISSING_OPTIONS_WARNING =
+  'Animated.event now requires a second argument for options';
+
+function isNativeLeaf(mapped: IMappedValue): boolean {
+  return (
+    mapped.argIndex === NATIVE_ARG_INDEX && mapped.path[0] === NATIVE_EVENT_KEY
+  );
 }
 
 // A value node settable from an event field. AnimatedValue carries setValue; we
@@ -57,41 +85,34 @@ function settableValue(
     : undefined;
 }
 
-// Walk the mapping to every leaf AnimatedNode, recording its key path. Shared by
-// the JS handler (to set values) and the native attach (to register paths).
+// Обходим маппинг до листьев `AnimatedNode`, общий для JS-обработчика и native attach
 function collectMappedValues(
-  mapping: IMapping,
-  path: readonly string[],
+  mapping: unknown,
+  at: IMappingLocation,
   out: IMappedValue[],
 ): void {
   if (mapping instanceof AnimatedNode) {
-    out.push({ path, node: mapping });
+    out.push({ ...at, node: mapping });
     return;
   }
+  if (!isRecord(mapping)) return;
   for (const key of Object.keys(mapping)) {
-    const child = Reflect.get(mapping, key);
-    if (child instanceof AnimatedNode) {
-      out.push({ path: [...path, key], node: child });
-    } else if (isRecord(child)) {
-      collectMappedValues(child, [...path, key], out);
-    }
+    collectMappedValues(
+      Reflect.get(mapping, key),
+      { argIndex: at.argIndex, path: [...at.path, key] },
+      out,
+    );
   }
 }
-
-// TODO(rn-parity, low priority): vendor's `AnimatedEvent.js` has `validateMapping`, a
-// `__DEV__`-only check that throws when an event's actual shape doesn't match the argMapping
-// structure. We have no equivalent — `extractAtPath` below silently no-ops on a mismatch instead.
-// Judged non-actionable (misuse-detection guard, no runtime-visible effect for a correct mapping,
-// same class as the `numColumns` invariant) — see the audit skill for the full reasoning.
 
 // Pull the numeric field at `path` out of one event argument. Returns undefined
 // when the path is absent or the leaf is not a number, so a malformed event is a
 // no-op rather than a throw inside an event dispatch.
 function extractAtPath(
-  event: unknown,
+  arg: unknown,
   path: readonly string[],
 ): number | undefined {
-  let current: unknown = event;
+  let current: unknown = arg;
   for (const key of path) {
     if (!isRecord(current)) return undefined;
     current = Reflect.get(current, key);
@@ -101,21 +122,23 @@ function extractAtPath(
 
 // The callback shape adapters wire as the view's event prop, carrying the
 // AnimatedEvent so the native attach path is reachable from the handler alone.
-export interface IAnimatedEventHandler {
+export type IAnimatedEventHandler = {
   (...args: unknown[]): void;
   __getEvent(): AnimatedEvent;
-}
+};
 
 export type IEventListener = (...args: unknown[]) => void;
 
-export class AnimatedEvent {
+export class AnimatedEvent extends AnimatedEventBase {
   // Listeners fired (in registration order) after the values are driven. Seeded
   // with config.listener; forkEvent appends more via __addListener (RN
   // AnimatedEvent.js seeds `__addListener(config.listener)` in its constructor).
   private readonly listeners: IEventListener[] = [];
-  // The leaves under argMapping[0].nativeEvent, the only place native-driven
-  // events accept animated values (RN invariant). Resolved once at construction.
+  private readonly argMapping: IArgMapping;
+  // Все листья маппинга для JS-обработчика, считаются один раз в конструкторе
   private readonly mappedValues: readonly IMappedValue[];
+  // Native принимает только листья под `argMapping[0].nativeEvent` (инвариант RN)
+  private readonly nativeValues: readonly IMappedValue[];
   // RN parity: the event remembers whether useNativeDriver was requested. Honored only
   // when a native module is present (__isNative); otherwise the JS path drives values.
   private readonly nativeDriverRequested: boolean;
@@ -124,18 +147,20 @@ export class AnimatedEvent {
   // avoiding a double drive and a redundant per-tick commit.
   private attachedNatively = false;
 
-  constructor(argMapping: readonly IMapping[], config?: IEventConfig) {
+  constructor(argMapping: IArgMapping, config?: IEventConfig) {
+    super();
+    if (config == null) console.warn(MISSING_OPTIONS_WARNING);
+    else if (config.useNativeDriver == null)
+      console.warn(MISSING_DRIVER_WARNING);
+    this.argMapping = argMapping;
     if (config?.listener !== undefined) this.listeners.push(config.listener);
     this.nativeDriverRequested = config?.useNativeDriver === true;
     const mapped: IMappedValue[] = [];
-    const first = argMapping[0];
-    if (isRecord(first)) {
-      const nativeEvent = Reflect.get(first, 'nativeEvent');
-      if (isRecord(nativeEvent)) {
-        collectMappedValues(nativeEvent, [], mapped);
-      }
-    }
+    argMapping.forEach((mapping, argIndex) => {
+      collectMappedValues(mapping, { argIndex, path: [] }, mapped);
+    });
     this.mappedValues = mapped;
+    this.nativeValues = mapped.filter(isNativeLeaf);
   }
 
   // Append / drop a listener (RN AnimatedEvent.js __addListener / __removeListener).
@@ -158,13 +183,14 @@ export class AnimatedEvent {
   }
 
   __attach(viewTag: number, eventName: string): void {
-    for (const mapped of this.mappedValues) {
+    if (!this.hasNativeEventMapping()) throw new Error(NATIVE_PATH_MESSAGE);
+    for (const mapped of this.nativeValues) {
       mapped.node.__makeNative();
       dlog(
         `event: attach ${eventName} path=${mapped.path.join('.')} -> view=${viewTag}`,
       );
       nativeAnimated.addAnimatedEventToView(viewTag, eventName, {
-        nativeEventPath: mapped.path,
+        nativeEventPath: mapped.path.slice(1),
         animatedValueTag: mapped.node.__getNativeTag(),
       });
     }
@@ -172,7 +198,7 @@ export class AnimatedEvent {
   }
 
   __detach(viewTag: number, eventName: string): void {
-    for (const mapped of this.mappedValues) {
+    for (const mapped of this.nativeValues) {
       dlog(`event: detach ${eventName} -> view=${viewTag}`);
       nativeAnimated.removeAnimatedEventFromView(
         viewTag,
@@ -183,21 +209,26 @@ export class AnimatedEvent {
     this.attachedNatively = false;
   }
 
+  private hasNativeEventMapping(): boolean {
+    const first = this.argMapping[0];
+    return isRecord(first) && Boolean(Reflect.get(first, NATIVE_EVENT_KEY));
+  }
+
   // JS path: walk each leaf, set its value from the matching event field, flush so
   // its bound props re-paint, then forward the raw args to the user's listener.
   __getHandler(): IAnimatedEventHandler {
+    let isMappingValidated = false;
     const handler: IAnimatedEventHandler = Object.assign(
       (...args: unknown[]): void => {
+        if (!isMappingValidated && isDevBuild()) {
+          validateMapping(this.argMapping, args);
+          isMappingValidated = true;
+        }
         // Once natively attached, the UI thread owns the values, so skip the JS set/flush
         // (it would double-drive and commit per tick); only forward listeners below.
         if (!this.attachedNatively) {
-          // Paths are stored relative to `nativeEvent` (the native module excludes
-          // that prefix); the JS event arg still carries it, so re-add it here.
-          const nativeEvent = isRecord(args[0])
-            ? Reflect.get(args[0], 'nativeEvent')
-            : undefined;
           for (const mapped of this.mappedValues) {
-            const extracted = extractAtPath(nativeEvent, mapped.path);
+            const extracted = extractAtPath(args[mapped.argIndex], mapped.path);
             if (extracted === undefined) continue;
             const setValue = settableValue(mapped.node);
             if (setValue === undefined) continue;
@@ -217,35 +248,29 @@ export class AnimatedEvent {
 // prop. The handler also exposes the AnimatedEvent (__getEvent) for adapters that
 // need the native attach path.
 export function event(
-  argMapping: readonly IMapping[],
+  argMapping: IArgMapping,
   config?: IEventConfig,
 ): IAnimatedEventHandler {
   return new AnimatedEvent(argMapping, config).__getHandler();
 }
 
-export interface INativeEventAttachment {
+export type INativeEventAttachment = {
   detach(): void;
-}
+};
 
-// Imperatively bind a real native event on a host node to the mapping's animated values, so the
-// event drives them on the UI thread with zero JS per event. RN's
-// AnimatedImplementation.attachNativeEvent (ScrollView.js:1095 uses it for sticky headers). The
-// ScrollView is NOT an animated component, so the event can't ride a prop; it is attached to the
-// node's native tag directly. Returns a detach handle. Callers MUST gate on
-// isNativeAnimatedAvailable(): with no native module __attach no-ops and the values never move,
-// so a JS Animated.event path must remain the fallback.
+// Императивно привязывает native-событие узла к значениям маппинга, как `attachNativeEvent` в RN
+// NOTE: без native-модуля значения не двигаются, вызывающий гейтит по `isNativeAnimatedAvailable()`
 export function attachNativeEvent(
   node: ISymbioteNode,
   eventName: string,
-  argMapping: readonly IMapping[],
+  argMapping: IArgMapping,
 ): INativeEventAttachment {
-  const animatedEvent = new AnimatedEvent(argMapping);
+  const animatedEvent = new AnimatedEvent(argMapping, {
+    useNativeDriver: true,
+  });
   let attachedTag: number | undefined;
 
-  // Bind once the node is committed: now if it already has a Fabric tag, else after the commit that
-  // assigns it. Vue/Svelte batch commits on a microtask, so the adapter can wire this (e.g. the
-  // sticky-header scroll) before the tag exists; whenCommitted defers instead of silently binding
-  // nothing. React commits synchronously and binds on the first try.
+  // Vue/Svelte коммитят в микротаске, тега может ещё не быть, поэтому ждём коммит
   const cancel = whenCommitted(node, () => {
     const viewTag = getNativeTag(node);
     if (viewTag === undefined) return;
@@ -263,13 +288,8 @@ export function attachNativeEvent(
   };
 }
 
-// Native-attach the AnimatedEvent already behind a handler from `event(...)`, binding it
-// to a committed host node. Unlike attachNativeEvent (which builds a fresh event from a
-// raw mapping for ScrollView's internal sticky value), this REUSES the caller's handler,
-// so createAnimatedComponent can offload `onScroll={Animated.event(..., {useNativeDriver})}`
-// to the UI thread, and the __makeNative cascade carries the bound interpolations/props
-// native with it. Returns undefined (caller keeps the JS path) when the prop is not a native
-// event handler; if it IS but the node has no tag yet, the bind defers to the commit (same race).
+// В отличие от `attachNativeEvent` переиспользует `AnimatedEvent` из обработчика `event(...)`
+// Не native-обработчик даёт undefined, вызывающий остаётся на JS-пути
 export function attachNativeEventHandler(
   node: unknown,
   eventName: string,
@@ -281,20 +301,20 @@ export function attachNativeEventHandler(
   const animatedEvent: unknown = accessor.call(handler);
   if (!(animatedEvent instanceof AnimatedEvent) || !animatedEvent.__isNative())
     return undefined;
-  const event = animatedEvent;
   let attachedTag: number | undefined;
 
   const cancel = whenCommitted(node, () => {
     const viewTag = getNativeTag(node);
     if (viewTag === undefined) return;
-    event.__attach(viewTag, eventName);
+    animatedEvent.__attach(viewTag, eventName);
     attachedTag = viewTag;
   });
 
   return {
     detach: (): void => {
       cancel();
-      if (attachedTag !== undefined) event.__detach(attachedTag, eventName);
+      if (attachedTag !== undefined)
+        animatedEvent.__detach(attachedTag, eventName);
     },
   };
 }

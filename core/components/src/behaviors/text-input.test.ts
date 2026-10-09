@@ -16,6 +16,7 @@ import {
   currentlyFocusedInput,
   removeChild,
   listenerFor,
+  Platform,
   routeProp,
   type IListener,
   type ISymbioteEvent,
@@ -25,12 +26,13 @@ import {
   buildTextInputHandle,
   registerTextInputBehavior,
   TEXT_INPUT_TAG,
+  textInputOf,
 } from './text-input';
 import { INITIAL_EVENT_COUNT } from '../state/text-input';
 
 const fabric = installRecordingFabric();
 const live = createLiveTree(fabric);
-let nextRootTag = 7000;
+let nextRootTag = 7_000;
 
 // PRODUCTION SHAPE: an adapter resolves the intrinsic tag through descriptorFor and calls
 // createElement with the FABRIC view name. Building the subject as createElement(TEXT_INPUT_TAG)
@@ -118,6 +120,31 @@ describe('text input host behavior', () => {
     expect(committedPropsOf(TEST_ID)).toMatchObject({
       mostRecentEventCount: INITIAL_EVENT_COUNT,
     });
+  });
+
+  // RN forces `caretHidden` to true under `Platform.isTesting` (TextInput.js:623), whatever the app
+  // wrote, so a test run never sees a blinking caret
+  it('hides the caret under Platform.isTesting even when the app shows it', () => {
+    const isTesting = vi.spyOn(Platform, 'isTesting', 'get');
+    isTesting.mockReturnValue(true);
+    registerTextInputBehavior();
+    const node = makeTextInput();
+    routeProp(node, 'testID', TEST_ID);
+    routeProp(node, 'caretHidden', false);
+    mount(node);
+
+    expect(committedPropsOf(TEST_ID)).toMatchObject({ caretHidden: true });
+    isTesting.mockRestore();
+  });
+
+  it('leaves the authored caretHidden alone outside a test run', () => {
+    registerTextInputBehavior();
+    const node = makeTextInput();
+    routeProp(node, 'testID', TEST_ID);
+    routeProp(node, 'caretHidden', false);
+    mount(node);
+
+    expect(committedPropsOf(TEST_ID)).toMatchObject({ caretHidden: false });
   });
 
   // Two independent consequences of one cause: the app's handler still fires (parked in the stash,
@@ -348,6 +375,96 @@ describe('text input host behavior', () => {
     expect(onBlur).toHaveBeenCalledTimes(1);
   });
 
+  // In RN `isFocused` reads the app-wide tracker, so a command moves it with no native event
+  it('reports focused right after focus() and unfocused right after blur()', () => {
+    registerTextInputBehavior();
+    const node = makeTextInput();
+    mount(node);
+    const handle = buildTextInputHandle(node);
+
+    handle.focus();
+    expect(handle.isFocused()).toBe(true);
+
+    handle.blur();
+    expect(handle.isFocused()).toBe(false);
+  });
+
+  // `TextInput-itest` "provides additional methods": a ref IS the node, so RN's API sits on it
+  it('puts the RN imperative API on the node itself', () => {
+    registerTextInputBehavior();
+    const node = makeTextInput();
+    mount(node);
+    const input = textInputOf(node);
+
+    expect(input?.getNativeRef()).toBe(node);
+    input?.focus();
+    expect(input?.isFocused()).toBe(true);
+    expect(currentlyFocusedInput()).toBe(node);
+    input?.blur();
+    expect(input?.isFocused()).toBe(false);
+  });
+
+  it('sends clear and setSelection through the node as RN does', () => {
+    registerTextInputBehavior();
+    const node = makeTextInput();
+    mount(node);
+    const input = textInputOf(node);
+
+    input?.clear();
+    input?.setSelection(2, 5);
+
+    expect(
+      commandsNamed('setTextAndSelection').map(entry => entry.args),
+    ).toEqual([
+      [INITIAL_EVENT_COUNT, '', 0, 0],
+      [INITIAL_EVENT_COUNT, null, 2, 5],
+    ]);
+  });
+
+  it('leaves a node with no text input behavior without the API', () => {
+    expect(textInputOf(makeTextInput())).toBeUndefined();
+  });
+
+  // RN's `getNativeRef` hands back the native instance the input renders to
+  it('answers the native node from getNativeRef', () => {
+    registerTextInputBehavior();
+    const node = makeTextInput();
+    mount(node);
+
+    expect(buildTextInputHandle(node).getNativeRef()).toBe(node);
+  });
+
+  // `TextInput-test.js`: the first input loses focus when a second one takes it
+  it('unfocuses the first input when a second one takes focus', () => {
+    registerTextInputBehavior();
+    const first = makeTextInput();
+    const second = makeTextInput();
+    mount(first);
+    mount(second);
+    const firstHandle = buildTextInputHandle(first);
+    const secondHandle = buildTextInputHandle(second);
+
+    firstHandle.focus();
+    secondHandle.focus();
+
+    expect(firstHandle.isFocused()).toBe(false);
+    expect(secondHandle.isFocused()).toBe(true);
+    expect(currentlyFocusedInput()).toBe(second);
+  });
+
+  it('reports unfocused once the input is unmounted', () => {
+    registerTextInputBehavior();
+    const node = makeTextInput();
+    const surface = mount(node);
+    const handle = buildTextInputHandle(node);
+    handle.focus();
+
+    surface.removeChild(node);
+    surface.commit();
+
+    expect(handle.isFocused()).toBe(false);
+  });
+
   it('drives focus and blur as native view commands', () => {
     registerTextInputBehavior();
     const node = makeTextInput();
@@ -431,10 +548,9 @@ describe('text input host behavior', () => {
     expect(commandsNamed('blur')).toHaveLength(0);
   });
 
-  // `clear` goes down the same stale-safe path a controlled write takes, and it must also move the
-  // mirror to '' — the app's own `value` follows the clear a moment later, and against a stale
-  // mirror that empty value reads as a divergence and commands a second, redundant write.
-  it('clears through setTextAndSelection and moves the mirror with it', () => {
+  // RN's `clear` only sends the command and never moves its mirror of the native text, so a commit
+  // with the same value commands nothing and a later empty value still reads as a divergence
+  it('clears through setTextAndSelection and leaves the mirror alone', () => {
     registerTextInputBehavior();
     const node = makeTextInput();
     routeProp(node, 'value', 'abc');
@@ -444,14 +560,15 @@ describe('text input host behavior', () => {
     handle.clear();
     expect(commandsNamed('setTextAndSelection')[0].args).toEqual([0, '', 0, 0]);
 
-    commitValue(surface, node, '');
-
+    commitValue(surface, node, 'abc');
     expect(commandsNamed('setTextAndSelection')).toHaveLength(1);
+
+    commitValue(surface, node, '');
+    expect(commandsNamed('setTextAndSelection')).toHaveLength(2);
   });
 
-  // A selection move must not rewrite the text: it echoes what native currently holds, which after
-  // a change is the text native reported — never the app's `value`.
-  it('moves the selection over the CURRENT text, not the app value', () => {
+  // RN passes a null text, so a selection move never rewrites it (`TextInput-itest.js`)
+  it('moves the selection with a null text', () => {
     registerTextInputBehavior();
     const node = makeTextInput();
     routeProp(node, 'value', 'app value');
@@ -464,7 +581,7 @@ describe('text input host behavior', () => {
     expect(commandsNamed('setTextAndSelection')).toHaveLength(1);
     expect(commandsNamed('setTextAndSelection')[0].args).toEqual([
       NATIVE_EVENT_COUNT,
-      'native text',
+      null,
       1,
       4,
     ]);

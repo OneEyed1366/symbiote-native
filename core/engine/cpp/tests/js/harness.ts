@@ -9,6 +9,8 @@
  * The protocol is one line per result on stdout. That is what makes the runner replaceable.
  */
 
+import './rn-host-stub';
+
 /** A command a test dispatched at a mounted view — `dispatchCommand`'s own three arguments. */
 export type IRecordedCommand = {
   tag: number;
@@ -28,6 +30,17 @@ declare const __symbioteTester: {
     payload?: Record<string, unknown>,
   ) => void;
   commands: () => IRecordedCommand[];
+  scrollTo: (tag: number, x: number, y: number) => void;
+  enqueueScroll: (tag: number, x: number, y: number) => void;
+  runWorkLoop: () => void;
+  setViewport: (width: number, height: number) => void;
+  setModalSize: (tag: number, width: number, height: number) => void;
+  animatedModule: () => unknown;
+  usesSharedAnimatedBackend: () => boolean;
+  boundingClientRect: (tag: number) => IBoundingRect;
+  produceFrames: (milliseconds: number) => void;
+  directManipulationProps: (tag: number) => Record<string, unknown>;
+  fabricUpdateProps: (tag: number) => Record<string, unknown>;
   mountingLogs: () => string[];
   commitNumber: () => number;
   heapInfo: () => Record<string, number>;
@@ -51,6 +64,82 @@ export function dispatchEvent(
   payload?: Record<string, unknown>,
 ): void {
   __symbioteTester.dispatchEvent(tag, type, payload);
+}
+
+/** Fantom's `runWorkLoop`: deliver pending state updates and run the tasks they scheduled */
+export function runWorkLoop(): void {
+  __symbioteTester.runWorkLoop();
+}
+
+/** Hands RN's own `NativeAnimatedModule` (C++) to the engine, as a device's TurboModule registry */
+export function useNativeAnimatedModule(): void {
+  const module = __symbioteTester.animatedModule();
+  // Fantom's tester turns `cxxNativeAnimatedEnabled` on for the C++ module
+  const flags = {
+    cxxNativeAnimatedEnabled: (): boolean => true,
+    useSharedAnimatedBackend: usesSharedAnimatedBackend,
+  };
+  Reflect.set(globalThis, '__turboModuleProxy', (name: string): unknown => {
+    if (name === 'NativeReactNativeFeatureFlags') return flags;
+    return name === 'NativeAnimatedModule' ||
+      name === 'NativeAnimatedTurboModule'
+      ? module
+      : null;
+  });
+}
+
+/** `ReactNativeFeatureFlags.useSharedAnimatedBackend()` of this run */
+export function usesSharedAnimatedBackend(): boolean {
+  return __symbioteTester.usesSharedAnimatedBackend();
+}
+
+export type IBoundingRect = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+/** `getBoundingClientRect` of a mounted view, its transform included, from the committed tree */
+export function getBoundingClientRect(tag: number): IBoundingRect {
+  return __symbioteTester.boundingClientRect(tag);
+}
+
+/** Fantom's `unstable_produceFramesForDuration`: native animation frames of ~16.3 ms each */
+export function produceFramesForDuration(milliseconds: number): void {
+  __symbioteTester.produceFrames(milliseconds);
+}
+
+/** Fantom's `unstable_getDirectManipulationProps`: what a native animation wrote into a view */
+export function getDirectManipulationProps(
+  tag: number,
+): Record<string, unknown> {
+  return __symbioteTester.directManipulationProps(tag);
+}
+
+/** Fantom's `unstable_getFabricUpdateProps`: what a native animation committed to Fabric */
+export function getFabricUpdateProps(tag: number): Record<string, unknown> {
+  return __symbioteTester.fabricUpdateProps(tag);
+}
+
+/** Fantom's `enqueueScrollEvent`: queued, delivered to JS by the next `runWorkLoop` */
+export function enqueueScroll(tag: number, x: number, y: number): void {
+  __symbioteTester.enqueueScroll(tag, x, y);
+}
+
+/** Fantom's `createRoot` viewport: resizes the surface the tree lays out in */
+export function setViewport(width: number, height: number): void {
+  __symbioteTester.setViewport(width, height);
+}
+
+/** Fantom's `enqueueModalSizeUpdate`: the host's screen size for a mounted Modal */
+export function setModalSize(tag: number, width: number, height: number): void {
+  __symbioteTester.setModalSize(tag, width, height);
+}
+
+/** Scroll a mounted ScrollView by its tag, which writes the offset into its Fabric state */
+export function scrollTo(tag: number, x: number, y: number): void {
+  __symbioteTester.scrollTo(tag, x, y);
 }
 
 /** A view as the PLATFORM holds it: what the differ told a host to create, not what JS built. */
@@ -260,32 +349,16 @@ export function commands(): IRecordedCommand[] {
 }
 
 /**
- * What the real Differentiator told the mounting platform to do since the last read, in React
- * Native's own wording ("Create {...}", "Update {...}", "Insert {...}", …).
- *
- * Populated by `mounted()`'s own `host.mount()` drain, so call `mounted()` first — this only
- * reads what that drain produced, it does not trigger one of its own. An "Update" line is the
- * real equivalent of the retired TypeScript mirror's clone-protocol count: the Differentiator
- * decided this node's props changed enough to need a native prop update, not merely that JS wrote
- * to it (`setProp`'s own `Object.is` dedupe can still turn a write away before it ever reaches
- * here — see `core/engine/src/node.ts`).
+ * What the real Differentiator told the mounting platform to do since the last read
+ * Populated by the `host.mount()` drain in `mounted()`, so call `mounted()` first, this only reads
  */
 export function mountingLogs(): string[] {
   return __symbioteTester.mountingLogs();
 }
 
 /**
- * The shadow tree's running commit number — a step's own commit count is the delta across it.
- *
- * The one headless instrument that speaks about a cost living PAST `completeRoot`, where the
- * device's overhead sits and where the mutation oracle goes blind: each commit signals the mounting
- * thread, and on a device that is `RCTMountingManager` creating and configuring `UIView`s on the
- * main thread. Two renderers can emit an identical mutation list and still cost differently there
- * if one of them splits it across more commits.
- *
- * NOT a transaction count, which reads 1 whatever happens — `MountingCoordinator::pullTransaction`
- * diffs the base revision against the latest, so intermediate commits collapse and the loop that
- * pulls them counts the caller's own drains.
+ * The shadow tree's running commit number, a step's own commit count is the delta across it
+ * It sees cost PAST `completeRoot`, unlike a transaction count, which reads 1 whatever happens
  */
 export function commitNumber(): number {
   return __symbioteTester.commitNumber();
@@ -430,6 +503,13 @@ export function expect(actual: unknown): {
   };
 }
 
+function runInOrder(hooks: ReadonlyArray<() => unknown>): Promise<void> {
+  return hooks.reduce<Promise<void>>(async (previous, hook) => {
+    await previous;
+    await hook();
+  }, Promise.resolve());
+}
+
 /**
  * Run everything registered and print one line per case.
  *
@@ -449,20 +529,22 @@ export function report(): void {
       // left standing. The runtime is NOT reset: module state belongs to the file.
       __symbioteTester.reset();
       try {
-        for (const hook of beforeEachHooks) await hook();
+        await runInOrder(beforeEachHooks);
         await one.run();
         results.push(`PASS ${one.name}`);
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error);
         results.push(`FAIL ${one.name} :: ${detail}`);
       }
-      for (const hook of afterEachHooks) {
-        try {
-          await hook();
-        } catch {
-          // An afterEach that throws must not rewrite the verdict of the case it followed.
-        }
-      }
+      await runInOrder(
+        afterEachHooks.map(hook => async () => {
+          try {
+            await hook();
+          } catch {
+            // An afterEach that throws must not rewrite the verdict of the case it followed.
+          }
+        }),
+      );
     });
   }
 

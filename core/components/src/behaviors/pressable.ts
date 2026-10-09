@@ -10,6 +10,7 @@ import {
   appListenerFor,
   dispatchViewCommand,
   dlog,
+  isSymbioteEvent,
   Platform,
   propOf,
   registerHostBehavior,
@@ -63,7 +64,7 @@ export type ICancelableResolver = (
   source: ISymbioteNode,
 ) => boolean | undefined;
 
-interface IBehaviorState {
+type IBehaviorState = {
   readonly runtime: IPressRuntime;
   readonly host: IPressHost;
   readonly refine: IPressConfigRefinement | undefined;
@@ -80,7 +81,7 @@ interface IBehaviorState {
   // Whether `listeners` holds a machine built for the gesture in progress. Reset when the gesture
   // ends, so the next one rebuilds from whatever the props are by then.
   isBuilt: boolean;
-}
+};
 
 const states = new WeakMap<ISymbioteNode, IBehaviorState>();
 
@@ -300,8 +301,10 @@ function resolveCancelable(source: ISymbioteNode): boolean | undefined {
 
 // The trigger is a FLAG, not a name: build if this gesture hasn't built yet, clear on gesture end
 // — order-independent, survives the engine reordering its own events.
+// A click is a whole gesture on its own: it builds the machine and ends it
 const GESTURE_END_KEYS: ReadonlySet<string> = new Set([
   'onPressOut',
+  'onClick',
   'onResponderTerminationRequest',
 ]);
 
@@ -314,13 +317,30 @@ function dispatch(
   const state = stateOf(node, options);
   if (!state.isBuilt) rebuild(node, state);
   const listener = state.listeners[key];
-  const result = isPressHandler(listener)
+  const isHandled = isPressHandler(listener);
+  const result = isHandled
     ? Reflect.apply(listener, undefined, args)
     : undefined;
+  if (isHandled && ownsPress(key)) stopBubbling(args[0]);
   // AFTER the handler, not before: `handlePressOut` is what settles the machine, and clearing the
   // flag first would let a re-entrant dispatch rebuild mid-gesture.
   if (GESTURE_END_KEYS.has(key)) state.isBuilt = false;
   return result;
+}
+
+// RN has one responder, so a nested pressable answers the press and its ancestors never see it
+const OWNED_PRESS_KEYS = ['onPress', 'onPressIn', 'onPressOut'] as const;
+
+type IOwnedPressKey = (typeof OWNED_PRESS_KEYS)[number];
+
+function ownsPress(key: string): key is IOwnedPressKey {
+  return OWNED_PRESS_KEYS.some(owned => owned === key);
+}
+
+// A hand-built event (a test driving a behavior directly) carries no `stopPropagation`
+function stopBubbling(event: unknown): void {
+  if (!isSymbioteEvent(event)) return;
+  if (typeof event.stopPropagation === 'function') event.stopPropagation();
 }
 
 // Engine event name -> the app-facing callback key it routes to. NOT the same list as
@@ -328,6 +348,7 @@ function dispatch(
 // this is only what it answers when Fabric fires
 const DISPATCH_KEYS: ReadonlyMap<string, string> = new Map([
   ['press', 'onPress'],
+  ['click', 'onClick'],
   ['pressIn', 'onPressIn'],
   ['pressOut', 'onPressOut'],
   ['startShouldSetResponder', 'onStartShouldSetResponder'],

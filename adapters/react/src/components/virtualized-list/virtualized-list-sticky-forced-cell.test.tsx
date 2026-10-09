@@ -12,18 +12,21 @@
 import { createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { VirtualizedList, mount, unmount } from '@symbiote-native/react';
+import { STICKY_HEADER_TAG } from '@symbiote-native/components';
 import { childrenOf, type ISymbioteNode } from '@symbiote-native/engine';
 import {
+  createLiveTree,
   installRecordingFabric,
-  payloadOf,
   type IAuthoredNode,
+  type ILiveNode,
 } from '@symbiote-native/test-utils';
 
-interface IRow {
+type IRow = {
   id: number;
-}
+};
 
 const ROOT_TAG = 44;
+const SCROLLED_OFFSET = 1_450;
 const ITEM_HEIGHT = 100;
 const VIEWPORT = 100;
 const DATA: IRow[] = Array.from({ length: 20 }, (_unused, index) => ({
@@ -31,6 +34,7 @@ const DATA: IRow[] = Array.from({ length: 20 }, (_unused, index) => ({
 }));
 
 const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
@@ -58,13 +62,23 @@ function findScrollView(): IAuthoredNode {
   return node;
 }
 
-// A sticky-header wrapper is the only node carrying a `transform` (its translateY); regular
-// cells and the content container don't (same tell sticky-section-headers.test.tsx uses). It is a
-// style key, so it lives in the payload rather than the author's bag.
-function collectStickyWrappers(handle: ISymbioteNode): ISymbioteNode[] {
-  return descendantsOf(handle).filter(node =>
-    Array.isArray(payloadOf(node).transform),
-  );
+function firstText(node: ILiveNode): string | undefined {
+  if (typeof node.payload.text === 'string') return node.payload.text;
+  for (const child of node.children) {
+    const found = firstText(child);
+    if (found !== undefined) return found;
+  }
+  return undefined;
+}
+
+// The row each `sticky-header` wrapper holds
+// The tag the engine was told is the oracle, the `translateY` needs a measurement round trip
+function stickyRows(): Array<string | undefined> {
+  const rows: Array<string | undefined> = [];
+  live.walkLive(live.appRoot(), node => {
+    if (node.tagName === STICKY_HEADER_TAG) rows.push(firstText(node));
+  });
+  return rows;
 }
 
 function App(): ReactElement {
@@ -79,7 +93,8 @@ function App(): ReactElement {
       index,
     }),
     // windowSize=1 => zero overscan, so [first,last] is a tight window around the viewport
-    // and a scroll to the middle of the list genuinely evicts index 0.
+    // The initial region [0, 1] is retained by RN's scroll-to-top optimization, header 10 is not
+    initialNumToRender: 2,
     windowSize: 1,
     stickyHeaderIndices: [0, 10],
     renderItem: ({ item }) => createElement('text', {}, `row-${item.id}`),
@@ -94,56 +109,46 @@ describe('VirtualizedList force-mounts the sticky header below the window', () =
       layout: { x: 0, y: 0, width: 320, height: VIEWPORT },
     });
 
-    // Scroll so the window covers index 5 only (offsets[5..6] = 500..700 straddle
-    // 550..650 with windowSize=1's zero overscan) — index 0 and its sticky section origin
-    // are well outside [first,last].
+    // The window covers indices 14 and 15 (1400..1600 straddle 1450..1550 at zero overscan)
+    // so sticky header 10 is far outside [first,last]
     fabric.fireEvent(findScrollView().instanceHandle, 'topScroll', {
-      contentOffset: { x: 0, y: 550 },
+      contentOffset: { x: 0, y: SCROLLED_OFFSET },
       contentSize: { width: 320, height: ITEM_HEIGHT * DATA.length },
       layoutMeasurement: { width: 320, height: VIEWPORT },
     });
 
     const rows = renderedRows(findScrollView().handle);
-    // The forced sticky cell: index 0 stays mounted even though it is far outside the
-    // in-window range.
+    // The forced sticky cell stays mounted far outside the in-window range
     expect(
-      rows.includes('row-0'),
-      'sticky header at index 0 stays force-mounted',
+      rows.includes('row-10'),
+      'sticky header at index 10 stays force-mounted',
     ).toBe(true);
-    // Real windowing still holds for everything else: indices strictly between the forced
-    // sticky cell and the window are NOT rendered.
-    expect(rows.includes('row-1'), 'index 1 stays windowed out').toBe(false);
-    expect(rows.includes('row-4'), 'index 4 stays windowed out').toBe(false);
-    // The window itself is resident.
+    // Indices strictly between the forced cell and the window are NOT rendered
+    expect(rows.includes('row-11'), 'index 11 stays windowed out').toBe(false);
+    expect(rows.includes('row-13'), 'index 13 stays windowed out').toBe(false);
+    // The retained initial region and the window itself are resident
+    expect(rows.includes('row-0'), 'initial region retained').toBe(true);
     expect(
-      rows.includes('row-5') || rows.includes('row-6'),
+      rows.includes('row-14') || rows.includes('row-15'),
       'window cell resident',
     ).toBe(true);
   });
 
   it('wraps the forced cell in the sticky-header wrapper, same as an in-window sticky cell', () => {
-    // ScrollView's own stickyHeaderIndices handling is pure JS (sticky-header.tsx): it wraps
-    // the FLAGGED CHILD in a ScrollViewStickyHeader (a `collapsable:false`, transform-bearing
-    // AnimatedView) rather than forwarding the raw index array to native. So the forced cell
-    // must land at the child position `stickyChildPositions` reports, or it never gets wrapped.
+    // A cell the app flagged sticky is wrapped in the `sticky-header` tag, the forced one too
     mount(ROOT_TAG, <App />);
     fabric.fireEvent(findScrollView().instanceHandle, 'topLayout', {
       layout: { x: 0, y: 0, width: 320, height: VIEWPORT },
     });
     fabric.fireEvent(findScrollView().instanceHandle, 'topScroll', {
-      contentOffset: { x: 0, y: 550 },
+      contentOffset: { x: 0, y: SCROLLED_OFFSET },
       contentSize: { width: 320, height: ITEM_HEIGHT * DATA.length },
       layoutMeasurement: { width: 320, height: VIEWPORT },
     });
 
-    const stickyWrappers = collectStickyWrappers(findScrollView().handle);
     expect(
-      stickyWrappers.length,
-      'the forced sticky cell got wrapped',
-    ).toBeGreaterThan(0);
-    expect(
-      stickyWrappers.some(wrapper => renderedRows(wrapper).includes('row-0')),
-      'row-0 (the forced cell) is inside a sticky wrapper',
-    ).toBe(true);
+      stickyRows(),
+      'forced and retained headers are both wrapped',
+    ).toEqual(['row-0', 'row-10']);
   });
 });

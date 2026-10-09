@@ -1,6 +1,5 @@
-// The typed style surface (ViewStyle/TextStyle and friends). Maps onto Yoga layout props and RN's
-// view/text props, which Fabric's C++ reads off the props payload. A correctly-typed subset of
-// RN's StyleSheet surface — agnostic types, so every adapter re-exports them from the engine.
+// The typed style surface (ViewStyle/TextStyle and friends), agnostic for every adapter
+// TODO(rn-port): RN's `StyleSheetTypes.d.ts` needs React types, has no `I` prefix and no animated
 
 import type { AnimatedNode } from './animated/graph';
 import type { IColorValue } from './platform-color';
@@ -40,22 +39,22 @@ export type ITransformProp =
 // New-Architecture box shadow (StyleSheetTypes BoxShadowValue:816). Either a CSS
 // `box-shadow` string or an array of shadow objects; Fabric's C++ parses both, so
 // these reach native as raw style props (no JS-side processColor on the nested color).
-export interface IBoxShadowValue {
+export type IBoxShadowValue = {
   offsetX: number | string;
   offsetY: number | string;
   color?: IColorValue;
   blurRadius?: number | string;
   spreadDistance?: number | string;
   inset?: boolean;
-}
+};
 
 // `filter`'s drop-shadow primitive (StyleSheetTypes DropShadowValue:721).
-export interface IDropShadowValue {
+export type IDropShadowValue = {
   offsetX: number | string;
   offsetY: number | string;
   standardDeviation?: number | string;
   color?: IColorValue;
-}
+};
 
 // One CSS filter function (StyleSheetTypes FilterFunction:709): each entry names
 // exactly one filter, mirroring the single-key-object shape of TransformProp.
@@ -71,9 +70,8 @@ export type IFilterFunction =
   | { sepia: number | string }
   | { dropShadow: IDropShadowValue | string };
 
-// One gradient color stop (StyleSheetTypes BackgroundImageValue:728/768): a color plus zero or
-// more positions — two positions on one stop is CSS's "double position" shorthand for two
-// adjacent stops sharing a color (expanded by the processor, not here).
+// One gradient color stop (StyleSheetTypes BackgroundImageValue:728/768): a color plus positions
+// Two positions on one stop is CSS's "double position" shorthand, expanded by the processor
 export type IColorStopValue = {
   color: IColorValue;
   positions?: ReadonlyArray<string>;
@@ -136,7 +134,7 @@ export type IBlendMode =
   | 'luminosity'
   | 'plus-lighter';
 
-export interface IViewStyle {
+export type IViewStyle = {
   // Box dimensions
   width?: IDimensionValue;
   height?: IDimensionValue;
@@ -163,8 +161,34 @@ export interface IViewStyle {
   rowGap?: number | string;
   columnGap?: number | string;
 
+  boxSizing?: 'border-box' | 'content-box';
+
   // Positioning
   position?: 'absolute' | 'relative' | 'static';
+  // Logical insets, margins and paddings: block is the vertical axis, inline the horizontal one,
+  // both resolved against `direction` by Yoga
+  insetBlock?: IDimensionValue;
+  insetBlockEnd?: IDimensionValue;
+  insetBlockStart?: IDimensionValue;
+  insetInline?: IDimensionValue;
+  insetInlineEnd?: IDimensionValue;
+  insetInlineStart?: IDimensionValue;
+  marginBlock?: IDimensionValue;
+  marginBlockEnd?: IDimensionValue;
+  marginBlockStart?: IDimensionValue;
+  marginInline?: IDimensionValue;
+  marginInlineEnd?: IDimensionValue;
+  marginInlineStart?: IDimensionValue;
+  paddingBlock?: IDimensionValue;
+  paddingBlockEnd?: IDimensionValue;
+  paddingBlockStart?: IDimensionValue;
+  paddingInline?: IDimensionValue;
+  paddingInlineEnd?: IDimensionValue;
+  paddingInlineStart?: IDimensionValue;
+  outlineColor?: IColorValue;
+  outlineOffset?: number;
+  outlineStyle?: 'solid' | 'dotted' | 'dashed';
+  outlineWidth?: number;
   top?: IDimensionValue;
   right?: IDimensionValue;
   bottom?: IDimensionValue;
@@ -257,9 +281,9 @@ export interface IViewStyle {
   filter?: IFilterFunction[] | string;
   experimental_backgroundImage?: IBackgroundImageValue[] | string;
   mixBlendMode?: IBlendMode;
-}
+};
 
-export interface ITextStyle extends IViewStyle {
+export type ITextStyle = IViewStyle & {
   color?: IColorValue;
   fontFamily?: string;
   fontSize?: number;
@@ -296,7 +320,10 @@ export interface ITextStyle extends IViewStyle {
   // Per-text override of the layout writing direction.
   writingDirection?: 'auto' | 'ltr' | 'rtl';
   includeFontPadding?: boolean;
-}
+  // The Text fold maps these onto `selectable` and `textAlignVertical`
+  userSelect?: 'auto' | 'text' | 'none' | 'contain' | 'all';
+  verticalAlign?: 'auto' | 'top' | 'bottom' | 'middle';
+};
 
 // A style "slot" exactly as RN callers pass it: a style object, a (possibly nested) array of
 // them, or a falsy entry contributing nothing (`style={[base, cond && override]}`). Mirrors RN's
@@ -322,7 +349,6 @@ export type IStyleProp<T> =
   | IStyleFalsy
   | IRecursiveArray<IWithAnimated<T> | IStyleFalsy>;
 
-// The constraint behind StyleSheet.create. Mirrors RN's NamedStyles<T>: validates each entry as a
-// real style object AND supplies the contextual type that keeps string-literal props
-// (flexDirection: 'row') from widening to `string` — the guarantee a bare identity create loses.
+// The constraint behind StyleSheet.create, like RN's NamedStyles<T>: validates each entry
+// It also keeps string-literal props (`flexDirection: 'row'`) from widening to `string`
 export type INamedStyles<T> = { [P in keyof T]: IViewStyle | ITextStyle };

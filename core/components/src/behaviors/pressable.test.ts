@@ -332,4 +332,23 @@ describe('pressable host behavior', () => {
     expect(onLongPress).toHaveBeenCalledTimes(1);
     vi.useRealTimers();
   });
+
+  // Минимум в 10ms из `Pressability-test`, нулевая задержка не стреляет сразу
+  it('floors delayLongPress at 10ms', () => {
+    vi.useFakeTimers();
+    registerPressableBehavior();
+    const onLongPress = vi.fn();
+    const node = makePressable();
+    routeProp(node, 'onLongPress', onLongPress);
+    routeProp(node, 'delayLongPress', 0);
+    mount(node);
+
+    press(node);
+    vi.advanceTimersByTime(9);
+    expect(onLongPress).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(1);
+    expect(onLongPress).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
 });

@@ -1,16 +1,8 @@
-// TextInput: the logic half (framework-agnostic, zero render). TextInput is the controlled-
-// value / event-count handshake primitive. There is NO `value` Fabric prop: JS folds
-// value/defaultValue into a single private `text` prop plus a `mostRecentEventCount` counter.
-// Native increments its own counter per keystroke and rejects stale writes by
-// eventLag = nativeCount - mostRecentEventCount, so a controlled JS write must push the
-// ACKNOWLEDGED count (the one native last reported) through the setTextAndSelection view
-// command, never a plain prop re-push, which would fight the cursor.
-//
-// Unlike Switch this is NOT a single reducer: the handshake holds two pieces with different
-// reactivity needs: `mostRecentEventCount` must re-render so the imperative handle echoes the
-// latest count, while `lastNativeText` is bookkeeping the controlled-write effect mutates
-// without a render. So the logic layer is the pure folds/maps + the controlled-write predicate;
-// each adapter holds the two pieces in ITS own primitives (React useState/useRef, Vue ref/let).
+// TODO(rn-port): RN's `TextInput.js` holds this handshake inside a React class, nothing to import
+
+// TextInput logic half: the controlled-value handshake, native rejects stale writes by `eventLag`.
+// A controlled write pushes the ACKNOWLEDGED count via `setTextAndSelection`, not a prop re-push
+// Adapters keep `mostRecentEventCount` (re-renders) and `lastNativeText` (no render) themselves
 
 import type {
   IMeasureOnSuccess,
@@ -28,6 +20,16 @@ export type IInputMode =
 export type IEnterKeyHint =
   'enter' | 'done' | 'go' | 'next' | 'previous' | 'search' | 'send';
 export type ISubmitBehavior = 'submit' | 'blurAndSubmit' | 'newline';
+export type IDataDetectorType =
+  | 'phoneNumber'
+  | 'link'
+  | 'address'
+  | 'calendarEvent'
+  | 'trackingNumber'
+  | 'flightNumber'
+  | 'lookupSuggestion'
+  | 'none'
+  | 'all';
 export type ITextInputSelection = { start: number; end?: number };
 export type ITextInputEventHandler = (event: ISymbioteEvent) => void;
 
@@ -88,11 +90,8 @@ export function shouldCommandText(
   return typeof value === 'string' && lastNativeText !== value;
 }
 
-// The event `onValueChange` fires with. Svelte's compiler treats any individual `on*`-prefixed
-// attribute as a native listener attachment and always calls it with exactly one argument, a real
-// object — a two-argument `(text, event)` callback silently drops `event` there and crashes when
-// `text` is passed as that sole argument (Svelte's own bookkeeping mutates it, which throws on a
-// primitive). So the value rides as a field on the event object itself, never as a second argument.
+// The event `onValueChange` fires with. Svelte calls an individual `on*` attribute with one object
+// argument, so `text` is a field of the event, a `(text, event)` callback would lose `event`
 export type ITextInputChangeEvent = ISymbioteEvent & { text: string };
 
 // The app-facing prop contract, shared by every adapter so the surface CANNOT drift. TextInput
@@ -144,6 +143,30 @@ export type ITextInputProps = IAccessibilityProps &
     // Pairs this input with an InputAccessoryView whose nativeID matches; native docks that
     // view above the keyboard while the input is focused. Forwarded via passthrough.
     inputAccessoryViewID?: string;
+    // Native-only props of RN's `TextInput.d.ts`: the engine forwards each as written, so they
+    // need no fold, only a type for app code
+    caretHidden?: boolean;
+    contextMenuHidden?: boolean;
+    spellCheck?: boolean;
+    clearTextOnFocus?: boolean;
+    enablesReturnKeyAutomatically?: boolean;
+    smartInsertDelete?: boolean;
+    disableKeyboardShortcuts?: boolean;
+    disableFullscreenUI?: boolean;
+    clearButtonMode?: 'never' | 'while-editing' | 'unless-editing' | 'always';
+    keyboardAppearance?: 'default' | 'light' | 'dark';
+    dataDetectorTypes?: IDataDetectorType | IDataDetectorType[];
+    passwordRules?: string | null;
+    lineBreakStrategyIOS?: 'none' | 'standard' | 'hangul-word' | 'push-out';
+    lineBreakModeIOS?:
+      'wordWrapping' | 'char' | 'clip' | 'head' | 'middle' | 'tail';
+    importantForAutofill?:
+      'auto' | 'no' | 'noExcludeDescendants' | 'yes' | 'yesExcludeDescendants';
+    inlineImageLeft?: string;
+    inlineImagePadding?: number;
+    returnKeyLabel?: string;
+    textBreakStrategy?: 'simple' | 'highQuality' | 'balanced';
+    inputAccessoryViewButtonLabel?: string;
     style?: ITextStyle;
     // TextInput.js's own `usePressability` — the same Pressability class every Touchable uses,
     // wired so a tap inside an authored `hitSlop` but outside the native view's focus zone still
@@ -158,12 +181,8 @@ export type ITextInputProps = IAccessibilityProps &
     // `nativeEvent.eventCount`/`target`) — one argument, always a real object; see
     // `ITextInputChangeEvent`.
     onValueChange?: (event: ITextInputChangeEvent) => void;
-    // TextInput.js:506 — `props.onChangeText(currentText)`, called right alongside `onChange` on
-    // the SAME native change event. RN's real signature takes the bare STRING; ours cannot — an
-    // individual `on*` attribute on a host tag compiles through Svelte's `target_handler`, which
-    // always calls with exactly one argument, a real object (`host-tag-invariants.test.ts`, and the
-    // identical reason `onValueChange` carries `text` as a FIELD rather than a second argument). So
-    // `text` rides on the event exactly like `onValueChange` does — same object, same field.
+    // RN passes a bare STRING here (TextInput.js:506), Svelte always passes one object argument
+    // So `text` rides on the event like in `onValueChange`, see `host-tag-invariants.test.ts`
     onChangeText?: (event: ITextInputChangeEvent) => void;
     onFocus?: ITextInputEventHandler;
     onBlur?: ITextInputEventHandler;
@@ -174,20 +193,9 @@ export type ITextInputProps = IAccessibilityProps &
     onContentSizeChange?: ITextInputEventHandler;
   };
 
-// The callback surface AS A VALUE, so a test can enumerate it instead of restating it. A hand-kept
-// second list is exactly the drift that let `onValueChange` go a month without reaching the app,
-// so this one is derived: `Record` over the keys of the prop type above makes it
-// exhaustive in BOTH directions — a callback declared and not listed fails to compile, and a name
-// listed and not declared fails too.
-//
-// IT LIVES IN A SOURCE FILE ON PURPOSE. The same check written inside the test that consumes it
-// would never run: every package tsconfig excludes `*.test.ts`, the root config is an empty
-// references shell, and vitest strips types without checking them — so a type-level oracle in a
-// test file is inert in this repo. Here `pnpm typecheck` is what enforces it.
-//
-// The accessibility/aria mixin's own `on*` callbacks are subtracted: they belong to every
-// primitive rather than to this one, and the boolean gate they ride has its own oracle
-// (`core/engine/src/__tests__/gated-event-props.test.ts`).
+// The callback surface as a value, so a test can enumerate it instead of restating it.
+// It is a source file because typecheck skips tests, `Record` keeps it exhaustive both ways
+// The aria mixin callbacks are subtracted, `gated-event-props.test.ts` is their oracle
 type ITextInputOwnCallback = Exclude<
   Extract<keyof ITextInputProps, `on${string}`>,
   Extract<keyof (IAccessibilityProps & IAriaProps), `on${string}`>
@@ -224,6 +232,8 @@ export type ITextInputHandle = {
   clear(): void;
   isFocused(): boolean;
   setSelection(start: number, end: number): void;
+  // RN's `getNativeRef`: the native instance the input renders to
+  getNativeRef(): ISymbioteNode;
   // Forwarded from the engine node, so a TextInput ref is not poorer than any other host ref.
   measure(callback: IMeasureOnSuccess): void;
   measureInWindow(callback: IMeasureInWindowOnSuccess): void;

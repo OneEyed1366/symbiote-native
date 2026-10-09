@@ -39,6 +39,7 @@ function createRoutingStub(calls: string[]): IScrollRoutingHandle {
     getScrollableNode: () => fakeScrollHandle,
     getScrollResponder: () => fakeScrollHandle,
     getScrollNode: () => null,
+    getScrollRef: () => null,
     recordInteraction: () => calls.push('recordInteraction'),
   };
 }

@@ -4,22 +4,22 @@
 // both live here so every adapter inherits the exact same surface. The adapter only attaches these
 // statics onto its component value and nests the feedback View under its Pressable.
 
-import { Platform } from '@symbiote-native/engine';
+import { Platform, type IColorValue } from '@symbiote-native/engine';
 
 // The two background dict shapes RN's static factories produce. A discriminated union on `type`
 // so a caller narrows without a cast.
-export interface IThemeAttrBackground {
+export type IThemeAttrBackground = {
   type: 'ThemeAttrAndroid';
   attribute: 'selectableItemBackground' | 'selectableItemBackgroundBorderless';
   rippleRadius?: number;
-}
+};
 
-export interface IRippleBackground {
+export type IRippleBackground = {
   type: 'RippleAndroid';
-  color: string | null;
+  color: IColorValue | null;
   borderless: boolean;
   rippleRadius?: number;
-}
+};
 
 export type INativeFeedbackBackground =
   IThemeAttrBackground | IRippleBackground;
@@ -52,7 +52,7 @@ export function selectableBackgroundBorderless(
 // RN runs the color through processColor here; we keep the string and the engine's Android rule
 // converts it (Java reads it with getInt, a string would fail). A null color is "no tint".
 export function rippleBackground(
-  color: string,
+  color: IColorValue,
   borderless: boolean,
   rippleRadius?: number,
 ): IRippleBackground {

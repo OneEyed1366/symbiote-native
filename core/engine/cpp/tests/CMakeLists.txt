@@ -139,6 +139,9 @@ foreach(module
   include_directories(${REACT_COMMON_DIR}/${module}/platform/cxx)
 endforeach()
 
+# The codegen'd spec (`FBReactNativeSpecJSI.h`) includes `ReactCommon/TurboModule.h` bare
+include_directories(${REACT_COMMON_DIR}/react/nativemodule/core)
+
 function(add_react_common_subdir relative_path)
   add_subdirectory(${REACT_COMMON_DIR}/${relative_path} ReactCommon/${relative_path})
 endfunction()
@@ -211,6 +214,13 @@ add_react_common_subdir(react/renderer/bridging)
 add_react_common_subdir(react/renderer/dom)
 add_react_common_subdir(react/renderer/uimanager)
 add_react_common_subdir(react/renderer/uimanager/consistency)
+# The native animated driver, the half of `Animated` a device runs in C++
+add_react_common_subdir(react/nativemodule/core)
+add_react_common_subdir(react/performance/cdpmetrics)
+add_react_common_subdir(react/renderer/viewtransition)
+add_react_common_subdir(react/renderer/animationbackend)
+add_react_common_subdir(react/renderer/scheduler)
+add_react_common_subdir(react/renderer/animated)
 
 # Yoga's own CMakeLists names the target `yogacore`; ReactCommon links it as `yoga`.
 if(TARGET yogacore AND NOT TARGET yoga)

@@ -13,14 +13,15 @@ import type {
   IAccessibilityProps,
   IAriaProps,
 } from '@symbiote-native/components';
+import type { IColorValue } from '@symbiote-native/engine';
 import type { IStyleProp, IViewStyle } from '../utils/styles';
 
-export interface IInputAccessoryViewProps
-  extends IAccessibilityProps, IAriaProps {
-  // The id a TextInput's inputAccessoryViewID points at to dock above its keyboard.
-  nativeID?: string;
-  backgroundColor?: string;
-  style?: IStyleProp<IViewStyle>;
-  className?: string;
-  children?: ReactNode;
-}
+export type IInputAccessoryViewProps = IAccessibilityProps &
+  IAriaProps & {
+    // The id a TextInput's inputAccessoryViewID points at to dock above its keyboard.
+    nativeID?: string;
+    backgroundColor?: IColorValue;
+    style?: IStyleProp<IViewStyle>;
+    className?: string;
+    children?: ReactNode;
+  };

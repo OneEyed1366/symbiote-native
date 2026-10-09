@@ -7,6 +7,7 @@ export {
   REFRESH_CONTROL,
   SCROLL_VIEW_TAG,
 } from './shared';
+export type { IInnerViewRef } from './inner-view-ref';
 // The tag, so a test can locate a committed sticky wrapper by what the engine was TOLD rather than
 // by a key its tag rule writes — see `ILiveNode.tagName`.
 export { STICKY_HEADER_TAG } from './sticky';

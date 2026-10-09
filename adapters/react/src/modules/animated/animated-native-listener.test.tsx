@@ -1,42 +1,21 @@
-// React-driven test proving that a JS listener on a NATIVE-driven value still fires.
-// While native owns the frames the
-// JS value never changes per-frame, so addListener on a native value must ask native to stream
-// updates back (onAnimatedValueUpdate on the device bus) and route them to the JS listener. We
-// inject a device-event source (exactly how a real app wires RN's DeviceEventEmitter), make a value
-// native, add a listener, emit a native update, and assert the listener fires and the JS value
-// syncs. Removing the last listener must stop native streaming.
+// A JS listener on a native-driven value still fires: `addListener` asks native to stream updates
+// back as `onAnimatedValueUpdate` on RN's device bus and routes them to the listener
+// Removing the last listener stops the stream
 
 import { type ReactElement } from 'react';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount, Animated } from '@symbiote-native/react';
-import { setDeviceEventSource } from '@symbiote-native/engine';
-import { installRecordingFabric } from '@symbiote-native/test-utils';
-
-// ---- injected device-event source (the app's RN DeviceEventEmitter stand-in) ----
-
-const deviceListeners = new Map<string, Set<(payload: unknown) => void>>();
-setDeviceEventSource({
-  addListener(eventType: string, listener: (payload: unknown) => void) {
-    const set = deviceListeners.get(eventType) ?? new Set();
-    deviceListeners.set(eventType, set);
-    set.add(listener);
-    return {
-      remove: () => {
-        set.delete(listener);
-      },
-    };
-  },
-});
-function emitDevice(eventType: string, payload: unknown): void {
-  deviceListeners.get(eventType)?.forEach(listener => listener(payload));
-}
+import {
+  emitRnDeviceEvent,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 
 // ---- fake NativeAnimatedTurboModule (records calls) ----------------------
 
-interface INativeCall {
+type INativeCall = {
   method: string;
   args: unknown[];
-}
+};
 const nativeCalls: INativeCall[] = [];
 
 function record(method: string): (...args: unknown[]) => void {
@@ -68,6 +47,8 @@ const fakeNativeAnimated = {
   getValue: record('getValue'),
   addAnimatedEventToView: record('addAnimatedEventToView'),
   removeAnimatedEventFromView: record('removeAnimatedEventFromView'),
+  addListener: record('addListener'),
+  removeListeners: record('removeListeners'),
 };
 Object.assign(globalThis, {
   nativeModuleProxy: { NativeAnimatedTurboModule: fakeNativeAnimated },
@@ -128,7 +109,7 @@ describe('Animated native value listener', () => {
     ).toBe(true);
 
     // native reports a mid-flight value via the device bus -> the JS listener fires
-    emitDevice('onAnimatedValueUpdate', { tag: valueTag, value: 0.5 });
+    emitRnDeviceEvent('onAnimatedValueUpdate', { tag: valueTag, value: 0.5 });
     expect(received).toBe(0.5);
     expect(opacity.__getValue()).toBe(0.5);
 
@@ -141,7 +122,47 @@ describe('Animated native value listener', () => {
     ).toBe(true);
 
     received = undefined;
-    emitDevice('onAnimatedValueUpdate', { tag: valueTag, value: 0.9 });
+    emitRnDeviceEvent('onAnimatedValueUpdate', { tag: valueTag, value: 0.9 });
     expect(received).toBeUndefined();
+  });
+
+  // На iOS `RCTEventEmitter` не шлёт событие без счётчика наблюдателей, RN передаёт ему модуль
+  it('pings the module observe counters around the shared device subscription', () => {
+    const node = new Animated.Value(0, { useNativeDriver: true });
+    node.__attach();
+    const listenerId = node.addListener(() => {});
+    expect(callsOf('addListener')).toHaveLength(1);
+
+    node.removeListener(listenerId);
+    expect(callsOf('removeListeners')).toHaveLength(1);
+    node.__detach();
+  });
+
+  // RN's `AnimatedValue-test` "listeners added after re-attach": detach drops the old listeners
+  it('streams to a listener added after a detach and re-attach, not to the old one', () => {
+    const node = new Animated.Value(0, { useNativeDriver: true });
+    node.__attach();
+    const callbackA = vi.fn();
+    node.addListener(callbackA);
+    emitRnDeviceEvent('onAnimatedValueUpdate', {
+      tag: node.__getNativeTag(),
+      value: 123,
+      offset: 50,
+    });
+    expect(callbackA).toHaveBeenCalledTimes(1);
+
+    node.__detach();
+    expect(callsOf('dropAnimatedNode')).toHaveLength(1);
+
+    const callbackB = vi.fn();
+    node.__attach();
+    node.addListener(callbackB);
+    emitRnDeviceEvent('onAnimatedValueUpdate', {
+      tag: node.__getNativeTag(),
+      value: 456,
+      offset: 60,
+    });
+    expect(callbackA).toHaveBeenCalledTimes(1);
+    expect(callbackB).toHaveBeenCalledTimes(1);
   });
 });

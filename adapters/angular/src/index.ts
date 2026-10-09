@@ -36,12 +36,15 @@ export {
   Text,
   TouchableNativeFeedback,
   View,
+  injectVirtualizedListScope,
   VirtualizedList,
   VirtualizedSectionList,
+  VListCellDirective,
   VListEmptyDirective,
   VListFooterDirective,
   VListHeaderDirective,
   VListItemDirective,
+  VListOutletDirective,
   VListSeparatorDirective,
   VSectionFooterDirective,
   VSectionHeaderDirective,
@@ -49,11 +52,8 @@ export {
   VSectionSeparatorDirective,
 } from './components';
 export { Animated } from './modules/animated';
-// Also exposed as named top-level symbols (not just Animated.View/.Text/...): ngtsc's partial-mode
-// static evaluator can't trace a component class through property access on an external
-// namespace object, only through a direct named import binding —
-// so `<AnimatedView>` in a template requires `import { AnimatedView } from '@symbiote-native/angular'`,
-// not `const AnimatedView = Animated.View`. Plain tsc/vitest don't catch this; only a real ngc run does.
+// Named top-level too, as the ngtsc static evaluator cannot trace `Animated.View` property access
+// A template tag like `<AnimatedView>` needs a direct import, only a real ngc run catches it
 export {
   AnimatedFlatList,
   AnimatedImage,
@@ -62,15 +62,9 @@ export {
   AnimatedText,
   AnimatedView,
 } from './modules/animated';
-// Exported even though Angular's version maps only the four primitives (View/Text/Image/
-// ScrollView) onto the pre-authored wrappers above and THROWS on anything else — there is no JIT
-// under AOT/Metro, so it cannot synthesize a wrapper at runtime the way the other four adapters
-// do. It ships anyway because portable code (`createAnimatedComponent(View)`) then compiles and
-// runs identically on all five adapters, and the one case Angular cannot serve fails with a
-// message naming the fix (author a standalone @Component over AnimatedComponentBase) instead of
-// failing as a missing export, which names nothing. Found by the barrel audit in
-// `.claude/rules/adapter-parity-audit.md`: it was implemented and tested here all along and simply
-// never reached this file, so `@symbiote-native/angular` consumers could not reach it at all.
+// Maps only View/Text/Image/ScrollView onto the wrappers above and throws on anything else (no JIT)
+// Portable `createAnimatedComponent(View)` still runs on all five adapters, and the error names
+// the fix: a standalone `@Component` over `AnimatedComponentBase`
 export { createAnimatedComponent } from './modules/animated';
 export type {
   IActivityIndicatorProps,
@@ -78,6 +72,7 @@ export type {
   IAngularImageBackgroundProps,
   IAngularInputAccessoryViewProps,
   IAngularKeyboardAvoidingViewProps,
+  IAngularLayoutConformanceProps,
   IAngularModalProps,
   IAngularPressableProps,
   IAngularRefreshControlProps,
@@ -101,6 +96,7 @@ export type {
   IImageSourceProp,
   IInputMode,
   IKeyboardAvoidingBehavior,
+  ILayoutConformanceMode,
   IModalAnimationType,
   IModalOrientation,
   IModalOrientationChangeEvent,
@@ -119,6 +115,7 @@ export type {
   IViewabilityConfigCallbackPair,
   IViewableItemsChangedInfo,
   IViewToken,
+  IListScope,
   IVirtualizedListHandle,
   IVirtualizedListProps,
   IVirtualizedSectionListHandle,
@@ -127,6 +124,7 @@ export type {
   IVListSeparatorContext,
   IVSectionContext,
   IVSectionItemContext,
+  IVSectionSeparatorContext,
   ISection,
   ISwitchProps,
   ISwitchTrackColor,
@@ -156,6 +154,7 @@ export {
   PressableElement,
   RefreshControlElement,
   SafeAreaViewElement,
+  LayoutConformanceElement,
   ScrollContentElement,
   ScrollViewElement,
   StickyHeaderElement,
@@ -190,12 +189,8 @@ export { mount, unmount } from './render';
 // without hand-writing its own Renderer2 walker.
 export { DescriptorOutlet } from './descriptor-to-angular';
 export { DescriptorHost } from './descriptor-to-angular/descriptor-host';
-// createPortal (same-surface only — see the file header) and createTunnel (cross-surface,
-// see its file header) are the Angular twins of the React/Vue portal/tunnel primitives.
-// Angular can't synthesize components at runtime (no JIT under Metro/Hermes), so both are
-// static, pre-authored structural directives (`*portal`/`*tunnelIn`, the `*ngIf`/`*ngFor`
-// idiom) parameterized by an `@Input()`, rather than a factory returning fresh components per
-// call.
+// Twins of the React/Vue portal and tunnel: same-surface portal, cross-surface tunnel
+// No JIT under Metro/Hermes, so both are pre-authored structural directives (`*portal`/`*tunnelIn`)
 export { PortalDirective, PortalOutletDirective } from './create-portal';
 export {
   createTunnel,
@@ -215,9 +210,14 @@ export { StatusBar } from './modules/status-bar';
 export type { IStatusBarProps, IStatusBarStyle } from './modules/status-bar';
 // AppRegistry: RN's app entry point over `mount`. setHostRegistrar wires RN's own
 // registrar so the native Fabric host finds our runnable by app key.
-export { AppRegistry, setHostRegistrar } from './modules/app-registry';
+export {
+  AppRegistry,
+  HeadlessJsTaskError,
+  setHostRegistrar,
+} from './modules/app-registry';
 export type {
   IComponentProvider,
+  IAppConfig,
   IAppParameters,
   IRunnable,
   IHostRegistrar,
@@ -238,6 +238,11 @@ export {
   connectWatchedSignal,
   PermissionsServiceBase,
 } from './services';
+export {
+  createAnimatedColor as injectAnimatedColor,
+  createAnimatedValue as injectAnimatedValue,
+  createAnimatedValueXY as injectAnimatedValueXY,
+} from '@symbiote-native/engine';
 export { AccessibilityInputsBase } from './accessibility-inputs';
 export { NativeViewBase } from './native-view-base';
 export { anchorStyleProp } from './primitives/shared';
@@ -258,6 +263,7 @@ export {
   AppState,
   Keyboard,
   KEYBOARD_EVENT,
+  TextInputState,
   BackHandler,
   PermissionsAndroid,
   PERMISSIONS,
@@ -333,7 +339,6 @@ export {
   Platform,
   processColor,
   setColorProcessor,
-  setDeviceEventSource,
   setNativeViewConfigSource,
   StyleSheet,
 } from '@symbiote-native/engine';
@@ -381,3 +386,44 @@ export {
   setAngularProfileDetail,
 } from './diagnostics';
 export type { IAngularProfile, IAngularProfileDetail } from './diagnostics';
+
+// The device event bus and the easing curves, shared verbatim from the engine
+export {
+  DeviceEventEmitter,
+  Easing,
+  EventEmitter,
+  NativeAppEventEmitter,
+  NativeEventEmitter,
+} from '@symbiote-native/engine';
+export type {
+  IEasing,
+  IEasingFunction,
+  IEmitterSubscription,
+  IEventEmitter,
+  IEventEmitterModule,
+  IEventSubscription,
+  INativeEventListener,
+} from '@symbiote-native/engine';
+
+// RN's dev and native-module utilities, shared verbatim from the engine. The ones RN owns forward
+// to its own module, which `registerApp` hands over
+export {
+  codegenNativeCommands,
+  codegenNativeComponent,
+  DevMenu,
+  DevSettings,
+  LogBox,
+  NativeComponentRegistry,
+  NativeModules,
+  Networking,
+  PushNotificationIOS,
+  ReactNativeVersion,
+  registerCallableModule,
+  requireNativeComponent,
+  Systrace,
+  Touchable,
+  TurboModuleRegistry,
+  UIManager,
+  UTFSequence,
+} from '@symbiote-native/engine';
+export type { IDevSettings } from '@symbiote-native/engine';

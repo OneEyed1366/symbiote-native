@@ -37,7 +37,7 @@ const TOUCH_END = 'topTouchEnd';
 const TOUCH_IDENTIFIER = 1;
 const TERMINATION_REQUEST = 'responderTerminationRequest';
 
-// The frame slot.measure reports; undefined disables measure (the radius fallback path).
+// The frame slot.measure reports; undefined leaves the responder unmeasured, so nothing drifts
 let measuredFrame:
   { width: number; height: number; pageX: number; pageY: number } | undefined;
 
@@ -119,8 +119,7 @@ function terminationGate(handle: unknown): IListener | undefined {
 }
 
 describe('React Pressable on the engine', () => {
-  // why: a tap is the entire product contract of Pressable — start+end without enough drift to
-  // fall out of the retention region must fire exactly one onPress, never zero or more than one.
+  // A tap without enough drift to leave the retention region fires `onPress` exactly once
   it('synthesizes onPress on start + end', () => {
     let presses = 0;
     mount(
@@ -253,8 +252,7 @@ describe('React Pressable on the engine', () => {
     expect(firstOrder).toEqual(['in', 'press', 'out']);
   });
 
-  // why: RN's disabled Pressable must not claim the responder or fire feedback at all — a
-  // disabled control that still visually/behaviorally reacts is a real a11y and product bug.
+  // A disabled Pressable must not claim the responder or fire any feedback
   it('suppresses onPress when disabled', () => {
     let presses = 0;
     mount(
@@ -272,9 +270,7 @@ describe('React Pressable on the engine', () => {
     expect(presses).toBe(0);
   });
 
-  // why: RN's long-press is exclusive with a tap — a held press must fire onLongPress and
-  // must NOT also count as a completed onPress on release, but the machine must rearm so a
-  // later, separate quick tap still works (a stuck "already long-pressed" flag would be a bug).
+  // A held press fires `onLongPress` and no `onPress`, and the next quick tap must still work
   it('fires onLongPress once on a hold, suppresses the tap, and rearms for the next tap', () => {
     const DELAY = 500;
     let longPresses = 0;
@@ -308,9 +304,7 @@ describe('React Pressable on the engine', () => {
     expect(longPresses).toBe(1);
   });
 
-  // why: releasing before delayLongPress elapses is an ordinary tap, not a long-press — the
-  // timer must be cancelled on release, not merely ignored, or a later unrelated advance could
-  // still fire a long-press for an already-finished gesture.
+  // The timer is cancelled on release, so a later advance cannot long-press a finished gesture
   it('does not long-press on a release before the delay', () => {
     const DELAY = 500;
     let longPresses = 0;
@@ -330,11 +324,7 @@ describe('React Pressable on the engine', () => {
     expect(longPresses).toBe(0);
   });
 
-  // why: unrelated a11y props pass through untouched. The `accessibilityState.disabled` half of
-  // this case moved to `core/engine/cpp/tests/js/pressable-payload.itest.ts` — the fold is
-  // `foldPressableProps` in the engine now, and this harness builds its payload through the
-  // TypeScript `fabricProps`, which carries no copy of it. What is left is the half this harness
-  // can still answer: that React's renderer hands the authored props through to the commit.
+  // The `disabled` fold is `foldPressableProps`, asserted in `pressable-payload.itest.ts`
   it('passes a11y props through untouched', () => {
     mount(
       ROOT_TAG,
@@ -345,12 +335,7 @@ describe('React Pressable on the engine', () => {
     expect(props.testID).toBe('save-btn');
   });
 
-  // why: `button` is a TAG, so this is the arm that fails if the registration is dropped — an
-  // unregistered `button` commits a bare view and nothing forwards the label.
-  //
-  // `accessibilityRole`/`accessible`/`accessibilityState` are `foldButtonProps`'s now, and this
-  // harness's `fabricProps` holds no copy — asserted in `button-payload.itest.ts`.
-  // `accessibilityLabel` is a plain forward, proving the registration is live.
+  // Fails if the `button` registration is dropped, role and state live in `button-payload.itest.ts`
   it('gives button its a11y label through the registration', () => {
     mount(
       ROOT_TAG,
@@ -383,6 +368,7 @@ describe('React Pressable on the engine', () => {
     const handle = responderHandle();
 
     // (a) small drift inside the retention region -> press still fires on release.
+    measuredFrame = { width: 20, height: 20, pageX: 95, pageY: 95 };
     fireAt(handle, TOUCH_START, 100, 100);
     fireAt(handle, TOUCH_MOVE, 108, 106); // hypot(8,6) = 10 < 30 -> retained
     fireAt(handle, TOUCH_END, 108, 106);
@@ -403,9 +389,7 @@ describe('React Pressable on the engine', () => {
     expect(presses).toBe(0);
   });
 
-  // why: unstable_pressDelay exists so a fast swipe-through doesn't flash every Pressable it
-  // crosses as "pressed" — pressIn must wait for the delay, but a release before the delay
-  // elapses must still flush the deferred press rather than silently dropping the tap.
+  // `pressIn` waits for `unstable_pressDelay`, an early release still flushes the deferred press
   it('defers the pressed state with unstable_pressDelay', () => {
     const DELAY = 120;
     let pressIns = 0;
@@ -489,9 +473,7 @@ describe('React Pressable on the engine', () => {
     fire(handle, 'topTouchCancel');
   });
 
-  // why: pressRetentionOffset can be set per-edge (not just a uniform radius) — the drift test
-  // must measure against the real per-edge frame, not a symmetric approximation, or an
-  // asymmetric layout (e.g. a wide short button) would retain/drop on the wrong side.
+  // `pressRetentionOffset` is per-edge, so drift is judged against the measured frame
   it('tests the measured rect per-edge (asymmetric) for retention', () => {
     measuredFrame = { width: 100, height: 40, pageX: 0, pageY: 0 };
     let presses = 0;
@@ -529,10 +511,7 @@ describe('React Pressable on the engine', () => {
     expect(presses).toBe(0);
   });
 
-  // why: cancelable={false} means "I refuse to yield the responder to a parent (e.g. a
-  // ScrollView) that asks to take over" — the wiring must actually attach a gate function that
-  // returns false, not merely accept the prop (buildPressableListeners is already unit-tested at
-  // core; this proves the adapter threads its result onto the real responder node).
+  // `cancelable={false}` refuses to yield the responder to a parent such as a ScrollView
   it('registers a termination gate returning false for cancelable={false}', () => {
     mount(ROOT_TAG, <pressable cancelable={false} onPress={() => {}} />);
     const gate = terminationGate(responderHandle());
@@ -540,8 +519,7 @@ describe('React Pressable on the engine', () => {
     expect(gate!({ nativeEvent: {} })).toBe(false);
   });
 
-  // why: cancelable={true} is the explicit opposite of the case above — the gate must still be
-  // attached (not omitted, which would defer to RN's own default) and must resolve to true.
+  // The explicit opposite: the gate is still attached and resolves to true
   it('registers a termination gate returning true for cancelable', () => {
     mount(ROOT_TAG, <pressable cancelable onPress={() => {}} />);
     const gate = terminationGate(responderHandle());
@@ -549,25 +527,15 @@ describe('React Pressable on the engine', () => {
     expect(gate!({ nativeEvent: {} })).toBe(true);
   });
 
-  // why: leaving `cancelable` unset must leave RN's own native default in charge — FORCING an
-  // answer would override that default with our own opinion.
-  //
-  // Asserted on the ANSWER, not on the listener's presence, and the change is a shape-vs-capability
-  // correction rather than a relaxation. The wrapper omitted the listener entirely; the behavior
-  // installs ONE dispatcher per owned event at attach — it has to, since the machine needs the slot
-  // before any gesture can start — and that dispatcher returns `undefined` when no inner gate was
-  // built. Undefined is exactly what an absent listener yields to the engine, so the capability is
-  // unchanged and only the shape moved (`.claude/rules/adapter-parity-audit.md`, "phrase a parity
-  // oracle as a CAPABILITY"). A presence check here would now report a correct adapter as broken.
+  // An unset `cancelable` leaves RN's native default in charge, so no answer is forced
+  // Asserted on the answer, since the behavior always installs one dispatcher
   it('forces no termination answer when cancelable is unset (RN implicit yes)', () => {
     mount(ROOT_TAG, <pressable onPress={() => {}} />);
     const gate = terminationGate(responderHandle());
     expect(gate?.({ nativeEvent: {} })).toBeUndefined();
   });
 
-  // why: onPressMove is a distinct RN callback from the retention drift bookkeeping above — it
-  // must fire on every responder move while the press is live, independent of whether the move
-  // stays inside or outside the retention region.
+  // `onPressMove` fires on every move while live, whether or not it stays in the retention region
   it('fires onPressMove on every responder move while the press is live', () => {
     let moves = 0;
     mount(
@@ -587,12 +555,7 @@ describe('React Pressable on the engine', () => {
     expect(moves).toBe(2);
   });
 
-  // why: android_ripple (core/components' rippleProps) is gated on Platform.OS === 'android' and
-  // must be a no-op elsewhere (RN Pressable.js: "inert on iOS") — this proves the adapter does
-  // NOT wrap the child in an extra ripple View when the platform gate is closed, rather than
-  // assuming the gate works from reading the source. Headless vitest resolves Platform.OS to
-  // 'ios' (core/engine/src/platform/index.ts has no Metro to pick .android — see that file's own
-  // comment), so this exercises the real "inert" branch, not a fake one.
+  // `android_ripple` is inert off Android, so no ripple View wraps the child (vitest runs as iOS)
   it('does not wrap the child in a ripple View for android_ripple on this (iOS-resolved) host', () => {
     mount(
       ROOT_TAG,
@@ -608,9 +571,5 @@ describe('React Pressable on the engine', () => {
     expect(rippleCarrier).toBeUndefined();
   });
 
-  // BOTH `accessible` CASES MOVED, as a pair:
-  // `core/engine/cpp/tests/js/pressable-payload.itest.ts`. Pressable.js:252 is the engine's rule
-  // now, and the opt-out case is the reason they had to travel together — `accessible: false` is
-  // what this harness produces whether or not any rule ran, so leaving it here would have kept a
-  // green case over a rule this file can no longer reach.
+  // Both `accessible` cases live in `pressable-payload.itest.ts`, the rule is the engine's
 });

@@ -1,59 +1,26 @@
-// The AnimatedProps leaf lifecycle every Animated.* wrapper needs: build a leaf from the current
-// props, swap it into the value graph, bind it to the committed node, and go native when asked.
-// Framework-agnostic on purpose - it knows nothing about hooks,
-// effects, change detection or reactivity, only the engine's own Animated primitives.
-//
-// WHY THIS LIVES IN THE ENGINE. It used to live four times, once per adapter (React's
-// create-animated-component.tsx, Vue's create-animated-component.ts, Svelte's
-// animated-props-runtime.ts, Angular's animated-leaf-binder.ts). Each re-derived the same policy,
-// and they drifted: only Svelte ever grew the rebuild guard below, after a day of device
-// debugging. React's `useMemo(..., [rest])` LOOKS like the same guard but is not - its
-// dependency is a fresh rest-destructured object every render - and Vue's `pendingLeaf === null`
-// answers "has render run yet", not "did anything change". A fix landing in one copy is exactly
-// what <adapters_reach_full_feature_parity> forbids: parity has to be structural.
-//
-// What stays in the adapter: WHEN to call reconcile (an effect, onUpdated, ngOnChanges, a $effect)
-// and HOW to find the host node (a ref, a ViewChild, a shim). Everything below is the same for all.
+// Жизненный цикл листа `AnimatedProps` для каждого Animated.* враппера: собрать лист из props,
+// вписать в граф значений, привязать к закоммиченному узлу и по запросу уйти в native
+// Адаптер решает КОГДА звать reconcile и КАК найти host node, остальное общее для всех
 
+import {
+  areCompositeKeysEqual,
+  createCompositeKeyForProps,
+  type ICompositeKey,
+} from './composite-key';
 import { AnimatedProps } from './props';
 import { dlog } from '../debug';
 import type { ISymbioteNode } from '../node';
 
-// Diagnostic-only, DEBUG-gated: a process-wide sequence number so every reconcile call across
-// every Animated.* instance in a log dump is individually identifiable and orderable.
+// Сквозной номер reconcile для лога, по нему различаются вызовы разных Animated.*
 let globalReconcileSeq = 0;
 
-// Per-key identity comparison, NOT deep equality. A style/handler/props object that is memoized
-// upstream stays `===` across ticks that did not touch it, which is what distinguishes "same
-// content" from a real change. Deep-comparing instead would walk live AnimatedNode graphs, which
-// are circular.
-//
-// The caller MUST pass a stored SNAPSHOT as `a` - see `lastProps` below. Handing this the same
-// live object on both sides compares it with itself and is unconditionally true.
-function shallowEqualProps(
-  a: Record<string, unknown>,
-  b: Record<string, unknown>,
-): boolean {
-  const aKeys = Object.keys(a);
-  const bKeys = Object.keys(b);
-  if (aKeys.length !== bKeys.length) return false;
-  for (const key of aKeys) {
-    if (a[key] !== b[key]) return false;
-  }
-  return true;
-}
-
-// Diagnostic-only. `style` here is a raw prop value, so it can be anything the caller wrote -
-// an object, an array of them, a class name, undefined. Read the field, do not assume a shape.
+// Только для лога: `style` тут сырой проп, поэтому читаем поле без допущений о форме
 function readTransform(style: unknown): unknown {
   if (typeof style !== 'object' || style === null) return undefined;
   return Reflect.get(style, 'transform');
 }
 
-// Diagnostic-only: a SHALLOW, non-serializing description of a style.transform array. Props here
-// carry RAW values - an animated entry is a live AnimatedNode in a circular parent<->children
-// graph - so JSON.stringify throws "Converting circular structure to JSON". Describe by
-// constructor name instead of walking it.
+// Только для лога: описание `transform` без JSON, т.к. живой узел в графе циклический
 function describeTransform(value: unknown): string {
   if (!Array.isArray(value)) return String(value);
   const entries = value.map(entry => {
@@ -69,29 +36,21 @@ function describeTransform(value: unknown): string {
   return `[${entries.join(',')}]`;
 }
 
-// Runs the native half of a reconcile - `setNativeView` / `__makeNative` / event attach - at a
-// moment the CALLER chooses, returning a canceller for a run that has not happened yet. Angular
-// passes `bind => whenCommitted(node, bind)`, because under its batched zoneless change detection
-// the host's Fabric tag does not exist yet at ngAfterViewInit time. Everyone else omits it and the
-// native half runs inline.
-//
-// Only the NATIVE half is deferrable. Building the leaf and attaching it to the VALUE GRAPH always
-// happens synchronously, and that split is load-bearing: a deferred build would sit behind a
-// canceller that the next reconcile drops, so a component reconciling faster than it commits would
-// never attach anything at all - the sticky-header pin would stay at its resting value forever.
+// Нативная половина reconcile идёт в момент, который выбирает вызывающий, и отдаёт отмену
+// Angular передаёт `bind => whenCommitted(node, bind)`, т.к. тег вью есть только после коммита
+// Откладывается лишь нативная половина, сборка листа и граф значений идут синхронно
 export type IScheduleNativeBind = (bind: () => void) => (() => void) | void;
 
 export type IAnimatedLeafLifecycle = {
-  // Rebuild the leaf from `props`, swap it into the value graph (new before old), then bind it to
-  // `node` (null while the host has no node at all) and go native if `wantsNative`. An
-  // `Animated.event` prop is NOT bound here — it reaches `routeProp`. Call on every update.
+  // Пересобирает лист из `props`, вписывает новый в граф раньше старого и привязывает к `node`
+  // (null пока у хоста нет узла), при `wantsNative` уходит в native. Звать на каждое обновление
   reconcile(
     props: Record<string, unknown>,
     node: ISymbioteNode | null,
     wantsNative: boolean,
     scheduleNativeBind?: IScheduleNativeBind,
   ): void;
-  // Detach the last-attached leaf. Call once, on unmount.
+  // Отцепляет последний лист, звать один раз при unmount
   teardown(): void;
 };
 
@@ -99,95 +58,64 @@ export function createAnimatedLeafLifecycle(
   label: string,
 ): IAnimatedLeafLifecycle {
   let attached: AnimatedProps | null = null;
-  // Diagnostic-only: the last node identity, plus a reentrancy flag to catch reconcile() being
-  // called AGAIN from inside its own call stack - the smoking-gun shape for a synchronous
-  // same-flush loop, as opposed to merely "called often".
+  // Только для лога: прошлый узел и признак повторного входа в reconcile из его же стека
   let lastNode: ISymbioteNode | null = null;
-  let inReconcile = false;
-  // Last-seen props/wantsNative for the skip below - a real content check, not diagnostics.
-  let lastProps: Record<string, unknown> | null = null;
+  let isInReconcile = false;
+  // Прошлый ключ props и флаг native для пропуска ниже
+  let lastKey: ICompositeKey | null = null;
+  let hasLastKey = false;
   let lastWantsNative = false;
-  // Canceller for a native bind the caller deferred and that has not run yet.
+  // Отмена нативной привязки, которую вызывающий отложил и которая ещё не прошла
   let cancelPendingBind: (() => void) | undefined;
 
   return {
     reconcile(props, node, wantsNative, scheduleNativeBind): void {
       const seq = ++globalReconcileSeq;
-      const reentrant = inReconcile;
-      const nodeChanged = node !== lastNode;
-      const wantsNativeChanged = wantsNative !== lastWantsNative;
-      const propsChanged =
-        lastProps === null || !shallowEqualProps(lastProps, props);
+      const isReentrant = isInReconcile;
+      const hasNodeChanged = node !== lastNode;
+      const hasWantsNativeChanged = wantsNative !== lastWantsNative;
+      const compositeKey = createCompositeKeyForProps(props);
+      const havePropsChanged =
+        !hasLastKey || !areCompositeKeysEqual(lastKey, compositeKey);
       lastNode = node;
       lastWantsNative = wantsNative;
-      // A SNAPSHOT, never the reference. A caller can legitimately hand back the SAME object on
-      // every update, mutating what its keys resolve to rather than allocating (Svelte's rest
-      // proxy does exactly that, device-confirmed); storing it would make the next
-      // call run shallowEqualProps on that object against ITSELF - reading the same current values
-      // through both sides - which is unconditionally true. `propsChanged` could then never be
-      // true again and reconcile would be skipped forever, so every rebuilt AnimatedInterpolation
-      // never reaches the native graph: the view stays wired to the FIRST interpolation, built
-      // before measurement with range [-1,0]->[0,0]. One pixel of travel, which on device reads as
-      // "the sticky header ignores scrolling entirely".
-      lastProps = { ...props };
-      // Thunk, not a string: reconcile runs on EVERY update of every Animated.* wrapper in the
-      // app (Angular re-reads it on each change-detection pass), and describeTransform allocates.
-      // Built eagerly it would cost its full price with logging off.
+      // Храним ключ, а не props: Svelte отдаёт один объект и меняет его на месте
+      lastKey = compositeKey;
+      hasLastKey = true;
+      // Thunk: reconcile идёт на каждое обновление, а `describeTransform` аллоцирует
       dlog(
         () =>
-          `AnimatedProps[${label}] reconcile#${seq} reentrant=${reentrant} wantsNative=${wantsNative} ` +
-          `hasNode=${node !== null} nodeChanged=${nodeChanged} propsChanged=${propsChanged} ` +
+          `AnimatedProps[${label}] reconcile#${seq} reentrant=${isReentrant} wantsNative=${wantsNative} ` +
+          `hasNode=${node !== null} nodeChanged=${hasNodeChanged} propsChanged=${havePropsChanged} ` +
           `transform=${describeTransform(readTransform(props.style))}`,
       );
-      if (reentrant) {
+      if (isReentrant) {
         dlog(
           `AnimatedProps[${label}] reconcile#${seq} *** RE-ENTRANT CALL DETECTED - see reconcile above ***`,
         );
       }
-      // Nothing meaningfully changed since the last call AND we are already natively connected
-      // (steady state) - skip tearing down and rebuilding the native AnimatedProps graph.
-      //
-      // Deliberately scoped to `attached.__isNative()` ONLY: before the first native connection,
-      // reconcile must run unconditionally on every tick - that cadence is what wires a rebuilt
-      // interpolation node into the shared value's children (AnimatedInterpolation.__attach ->
-      // parent.__addChild, cascaded from AnimatedProps.__attach); skipping there can leave a
-      // freshly rebuilt interpolation never attached, so its listener never fires. Once native and
-      // staying native, that bootstrap concern is moot - and rebuilding there was the
-      // collision-disappearance bug: every scroll-driven passthrough tick reconnected a brand new
-      // native node (restoreDefaultValues + connect) even though nothing animated-relevant had
-      // changed, and a reconnect landing exactly when scrolling stopped left the view frozen at
-      // its post-reset default until the next tick.
-      if (
-        attached !== null &&
-        attached.__isNative() &&
-        !nodeChanged &&
-        !wantsNativeChanged &&
-        !propsChanged
-      ) {
+      // Пропуск только для уже нативного листа: до первой нативной привязки reconcile идёт
+      // каждый раз, иначе пересобранная интерполяция не попадёт в детей общего значения
+      const isUnchanged =
+        !hasNodeChanged && !hasWantsNativeChanged && !havePropsChanged;
+      if (attached !== null && attached.__isNative() && isUnchanged) {
         dlog(
           `AnimatedProps[${label}] reconcile#${seq} skipped (no-op: already native, props/node unchanged)`,
         );
+        attached.refreshStatics(props);
         return;
       }
-      inReconcile = true;
+      isInReconcile = true;
       try {
-        // Attach the NEW leaf BEFORE detaching the OLD one: a shared Value self-detaches (dropping
-        // its native node) the instant its child count hits zero, so detaching first would kill a
-        // running native animation on any unrelated update. Mirrors RN's
-        // AnimatedComponent._attachProps.
+        // Новый лист вписываем ДО отцепления старого: у общего значения без детей нативный узел
+        // сам отцепляется, и бегущая анимация гибнет
         const newLeaf = new AnimatedProps(props);
         newLeaf.__attach();
         if (attached !== null && attached !== newLeaf) attached.__detach();
         attached = newLeaf;
 
-        // The native half, which a caller may defer.
-        //
-        // It used to native-attach every `Animated.event` prop here as well. It must not any more:
-        // a wrapper hands those same props DOWN to a host element, so they reach `routeProp`,
-        // which binds them itself (`host-binding.ts`, `bindAnimatedEvent`) — that is what makes a
-        // bare `<scroll-view onScroll={…} />` work with no wrapper at all. Doing it here too
-        // registered the SAME mapping twice on one view tag, caught by the Vue and Svelte
-        // wrapper tests the day the engine half landed.
+        // События `Animated.event` тут не привязываем: они идут вниз в `routeProp` с props
+        // и привязываются там, двойная привязка вешала один маппинг дважды
         const bindNative = (): void => {
           if (node !== null) newLeaf.setNativeView(node);
           if (wantsNative) newLeaf.__makeNative();
@@ -201,7 +129,7 @@ export function createAnimatedLeafLifecycle(
         }
         cancelPendingBind = scheduleNativeBind(bindNative) ?? undefined;
       } finally {
-        inReconcile = false;
+        isInReconcile = false;
       }
     },
     teardown(): void {

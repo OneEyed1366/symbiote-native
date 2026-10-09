@@ -6,29 +6,9 @@
 // `Animated.timing(new Animated.Value(0), …).start()`, works against the Angular-driven engine.
 
 import {
-  AnimatedValue,
-  AnimatedValueXY,
-  AnimatedColor,
+  AnimatedDrivers,
   AnimatedMock,
-  Easing,
   Platform,
-  timing,
-  spring,
-  decay,
-  parallel,
-  sequence,
-  stagger,
-  loop,
-  delay,
-  add,
-  subtract,
-  multiply,
-  divide,
-  modulo,
-  diffClamp,
-  event,
-  forkEvent,
-  unforkEvent,
 } from '@symbiote-native/engine';
 import {
   AnimatedFlatList,
@@ -61,37 +41,12 @@ export {
 // components exist. Angular still cannot synthesize arbitrary animated wrappers at runtime; custom
 // animated components remain explicit standalone components over AnimatedComponentBase.
 
-// The live, JS-driven driver namespace (real frames). RN's AnimatedImplementation.
-const liveDrivers = {
-  Value: AnimatedValue,
-  ValueXY: AnimatedValueXY,
-  Color: AnimatedColor,
-  Easing,
-  timing,
-  spring,
-  decay,
-  parallel,
-  sequence,
-  stagger,
-  loop,
-  delay,
-  add,
-  subtract,
-  multiply,
-  divide,
-  modulo,
-  diffClamp,
-  event,
-  forkEvent,
-  unforkEvent,
-};
-
 // RN swaps the WHOLE driver namespace for the mock when the host reports isDisableAnimations
 // (reduced motion / test env): the mock keeps the same surface but jumps each animation to its
 // final value synchronously, no frames. The animated COMPONENTS are live in both branches; only
 // the drivers/value/operators/events half is swapped, exactly like RN spreading `...Animated`
 // (impl or mock) over the same components.
-const drivers = Platform.isDisableAnimations ? AnimatedMock : liveDrivers;
+const drivers = Platform.isDisableAnimations ? AnimatedMock : AnimatedDrivers;
 
 export const Animated = {
   View: AnimatedView,

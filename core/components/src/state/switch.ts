@@ -1,8 +1,5 @@
-// Switch: the logic half (framework-agnostic, zero render). Switch is controlled exactly
-// like RN's: `value` is a real Fabric prop the parent owns, so the only state the component
-// itself holds is what native LAST reported, kept so the lifecycle layer can detect a
-// rejected toggle and snap native back. The reducer + the two pure predicates here are the
-// whole state machine; the adapter supplies the hook (useReducer / ref / watch) around it.
+// Switch logic half, controlled like RN's: `value` is a Fabric prop, state is the last report
+// TODO(rn-port): RN's `Switch.js` keeps this machine inside a React component, nothing to import
 
 import type { ISymbioteEvent } from '@symbiote-native/engine';
 
@@ -23,9 +20,8 @@ export function switchReducer(
 ): ISwitchState {
   switch (action.type) {
     case 'native-reported':
-      // Always a fresh object, even when the boolean is unchanged from the prior report:
-      // the snap-back effect keys on state identity so it re-fires on every report (native
-      // may re-toggle to a value JS keeps rejecting, and must be commanded back each time).
+      // Always a fresh object, even when the boolean is unchanged from the prior report.
+      // The snap-back effect keys on state identity, so native is commanded back on every report
       return { lastNativeReport: action.value };
   }
 }

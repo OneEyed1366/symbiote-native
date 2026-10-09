@@ -88,7 +88,7 @@ describe('AnimatedValue — Positive (own API, no Fabric slot)', () => {
   // A driver that walks through `steps` synchronously and finishes.
   function steppingDriver(steps: number[]): IAnimation {
     return {
-      start(_from, onUpdate, onEnd): void {
+      start({ onUpdate, onEnd }): void {
         for (const step of steps) onUpdate(step);
         onEnd({ finished: true });
       },
@@ -115,7 +115,9 @@ describe('AnimatedValue — Positive (own API, no Fabric slot)', () => {
   it('animate() drives listeners through every intermediate step, then fires the end callback once', () => {
     const v = new AnimatedValue(0);
     const seen: number[] = [];
-    v.addListener(({ value: n }) => seen.push(n));
+    v.addListener(({ value: n }) => {
+      if (typeof n === 'number') seen.push(n);
+    });
     let endCount = 0;
     v.animate(steppingDriver([1, 2, 3]), () => {
       endCount += 1;

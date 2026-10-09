@@ -29,7 +29,7 @@
 // live-tree walk is needed for those either. `createLiveTree` is used only where the CLAIM is
 // genuinely about current tree shape — the root's child count and the serialized shape.
 import { defineComponent, h, ref } from '@vue/runtime-core';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   Modal,
   mount,
@@ -79,6 +79,42 @@ function mountModal(
     }),
   );
 }
+
+describe('Vue Modal dev warnings', () => {
+  afterEach(() => {
+    Reflect.deleteProperty(globalThis, '__DEV__');
+    vi.restoreAllMocks();
+  });
+
+  it('warns in a dev build about a prop combination RN cannot honour', async () => {
+    Reflect.set(globalThis, '__DEV__', true);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    mountModal({
+      visible: true,
+      transparent: true,
+      presentationStyle: 'pageSheet',
+    });
+    await tick();
+
+    expect(warn).toHaveBeenCalledWith(
+      "Modal with 'pageSheet' presentation style and 'transparent' value is not supported.",
+    );
+  });
+
+  it('stays quiet in a release build', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    mountModal({
+      visible: true,
+      transparent: true,
+      presentationStyle: 'pageSheet',
+    });
+    await tick();
+
+    expect(warn).not.toHaveBeenCalled();
+  });
+});
 
 describe('Vue Modal on the engine', () => {
   describe('Positive (a visible modal commits a faithful ModalHostView tree)', () => {

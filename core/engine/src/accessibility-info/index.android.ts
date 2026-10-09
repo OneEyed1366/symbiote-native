@@ -1,11 +1,6 @@
-// AccessibilityInfo on Android wraps the stock RN `AccessibilityInfo` native module
-// (NO native code added; it ships with react-native). Android's getters take a SINGLE
-// success callback (no error callback) and a different method set than iOS: screen-reader
-// is `isTouchExplorationEnabled`, plus reduce-motion / invert-colors / grayscale /
-// high-text-contrast / accessibility-service, and `getRecommendedTimeoutMillis`. The
-// device-event NAMES also differ from iOS (e.g. screen-reader is `touchExplorationDidChange`,
-// reduce-motion is `reduceMotionDidChange`). Metro picks this on an Android host. Mirrors
-// RN's AccessibilityInfo.js Android branches.
+// AccessibilityInfo on Android over the stock `AccessibilityInfo` native module
+// TODO(rn-port): a copy of RN's Android branches, RN's module imports `RendererProxy` for
+// `sendAccessibilityEvent`, which loads React's renderer, so a non-React adapter cannot use it
 
 import { createDeviceEventModule } from '../native-modules';
 import {
@@ -61,7 +56,7 @@ type IStateCallback = (enabled: boolean) => void;
 // and the recommended-timeout query. Optional methods guard older hosts. No error callback
 // and no setAccessibilityFocus: focus is a 'focus' accessibility event routed through the
 // Fabric slot (see sendAccessibilityEvent below).
-interface INativeAccessibilityInfoAndroid extends IEventEmitterModule {
+type INativeAccessibilityInfoAndroid = IEventEmitterModule & {
   isTouchExplorationEnabled(onSuccess: IStateCallback): void;
   isReduceMotionEnabled(onSuccess: IStateCallback): void;
   isInvertColorsEnabled?(onSuccess: IStateCallback): void;
@@ -75,7 +70,7 @@ interface INativeAccessibilityInfoAndroid extends IEventEmitterModule {
   ): void;
   addListener(eventType: string): void;
   removeListeners(count: number): void;
-}
+};
 
 // Lazily resolved so importing this module has no native side effect. `null` when
 // unlinked. The lazy-resolve + lazy-emitter shape lives in `createDeviceEventModule`
@@ -84,6 +79,8 @@ const deviceEventModule =
   createDeviceEventModule<INativeAccessibilityInfoAndroid>({
     moduleName: ACCESSIBILITY_MODULE,
     moduleLogPrefix: 'AccessibilityInfo(android): module',
+    // RN subscribes on the device bus directly, never through the module's observe counters
+    bindModuleToEmitter: false,
   });
 
 function getModule(): INativeAccessibilityInfoAndroid | null {
@@ -96,21 +93,18 @@ function getEmitter() {
 
 const MODULE_UNAVAILABLE = 'NativeAccessibilityInfoAndroid is not available';
 
-// Run a single-callback Android getter as a Promise, REJECTING when it cannot run, as RN does
-// (AccessibilityInfo.js): a required getter names the module, an optional one names itself.
+// Отклоняем, если геттер не запустить, как RN: по умолчанию ошибка называет метод,
+// обязательные геттеры передают свой текст
 function queryState(
   pick: (
     module: INativeAccessibilityInfoAndroid,
   ) => ((s: IStateCallback) => void) | undefined,
   label: string,
-  isOptional = false,
+  message = `NativeAccessibilityInfoAndroid.${label} is not available`,
 ): Promise<boolean> {
   const module = getModule();
   const getter = module === null ? undefined : pick(module);
   if (module === null || getter === undefined) {
-    const message = isOptional
-      ? `NativeAccessibilityInfoAndroid.${label} is not available`
-      : MODULE_UNAVAILABLE;
     dlog(`AccessibilityInfo(android).${label} -> rejected: ${message}`);
     return Promise.reject(new Error(message));
   }
@@ -125,11 +119,16 @@ class AccessibilityInfoAndroid implements IAccessibilityInfoStatic {
     return queryState(
       m => m.isTouchExplorationEnabled,
       'isScreenReaderEnabled',
+      MODULE_UNAVAILABLE,
     );
   }
 
   isReduceMotionEnabled(): Promise<boolean> {
-    return queryState(m => m.isReduceMotionEnabled, 'isReduceMotionEnabled');
+    return queryState(
+      m => m.isReduceMotionEnabled,
+      'isReduceMotionEnabled',
+      MODULE_UNAVAILABLE,
+    );
   }
 
   // iOS-only query; Android has no bold-text setting, so resolve false (RN parity).
@@ -138,15 +137,11 @@ class AccessibilityInfoAndroid implements IAccessibilityInfoStatic {
   }
 
   isGrayscaleEnabled(): Promise<boolean> {
-    return queryState(m => m.isGrayscaleEnabled, 'isGrayscaleEnabled', true);
+    return queryState(m => m.isGrayscaleEnabled, 'isGrayscaleEnabled');
   }
 
   isInvertColorsEnabled(): Promise<boolean> {
-    return queryState(
-      m => m.isInvertColorsEnabled,
-      'isInvertColorsEnabled',
-      true,
-    );
+    return queryState(m => m.isInvertColorsEnabled, 'isInvertColorsEnabled');
   }
 
   // iOS-only query; resolve false (RN parity).
@@ -158,7 +153,6 @@ class AccessibilityInfoAndroid implements IAccessibilityInfoStatic {
     return queryState(
       m => m.isHighTextContrastEnabled,
       'isHighTextContrastEnabled',
-      true,
     );
   }
 
@@ -176,7 +170,6 @@ class AccessibilityInfoAndroid implements IAccessibilityInfoStatic {
     return queryState(
       m => m.isAccessibilityServiceEnabled,
       'isAccessibilityServiceEnabled',
-      true,
     );
   }
 

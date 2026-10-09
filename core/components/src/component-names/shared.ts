@@ -55,6 +55,9 @@ export type ISymbioteIntrinsic =
   // The native spinner itself, built by the host's `buildStructure`.
   | 'activity-indicator-spinner'
   | 'safe-area-view'
+  // RN's `experimental_LayoutConformance`: a native wrapper whose `mode` picks the layout rules
+  // for its subtree, painted as `display: contents` so it takes no box of its own
+  | 'layout-conformance'
   | 'modal'
   | 'refresh-control'
   // The sticky-header wrapper RN builds in JS (ScrollViewStickyHeader.js): an ordinary view
@@ -74,10 +77,10 @@ export type ICrossTypedIntrinsics<
   Crossed extends Partial<Record<ISymbioteIntrinsic, unknown>>,
 > = Omit<Record<ISymbioteIntrinsic, LooseProps>, keyof Crossed> & Crossed;
 
-export interface IComponentDescriptor {
+export type IComponentDescriptor = {
   component: string;
   isText: boolean;
-}
+};
 
 // The only text-laying intrinsic; drives the RCTText / RCTVirtualText nesting choice
 // (a <Text> inside another <Text> becomes a virtual span). Platform-invariant, so it is

@@ -103,29 +103,33 @@ describe('what a button sends native', () => {
     expect(payload.touchSoundDisabled).toBe(undefined);
   });
 
+  // `accessibilityLabel={ariaLabel || accessibilityLabel}` (`Button.js:343`), `||` not `??`
+  it('falls back to accessibilityLabel for an empty aria-label', () => {
+    const payload = commit({
+      'aria-label': '',
+      accessibilityLabel: 'Save now',
+    }).payload;
+
+    expect(payload.accessibilityLabel).toBe('Save now');
+    expect(commit({ 'aria-label': 'Aria' }).payload.accessibilityLabel).toBe(
+      'Aria',
+    );
+  });
+
   // why: `color` is Button's own prop — it tints the LABEL on iOS and the view on Android — and is
   // consumed entirely by the derived folds. On the host node it is a key native does not know.
   it('keeps color off the host payload', () => {
     expect(commit({ color: '#ff0000' }).payload.color).toBe(undefined);
   });
 
-  // why: THE CONTROL for that strip, and the reason it is worth a case of its own. The engine's
-  // rule erases `color` from the PAYLOAD; the derived folds read it off the NODE. If a future change
-  // made the strip mutate the node's props instead, the label would silently lose its tint while
-  // every assertion above still passed.
+  // The strip erases `color` from the payload only, the derived folds read it off the node
   it('still tints the label from the color it stripped', () => {
     const payload = commit({ color: '#ff0000' }).payload;
     expect(payload.accessibilityRole).toBe('button');
     expect(payload.color).toBe(undefined);
   });
 
-  // why: THE PRICE, and it has read 4, then 3, then 1, then ZERO in three days. Off Android this
-  // primitive now binds no `payloadFold` on any of its four nodes.
-  //
-  // The last to go was the label text's, which needed `IAncestorLookup`: its style is a function of
-  // the BUTTON's `color` and `disabled` while its parent is the wrapping view, so `ownerProps` —
-  // which answers "my parent" — could not reach it. On Android the owner's fold survives for the
-  // view style and the ripple background.
+  // Off Android no node of the button binds a `payloadFold`, so a commit makes no trip into JS
   it('costs no trip into JS at all', () => {
     const one = commit({});
     print(`DEBUG button folds=${one.folds}`);
@@ -174,36 +178,24 @@ function focusableOf(
 const noop = (): void => {};
 
 describe('whether a button is a focus stop', () => {
-  // why: the ordinary case. A button with a handler is reachable by keyboard, TV remote and switch
-  // control; one without is decoration and must not be.
+  // A button with a handler is reachable by keyboard and remote, without one it is decoration
   it('is focusable with a handler and not without one', () => {
     expect(focusableOf({}, noop)).toBe(true);
     expect(focusableOf({})).toBe(false);
   });
 
-  // why: leg 3 in its plain form. A disabled button is not a focus stop, which is the difference
-  // between a control a screen reader skips and one it lands on to do nothing.
+  // A disabled button is skipped by a screen reader
   it('is not focusable while disabled', () => {
     expect(focusableOf({ disabled: true }, noop)).toBe(false);
   });
 
-  // why: THE REASON BUTTON CANNOT SHARE THE TOUCHABLE'S RULE. `aria-disabled` alone disables a
-  // button (`Button.js:337`), so it has to reach this expression — a rule reading only `disabled`
-  // would leave an aria-disabled button in the focus order.
+  // `aria-disabled` alone disables a button, a touchable rule reading only `disabled` misses it
   it('lets aria-disabled alone take it out of the focus order', () => {
     expect(focusableOf({ 'aria-disabled': true }, noop)).toBe(false);
   });
 
-  // why: and the third source, which is what an app writes when it is driving accessibility state
-  // directly rather than through the alias.
-  // why: the MERGE, which is the composition of TWO ported rules and therefore visible only here.
-  // RN keeps `busy`/`checked`/`expanded`/`selected` from the app's own composite and overrides only
-  // `disabled` (`Button.js:333-338`) — and nothing in `button.ts` does that: the engine's aria fold
-  // writes `disabled` from `aria-disabled` while preserving the other fields, and the pressable rule
-  // composes onto the result. That is the whole reason Button owes no `accessibilityState` fold of
-  // its own, so it is the claim that would silently break if either rule stopped preserving.
-  //
-  // Travelled from `core/components/src/behaviors/button.test.ts`, which could see neither rule.
+  // Two rules compose here (aria fold, pressable), so only this fixture sees both
+  // The other `accessibilityState` fields must survive the `disabled` rewrite
   it('merges aria-disabled into an authored accessibilityState, keeping its other fields', () => {
     const state = commit({
       accessibilityState: { busy: true },
@@ -221,23 +213,47 @@ describe('whether a button is a focus stop', () => {
     );
   });
 
-  // why: THE PRECEDENCE, and it is the case a `||` over the three gets wrong. `??` means an
-  // EXPLICIT `disabled: false` wins over an aria-disabled that says otherwise — the app's direct
-  // answer beats the accessibility hint, not the other way round.
+  // `??` not `||`: an explicit `disabled: false` beats `aria-disabled`
   it('lets an explicit disabled false beat aria-disabled', () => {
     expect(focusableOf({ disabled: false, 'aria-disabled': true }, noop)).toBe(
       true,
     );
   });
 
-  // why: leg 1. An app opting a button out of the focus order deliberately still gets its way, and
-  // `&&` means the opt-OUT is the one that cannot be overridden.
+  // The `disabled` prop overrides `accessibilityState.disabled` both ways and rewrites the state
+  // the button reports
+  it('lets the disabled prop override accessibilityState.disabled, both ways', () => {
+    const enabled = commit({
+      disabled: false,
+      accessibilityState: { disabled: true },
+    }).payload.accessibilityState;
+    const disabled = commit({
+      disabled: true,
+      accessibilityState: { disabled: false },
+    }).payload.accessibilityState;
+
+    expect(isRecord(enabled) && enabled.disabled).toBe(false);
+    expect(isRecord(disabled) && disabled.disabled).toBe(true);
+    expect(
+      focusableOf(
+        { disabled: false, accessibilityState: { disabled: true } },
+        noop,
+      ),
+    ).toBe(true);
+    expect(
+      focusableOf(
+        { disabled: true, accessibilityState: { disabled: false } },
+        noop,
+      ),
+    ).toBe(false);
+  });
+
+  // An explicit opt-out of focus cannot be overridden by a handler (`&&`)
   it('honours an explicit focusable false', () => {
     expect(focusableOf({ focusable: false }, noop)).toBe(false);
   });
 
-  // why: the flip after mount, which is the case a rule keyed on a listener has to survive. A
-  // button that becomes pressable when its form validates is an ordinary screen.
+  // A rule keyed on a listener has to survive the handler arriving after mount
   it('becomes a focus stop when the handler arrives late', () => {
     const surface = createSurface(ROOT_TAG);
     const node: ISymbioteNode = createElement('RCTView', false, 'button');

@@ -1,0 +1,199 @@
+# RN test ledger (reset 2026-10-07, after merging origin/develop)
+
+One line per RN test file under `.vendors/react-native/packages/{react-native/{Libraries,src},virtualized-lists}`
+(191 files, generated). `[ ]` not compared. Close a line as `[x] P <ours>` (ported), `[x] E <ours>` (already
+equals RN, cite our test) or `[x] N/A <reason>`. Edit in place, never delete a line.
+
+- [x] P `animated-scroll-driven.itest.ts` (`flattenOffset`, `extractOffset`, `onScroll` groups) `react-native/Libraries/Animated/__tests__/Animated-itest.js`
+- [x] P `animated-*-rn.test.ts`, `animations/animated-composition-rn.test.ts`, `host-binding.test.ts` (+ stops a running animation when its node leaves). DELIBERATE: RN defers detach / `__restoreDefaultValues` to a microtask after React unmount, our host releases on removal; `setNativeProps` bypass is a React test renderer detail `react-native/Libraries/Animated/__tests__/Animated-test.js`
+- [x] N/A web build of Animated (`Animated.web`), not shipped `react-native/Libraries/Animated/__tests__/Animated-web-test.js`
+- [x] P `animated-backend.itest.ts` `react-native/Libraries/Animated/__tests__/AnimatedBackend-itest.js`
+- [x] P `animated-backend-suspense.itest.ts` `react-native/Libraries/Animated/__tests__/AnimatedBackendSuspense-itest.js`
+- [x] E `animated-mock.test.ts` `react-native/Libraries/Animated/__tests__/AnimatedMock-test.js`
+- [x] E `animated-object.test.ts` `react-native/Libraries/Animated/__tests__/AnimatedObject-test.js`
+- [x] E `animated-end-to-end-rn.test.ts` (static props style), `leaf-lifecycle.test.ts` `react-native/Libraries/Animated/__tests__/AnimatedProps-test.js`
+- [x] P `animated-native-listener.test.tsx` (+ re-attach), `animated-value-native-driver.test.ts` `react-native/Libraries/Animated/__tests__/AnimatedValue-test.js`
+- [x] N/A we import RN's own implementation, so the test is RN's own `react-native/Libraries/Animated/__tests__/bezier-test.js`
+- [x] N/A we import RN's own implementation, so the test is RN's own `react-native/Libraries/Animated/__tests__/Easing-test.js`
+- [x] E `animated-interpolation-rn.test.ts` `react-native/Libraries/Animated/__tests__/Interpolation-test.js`
+- [x] E `animated-native-graph-rn.test.ts` (flag default off; `shouldUseAnimatedObjectForTransform` on is N/A, no feature flags) `react-native/Libraries/Animated/__tests__/NativeAnimatedAllowlist-test.js`
+- [x] E `animated-value-rn.test.ts` (61 frames, zero duration), `animated-end-to-end-rn.test.ts` `react-native/Libraries/Animated/__tests__/TimingAnimation-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/BatchedBridge/__tests__/MessageQueue-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/BatchedBridge/__tests__/NativeModules-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/Blob/__tests__/Blob-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/Blob/__tests__/BlobManager-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/Blob/__tests__/BlobRegistry-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/Blob/__tests__/File-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/Blob/__tests__/FileReader-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/Blob/__tests__/URL-test.js`
+- [x] P `Button-itest.js` → `button-rendered.android.itest.ts`
+- [x] E `Button-test.js` (9 snapshots): `button-payload.itest.ts` + `button-derived-payload.itest.ts`, aria-label case added
+- [x] P `accessibility-info-android.test.ts` (+ high text contrast, iOS-only getters false) + `accessibility-info-ios.test.ts` `react-native/Libraries/Components/AccessibilityInfo/__tests__/AccessibilityInfo-test.js`
+- [x] P `ActivityIndicator-itest.js` → `activity-indicator-rendered.android.itest.ts` (ref cases N/A: DOM API)
+- [x] E `ActivityIndicator-test.js`: displayName N/A (tag), render snapshot = `activity-indicator-payload.itest.ts`
+- [x] N/A (DrawerLayoutAndroid dropped, CLAUDE.md) `react-native/Libraries/Components/DrawerAndroid/__tests__/DrawerAndroid-test.js`
+- [x] P `keyboard.test.ts` (+ easing passthrough, unknown easing -> `keyboard`) `react-native/Libraries/Components/Keyboard/__tests__/Keyboard-test.js`
+- [x] P `pressable-rendered.android.itest.ts` (51; `ref`/DOM N/A) `react-native/Libraries/Components/Pressable/__tests__/Pressable-itest.js`
+- [x] P state cases in `pressable-rendered.android.itest.ts`, snapshots N/A `react-native/Libraries/Components/Pressable/__tests__/Pressable-test.js`
+- [x] N/A (ruling: ProgressBarAndroid extracted from RN core, not a SymbioteNative primitive) `react-native/Libraries/Components/ProgressBarAndroid/__tests__/ProgressBarAndroid-itest.js`
+- [x] P `safe-area-view-rendered.android.itest.ts` (view name differs by user ruling: insets on Android) `react-native/Libraries/Components/SafeAreaView/__tests__/SafeAreaView-itest.js`
+- [x] E `scroll-view-on-scroll.itest.ts` (deliver, batch per UI tick) `react-native/Libraries/Components/ScrollView/__tests__/ScrollView-itest.js`
+- [x] E ref / innerViewRef: `scroll-view-inner-view-ref.test.tsx`, `inner-view-ref.test.ts`, `scroll-view-imperative.test.ts` (the node itself carries `getInnerViewRef` + `measure*`); snapshots N/A `react-native/Libraries/Components/ScrollView/__tests__/ScrollView-test.js`
+- [x] E 49 RN cases matched by title to the 11 `scroll-view-view-culling*.itest.ts` files (basic / recursive / negative offset / deep / add / initial / unmount / smaller / outside / transforms x4 / Modal / FlatList / reparenting x~20 / opt-out x2 / overflow visible / RTL x2 / no layout) `react-native/Libraries/Components/ScrollView/__tests__/ScrollView-viewCulling-itest.js`
+- [x] E `status-bar-stack.test.ts` (first-flush defaults stand in for the `_defaultProps` reads); component props reads N/A `react-native/Libraries/Components/StatusBar/__tests__/StatusBar-test.js`
+- [x] N/A only the DOM tag name `RN:Switch`; behavior in `switch-payload.itest.ts` + `switch*.test.ts` `react-native/Libraries/Components/Switch/__tests__/Switch-itest.js`
+- [x] N/A snapshots of RN's own component names; behavior in `input-accessory-view.test.ts` `react-native/Libraries/Components/TextInput/__tests__/InputAccessoryView-test.js`
+- [x] P `text-input-rendered.android.itest.ts` (17; `ref`/DOM N/A; `onChangeText` string vs event is a user ruling) `react-native/Libraries/Components/TextInput/__tests__/TextInput-itest.js`
+- [x] P instance functions, onChange, focus / blur state, unfocus on second focus: `text-input.test.ts` + `text-input-rendered.android.itest.ts`; textContentType precedence: `text-input-payload.itest.ts`; snapshots N/A; `useTextChildren`: `text-input-text-children.test.*` in Vue / Solid / Svelte / Angular, React via the Android itest. OPEN: the value + children invariant `react-native/Libraries/Components/TextInput/__tests__/TextInput-test.js`
+- [x] P `touchable-highlight-rendered.android.itest.ts` (58; `ref` N/A, DOM) `react-native/Libraries/Components/Touchable/__tests__/TouchableHighlight-itest.js`
+- [x] P `touchable-native-feedback-rendered.android.itest.ts` (snapshots read from the tree) `react-native/Libraries/Components/Touchable/__tests__/TouchableNativeFeedback-test.js`
+- [x] P `touchable-opacity-rendered.android.itest.ts` (`ref` N/A, DOM) `react-native/Libraries/Components/Touchable/__tests__/TouchableOpacity-itest.js`
+- [x] P disabled snapshots as `touchable-opacity-rendered.android.itest.ts` + `touchable-payload.itest.ts`; `displayName` N/A `react-native/Libraries/Components/Touchable/__tests__/TouchableOpacity-test.js`
+- [x] P `touchable-without-feedback-rendered.android.itest.ts` (`ref` N/A, DOM) `react-native/Libraries/Components/Touchable/__tests__/TouchableWithoutFeedback-itest.js`
+- [x] P disabled snapshots as the "disabled state on the child" group in `touchable-without-feedback-rendered.android.itest.ts` `react-native/Libraries/Components/Touchable/__tests__/TouchableWithoutFeedback-test.js`
+- [x] N/A tests a Fantom-only helper, `getDefinedEventHandlers`; handler delivery in `pressable-click-events.itest.ts` `react-native/Libraries/Components/View/__tests__/FantomEventHandlers-itest.js`
+- [x] P style cases in `view-style-parity.itest.ts`; transform / `pointerEvents` / accessibility / `aria-*` + resets / id in `view-rendered.android.itest.ts` (29); `ref` N/A (DOM) `react-native/Libraries/Components/View/__tests__/View-itest.js`
+- [x] P `tabIndex` in `view-payload.itest.ts`, aria bag in `aria-payload.itest.ts` + `text-props-payload.itest.ts`; `displayName` N/A `react-native/Libraries/Components/View/__tests__/View-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/Core/__tests__/ExceptionsManager-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/Core/__tests__/ReactNativeVersionCheck-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/Core/Devtools/__tests__/loadBundleFromServer-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/Core/Devtools/__tests__/parseErrorStack-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/Core/Devtools/__tests__/parseHermesStack-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/Core/Timers/__tests__/JSTimers-test.js`
+- [x] N/A (RN's own `Image.resolveAssetSource` runs, injected by `bootstrapHost`) `react-native/Libraries/Image/__tests__/assetRelativePathInSnapshot-test.js`
+- [x] N/A (RN's own `AssetUtils` runs, same seam) `react-native/Libraries/Image/__tests__/AssetUtils-test.js`
+- [x] P `image-rendered.android.itest.ts` (37 on build-android, with the shared accessibility + testID suites); N/A in it: `require` asset, `ref`/DOM, statics (`image-loader.test.ts`)
+- [x] N/A snapshots of RN's jest mock and `ImageInjection` hooks (not exported from `react-native`); `getSize` mock case is `image-loader.test.ts`: `react-native/Libraries/Image/__tests__/Image-test.js`
+- [x] P `image-background-rendered.android.itest.ts` (3; `require` and `imageRef` N/A) `react-native/Libraries/Image/__tests__/ImageBackground-itest.js`
+- [x] E importantForAccessibility carried to the inner image: `image-background-image-payload.itest.ts`; snapshots N/A: `react-native/Libraries/Image/__tests__/ImageBackground-test.js`
+- [x] P srcSet / src precedence, headers, 1x fallback in `image-payload.itest.ts` + `image-rendered.android.itest.ts`; warnings: `image-source-write.test.ts` `warnOnBadSrcSet` (ADDED): `react-native/Libraries/Image/__tests__/ImageSourceUtils-test.js`
+- [x] N/A (RN's own resolver runs, see AssetUtils) `react-native/Libraries/Image/__tests__/resolveAssetSource-test.js`
+- [x] P `FlatList-itest.js` → `flat-list-rendered.android.itest.ts` (+ `flat-list-{behavior,layout,scroll-props}.itest.ts`); header wrapper view flattened by ruling 2026-10-06; `scrollToEnd` 400 not 1000 (onLayout reached JS)
+- [x] P `FlatList-test.js`: ListItemComponent cases → `flat-list-item-component.test.*` (5 adapters), data shapes → `flat-list-data-shapes.test.*`, getNativeScrollRef → `list-handle.test.ts`, snapshots = structure itest
+- [x] E every group as a vitest case in `adapters/react/src/components/section-list/*.test.*` (empty, header, footer, separators, empty component, per-section renderItem, sticky wrappers, layout events) + `section-list-sticky.itest.ts` for the mounted order; RefreshControl case: `flat-list-refresh.test.tsx` `react-native/Libraries/Lists/__tests__/SectionList-itest.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/LogBox/__tests__/LogBox-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/LogBox/__tests__/LogBoxInspectorContainer-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/LogBox/__tests__/LogBoxNotificationContainer-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/LogBox/Data/__tests__/LogBoxData-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/LogBox/Data/__tests__/LogBoxLog-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/LogBox/Data/__tests__/LogBoxSymbolication-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/LogBox/Data/__tests__/parseLogBoxLog-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/LogBox/UI/__tests__/LogBoxButton-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/LogBox/UI/__tests__/LogBoxInspector-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/LogBox/UI/__tests__/LogBoxInspectorCodeFrame-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/LogBox/UI/__tests__/LogBoxInspectorFooter-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/LogBox/UI/__tests__/LogBoxInspectorHeader-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/LogBox/UI/__tests__/LogBoxInspectorMessageHeader-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/LogBox/UI/__tests__/LogBoxInspectorReactFrames-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/LogBox/UI/__tests__/LogBoxInspectorSection-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/LogBox/UI/__tests__/LogBoxInspectorSourceMapStatus-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/LogBox/UI/__tests__/LogBoxInspectorStackFrame-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/LogBox/UI/__tests__/LogBoxInspectorStackFrames-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/LogBox/UI/__tests__/LogBoxMessage-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/LogBox/UI/__tests__/LogBoxNotification-test.js`
+- [x] P `modal-rendered.android.itest.ts` (22; `ref`/DOM N/A) `react-native/Libraries/Modal/__tests__/Modal-itest.js`
+- [x] N/A snapshots of RN's own component names `react-native/Libraries/Modal/__tests__/Modal-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/NativeComponent/__tests__/StaticViewConfigValidator-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/Network/__tests__/FormData-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/Network/__tests__/XMLHttpRequest-test.js`
+- [x] P `pressability-rendered.itest.ts` (7, RN's real class via `usePressability`; `ref`/DOM N/A) `react-native/Libraries/Pressability/__tests__/Pressability-itest.js`
+- [x] P our press machine: `pressability-rn.test.ts` (25) + `pressable.test.ts`; hover cases N/A on native; `onFocus`/`onBlur` in `pressable-rendered.android.itest.ts` `react-native/Libraries/Pressability/__tests__/Pressability-test.js`
+- [x] N/A (ruling 2026-10-06: DOM node API out of scope) `react-native/Libraries/ReactNative/__tests__/FabricUIManager-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/ReactNative/__tests__/StaleEventHandlersFromInterruptedRender-itest.js`
+- [x] N/A (ruling 2026-10-06: DOM node API out of scope) `react-native/Libraries/ReactNative/__tests__/State-ForcedCloneCommitHook-itest.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/ReactNative/__tests__/SyncOnCommit-itest.js`
+- [x] P `attribute-payload-rn.test.ts` (style slots, removal, reset); function props -> `true` is `events.test.ts` (`onLayout`); per-attribute `diff`/`process` configs N/A (view config is derived at runtime, the diff is the engine's clone-on-write) `react-native/Libraries/ReactNative/ReactFabricPublicInstance/__tests__/ReactNativeAttributePayload-test.js`
+- [x] E `style-sheet.test.ts` (block "RN flattenStyle semantics") + `style.test.ts` `react-native/Libraries/StyleSheet/__tests__/flattenStyle-test.js`
+- [x] N/A RN's `normalizeColor` runs as is (`upstream-color-path.test.ts`); not importable headless with opaque colours (Platform shim cycle), constructor shapes in `platform-color.test.ts` `react-native/Libraries/StyleSheet/__tests__/normalizeColor-test.js`
+- [x] E `process-aspect-ratio.test.ts`; DELIBERATE: invalid input returns `undefined`, RN throws in `__DEV__` only (commit path never throws, as `processTransform`) `react-native/Libraries/StyleSheet/__tests__/processAspectRatio-test.js`
+- [x] N/A we import RN's own implementation, so the test is RN's own `react-native/Libraries/StyleSheet/__tests__/processBackgroundImage-test.js`
+- [x] N/A we import RN's own implementation, so the test is RN's own `react-native/Libraries/StyleSheet/__tests__/processBackgroundPosition-test.js`
+- [x] N/A we import RN's own implementation, so the test is RN's own `react-native/Libraries/StyleSheet/__tests__/processBackgroundRepeat-test.js`
+- [x] N/A we import RN's own implementation, so the test is RN's own `react-native/Libraries/StyleSheet/__tests__/processBackgroundSize-test.js`
+- [x] N/A we import RN's own implementation, so the test is RN's own `react-native/Libraries/StyleSheet/__tests__/processBoxShadow-itest.js`
+- [x] N/A we import RN's own implementation, so the test is RN's own `react-native/Libraries/StyleSheet/__tests__/processColor-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/StyleSheet/__tests__/processColorArray-test.js`
+- [x] N/A we import RN's own implementation, so the test is RN's own `react-native/Libraries/StyleSheet/__tests__/processFilter-test.js`
+- [x] E `process-font-variant.test.ts` `react-native/Libraries/StyleSheet/__tests__/processFontVariant-test.js`
+- [x] N/A we import RN's own implementation, so the test is RN's own `react-native/Libraries/StyleSheet/__tests__/processTransform-test.js`
+- [x] N/A we import RN's own implementation, so the test is RN's own `react-native/Libraries/StyleSheet/__tests__/processTransformOrigin-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/StyleSheet/__tests__/setNormalizedColorAlpha-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/StyleSheet/__tests__/splitLayoutProps-test.js`
+- [x] E `style-sheet.test.ts` ("setStyleAttributePreprocessor warning") `react-native/Libraries/StyleSheet/__tests__/StyleSheet-test.js`
+- [x] P `text-fabric-props.itest.ts` (props), `text-rendered.android.itest.ts` (accessibility / role / testID suites), `text-nesting.itest.ts`; `ref` N/A (DOM) `react-native/Libraries/Text/__tests__/Text-itest.js`
+- [x] P `text-props-payload.itest.ts` (aria bag, web props, styles, nested defaults) + `text-pressable-payload.itest.ts` (link role); snapshots of component names N/A `react-native/Libraries/Text/__tests__/Text-test.js`
+- [x] E `back-handler.test.ts` `react-native/Libraries/Utilities/__tests__/BackHandler-itest.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/Utilities/__tests__/binaryToBase64-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/Utilities/__tests__/codegenNativeComponent-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/Utilities/__tests__/deepFreezeAndThrowOnMutationInDev-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/Utilities/__tests__/DeviceInfo-test.js`
+- [x] E `dimensions.test.ts` `react-native/Libraries/Utilities/__tests__/Dimensions-test.js`
+- [x] N/A DOM `Event` class, not reimplemented `react-native/Libraries/Utilities/__tests__/HardwareBackPressEvent-itest.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/Utilities/__tests__/logError-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/Utilities/__tests__/mapWithSeparator-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/Utilities/__tests__/PerformanceLogger-test.js`
+- [x] E `pixel-ratio.test.ts` `react-native/Libraries/Utilities/__tests__/PixelRatio-test.js`
+- [x] E `platform.test.ts` `react-native/Libraries/Utilities/__tests__/Platform-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/Utilities/__tests__/ReactNativeTestTools-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/Utilities/__tests__/SceneTracker-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/Utilities/__tests__/stringifySafe-test.js`
+- [x] N/A tests RN's jest mock of `Appearance`; our hook is covered by `appearance.test.ts` `react-native/Libraries/Utilities/__tests__/useColorScheme-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/Utilities/__tests__/useMergeRefs-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/Utilities/__tests__/useRefEffect-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/Utilities/__tests__/warnOnce-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/Utilities/differ/__tests__/deepDiffer-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/Utilities/differ/__tests__/matricesDiffer-test.js`
+- [x] N/A RN's own `EventEmitter` runs on a device (bootstrap injects `DeviceEventEmitter`); our hub is the headless fallback `react-native/Libraries/vendor/emitter/__tests__/EventEmitter-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/Libraries/WebSocket/__tests__/WebSocket-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/src/private/__tests__/MemoryBaseline-itest.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/src/private/__tests__/utilities/__tests__/ShadowNodeReferenceCounter-itest.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/src/private/__tests__/utilities/__tests__/ShadowNodeRevisionGetter-itest.js`
+- [x] P `animated-native-graph-rn.test.ts`, `animated-events-listeners-rn.test.ts`; view connect / reconnect is `host-binding.test.ts` + `engine-animated-native-driver.itest.ts` `react-native/src/private/animated/__tests__/AnimatedNative-test.js`
+- [x] P `animated-props.itest.ts` `react-native/src/private/animated/__tests__/AnimatedProps-itest.js`
+- [x] N/A React hook internals; the host binds values itself (`leaf-lifecycle.test.ts`, `host-binding.test.ts`) `react-native/src/private/animated/__tests__/createAnimatedPropsHook-test.js`
+- [x] N/A React hook internals (memoised `AnimatedProps`); rebuild rules are `leaf-lifecycle.test.ts` `react-native/src/private/animated/__tests__/createAnimatedPropsMemoHook-test.js`
+- [x] N/A (ruling 2026-10-07: unstable VirtualView out of scope) `react-native/src/private/components/virtualview/__tests__/VirtualView-enableEagerAlternateStateNodeCleanup-itest.js`
+- [x] N/A (ruling 2026-10-07: unstable VirtualView out of scope) `react-native/src/private/components/virtualview/__tests__/VirtualView-itest.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/src/private/devsupport/rndevtools/__tests__/TracingStateObserver-test.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/src/private/featureflags/__tests__/ReactNativeFeatureFlags-test.js`
+- [x] N/A (ruling 2026-10-06: DOM node API out of scope) `react-native/src/private/renderer/branching/__tests__/ShadowTreeBranching-itest.js`
+- [x] N/A (ruling 2026-10-06: DOM node API out of scope) `react-native/src/private/renderer/consistency/__tests__/UIConsistency-itest.js`
+- [x] N/A (ruling 2026-10-06: DOM node API out of scope) `react-native/src/private/renderer/core/__tests__/EventDispatching-itest.js`
+- [x] N/A (ruling 2026-10-06: DOM node API out of scope) `react-native/src/private/renderer/core/__tests__/EventTargetDispatching-itest.js`
+- [x] N/A (ruling 2026-10-06: DOM node API out of scope) `react-native/src/private/renderer/core/__tests__/ResponderEventTarget-itest.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/src/private/renderer/mounting/__tests__/Mounting-itest.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/src/private/renderer/mounting/__tests__/MountingIntermediateCommits-itest.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/src/private/setup/__tests__/setUpDefaultReactNativeEnvironment-ComponentSideEffects-itest.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/src/private/setup/__tests__/setUpDefaultReactNativeEnvironment-FeatureFlags-itest.js`
+- [x] N/A not reimplemented: stock react-native runs it as is (host seam) or it tests the Fantom harness itself `react-native/src/private/setup/__tests__/setUpDefaultReactNativeEnvironment-Globals-itest.js`
+- [x] N/A (ruling 2026-10-06: DOM / webapis out of scope) `react-native/src/private/webapis/dom/events/__tests__/CustomEvent-itest.js`
+- [x] N/A (ruling 2026-10-06: DOM / webapis out of scope) `react-native/src/private/webapis/dom/events/__tests__/Event-itest.js`
+- [x] N/A (ruling 2026-10-06: DOM / webapis out of scope) `react-native/src/private/webapis/dom/events/__tests__/EventHandlerAttributes-itest.js`
+- [x] N/A (ruling 2026-10-06: DOM / webapis out of scope) `react-native/src/private/webapis/dom/events/__tests__/EventTarget-itest.js`
+- [x] N/A (ruling 2026-10-06: DOM / webapis out of scope) `react-native/src/private/webapis/dom/nodes/__tests__/ReactNativeDocument-itest.js`
+- [x] N/A (ruling 2026-10-06: DOM / webapis out of scope) `react-native/src/private/webapis/dom/nodes/__tests__/ReactNativeElement-itest.js`
+- [x] N/A (ruling 2026-10-06: DOM / webapis out of scope) `react-native/src/private/webapis/dom/nodes/__tests__/ReadOnlyText-itest.js`
+- [x] N/A (ruling 2026-10-06: DOM / webapis out of scope) `react-native/src/private/webapis/dom/oldstylecollections/__tests__/HTMLCollection-test.js`
+- [x] N/A (ruling 2026-10-06: DOM / webapis out of scope) `react-native/src/private/webapis/dom/oldstylecollections/__tests__/NodeList-test.js`
+- [x] N/A (ruling 2026-10-06: DOM / webapis out of scope) `react-native/src/private/webapis/errors/__tests__/DOMException-itest.js`
+- [x] N/A (ruling 2026-10-06: DOM / webapis out of scope) `react-native/src/private/webapis/geometry/__tests__/DOMRectList-test.js`
+- [x] N/A (ruling 2026-10-06: DOM / webapis out of scope) `react-native/src/private/webapis/idlecallbacks/__tests__/requestIdleCallback-itest.js`
+- [x] N/A (ruling 2026-10-06: DOM / webapis out of scope) `react-native/src/private/webapis/intersectionobserver/__tests__/IntersectionObserver-itest.js`
+- [x] N/A (ruling 2026-10-06: DOM / webapis out of scope) `react-native/src/private/webapis/mutationobserver/__tests__/MutationObserver-itest.js`
+- [x] N/A (ruling 2026-10-06: DOM / webapis out of scope) `react-native/src/private/webapis/performance/__tests__/EventTimingAPI-itest.js`
+- [x] N/A (ruling 2026-10-06: DOM / webapis out of scope) `react-native/src/private/webapis/performance/__tests__/LongTasksAPI-itest.js`
+- [x] N/A (ruling 2026-10-06: DOM / webapis out of scope) `react-native/src/private/webapis/performance/__tests__/Performance-itest.js`
+- [x] N/A (ruling 2026-10-06: DOM / webapis out of scope) `react-native/src/private/webapis/performance/__tests__/PerformanceMemory-itest.js`
+- [x] N/A (ruling 2026-10-06: DOM / webapis out of scope) `react-native/src/private/webapis/performance/__tests__/PerformanceObserver-itest.js`
+- [x] N/A (ruling 2026-10-06: DOM / webapis out of scope) `react-native/src/private/webapis/performance/__tests__/UserTiming-itest.js`
+- [x] N/A (ruling 2026-10-06: DOM / webapis out of scope) `react-native/src/private/webapis/structuredClone/__tests__/structuredClone-itest.js`
+- [x] E all 14 titles in `core/components/src/state/cell-render-mask.test.ts` `virtualized-lists/Lists/__tests__/CellRenderMask-test.js`
+- [x] N/A internal dev telemetry (`onFillRate` sampling), not in RN's public surface and not ported `virtualized-lists/Lists/__tests__/FillRateHelper-test.js`
+- [x] P `list-metrics-rn.test.ts` (25 at table level); FIXED: orientation change drops measurements; DELIBERATE: no `isMounted` flag, an RTL cell before content length keeps length only (RN throws) `virtualized-lists/Lists/__tests__/ListMetricsAggregator-test.js`
+- [x] E reworded in `viewability-rn.test.ts` (majority x2, imprecision, waitForInteraction) + `list-viewability-pairs.test.ts` (minimumViewTime delay / skip) `virtualized-lists/Lists/__tests__/ViewabilityHelper-test.js`
+- [x] P ported 2026-10-07: initial scroll / render area / append-remove in `virtualized-list-rn-initial-scroll.test.tsx` (17), focus x4 `virtualized-list-rn-focus.test.tsx`, `stickyHeaderIndices` x3 `virtualized-list-rn-sticky.test.tsx`, tail spacer x5 `core/components/src/state/list-tail-spacer-rn.test.ts`; earlier: windowSize x3, sticky batched x3, MVCP x2, `disableVirtualization` x5, initialNumToRender x4, onStart / onEndReached x3 in `virtualized-list-rn-windowing` / `-edges`; basics (ListItemComponent, slots, separators, nested, getScrollRef, viewable data after change) in the sibling `virtualized-list-*.test.tsx` and `flat-list-*.test.*`; `scrollToIndex` throws in `virtualized-list-reducer.test.ts`. Deliberate: empty-component wrapper view, no zero-height spacer node, sticky indices read as item indices with a header, window grows off `getItemLayout` before the content layout (see the findings log). OWED: `_onCellLayout` has no observable twin beyond the cached / estimated scroll cases `virtualized-lists/Lists/__tests__/VirtualizedList-test.js`
+- [x] E simple / empty / empty component / bells / separators / nested / `scrollToLocation` x3 in `core/components/src/state/section-list*.test.ts` + `adapters/react/src/components/{virtualized-section-list,section-list}/*.test.*` `virtualized-lists/Lists/__tests__/VirtualizedSectionList-test.js`
+- [x] E all 17 titles in `core/components/src/state/virtualize-utils.test.ts` `virtualized-lists/Lists/__tests__/VirtualizeUtils-test.js`
+- [x] N/A `clamp` is `Math.min` / `Math.max` inline in our code `virtualized-lists/Utilities/__tests__/clamp-test.js`
+- [x] P `image-rendered.android.itest.ts` (24: referrerPolicy x8, crossOrigin, resizeMode, source / src / srcSet, loading events, tintColor, aria-hidden) + `image-payload.itest.ts` (65); `getSize` / `getSizeWithHeaders` / `prefetch` in `image-loader.test.ts`; the `RN:Image` tag name and element-node cases are DOM-API N/A `react-native/Libraries/Image/__tests__/Image-itest.js`
+- [x] N/A every `*-benchmark-itest.js` (Animated, AnimatedBackend, View, View-vs-ViewNativeComponent, Image, Text, EventDispatching, RuntimeScheduler, console, EventTarget, ReactNativeElement, IntersectionObserver, Performance, structuredClone) measures RN's own renderer, our numbers come from the `symbiote-perf-measurement` harness `react-native/**/__tests__/*-benchmark-itest.js`

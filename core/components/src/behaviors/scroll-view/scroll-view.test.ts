@@ -50,7 +50,7 @@ function slotPropsOf(owner: ISymbioteNode): Readonly<Record<string, unknown>> {
   if (slot === undefined) throw new Error('the owner built no slot');
   return propsOf(slot);
 }
-let nextRootTag = 9700;
+let nextRootTag = 9_700;
 
 function scrollNode(tag: string): ISymbioteNode {
   return createElement(descriptorFor(tag).component, false, tag);
@@ -413,15 +413,15 @@ describe('onContentSizeChange is synthesized from the content view layout', () =
     // RN's contract is positional, NOT a {width, height} object.
     expect(seen).toEqual([[320, 900]]);
 
-    // Deduped exactly as RN dedupes: a layout pass that did not change the size is not a content
-    // size change.
+    // RN's `_handleContentOnLayout` has no dedupe: every content layout event reaches the handler
     listener(layoutEvent(slot, 320, 900));
-    expect(seen).toHaveLength(1);
+    expect(seen).toHaveLength(2);
 
-    listener(layoutEvent(slot, 320, 1200));
+    listener(layoutEvent(slot, 320, 1_200));
     expect(seen).toEqual([
       [320, 900],
-      [320, 1200],
+      [320, 900],
+      [320, 1_200],
     ]);
   });
 
@@ -432,18 +432,12 @@ describe('onContentSizeChange is synthesized from the content view layout', () =
     expect(commit().slot.payload.onLayout).toBe(true);
 
     routeProp(node, 'onContentSizeChange', undefined);
-    // ABSENT, not null. Fabric has no prop removal — the engine's op stream spells "clear" with
-    // NO_VALUE, and a host replaying that op deletes the key; `null` was only ever the old mirror's
-    // clone-protocol spelling (mirror-elimination.md, "RESOLVED: the onLayout === null decision").
+    // Ключ пропадает, не становится `null`: Fabric снимает проп операцией `NO_VALUE`
     expect(Object.hasOwn(commit().slot.payload, 'onLayout')).toBe(false);
-    // …and the record lost it too, proving a clearing op was sent rather than merely stopped.
-    // `slot` is the engine's own `childHost` handle, so there is nothing to search for.
-    expect(
-      Object.hasOwn(
-        fabric.find(n => n.handle === slot)?.props ?? {},
-        'onLayout',
-      ),
-    ).toBe(false);
+    // Запись хоста тоже потеряла ключ, значит ушла операция снятия
+    const recorded = fabric.find(n => n.handle === slot);
+    const recordedProps = recorded === undefined ? {} : recorded.props;
+    expect(Object.hasOwn(recordedProps, 'onLayout')).toBe(false);
     expect(listenerFor(slot, 'layout')).toBeUndefined();
   });
 });

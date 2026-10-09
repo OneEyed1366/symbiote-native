@@ -24,14 +24,14 @@ const ROOT_TAG = 921;
 
 // ---- fake StatusBarManager ----------------------------------------------
 
-interface IStyleCall {
+type IStyleCall = {
   style: IStatusBarStyle;
   animated: boolean;
-}
-interface IHiddenCall {
+};
+type IHiddenCall = {
   hidden: boolean;
   animation: IStatusBarAnimation;
-}
+};
 
 let styleCalls: IStyleCall[] = [];
 let hiddenCalls: IHiddenCall[] = [];
@@ -75,12 +75,18 @@ beforeEach(() => {
   networkCalls = [];
 });
 
-afterEach(() => unmount(ROOT_TAG));
+// The stack sends to native once per frame, and unmounting queues a flush back to the defaults
+const frame = (): Promise<void> =>
+  new Promise(resolve => setImmediate(resolve));
+
+afterEach(async () => {
+  unmount(ROOT_TAG);
+  await frame();
+});
 
 describe('StatusBar', () => {
-  // why: the whole component is one effect; if it never ran, an app's `<StatusBar barStyle=…>`
-  // would be inert with no error anywhere — the native module is optional by design.
-  it('applies its props on mount and renders no host node', () => {
+  // The whole component is one effect, if it never ran an app's `<StatusBar barStyle=…>` is inert
+  it('applies its props on mount and renders no host node', async () => {
     mount(ROOT_TAG, () => (
       <StatusBar
         barStyle="light-content"
@@ -88,35 +94,39 @@ describe('StatusBar', () => {
         networkActivityIndicatorVisible
       />
     ));
+    await frame();
 
     expect(styleCalls).toEqual([{ style: 'light-content', animated: false }]);
-    expect(hiddenCalls).toEqual([{ hidden: false, animation: 'none' }]);
     expect(networkCalls).toEqual([true]);
-    // StatusBar drives a native module, it does not paint: a stray host node here would land an
-    // empty RCTView in the app's layout.
-    // Nothing paintable was even ASKED for: the op stream carries no element and no raw text. An
-    // anchor records an empty view name, which is why the filter is on the name rather than a
-    // bare count — an anchor would be structural bookkeeping, not a stray view.
+    // StatusBar drives a native module, an anchor records an empty view name so it is filtered out
     expect(fabric.findAll(node => node.viewName !== '')).toHaveLength(0);
   });
 
-  // why: a Solid body runs once. Reading `props.hidden` outside the effect (or handing the engine
-  // a snapshot bag) type-checks, mounts correctly, and then never updates again.
-  it('re-applies when a prop signal changes', () => {
+  // A Solid body runs once, a prop read outside the effect would freeze at its mount value
+  it('re-applies when a prop signal changes', async () => {
     const [hidden, setHidden] = createSignal(false);
 
     mount(ROOT_TAG, () => (
       <StatusBar barStyle="dark-content" hidden={hidden()} animated />
     ));
-
-    expect(hiddenCalls).toEqual([{ hidden: false, animation: 'fade' }]);
+    await frame();
+    hiddenCalls = [];
 
     setHidden(true);
+    await frame();
 
-    expect(hiddenCalls).toEqual([
-      { hidden: false, animation: 'fade' },
-      { hidden: true, animation: 'fade' },
-    ]);
+    expect(hiddenCalls).toEqual([{ hidden: true, animation: 'fade' }]);
+  });
+
+  it('restores the defaults when the component unmounts', async () => {
+    mount(ROOT_TAG, () => <StatusBar barStyle="dark-content" />);
+    await frame();
+    styleCalls = [];
+
+    unmount(ROOT_TAG);
+    await frame();
+
+    expect(styleCalls).toEqual([{ style: 'default', animated: false }]);
   });
 
   // why: RN exposes the imperative API without rendering anything, and app code calls it that way.

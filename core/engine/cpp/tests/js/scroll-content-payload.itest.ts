@@ -111,25 +111,20 @@ const horizontal = (ownerProps: Record<string, unknown>): ICommitted =>
   commit('horizontal-scroll-view', ownerProps);
 
 describe('what a scroll content node sends native', () => {
-  // why: a horizontal scroller lays its content along the row axis, and the content node is where
-  // that happens — the wrapper writes `[contentContainerStyle, {flexDirection:'row'}]`. Without it
-  // the row stacks vertically inside a horizontally-scrolling box and nothing scrolls.
+  // A horizontal scroller lays its content along the row axis
   it('gives the horizontal content node the row direction', () => {
     expect(horizontal({}).payload.flexDirection).toBe('row');
   });
 
-  // why: the CONSTANT wins here, which is the opposite precedence from the owner's base style and is
-  // deliberate — RN writes the row direction AFTER the app's contentContainerStyle. A test that
-  // checked only one node would pass with both folds written the same way.
-  it('puts the row constant OVER the app contentContainerStyle', () => {
+  // `ScrollView.js:1654` is `[row, contentContainerStyle]`, so the app's own direction wins
+  it('lets the app contentContainerStyle override the row constant', () => {
     expect(
       horizontal({ contentContainerStyle: { flexDirection: 'column' } }).payload
         .flexDirection,
-    ).toBe('row');
+    ).toBe('column');
   });
 
-  // why: nothing composes a direction onto a VERTICAL content node — the wrapper's contentStyle for
-  // vertical is `contentContainerStyle` alone. Inventing one would override an app that set its own.
+  // Nothing composes a direction onto a vertical content node
   it('invents no direction on the vertical content node', () => {
     expect(vertical({}).payload.flexDirection).toBe(undefined);
     expect(
@@ -138,9 +133,7 @@ describe('what a scroll content node sends native', () => {
     ).toBe('row');
   });
 
-  // why: THE HALF THAT NEEDED THE SEAM. Both props stay on the OWNER, and the content node is what
-  // must stop collapsing — a Yoga-collapsed content view takes the scroll metrics with it, and an
-  // anchored scroll (`maintainVisibleContentPosition`) needs its children to keep their identity.
+  // The owner holds the prop, the content node is what must stop collapsing its children
   it('stops collapsing its children when the OWNER anchors the scroll', () => {
     expect(
       vertical({ maintainVisibleContentPosition: { minIndexForVisible: 0 } })
@@ -148,28 +141,20 @@ describe('what a scroll content node sends native', () => {
     ).toBe(false);
   });
 
-  // why: `snapToAlignment` is HALF a reason, and only on Android — RN's own gate is
-  // `maintainVisibleContentPosition != null || (Platform.OS === 'android' && snapToAlignment !=
-  // null)` (`ScrollView.js:1731-1733`). We honoured it on both platforms, so an iOS ScrollView that
-  // merely snaps stopped Yoga flattening its children for no reason RN has. The Android half is
-  // asserted on the arm that compiles it (`android-rules.android.itest.ts`).
+  // `snapToAlignment` preserves children on Android only (`ScrollView.js:1731-1733`)
+  // The Android half lives in `android-rules.android.itest.ts`
   it('lets a snapping iOS scroller collapse its children, as RN does', () => {
     expect(
       vertical({ snapToAlignment: 'center' }).payload.collapsableChildren,
     ).toBe(undefined);
   });
 
-  // why: PRESENCE decides, not truthiness — `snapToAlignment: 'start'` and an empty
-  // `maintainVisibleContentPosition` object are both real requests. And the key is written only when
-  // false, matching every wrapper: RN sends `collapsableChildren={!preserveChildren}`, so an
-  // explicit `true` is the native default and one more key on every scroll view that ever renders.
+  // `true` is the native default, so the key is written only when false
   it('writes nothing when the owner asks for neither', () => {
     expect(vertical({}).payload.collapsableChildren).toBe(undefined);
   });
 
-  // why: the owner's OTHER props must not leak down. The rule reads two names off the parent and
-  // copies nothing — a rule that merged the parent's bag would put the scroller's whole surface on
-  // its content view, which Fabric would mostly drop and partly honour.
+  // The rule reads two names off the owner and copies nothing else down
   it('copies nothing else down from the owner', () => {
     const payload = vertical({
       testID: 'list',
@@ -182,8 +167,7 @@ describe('what a scroll content node sends native', () => {
     expect(payload.snapToAlignment).toBe(undefined);
   });
 
-  // why: ScrollView.js:1740-1745 — the content view carries the scroller's removeClippedSubviews
-  // (sticky headers only change that on Android); unset stays unset.
+  // `ScrollView.js:1740-1745`: sticky headers only change this on Android, unset stays unset
   it('carries the owner removeClippedSubviews down, sticky headers or not, off Android', () => {
     expect(
       vertical({ removeClippedSubviews: true }).payload.removeClippedSubviews,
@@ -195,15 +179,8 @@ describe('what a scroll content node sends native', () => {
     expect(vertical({}).payload.removeClippedSubviews).toBe(undefined);
   });
 
-  // why: `collapsable={false}` is UNCONDITIONAL on RN's content view (`ScrollView.js:1747`) — Yoga may
-  // collapse a view that only groups children, and a collapsed content node takes the scroll metrics
-  // with it. A constant of the tag, so the rule writes it.
-  //
-  // THE SECOND ASSERTION IS THE ONE THAT DISCRIMINATES, and without it this case is green either way.
-  // `buildStructure` used to seed the key with a `setProp` at build time, which reaches the payload by
-  // a completely different route and would satisfy the first line forever. A rule's output lives in
-  // the payload and nowhere else, so an absent AUTHORED prop is what says the seed is gone — the same
-  // witness the sticky port used one commit earlier.
+  // `collapsable={false}` is unconditional (`ScrollView.js:1747`)
+  // The authored prop stays absent, so the rule and not a build-time seed wrote it
   it('refuses to be flattened away, from the rule and not a seed', () => {
     const content = contentOf({});
 
@@ -211,15 +188,7 @@ describe('what a scroll content node sends native', () => {
     expect(propsOf(content).collapsable).toBe(undefined);
   });
 
-  // why: THE FAILURE MODE THE SEAM INTRODUCES, and the only one. A rule that reads its parent runs
-  // when THIS node is dirty, so a write to the OWNER after the first commit has to mark the content
-  // node dirty or the rule never re-reads it — the content view would keep collapsing its children
-  // forever while the scroller believes it anchors them.
-  //
-  // `slotDerived` already names both props, so this works, and it worked for the JS fold too for
-  // exactly the same reason: that fold also only ran when its node was dirty. The seam did not
-  // change the requirement, which is why this passes — but nothing said so out loud until now, and
-  // an unstated invariant is one a later `slotDerived` edit deletes without noticing.
+  // A late write to the owner must dirty the content node, `slotDerived` names both props
   it('re-reads the owner when the anchor prop arrives after the first commit', () => {
     const surface = createSurface(ROOT_TAG);
     const owner: ISymbioteNode = createElement(
@@ -235,9 +204,7 @@ describe('what a scroll content node sends native', () => {
     mounted();
     expect(committedPayloadOf(content)?.collapsableChildren).toBe(undefined);
 
-    // `maintainVisibleContentPosition` rather than `snapToAlignment`, because the latter is an
-    // Android-only leg and this claim — that a late write to the OWNER re-derives the CHILD — is
-    // platform-independent. `slotDerived` names both, so either would do on the Android arm.
+    // `snapToAlignment` would be an Android-only leg, this claim is platform-independent
     routeProp(owner, 'maintainVisibleContentPosition', {
       minIndexForVisible: 0,
     });
@@ -247,8 +214,7 @@ describe('what a scroll content node sends native', () => {
     expect(committedPayloadOf(content)?.collapsableChildren).toBe(false);
   });
 
-  // why: THE PRICE, and it is the whole point — a scroll view is now ZERO trips into JS on both of
-  // its nodes. The owner shed its fold last iteration; this is the other one.
+  // A scroll view costs zero trips into JS on both of its nodes
   it('costs no trip into JS for either node', () => {
     const one = vertical({ snapToAlignment: 'center' });
     print(`DEBUG scroll-content folds=${one.folds}`);

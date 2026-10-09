@@ -18,6 +18,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   createLiveTree,
   installRecordingFabric,
+  seedWindowDimensions,
   type ILiveNode,
 } from '@symbiote-native/test-utils';
 // SIDE-EFFECT IMPORT: the nativeID/backgroundColor/style mapping lives in the tag's behavior, and
@@ -31,13 +32,17 @@ const ROOT_TAG = 831;
 const ACCESSORY_VIEW = 'RCTInputAccessoryView';
 const NATIVE_ID = 'accessory-1';
 const BACKGROUND_COLOR = '#eeeeee';
+const ACCESSORY_STYLE = { flex: 1 };
 
 const fabric = installRecordingFabric();
 const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
-beforeEach(() => fabric.reset());
+beforeEach(() => {
+  fabric.reset();
+  seedWindowDimensions();
+});
 afterEach(() => unmount(ROOT_TAG));
 
 function committed(predicate: (node: ILiveNode) => boolean): ILiveNode {
@@ -52,16 +57,13 @@ function accessory(): ILiveNode {
 
 describe('Solid InputAccessoryView on the engine', () => {
   describe('Positive', () => {
-    // why: the docking view is a REAL Fabric host (RCTInputAccessoryView), not a JS wrapper — a
-    // wrong view name resolves no component and the toolbar never appears. nativeID and
-    // backgroundColor are emitted conditionally by the shared render fn, and `style` has to reach
-    // the host flattened, which is the engine's job on the way through.
+    // A wrong view name resolves no component and the toolbar never appears
     it('commits a real RCTInputAccessoryView carrying nativeID, backgroundColor and a flattened style', async () => {
       mount(ROOT_TAG, () => (
         <input-accessory-view
           nativeID={NATIVE_ID}
           backgroundColor={BACKGROUND_COLOR}
-          style={{ flex: 1 }}
+          style={ACCESSORY_STYLE}
         />
       ));
       await tick();
@@ -72,10 +74,8 @@ describe('Solid InputAccessoryView on the engine', () => {
       expect(props.flex).toBe(1);
     });
 
-    // why: renderInputAccessoryView deliberately returns ZERO structural children — "the adapter
-    // adds the user children". This proves Solid's half of that split contract actually holds:
-    // the literal tag hosts the live subtree instead of dropping it.
-    it('nests the caller-supplied children directly under the host', async () => {
+    // RN renders the children inside a SafeAreaView that fills the accessory
+    it('nests the caller-supplied children in a safe area view', async () => {
       mount(ROOT_TAG, () => (
         <input-accessory-view nativeID={NATIVE_ID}>
           <text>Done</text>
@@ -85,12 +85,11 @@ describe('Solid InputAccessoryView on the engine', () => {
 
       const children = accessory().children;
       expect(children).toHaveLength(1);
-      expect(children[0].viewName).toBe('RCTText');
+      expect(children[0].viewName).toBe('SafeAreaView');
+      expect(children[0].children[0].viewName).toBe('RCTText');
     });
 
-    // why: an accessory docks to a TextInput purely by a shared string id (RN convention, no
-    // runtime linking code) — nativeID here must equal inputAccessoryViewID there. Proves neither
-    // component's own prop routing mutates or drops that id when both are mounted together.
+    // The accessory docks to a text input only by the shared id, so neither side may rewrite it
     it('keeps the nativeID <-> inputAccessoryViewID docking pair intact', async () => {
       mount(ROOT_TAG, () => (
         <view>
@@ -108,11 +107,8 @@ describe('Solid InputAccessoryView on the engine', () => {
       );
     });
 
-    // why: native reads only `accessibility*`, and the engine folds the web aliases into them off
-    // the authored, HYPHENATED names. This component owns its host element rather than rendering
-    // through a View, so nothing else in the path carries the aliases down for it — losing one
-    // leaves the toolbar unlabelled for a screen reader.
-    // The fold's own cases: `core/engine/cpp/tests/js/aria-payload.itest.ts`.
+    // Native reads only `accessibility*`, the engine folds the aliases from their hyphenated names
+    // (fold cases in `core/engine/cpp/tests/js/aria-payload.itest.ts`)
     it('forwards the aria aliases under their authored names', async () => {
       mount(ROOT_TAG, () => (
         <input-accessory-view aria-label="toolbar" aria-busy={true} />
@@ -124,11 +120,7 @@ describe('Solid InputAccessoryView on the engine', () => {
       expect(props['aria-busy']).toBe(true);
     });
 
-    // why: Solid runs a component body ONCE. Every prop read sits inside the bag accessor
-    // precisely so a later change still reaches the host; a single destructure in the component
-    // would freeze the toolbar at its mount-time props while every other test here passed. The
-    // node-identity assertion is the other half — rebuilding the host would also show the new
-    // value, while destroying the identity native state keys on.
+    // A body runs once, so a destructured prop would freeze at its mount value
     it('re-commits the same host node when backgroundColor changes after mount', async () => {
       const [color, setColor] = createSignal(BACKGROUND_COLOR);
       mount(ROOT_TAG, () => (
@@ -149,11 +141,7 @@ describe('Solid InputAccessoryView on the engine', () => {
       );
     });
 
-    // why: renderInputAccessoryView emits `backgroundColor` CONDITIONALLY, so the key VANISHES
-    // from the bag the moment a caller clears it. Solid's `spread` walks only the current key set
-    // and has no removal pass, so without withStableKeys the native view keeps painting the old
-    // colour forever (.claude/rules/solid-descriptor-bridge.md §1). Reading the COMMITTED tree is
-    // what makes this observable at all.
+    // `spread` has no removal pass, so a cleared key would keep painting the old colour
     it('clears backgroundColor on the host when the prop goes undefined', async () => {
       const [color, setColor] = createSignal<string | undefined>(
         BACKGROUND_COLOR,
@@ -167,14 +155,9 @@ describe('Solid InputAccessoryView on the engine', () => {
       setColor(undefined);
       await tick();
 
-      // The engine's diffProps sends a removed key down as literal null, not absence
-      // (symbiote-engine-core §8) — so `null` here IS the cleared state Fabric acts on.
-      // ABSENT, not null: the literal null was the CLONE PROTOCOL's spelling of "reset to the
-      // default", held only inside the diff the stand-in merged. The engine's op stream says the
-      // same thing with `NO_VALUE`, and a host replaying that op deletes the key.
+      // Absent rather than null, the op stream deletes the key with `NO_VALUE`
       expect(Object.hasOwn(accessory().payload, 'backgroundColor')).toBe(false);
-      // …and the half that proves the engine ACTED: the record carried the colour after the mount
-      // above, so its being gone from the record means a clearing op was sent for it.
+      // The record held the colour after the mount, so its absence means a clearing op was sent
       const recorded = fabric.find(node => node.viewName === ACCESSORY_VIEW);
       expect(Object.hasOwn(recorded?.props ?? {}, 'backgroundColor')).toBe(
         false,

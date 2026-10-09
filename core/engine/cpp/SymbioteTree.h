@@ -200,8 +200,9 @@ class Tree {
       facebook::jsi::Runtime &runtime,
       const facebook::jsi::Value *arguments,
       size_t count);
-  /** `shadowNodeWrapperOf(handle)`, a `ShadowNodeWrapper` over the committed node or undefined */
-  facebook::jsi::Value shadowNodeWrapperOf(
+  // `shadowNodeOf(handle)`: the committed `ShadowNode` as RN's own bridging reads it, `undefined`
+  // before a first commit. The shared animation backend finds a view's family through it
+  facebook::jsi::Value shadowNodeOf(
       facebook::jsi::Runtime &runtime,
       const facebook::jsi::Value *arguments,
       size_t count);

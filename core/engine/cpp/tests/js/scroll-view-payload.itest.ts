@@ -254,4 +254,25 @@ describe('what a scroll view sends native', () => {
   });
 });
 
+// `ScrollView.js:1766,1796`: the experimental prop is renamed, the unprefixed one is not a prop
+describe('the scroll view props RN renames or nulls', () => {
+  it('sends experimental_endDraggingSensitivityMultiplier under its native name', () => {
+    const payload = vertical({
+      experimental_endDraggingSensitivityMultiplier: 2,
+    }).payload;
+
+    expect(payload.endDraggingSensitivityMultiplier).toBe(2);
+    expect(payload.experimental_endDraggingSensitivityMultiplier).toBe(
+      undefined,
+    );
+  });
+
+  it('treats a null snap prop as absent when resolving pagingEnabled', () => {
+    expect(
+      vertical({ pagingEnabled: true, snapToInterval: null }).payload
+        .pagingEnabled,
+    ).toBe(true);
+  });
+});
+
 report();

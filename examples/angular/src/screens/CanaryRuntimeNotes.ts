@@ -49,7 +49,9 @@ export class CanaryRuntimeNotes {
     ` · hairline ${StyleSheet.hairlineWidth.toFixed(3)}`;
 
   private readonly keyboardHeight = signal(0);
-  private readonly appPhase = signal(AppState.currentState ?? 'unknown');
+  private readonly appPhase = signal<string>(
+    AppState.currentState ?? 'unknown',
+  );
   readonly keyboardNote = computed(() =>
     this.keyboardHeight() > 0
       ? `keyboard up · ${this.keyboardHeight()}px`
@@ -72,10 +74,7 @@ export class CanaryRuntimeNotes {
       Keyboard.addListener(KEYBOARD_EVENT.didHide, () =>
         this.keyboardHeight.set(0),
       ),
-      AppState.addEventListener('change', (...args: unknown[]) => {
-        const next = args[0];
-        if (typeof next === 'string') this.appPhase.set(next);
-      }),
+      AppState.addEventListener('change', next => this.appPhase.set(next)),
     ];
     inject(DestroyRef).onDestroy(() =>
       subscriptions.forEach(subscription => subscription.remove()),
