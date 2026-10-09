@@ -10,17 +10,15 @@ import {
 } from '@symbiote-native/engine';
 
 export function useColorScheme(): {
-  readonly current: IColorSchemeName | null;
+  readonly current: IColorSchemeName | null | undefined;
 } {
-  let colorScheme = $state<IColorSchemeName | null>(
+  let colorScheme = $state<IColorSchemeName | null | undefined>(
     Appearance.getColorScheme(),
   );
 
   $effect(() => {
-    // Re-read on mount in case the scheme changed between this function's own call and the
-    // effect actually running — this write is the effect's only touch of `colorScheme`
-    // (never a read), so the effect has no dependency on it and runs exactly once on mount,
-    // cleaning up exactly once on unmount.
+    // Re-read on mount, the scheme can change before the effect runs
+    // This write is the effect's only touch of `colorScheme`, so it never re-runs on it
     colorScheme = Appearance.getColorScheme();
     const subscription: IEventSubscription = Appearance.addChangeListener(
       preferences => {
@@ -31,7 +29,7 @@ export function useColorScheme(): {
   });
 
   return {
-    get current(): IColorSchemeName | null {
+    get current(): IColorSchemeName | null | undefined {
       return colorScheme;
     },
   };
