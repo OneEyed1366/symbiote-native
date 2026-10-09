@@ -1,7 +1,7 @@
 // The windowed child plan: rendered cells and the spacers that stand in for everything between
 
 import type { IPlatformOSType } from '@symbiote-native/engine';
-import { CellRenderMask } from './cell-render-mask';
+import { CellRenderMask, type ICellRenderMask } from './cell-render-mask';
 import {
   EMPTY_OFFSET,
   FIRST_INDEX,
@@ -51,7 +51,7 @@ export type IListPlanParams = {
 // Keeps the nearest sticky header above the window mounted, even when its layout is off-screen
 // RN's `_ensureClosestStickyHeader`, the header is a region of its own with a spacer on each side
 function addClosestStickyHeader(
-  mask: CellRenderMask,
+  mask: ICellRenderMask,
   stickyIndices: ReadonlySet<number>,
   windowFirst: number,
 ): void {
@@ -76,7 +76,7 @@ function regionExtent(
 
 export function buildRenderMask(
   params: Pick<IListPlanParams, 'count' | 'regions' | 'stickyIndices'>,
-): CellRenderMask {
+): ICellRenderMask {
   const mask = new CellRenderMask(params.count);
   if (params.count === EMPTY_OFFSET) return mask;
   for (const region of params.regions) mask.addCells(region);

@@ -1,10 +1,6 @@
-// Pressable, the logic half (framework-agnostic, zero render). The press lifecycle RN's
-// Pressability runs in JS lives here as a pure state machine over a mutable runtime plus an
-// adapter-supplied host. Both React and Vue call the SAME handlers, differing only in lifecycle.
-
-// Framework-specific, stays in the adapter: the `pressed` state cell (drives a re-render, so each
-// framework owns its reactive primitive) and the raw frame-measure. The rest — timers, geometry,
-// suppression flags, when each callback fires — is here, shared by every adapter.
+// Pressable, the logic half: the press lifecycle as a pure state machine, shared by every adapter
+// TODO(rn-port): RN's `Pressability` needs raw responder handlers on each node
+// The engine synthesizes `press` and `pressIn` and this adds delays, so a swap is its own task
 
 import {
   dlog,
@@ -38,9 +34,8 @@ export type {
 } from './press-geometry';
 
 export const DEFAULT_DELAY_LONG_PRESS_MS = 500;
-// A SEPARATE, smaller radius than pressRetentionOffset/hitSlop: any move past it cancels a
-// pending long press even while the finger is still well inside the retention rect — real presses
-// jitter a few px, long-press must not fire mid-scroll.
+// A separate, smaller radius than the retention offset or `hitSlop`
+// Any move past it cancels a pending long press, so a jittering finger does not long-press
 export const LONG_PRESS_DEACTIVATION_DISTANCE = 10;
 // Pressability's default active-visual floor for a plain Pressable. Touchable* overrides this to 0.
 export const DEFAULT_MIN_PRESS_DURATION_MS = 130;
@@ -318,7 +313,6 @@ export function createPressHandlers(
   host: IPressHost,
 ): IPressHandlers {
   const context: IPressContext = { config, runtime, host };
-  const isWithinRetention = createRetentionCheck(config);
   const { onPress, onPressMove, android_disableSound } = config;
 
   return {
@@ -403,6 +397,7 @@ export function createPressHandlers(
       if (region === undefined) return;
       const here = readPoint(event);
       if (!here) return;
+      const isWithinRetention = createRetentionCheck(config);
       // Pressability.js:502-508, checked before the retention branch and independent of it: a
       // jitter inside the retention rect must still not fire a long press
       const activatePosition = runtime.activatePosition;

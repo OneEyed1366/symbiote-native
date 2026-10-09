@@ -1,6 +1,5 @@
-// Button: shared render half (framework-agnostic). Ported against RN's own
-// `Libraries/Components/Button.js` — a touchable wrapping a `View` wrapping a `Text`, where the
-// VIEW is what carries the look on Android and is empty on iOS.
+// Button: shared render half (framework-agnostic), ported against RN's `Button.js`
+// TODO(rn-port): `Button.js` is a React component with a private body, there is nothing to import
 //
 // The inner view is not optional chrome. RN's Button is the one control in the library that ships
 // a finished appearance, and on Android that appearance — a filled, elevated, rounded Material

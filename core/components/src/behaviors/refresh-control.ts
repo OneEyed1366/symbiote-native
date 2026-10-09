@@ -1,3 +1,5 @@
+// TODO(rn-port): RN's `RefreshControl.js` is a React class, its handshake is re-expressed here
+
 // RefreshControl's machine, on the engine node instead of inside a framework component.
 //
 // WHAT THE FIVE WRAPPERS ACTUALLY DO, counted before writing this — the audit rule's instruction to
@@ -46,47 +48,34 @@ export const REFRESH_CONTROL_TAG = 'refresh-control';
 // RN's own name for the command, sent to whichever of the two native views the platform resolved.
 const SET_NATIVE_REFRESHING = 'setNativeRefreshing';
 
-// What native LAST reported, absent until it has reported at all. Absent is not `false`: native is
-// optimistic — it spins on the gesture before JS approves — so only a report can make the mirror
-// authoritative, and an app that drives `refreshing` on its own initiative must never be corrected
-// against a value native never claimed.
+// What native LAST reported, absent until it has reported. Absent is not `false`: native spins
+// on the gesture before JS approves, so only a report makes the mirror authoritative
 const reported = new WeakMap<ISymbioteNode, boolean>();
 
-// TODO(rn-parity, low priority, efficiency not correctness): vendor's `componentDidUpdate`
-// (`RefreshControl.js:139-158`) sends `setNativeRefreshing` only when `refreshing` did NOT change
-// between renders, trusting the ordinary prop diff to carry a real change to native. Ours has no
-// such guard — `evaluateSnapBack` fires the command on any disagreement with `reported`, even when
-// this same commit already carries the authored `refreshing` change (accept-then-finish: app agrees
-// on the gesture, then sets `refreshing: false` to end it — vendor sends zero commands, we send one
-// extra). Both settle on the same native value, so this is a harmless redundant call, not a bug —
-// and NOT a candidate for the same fix as the "repairs a snap-back the app contradicts on a later
-// commit" test below, which relies on this exact unconditional re-check for a genuine cross-
-// framework microtask race. A real fix needs tracking the last-seen authored value alongside
-// `reported`, so a same-commit authored change can be told apart from native drifting on its own —
-// not attempted here.
-//
-// Shared by both triggers — see the module header for why there are two.
+// TODO(rn-parity): vendor skips `setNativeRefreshing` when `refreshing` changed in the same commit
+// Ours sends one redundant command, harmless since both settle on the same native value
+
+// Shared by both triggers, see the module header for why there are two
 function evaluateSnapBack(node: ISymbioteNode): void {
   const lastNativeReport = reported.get(node);
   if (lastNativeReport === undefined) return; // no report yet, nothing to disagree with
 
-  const refreshing = propOf(node, 'refreshing') === true;
-  if (lastNativeReport === refreshing) {
-    dlog(`RefreshControl behavior snap-back no-op refreshing=${refreshing}`);
+  const isRefreshing = propOf(node, 'refreshing') === true;
+  if (lastNativeReport === isRefreshing) {
+    dlog(`RefreshControl behavior snap-back no-op refreshing=${isRefreshing}`);
     return;
   }
 
   dlog(
-    `RefreshControl behavior ${SET_NATIVE_REFRESHING} reported=${lastNativeReport} refreshing=${refreshing}`,
+    `RefreshControl behavior ${SET_NATIVE_REFRESHING} reported=${lastNativeReport} refreshing=${isRefreshing}`,
   );
-  dispatchViewCommand(node, SET_NATIVE_REFRESHING, [refreshing]);
-  reported.set(node, refreshing);
+  dispatchViewCommand(node, SET_NATIVE_REFRESHING, [isRefreshing]);
+  reported.set(node, isRefreshing);
 }
 
 function onRefresh(node: ISymbioteNode, event: ISymbioteEvent): void {
-  // Native has already started spinning by the time this arrives (RefreshControl.js:180), so the
-  // mirror moves BEFORE the app's handler runs — a handler that flips `refreshing` to true then
-  // agrees with it, and one that does nothing is what the deferred check corrects.
+  // Native already spun by the time this arrives (RefreshControl.js:180), so the mirror moves first
+  // A handler that sets `refreshing` agrees with it, one that does nothing gets corrected later
   reported.set(node, true);
 
   const listener = appListenerFor(node, 'refresh');

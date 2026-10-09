@@ -1,3 +1,5 @@
+// TODO(rn-port): RN's `Modal.js` is a React component, only its native host view is shared
+
 // Modal: the render half (framework-agnostic). RCTModalHostView is an ordinary Fabric host
 // node: it lives in the SAME childSet and commits through the SAME completeRoot as the rest of
 // the tree. The native iOS/Android view presents its own window internally; there is no second
@@ -27,11 +29,8 @@ export type IModalOrientation =
   | 'landscape-left'
   | 'landscape-right';
 
-// What Fabric puts on `nativeEvent` for topOrientationChange — NOT what an onOrientationChange
-// handler receives. The engine registers every `onX` prop as `(event: ISymbioteEvent) => handler(event)`
-// (core/engine/src/node.ts setEventListener), so a handler always gets the wrapper and reads the
-// orientation at `event.nativeEvent.orientation`, narrowed at runtime like every other nativeEvent
-// field (readLayoutField, valueFromChange).
+// What Fabric puts on `nativeEvent` for `topOrientationChange`, not what a handler receives.
+// The engine wraps every `onX` handler, so it reads `nativeEvent.orientation` narrowed at runtime
 export type IModalOrientationChangeEvent = {
   orientation: 'portrait' | 'landscape';
 };
@@ -69,11 +68,8 @@ const DEFAULT_ANIMATION_TYPE: IModalAnimationType = 'none';
 const PRESENTATION_FULL_SCREEN: IModalPresentationStyle = 'fullScreen';
 const PRESENTATION_OVER_FULL_SCREEN: IModalPresentationStyle = 'overFullScreen';
 
-// The pre-resolved inputs renderModal paints from. The adapter narrows the typed fields (the
-// visible gate / backdrop / platform props) and folds everything else: the events
-// (onShow/onDismiss/onRequestClose/onOrientationChange, all real ViewConfig DirectEvents), the
-// already-folded accessibility* props, and testID into `passthrough`, which lands on the
-// modal host node untouched.
+// The pre-resolved inputs `renderModal` paints from, the adapter narrows the typed fields
+// Events, folded accessibility props and `testID` go into `passthrough`, untouched on the host node
 export type IModalViewProps = {
   visible?: boolean;
   transparent?: boolean;
@@ -111,9 +107,8 @@ function containerOf(view: IModalViewProps, isRTL: boolean): IDescriptor {
   return el('view', { style: containerStyle, collapsable: false }, []);
 }
 
-// `isRTL` is injectable purely for testability, the same shape `computeInset`'s `os` option
-// takes: `I18nManager`'s constants are resolved once at module load with no setter, so a test
-// exercising the RTL branch cannot toggle the real module and must pass the value in.
+// `isRTL` is injectable for tests, like the `os` option of `computeInset`
+// `I18nManager` resolves its constants once at load with no setter, so a test must pass it in
 export function renderModal(
   view: IModalViewProps,
   isRTL: boolean = I18nManager.isRTL,

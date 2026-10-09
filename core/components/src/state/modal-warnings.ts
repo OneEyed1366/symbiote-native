@@ -1,4 +1,5 @@
 // RN's Modal.js `confirmProps`: prop combinations the platform cannot honour, warned in dev
+// TODO(rn-port): `confirmProps` is private to RN's `Modal.js`, which is a React class, no export
 
 import { isDevBuild, Platform } from '@symbiote-native/engine';
 import type { IModalPresentationStyle } from '../view/render-modal';

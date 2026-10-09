@@ -1,4 +1,6 @@
 // Which cells count as viewable and what changed between two passes
+// TODO(rn-port): RN's `ViewabilityHelper` is a stateful class with its own timers, one per config
+// Ours is pure and runs one pass across all pairs, `_isViewable` is not exported upstream
 
 import {
   DEFAULT_VIEW_AREA_COVERAGE_PERCENT_THRESHOLD,

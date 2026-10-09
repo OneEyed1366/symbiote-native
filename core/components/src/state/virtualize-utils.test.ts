@@ -1,6 +1,10 @@
 // Port of RN's VirtualizeUtils-test.js, metrics given directly instead of through a
 // `ListMetricsAggregator`
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+// @ts-expect-error - untyped Flow source
+import * as ReactNativeFeatureFlags from 'react-native/src/private/featureflags/ReactNativeFeatureFlags';
+// @ts-expect-error - untyped Flow source
+import { dangerouslyResetForTesting } from 'react-native/src/private/featureflags/ReactNativeFeatureFlagsBase';
 import {
   computeWindowedRenderLimits,
   elementsThatOverlapOffsets,
@@ -114,7 +118,13 @@ describe('computeWindowedRenderLimits', () => {
     ).toEqual({ first: 0, last: 2 });
   });
 
+  afterEach(() => dangerouslyResetForTesting());
+
   it('handles overflow cases when window size suddenly collapses', () => {
+    dangerouslyResetForTesting();
+    ReactNativeFeatureFlags.override({
+      fixVirtualizeListCollapseWindowSize: () => true,
+    });
     const frames = [
       { offset: 0, length: 275 },
       { offset: 275, length: 352 },
@@ -136,7 +146,6 @@ describe('computeWindowedRenderLimits', () => {
           velocity: 0.9264489707504611,
           visibleLength: 640,
         },
-        fixCollapseWindowSize: true,
       }),
     ).toEqual({ first: 0, last: 6 });
   });

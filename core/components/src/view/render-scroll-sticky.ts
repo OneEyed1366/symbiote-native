@@ -1,11 +1,8 @@
-// Sticky headers: the framework-agnostic math behind the JS layer RN implements in
-// ScrollView.js / ScrollViewStickyHeader.js. RN does stickiness PURELY IN JS: a single
-// scroll AnimatedValue drives each flagged header's translateY through an interpolation that
-// keeps it pinned to the top (or bottom, inverted) until the next header collides with it.
-// The native Fabric scroll view does NOT honor stickyHeaderIndices on its own. The load-bearing
-// piece, the top/inverted inputRange/outputRange math (computeStickyInterpolation), is ported
-// byte-for-byte from ScrollViewStickyHeader.js's effect. The adapter owns the component shell,
-// the layout state, and building the interpolation onto its Animated value.
+// TODO(rn-port): the sticky math sits in an effect of React's `ScrollViewStickyHeader.js`
+
+// Sticky headers: RN pins them purely in JS, the scroll `AnimatedValue` drives each `translateY`.
+// `computeStickyInterpolation` is the range math of `ScrollViewStickyHeader.js`
+// The adapter owns the component shell, the layout state and the interpolation
 
 import type { AnimatedValue, ISymbioteEvent } from '@symbiote-native/engine';
 import { readLayoutField } from './layout-event';

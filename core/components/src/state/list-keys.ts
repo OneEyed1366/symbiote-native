@@ -1,18 +1,10 @@
 // Item identity for the list state: keys and index lookup
 
 import { FIRST_INDEX, NO_INDEX } from './list-constants';
+import { rnDefaultItemKey } from './virtualize-utils';
 
 // RN's default, an object item's own `key`, else its `id`, else the index
-// The index alone breaks identity on a swap, so apps rely on this
-export function defaultKeyExtractor<ItemT>(item: ItemT, index: number): string {
-  if (typeof item === 'object' && item !== null) {
-    const key: unknown = Reflect.get(item, 'key');
-    if (key !== undefined && key !== null) return String(key);
-    const id: unknown = Reflect.get(item, 'id');
-    if (id !== undefined && id !== null) return String(id);
-  }
-  return String(index);
-}
+export const defaultKeyExtractor = rnDefaultItemKey;
 
 // One place for every adapter's `keyForIndex`: the caller's extractor, else the default
 export function resolveItemKey<ItemT>(

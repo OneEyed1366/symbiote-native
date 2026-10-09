@@ -1,3 +1,5 @@
+// TODO(rn-port): RN's `ActivityIndicator.js` is a React component, we rebuild its two-node shape
+
 // ActivityIndicator's host behavior: the composition and the prop fold, below the framework, so
 // the primitive is a bare `activity-indicator` tag and not five wrapper components.
 
@@ -88,9 +90,8 @@ const ACTIVITY_INDICATOR_HOST_PROPS: readonly string[] = [
 // `core/engine/cpp/tests/js/activity-indicator-payload.itest.ts`. `platform.defaultColor` stays
 // because the Android half is chosen by COMPONENT NAME in C++.
 
-// Returns the spinner as the slot because the prop redirect gates on `childHost` being set — not
-// because children go there: RN's ActivityIndicator takes no children at all, hence
-// `slotTakesNoChildren` below (Android's ProgressBar isn't a ViewGroup and would crash on addView).
+// The spinner is the slot because the prop redirect gates on `childHost`, not for children
+// It takes none (`slotTakesNoChildren`), Android's ProgressBar is no ViewGroup, `addView` crashes
 function buildSpinner(platform: IActivityIndicatorPlatform) {
   return (node: ISymbioteNode): ISymbioteNode => {
     const descriptor = descriptorFor(ACTIVITY_INDICATOR_SPINNER_TAG);
@@ -132,9 +133,8 @@ export function registerActivityIndicatorBehaviors(
     ACTIVITY_INDICATOR_TAG,
     activityIndicatorBehavior(platform),
   );
-  // A registration with no runtime: a tag with no behavior registered carries an empty `tagName`
-  // in C++ and no rule can fire for it, so this has to exist even though there's no JS left to run
-  // — a registration is how this codebase declares a tag HAS platform semantics.
+  // A registration with no runtime: a tag without one has an empty `tagName` in C++, no rule fires
+  // It declares that the tag HAS platform semantics
   registerHostBehavior(ACTIVITY_INDICATOR_SPINNER_TAG, {
     attach() {},
     detach() {},
