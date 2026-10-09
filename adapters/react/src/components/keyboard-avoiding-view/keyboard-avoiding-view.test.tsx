@@ -1,45 +1,18 @@
-// Co-located React-driven test.
-//
-// The Keyboard module's own subscribe/cache/unsubscribe contract (addListener, isVisible,
-// metrics, malformed-payload handling, removeAllListeners) is already exhaustively unit-tested
-// in core/engine/src/keyboard/keyboard.test.ts — N/A here, not duplicated.
-//
-// resolveKeyboardAvoidingLayout / computeInset / readKeyboardFrame / readLayoutFrame /
-// keyboardAvoidingEventNamesFor (core/components/src/view/render-keyboard-avoiding-view.ts) are
-// the framework-agnostic inset math + behavior->layout decision, unit-tested on their own in
-// render-keyboard-avoiding-view.test.ts. What THIS file owns is the React lifecycle around them:
-// which events the effect subscribes to, that the LIVE inset (not a stale closure) is fed back
-// as previousInset, that the cross-fade setting is read once and passed through, and cleanup.
-//
-// The shared fake-Fabric slot records the committed tree; a fake __turboModuleProxy returns
-// a KeyboardObserver with observe-counters plus an AccessibilityManager whose cross-fade getter
-// reads a per-test flag; a fake RN$registerCallableModule captures the device hub so the test can
-// play "native". Each scenario mounts a KeyboardAvoidingView, gives the wrapper a frame via
-// topLayout, then emits the host's show/hide notifications and asserts the wrapper's style tracks
-// the computed inset (the engine HOISTS paddingBottom/height/flex to top-level props).
-//
-// Headless Platform resolves to iOS (core/engine/src/platform/index.ts re-exports index.ios), so
-// the subscribed pair here is the WILL pair. The Android branch of keyboardAvoidingEventNamesFor
-// is covered by the core unit test, which passes the host in as an argument — N/A here, since a
-// mounted component can only ever see this process's one host.
-//
-// No Negative group: KeyboardAvoidingView (adapters/react/.../keyboard-avoiding-view/index.ts)
-// and resolveKeyboardAvoidingLayout have no guard clause and no branch that throws — every
-// unrecognized `behavior` value and every malformed native payload is designed to degrade to a
-// safe default rather than reject, so there is no contract-accurate throwing scenario here.
+// React lifecycle of `KeyboardAvoidingView`: events the effect subscribes to, the live inset fed
+// back as `previousInset`, the one-off cross-fade read and cleanup; inset math lives in core
+// Headless `Platform` is iOS, so the will* pair is subscribed; no Negative group, nothing throws
 
 import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { KeyboardAvoidingView, mount, unmount } from '@symbiote-native/react';
 import {
   createLiveTree,
+  emitRnDeviceEvent,
   installRecordingFabric,
   type ILiveNode,
 } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 290;
-
-// ---- fake native-module + device-hub globals ----------------------------
 
 let keyboardAdded = 0;
 let keyboardRemoved = 0;
@@ -51,9 +24,8 @@ const fakeKeyboardObserver = {
     keyboardRemoved += count;
   },
 };
-// The iOS "Prefer Cross-Fade Transitions" setting the component reads once per mount. The native
-// module is resolved and CACHED on first lookup (createDeviceEventModule), so the flag has to be
-// mutable behind a stable getter rather than swapped module-for-module between tests.
+// The iOS cross-fade setting is read once per mount and the module is cached on first lookup
+// So the flag stays mutable behind a stable getter instead of swapping modules between tests
 let prefersCrossFade = false;
 const fakeAccessibilityManager = {
   getCurrentPrefersCrossFadeTransitionsState: (
@@ -69,10 +41,6 @@ const registeredModules: Record<string, unknown> = {
   AccessibilityManager: fakeAccessibilityManager,
 };
 
-// The device hub our code registers, captured so the test can act as "native".
-let deviceHub:
-  { emit: (eventType: string, ...args: unknown[]) => void } | undefined;
-
 function isType<T>(value: unknown): value is T {
   return value !== null && value !== undefined;
 }
@@ -84,30 +52,22 @@ Object.assign(globalThis, {
     if (!isType<T>(module)) return null;
     return module;
   },
-  RN$registerCallableModule: (
-    name: string,
-    factory: () => { emit: (eventType: string, ...args: unknown[]) => void },
-  ): void => {
-    if (name === 'RCTDeviceEventEmitter') deviceHub = factory();
-  },
 });
-
-// ---- inset geometry -----------------------------------------------------
 
 const SCREEN_HEIGHT = 800;
 const FRAME_Y = 0;
 const KEYBOARD_HEIGHT = 300;
-// Keyboard top edge sits KEYBOARD_HEIGHT up from the screen bottom.
-const KEYBOARD_SCREEN_Y = SCREEN_HEIGHT - KEYBOARD_HEIGHT; // 500
-// inset = max(0, frameY + frameHeight - keyboardY) = 0 + 800 - 500 = 300.
+// The keyboard top edge sits KEYBOARD_HEIGHT up from the screen bottom
+const KEYBOARD_SCREEN_Y = SCREEN_HEIGHT - KEYBOARD_HEIGHT;
+// inset = max(0, frameY + frameHeight - keyboardY) = 0 + 800 - 500 = 300
 const EXPECTED_INSET = FRAME_Y + SCREEN_HEIGHT - KEYBOARD_SCREEN_Y;
 const WRAPPER_FRAME = { x: 0, y: FRAME_Y, width: 400, height: SCREEN_HEIGHT };
 
-// The two notifications the effect must subscribe to on this host, spelled out rather than
-// re-derived from keyboardAvoidingEventNamesFor — a test that recomputes the value it checks
-// would follow the component into any rename.
+// Spelled out instead of derived from `keyboardAvoidingEventNamesFor`, or a rename would pass
 const SHOW_EVENT = 'keyboardWillShow';
 const HIDE_EVENT = 'keyboardWillHide';
+
+const FILL_STYLE = { flex: 1 };
 
 function App(
   props: Partial<
@@ -118,7 +78,7 @@ function App(
   >,
 ): ReactElement {
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} {...props}>
+    <KeyboardAvoidingView style={FILL_STYLE} {...props}>
       <text>type here</text>
     </KeyboardAvoidingView>
   );
@@ -134,8 +94,7 @@ beforeEach(() => {
 });
 afterEach(() => unmount(ROOT_TAG));
 
-// The current committed wrapper (the outer RCTView KeyboardAvoidingView renders).
-// Re-read after each commit — a live node's payload is always the current one.
+// The outer RCTView that `KeyboardAvoidingView` renders, re-read after each commit
 function currentWrapper(): ILiveNode {
   const wrapper = live.nodeOf(live.appRoot()).children[0];
   expect(wrapper, 'an RCTView wrapper sits under the root').toBeDefined();
@@ -143,31 +102,24 @@ function currentWrapper(): ILiveNode {
   return wrapper;
 }
 
-function showKeyboard(
-  hub: { emit: (eventType: string, ...args: unknown[]) => void },
-  screenY: number = KEYBOARD_SCREEN_Y,
-): void {
-  hub.emit(SHOW_EVENT, {
+function showKeyboard(screenY: number = KEYBOARD_SCREEN_Y): void {
+  emitRnDeviceEvent(SHOW_EVENT, {
     endCoordinates: { height: KEYBOARD_HEIGHT, screenY },
   });
 }
-function hideKeyboard(hub: {
-  emit: (eventType: string, ...args: unknown[]) => void;
-}): void {
-  hub.emit(HIDE_EVENT, {
+function hideKeyboard(): void {
+  emitRnDeviceEvent(HIDE_EVENT, {
     endCoordinates: { height: 0, screenY: SCREEN_HEIGHT },
   });
 }
 
-// The component reads the cross-fade setting through a promise; let that microtask land before
-// playing a keyboard event, or the flag is still at its default when the math runs.
+// The cross-fade setting arrives through a promise, let it land before the math runs
 async function settleCrossFadeRead(): Promise<void> {
   await Promise.resolve();
   await Promise.resolve();
 }
 
-// Re-measure the wrapper. Real native re-lays out after every commit; the fake slot does not, so
-// each scenario that depends on a NEW frame states it explicitly.
+// The fake slot does not re-lay out after a commit like native does, so each scenario says so
 function measureWrapper(height: number): void {
   fabric.fireEvent(currentWrapper().instanceHandle, 'topLayout', {
     layout: { ...WRAPPER_FRAME, height },
@@ -175,238 +127,179 @@ function measureWrapper(height: number): void {
 }
 
 describe('KeyboardAvoidingView', () => {
-  describe('Positive — behavior branches resolve to the documented wrapper/nested layout', () => {
-    // why: RN's 'padding' mode adjusts the single wrapper's paddingBottom directly
-    // (resolveKeyboardAvoidingLayout's 'wrapper' branch) — the most common usage.
+  describe('Positive: behavior branches resolve to the documented wrapper or nested layout', () => {
+    // RN's 'padding' mode adjusts `paddingBottom` of the single wrapper, the common usage
     it('behavior="padding": tracks the keyboard inset on paddingBottom across show/hide', () => {
       mount(ROOT_TAG, <App behavior="padding" />);
-      const hub = deviceHub!;
-      expect(hub, 'device hub is installed by mount').toBeDefined();
+      expect(keyboardAdded, 'mount subscribes to the keyboard').toBeGreaterThan(
+        0,
+      );
 
-      // handleLayout writes a ref (no state), so no recommit happens here.
-      fabric.fireEvent(currentWrapper().instanceHandle, 'topLayout', {
-        layout: WRAPPER_FRAME,
-      });
+      // `handleLayout` writes a ref, so no recommit happens here
+      measureWrapper(SCREEN_HEIGHT);
       const before = currentWrapper().payload.paddingBottom;
       expect(before === undefined || before === 0).toBe(true);
 
-      showKeyboard(hub);
+      showKeyboard();
       expect(currentWrapper().payload.paddingBottom).toBe(EXPECTED_INSET);
 
-      hideKeyboard(hub);
+      hideKeyboard();
       expect(currentWrapper().payload.paddingBottom).toBe(0);
     });
 
-    // why: 'position' is the only behavior that NESTS content in an inner view pushed up by
-    // `bottom: inset`, instead of resizing the wrapper itself (resolveKeyboardAvoidingLayout's
-    // 'nested' branch) — this proves the React FC actually builds that extra inner View
-    // (`createElement('view', { style: layout.innerStyle }, children)`), not just picks the
-    // style.
+    // Only 'position' nests content in an inner view pushed up by `bottom: inset`
     it('behavior="position": nests children in an inner view whose bottom tracks the inset', () => {
       mount(ROOT_TAG, <App behavior="position" />);
-      const hub = deviceHub!;
-      fabric.fireEvent(currentWrapper().instanceHandle, 'topLayout', {
-        layout: WRAPPER_FRAME,
-      });
+      measureWrapper(SCREEN_HEIGHT);
 
       const inner = currentWrapper().children[0];
       expect(inner, 'position mode nests an inner RCTView').toBeDefined();
       expect(inner.viewName).toBe('RCTView');
       expect(inner.payload.bottom).toBe(0);
 
-      showKeyboard(hub);
+      showKeyboard();
       expect(currentWrapper().children[0].payload.bottom).toBe(EXPECTED_INSET);
     });
 
-    // why: 'height' only shrinks the wrapper (height = initialHeight - inset, flex collapsed
-    // to 0) once BOTH the keyboard is up AND an initial measured height exists
-    // (resolveKeyboardAvoidingLayout: `behavior === 'height' && effectiveInset > 0 &&
-    // initialHeight !== undefined`) — otherwise it renders untouched, matching RN's "no-op
-    // until we know the starting height" guard.
+    // 'height' shrinks the wrapper only with the keyboard up AND a measured initial height
+    // Before that it stays untouched, matching RN's no-op guard
     it('behavior="height": shrinks height only once measured and only while the keyboard is up', () => {
       mount(ROOT_TAG, <App behavior="height" />);
-      const hub = deviceHub!;
 
-      // Keyboard shows before any layout was measured: initialHeight is still undefined, so
-      // the guard must hold the wrapper untouched rather than compute a bogus height.
-      showKeyboard(hub);
+      // The keyboard shows before any layout was measured, so `initialHeight` is still undefined
+      showKeyboard();
       expect(currentWrapper().payload.height).toBeUndefined();
 
-      hideKeyboard(hub);
-      fabric.fireEvent(currentWrapper().instanceHandle, 'topLayout', {
-        layout: WRAPPER_FRAME,
-      });
-      showKeyboard(hub);
+      hideKeyboard();
+      measureWrapper(SCREEN_HEIGHT);
+      showKeyboard();
       expect(currentWrapper().payload.height).toBe(
         SCREEN_HEIGHT - EXPECTED_INSET,
       );
       expect(currentWrapper().payload.flex).toBe(0);
 
-      // Once removed, a previously-present prop clones through as an explicit `null` (the
-      // engine's native-removal signal), not `undefined` — that distinction is the engine's
-      // own contract, not this component's; either way means "no longer applied".
-      hideKeyboard(hub);
+      // A removed prop clones through as an explicit `null`, the engine's native-removal signal
+      hideKeyboard();
       const height = currentWrapper().payload.height;
       expect(height === undefined || height === null).toBe(true);
     });
 
-    // why: THE regression this fix exists for. In 'height' mode the wrapper is shrunk by the
-    // inset, so native's next onLayout reports a frame shorter by exactly that much. computeInset
-    // adds the PREVIOUS inset back (RN's `this.state.bottom + …`), which makes the second event a
-    // fixpoint. Feed it a stale inset — or none — and the shrunk frame computes an overlap of 0,
-    // the wrapper springs back to full height, and the content drops under the keyboard.
-    // Two events, deliberately: one alone cannot tell a live inset from a frozen closure.
+    // The wrapper shrinks by the inset, so the next `onLayout` reports a frame shorter by that much
+    // `computeInset` adds the previous inset back, which makes the second event a fixpoint
+    // A stale or missing inset computes overlap 0 and the content drops under the keyboard
     it('behavior="height": a second keyboard event on the SHRUNK frame holds the inset put', () => {
       mount(ROOT_TAG, <App behavior="height" />);
-      const hub = deviceHub!;
 
       measureWrapper(SCREEN_HEIGHT);
-      showKeyboard(hub);
+      showKeyboard();
       const shrunkHeight = SCREEN_HEIGHT - EXPECTED_INSET;
       expect(currentWrapper().payload.height).toBe(shrunkHeight);
 
-      // Native re-lays out the now-shorter wrapper, then the keyboard reports its frame again.
+      // Native re-lays out the now-shorter wrapper, then the keyboard reports its frame again
       measureWrapper(shrunkHeight);
-      showKeyboard(hub);
+      showKeyboard();
       expect(currentWrapper().payload.height).toBe(shrunkHeight);
       expect(currentWrapper().payload.flex).toBe(0);
     });
 
-    // why: an unset `behavior` (RN allows it — defaults to no-op on iOS in RN itself, here
-    // resolveKeyboardAvoidingLayout's fallthrough) must still apply the caller's own `style`
-    // untouched and never inject an inset the caller didn't ask for.
+    // An unset `behavior` must keep the caller's `style` and never inject an inset
     it('behavior=undefined: renders the wrapper untouched by any inset', () => {
       mount(ROOT_TAG, <App />);
-      const hub = deviceHub!;
-      fabric.fireEvent(currentWrapper().instanceHandle, 'topLayout', {
-        layout: WRAPPER_FRAME,
-      });
-      showKeyboard(hub);
+      measureWrapper(SCREEN_HEIGHT);
+      showKeyboard();
       expect(currentWrapper().payload.paddingBottom).toBeUndefined();
       expect(currentWrapper().payload.height).toBeUndefined();
       expect(currentWrapper().payload.flex).toBe(1);
     });
   });
 
-  describe('Positive — the enabled and keyboardVerticalOffset gates', () => {
-    // why: RN gates every inset computation on `enabled ?? true` (KeyboardAvoidingView.js) —
-    // enabled=false must render the view exactly as if the keyboard never showed, even after a
-    // real keyboardDidShow event fires.
+  describe('Positive: the enabled and keyboardVerticalOffset gates', () => {
+    // RN gates every inset on `enabled ?? true`, so false renders as if the keyboard never showed
     it('enabled=false forces the inset to 0 even while the keyboard is shown', () => {
       mount(ROOT_TAG, <App behavior="padding" enabled={false} />);
-      const hub = deviceHub!;
-      fabric.fireEvent(currentWrapper().instanceHandle, 'topLayout', {
-        layout: WRAPPER_FRAME,
-      });
-      showKeyboard(hub);
+      measureWrapper(SCREEN_HEIGHT);
+      showKeyboard();
       const padding = currentWrapper().payload.paddingBottom;
       expect(padding === undefined || padding === 0).toBe(true);
     });
 
-    // why: keyboardVerticalOffset shifts the keyboard's effective top edge up before the
-    // overlap math runs (`keyboardY = keyboard.screenY - verticalOffset`) — a view that starts
-    // below the screen's top (a header, a nav bar) passes this so its own inset still clears
-    // the keyboard exactly, rather than under- or over-padding by the offset amount.
+    // The offset moves the keyboard top edge up before the overlap math, for a view below a header
     it('keyboardVerticalOffset shifts the computed inset by exactly the offset', () => {
       const OFFSET = 40;
       mount(
         ROOT_TAG,
         <App behavior="padding" keyboardVerticalOffset={OFFSET} />,
       );
-      const hub = deviceHub!;
-      fabric.fireEvent(currentWrapper().instanceHandle, 'topLayout', {
-        layout: WRAPPER_FRAME,
-      });
-      showKeyboard(hub);
+      measureWrapper(SCREEN_HEIGHT);
+      showKeyboard();
       expect(currentWrapper().payload.paddingBottom).toBe(
         EXPECTED_INSET + OFFSET,
       );
     });
   });
 
-  describe('Positive — the platform-correct event pair', () => {
-    // why: RN subscribes to exactly TWO notifications, chosen per host, and this host (headless
-    // = iOS) takes the WILL pair so the view rides up WITH the keyboard animation instead of
-    // snapping into place after it. Asserting on the wire names, not on a spy, because the name
-    // is the whole contract — a subscription to the right count of the wrong events is silent.
+  describe('Positive: the platform-correct event pair', () => {
+    // This host takes the will* pair so the view rides up WITH the keyboard animation
+    // Asserted on the wire names, since a subscription to the wrong events is silent
     it(`applies the inset on ${SHOW_EVENT} and clears it on ${HIDE_EVENT}`, () => {
       mount(ROOT_TAG, <App behavior="padding" />);
-      const hub = deviceHub!;
       measureWrapper(SCREEN_HEIGHT);
 
-      hub.emit(SHOW_EVENT, {
-        endCoordinates: { height: KEYBOARD_HEIGHT, screenY: KEYBOARD_SCREEN_Y },
-      });
+      showKeyboard();
       expect(currentWrapper().payload.paddingBottom).toBe(EXPECTED_INSET);
 
-      hub.emit(HIDE_EVENT, {
-        endCoordinates: { height: 0, screenY: SCREEN_HEIGHT },
-      });
+      hideKeyboard();
       expect(currentWrapper().payload.paddingBottom).toBe(0);
     });
 
-    // why: keyboardDidChangeFrame is the listener RN's own comment warns against — with an
-    // undocked, split or floating iOS keyboard it is emitted BEFORE the hide notification, so a
-    // frame captured mid-dismissal would be applied as if the keyboard were still up. Dropping it
-    // is part of the fix. The did* pair goes with it on this host: it fires only once the keyboard
-    // has finished animating, one animation too late.
+    // An undocked, split or floating iOS keyboard emits change-frame BEFORE the hide
+    // So a frame captured mid-dismissal would apply, and the did* pair fires one animation too late
     it('ignores the events it no longer subscribes to (didChangeFrame, didShow)', () => {
       mount(ROOT_TAG, <App behavior="padding" />);
-      const hub = deviceHub!;
       measureWrapper(SCREEN_HEIGHT);
 
       const frame = {
         endCoordinates: { height: KEYBOARD_HEIGHT, screenY: KEYBOARD_SCREEN_Y },
       };
-      hub.emit('keyboardDidChangeFrame', frame);
-      hub.emit('keyboardWillChangeFrame', frame);
-      hub.emit('keyboardDidShow', frame);
+      emitRnDeviceEvent('keyboardDidChangeFrame', frame);
+      emitRnDeviceEvent('keyboardWillChangeFrame', frame);
+      emitRnDeviceEvent('keyboardDidShow', frame);
 
       const padding = currentWrapper().payload.paddingBottom;
       expect(padding === undefined || padding === 0).toBe(true);
     });
   });
 
-  describe('Positive — the iOS Prefer-Cross-Fade setting', () => {
-    // why: with that accessibility setting on, iOS reports the keyboard's screenY as 0 instead of
-    // its real top edge. The ordinary overlap math then reads that as "the keyboard covers
-    // everything" and lifts the view by its whole y + height — the content leaves the screen. The
-    // component must read the setting once through AccessibilityInfo and pass it down, or core
-    // cannot take its early return.
+  describe('Positive: the iOS Prefer-Cross-Fade setting', () => {
+    // With the setting on, iOS reports `screenY` 0, which reads as a keyboard covering everything
+    // The component passes the setting down so core can take its early return
     it('screenY=0 with the setting ON lifts nothing', async () => {
       prefersCrossFade = true;
       mount(ROOT_TAG, <App behavior="padding" />);
-      const hub = deviceHub!;
       await settleCrossFadeRead();
       measureWrapper(SCREEN_HEIGHT);
 
-      showKeyboard(hub, 0);
+      showKeyboard(0);
       const padding = currentWrapper().payload.paddingBottom;
       expect(padding === undefined || padding === 0).toBe(true);
     });
 
-    // why: the paired half — the early return is gated on the setting, not on screenY alone. With
-    // it OFF (the ordinary device, and the fallback when the native getter is absent) the very
-    // same payload must still lift the view, or the guard would have swallowed a real keyboard.
+    // The early return is gated on the setting, not on `screenY` alone
     it('screenY=0 with the setting OFF still lifts by the full overlap', async () => {
       mount(ROOT_TAG, <App behavior="padding" />);
-      const hub = deviceHub!;
       await settleCrossFadeRead();
       measureWrapper(SCREEN_HEIGHT);
 
-      showKeyboard(hub, 0);
+      showKeyboard(0);
       expect(currentWrapper().payload.paddingBottom).toBe(
         FRAME_Y + SCREEN_HEIGHT,
       );
     });
   });
 
-  describe('Positive — keyboard subscription lifecycle', () => {
-    // why: the useEffect subscribes to the host's show/hide pair on mount and MUST clean up on
-    // unmount, or every remount leaks 2 more native listeners onto an already-unmounted
-    // component's stale closures. Asserting a DELTA (not an absolute count) keeps this robust
-    // against the module-level cache-feed subscription that Keyboard sets up once, lazily, on
-    // whichever test happens to call addListener first.
+  describe('Positive: keyboard subscription lifecycle', () => {
+    // The effect must clean up on unmount, or every remount leaks two more listeners
+    // A delta, not an absolute count, since `Keyboard` sets up its cache feed once and lazily
     it('subscribes exactly 2 keyboard listeners on mount and removes exactly 2 on unmount', () => {
       const addedBefore = keyboardAdded;
       mount(ROOT_TAG, <App behavior="padding" />);
@@ -418,29 +311,20 @@ describe('KeyboardAvoidingView', () => {
     });
   });
 
-  describe('Positive — race and malformed-payload safety', () => {
-    // why: a keyboard can show before the wrapper's own onLayout has ever fired (slow layout,
-    // fast keyboard). computeInset's `frame === undefined` guard must hold the inset at 0
-    // rather than throw or compute NaN/negative padding from a missing frame.
+  describe('Positive: race and malformed-payload safety', () => {
+    // A keyboard can show before the first `onLayout`, the missing frame must hold the inset at 0
     it('keyboard shows before the wrapper has measured a layout: inset stays 0, no crash', () => {
       mount(ROOT_TAG, <App behavior="padding" />);
-      const hub = deviceHub!;
-      showKeyboard(hub);
+      showKeyboard();
       const padding = currentWrapper().payload.paddingBottom;
       expect(padding === undefined || padding === 0).toBe(true);
     });
 
-    // why: readKeyboardFrame narrows an untyped native payload and returns undefined on a
-    // malformed shape rather than throwing; computeInset then takes its `keyboard === undefined`
-    // branch. A malformed show event must leave the wrapper's inset unaffected, not crash the
-    // mount.
+    // `readKeyboardFrame` returns undefined on a malformed shape, so the inset stays unaffected
     it('ignores a malformed show payload missing endCoordinates', () => {
       mount(ROOT_TAG, <App behavior="padding" />);
-      const hub = deviceHub!;
-      fabric.fireEvent(currentWrapper().instanceHandle, 'topLayout', {
-        layout: WRAPPER_FRAME,
-      });
-      hub.emit(SHOW_EVENT, { duration: 250, easing: 'keyboard' });
+      measureWrapper(SCREEN_HEIGHT);
+      emitRnDeviceEvent(SHOW_EVENT, { duration: 250, easing: 'keyboard' });
       const padding = currentWrapper().payload.paddingBottom;
       expect(padding === undefined || padding === 0).toBe(true);
     });

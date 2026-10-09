@@ -23,7 +23,6 @@ const ENGINE_UTILITIES = [
   'processColor',
   'setNativeViewConfigSource',
   'setColorProcessor',
-  'setDeviceEventSource',
   'dlog',
   'isDebug',
 ];

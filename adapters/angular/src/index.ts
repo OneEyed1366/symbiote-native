@@ -52,11 +52,8 @@ export {
   VSectionSeparatorDirective,
 } from './components';
 export { Animated } from './modules/animated';
-// Also exposed as named top-level symbols (not just Animated.View/.Text/...): ngtsc's partial-mode
-// static evaluator can't trace a component class through property access on an external
-// namespace object, only through a direct named import binding —
-// so `<AnimatedView>` in a template requires `import { AnimatedView } from '@symbiote-native/angular'`,
-// not `const AnimatedView = Animated.View`. Plain tsc/vitest don't catch this; only a real ngc run does.
+// Named top-level too, as the ngtsc static evaluator cannot trace `Animated.View` property access
+// A template tag like `<AnimatedView>` needs a direct import, only a real ngc run catches it
 export {
   AnimatedFlatList,
   AnimatedImage,
@@ -65,15 +62,9 @@ export {
   AnimatedText,
   AnimatedView,
 } from './modules/animated';
-// Exported even though Angular's version maps only the four primitives (View/Text/Image/
-// ScrollView) onto the pre-authored wrappers above and THROWS on anything else — there is no JIT
-// under AOT/Metro, so it cannot synthesize a wrapper at runtime the way the other four adapters
-// do. It ships anyway because portable code (`createAnimatedComponent(View)`) then compiles and
-// runs identically on all five adapters, and the one case Angular cannot serve fails with a
-// message naming the fix (author a standalone @Component over AnimatedComponentBase) instead of
-// failing as a missing export, which names nothing. Found by the barrel audit in
-// `.claude/rules/adapter-parity-audit.md`: it was implemented and tested here all along and simply
-// never reached this file, so `@symbiote-native/angular` consumers could not reach it at all.
+// Maps only View/Text/Image/ScrollView onto the wrappers above and throws on anything else (no JIT)
+// Portable `createAnimatedComponent(View)` still runs on all five adapters, and the error names
+// the fix: a standalone `@Component` over `AnimatedComponentBase`
 export { createAnimatedComponent } from './modules/animated';
 export type {
   IActivityIndicatorProps,
@@ -198,12 +189,8 @@ export { mount, unmount } from './render';
 // without hand-writing its own Renderer2 walker.
 export { DescriptorOutlet } from './descriptor-to-angular';
 export { DescriptorHost } from './descriptor-to-angular/descriptor-host';
-// createPortal (same-surface only — see the file header) and createTunnel (cross-surface,
-// see its file header) are the Angular twins of the React/Vue portal/tunnel primitives.
-// Angular can't synthesize components at runtime (no JIT under Metro/Hermes), so both are
-// static, pre-authored structural directives (`*portal`/`*tunnelIn`, the `*ngIf`/`*ngFor`
-// idiom) parameterized by an `@Input()`, rather than a factory returning fresh components per
-// call.
+// Twins of the React/Vue portal and tunnel: same-surface portal, cross-surface tunnel
+// No JIT under Metro/Hermes, so both are pre-authored structural directives (`*portal`/`*tunnelIn`)
 export { PortalDirective, PortalOutletDirective } from './create-portal';
 export {
   createTunnel,
@@ -352,7 +339,6 @@ export {
   Platform,
   processColor,
   setColorProcessor,
-  setDeviceEventSource,
   setNativeViewConfigSource,
   StyleSheet,
 } from '@symbiote-native/engine';

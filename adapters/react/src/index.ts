@@ -167,14 +167,11 @@ export type {
   IFlexJustify,
 } from './utils/styles';
 export { mount, unmount } from './render';
-// createPortal: react-reconciler's Fiber-level portal, working here because @symbiote-native/react is
-// mutation-mode (unlike stock RN's persistent-mode Fabric renderer, which doesn't support it —
-// see create-portal.ts). v1 scope: target must be an already-mounted node in the SAME surface.
+// `createPortal` needs mutation mode, stock RN's persistent-mode renderer has no portal
+// The target must be a mounted node of the same surface, see create-portal.ts
 export { createPortal, type IPortalContainer } from './create-portal';
-// createTunnel: cross-surface content sharing. createPortal/Teleport stay same-surface-only
-// by design — a real React portal can't reach across two separate reconciler roots either
-// (see github.com/facebook/react/issues/17147), so reaching a different surface means letting
-// that surface commit its own content by reading from a shared store instead.
+// `createTunnel` shares content across surfaces, since a React portal cannot reach another root
+// (github.com/facebook/react/issues/17147) and the other surface reads a shared store instead
 export { createTunnel, type ITunnel } from './create-tunnel';
 // descriptorToReact: the @symbiote-native/components Descriptor → React.createElement bridge. Exported so
 // an external wrapper package (e.g. @symbiote-native/slider/react over a third-party native view) can map
@@ -225,14 +222,11 @@ export type {
   IOpaqueColorValue,
   IDynamicColorIOSTuple,
 } from '@symbiote-native/engine';
-// The three app-entry seams, wired once on a real host, so the barrel exposes them together.
-// setNativeViewConfigSource hands the engine RN's ViewConfig registry, which is how third-party
-// Fabric views auto-derive their metadata:
-//   setNativeViewConfigSource(name => ReactNativeViewConfigRegistry.get(name))
+// Seams wired once on a real host: `setNativeViewConfigSource` derives third-party view configs
+//   `setNativeViewConfigSource(name => ReactNativeViewConfigRegistry.get(name))`
 export {
   setNativeViewConfigSource,
   setColorProcessor,
-  setDeviceEventSource,
 } from '@symbiote-native/engine';
 // Diagnostics, gated by DEBUG (<keep_logs_gate_behind_DEBUG>): app code logs through the same
 // seam the engine does instead of a bare console.log.

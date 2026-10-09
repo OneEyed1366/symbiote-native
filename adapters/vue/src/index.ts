@@ -9,36 +9,15 @@
 
 import './register';
 
-// Re-exports Vue's ENTIRE public API (ref, computed, defineComponent, unref, …), which looks like
-// scope creep on an otherwise carefully curated barrel — it is not ergonomics, it is what makes
-// `vueCompilerOptions.lib: "@symbiote-native/vue"` (examples/*/tsconfig.typecheck.json) safe to
-// set. Volar/`@vue/language-core` generates virtual TS referencing `import(lib).unref`,
-// `import(lib).GlobalComponents`, `.GlobalDirectives`, `.ShallowRef`, `.ObjectDirective` — always
-// off `lib`'s ROOT import, never a subpath — so pointing `lib` at us without this line breaks
-// EVERY `.vue` SFC's template check with `Cannot find name` the moment Volar's codegen touches any
-// of them. `lib`'s other consumer, `optionsWrapper`'s `(await import(lib)).defineComponent(...)`,
-// only fires for a plain `<script>` `export default {}` block (`isExportRawObject`,
-// `@vue/language-core/lib/codegen/script/index.js`) — every `.vue` file in this repo uses
-// `<script setup>`, so that branch never runs and defineComponent needing to resolve from here too
-// is moot in practice, not something this wildcard has to get right on its own.
-//
-// WHY `lib` NEEDS TO BE US AT ALL: plain `"vue"` (Volar's default) types `__VLS_IntrinsicElements`
-// and `GlobalComponents` off `vue`'s own `jsx-runtime`/ambient augmentation — the SAME
-// `view`/`text`/`image`/`switch`-collide-with-real-SVG-elements problem documented in
-// `jsx-runtime.ts` and `intrinsic-elements.ts`, but for `.vue` TEMPLATES rather than TSX. Volar's
-// native-vs-component branch (`!isNativeTag(tag)`) reads `IntrinsicElements` from
-// `import('${lib}/jsx-runtime')`, so redirecting `lib` to our own package is what finally reaches
-// OUR jsx-runtime.ts (real `IViewProps`/`ITextProps`/… on all 4 collision tags) for those four.
+// Volar reads `unref`, `GlobalComponents` and the rest off the ROOT import of `lib`, which is this
+// package (`vueCompilerOptions.lib`), so the barrel re-exports all of `vue`
+// Pointing `lib` here also routes `.vue` template tags to our `jsx-runtime.ts` and its prop types
 export * from 'vue';
 
 export { mount, unmount, setAppConfigurator } from './render';
 export type { IAppConfigurator } from './render';
-// The portal: Vue's own <Teleport>, guarded so `to` must be a node/surface this renderer actually
-// mounted (there is no querySelector). It MOVES host nodes, so it reaches any already-mounted
-// target in the SAME surface — including one you only hold a ref to — and keeps the content's
-// reactive owner at the call site (provide/inject resolve from where it was written). Reaching a
-// second, independently mount()ed surface is a different mechanism: createTunnel, which copies
-// into an <Out/> the destination has to render. See create-portal/index.ts.
+// Vue's `Teleport` moves host nodes within one surface, `to` must be a node this renderer mounted
+// Another `mount()`ed surface is the job of `createTunnel`, see create-portal/index.ts
 export { Teleport, type ITeleportTarget } from './create-portal';
 export { createTunnel, type ITunnel } from './create-tunnel';
 // Vue's own Transition/TransitionGroup are runtime-dom-only (CSS class toggling) and
@@ -113,13 +92,8 @@ export type {
   IScrollViewProps,
   IScrollViewHandle,
 } from './components/scroll-view/scroll-view-props';
-// `Pressable` is a TAG — `<pressable>` — and there is nothing to import in its place. The press
-// machine runs on the engine node (`registerPressableBehavior`).
-//
-// `IPressableSlots` is GONE with the wrapper and nothing replaces it: press state lives on the
-// engine node and never reaches Vue's reactivity, so `#default="{ pressed }"` has no channel. A
-// functional `style` still works (the engine resolves it at both values of `pressed`), and a child
-// that needs the state takes it from a ref the screen mirrors off `@press-in`/`@press-out`.
+// `Pressable` is the tag `<pressable>`, the press machine runs on the engine node
+// No slot props: press state never reaches Vue reactivity, mirror `@press-in`/`@press-out` in a ref
 export type {
   IPressableProps,
   IPressState,
@@ -374,12 +348,8 @@ export type {
   IPlatformSelectSpec,
 } from '@symbiote-native/engine';
 // Wired once by the app entry on a real host (like setColorProcessor): hands the engine
-// RN's ViewConfig registry so third-party Fabric views auto-derive their metadata.
-// setDeviceEventSource is the third seam of the same set and travels with them.
-export {
-  setNativeViewConfigSource,
-  setDeviceEventSource,
-} from '@symbiote-native/engine';
+// RN's ViewConfig registry so third-party Fabric views auto-derive their metadata
+export { setNativeViewConfigSource } from '@symbiote-native/engine';
 export type {
   INativeViewConfig,
   INativeViewConfigSource,

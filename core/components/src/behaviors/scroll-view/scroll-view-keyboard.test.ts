@@ -9,27 +9,11 @@ import {
   createElement,
   createSurface,
   routeProp,
-  setDeviceEventSource,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
 
 import { descriptorFor } from '../../component-names';
 import { registerScrollViewBehavior, SCROLL_VIEW_TAG } from './index';
-
-// The app's device bus, standing in for RN's `DeviceEventEmitter`
-const busListeners = new Map<string, Set<(...args: unknown[]) => void>>();
-setDeviceEventSource({
-  addListener(eventType, listener) {
-    const set = busListeners.get(eventType) ?? new Set();
-    busListeners.set(eventType, set);
-    set.add(listener);
-    return { remove: () => set.delete(listener) };
-  },
-  emit(eventType, ...args) {
-    for (const listener of busListeners.get(eventType) ?? []) listener(...args);
-  },
-  listenerCount: eventType => busListeners.get(eventType)?.size ?? 0,
-});
 
 const fabric = installRecordingFabric();
 let nextRootTag = 9_800;

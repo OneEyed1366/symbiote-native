@@ -1,14 +1,14 @@
-// React-driven test proving the iOS AccessibilityInfo module, no simulator needed.
-// A fake __turboModuleProxy returns an
-// AccessibilityManager native module (state getters that invoke their success callback with known
-// values, plus observe-counters); a fake RN$registerCallableModule captures the device hub so the
-// test can play "native" and emit `screenReaderChanged`. iOS routes non-'click' accessibility events
-// through the shared Fabric slot, so case 6 augments the slot to record sendAccessibilityEvent.
+// The iOS `AccessibilityInfo` module without a simulator: a fake `__turboModuleProxy` returns the
+// `AccessibilityManager` module, `emitRnDeviceEvent` plays "native" for `screenReaderChanged`
+// iOS routes non-'click' events through the Fabric slot, which the recording host records
 
 import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount, AccessibilityInfo } from '@symbiote-native/react';
-import { installRecordingFabric } from '@symbiote-native/test-utils';
+import {
+  emitRnDeviceEvent,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 
 // The a11y event sink needed a hand-written slot override under the stand-in. The recording host
 // records it natively — `sendAccessibilityEvent` is one of the three imperative calls it keeps,
@@ -76,10 +76,6 @@ const registeredModules: Record<string, unknown> = {
   AccessibilityManager: fakeAccessibilityInfo,
 };
 
-// The device hub our code registers, captured so the test can act as "native".
-let deviceHub:
-  { emit: (eventType: string, ...args: unknown[]) => void } | undefined;
-
 function isType<T>(value: unknown): value is T {
   return value !== null && value !== undefined;
 }
@@ -90,12 +86,6 @@ Object.assign(globalThis, {
     if (module === undefined || module === null) return null;
     if (!isType<T>(module)) return null;
     return module;
-  },
-  RN$registerCallableModule: (
-    name: string,
-    factory: () => { emit: (eventType: string, ...args: unknown[]) => void },
-  ): void => {
-    if (name === 'RCTDeviceEventEmitter') deviceHub = factory();
   },
 });
 
@@ -122,18 +112,18 @@ describe('AccessibilityInfo (iOS)', () => {
         received = state;
       },
     );
-    expect(deviceHub).toBeDefined();
+    expect(typeof sub.remove).toBe('function');
     // RN listens on the device bus and never pings the native module's observe counters
     expect(a11yAdded).toBe(0);
 
-    deviceHub?.emit('screenReaderChanged', false);
+    emitRnDeviceEvent('screenReaderChanged', false);
     expect(received).toBe(false);
 
     received = undefined;
     sub.remove();
     expect(a11yRemoved).toBe(0);
 
-    deviceHub?.emit('screenReaderChanged', true);
+    emitRnDeviceEvent('screenReaderChanged', true);
     expect(received).toBeUndefined();
   });
 
