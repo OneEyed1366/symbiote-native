@@ -200,6 +200,11 @@ class Tree {
       facebook::jsi::Runtime &runtime,
       const facebook::jsi::Value *arguments,
       size_t count);
+  /** `shadowNodeWrapperOf(handle)`, a `ShadowNodeWrapper` over the committed node or undefined */
+  facebook::jsi::Value shadowNodeWrapperOf(
+      facebook::jsi::Runtime &runtime,
+      const facebook::jsi::Value *arguments,
+      size_t count);
 
   /**
    * The imperative six, taking the same placeholder object `applyOps` attached the node to.

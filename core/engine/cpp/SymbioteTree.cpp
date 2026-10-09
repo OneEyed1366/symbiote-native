@@ -2200,15 +2200,29 @@ jsi::Value Tree::committedRecordOf(
   if (node->committed == nullptr) return jsi::Value::undefined();
 
   auto record = jsi::Object(runtime);
-  // The PLACEHOLDER, not the `ShadowNode`. The reference applier answers with its fake Fabric node
-  // because that is what its slot's imperative calls accept; here the imperative five below accept
-  // this object, so it is the same field playing the same role. There is no JS value for a
-  // `shared_ptr<const ShadowNode>` that anything downstream could use.
+  // The PLACEHOLDER, not the `ShadowNode`: the imperative five below accept this object, a wrapper
+  // over the node itself comes from `shadowNodeWrapperOf`
   record.setProperty(runtime, "handle", jsi::Value(runtime, arguments[0]));
   record.setProperty(runtime, "tag", jsi::Value(static_cast<double>(node->tag)));
   record.setProperty(
       runtime, "rootTag", jsi::Value(static_cast<double>(node->committedSurfaceId)));
+  record.setProperty(
+      runtime, "familyGeneration", jsi::Value(static_cast<double>(node->familyGeneration)));
   return record;
+}
+
+jsi::Value Tree::shadowNodeWrapperOf(
+    jsi::Runtime &runtime,
+    const jsi::Value *arguments,
+    size_t count) {
+  if (count < 1) {
+    throw jsi::JSError(runtime, "symbiote engine: expected shadowNodeWrapperOf(handle)");
+  }
+  const auto node = nodeFrom(runtime, arguments[0].asObject(runtime), "shadowNodeWrapperOf");
+  if (node->committed == nullptr) return jsi::Value::undefined();
+  // A snapshot, it pins THIS revision until collected and its family is what Reanimated keys on
+  // Not `assignRuntimeShadowNodeReference`, nothing here would keep the wrapper refreshed
+  return react::valueFromShadowNode(runtime, node->committed);
 }
 
 jsi::Value Tree::committedPayloadOf(

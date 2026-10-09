@@ -20,9 +20,15 @@ import {
   hasAnimatedBindings,
   reattachAnimatedProps,
 } from './animated/host-binding';
+import { hasNodeBindings } from './node-binding-gate';
 import { EMPTY_CENSUS, flushOps, treeHost } from './tree-host';
 import { isSymbioteNode, type ISymbioteNode } from './node-types';
 import type { ITreeCensus } from './tree-host';
+
+// Whether a removed node can hold something to release, so it is worth nominating for the sweep
+function owesTeardown(): boolean {
+  return hasAttachedBehaviors() || hasAnimatedBindings() || hasNodeBindings();
+}
 
 // The host's raw answer, surface INCLUDED, unlike `parentOf` in `host-access.ts`, which reports a
 // top-level node as parentless by design. The two swaps below have to NAME the holder in an op
@@ -165,8 +171,7 @@ export function removeChild(
   // A wrap claim leaving: the owner takes its own place back and stays in the tree, nominated for
   // teardown like any other removed node т.к. the wrapper IS leaving
   if (unwrapsOwner(requestedParent, child)) {
-    if (hasAttachedBehaviors() || hasAnimatedBindings())
-      markDetachCandidate(child);
+    if (owesTeardown()) markDetachCandidate(child);
     return;
   }
   // A slot that IS the child being removed stops being one. Without the clear, `hostFor` below
@@ -176,8 +181,7 @@ export function removeChild(
   const parent = hostFor(requestedParent, child);
   // `hasAttachedBehaviors`, not `hasHostBehaviors`: the latter is on from module load in every app
   // just from registering Pressable as a type
-  if (hasAttachedBehaviors() || hasAnimatedBindings())
-    markDetachCandidate(child);
+  if (owesTeardown()) markDetachCandidate(child);
   // BOTH, and the owner is the one that matters: a composed primitive's behavior lives on the node
   // the adapter named, while `hostFor` redirects the mutation into its internal slot
   armCommitHookForChildChange(requestedParent);

@@ -2,12 +2,18 @@
 // order, merged into the one array the payload carries
 
 import { recordSetUnderlayShown } from './mutation-buffer';
-import {
-  EMPTY_STYLE,
-  resolveActiveClassName,
-  type IClassNameValue,
-} from './style-registry';
+import { EMPTY_STYLE, type IClassNameValue } from './style-registry';
 import { setProp } from './node-props';
+import {
+  claimedKeysIn,
+  hasStyleClaims,
+  offerOwnedStyle,
+  settleHandles,
+  settleStyle,
+  syncStyleHandles,
+  withoutClaimedKeys,
+  withSettledLayer,
+} from './style-claim';
 import type { IClassStyleParts, ISymbioteNode } from './node-types';
 
 // Narrowed rather than cast: `routeProp` takes `unknown`, and a bare `typeof v === 'function'`
@@ -33,21 +39,54 @@ export function stylePartsOf(node: ISymbioteNode): IClassStyleParts {
   });
 }
 
-// Slot 1's twin of `baseStyleOf`: the variant replaces slot 1, not slot 0, so it beats the class
-// cascade the way the authored style does while a `:active` rule can still win slot 0 underneath
-function explicitStyleOf(parts: IClassStyleParts): unknown {
+// The pressed variant replaces slot 1, so it beats the class cascade like the authored style
+function rawExplicitStyleOf(parts: IClassStyleParts): unknown {
   return parts.isPressed && parts.activeStyle !== undefined
     ? parts.activeStyle
     : parts.explicitStyle;
 }
 
-// `resolveActiveClassName` resolves the element's tokens PLUS `:active` through the same matcher,
-// so the result already contains everything the base class gave. Resolved LAZILY at press time,
-// т.к. eager would double the resolutions on every class WRITE to serve a rare state
+// What slots 0 and 1 publish: the style minus the keys a style claim took, and the very same
+// object when it took none
 function baseStyleOf(parts: IClassStyleParts): unknown {
-  return parts.isPressed && typeof parts.className === 'string'
-    ? resolveActiveClassName(parts.className)
-    : parts.classStyle;
+  const raw = parts.classStyle;
+  return hasStyleClaims() ? withoutClaimedKeys(raw, parts) : raw;
+}
+
+function explicitStyleOf(parts: IClassStyleParts): unknown {
+  const raw = rawExplicitStyleOf(parts);
+  if (!hasStyleClaims()) return raw;
+  return withSettledLayer(parts, withoutClaimedKeys(raw, parts));
+}
+
+// Values an animation settled on are kept over the author's style, so a publish after the animation
+// has ended cannot take the node back to the value it started from
+export function settleNodeStyle(
+  node: ISymbioteNode,
+  settled: Readonly<Record<string, unknown>>,
+): void {
+  const parts = stylePartsOf(node);
+  if (settleStyle(parts, settled)) pushClassStyle(node, parts);
+}
+
+// The starting values of a node's style handles go out with its first publish only
+function settleClaimedHandles(parts: IClassStyleParts): void {
+  if (!hasStyleClaims()) return;
+  settleHandles(parts, [parts.classStyle, rawExplicitStyleOf(parts)]);
+}
+
+function offerClaimedStyle(node: ISymbioteNode, parts: IClassStyleParts): void {
+  if (!hasStyleClaims()) return;
+  offerOwnedStyle(node, {
+    ...claimedKeysIn(parts.classStyle),
+    ...claimedKeysIn(rawExplicitStyleOf(parts)),
+  });
+}
+
+// Asked before the publish guard: two handles can hide behind one published style
+function bindStyleHandles(node: ISymbioteNode, parts: IClassStyleParts): void {
+  if (!hasStyleClaims()) return;
+  syncStyleHandles(node, [parts.classStyle, rawExplicitStyleOf(parts)]);
 }
 
 // What a node publishes when NOTHING resolves. Length 0 is the marker and needs no second field,
@@ -65,49 +104,58 @@ const sharedPairByBase = new WeakMap<
   WeakMap<object, readonly unknown[]> | readonly unknown[]
 >();
 
-// The published array for this pair, the same object every time the same two parts are handed in.
-// `undefined` when the pair cannot be keyed, and the caller then builds its own array
-function sharedStylePair(
-  base: unknown,
-  explicit: unknown,
+function isKeyable(value: unknown): value is object {
+  return typeof value === 'object' && value !== null;
+}
+
+function pairKeyedByExplicit(explicit: object): readonly unknown[] {
+  const cached = sharedPairByExplicit.get(explicit);
+  if (cached !== undefined) return cached;
+  const made: readonly unknown[] = [undefined, explicit];
+  sharedPairByExplicit.set(explicit, made);
+  return made;
+}
+
+function pairKeyedByBase(base: object): readonly unknown[] | undefined {
+  const cached = sharedPairByBase.get(base);
+  if (Array.isArray(cached)) return cached;
+  // A base already seen WITH an explicit half holds the second-level map here, and the base-only
+  // array has nowhere to live beside it. Rare enough not to earn a third map
+  if (cached !== undefined) return undefined;
+  const made: readonly unknown[] = [base, undefined];
+  sharedPairByBase.set(base, made);
+  return made;
+}
+
+function pairKeyedByBoth(
+  base: object,
+  explicit: object,
 ): readonly unknown[] | undefined {
-  const baseIsKeyable = typeof base === 'object' && base !== null;
-  const explicitIsKeyable = typeof explicit === 'object' && explicit !== null;
-
-  if (base === undefined && explicitIsKeyable) {
-    const cached = sharedPairByExplicit.get(explicit);
-    if (cached !== undefined) return cached;
-    const made: readonly unknown[] = [base, explicit];
-    sharedPairByExplicit.set(explicit, made);
-    return made;
-  }
-  if (!baseIsKeyable) return undefined;
-
-  if (explicit === undefined) {
-    const cached = sharedPairByBase.get(base);
-    if (Array.isArray(cached)) return cached;
-    if (cached === undefined) {
-      const made: readonly unknown[] = [base, explicit];
-      sharedPairByBase.set(base, made);
-      return made;
-    }
-    // A base already seen WITH an explicit half holds the second-level map here, and the base-only
-    // array has nowhere to live beside it. Rare enough not to earn a third map
-    return undefined;
-  }
-  if (!explicitIsKeyable) return undefined;
-
   const existing = sharedPairByBase.get(base);
-  const byExplicit = existing instanceof WeakMap ? existing : new WeakMap();
-  if (existing === undefined) sharedPairByBase.set(base, byExplicit);
   // The same clash the other way round: this base is holding its base-only array, so leave it
   if (Array.isArray(existing)) return undefined;
+  const byExplicit = existing instanceof WeakMap ? existing : new WeakMap();
+  if (existing === undefined) sharedPairByBase.set(base, byExplicit);
 
   const cached = byExplicit.get(explicit);
   if (cached !== undefined) return cached;
   const made: readonly unknown[] = [base, explicit];
   byExplicit.set(explicit, made);
   return made;
+}
+
+// The published array for this pair, the same object every time the same two parts are handed in.
+// `undefined` when the pair cannot be keyed, and the caller then builds its own array
+function sharedStylePair(
+  base: unknown,
+  explicit: unknown,
+): readonly unknown[] | undefined {
+  if (base === undefined && isKeyable(explicit)) {
+    return pairKeyedByExplicit(explicit);
+  }
+  if (!isKeyable(base)) return undefined;
+  if (explicit === undefined) return pairKeyedByBase(base);
+  return isKeyable(explicit) ? pairKeyedByBoth(base, explicit) : undefined;
 }
 
 // A plain style bag: not an array of styles, not a callback, not null
@@ -175,12 +223,15 @@ export function pushClassStyle(
 ): void {
   // An unchanged class still reaches this write, т.к. Solid has no diff. The guard keys off
   // `published`, which `setNativeProps` clears, so an imperative restore still re-publishes
+  bindStyleHandles(node, parts);
   if (isAlreadyPublished(parts)) return;
+  offerClaimedStyle(node, parts);
   // Emits NO_VALUE rather than `[undefined, undefined]`, so the host skips a real array with one
   // pointer check instead of building and diffing a `folly::dynamic`
   if (hasNothingToPublish(parts)) {
     parts.published = PUBLISHED_NOTHING;
     setProp(node, 'style', undefined);
+    settleClaimedHandles(parts);
     return;
   }
   // Third slot only appended while hidden: a permanent 3-element array would add an allocation to
@@ -193,6 +244,7 @@ export function pushClassStyle(
       : [base, explicit, parts.hiddenStyle];
   parts.published = published;
   setProp(node, 'style', published);
+  settleClaimedHandles(parts);
 }
 
 // `display: 'none'` is a real RN style value (Yoga's DisplayNone), so a hidden node keeps its

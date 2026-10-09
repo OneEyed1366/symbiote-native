@@ -24,9 +24,8 @@ export {
   routeProp,
   censusRetainedTree,
   getExplicitStyle,
-  // Exported for the one adapter that has to build style objects rather than receive them:
-  // Angular's ɵɵstyleMap hands over keys, so its renderer allocates a fresh object per node and
-  // needs to recognise one it has already published.
+  // For Angular, which builds style objects from the keys `ɵɵstyleMap` hands over
+  // Its renderer needs to recognise one it has already published
   isSameShallowStyle,
   getPublishedStyle,
   setNodeHidden,
@@ -48,6 +47,7 @@ export {
   childrenOf,
   firstChildOf,
   nextSiblingOf,
+  isInSurface,
   isTextContainer,
   isRawTextNode,
   componentOf,
@@ -109,6 +109,8 @@ export {
   setNativeProps,
   getNativeTag,
   getNativeNode,
+  getShadowNodeWrapper,
+  getFamilyGeneration,
   whenCommitted,
   measure,
   measureInWindow,
@@ -147,9 +149,8 @@ export type {
 // package and whatever implements the tree, audience a host author, not an app. They live on the
 // mutation-buffer subpath instead, since a name on this barrel is public API on all five adapters.
 
-// "A commit just reached completeRoot" — the one seam that means the same thing under every
-// adapter: React commits synchronously, Vue/Svelte/Angular schedule it on a microtask, so each
-// framework's after-render hook fires at a different point relative to the native commit.
+// A commit just reached `completeRoot`, which means the same under every adapter
+// Each framework's own after-render hook fires at a different point relative to the commit
 export { registerPostCommit, unregisterPostCommit } from './post-commit';
 // The aria/role -> accessibility* fold. Lives here rather than in a component wrapper because a tag
 // has none: `fabricProps` runs it on the way to the payload, so every path gets it.
@@ -211,12 +212,15 @@ export type {
 } from './styles';
 export { StyleSheet, computeHairlineWidth } from './style-sheet';
 export {
-  registerRules,
   resolveClassName,
   styleOfProps,
-  clearGlobalStyles,
   isClassNameValue,
 } from './style-registry';
+export {
+  registerRules,
+  clearGlobalStyles,
+  keyframesNamed,
+} from './keyframes-registry';
 export type { IClassNameValue, IStyleRule } from './style-registry';
 export { renameClassTokens } from './style-registry/scope';
 export type {
@@ -523,6 +527,19 @@ export {
 // composed primitive assigns a fold to its own slot (`behaviors/scroll-view.ts`), and the owner's
 // `foldPayload` field cannot type that.
 export type { IClaimMode, IHostBehavior, IPayloadFold } from './host-behavior';
+export { registerPropClaim } from './prop-claim';
+export type { IPropClaim } from './prop-claim';
+export { registerStyleClaim } from './style-claim';
+export type {
+  IFoundHandle,
+  IOwnedStyle,
+  IStyleClaim,
+  IStyleHandleClaim,
+  IVariantBase,
+} from './style-claim';
+export { registerStyleHandleClaim } from './style-handle';
+export { settleNodeStyle } from './node-style';
+export { bindToNode } from './node-binding';
 // markPropsDirty is a behavior's only way to say "the fold reads state I just changed" — every
 // other dirtying route goes through a prop write, and a derived-payload behavior has no prop to
 // write. Pair it with requestCommitFor: dirtying is not publishing.

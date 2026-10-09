@@ -12,6 +12,7 @@ import { slotPropNameFor } from './host-behavior';
 import { hasAnimatedNodes } from './animated/graph';
 import { bindAnimatedEvent, bindAnimatedValue } from './animated/host-binding';
 import { REACT_JSX_DEV_PROPS, setProp } from './node-props';
+import { hasPropClaims, isPropClaimed } from './prop-claim';
 import {
   isStyleCallback,
   isSameShallowStyle,
@@ -190,6 +191,7 @@ export function routeProp(
     ? bindAnimatedValue(node, key, value)
     : value;
   if (routeStyleSlot(node, key, resolved)) return;
+  if (hasPropClaims() && isPropClaimed(node, key, resolved)) return;
   // RN's snapshot affordance: render the control pressed with no gesture. One string compare on the
   // first commit, where a behavior hook reading it would cost a post-commit crossing per node
   if (key === 'testOnly_pressed') setNodePressed(node, resolved === true);
