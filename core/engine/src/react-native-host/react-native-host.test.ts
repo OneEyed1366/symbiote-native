@@ -32,6 +32,45 @@ describe('an object export after setReactNativeHost', () => {
     expect(hasViewManagerConfig).toHaveBeenCalledWith('RCTView');
   });
 
+  it('forwards the statics of a module RN defines as a class', () => {
+    class RealDimensions {
+      static scale = 3;
+      static get(dim: string) {
+        return { dim, scale: this.scale };
+      }
+    }
+    host.setReactNativeHost({ Dimensions: RealDimensions });
+
+    expect(host.Dimensions.get('window')).toEqual({ dim: 'window', scale: 3 });
+  });
+
+  it('lets a spy installed on the facade land on the real module and restore', () => {
+    const real = { get: () => 'real' };
+    host.setReactNativeHost({ Dimensions: real });
+    const spy = vi.spyOn(host.Dimensions, 'get').mockReturnValue({
+      width: 1,
+      height: 2,
+      scale: 3,
+      fontScale: 4,
+    });
+
+    expect(host.Dimensions.get('window').width).toBe(1);
+    expect(host.Dimensions.get).toHaveBeenCalledOnce();
+
+    spy.mockRestore();
+
+    expect(real.get()).toBe('real');
+  });
+
+  it('writes an assigned member through to the real module', () => {
+    const real = { isRTL: false };
+    host.setReactNativeHost({ Dimensions: real });
+
+    Reflect.set(host.Dimensions, 'isRTL', true);
+
+    expect(real.isRTL).toBe(true);
+  });
+
   it('keeps `this` on the real module for a method that reads it', () => {
     const callback = vi.fn();
     host.setReactNativeHost({
@@ -86,15 +125,58 @@ describe('an object export after setReactNativeHost', () => {
     expect(second).toHaveBeenCalledWith(3);
   });
 
-  it.each(['NativeModules', 'Networking', 'LogBox', 'DevMenu', 'Touchable'])(
-    'forwards %s',
-    name => {
-      const real = { marker: name };
-      host.setReactNativeHost(Object.fromEntries([[name, real]]));
+  it.each([
+    'NativeModules',
+    'Networking',
+    'LogBox',
+    'DevMenu',
+    'Touchable',
+    'Dimensions',
+    'PixelRatio',
+    'I18nManager',
+    'Appearance',
+    'AppState',
+    'Settings',
+    'BackHandler',
+    'Linking',
+    'Alert',
+    'Share',
+    'Vibration',
+    'ToastAndroid',
+    'ActionSheetIOS',
+    'PermissionsAndroid',
+    'InteractionManager',
+    'LayoutAnimation',
+    'DevSettings',
+    'Systrace',
+    'DeviceEventEmitter',
+  ])('forwards %s', name => {
+    const real = { marker: name };
+    host.setReactNativeHost(Object.fromEntries([[name, real]]));
 
-      expect(Reflect.get(host, name).marker).toBe(name);
-    },
-  );
+    expect(Reflect.get(host, name).marker).toBe(name);
+  });
+});
+
+describe('the NativeEventEmitter class', () => {
+  it("builds RN's class with the module it is given", () => {
+    class RealEmitter {
+      constructor(readonly nativeModule?: object) {}
+    }
+    host.setReactNativeHost({ NativeEventEmitter: RealEmitter });
+    const nativeModule = { addListener() {}, removeListeners() {} };
+
+    const emitter = host.createNativeEventEmitter(nativeModule);
+
+    expect(emitter).toBeInstanceOf(RealEmitter);
+    expect(Reflect.get(emitter, 'nativeModule')).toBe(nativeModule);
+  });
+
+  it('tells how to wire it when nobody did', () => {
+    expect(() => host.createNativeEventEmitter()).toThrow(
+      'react-native is not wired',
+    );
+  });
 });
 
 describe('the Pressability class', () => {
