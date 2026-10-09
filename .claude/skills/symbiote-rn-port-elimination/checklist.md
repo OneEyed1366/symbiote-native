@@ -138,6 +138,13 @@ Legend: `[ ]` todo / `[x]` done / `[~]` walked and kept (reason) / `[!]` needs a
 
 Changeset `.changeset/rn-port-elimination-device-modules.md` exists; append a sentence there per module swap. Nothing is committed.
 
+## Committing a swap series
+
+- The `commit-msg` hook wants a `.changeset/*.md` in every commit that touches a published package, so each commit carries a small one.
+- The pre-commit `tsc` sees the staged files over the WORKING tree, so stage the final version of a file. A commit can pass the hook and still not build alone.
+- `commit-size` stops at 400 lines and one file can exceed it. Raising `commit` in `code-health.json` needs the user's yes and is restored after.
+- Back up first with `git diff HEAD --binary > .git/x.patch`, since a failed lint-staged run can rewrite the tree.
+
 ## Log
 
 - 2026-10-09 it1 Group 3 wave done (Alert, Linking, Vibration, Share, ToastAndroid, ActionSheetIOS, PermissionsAndroid). `tsc --build` clean, vitest green bar load-flaky files, Hermes itests 810 PASS.
