@@ -1,20 +1,17 @@
-// RN's aria-* / role -> accessibility* fold, at the layer every path goes through: it can't run
-// per attribute (aria-checked folds against a sibling accessibilityState), so it belongs at the
-// one point where the whole bag is known, the payload build.
+// RN's aria-* and role -> accessibility* fold, run once where the whole prop bag is known
+// TODO(rn-port): the original is inline in RN's `View.js` component body, so it cannot be imported
 
-// The alias wins everywhere, as in RN's View.js: a scalar is assigned over the explicit prop and a
-// composite field is `alias ?? existing`. accessibility-props.test.ts pins both
+// The alias wins everywhere, as in RN: a scalar is assigned over the explicit prop
+// A composite field is `alias ?? existing`, `accessibility-props.test.ts` pins both
 
-// Record-level rather than typed: the engine's caller has a raw node.props bag with no index
-// signature. The typed resolveAccessibilityProps<T> in core/components delegates here.
+// Record-level, the engine's caller has a raw `node.props` bag with no index signature
+// The typed `resolveAccessibilityProps` in core/components delegates here
 import { dlog } from './debug';
 
-// Exported so a behavior folding a different node's bag can name these without restating the
-// list — slotDerived (host-behavior.ts) takes prop names, so a derived primitive enumerates them.
+// Exported so a behavior folding another node's bag can name them, `slotDerived` takes prop names
 
-// as const rather than readonly string[], so the members are literals: pickAccessibilityProps
-// (Svelte adapter) indexes IAriaProps with them, and a name here not a key of IAriaProps then
-// fails to compile at the use site instead of going quietly unforwarded.
+// `as const`, so a name that is not a key of `IAriaProps` fails to compile where it is used
+// `pickAccessibilityProps` (Svelte adapter) indexes `IAriaProps` with them
 export const ARIA_ALIAS_KEYS = [
   'role',
   'aria-label',

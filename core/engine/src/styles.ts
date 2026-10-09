@@ -1,6 +1,5 @@
-// The typed style surface (ViewStyle/TextStyle and friends). Maps onto Yoga layout props and RN's
-// view/text props, which Fabric's C++ reads off the props payload. A correctly-typed subset of
-// RN's StyleSheet surface — agnostic types, so every adapter re-exports them from the engine.
+// The typed style surface (ViewStyle/TextStyle and friends), agnostic for every adapter
+// TODO(rn-port): RN's `StyleSheetTypes.d.ts` needs React types, has no `I` prefix and no animated
 
 import type { AnimatedNode } from './animated/graph';
 import type { IColorValue } from './platform-color';
@@ -71,9 +70,8 @@ export type IFilterFunction =
   | { sepia: number | string }
   | { dropShadow: IDropShadowValue | string };
 
-// One gradient color stop (StyleSheetTypes BackgroundImageValue:728/768): a color plus zero or
-// more positions — two positions on one stop is CSS's "double position" shorthand for two
-// adjacent stops sharing a color (expanded by the processor, not here).
+// One gradient color stop (StyleSheetTypes BackgroundImageValue:728/768): a color plus positions
+// Two positions on one stop is CSS's "double position" shorthand, expanded by the processor
 export type IColorStopValue = {
   color: IColorValue;
   positions?: ReadonlyArray<string>;
@@ -351,7 +349,6 @@ export type IStyleProp<T> =
   | IStyleFalsy
   | IRecursiveArray<IWithAnimated<T> | IStyleFalsy>;
 
-// The constraint behind StyleSheet.create. Mirrors RN's NamedStyles<T>: validates each entry as a
-// real style object AND supplies the contextual type that keeps string-literal props
-// (flexDirection: 'row') from widening to `string` — the guarantee a bare identity create loses.
+// The constraint behind StyleSheet.create, like RN's NamedStyles<T>: validates each entry
+// It also keeps string-literal props (`flexDirection: 'row'`) from widening to `string`
 export type INamedStyles<T> = { [P in keyof T]: IViewStyle | ITextStyle };

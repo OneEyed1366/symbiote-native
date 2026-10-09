@@ -1,4 +1,5 @@
 // `StyleSheet.setStyleAttributePreprocessor` registry, read by `flatten` and by the style publish
+// TODO(rn-port): RN keeps this in `ReactNativeStyleAttributes`, which only its view configs read
 
 import { flattenStyle } from './style';
 

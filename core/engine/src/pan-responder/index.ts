@@ -1,16 +1,6 @@
-// PanResponder: pure JS gesture recognition layered on the View responder event
-// props. It reconciles a stream of touch events into one accumulative gesture and
-// exposes a `panHandlers` object the caller spreads onto a View. There is no new
-// native view and no core change: it only consumes the responder props shared
-// already synthesizes (onStartShouldSetResponder / onResponderGrant /
-// onResponderMove / onResponderRelease / onResponderTerminate / ...), exactly
-// as RN's PanResponder consumes them.
-//
-// Ported from react-native/Libraries/Interaction/PanResponder.js. RN sources its
-// touch geometry from a global ResponderTouchHistoryStore; symbiote's synthetic
-// events instead carry the live touches on `event.nativeEvent.touches` (and the
-// changed ones on `changedTouches`), so the centroid/velocity math here reads
-// those directly while keeping RN's accumulate-deltas-over-time behavior.
+// PanResponder: reconciles responder events into one accumulative gesture behind `panHandlers`
+// TODO(rn-port): a copy of RN's `PanResponder.js`, RN reads `event.touchHistory`, breaks without
+// Ours reads `nativeEvent.touchHistory` and falls back to `nativeEvent.touches`
 
 import { dlog } from '../debug';
 import type { ISymbioteEvent } from '../node';
@@ -127,7 +117,7 @@ function createGestureState(): IPanResponderGestureState {
 }
 
 // Решают, станет ли жест респондером, и принимают или отклоняют перехват
-function shouldSetHandlers(
+function createShouldSetHandlers(
   config: IPanResponderCallbacks,
   gestureState: IPanResponderGestureState,
 ): IShouldSetHandlers {
@@ -271,7 +261,7 @@ const PanResponder = {
     const gestureState = createGestureState();
     return {
       panHandlers: {
-        ...shouldSetHandlers(config, gestureState),
+        ...createShouldSetHandlers(config, gestureState),
         ...grantHandlers(config, gestureState),
         ...progressHandlers(config, gestureState),
       },
