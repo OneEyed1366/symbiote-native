@@ -1,13 +1,6 @@
-// The inset math itself (computeInset / resolveKeyboardAvoidingLayout, behavior ->
-// style/structure) is framework-agnostic core logic (@symbiote-native/components,
-// render-keyboard-avoiding-view.ts) shared verbatim with React/Vue — this file does not
-// re-derive its edge cases. What is Angular-specific and exercised here: ngOnInit's Keyboard
-// subscription driving markForCheck (the zoneless twin of React's setState / Vue's reactive
-// ref), which two events that subscription picks and tears down, the once-per-mount
-// prefersCrossFadeTransitions read it feeds into every computeInset call, handleLayout
-// measuring the wrapper frame before forwarding to the caller's onLayout, the
-// `enabled === false` gate, and the anchor `class=` resolution (mirrors pressable.test.ts's
-// "resolves a class=" case).
+// Angular-only part of `KeyboardAvoidingView`: the `Keyboard` subscription driving `markForCheck`
+// and the event pair it picks and tears down, the one-off `prefersCrossFadeTransitions` read,
+// the `enabled === false` gate and the anchor `class=` resolution; the inset math lives in core
 import '@angular/compiler';
 import { Component } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -19,7 +12,11 @@ import {
   type IEventSubscription,
   type IKeyboardEventName,
 } from '@symbiote-native/engine';
-import { installRecordingFabric, payloadOf } from '@symbiote-native/test-utils';
+import {
+  emitRnDeviceEvent,
+  installRecordingFabric,
+  payloadOf,
+} from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../../render';
 import { KeyboardAvoidingView, type IKeyboardAvoidingBehavior } from './index';
@@ -29,18 +26,8 @@ const fabric = installRecordingFabric();
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
-type IDeviceHub = { emit: (eventType: string, ...args: unknown[]) => void };
-
-// ngOnInit subscribes to the Keyboard module, which installs the bridgeless device-event hub on
-// first use (core/engine/src/native-events.ts). Capturing the hub — the same fake
-// core/engine/src/keyboard/keyboard.test.ts uses — lets these tests play "native" and fire
-// keyboardWillShow/keyboardWillHide, instead of stubbing the registration away as a no-op.
-//
-// ngOnInit ALSO reads the iOS Prefer-Cross-Fade accessibility setting once, so the fake
-// __turboModuleProxy below answers for AccessibilityManager (the module name the engine's iOS
-// AccessibilityInfo resolves) with a getter reading `prefersCrossFade`, which each test sets
-// BEFORE mounting. Every other module name resolves null, exactly as with no proxy installed.
-let deviceHub: IDeviceHub | undefined;
+// `ngOnInit` also reads the iOS cross-fade setting once, through `AccessibilityManager`
+// The fake proxy answers it from `prefersCrossFade`, which each test sets BEFORE mounting
 let prefersCrossFade = false;
 
 const fakeAccessibilityManager = {
@@ -51,8 +38,8 @@ const fakeAccessibilityManager = {
   },
 };
 
-// The proxy's contract is generic-by-name; the caller owns the shape. Same guard the React
-// adapter's accessibility-info test uses, so the fake needs no `as`.
+// The proxy's contract is generic by name, the caller owns the shape
+// Same guard as the React adapter's accessibility-info test, so the fake needs no `as`
 function isModule<T>(value: unknown): value is T {
   return value !== null && value !== undefined;
 }
@@ -64,38 +51,23 @@ Object.assign(globalThis, {
       ? fakeAccessibilityManager
       : null;
   },
-  RN$registerCallableModule: (
-    name: string,
-    factory: () => IDeviceHub,
-  ): void => {
-    if (name === 'RCTDeviceEventEmitter') deviceHub = factory();
-  },
 });
 
-// The hub is registered ONCE per module (installDeviceEventHub's `installed` flag), so a
-// per-test reset of `deviceHub` would silently turn every later emit into a no-op — and a test
-// asserting "no inset" would then pass for the wrong reason. Throwing instead keeps every
-// emit-driven assertion honest.
-function deviceEmit(eventType: string, payload: unknown): void {
-  if (deviceHub === undefined)
-    throw new Error('the device event hub was never registered');
-  deviceHub.emit(eventType, payload);
-}
-
+// `Keyboard` listens on RN's device bus, so `emitRnDeviceEvent` plays "native" for these tests
 function emitKeyboardShow(
   screenY: number,
   height: number,
-  eventType = KEYBOARD_EVENT.willShow,
+  eventType: string = KEYBOARD_EVENT.willShow,
 ) {
-  deviceEmit(eventType, {
+  emitRnDeviceEvent(eventType, {
     duration: 250,
     easing: 'keyboard',
     endCoordinates: { screenX: 0, screenY, width: 390, height },
   });
 }
 
-function emitKeyboardHide(eventType = KEYBOARD_EVENT.willHide): void {
-  deviceEmit(eventType, {});
+function emitKeyboardHide(eventType: string = KEYBOARD_EVENT.willHide): void {
+  emitRnDeviceEvent(eventType, {});
 }
 
 function fireLayout(testID: string, y: number, height: number): void {
@@ -104,9 +76,7 @@ function fireLayout(testID: string, y: number, height: number): void {
   });
 }
 
-// The recording host mutates a node's props IN PLACE (no clone-on-write), so `fabric.find`
-// reflects a prop set after mount — like paddingBottom growing on keyboardWillShow — just as well
-// as one set at creation; there is no separate "live clone" to walk here.
+// The recording host mutates props in place, so `fabric.find` also sees props set after mount
 function committedWrapper(testID: string): {
   handle: object;
   instanceHandle: unknown;
@@ -117,9 +87,7 @@ function committedWrapper(testID: string): {
   return node;
 }
 
-// The inset values (paddingBottom / height) and the class-derived backgroundColor are all
-// computed on the way into the PAYLOAD (style flattened, the class merge resolved) — the raw
-// authored bag keeps `style` as an object/array, not a top-level key.
+// Inset values and the `backgroundColor` from a class are computed into the PAYLOAD
 function committedPayload(testID: string): Record<string, unknown> {
   return payloadOf(committedWrapper(testID).handle);
 }
@@ -160,9 +128,8 @@ class KeyboardAvoidingViewDisabledHostFixture {}
 })
 class KeyboardAvoidingViewHeightHostFixture {}
 
-// `mount` hands back the surface, not the root instance, so the bound behavior lives in a
-// module-level object the fixture reads through — that is the only handle a test has on an input
-// it wants to change after init.
+// `mount` hands back the surface, not the root instance, so the bound behavior sits in a module
+// object the fixture reads through, the only handle on an input changed after init
 const boundBehavior: { value: IKeyboardAvoidingBehavior } = {
   value: 'padding',
 };
@@ -192,9 +159,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-// why: contract-accurate group name — nothing here throws. ngOnInit's Keyboard subscription,
-// the inset gate, and the anchor merge all resolve to a value or a no-op, never a rejection.
-describe('KeyboardAvoidingView (no throwing path — see file header)', () => {
+describe('KeyboardAvoidingView (no throwing path)', () => {
   it('measures its own frame, then pushes the wrapper down by the keyboard overlap on show, and clears it on hide', async () => {
     mount(ROOT_TAG, KeyboardAvoidingViewHostFixture);
     await tick();
@@ -202,8 +167,7 @@ describe('KeyboardAvoidingView (no throwing path — see file header)', () => {
     fireLayout('kav', 100, 500);
     await tick();
 
-    // why: RN's inset is "how far the view must move so it no longer overlaps the keyboard" —
-    // wrapper bottom edge (100 + 500 = 600) minus the keyboard's top edge (300) = 300.
+    // The inset is how far the view must move to clear the keyboard: 100 + 500 - 300 = 300
     emitKeyboardShow(300, 346);
     await tick();
     expect(committedPayload('kav').paddingBottom).toBe(300);
@@ -214,10 +178,8 @@ describe('KeyboardAvoidingView (no throwing path — see file header)', () => {
   });
 
   it("subscribes to exactly this host's show/hide pair and tears both down on unmount", async () => {
-    // why: RN picks TWO events per host — iOS the will* pair, Android the did* pair — and
-    // deliberately never listens to change-frame (with an undocked/split/floating iOS keyboard
-    // it fires BEFORE the hide, so it would apply a frame captured mid-dismissal). The headless
-    // Platform module resolves to iOS, so the will* pair is the expected set here.
+    // RN subscribes to the will* pair on iOS and the did* pair on Android, never to change-frame
+    // The headless `Platform` resolves to iOS, so the will* pair is expected
     const subscribed: IKeyboardEventName[] = [];
     const removed: IKeyboardEventName[] = [];
     const addListener = Keyboard.addListener.bind(Keyboard);
@@ -248,37 +210,39 @@ describe('KeyboardAvoidingView (no throwing path — see file header)', () => {
     expect(removed).toEqual([KEYBOARD_EVENT.willShow, KEYBOARD_EVENT.willHide]);
   });
 
-  it('ignores the did* and change-frame notifications this host does not subscribe to', async () => {
+  it.each([
+    KEYBOARD_EVENT.didShow,
+    KEYBOARD_EVENT.didChangeFrame,
+    KEYBOARD_EVENT.willChangeFrame,
+  ])('ignores %s, which this host does not subscribe to', async eventType => {
     mount(ROOT_TAG, KeyboardAvoidingViewHostFixture);
     await tick();
     fireLayout('kav', 100, 500);
     await tick();
 
-    for (const eventType of [
-      KEYBOARD_EVENT.didShow,
-      KEYBOARD_EVENT.didChangeFrame,
-      KEYBOARD_EVENT.willChangeFrame,
-    ]) {
-      emitKeyboardShow(300, 346, eventType);
-      await tick();
-      expect(committedPayload('kav').paddingBottom).toBe(0);
-    }
+    emitKeyboardShow(300, 346, eventType);
+    await tick();
+    expect(committedPayload('kav').paddingBottom).toBe(0);
+  });
+
+  it('keeps the inset when the did* twin of the subscribed hide arrives', async () => {
+    mount(ROOT_TAG, KeyboardAvoidingViewHostFixture);
+    await tick();
+    fireLayout('kav', 100, 500);
+    await tick();
 
     emitKeyboardShow(300, 346);
     await tick();
     expect(committedPayload('kav').paddingBottom).toBe(300);
 
-    // The did* twin of the subscribed hide must not clear it either.
     emitKeyboardHide(KEYBOARD_EVENT.didHide);
     await tick();
     expect(committedPayload('kav').paddingBottom).toBe(300);
   });
 
   it('holds the height-mode inset when the shrunk wrapper re-measures shorter', async () => {
-    // why: the regression the previousInset correction exists for. 'height' mode SHRINKS the
-    // wrapper by the inset, so the next onLayout reports a frame shorter by exactly that much;
-    // without adding the applied inset back, each further keyboard event computes a smaller
-    // overlap and the view walks back down under the keyboard.
+    // 'height' mode shrinks the wrapper by the inset, so the next layout reports a shorter frame
+    // Without adding the applied inset back, each event computes less overlap and the view sinks
     mount(ROOT_TAG, KeyboardAvoidingViewHeightHostFixture);
     await tick();
 
@@ -286,24 +250,21 @@ describe('KeyboardAvoidingView (no throwing path — see file header)', () => {
     await tick();
     emitKeyboardShow(300, 346);
     await tick();
-    // 0 + 600 - 300 = 300 of overlap, so the wrapper shrinks from 600 to 300.
+    // 0 + 600 - 300 = 300 of overlap, so the wrapper shrinks from 600 to 300
     expect(committedPayload('kav').height).toBe(300);
 
-    // Native re-measures the now-shrunk wrapper.
+    // Native re-measures the now-shrunk wrapper
     fireLayout('kav', 0, 300);
     await tick();
     emitKeyboardShow(300, 346);
     await tick();
-    // 300 (applied) + 0 + 300 - 300 = 300 — the same inset, so the height stays put. Without the
-    // correction it computes 0 and the shrink is dropped entirely.
+    // 300 (applied) + 0 + 300 - 300 = 300, the same inset; without the correction it is 0
     expect(committedPayload('kav').height).toBe(300);
   });
 
   it('uses the behavior in force at event time, not the one bound when it subscribed', async () => {
-    // why: `behavior` is read inside a subscription that outlives any number of input changes,
-    // and it is what gates 'height' mode's previous-inset correction — a handler capturing it at
-    // subscribe time keeps applying the old mode's math forever. Same trap as previousInset, one
-    // field over.
+    // `behavior` is read inside a long-lived subscription, a handler capturing it at subscribe
+    // time would keep applying the old mode's math, the same trap as `previousInset`
     mount(ROOT_TAG, KeyboardAvoidingViewBehaviorHostFixture);
     await tick();
 
@@ -313,17 +274,14 @@ describe('KeyboardAvoidingView (no throwing path — see file header)', () => {
     await tick();
     expect(committedPayload('kav').paddingBottom).toBe(300);
 
-    // Nothing else ticks change detection under zoneless, so the keyboard event's own
-    // markForCheck is what carries the new input down: this emit still resolves the OLD
-    // behavior, and the assertions that matter are on the one after it.
+    // Nothing else ticks change detection under zoneless, so the event's own `markForCheck`
+    // carries the new input down, and this emit still resolves the old behavior
     boundBehavior.value = 'height';
     emitKeyboardShow(300, 346);
     await tick();
     expect(committedPayload('kav').height).toBe(300);
 
-    // Native re-measures the now-shrunk wrapper. Only a handler reading `behavior` live sees
-    // 'height' here and adds the applied inset back; a captured 'padding' computes 0 and drops
-    // the shrink.
+    // Only a handler reading `behavior` live sees 'height' here and adds the applied inset back
     fireLayout('kav', 0, 300);
     await tick();
     emitKeyboardShow(300, 346);
@@ -332,9 +290,8 @@ describe('KeyboardAvoidingView (no throwing path — see file header)', () => {
   });
 
   it('lifts nothing when the keyboard reports screenY 0 and Prefer Cross-Fade Transitions is on', async () => {
-    // why: with that iOS accessibility setting on, the keyboard reports screenY as 0 instead of
-    // its real top edge, and the ordinary math turns that into "lift the view by its whole
-    // y + height" — the content goes clean off screen.
+    // With that iOS setting on the keyboard reports `screenY` 0, which the plain math turns into
+    // a lift by the whole y + height, so the content leaves the screen
     prefersCrossFade = true;
 
     mount(ROOT_TAG, KeyboardAvoidingViewHostFixture);
@@ -348,8 +305,7 @@ describe('KeyboardAvoidingView (no throwing path — see file header)', () => {
   });
 
   it('still lifts on a screenY 0 keyboard when Prefer Cross-Fade Transitions is off', async () => {
-    // why: the cross-fade early return must be gated on the setting, not on screenY alone —
-    // otherwise a genuinely full-height keyboard would stop being avoided.
+    // The cross-fade early return is gated on the setting, not on `screenY` alone
     mount(ROOT_TAG, KeyboardAvoidingViewHostFixture);
     await tick();
     fireLayout('kav', 100, 500);
@@ -361,8 +317,7 @@ describe('KeyboardAvoidingView (no throwing path — see file header)', () => {
   });
 
   it('does not apply an inset when enabled is explicitly false', async () => {
-    // why: source contract — "RN gates every inset on enabled ?? true; only an explicit false
-    // disables" (index.ts's effectiveInset getter). Undefined/true must still avoid the keyboard.
+    // RN gates every inset on `enabled ?? true`, only an explicit false disables it
     mount(ROOT_TAG, KeyboardAvoidingViewDisabledHostFixture);
     await tick();
 

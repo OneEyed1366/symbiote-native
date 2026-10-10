@@ -1,14 +1,11 @@
-// Per-touch position/time tracking, ported from RN's ResponderTouchHistoryStore. PanResponder's
-// multitouch dx/vx math needs each touch's own previous->current delta, which a grant-relative
-// centroid of all live touches can't reconstruct; the bank attaches to responder events.
-
-// events/index.ts consumes only this file's public surface (recordTouchTrack, attachTouchHistory,
-// resetTouchHistory, touchHistory); everything else here is a private implementation detail.
+// Per-touch position and time tracking for `PanResponder`'s multitouch dx/vx math
+// TODO(rn-port): a copy of RN's `ResponderTouchHistoryStore` on purpose, RN throws on a touch
+// without an identifier, and a throw inside responder negotiation would drop real touches
 
 import { isRecord } from './type-guards';
 
 // One slot per active touch identifier. Mirrors RN's TouchRecord field-for-field.
-interface ITouchRecord {
+type ITouchRecord = {
   touchActive: boolean;
   startPageX: number;
   startPageY: number;
@@ -19,16 +16,16 @@ interface ITouchRecord {
   previousPageX: number;
   previousPageY: number;
   previousTimeStamp: number;
-}
+};
 
-interface ITouchHistory {
+type ITouchHistory = {
   touchBank: ITouchRecord[];
   numberActiveTouches: number;
-  // The single active touch's identifier, so TouchHistoryMath skips the bank scan in
-  // the common one-finger case (-1 when not exactly one touch is down).
+  // The single active touch's identifier, so `TouchHistoryMath` skips the bank scan
+  // It is -1 when not exactly one touch is down
   indexOfSingleActiveTouch: number;
   mostRecentTimeStamp: number;
-}
+};
 
 // RN's bank is indexed by touch identifier and warns above 20; we never warn (headless
 // events may carry larger or absent ids), we just skip anything out of a sane range.
@@ -45,12 +42,12 @@ export const touchHistory: ITouchHistory = {
 // A raw touch as it arrives inside the untyped nativeEvent. Each field is narrowed defensively so
 // a malformed or coordinate-less touch is skipped, never thrown — recording must not perturb the
 // responder negotiation.
-interface INormalizedTouch {
+type INormalizedTouch = {
   identifier: number;
   pageX: number;
   pageY: number;
   timestamp: number;
-}
+};
 
 function toFiniteNumber(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value)
@@ -144,9 +141,7 @@ function arrayFirst(value: unknown): unknown {
   return Array.isArray(value) ? value[0] : undefined;
 }
 
-// Maintain the bank as a touch frame flows. Mirrors RN's recordTouchTrack: moveish
-// shifts records, startish records + recomputes numberActiveTouches, endish marks the
-// record inactive + rescans for the single remaining touch. `kind` is the touch phase.
+// Records one touch frame into the bank by phase, as RN's `recordTouchTrack` does
 export function recordTouchTrack(
   kind: 'start' | 'move' | 'end',
   nativeEvent: Record<string, unknown>,
@@ -157,26 +152,29 @@ export function recordTouchTrack(
     return;
   }
   if (kind === 'start') {
-    for (const touch of changedTouchesOf(nativeEvent)) recordTouchStart(touch);
-    touchHistory.numberActiveTouches = activeTouchCount(nativeEvent);
-    if (touchHistory.numberActiveTouches === 1) {
-      const first = normalizeTouch(arrayFirst(nativeEvent.touches));
-      touchHistory.indexOfSingleActiveTouch = first?.identifier ?? -1;
-    }
+    recordStartFrame(nativeEvent);
     return;
   }
-  for (const touch of changedTouchesOf(nativeEvent))
-    shiftTouchRecord(touch, false);
+  recordEndFrame(nativeEvent);
+}
+
+// Kept apart from `recordTouchTrack` so each phase reads on its own
+function recordStartFrame(nativeEvent: Record<string, unknown>): void {
+  for (const touch of changedTouchesOf(nativeEvent)) recordTouchStart(touch);
   touchHistory.numberActiveTouches = activeTouchCount(nativeEvent);
-  if (touchHistory.numberActiveTouches === 1) {
-    for (let i = 0; i < touchBank.length; i++) {
-      const record = touchBank[i];
-      if (record !== undefined && record.touchActive) {
-        touchHistory.indexOfSingleActiveTouch = i;
-        break;
-      }
-    }
+  if (touchHistory.numberActiveTouches !== 1) return;
+  const first = normalizeTouch(arrayFirst(nativeEvent.touches));
+  touchHistory.indexOfSingleActiveTouch = first?.identifier ?? -1;
+}
+
+function recordEndFrame(nativeEvent: Record<string, unknown>): void {
+  for (const touch of changedTouchesOf(nativeEvent)) {
+    shiftTouchRecord(touch, false);
   }
+  touchHistory.numberActiveTouches = activeTouchCount(nativeEvent);
+  if (touchHistory.numberActiveTouches !== 1) return;
+  const activeIndex = touchBank.findIndex(record => record?.touchActive);
+  if (activeIndex !== -1) touchHistory.indexOfSingleActiveTouch = activeIndex;
 }
 
 // Drop all touch state. Called on a fully-released / cancelled gesture so a stale bank

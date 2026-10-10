@@ -1,110 +1,6 @@
-// What a ported tag rule BOUGHT, priced against the thing it replaced, in one process.
-//
-// The eight-step suite arms cannot answer this and it is worth saying why rather than quoting them:
-// their row is `view / text / view+text / view+text / text-input`, which is the device row with its
-// two `<Pressable>`s spelled as plain views, and it holds no `<switch>` at all. So `folds` reads 0
-// on every arm whether or not a rule moved, and a table taken from them would be evidence of
-// nothing.
-//
-// This is the A/B instead, and it is a fair one because both arms are the SAME tree in the SAME
-// process, differing only in WHERE the rule runs:
-//
-//   `<tag>`         the rule in C++, reached off the tag
-//   `<tag>-in-js`   a tag registered HERE with a `payloadFold` that produces the same payload —
-//                   which is what the real tag was until the port
-//
-// ONE ARM DIFFERS AND IT IS THE `clone` ROW. Its rule is keyed on the PARENT'S tag rather than the
-// node's, so what the two arms differ in is the CONTAINER: a `touchable-native-feedback` on the
-// native side, a plain `view` on the JS side, so nothing native can fire there and the fold is the
-// only thing working. Same comparison, one level up.
-//
-// The payloads are asserted EQUAL, key by key, before any millisecond is read. Two arms that
-// disagree about what they send are not one measurement, and a fold that quietly did less would
-// look faster.
-//
-// The JS arms are not mirrors in the sense the porting rule forbids: they exist in this measurement
-// file only, nothing in the source tree calls them, and their whole job is to be the thing that was
-// deleted. A rule with no "before" cannot be priced at all.
-//
-// MEASURED on `build-release`, three consecutive runs, one sitting, a thousand nodes per commit:
-//
-//              native walk        js walk             per node   keys in the bag / what the rule does
-//   content    4.2  2.9  2.9 ms   13.2 11.7 11.0 ms    ~8.7 us   3 + a 2-key style / READS ITS PARENT
-//   imagebg    3.4  3.2  3.0 ms   13.4 12.8 12.3 ms    ~9.6 us   2 + a 3-key style / writes ONE key
-//   spinner    3.7  3.9  3.8 ms   14.2 13.7 13.8 ms   ~10.1 us   4, no style / the MOST work here
-//   accessory  3.2  3.3  3.2 ms   14.5 13.9 14.1 ms   ~10.9 us   4 / nothing at all
-//   button     3.9  4.0  3.9 ms   16.8 16.3 15.9 ms   ~12.4 us   5 + a 2-key style
-//   clone      4.7  4.6  4.6 ms   18.6 18.0 18.0 ms   ~13.6 us   1 / READS ITS PARENT'S TAG, 18 keys
-//   pressable  3.9  3.7  3.7 ms   20.6 18.3 17.8 ms   ~15.1 us   4 + a 3-key style
-//   scroll     4.6  4.2  4.2 ms   21.0 20.6 18.8 ms   ~15.8 us   4 + a 2-key style / the BIGGEST rule
-//   switch     5.0  4.8  5.0 ms   25.6 23.8 23.5 ms   ~19.4 us   6 + nested trackColor
-//   image      6.2  6.3  6.0 ms   30.4 29.3 27.5 ms   ~23.0 us   6 + what the rule BUILDS
-//   bgimage    7.8  8.0  7.7 ms   38.7 38.5 36.8 ms   ~30.1 us   6 + a 3-part style / TWO rules
-//
-// `clone` is the one DESCENDANT rule and the one row whose bag is not the node's own: its child
-// carries a single prop and the rule marshals EIGHTEEN off the parent. It lands where the bag says
-// it should, mid-table beside `pressable` and `button`, which is the model holding on a rule that
-// could have broken it — the cost follows what crosses, whichever node the keys came from.
-//
-// Read it as the price of one TNF or TWF per commit, not per row: those tags have exactly one child.
-//
-// `bgimage` is the dearest row in the file and it is the model's own prediction rather than a
-// surprise: its tag runs the image rule AND the background one, so it carries `image`'s bag plus a
-// three-part style composed on top. Biggest bag, biggest price.
-//
-// It is also the SECOND parent-reading rule, and the pair settles what `content` alone could not.
-// `content` reads its owner while doing almost nothing, so its cheapest-of-nine native walk could
-// have been the rule's smallness rather than the read's. Here the read sits inside the most
-// expensive rule in the file, and the arithmetic isolates it: `bgimage` native minus `image` native
-// is ~1.4 ms over a thousand nodes, i.e. **~1.4 us per node for the parent read plus the style it
-// builds**. A pointer hop on a tree already in memory, whatever is happening around it.
-//
-// `content` IS THE CHEAPEST NATIVE WALK OF THE NINE and it is the only rule that reads the node
-// ABOVE it, which is the answer to the question the `ownerProps` seam had to earn: reading a parent
-// costs nothing measurable. It is a pointer hop on a tree that is already in memory here — the same
-// question cost a JS closure and a crossing for as long as the fold lived on the other side. That is
-// the whole case for the seam, and it is why a rule being "derived from its owner" stopped being a
-// reason to leave it in JS.
-//
-// `scroll` is the fourth point on that experiment and the one that closes it. Its rule is the
-// BIGGEST in the file — compose a base style, default a flag, strip the axis, resolve an asymmetric
-// pair, erase two keys, map a word to a friction constant — and it lands mid-table, next to
-// `pressable`, whose rule does far less over a bag of the same size. Size of bag, not size of rule.
-//
-// THE TOP THREE ROWS ARE A DELIBERATE EXPERIMENT, not three ports that happened to be cheap. Their
-// rules do, in order: almost nothing (ONE key written), the MOST work in the file (builds a style
-// object, resolves a size two ways, writes two defaults, picks a colour), and literally nothing at
-// all. They land within 1.4 us of each other. Whatever the price is a function of, it is not what the
-// rule computes.
-//
-// It is what has to be MARSHALLED. Read the column against the bag and it orders cleanly, with the
-// dearest row dear because its rule CREATES keys (a `source` object, a headers map, a style array)
-// that then have to travel back. So the cost model for a fold is: bag in, bag out, and the body is
-// free — which is why a trivial fold over a large bag is the worst value available, and why deleting
-// one that does nothing (see `accessory`) is worth as much as porting one that does a lot.
-//
-// `button`'s arm carries BOTH its rules — the pressable one its tag also gets, then its own — which
-// is why its JS twin composes the two folds rather than spelling only half. It still lands under
-// `pressable` on the per-node column, because that column is bag size and its bag is smaller.
-//
-// So each rule itself is 3-6 ms and the CROSSING is three to five times that. Same shape the
-// text-input port measured and the reason a fold's price is the TRIP and not the function: the bag
-// goes out as a `jsi::Value` and comes back through `jsi::dynamicFromValue`, a per-key JSI walk, for
-// a rule that rewrites a handful of keys.
-//
-// THE ACCESSORY ROW IS WHY AN ARM WITH NO RULE EARNS A PLACE IN A FILE ABOUT RULES. Its fold did
-// NOTHING — it took the bag apart and put it back together unchanged, which is why the port deleted
-// it instead of moving it — and it still cost ~11 us per node. A fold is charged for EXISTING.
-//
-// The NATIVE column is tight run to run and the JS column nearly as much on this sitting; expect the
-// JS one to drift more on a busier machine, since a JS fold allocates and carries GC that best-of-N
-// cannot fully suppress.
-//
-// This table REPLACES an earlier three-row one (pressable 4.1/20.6, switch 5.6/27.1, image 6.9/32.2)
-// taken in another sitting on a busier machine. Every figure in both is real and neither is the
-// other's before/after — ONE RULER PER COMPARISON, which is why every rule is priced in the same
-// file, in the same process, in one sitting, and why the old rows were replaced rather than kept
-// alongside. Adding a row means re-running all of them.
+// A/B of each tag rule in C++ against the same rule as a JS `payloadFold`, one tree, one process
+// Payloads are asserted equal key by key before any clock is read; the JS arms exist only here
+// Figures and the cost model live in the `symbiote-engine-tag-rules` skill
 
 import {
   registerActivityIndicatorBehavior,
@@ -135,13 +31,8 @@ registerImageBehavior();
 registerInputAccessoryViewBehavior();
 registerActivityIndicatorBehavior();
 
-// ── the JS arms: the same rule, written on the other side of the wire ────────────────────────────
-//
-// These started as verbatim copies of what each behavior carried immediately before its port, and
-// the switch arm is no longer that — its rule was CORRECTED after the move (RN's
-// `accessibilityRole` default and the iOS `alignSelf` composition, `Switch.js:255,266`). The arm
-// was updated to match, which is the point rather than a chore: `expectSamePayload` refuses to time
-// two arms that send different bags, so the guard caught the divergence the moment it appeared.
+// The JS arms: the same rule, written on the other side of the wire
+// `expectSamePayload` refuses to time arms that disagree, which is how a stale twin shows up
 
 const PRESSABLE_MACHINE_KEYS = [
   'android_ripple',
@@ -177,9 +68,7 @@ registerHostBehavior('pressable-in-js', {
   detach(): void {},
   foldPayload(props: Readonly<Record<string, unknown>>) {
     const out = pressableFoldInJs(props);
-    // `Pressable.js:340` — unconditional on the BARE tag only, matching `foldPressableProps`'s
-    // `isBarePressable` branch. Composed here rather than inside `pressableFoldInJs`, which
-    // `button-in-js` also calls and must not inherit it.
+    // Bare tag only: `button-in-js` reuses `pressableFoldInJs` and must not inherit it
     out.collapsable = false;
     return out;
   },
@@ -192,22 +81,21 @@ registerHostBehavior('switch-in-js', {
   attach(): void {},
   detach(): void {},
   foldPayload(props: Readonly<Record<string, unknown>>) {
-    const value = props.value === true;
+    const isOn = props.value === true;
     const track = props.trackColor;
     const bag: Record<string, unknown> =
       track !== null && typeof track === 'object' ? { ...track } : {};
     const background = stringOf(props.ios_backgroundColor);
     const out: Record<string, unknown> = {
       ...props,
-      value,
+      value: isOn,
       disabled:
         typeof props.disabled === 'boolean' ? props.disabled : undefined,
       onTintColor: stringOf(bag.true),
       tintColor: stringOf(bag.false),
       thumbTintColor: stringOf(props.thumbColor),
       accessibilityRole: props.accessibilityRole ?? 'switch',
-      // `alignSelf` UNDER the app's style, the pill OVER it — RN's nested `StyleSheet.compose`
-      // (`Switch.js:266`). The iOS arm only; this fixture commits a `Switch`.
+      // `alignSelf` under the app's style, the pill over it, the iOS arm only
       style: [
         { alignSelf: 'flex-start' },
         props.style,
@@ -223,10 +111,7 @@ registerHostBehavior('switch-in-js', {
   },
 });
 
-// ── the fixtures ─────────────────────────────────────────────────────────────────────────────────
-
-// A bag the size a real row carries: what the rule reads, what it strips, and a style — so the
-// measurement is of a fold marshalling a realistic object rather than a two-key toy.
+// A bag the size a real row carries, so the fold marshals a realistic object
 const PRESSABLE_PROPS = {
   disabled: true,
   delayLongPress: 700,
@@ -234,9 +119,7 @@ const PRESSABLE_PROPS = {
   style: { flexDirection: 'row', paddingLeft: 8, height: 44 },
 };
 
-// The `image` arm's JS twin. `source` is NOT in it: the asset lookup moved to write time for both
-// arms alike (`image-source-write.ts`), so it is not part of what either side of this comparison
-// does — which is exactly why the two arms can be compared at all.
+// No `source` here: the asset lookup moved to write time for both arms
 const IMAGE_ALIAS_KEYS = [
   'src',
   'srcSet',
@@ -263,7 +146,8 @@ function imageFoldInJs(
   if (typeof props.height === 'number') size.height = props.height;
 
   out.source = [{ uri: props.src, ...size, headers }];
-  if (Object.keys(size).length > 0) out.style = [size, props.style];
+  out.resizeMode = 'cover';
+  out.style = [{ overflow: 'hidden' }, size, props.style];
   if (typeof props.alt === 'string') {
     out.accessibilityLabel ??= props.alt;
     out.accessible = true;
@@ -279,15 +163,10 @@ registerHostBehavior('image-in-js', {
   foldPayload: imageFoldInJs,
 });
 
-// ImageBackground's INNER image, and the only arm here whose tag runs TWO rules — the ordinary image
-// one and then the background's. So the twin composes both, in that order, which is also the record
-// of the ordering divergence from RN that the image port left standing.
-//
-// The background half reads the owner through a CLOSURE, exactly as `imageFold(owner)` did before
-// the `ownerProps` seam; the native half reads `node.parent`. That pairing is the whole point of the
-// row — it is the SECOND parent-reading rule, and the first was measured on a rule that does almost
-// nothing (`content`), so this one says whether the seam still costs nothing when the rule around it
-// is the most expensive in the file.
+// The owner as the JS folds saw it, through a closure: a JS fold has no parent to consult
+let jsOwnerProps: Readonly<Record<string, unknown>> = {};
+
+// The only tag with two rules: the image one, then the background one
 registerHostBehavior('image-background-image-in-js', {
   attach(): void {},
   detach(): void {},
@@ -318,10 +197,14 @@ registerHostBehavior('image-background-image', {
   resolvesImageSources: true,
 });
 
-// `input-accessory-view`'s native arm forces `{position: 'absolute'}` under the authored style
-// (`foldInputAccessoryViewProps` — RN docks the view above the keyboard, so it must not lay out
-// wherever the app placed it in the tree). The twin has to compose the same, or `expectSamePayload`
-// refuses to time the pair — exactly what caught this fixture going stale when the rule was ported.
+// An array goes through as it is, an object is copied, anything else is no style at all
+function copyOfStyle(style: unknown): unknown {
+  if (typeof style !== 'object' || style === null) return undefined;
+  if (Array.isArray(style)) return style;
+  return { ...style };
+}
+
+// The native rule forces `position: 'absolute'` under the authored style
 registerHostBehavior('input-accessory-view-in-js', {
   attach(): void {},
   detach(): void {},
@@ -331,13 +214,7 @@ registerHostBehavior('input-accessory-view-in-js', {
     for (const key of Object.keys(props)) {
       if (!consumed.has(key)) out[key] = props[key];
     }
-    const style = props.style;
-    const authoredStyle =
-      typeof style !== 'object' || style === null
-        ? undefined
-        : Array.isArray(style)
-          ? style
-          : { ...style };
+    const authoredStyle = copyOfStyle(props.style);
     out.style =
       authoredStyle === undefined
         ? [{ position: 'absolute' }]
@@ -350,16 +227,15 @@ registerHostBehavior('input-accessory-view-in-js', {
   },
 });
 
-// The spinner, whose rule is the only one in this file that had to be REACHED before it could be
-// priced: its tag is built by its owner and named by no app, so until a stub behavior was registered
-// for it the host saw an empty `tagName` and ran nothing. See `activity-indicator/shared.ts`.
+// The spinner's tag is built by its owner, so a stub behavior has to name it for the host
 registerHostBehavior('activity-indicator-spinner-in-js', {
   attach(): void {},
   detach(): void {},
   foldPayload(props: Readonly<Record<string, unknown>>) {
     const out: Record<string, unknown> = { ...props };
     const size = props.size;
-    const box = size === 'large' ? 36 : typeof size === 'number' ? size : 20;
+    const fallbackBox = size === 'large' ? 36 : 20;
+    const box = typeof size === 'number' ? size : fallbackBox;
     if (typeof size === 'number') delete out.size;
     else out.size = size === 'large' ? 'large' : 'small';
     out.style = { width: box, height: box };
@@ -370,8 +246,7 @@ registerHostBehavior('activity-indicator-spinner-in-js', {
   },
 });
 
-// The SMALLEST rule in the file — one key, written unconditionally — and it is here as the control
-// for the column's own claim. If price tracked what a rule DOES, this row would be nearly free.
+// The smallest rule here, one key written unconditionally: the control row
 registerHostBehavior('image-background-in-js', {
   attach(): void {},
   detach(): void {},
@@ -380,8 +255,7 @@ registerHostBehavior('image-background-in-js', {
   },
 });
 
-// Registered bare rather than through `registerImageBackgroundBehavior`, which would build an inner
-// image per node and price a subtree instead of a rule — the same reason `button`'s arm is bare.
+// Bare: the real behavior builds an inner image per node and would price a subtree
 registerHostBehavior('image-background', {
   attach(): void {},
   detach(): void {},
@@ -393,8 +267,6 @@ const IMAGE_BACKGROUND_PROPS = {
   style: { width: 120, height: 80, borderRadius: 4 },
 };
 
-// The BIGGEST rule in the file by what it does — compose a base style, default a flag, strip the
-// axis, resolve an asymmetric pair, erase two keys, map a word to a friction constant.
 registerHostBehavior('scroll-view-in-js', {
   attach(): void {},
   detach(): void {},
@@ -414,7 +286,7 @@ registerHostBehavior('scroll-view-in-js', {
     delete out.horizontal;
     if (props.alwaysBounceVertical === undefined)
       out.alwaysBounceVertical = true;
-    // ScrollView.js:1797-1808. The fixture wires no momentum listener.
+    // The fixture wires no momentum listener
     out.sendMomentumEvents = false;
     if (
       Array.isArray(props.stickyHeaderIndices) &&
@@ -427,9 +299,7 @@ registerHostBehavior('scroll-view-in-js', {
     delete out.invertStickyHeaders;
     if (props.decelerationRate === 'normal') out.decelerationRate = 0.998;
     else if (props.decelerationRate === 'fast') out.decelerationRate = 0.99;
-    // The iOS half of the paging/snapping expression, since this build is the iOS one. Resolved on
-    // every scroll view, as the rule does — the twin has to spell that out or `expectSamePayload`
-    // refuses to time the two arms, which is how this line came to be written.
+    // The iOS half of the paging expression, resolved on every scroll view
     out.pagingEnabled =
       props.pagingEnabled === true &&
       props.snapToInterval === undefined &&
@@ -438,30 +308,19 @@ registerHostBehavior('scroll-view-in-js', {
   },
 });
 
-// Registered bare, like `button`'s and `image-background`'s arms: the real behavior builds a content
-// node per scroll view, and this file prices ONE rule against ONE fold, not a subtree.
+// Bare, like `image-background`: the real behavior builds a content node per scroll view
 registerHostBehavior('scroll-view', { attach(): void {}, detach(): void {} });
 
-// THE FIRST RULE HERE THAT READS ITS PARENT, and the reason it is priced beside the others rather
-// than trusted: `ownerProps` is a pointer hop in C++ and a whole JS closure plus a crossing in the
-// arm it replaced, so the two sides are not comparable in the way the other rows are. What the row
-// answers is the only question that matters for the seam — does reading the parent cost anything
-// measurable against a rule that does not.
-//
-// The JS twin reads the owner through a closure, which is what `contentFold` did.
-let jsOwnerProps: Readonly<Record<string, unknown>> = {};
-
+// The rule that reads its parent: a pointer hop in C++, a closure plus a crossing in JS
 registerHostBehavior('scroll-content-in-js', {
   attach(): void {},
   detach(): void {},
   foldPayload(props: Readonly<Record<string, unknown>>) {
-    // `snapToAlignment` is deliberately NOT a leg here, and the omission is the arm's, not a
-    // simplification: it is Android-only in the engine's rule (`ScrollView.js:1731-1733`), so a twin
-    // that read it would disagree with the rule on this build and `expectSamePayload` would refuse
-    // to time them. It did exactly that when the gate landed, which is what the guard is for.
-    const preserves = jsOwnerProps.maintainVisibleContentPosition !== undefined;
-    if (!preserves) return props;
-    return { ...props, collapsableChildren: false };
+    // No `snapToAlignment` leg: the engine's rule reads it on Android only
+    const hasPreservedPosition =
+      jsOwnerProps.maintainVisibleContentPosition !== undefined;
+    if (hasPreservedPosition) return { ...props, collapsableChildren: false };
+    return props;
   },
 });
 
@@ -470,17 +329,8 @@ registerHostBehavior('scroll-content', {
   detach(): void {},
 });
 
-// NO ARM FOR `touchable-opacity`'s `focusable`, and the reason is this file's own finding rather
-// than an omission. What that port deleted was a fold whose body was one key; the `accessory` row
-// already prices a fold whose body is NOTHING at 11.4 us/node, and the cost model these nine rows
-// establish is "bag in, bag out, body free". An arm here would have to mirror the whole pressable
-// rule to keep `expectSamePayload` satisfiable, which is a large mirror bought to re-derive a number
-// the page already carries.
-//
-// What is NOT already on the page is the MULTIPLIER, and it is measured where it is visible:
-// `touchable-focusable-payload.itest.ts` reads `foldsFound` 5 for a single mounted touchable, not 1
-// — the opacity settle re-commits the node several times before it comes to rest. So the saving is
-// ~5 trips per touchable at mount rather than one.
+// No arm for `touchable-opacity`'s `focusable`: it would mirror the whole pressable rule
+// to price a one-key fold. Its multiplier is in `touchable-focusable-payload.itest.ts`
 
 const SCROLL_CONTENT_PROPS = {
   collapsable: false,
@@ -509,25 +359,18 @@ const INPUT_ACCESSORY_VIEW_PROPS = {
   style: { paddingTop: 4, height: 44 },
 };
 
-// Button's own rules, over the pressable ones its tag also gets. Priced on a BARE tag rather than
-// through `registerButtonBehavior`, deliberately: that behavior builds three derived nodes, so a
-// real `<button>` pays FOUR crossings per commit (`button-payload.itest.ts`) and this file measures
-// ONE rule against ONE fold. Mixing the two would price the subtree, not the port.
-//
-// THE STUB IS NOT OPTIONAL, and finding that out is worth recording: a tag reaches C++ only through
-// `recordSetTag`, which `attachHostBehavior` emits. A node built with a tag NOBODY registered
-// carries an empty `tagName` in the host, so no tag rule fires — the first run of this arm measured
-// a native side doing nothing at all, and `expectSamePayload` is what caught it rather than a
-// suspiciously fast number.
+// Bare tag, not `registerButtonBehavior`: that builds three derived nodes per button
+// An unregistered tag reaches C++ empty, so no rule fires on the native arm
 registerHostBehavior('button', { attach(): void {}, detach(): void {} });
+
+// The fixture writes no press handler, so the native `hasPressListener` leg reads false
+const HAS_PRESS_LISTENER_IN_FIXTURE = false;
 
 registerHostBehavior('button-in-js', {
   attach(): void {},
   detach(): void {},
   foldPayload(props: Readonly<Record<string, unknown>>) {
-    // The pressable fold FIRST, because the native arm's tag gets both — `button` is served by
-    // `usesPressableRule` and then by `foldButtonProps`, in that order. An arm that applied only
-    // half would send a different bag, and `expectSamePayload` would refuse to time it.
+    // The pressable fold first: the native tag gets both rules, in that order
     const out: Record<string, unknown> = pressableFoldInJs(props);
     out.accessibilityRole = 'button';
     if (out.importantForAccessibility === 'no')
@@ -537,14 +380,7 @@ registerHostBehavior('button-in-js', {
       delete out.touchSoundDisabled;
     }
     delete out.color;
-    // Button's THREE-LEG `focusable`, over the one-leg answer the pressable fold above just wrote —
-    // the layering the real rule does, and the reason `usesTouchableFocusableRule` excludes `button`.
-    //
-    // The middle leg is `onPress !== undefined`, and this fixture wires no handler: `buildList`
-    // writes props with `setProp` and a listener reaches the engine only through the event routing
-    // in `routeProp`. So the native arm's `hasPressListener` is false here and the twin has to say
-    // the same, or `expectSamePayload` refuses to time the pair — which is exactly what it did when
-    // the rule moved and this twin still expressed the old one.
+    // Three legs over the one the pressable fold wrote
     out.focusable =
       out.focusable !== false &&
       HAS_PRESS_LISTENER_IN_FIXTURE &&
@@ -553,21 +389,14 @@ registerHostBehavior('button-in-js', {
   },
 });
 
-// Named rather than inlined as `false`, so the expression above reads as the RULE and this reads as
-// the fixture's own fact. A `false` sitting in the middle of a boolean chain is indistinguishable
-// from a rule that always answers false.
-const HAS_PRESS_LISTENER_IN_FIXTURE = false;
-
-// THE ONE DESCENDANT ARM, and its two registrations are not symmetric with any other pair in this
-// file — the rule is dispatched from the PARENT'S tag, so what the native arm needs is a tagged
-// CONTAINER, and the row's own tag carries no rule at all.
+// The one descendant rule, dispatched from the parent's tag: the native arm needs a tagged
+// container and the row's own tag carries no rule
 registerHostBehavior('touchable-native-feedback', {
   attach(): void {},
   detach(): void {},
 });
 registerHostBehavior('clone', { attach(): void {}, detach(): void {} });
 
-// RN's clone list (`TouchableNativeFeedback.js:349-390`), the shape the JS fold this replaced had.
 const CLONE_KEYS_IN_JS: readonly string[] = [
   'accessibilityHint',
   'accessibilityLanguage',
@@ -594,8 +423,6 @@ registerHostBehavior('clone-in-js', {
   detach(): void {},
   foldPayload(props: Readonly<Record<string, unknown>>) {
     const out: Record<string, unknown> = { ...props };
-    // The owner through a CLOSURE, as the real fold did — a JS fold has no parent to consult, which
-    // is the whole reason the rule could not be self-keyed and had to become a descendant one.
     for (const key of CLONE_KEYS_IN_JS) {
       if (jsOwnerProps[key] === undefined) delete out[key];
       else out[key] = jsOwnerProps[key];
@@ -627,9 +454,7 @@ registerHostBehavior('clone-in-js', {
   },
 });
 
-// The bag the rule marshals, which by this file's own finding is what a fold's price tracks. Eight
-// of RN's clone names plus the four it computes — a TNF an app actually writes carries a handful,
-// not all eighteen.
+// Eight of RN's clone names plus the four it computes, a realistic owner bag
 const CLONE_OWNER_PROPS: Record<string, unknown> = {
   accessibilityLabel: 'Save',
   accessibilityHint: 'Saves the draft',
@@ -643,9 +468,7 @@ const CLONE_OWNER_PROPS: Record<string, unknown> = {
   disabled: false,
 };
 
-// `props.disabled ?? aria-disabled ?? accessibilityState.disabled` (`Button.js:331,337`), off the
-// AUTHORED bag — by the time the folds above have run, `disabled` has been erased into
-// `accessibilityState` and the precedence would collapse.
+// Read off the authored bag: the folds above erase `disabled` into `accessibilityState`
 function buttonDisabledInJs(
   props: Readonly<Record<string, unknown>>,
 ): boolean | undefined {
@@ -690,27 +513,23 @@ type IArm = {
   readonly payload: Readonly<Record<string, unknown>>;
 };
 
-function buildList(
-  rootTag: number,
-  view: string,
-  tag: string,
-  props: Record<string, unknown>,
-  // Props for the CONTAINER every row hangs off, which is the parent a rule reads through
-  // `ownerProps`. Empty for every arm but `content`, whose whole subject is that read — and without
-  // it that arm would measure a rule taking its early-out, i.e. nothing.
-  ownerProps: Record<string, unknown> = {},
-  // The container's own TAG. Every arm but `clone` leaves it a plain `view`: a rule keyed on the
-  // node's own tag does not care what contains it. `clone` is the one DESCENDANT rule in the file —
-  // it is dispatched from the parent's tag — so for that arm this is the thing under test, and the
-  // JS arm gets a plain `view` here precisely so the native rule cannot fire on it.
-  ownerTag = 'view',
-): IArm {
+// `ownerProps` feed the container every row hangs off, the parent a rule reads
+// `ownerTag` is its tag, a plain `view` except for the descendant `clone` rule
+type IRowSpec = {
+  readonly view: string;
+  readonly tag: string;
+  readonly props: Record<string, unknown>;
+  readonly ownerProps?: Record<string, unknown>;
+  readonly ownerTag?: string;
+};
+
+function buildList(rootTag: number, spec: IRowSpec): IArm {
+  const { view, tag, props, ownerProps = {}, ownerTag = 'view' } = spec;
   const surface = createSurface(rootTag);
   const container: ISymbioteNode = createElement('RCTView', false, ownerTag);
   for (const [name, value] of Object.entries(ownerProps))
     setProp(container, name, value);
-  // The SURFACE takes its child through its own method — it is not an engine node, so the free
-  // `appendChild` would name a slot this batch never created.
+  // The surface is not an engine node, so it takes its child through its own method
   surface.appendChild(container);
 
   let first: ISymbioteNode | undefined;
@@ -736,20 +555,18 @@ function buildList(
   };
 }
 
-// A CANONICAL string: array order preserved, object keys sorted. `folly::dynamic` does not keep an
-// object's authored key order, so a plain `JSON.stringify` comparison asserts the host's hash order
-// and fails on two payloads that are equal — which it did, on the image arm's `source`. Arrays are
-// deliberately NOT sorted: their order is part of the contract (native picks a source by scale).
+// Array order is part of the contract (native picks a source by scale), key order is not
+// `folly::dynamic` does not keep an object's authored key order
 function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
   if (value === null || typeof value !== 'object') return JSON.stringify(value);
   const entries = Object.entries({ ...value }).sort(([left], [right]) =>
     left < right ? -1 : 1,
   );
-  return `{${entries.map(([key, held]) => `${key}:${canonical(held)}`).join(',')}}`;
+  const fields = entries.map(([key, held]) => `${key}:${canonical(held)}`);
+  return `{${fields.join(',')}}`;
 }
 
-// The gate on every measurement below: two arms that send different payloads are not one ruler.
 function expectSamePayload(native: IArm, js: IArm): void {
   expect(Object.keys(native.payload).sort().join(' ')).toBe(
     Object.keys(js.payload).sort().join(' '),
@@ -759,54 +576,26 @@ function expectSamePayload(native: IArm, js: IArm): void {
   }
 }
 
-// BEST OF N, for the reason `child-list-scaling.itest.ts` spells out: timing noise is one-sided —
-// it only ever ADDS — so the smallest of several runs is the closest reading to the work itself.
-// Here the first sample is also the coldest, and it showed: an arm read 13.0 ms on its first pass
-// and 4.3 on its third, in the same process.
-//
-// A fresh surface per sample, from a counter, so no two samples share a tree.
+// Best of N: timing noise only ever adds, and the first sample is the coldest
+// A fresh surface per sample, so no two share a tree
 const SAMPLES = 4;
 let nextRootTag = 1;
 
-function bestArm(
-  view: string,
-  tag: string,
-  props: Record<string, unknown>,
-  ownerProps: Record<string, unknown> = {},
-  ownerTag = 'view',
-): IArm {
+function bestArm(spec: IRowSpec): IArm {
   let best: IArm | undefined;
   for (let run = 0; run < SAMPLES; run += 1) {
-    const arm = buildList(
-      (nextRootTag += 1),
-      view,
-      tag,
-      props,
-      ownerProps,
-      ownerTag,
-    );
+    const arm = buildList((nextRootTag += 1), spec);
     if (best === undefined || arm.walk < best.walk) best = arm;
   }
   if (best === undefined) throw new Error('no sample was taken');
   return best;
 }
 
-function priced(
-  name: string,
-  view: string,
-  tag: string,
-  props: Record<string, unknown>,
-  ownerProps: Record<string, unknown> = {},
-  ownerTag = 'view',
-): void {
-  // The JS arm reads its owner through a CLOSURE, which is what the fold it replaces did, so the
-  // value has to be handed to it out of band — there is no parent for it to consult.
-  jsOwnerProps = ownerProps;
-  const native = bestArm(view, tag, props, ownerProps, ownerTag);
-  // A plain `view` container on the JS arm, always. For a self-keyed rule that changes nothing; for
-  // the descendant rule it is what STOPS the native rule firing, so the JS fold is the only thing
-  // doing the work — which is the whole comparison.
-  const js = bestArm(view, `${tag}-in-js`, props, ownerProps);
+function priced(name: string, spec: IRowSpec): void {
+  jsOwnerProps = spec.ownerProps ?? {};
+  const native = bestArm(spec);
+  // A plain `view` container on the JS arm keeps the descendant rule from firing natively
+  const js = bestArm({ ...spec, tag: `${spec.tag}-in-js`, ownerTag: 'view' });
 
   expectSamePayload(native, js);
   print(
@@ -815,93 +604,97 @@ function priced(
       `  per node=${(((js.walk - native.walk) / ROWS) * 1_000).toFixed(1)} us`,
   );
 
-  // The COUNT, not the clock. The rule runs on both arms and produced the same payload, so the
-  // only difference left is the crossing; a wall-time bound would be a flake on a loaded machine,
-  // and the count is what the port actually changed.
+  // The count, not the clock: a wall-time bound flakes on a loaded machine
   expect(native.folds).toBe(0);
   expect(js.folds).toBe(ROWS);
 }
 
 describe('what a ported tag rule costs on each side of the wire', () => {
   it('pays no trip into JS for a thousand pressables', () => {
-    priced('pressable', 'RCTView', 'pressable', PRESSABLE_PROPS);
+    priced('pressable', {
+      view: 'RCTView',
+      tag: 'pressable',
+      props: PRESSABLE_PROPS,
+    });
   });
 
   it('pays no trip into JS for a thousand switches', () => {
-    priced('switch', 'Switch', 'switch', SWITCH_PROPS);
+    priced('switch', { view: 'Switch', tag: 'switch', props: SWITCH_PROPS });
   });
 
   it('pays no trip into JS for a thousand images', () => {
-    priced('image', 'RCTImageView', 'image', IMAGE_PROPS);
+    priced('image', {
+      view: 'RCTImageView',
+      tag: 'image',
+      props: IMAGE_PROPS,
+    });
   });
 
   it('pays no trip into JS for a thousand scroll content nodes', () => {
-    priced(
-      'content',
-      'RCTScrollContentView',
-      'scroll-content',
-      SCROLL_CONTENT_PROPS,
-      // The platform-INVARIANT anchor prop, so this arm prices the same rule on every build. Its
-      // Android-only sibling `snapToAlignment` would make the two arms disagree here — see the
-      // twin's own note.
-      { maintainVisibleContentPosition: { minIndexForVisible: 0 } },
-    );
+    priced('content', {
+      view: 'RCTScrollContentView',
+      tag: 'scroll-content',
+      props: SCROLL_CONTENT_PROPS,
+      // Platform-invariant anchor prop; `snapToAlignment` would split the arms on Android
+      ownerProps: { maintainVisibleContentPosition: { minIndexForVisible: 0 } },
+    });
   });
 
   it('pays no trip into JS for a thousand scroll views', () => {
-    priced('scroll', 'RCTScrollView', 'scroll-view', SCROLL_VIEW_PROPS);
+    priced('scroll', {
+      view: 'RCTScrollView',
+      tag: 'scroll-view',
+      props: SCROLL_VIEW_PROPS,
+    });
   });
 
   it('pays no trip into JS for a thousand image backgrounds', () => {
-    priced('imagebg', 'RCTView', 'image-background', IMAGE_BACKGROUND_PROPS);
+    priced('imagebg', {
+      view: 'RCTView',
+      tag: 'image-background',
+      props: IMAGE_BACKGROUND_PROPS,
+    });
   });
 
   it('pays no trip into JS for a thousand image-background images', () => {
-    priced(
-      'bgimage',
-      'RCTImageView',
-      'image-background-image',
-      IMAGE_PROPS,
-      // The box the proxy exists to counter. Without it this arm would measure the rule taking its
-      // early-out, which is the same trap the `content` arm's comment records.
-      { style: { width: 120, height: 80 } },
-    );
+    priced('bgimage', {
+      view: 'RCTImageView',
+      tag: 'image-background-image',
+      props: IMAGE_PROPS,
+      // Without a box the rule takes its early-out and the arm prices nothing
+      ownerProps: { style: { width: 120, height: 80 } },
+    });
   });
 
   it('pays no trip into JS for a thousand spinners', () => {
-    priced(
-      'spinner',
-      'ActivityIndicatorView',
-      'activity-indicator-spinner',
-      SPINNER_PROPS,
-    );
+    priced('spinner', {
+      view: 'ActivityIndicatorView',
+      tag: 'activity-indicator-spinner',
+      props: SPINNER_PROPS,
+    });
   });
 
   it('pays no trip into JS for a thousand buttons', () => {
-    priced('button', 'RCTView', 'button', BUTTON_PROPS);
+    priced('button', { view: 'RCTView', tag: 'button', props: BUTTON_PROPS });
   });
 
-  // The only arm whose rule is keyed on the PARENT'S tag. The native container is a
-  // `touchable-native-feedback`; the JS one is a plain `view`, so nothing native fires and the fold
-  // is the only thing doing the work.
+  // The native container is a `touchable-native-feedback`, the JS one a plain `view`
   it('pays no trip into JS for a thousand cloned children', () => {
-    priced(
-      'clone',
-      'RCTView',
-      'clone',
-      { backgroundColor: 'red' },
-      CLONE_OWNER_PROPS,
-      'touchable-native-feedback',
-    );
+    priced('clone', {
+      view: 'RCTView',
+      tag: 'clone',
+      props: { backgroundColor: 'red' },
+      ownerProps: CLONE_OWNER_PROPS,
+      ownerTag: 'touchable-native-feedback',
+    });
   });
 
   it('pays no trip into JS for a thousand input accessory views', () => {
-    priced(
-      'accessory',
-      'RCTInputAccessoryView',
-      'input-accessory-view',
-      INPUT_ACCESSORY_VIEW_PROPS,
-    );
+    priced('accessory', {
+      view: 'RCTInputAccessoryView',
+      tag: 'input-accessory-view',
+      props: INPUT_ACCESSORY_VIEW_PROPS,
+    });
   });
 });
 

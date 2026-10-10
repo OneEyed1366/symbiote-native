@@ -1,3 +1,5 @@
+// TODO(rn-port): RN's `ImageBackground.js` is a React component, we commit its two nodes by tag
+
 // ImageBackground's host behavior. RN's `ImageBackground.js:74-103` opens a `<View>` with the
 // app's `style`, an absolutely-filled `<Image>` inside, children painted AFTER on top — this tag
 // commits the same two nodes (`image-background` + its inner image).

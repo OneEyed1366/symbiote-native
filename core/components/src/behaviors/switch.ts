@@ -1,41 +1,8 @@
-// Switch's machine, on the engine node instead of inside a framework component — the second
-// STATEFUL primitive after TextInput (`.claude/rules/host-primitive-tier.md`, "cheapest: tag
-// exists, no handle. lastNativeReport -> dispatchViewCommand").
-//
-// WHAT A `Switch` COMPONENT ACTUALLY DOES, and why none of it needs a framework. It mirrors the
-// value native LAST REPORTED (not the value the app authors), and when the two disagree — the app
-// rejected the toggle, or its handler is a no-op — it commands native back down with the
-// platform's snap-back command (Switch.js:221-225: iOS `setValue`, Android `setNativeValue`). The
-// TEMPLATE reads none of it.
-//
-// WHY THE DIVERGENCE CHECK IS DEFERRED A MICROTASK, NOT RUN SYNCHRONOUSLY INSIDE `onChange`. The
-// obvious place to compare "what native just reported" against "what the app currently authors" is
-// right where the report arrives. It is wrong: an ACCEPTED toggle updates the app's own state, and
-// that state reaches the node only once the app's OWN reconciliation runs — which, for
-// every adapter here, happens strictly after `onChange` returns, never during it. Checking
-// synchronously would read the STALE pre-accept value and send a spurious snap-back on every
-// accepted toggle. The wrapper avoids this by running its own check from an effect that fires AFTER
-// the app's state update has flowed into a new render (`useLayoutEffect`, `$effect`, a post-flush
-// `watch`); Angular's OWN switch component (`adapters/angular/src/components/switch/shared.ts`,
-// `snapBackIfNeeded`) already solves the identical problem for a node with no render the same way —
-// `queueMicrotask` then a plain read of the current value — and this mirrors it rather than routing
-// through `IHostBehavior.afterCommit`.
-//
-// `afterCommit` was the first design and it does NOT work here: it requires a commit that actually
-// changes something to reach `runDeferredAttaches` at all (`commit.ts`'s `!result.changed` early
-// return — the same gate `text-input.test.ts` documents), and this check on its own writes no prop.
-// Pairing it with `requestCommitFor` — which schedules a commit but writes nothing either — hits
-// exactly that early return and never fires; proven wrong by this file's own test before it shipped.
-// `queueMicrotask` sidesteps the whole question: it needs no commit, only a later turn of the
-// microtask queue, and `dispatchViewCommand` is an imperative call to native independent of Fabric's
-// prop-commit pipeline anyway.
-//
-// The residual gap this leaves, and it is why `afterCommit` is STILL registered below: a check
-// scheduled only from `onChange` never re-runs for a prop change with no preceding native event —
-// e.g. the app moves `value` on its own initiative while a PAST toggle's disagreement is still
-// unresolved. `afterCommit` costs nothing extra (it fires only on a commit that already changed
-// something) and closes that one case; the microtask path is what the no-op-handler case actually
-// needs.
+// TODO(rn-port): RN's `Switch.js` is a React component, its snap-back is re-expressed here
+
+// Switch's machine on the engine node, it mirrors what native LAST reported and snaps it back.
+// The check runs a microtask after `onChange`, so an ACCEPTING app's state reaches the node first,
+// `afterCommit` stays for a `value` change with no native event (see Angular's `snapBackIfNeeded`)
 import {
   appListenerFor,
   dispatchViewCommand,
@@ -95,18 +62,18 @@ function evaluateSnapBack(node: ISymbioteNode): void {
   const state = stateOf(node);
   if (state === undefined) return; // detached before this ran
 
-  const fabricValue = propOf(node, 'value') === true;
-  if (!shouldSnapBack(state, fabricValue)) {
+  const isValueOn = propOf(node, 'value') === true;
+  if (!shouldSnapBack(state, isValueOn)) {
     dlog(
-      `Switch behavior snap-back no-op reported=${String(state.lastNativeReport)} value=${fabricValue}`,
+      `Switch behavior snap-back no-op reported=${String(state.lastNativeReport)} value=${isValueOn}`,
     );
     return;
   }
 
   dlog(
-    `Switch behavior ${snapBackCommand()} snap-back reported=${String(state.lastNativeReport)} value=${fabricValue}`,
+    `Switch behavior ${snapBackCommand()} snap-back reported=${String(state.lastNativeReport)} value=${isValueOn}`,
   );
-  dispatchViewCommand(node, snapBackCommand(), [fabricValue]);
+  dispatchViewCommand(node, snapBackCommand(), [isValueOn]);
 }
 
 function onChange(node: ISymbioteNode, event: ISymbioteEvent): void {
@@ -121,22 +88,13 @@ function onChange(node: ISymbioteNode, event: ISymbioteEvent): void {
   );
   states.set(node, switchReducer(state, { type: 'native-reported', value }));
 
-  // Switch.js:201-207's `handleChange` — `onChange` first, THEN `onValueChange`, always. An app
-  // with side effects observable across both (a shared counter, a log) sees that exact order on a
-  // real device.
-  //
-  // `onChange` is a raw `change` listener authored directly on the bare tag — not part of any
-  // adapter's public surface today, but `change` is the name this behavior's own dispatcher owns
-  // (`ownedListeners` below), so one is stashed rather than silently evicting the machine.
+  // Switch.js:201-207's `handleChange`: `onChange` first, THEN `onValueChange`, always
+  // `onChange` is a raw `change` listener on the bare tag, kept so it cannot evict the machine
   const rawListener = appListenerFor(node, 'change');
   if (typeof rawListener === 'function') rawListener(event);
 
-  // `onValueChange` is not a Fabric event — it is a fold the component wrapper does over the raw
-  // `change` payload (same class as TextInput's `onValueChange`, `text-input.ts`'s
-  // `callValueChange`), so it lands on the node as a plain prop key rather than through
-  // `ownedListeners`. ONE argument, `value` carried on the event (`ISwitchChangeEvent`) — same
-  // reason as TextInput: Svelte's compiler forces an individual `on*` attribute through a native
-  // listener wrapper that calls with exactly one argument, always a real object.
+  // `onValueChange` is a plain prop key, not a Fabric event, the wrapper folds it over `change`
+  // ONE argument with `value` on the event (`ISwitchChangeEvent`), Svelte passes `on*` one object
   const listener = propOf(node, 'onValueChange');
   if (typeof listener === 'function') {
     const changeEvent: ISwitchChangeEvent = Object.assign(event, { value });
@@ -148,9 +106,8 @@ function onChange(node: ISymbioteNode, event: ISymbioteEvent): void {
   queueMicrotask(() => evaluateSnapBack(node));
 }
 
-// Switch.js:238-239,288-289 — unconditional on both platforms, never a function of any prop: a
-// switch always claims the responder and never yields it, so its own native drag-to-toggle cannot
-// be stolen mid-gesture by a parent ScrollView's own responder negotiation.
+// Switch.js:238-239,288-289: unconditional on both platforms, never a function of any prop
+// A switch always claims the responder, so a parent ScrollView cannot steal its drag-to-toggle
 function alwaysClaimsResponder(): boolean {
   return true;
 }

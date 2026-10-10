@@ -8,7 +8,7 @@
 import { defaultKeyExtractor } from './virtualized-list';
 import type { IScrollRoutingHandle } from './scroll-routing-handle';
 
-export interface ISection<ItemT> {
+export type ISection<ItemT> = {
   title: string;
   data: readonly ItemT[];
   // A stable identity for this section (`VirtualizedSectionList.js`'s `section.key`), used ahead
@@ -25,22 +25,73 @@ export interface ISection<ItemT> {
   // Method shorthand is checked bivariantly instead, which is what every other generic template
   // context in this adapter relies on.
   keyExtractor?(item: ItemT, index: number): string;
-}
+};
 
-// A flattened entry is a section header, an item, a section footer, or a between-sections
-// separator, tagged so the single renderItem can dispatch to the right renderer. The
-// separator carries no data - it just paints the gap.
-export type ISectionEntry<ItemT> =
-  | { kind: 'header'; section: ISection<ItemT>; sectionIndex: number }
-  | {
+// Separators are no cells of their own: an item cell paints them around itself, as RN's
+// `ItemWithSeparator` does, so the entry carries its neighbours
+type ISectionNeighbours<SectionT> = {
+  section: SectionT;
+  sectionIndex: number;
+  leadingSection: SectionT | undefined;
+  trailingSection: SectionT | undefined;
+};
+
+// `SectionT` is the app's own section type: an adapter adds `renderItem` / `ItemSeparatorComponent`
+export type ISectionEntry<
+  ItemT,
+  SectionT extends ISection<ItemT> = ISection<ItemT>,
+> =
+  | ({ kind: 'header' } & ISectionNeighbours<SectionT>)
+  | ({
       kind: 'item';
       item: ItemT;
-      section: ISection<ItemT>;
-      sectionIndex: number;
       itemIndex: number;
-    }
-  | { kind: 'footer'; section: ISection<ItemT>; sectionIndex: number }
-  | { kind: 'section-separator'; sectionIndex: number };
+      leadingItem: ItemT | undefined;
+      trailingItem: ItemT | undefined;
+    } & ISectionNeighbours<SectionT>)
+  | ({ kind: 'footer' } & ISectionNeighbours<SectionT>);
+
+export const SECTION_ENTRY_KIND = {
+  header: 'header',
+  item: 'item',
+  footer: 'footer',
+} as const;
+
+type IEntryOfKind<
+  ItemT,
+  SectionT extends ISection<ItemT>,
+  K extends ISectionEntry<ItemT, SectionT>['kind'],
+> = Extract<ISectionEntry<ItemT, SectionT>, { kind: K }>;
+
+// One renderer per entry kind, the inner list streams all three through a single `renderItem`
+export type ISectionEntryRenderers<
+  ItemT,
+  TNode,
+  SectionT extends ISection<ItemT> = ISection<ItemT>,
+> = {
+  header(entry: IEntryOfKind<ItemT, SectionT, 'header'>): TNode;
+  item(entry: IEntryOfKind<ItemT, SectionT, 'item'>): TNode;
+  footer(entry: IEntryOfKind<ItemT, SectionT, 'footer'>): TNode;
+};
+
+// The dispatch every adapter's entry renderer shares, only what each kind renders differs
+export function renderSectionEntry<
+  ItemT,
+  TNode,
+  SectionT extends ISection<ItemT> = ISection<ItemT>,
+>(
+  renderers: ISectionEntryRenderers<ItemT, TNode, SectionT>,
+  entry: ISectionEntry<ItemT, SectionT>,
+): TNode {
+  switch (entry.kind) {
+    case SECTION_ENTRY_KIND.header:
+      return renderers.header(entry);
+    case SECTION_ENTRY_KIND.footer:
+      return renderers.footer(entry);
+    case SECTION_ENTRY_KIND.item:
+      return renderers.item(entry);
+  }
+}
 
 // The imperative API RN exposes on a SectionList ref. scrollToLocation is this handle's
 // own primary member: it resolves a (sectionIndex, itemIndex) coordinate to the flattened
@@ -48,7 +99,7 @@ export type ISectionEntry<ItemT> =
 // flash/scroll-ref/interaction tail is the inner-scroll routing shared with
 // VirtualizedList (see IScrollRoutingHandle) - extending it, rather than re-declaring it,
 // is what keeps the two handle types from drifting from each other.
-export interface IVirtualizedSectionListHandle extends IScrollRoutingHandle {
+export type IVirtualizedSectionListHandle = IScrollRoutingHandle & {
   scrollToLocation(params: {
     sectionIndex: number;
     itemIndex: number;
@@ -56,39 +107,112 @@ export interface IVirtualizedSectionListHandle extends IScrollRoutingHandle {
     viewPosition?: number;
     animated?: boolean;
   }): void;
-}
+};
 
 // Flatten sections into entries AND record where each section header lands in the flat
 // stream, so scrollToLocation can map (sectionIndex, itemIndex) -> flat index without
-// re-deriving the layout. withSeparators inserts a section separator between adjacent
-// sections (never before the first / after the last).
-export function flattenSections<ItemT>(
-  sections: ReadonlyArray<ISection<ItemT>>,
-  withSeparators: boolean,
-): { entries: ISectionEntry<ItemT>[]; headerIndices: number[] } {
-  const entries: ISectionEntry<ItemT>[] = [];
+// re-deriving the layout
+export function flattenSections<
+  ItemT,
+  SectionT extends ISection<ItemT> = ISection<ItemT>,
+>(
+  sections: ReadonlyArray<SectionT & ISection<ItemT>>,
+): { entries: ISectionEntry<ItemT, SectionT>[]; headerIndices: number[] } {
+  const entries: ISectionEntry<ItemT, SectionT>[] = [];
   const headerIndices: number[] = [];
   sections.forEach((section, sectionIndex) => {
-    if (withSeparators && sectionIndex > 0) {
-      entries.push({ kind: 'section-separator', sectionIndex });
-    }
+    const around = {
+      section,
+      sectionIndex,
+      leadingSection: sections[sectionIndex - 1],
+      trailingSection: sections[sectionIndex + 1],
+    };
     headerIndices[sectionIndex] = entries.length;
-    entries.push({ kind: 'header', section, sectionIndex });
+    entries.push({ kind: SECTION_ENTRY_KIND.header, ...around });
     section.data.forEach((item, itemIndex) => {
-      entries.push({ kind: 'item', item, section, sectionIndex, itemIndex });
+      entries.push({
+        kind: SECTION_ENTRY_KIND.item,
+        item,
+        itemIndex,
+        leadingItem: section.data[itemIndex - 1],
+        trailingItem: section.data[itemIndex + 1],
+        ...around,
+      });
     });
-    entries.push({ kind: 'footer', section, sectionIndex });
+    entries.push({ kind: SECTION_ENTRY_KIND.footer, ...around });
   });
   return { entries, headerIndices };
 }
 
-// Unwrap an entry separator-prop into its underlying ItemT (or undefined for a non-item
-// entry: header/footer/section-separator gaps have no item), so the user's
-// ItemSeparatorComponent, typed on ItemT, sees real items.
-export function unwrapEntryItem<ItemT>(
-  entry: ISectionEntry<ItemT> | undefined,
-): ItemT | undefined {
-  return entry !== undefined && entry.kind === 'item' ? entry.item : undefined;
+export type ISeparatorGapProps<ItemT, SectionT = ISection<ItemT>> = {
+  leadingItem: ItemT | undefined;
+  trailingItem: ItemT | undefined;
+  section: SectionT;
+  leadingSection: SectionT | undefined;
+  trailingSection: SectionT | undefined;
+};
+
+export const SEPARATOR_GAP_KIND = {
+  none: 'none',
+  section: 'section',
+  item: 'item',
+} as const;
+
+// `none` carries no props. `section` is the section separator, `item` the item one
+export type ISeparatorGap<ItemT, SectionT = ISection<ItemT>> =
+  | { kind: typeof SEPARATOR_GAP_KIND.none; props?: undefined }
+  | {
+      kind: typeof SEPARATOR_GAP_KIND.section | typeof SEPARATOR_GAP_KIND.item;
+      props: ISeparatorGapProps<ItemT, SectionT>;
+    };
+
+const NO_GAP = { kind: SEPARATOR_GAP_KIND.none } as const;
+
+// Which separator RN paints between two neighbouring cells (`_getSeparatorComponent`): the
+// section one before a section's first item and after its last, the item one between items
+export function sectionGapFor<
+  ItemT,
+  SectionT extends ISection<ItemT> = ISection<ItemT>,
+>(
+  previous: ISectionEntry<ItemT, SectionT> | undefined,
+  next: ISectionEntry<ItemT, SectionT> | undefined,
+): ISeparatorGap<ItemT, SectionT> {
+  if (previous === undefined || next === undefined) return NO_GAP;
+  const props = {
+    leadingItem:
+      previous.kind === SECTION_ENTRY_KIND.item ? previous.item : undefined,
+    trailingItem: next.kind === SECTION_ENTRY_KIND.item ? next.item : undefined,
+    section: previous.section,
+    leadingSection: previous.leadingSection,
+    trailingSection: previous.trailingSection,
+  };
+  const { header, item, footer } = SECTION_ENTRY_KIND;
+  if (previous.kind === item && next.kind === item)
+    return { kind: SEPARATOR_GAP_KIND.item, props };
+  const isEdgeOfItems =
+    (previous.kind === header && next.kind === item) ||
+    (previous.kind === item && next.kind === footer);
+  return isEdgeOfItems ? { kind: SEPARATOR_GAP_KIND.section, props } : NO_GAP;
+}
+
+// The gaps an item cell paints itself: the leading one only after a header, the trailing one
+// always. A gap between two items belongs to the earlier cell
+export function cellGapsFor<
+  ItemT,
+  SectionT extends ISection<ItemT> = ISection<ItemT>,
+>(
+  entries: ReadonlyArray<ISectionEntry<ItemT, SectionT>>,
+  index: number,
+): {
+  leading: ISeparatorGap<ItemT, SectionT>;
+  trailing: ISeparatorGap<ItemT, SectionT>;
+} {
+  const previous = entries[index - 1];
+  const isAfterHeader = previous?.kind === SECTION_ENTRY_KIND.header;
+  return {
+    leading: isAfterHeader ? sectionGapFor(previous, entries[index]) : NO_GAP,
+    trailing: sectionGapFor(entries[index], entries[index + 1]),
+  };
 }
 
 // RN's own section-relative key (`VirtualizedSectionList.js`'s `_subExtractor`): the section's
@@ -103,14 +227,11 @@ function sectionKeyPart(
 
 export function sectionEntryKey<ItemT>(
   entry: ISectionEntry<ItemT>,
-  index: number,
   keyExtractor?: (item: ItemT, index: number) => string,
 ): string {
-  if (entry.kind === 'section-separator')
-    return `section-${entry.sectionIndex}:separator`;
   const sectionKey = sectionKeyPart(entry.section, entry.sectionIndex);
-  if (entry.kind === 'header') return `${sectionKey}:header`;
-  if (entry.kind === 'footer') return `${sectionKey}:footer`;
+  if (entry.kind === SECTION_ENTRY_KIND.header) return `${sectionKey}:header`;
+  if (entry.kind === SECTION_ENTRY_KIND.footer) return `${sectionKey}:footer`;
   const resolve =
     entry.section.keyExtractor ?? keyExtractor ?? defaultKeyExtractor;
   return `${sectionKey}:${resolve(entry.item, entry.itemIndex)}`;
@@ -126,4 +247,63 @@ export function scrollLocationToFlatIndex(
   const headerFlatIndex = headerIndices[sectionIndex];
   if (headerFlatIndex === undefined) return undefined;
   return headerFlatIndex + itemIndex;
+}
+
+type IFlatItemLayout = { length: number; offset: number; index: number };
+
+// The user's `getItemLayout` gets `sections`, as in RN, while the inner stream is the flat entries
+// The flat index matches RN's only without a section separator, it adds a row per boundary
+export function layoutOverSections<ItemT>(
+  getItemLayout:
+    | ((
+        data: ReadonlyArray<ISection<ItemT>> | null,
+        index: number,
+      ) => IFlatItemLayout)
+    | undefined,
+  sections: ReadonlyArray<ISection<ItemT>>,
+): ((entries: unknown, index: number) => IFlatItemLayout) | undefined {
+  if (getItemLayout === undefined) return undefined;
+  return (_entries, index) => getItemLayout(sections, index);
+}
+
+export type IScrollLocation = {
+  sectionIndex: number;
+  itemIndex: number;
+  viewOffset?: number;
+  viewPosition?: number;
+  animated?: boolean;
+};
+
+export type IScrollLocationTarget = {
+  index: number;
+  viewOffset: number | undefined;
+  viewPosition: number | undefined;
+  animated: boolean | undefined;
+  offsetByCellLength: number | undefined;
+};
+
+// What the inner list's `scrollToIndex` takes for a section location, shared by every adapter
+// A stuck header covers the target item, so its length joins the offset (RN's `scrollToLocation`)
+export function resolveScrollLocation(
+  headerIndices: number[],
+  stickyHeaderIndices: readonly number[] | undefined,
+  location: IScrollLocation,
+): IScrollLocationTarget | undefined {
+  const { sectionIndex, itemIndex } = location;
+  const index = scrollLocationToFlatIndex(
+    headerIndices,
+    sectionIndex,
+    itemIndex,
+  );
+  if (index === undefined) return undefined;
+  const headerIndex = headerIndices[sectionIndex];
+  const isCovered =
+    itemIndex > 0 && stickyHeaderIndices?.includes(headerIndex) === true;
+  return {
+    index,
+    viewOffset: location.viewOffset,
+    viewPosition: location.viewPosition,
+    animated: location.animated,
+    offsetByCellLength: isCovered ? headerIndex : undefined,
+  };
 }

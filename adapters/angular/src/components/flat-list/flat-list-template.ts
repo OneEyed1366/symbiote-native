@@ -31,6 +31,7 @@ export const FLAT_LIST_TEMPLATE = `
       [maxToRenderPerBatch]="maxToRenderPerBatch"
       [updateCellsBatchingPeriod]="updateCellsBatchingPeriod"
       [windowSize]="windowSize"
+      [disableVirtualization]="disableVirtualization"
       [stickyHeaderIndices]="stickyHeaderIndices"
       [maintainVisibleContentPosition]="maintainVisibleContentPosition"
       [onScroll]="onScroll"
@@ -38,15 +39,21 @@ export const FLAT_LIST_TEMPLATE = `
       [onScrollEndDrag]="onScrollEndDrag"
       [onMomentumScrollBegin]="onMomentumScrollBegin"
       [onMomentumScrollEnd]="onMomentumScrollEnd"
+      [onContentSizeChange]="onContentSizeChange"
       [scrollEventThrottle]="scrollEventThrottle"
       [keyboardShouldPersistTaps]="keyboardShouldPersistTaps"
       [keyboardDismissMode]="keyboardDismissMode"
       [removeClippedSubviews]="resolvedRemoveClippedSubviews"
       [nestedScrollEnabled]="nestedScrollEnabled"
+      [stickyHeaderHiddenOnScroll]="stickyHeaderHiddenOnScroll"
+      [innerViewRef]="innerViewRef"
       [testID]="testID"
       [nativeID]="nativeID"
       [style]="resolvedStyle"
       [contentContainerStyle]="contentContainerStyle"
+      [listHeaderComponentStyle]="listHeaderComponentStyle"
+      [listFooterComponentStyle]="listFooterComponentStyle"
+      [cellRendererTemplate]="cellDir?.templateRef"
       ${LIST_ACCESSIBILITY_FORWARD}
     >
       <ng-template vListItem let-row let-separators="separators">
@@ -55,6 +62,7 @@ export const FLAT_LIST_TEMPLATE = `
             <view [style]="columnCellStyle">
               <ng-container
                 [vListOutlet]="itemDir?.templateRef"
+                [vListOutletComponent]="itemComponent"
                 [vListOutletContext]="cell.context"
               ></ng-container>
             </view>
@@ -119,6 +127,7 @@ export const FLAT_LIST_TEMPLATE = `
       [maxToRenderPerBatch]="maxToRenderPerBatch"
       [updateCellsBatchingPeriod]="updateCellsBatchingPeriod"
       [windowSize]="windowSize"
+      [disableVirtualization]="disableVirtualization"
       [stickyHeaderIndices]="stickyHeaderIndices"
       [maintainVisibleContentPosition]="maintainVisibleContentPosition"
       [onScroll]="onScroll"
@@ -126,16 +135,23 @@ export const FLAT_LIST_TEMPLATE = `
       [onScrollEndDrag]="onScrollEndDrag"
       [onMomentumScrollBegin]="onMomentumScrollBegin"
       [onMomentumScrollEnd]="onMomentumScrollEnd"
+      [onContentSizeChange]="onContentSizeChange"
       [scrollEventThrottle]="scrollEventThrottle"
       [keyboardShouldPersistTaps]="keyboardShouldPersistTaps"
       [keyboardDismissMode]="keyboardDismissMode"
       [removeClippedSubviews]="resolvedRemoveClippedSubviews"
       [nestedScrollEnabled]="nestedScrollEnabled"
+      [stickyHeaderHiddenOnScroll]="stickyHeaderHiddenOnScroll"
+      [innerViewRef]="innerViewRef"
       [testID]="testID"
       [nativeID]="nativeID"
       [style]="resolvedStyle"
       [contentContainerStyle]="contentContainerStyle"
+      [listHeaderComponentStyle]="listHeaderComponentStyle"
+      [listFooterComponentStyle]="listFooterComponentStyle"
+      [cellRendererTemplate]="cellDir?.templateRef"
       [itemTemplate]="itemDir?.templateRef"
+      [listItemComponent]="listItemComponent"
       [itemSeparatorTemplate]="separatorDir?.templateRef"
       ${LIST_ACCESSIBILITY_FORWARD}
     >

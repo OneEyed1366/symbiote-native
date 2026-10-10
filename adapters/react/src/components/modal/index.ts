@@ -17,9 +17,15 @@ import {
   useEffect,
   useReducer,
   type FC,
+  type ReactElement,
   type ReactNode,
 } from 'react';
-import { dlog, Platform, type ISymbioteEvent } from '@symbiote-native/engine';
+import {
+  dlog,
+  Platform,
+  type IColorValue,
+  type ISymbioteEvent,
+} from '@symbiote-native/engine';
 import {
   createInitialModalState,
   isModalVisible,
@@ -28,6 +34,7 @@ import {
   renderModal,
   resolveAccessibilityProps,
   shouldRenderModal,
+  warnAboutModalProps,
   type IAccessibilityProps,
   type IAriaProps,
   type IModalAnimationType,
@@ -35,6 +42,7 @@ import {
   type IModalPresentationStyle,
 } from '@symbiote-native/components';
 import type { IStyleProp, IViewStyle } from '../../utils/styles';
+import { VirtualizedListScopeResetter } from '../virtualized-list/nested-scope';
 
 export type {
   IModalAnimationType,
@@ -43,41 +51,110 @@ export type {
   IModalOrientationChangeEvent,
 } from '@symbiote-native/components';
 
-export interface IModalProps extends IAccessibilityProps, IAriaProps {
-  visible?: boolean;
-  transparent?: boolean;
-  backdropColor?: string;
-  animationType?: IModalAnimationType;
-  presentationStyle?: IModalPresentationStyle;
-  supportedOrientations?: ReadonlyArray<IModalOrientation>;
-  hardwareAccelerated?: boolean;
-  // navigationBarTranslucent makes the Android nav bar translucent; RN requires
-  // statusBarTranslucent true alongside it (Modal.js ~172 / confirmProps ~193).
-  statusBarTranslucent?: boolean;
-  navigationBarTranslucent?: boolean;
-  // allowSwipeDismissal lets a swipe-down dismiss the modal on iOS; RN pairs it with
-  // onRequestClose to handle the dismissal (Modal.js ~155).
-  allowSwipeDismissal?: boolean;
-  onShow?: () => void;
-  onDismiss?: () => void;
-  onRequestClose?: () => void;
-  // The engine hands every listener the ISymbioteEvent wrapper, so the orientation is read at
-  // event.nativeEvent.orientation (IModalOrientationChangeEvent describes that payload).
-  onOrientationChange?: (event: ISymbioteEvent) => void;
-  style?: IStyleProp<IViewStyle>;
-  // Forwarded onto the container View like `style` — resolves through the shared style
-  // registry.
-  className?: string;
-  children?: ReactNode;
+export type IModalProps = IAccessibilityProps &
+  IAriaProps & {
+    visible?: boolean;
+    transparent?: boolean;
+    backdropColor?: IColorValue;
+    animationType?: IModalAnimationType;
+    presentationStyle?: IModalPresentationStyle;
+    supportedOrientations?: ReadonlyArray<IModalOrientation>;
+    hardwareAccelerated?: boolean;
+    // navigationBarTranslucent makes the Android nav bar translucent; RN requires
+    // statusBarTranslucent true alongside it (Modal.js ~172 / confirmProps ~193).
+    statusBarTranslucent?: boolean;
+    navigationBarTranslucent?: boolean;
+    // allowSwipeDismissal lets a swipe-down dismiss the modal on iOS; RN pairs it with
+    // onRequestClose to handle the dismissal (Modal.js ~155).
+    allowSwipeDismissal?: boolean;
+    onShow?: () => void;
+    onDismiss?: () => void;
+    onRequestClose?: () => void;
+    // The engine hands every listener the ISymbioteEvent wrapper, so the orientation is read at
+    // event.nativeEvent.orientation (IModalOrientationChangeEvent describes that payload).
+    onOrientationChange?: (event: ISymbioteEvent) => void;
+    style?: IStyleProp<IViewStyle>;
+    // Forwarded onto the container View like `style` — resolves through the shared style
+    // registry.
+    className?: string;
+    children?: ReactNode;
+  };
+
+type IModalTreeInput = Parameters<typeof renderModal>[0] & {
+  className: string | undefined;
+  children: ReactNode;
+};
+
+// The user children nest UNDER the container View, never beside the host, as RN lays a modal out
+// They sit outside the list above, so a list in them is not nested in it
+function modalTreeOf(input: IModalTreeInput): ReactElement | null {
+  const { className, children, ...renderInput } = input;
+  const root = renderModal(renderInput);
+  const [container] = root.children;
+  if (typeof container === 'string') return null;
+  return createElement(
+    root.type,
+    { key: root.key, ...root.props },
+    createElement(
+      container.type,
+      { key: container.key, ...container.props, className },
+      createElement(VirtualizedListScopeResetter, null, children),
+    ),
+  );
+}
+
+// The iOS keep-alive: armed on show, dropped only by the native dismiss
+function useKeepAlive(visible: boolean | undefined): {
+  isVisible: boolean;
+  state: ReturnType<typeof createInitialModalState>;
+  dispatch: (action: Parameters<typeof modalReducer>[1]) => void;
+} {
+  const isVisible = isModalVisible(visible);
+  const [state, dispatch] = useReducer(
+    modalReducer,
+    isVisible,
+    createInitialModalState,
+  );
+  useEffect(() => {
+    const action = modalVisibilityAction(isVisible);
+    if (action !== undefined) dispatch(action);
+  }, [isVisible]);
+  return { isVisible, state, dispatch };
+}
+
+// RN checks on mount and on every update, a dev build only
+function useModalWarnings(props: IModalProps): void {
+  const {
+    presentationStyle,
+    transparent,
+    navigationBarTranslucent,
+    statusBarTranslucent,
+    allowSwipeDismissal,
+    onRequestClose,
+  } = props;
+  useEffect(() => {
+    warnAboutModalProps({
+      presentationStyle,
+      transparent,
+      navigationBarTranslucent,
+      statusBarTranslucent,
+      allowSwipeDismissal,
+      onRequestClose,
+    });
+  }, [
+    presentationStyle,
+    transparent,
+    navigationBarTranslucent,
+    statusBarTranslucent,
+    allowSwipeDismissal,
+    onRequestClose,
+  ]);
 }
 
 export const Modal: FC<IModalProps> = rawProps => {
-  // Modal owns its host element (modal), so it folds aria/role here; the resolved fields
-  // ride the host node via `...passthrough`. The events (onShow/onDismiss/onRequestClose/
-  // onOrientationChange) are real ViewConfig DirectEvents, so they too ride passthrough raw.
-  // className is pulled out here, like style, and applied to the CONTAINER element below — left in
-  // ...passthrough it would land on the outer modal host instead (renderModal composes
-  // `style` into the container's style, not the host's).
+  useModalWarnings(rawProps);
+  // Aria and role fold here, the events are real DirectEvents and ride `passthrough` raw
+  // `className` is pulled out to land on the container, in `passthrough` it would reach the host
   const {
     visible,
     transparent,
@@ -96,18 +173,7 @@ export const Modal: FC<IModalProps> = rawProps => {
     ...passthrough
   } = resolveAccessibilityProps(rawProps);
 
-  // The iOS keep-alive (state/modal.ts): armed on show, dropped only by the native dismiss below.
-  const isVisible = isModalVisible(visible);
-  const [state, dispatch] = useReducer(
-    modalReducer,
-    isVisible,
-    createInitialModalState,
-  );
-  useEffect(() => {
-    const action = modalVisibilityAction(isVisible);
-    if (action !== undefined) dispatch(action);
-  }, [isVisible]);
-
+  const { isVisible, state, dispatch } = useKeepAlive(visible);
   if (!shouldRenderModal(isVisible, state)) {
     dlog('Modal hidden -> no node committed');
     return null;
@@ -120,7 +186,7 @@ export const Modal: FC<IModalProps> = rawProps => {
     onDismiss?.();
   };
 
-  const root = renderModal({
+  return modalTreeOf({
     visible,
     transparent,
     backdropColor,
@@ -133,19 +199,7 @@ export const Modal: FC<IModalProps> = rawProps => {
     allowSwipeDismissal,
     style,
     passthrough: { ...passthrough, onDismiss: handleDismiss },
+    className,
+    children,
   });
-
-  // root = modal > [container]; the user children nest UNDER the container View, never as
-  // a direct sibling of the host (RN's modal content layout).
-  const [container] = root.children;
-  if (typeof container === 'string') return null;
-  return createElement(
-    root.type,
-    { key: root.key, ...root.props },
-    createElement(
-      container.type,
-      { key: container.key, ...container.props, className },
-      children,
-    ),
-  );
 };

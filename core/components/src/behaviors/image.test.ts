@@ -17,6 +17,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   createElement,
   createSurface,
+  Platform,
   routeProp,
   setImageSourceResolver,
   type ISymbioteNode,
@@ -170,5 +171,43 @@ describe('an image tag reports whether native should notify load events', () => 
       candidate => candidate.payload.testID === TEST_ID,
     );
     expect(found?.props.shouldNotifyLoadEvents).toBe(undefined);
+  });
+});
+
+// `Image.android.js:191` бросает и в production, на iOS такой проверки нет
+describe('an image tag with both placeholder sources', () => {
+  const originalOs = Platform.OS;
+  const BOTH_SOURCES_ERROR =
+    'The <Image> component cannot have defaultSource and loadingIndicatorSource at the same time. ' +
+    'Please use either defaultSource or loadingIndicatorSource.';
+
+  function setOs(os: string): void {
+    Object.defineProperty(Platform, 'OS', { value: os, configurable: true });
+  }
+
+  function bothSources(): void {
+    const node: ISymbioteNode = createElement('RCTImageView', false, 'image');
+    routeProp(node, 'defaultSource', { uri: 'http://x/placeholder.png' });
+    routeProp(node, 'loadingIndicatorSource', { uri: 'http://x/spinner.gif' });
+  }
+
+  afterEach(() => setOs(originalOs));
+
+  it('throws on Android, whichever prop is written second', () => {
+    setOs('android');
+    expect(bothSources).toThrow(BOTH_SOURCES_ERROR);
+  });
+
+  it('accepts either one alone on Android', () => {
+    setOs('android');
+    const node: ISymbioteNode = createElement('RCTImageView', false, 'image');
+    expect(() =>
+      routeProp(node, 'defaultSource', { uri: 'http://x/placeholder.png' }),
+    ).not.toThrow();
+  });
+
+  it('accepts both on iOS', () => {
+    setOs('ios');
+    expect(bothSources).not.toThrow();
   });
 });

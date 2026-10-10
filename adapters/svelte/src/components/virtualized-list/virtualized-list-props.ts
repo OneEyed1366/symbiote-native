@@ -8,7 +8,7 @@
 // Snippet props are Svelte's idiomatic render-prop mechanism (closest cousin to React's
 // renderItem-as-a-prop, unlike Vue's scoped-slot form) — `item`/`separator`/`header`/`footer`/
 // `empty` all follow the same shape View.svelte's `children: Snippet` already uses.
-import type { Snippet } from 'svelte';
+import type { Component, Snippet } from 'svelte';
 import {
   ARIA_ALIAS_KEYS,
   type IStyleProp,
@@ -19,6 +19,8 @@ import {
 import {
   type IAccessibilityProps,
   type IAriaProps,
+  type ICellRendererBaseProps,
+  type IInnerViewRef,
   type ISeparatorProps,
   type ISeparators,
   type IViewabilityConfig,
@@ -30,174 +32,144 @@ import type { ISvelteClassValue } from '../../class-value';
 
 export type { IVirtualizedListHandle };
 
-export interface IVirtualizedListProps<ItemT>
-  extends IAccessibilityProps, IAriaProps {
-  data: unknown;
-  getItem: (data: unknown, index: number) => ItemT;
-  getItemCount: (data: unknown) => number;
-  // The cell renderer. Required, like React's `renderItem` (Vue's twin, #item, is likewise the
-  // one non-optional scoped slot).
-  item: Snippet<[{ item: ItemT; index: number; separators: ISeparators }]>;
-  separator?: Snippet<[ISeparatorProps<ItemT>]>;
-  header?: Snippet;
-  footer?: Snippet;
-  empty?: Snippet;
-  keyExtractor?: (item: ItemT, index: number) => string;
-  getItemLayout?: (
-    data: unknown,
-    index: number,
-  ) => { length: number; offset: number; index: number };
-  horizontal?: boolean;
-  inverted?: boolean;
-  // Opaque marker prop kept for RN-surface parity: reading it inside a $derived.by already forces
-  // that derived to re-run when it changes, so — unlike React/Vue, which need no wiring beyond
-  // reading it as a render dependency — Svelte's fine-grained reactivity makes this a genuine no-op
-  // UNLESS the caller's own closures read external state the compiler cannot see. Voided in the
-  // component; kept in the prop surface for RN/React/Vue parity.
-  extraData?: unknown;
-  onEndReached?: (info: { distanceFromEnd: number }) => void;
-  onEndReachedThreshold?: number;
-  onStartReached?: (info: { distanceFromStart: number }) => void;
-  onStartReachedThreshold?: number;
-  // Pull-to-refresh. When onRefresh is set, the real RefreshControl (adapters/svelte/src/
-  // components/RefreshControl.svelte) is attached to the raw scroll intrinsics this file hand-
-  // authors — see index.svelte's header comment for the sibling(iOS)/wrap(Android) wiring, the
-  // same shape ScrollView's own RefreshControl attachment uses. refreshing defaults to false when
-  // nullish, mirroring RN.
-  onRefresh?: () => void;
-  refreshing?: boolean | null;
-  progressViewOffset?: number;
-  onViewableItemsChanged?: (info: IViewableItemsChangedInfo<ItemT>) => void;
-  viewabilityConfig?: IViewabilityConfig;
-  viewabilityConfigCallbackPairs?: IViewabilityConfigCallbackPair<ItemT>[];
-  onScrollToIndexFailed?: (info: {
-    index: number;
-    highestMeasuredFrameIndex: number;
-    averageItemLength: number;
-  }) => void;
-  initialNumToRender?: number;
-  initialScrollIndex?: number;
-  maxToRenderPerBatch?: number;
-  updateCellsBatchingPeriod?: number;
-  windowSize?: number;
-  // Data indices (into the item stream) that should stick to the top. Unlike ScrollView.svelte
-  // (which only ever sees an opaque children Snippet, see scroll-view-props.ts's KNOWN GAP), this
-  // component walks an indexable cell list, so it wraps each flagged windowed cell in
-  // `sticky-header` tag itself — see index.svelte's sticky wiring.
-  stickyHeaderIndices?: number[];
-  maintainVisibleContentPosition?: {
-    minIndexForVisible: number;
-    autoscrollToTopThreshold?: number;
+// What a `cellRenderer` snippet is handed, the item and its separator arrive as `children`
+export type ICellRendererProps<ItemT> = ICellRendererBaseProps<ItemT> & {
+  children: Snippet;
+};
+
+// What an `item` snippet and a `listItemComponent` are both handed
+export type IListItemInfo<ItemT> = {
+  item: ItemT;
+  index: number;
+  separators: ISeparators;
+};
+
+export type IVirtualizedListProps<ItemT> = IAccessibilityProps &
+  IAriaProps & {
+    data: unknown;
+    getItem: (data: unknown, index: number) => ItemT;
+    getItemCount: (data: unknown) => number;
+    // The cell renderer, like React's `renderItem`. One of `item` and `listItemComponent` is
+    // required, the component wins when both are given
+    item?: Snippet<[IListItemInfo<ItemT>]>;
+    // RN's `ListItemComponent`: a component taking `item`, `index` and `separators` as props
+    listItemComponent?: Component<IListItemInfo<ItemT>>;
+    separator?: Snippet<[ISeparatorProps<ItemT>]>;
+    // Replaces the view around each cell, it must wire `onLayout` and `onFocus` itself
+    cellRenderer?: Snippet<[ICellRendererProps<ItemT>]>;
+    header?: Snippet;
+    footer?: Snippet;
+    empty?: Snippet;
+    keyExtractor?: (item: ItemT, index: number) => string;
+    getItemLayout?: (
+      data: unknown,
+      index: number,
+    ) => { length: number; offset: number; index: number };
+    horizontal?: boolean;
+    inverted?: boolean;
+    // Opaque marker prop kept for RN-surface parity: reading it inside a $derived.by already forces
+    // that derived to re-run when it changes, so — unlike React/Vue, which need no wiring beyond
+    // reading it as a render dependency — Svelte's fine-grained reactivity makes this a genuine no-op
+    // UNLESS the caller's own closures read external state the compiler cannot see. Voided in the
+    // component; kept in the prop surface for RN/React/Vue parity.
+    extraData?: unknown;
+    onEndReached?: (info: { distanceFromEnd: number }) => void;
+    onEndReachedThreshold?: number;
+    onStartReached?: (info: { distanceFromStart: number }) => void;
+    onStartReachedThreshold?: number;
+    // Pull-to-refresh. When onRefresh is set, the real RefreshControl (adapters/svelte/src/
+    // components/RefreshControl.svelte) is attached to the raw scroll intrinsics this file hand-
+    // authors — see index.svelte's header comment for the sibling(iOS)/wrap(Android) wiring, the
+    // same shape ScrollView's own RefreshControl attachment uses. refreshing defaults to false when
+    // nullish, mirroring RN.
+    onRefresh?: () => void;
+    refreshing?: boolean | null;
+    progressViewOffset?: number;
+    onViewableItemsChanged?: (info: IViewableItemsChangedInfo<ItemT>) => void;
+    viewabilityConfig?: IViewabilityConfig;
+    viewabilityConfigCallbackPairs?: IViewabilityConfigCallbackPair<ItemT>[];
+    onScrollToIndexFailed?: (info: {
+      index: number;
+      highestMeasuredFrameIndex: number;
+      averageItemLength: number;
+    }) => void;
+    initialNumToRender?: number;
+    initialScrollIndex?: number;
+    maxToRenderPerBatch?: number;
+    updateCellsBatchingPeriod?: number;
+    windowSize?: number;
+    // Mounts every cell from the top and paints no spacer, the window only grows toward the end
+    disableVirtualization?: boolean;
+    // Data indices (into the item stream) that should stick to the top. Unlike ScrollView.svelte
+    // (which only ever sees an opaque children Snippet, see scroll-view-props.ts's KNOWN GAP), this
+    // component walks an indexable cell list, so it wraps each flagged windowed cell in
+    // `sticky-header` tag itself — see index.svelte's sticky wiring.
+    stickyHeaderIndices?: number[];
+    maintainVisibleContentPosition?: {
+      minIndexForVisible: number;
+      autoscrollToTopThreshold?: number;
+    };
+    onScroll?: (event: ISymbioteEvent) => void;
+    onContentSizeChange?: (width: number, height: number) => void;
+    onScrollBeginDrag?: (event: ISymbioteEvent) => void;
+    onScrollEndDrag?: (event: ISymbioteEvent) => void;
+    onMomentumScrollBegin?: (event: ISymbioteEvent) => void;
+    onMomentumScrollEnd?: (event: ISymbioteEvent) => void;
+    scrollEventThrottle?: number;
+    keyboardShouldPersistTaps?: boolean | 'always' | 'never' | 'handled';
+    keyboardDismissMode?: 'none' | 'on-drag' | 'interactive';
+    removeClippedSubviews?: boolean;
+    nestedScrollEnabled?: boolean;
+    stickyHeaderHiddenOnScroll?: boolean;
+    innerViewRef?: IInnerViewRef;
+    style?: IStyleProp<IViewStyle>;
+    contentContainerStyle?: IStyleProp<IViewStyle>;
+    listHeaderComponentStyle?: IStyleProp<IViewStyle>;
+    listFooterComponentStyle?: IStyleProp<IViewStyle>;
+    class?: ISvelteClassValue;
   };
-  onScroll?: (event: ISymbioteEvent) => void;
-  onScrollBeginDrag?: (event: ISymbioteEvent) => void;
-  onScrollEndDrag?: (event: ISymbioteEvent) => void;
-  onMomentumScrollBegin?: (event: ISymbioteEvent) => void;
-  onMomentumScrollEnd?: (event: ISymbioteEvent) => void;
-  scrollEventThrottle?: number;
-  keyboardShouldPersistTaps?: boolean | 'always' | 'never' | 'handled';
-  keyboardDismissMode?: 'none' | 'on-drag' | 'interactive';
-  removeClippedSubviews?: boolean;
-  nestedScrollEnabled?: boolean;
-  style?: IStyleProp<IViewStyle>;
-  contentContainerStyle?: IStyleProp<IViewStyle>;
-  class?: ISvelteClassValue;
-}
 
 // Re-exported so consumers can type a `bind:this` target without reaching into
 // @symbiote-native/components directly.
 export type { ISeparators, ISeparatorProps, ISymbioteEvent, ISymbioteNode };
 
-// Every IAccessibilityProps field, named explicitly (the object-bag convention this adapter's
-// custom-element host tags require — svelte-adapter-dom-shim skill §3g(c) — forbids a raw
-// `...rest` spread landing on a symbiote-* tag, so this mirrors React's `...accessibilityRest`
-// field-by-field instead of reusing its spread). Shared by every list component (VirtualizedList's
-// own host-bag construction AND FlatList's/VirtualizedSectionList's/SectionList's component-to-
-// component forwarding down to VirtualizedList) so the field list lives in exactly one place.
-// It used to call `resolveAccessibilityProps` first, folding `aria-*`/`role` into their
-// `accessibility*` twins so there were canonical names to pick BY NAME. That fold is the device's
-// rule now, so the aria keys are picked and forwarded RAW instead (the loop at the end) and the
-// engine folds once, at the leaf. Picking twice across a forwarding hop stays a no-op for the same
-// reason folding twice was: a pick is idempotent.
+const ACCESSIBILITY_KEYS = [
+  'testID',
+  'nativeID',
+  'accessible',
+  'accessibilityLabel',
+  'accessibilityHint',
+  'accessibilityRole',
+  'accessibilityState',
+  'accessibilityValue',
+  'accessibilityActions',
+  'accessibilityLabelledBy',
+  'importantForAccessibility',
+  'accessibilityLiveRegion',
+  'screenReaderFocusable',
+  'accessibilityViewIsModal',
+  'accessibilityElementsHidden',
+  'accessibilityIgnoresInvertColors',
+  'accessibilityLanguage',
+  'accessibilityRespondsToUserInteraction',
+  'accessibilityShowsLargeContentViewer',
+  'accessibilityLargeContentTitle',
+  'onAccessibilityAction',
+  'onAccessibilityTap',
+  'onMagicTap',
+  'onAccessibilityEscape',
+] as const satisfies readonly (keyof IAccessibilityProps)[];
+
+// Named keys instead of a `...rest` spread: a custom-element host tag takes an object bag
+// Aria keys go through RAW, the engine folds them once at the leaf (`foldAriaProps`)
+// The pick is idempotent, so it can run again across a forwarding hop
 export function pickAccessibilityProps<
   T extends IAccessibilityProps & IAriaProps,
 >(props: T): IAccessibilityProps & IAriaProps {
-  const resolved = props;
   const picked: IAccessibilityProps & IAriaProps = {};
-  if (resolved.testID !== undefined) picked.testID = resolved.testID;
-  if (resolved.nativeID !== undefined) picked.nativeID = resolved.nativeID;
-  if (resolved.accessible !== undefined)
-    picked.accessible = resolved.accessible;
-  if (resolved.accessibilityLabel !== undefined)
-    picked.accessibilityLabel = resolved.accessibilityLabel;
-  if (resolved.accessibilityHint !== undefined)
-    picked.accessibilityHint = resolved.accessibilityHint;
-  if (resolved.accessibilityRole !== undefined)
-    picked.accessibilityRole = resolved.accessibilityRole;
-  if (resolved.accessibilityState !== undefined)
-    picked.accessibilityState = resolved.accessibilityState;
-  if (resolved.accessibilityValue !== undefined)
-    picked.accessibilityValue = resolved.accessibilityValue;
-  if (resolved.accessibilityActions !== undefined)
-    picked.accessibilityActions = resolved.accessibilityActions;
-  if (resolved.accessibilityLabelledBy !== undefined) {
-    picked.accessibilityLabelledBy = resolved.accessibilityLabelledBy;
-  }
-  if (resolved.importantForAccessibility !== undefined) {
-    picked.importantForAccessibility = resolved.importantForAccessibility;
-  }
-  if (resolved.accessibilityLiveRegion !== undefined) {
-    picked.accessibilityLiveRegion = resolved.accessibilityLiveRegion;
-  }
-  if (resolved.screenReaderFocusable !== undefined) {
-    picked.screenReaderFocusable = resolved.screenReaderFocusable;
-  }
-  if (resolved.accessibilityViewIsModal !== undefined) {
-    picked.accessibilityViewIsModal = resolved.accessibilityViewIsModal;
-  }
-  if (resolved.accessibilityElementsHidden !== undefined) {
-    picked.accessibilityElementsHidden = resolved.accessibilityElementsHidden;
-  }
-  if (resolved.accessibilityIgnoresInvertColors !== undefined) {
-    picked.accessibilityIgnoresInvertColors =
-      resolved.accessibilityIgnoresInvertColors;
-  }
-  if (resolved.accessibilityLanguage !== undefined) {
-    picked.accessibilityLanguage = resolved.accessibilityLanguage;
-  }
-  if (resolved.accessibilityRespondsToUserInteraction !== undefined) {
-    picked.accessibilityRespondsToUserInteraction =
-      resolved.accessibilityRespondsToUserInteraction;
-  }
-  if (resolved.accessibilityShowsLargeContentViewer !== undefined) {
-    picked.accessibilityShowsLargeContentViewer =
-      resolved.accessibilityShowsLargeContentViewer;
-  }
-  if (resolved.accessibilityLargeContentTitle !== undefined) {
-    picked.accessibilityLargeContentTitle =
-      resolved.accessibilityLargeContentTitle;
-  }
-  if (resolved.onAccessibilityAction !== undefined)
-    picked.onAccessibilityAction = resolved.onAccessibilityAction;
-  if (resolved.onAccessibilityTap !== undefined)
-    picked.onAccessibilityTap = resolved.onAccessibilityTap;
-  if (resolved.onMagicTap !== undefined)
-    picked.onMagicTap = resolved.onMagicTap;
-  if (resolved.onAccessibilityEscape !== undefined)
-    picked.onAccessibilityEscape = resolved.onAccessibilityEscape;
-  // THE ARIA HALF, forwarded RAW and DERIVED from the engine's own list rather than named again
-  // here. `ARIA_ALIAS_KEYS` is exported for exactly this — its comment says a second hand-written
-  // copy is what `adapter-parity-audit.md` records going stale one member at a time — so this loop
-  // gains a new alias the day the engine does.
-  //
-  // Raw, because the fold is the device's rule (`foldAriaProps`, `SymbioteFabricProps.cpp`) and it
-  // reads these names literally off the bag it commits. Folding them here would be a second
-  // implementation of it, and the one this file used to hold: `resolveAccessibilityProps`.
-  for (const key of ARIA_ALIAS_KEYS) {
+  for (const key of [...ACCESSIBILITY_KEYS, ...ARIA_ALIAS_KEYS]) {
     const value = props[key];
-    // `Object.assign` with a computed key, not `picked[key] = value`: the key is a union and the
-    // value is its correlated member type, which TypeScript cannot check across a loop. This is the
-    // spelling that stays sound without an `as`.
+    // `Object.assign` keeps the correlated key/value types sound without an `as`
     if (value !== undefined) Object.assign(picked, { [key]: value });
   }
   return picked;

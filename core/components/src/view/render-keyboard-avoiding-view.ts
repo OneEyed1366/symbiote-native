@@ -1,3 +1,5 @@
+// TODO(rn-port): RN's `KeyboardAvoidingView.js` keeps the inset math in a React class, no export
+
 // KeyboardAvoidingView: the pure logic + view-contract half (framework-agnostic). It owns
 // every piece that does NOT need a framework: the keyboard/frame inset math, the onLayout
 // frame read, and the behavior -> style/structure decision. Each adapter supplies ONLY the
@@ -12,6 +14,7 @@
 
 import {
   AccessibilityInfo,
+  coerceLayoutAnimationType,
   dlog,
   isRecord,
   KEYBOARD_EVENT,
@@ -35,16 +38,16 @@ export const DEFAULT_VERTICAL_OFFSET = 0;
 const COLLAPSED_FLEX = 0;
 
 // The wrapper frame as RN's onLayout reports it: nativeEvent.layout.{ y, height }.
-export interface IMeasuredFrame {
+export type IMeasuredFrame = {
   y: number;
   height: number;
-}
+};
 
 // The keyboard's top edge (screenY) and height, pulled off the raw native payload.
-export interface IKeyboardFrame {
+export type IKeyboardFrame = {
   screenY: number;
   height: number;
-}
+};
 
 // Pull the keyboard's top edge (screenY) and height off the raw native payload. The shape is
 // the consumer's knowledge, so we narrow `unknown` here rather than trust a type, no `as`.
@@ -70,15 +73,11 @@ export function readLayoutFrame(layout: unknown): IMeasuredFrame | undefined {
   return { y, height };
 }
 
-// Which keyboard notifications KeyboardAvoidingView subscribes to, per host
-// (RN KeyboardAvoidingView.js:198-215). TWO events, never three — the change-frame notification is
-// deliberately absent, and RN's own comment says why: with an undocked, split or floating iOS
-// keyboard, WillChangeFrame is emitted BEFORE WillHide, so a change-frame listener applies a frame
-// captured mid-dismissal. iOS additionally takes the WILL pair so the view rides up with the
-// keyboard animation rather than snapping into place after it; Android has no will-notifications.
-//
-// The host is an ARGUMENT, not a `Platform.OS` read inside the body, so both branches are
-// unit-testable — the headless Platform module always resolves to iOS.
+// Two keyboard events per host, never three (`KeyboardAvoidingView.js:198-215`)
+// A change-frame listener would apply a frame captured mid-dismissal on an undocked iOS keyboard
+// iOS takes the WILL pair to ride up with the keyboard, Android has no will-notifications
+
+// The host is an argument, so both branches are testable, headless Platform always resolves to iOS
 export type IKeyboardAvoidingEventNames = {
   show: IKeyboardEventName;
   hide: IKeyboardEventName;
@@ -120,10 +119,10 @@ export function readPrefersCrossFadeTransitions(
 // duration defined here".
 const MIN_LAYOUT_ANIMATION_DURATION = 10;
 
-export interface IKeyboardAnimationTiming {
+export type IKeyboardAnimationTiming = {
   duration: number;
   easing: string;
-}
+};
 
 // The keyboard event's own transition curve, read off the SAME raw payload `readKeyboardFrame`
 // reads `endCoordinates` from — `duration`/`easing` sit one level up, beside it.
@@ -137,14 +136,9 @@ export function readKeyboardAnimationTiming(
   return { duration, easing };
 }
 
-// RN's `_updateBottomIfNecessary` (`:169-179`): once the inset actually changes, arm the NEXT
-// commit to animate over the keyboard's own transition curve instead of snapping. Gated on
-// `enabled` and on the event carrying BOTH a duration and an easing name — Android's
-// DID_SHOW/DID_HIDE notifications carry neither, so this is correctly a no-op there, same as
-// vendor's `if (enabled && duration && easing)`.
-//
-// `configure` is injectable purely for testability, the same shape `readPrefersCrossFadeTransitions`
-// takes its `query`; callers pass nothing and get the real `LayoutAnimation.configureNext`.
+// RN's `_updateBottomIfNecessary`: arms the next commit to animate over the keyboard's own curve
+// Android's DID_SHOW/DID_HIDE carry no duration or easing, so there it is a no-op, as in RN
+// `configure` is injectable for tests, callers pass nothing and get `LayoutAnimation.configureNext`
 export function configureKeyboardAvoidingAnimation(
   timing: IKeyboardAnimationTiming | undefined,
   enabled: boolean,
@@ -162,7 +156,7 @@ export function configureKeyboardAvoidingAnimation(
     duration: flooredDuration,
     update: {
       duration: flooredDuration,
-      type: LayoutAnimation.coerceType(easing),
+      type: coerceLayoutAnimationType(easing),
     },
   });
 }
@@ -230,7 +224,7 @@ export type IKeyboardAvoidingLayout =
     }
   | { kind: 'wrapper'; wrapperStyle?: IStyleProp<IViewStyle> };
 
-export interface IResolveKeyboardAvoidingLayoutParams {
+export type IResolveKeyboardAvoidingLayoutParams = {
   behavior?: IKeyboardAvoidingBehavior;
   // Already gated on `enabled` by the adapter: 0 when disabled, the computed inset otherwise.
   effectiveInset: number;
@@ -238,7 +232,7 @@ export interface IResolveKeyboardAvoidingLayoutParams {
   initialHeight?: number;
   style?: IStyleProp<IViewStyle>;
   contentContainerStyle?: IStyleProp<IViewStyle>;
-}
+};
 
 // Map the behavior + effective inset onto the wrapper/inner styles and the nesting decision:
 // the framework-agnostic core of RN's render(). 'position' nests; the others adjust the

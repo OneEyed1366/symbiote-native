@@ -1,6 +1,6 @@
-// @symbiote-native/engine/animated: the framework-agnostic, JS-driven Animated engine.
-// The value graph, easing, interpolation and drivers are pure JS with no React
-// and no native dependency; every adapter re-exports them.
+// The framework-agnostic Animated engine, every adapter re-exports it
+// TODO(rn-port): the node graph stays ours, RN's `Animation.js` imports `AnimatedProps`
+// And that imports `RendererProxy`, which would put React's renderer into every other adapter
 
 export {
   AnimatedNode,
@@ -9,7 +9,12 @@ export {
   flushValue,
   type IValueListener,
 } from './graph';
-export { AnimatedValue } from './value';
+export { AnimatedValue, type IAnimatedValueConfig } from './value';
+export {
+  createAnimatedColor,
+  createAnimatedValue,
+  createAnimatedValueXY,
+} from './create-animated';
 export { AnimatedValueXY, type IValueXY } from './value-xy';
 export {
   AnimatedAddition,
@@ -64,9 +69,17 @@ export {
   type ITimingConfig,
   type ISpringConfig,
   type IDecayConfig,
+  type IVectorTimingConfig,
+  type IVectorSpringConfig,
+  type IVectorDecayConfig,
   type IParallelConfig,
   type ILoopAnimationConfig,
 } from './animations/composition';
+export type {
+  IVectorNumbers,
+  IVectorTarget,
+  IVectorValue,
+} from './animations/vector';
 // The native-driver bridge. Adapters need it to connect a props leaf to
 // a host view tag and to restore default values on disconnect.
 export {
@@ -87,6 +100,7 @@ export {
 } from './leaf-lifecycle';
 export { AnimatedStyle, AnimatedTransform } from './style';
 export { AnimatedMock } from './mock';
+export { AnimatedDrivers } from './drivers';
 // Framework-agnostic createAnimatedComponent helpers. Both adapters import them.
 export {
   reduceProps,

@@ -16,10 +16,9 @@ import {
   shallowRef,
   type FunctionalComponent,
 } from '@vue/runtime-core';
-import type { ISymbioteNode } from '@symbiote-native/engine';
-import type {
-  IScrollViewHandle,
-  IVirtualizedSectionListHandle,
+import {
+  routeScrollHandle,
+  type IVirtualizedSectionListHandle,
 } from '@symbiote-native/components';
 import {
   VirtualizedSectionList,
@@ -61,16 +60,7 @@ function buildDelegate(
 ): IVirtualizedSectionListHandle {
   return {
     scrollToLocation: params => getInner()?.scrollToLocation(params),
-    flashScrollIndicators: () => getInner()?.flashScrollIndicators(),
-    getNativeScrollRef: (): IScrollViewHandle | null =>
-      getInner()?.getNativeScrollRef() ?? null,
-    getScrollableNode: (): IScrollViewHandle | null =>
-      getInner()?.getScrollableNode() ?? null,
-    getScrollResponder: (): IScrollViewHandle | null =>
-      getInner()?.getScrollResponder() ?? null,
-    getScrollNode: (): ISymbioteNode | null =>
-      getInner()?.getScrollNode() ?? null,
-    recordInteraction: () => getInner()?.recordInteraction(),
+    ...routeScrollHandle(getInner),
   };
 }
 

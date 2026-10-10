@@ -54,7 +54,12 @@ import {
 import { describe, expect, it, mounted, print, report } from './harness';
 
 const SCROLL = 'RCTScrollView';
-let nextRootTag = 7700;
+let nextRootTag = 7_700;
+
+function freshRootTag(): number {
+  nextRootTag += 1;
+  return nextRootTag;
+}
 
 registerScrollViewBehavior();
 registerRefreshControlBehavior();
@@ -73,7 +78,7 @@ function wrapped(
   props: Readonly<Record<string, unknown>> = {},
   tag: string = SCROLL_VIEW_TAG,
 ): IWrapped {
-  const rootTag = (nextRootTag += 1);
+  const rootTag = freshRootTag();
   const surface = createSurface(rootTag);
   const owner: ISymbioteNode = createElement(SCROLL, false, tag);
   for (const [name, value] of Object.entries(props))
@@ -110,19 +115,16 @@ function wrapped(
 }
 
 describe('the android refresh wrap, split by the engine', () => {
-  // why: THE PRICE, and it is what makes this a port rather than a rewrite. Everything below would
-  // pass equally well with both folds still in JS closures — two trips per commit, on the two nodes
-  // an app touches every time it pulls to refresh. This is the assertion that says they moved.
+  // Everything below also passes with both folds in JS closures, only this proves they moved
+  // into C++ (zero trips into JS per commit)
   it('costs no trip into JS on either node', () => {
     const tree = wrapped({ style: { marginTop: 7, opacity: 0.5 } });
     print(`DEBUG wrap folds=${tree.folds}`);
     expect(tree.folds).toBe(0);
   });
 
-  // why: the LAYOUT half goes to the wrapper's frame and the VISUAL half stays on the scroller.
-  // Asserted BOTH ways on each node, because a rule that forwarded the whole style to both boxes
-  // would satisfy either half alone — and that is exactly the bug the split exists to prevent: the
-  // wrapper would paint the app's background behind a scroller already painting it.
+  // Layout goes to the wrapper's frame and paint stays on the scroller, asserted both ways on
+  // each node, or a style forwarded to both boxes would paint a background twice
   it('routes layout to the wrapper and paint to the scroller', () => {
     const tree = wrapped({
       style: { marginTop: 7, height: 120, opacity: 0.5, paddingLeft: 3 },
@@ -139,6 +141,41 @@ describe('the android refresh wrap, split by the engine', () => {
     expect(tree.owner.height).toBe(undefined);
   });
 
+  // `splitLayoutProps-test` 'splits style objects': width, margin and transform are layout,
+  // padding is not, and nothing is copied to both boxes
+  it("splits RN's style object the way splitLayoutProps does", () => {
+    const tree = wrapped({
+      style: {
+        width: 10,
+        margin: 20,
+        padding: 30,
+        transform: [{ scaleY: -1 }],
+      },
+    });
+
+    expect(tree.wrapper.width).toBe(10);
+    expect(tree.wrapper.margin).toBe(20);
+    expect(tree.wrapper.transform).toEqual([{ scaleY: -1 }]);
+    expect(tree.wrapper.padding).toBe(undefined);
+    expect(tree.owner.padding).toBe(30);
+    expect(tree.owner.width).toBe(undefined);
+    expect(tree.owner.margin).toBe(undefined);
+    expect(tree.owner.transform).toBe(undefined);
+  });
+
+  // `splitLayoutProps-test` 'does not copy values to both returned objects': the vertical margin
+  // is layout, the horizontal padding is not
+  it('keeps a key on one box only', () => {
+    const tree = wrapped({
+      style: { marginVertical: 5, paddingHorizontal: 10 },
+    });
+
+    expect(tree.wrapper.marginVertical).toBe(5);
+    expect(tree.wrapper.paddingHorizontal).toBe(undefined);
+    expect(tree.owner.paddingHorizontal).toBe(10);
+    expect(tree.owner.marginVertical).toBe(undefined);
+  });
+
   // why: `ScrollView.js:1862` — `nestedScrollEnabled ?? true` on the wrapped scroller, so it
   // takes the gesture before the refresh parent does; an authored false still wins.
   it('defaults nestedScrollEnabled on under the wrap', () => {
@@ -148,10 +185,8 @@ describe('the android refresh wrap, split by the engine', () => {
     ).toBe(false);
   });
 
-  // why: `ScrollView.js:1856` composes the base onto BOTH boxes, and its own comment says why — a
-  // wrapper with no explicit layout style otherwise loses `flexGrow` and collapses to its content
-  // height inside a flex parent, where RN's grows. Every adapter had dropped it from the wrapper
-  // before the split became one function; this is the case that stops it being dropped again.
+  // `ScrollView.js:1856` composes the base onto both boxes, or the wrapper loses `flexGrow` and
+  // collapses to its content height inside a flex parent
   it('composes the axis base onto both boxes', () => {
     const tree = wrapped({ style: { opacity: 0.5 } });
 
@@ -187,10 +222,8 @@ describe('the android refresh wrap, split by the engine', () => {
     expect(tree.wrapper.flexDirection).toBe('row');
   });
 
-  // why: the wrapper is DERIVED from a node that is not itself, so it re-derives only if a write to
-  // the scroller marks it dirty. Without that it freezes at its mount frame while the scroller
-  // visibly restyles inside it. `slotDerived` naming `style` is what makes it work and nothing
-  // else does — this is the case that fails if that entry goes.
+  // The wrapper re-derives only when a write to the scroller marks it dirty, which is what
+  // `slotDerived` naming `style` does, without it the wrapper freezes at its mount frame
   it('re-derives both boxes on a style write after mount', () => {
     const first = wrapped({ style: { marginTop: 7, opacity: 0.5 } });
     expect(first.wrapper.marginTop).toBe(7);
@@ -204,7 +237,7 @@ describe('the android refresh wrap, split by the engine', () => {
   // and the scroll view is an ordinary one again, carrying its whole style — so a rule keyed on the
   // tag alone would permanently strip every margin off any scroll view that had ever been pulled.
   it('hands the whole style back when the wrap goes away', () => {
-    const rootTag = (nextRootTag += 1);
+    const rootTag = freshRootTag();
     const surface = createSurface(rootTag);
     const owner: ISymbioteNode = createElement(SCROLL, false, SCROLL_VIEW_TAG);
     routeProp(owner, 'style', { marginTop: 7, opacity: 0.5 });
@@ -232,7 +265,7 @@ describe('the android refresh wrap, split by the engine', () => {
   // mount one on its own — must be left exactly as written. The rule reads a child that is not
   // there, and the answer to that has to be "nothing", not a base style for an axis nobody chose.
   it('invents nothing on a refresh control that wraps no scroller', () => {
-    const rootTag = (nextRootTag += 1);
+    const rootTag = freshRootTag();
     const surface = createSurface(rootTag);
     const refresh: ISymbioteNode = createElement(
       REFRESH_CONTROL,

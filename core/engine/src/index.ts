@@ -24,9 +24,9 @@ export {
   routeProp,
   censusRetainedTree,
   getExplicitStyle,
-  // Exported for the one adapter that has to build style objects rather than receive them:
-  // Angular's ɵɵstyleMap hands over keys, so its renderer allocates a fresh object per node and
-  // needs to recognise one it has already published.
+  // Exported for the one adapter that builds style objects instead of receiving them, `styleMap`
+  // hands Angular keys, so its renderer allocates a fresh object per node and must recognise one
+  // it published
   isSameShallowStyle,
   getPublishedStyle,
   setNodeHidden,
@@ -37,6 +37,7 @@ export {
   isSymbioteNode,
   isSymbioteEvent,
   RAW_TEXT_COMPONENT,
+  TEXT_COMPONENT,
   debugNodeId,
   takePropKeyTally,
 } from './node';
@@ -65,13 +66,10 @@ export { isEventFor } from './view-config';
 export { registerComponent, setNativeViewConfigSource } from './registry';
 // Real cross-package consumer: core/components' KeyboardAvoidingView render narrows
 // raw native payloads with this same guard, so it needs it off the package root.
-export { isRecord } from './type-guards';
+export { isBoolean, isNumber, isRecord, isString } from './type-guards';
 // InteractionManager: pure JS (timers + emitter), framework-agnostic, so it lives
 // here; every adapter re-exports it.
-export {
-  InteractionManager,
-  Events as InteractionManagerEvents,
-} from './interaction-manager';
+export { Events as InteractionManagerEvents } from './interaction-manager';
 export type {
   IInteractionEvent,
   ISimpleTask,
@@ -117,6 +115,8 @@ export {
   disposeRoot,
   requestCommitFor,
 } from './imperative';
+export { setScrollResponderImpl } from './scroll-responder';
+export type { IScrollResponderImpl, IZoomRect } from './scroll-responder';
 export type { IDomRect } from './tree-host';
 // The tree host: the seam a runtime installs to answer about the tree JS does not hold. `setTreeHost`
 // is what `installFabric()` (@symbiote-native/test-utils) calls with the TypeScript applier.
@@ -147,9 +147,9 @@ export type {
 // package and whatever implements the tree, audience a host author, not an app. They live on the
 // mutation-buffer subpath instead, since a name on this barrel is public API on all five adapters.
 
-// "A commit just reached completeRoot" — the one seam that means the same thing under every
-// adapter: React commits synchronously, Vue/Svelte/Angular schedule it on a microtask, so each
-// framework's after-render hook fires at a different point relative to the native commit.
+// A commit reaching `completeRoot` is the one seam that means the same under every adapter
+// React commits synchronously, Vue/Svelte/Angular on a microtask, so after-render hooks fire at
+// different points
 export { registerPostCommit, unregisterPostCommit } from './post-commit';
 // The aria/role -> accessibility* fold. Lives here rather than in a component wrapper because a tag
 // has none: `fabricProps` runs it on the way to the payload, so every path gets it.
@@ -168,6 +168,7 @@ export {
   PlatformColor,
   DynamicColorIOS,
   isOpaqueColorValue,
+  isProcessableColor,
 } from './platform-color';
 export type {
   IColorValue,
@@ -224,6 +225,8 @@ export type {
   IClassToggleMap,
   IScopableClassValue,
 } from './style-registry/scope';
+export { EventEmitter } from './event-emitter';
+export type { IEmitterSubscription, IEventEmitter } from './event-emitter';
 export { Platform } from './platform';
 export { isDevBuild } from './platform/shared';
 export type {
@@ -237,14 +240,61 @@ export type {
 export type { IPlatformConstantsIOS } from './platform/index.ios';
 export type { IPlatformConstantsAndroid } from './platform/index.android';
 export { dlog, isDebug } from './debug';
+export { ReactNativeVersion } from './react-native-version';
+export { UTFSequence } from './utf-sequence';
+export {
+  ActionSheetIOS,
+  Alert,
+  Appearance,
+  AppState,
+  BackHandler,
+  codegenNativeCommands,
+  codegenNativeComponent,
+  Dimensions,
+  DevMenu,
+  DevSettings,
+  I18nManager,
+  InteractionManager,
+  LayoutAnimation,
+  Linking,
+  loadPressability,
+  LogBox,
+  NativeComponentRegistry,
+  NativeModules,
+  Networking,
+  PermissionsAndroid,
+  PixelRatio,
+  PushNotificationIOS,
+  registerCallableModule,
+  requireNativeComponent,
+  Settings,
+  Share,
+  setPressabilityLoader,
+  setReactNativeHost,
+  Systrace,
+  ToastAndroid,
+  Touchable,
+  UIManager,
+  Vibration,
+} from './react-native-host';
+export type {
+  IPressability,
+  IPressabilityClass,
+  IPressabilityHandlers,
+} from './react-native-host';
+export type { IDevSettings } from './dev-settings';
 export { reportUncaughtError } from './report-error';
 export type { IUncaughtErrorInfo } from './report-error';
 
-export { getNativeModule, getEnforcingNativeModule } from './native-modules';
 export {
-  installDeviceEventHub,
+  getNativeModule,
+  getEnforcingNativeModule,
+  TurboModuleRegistry,
+} from './native-modules';
+export {
+  DeviceEventEmitter,
+  NativeAppEventEmitter,
   NativeEventEmitter,
-  setDeviceEventSource,
 } from './native-events';
 export type { IEventValueSource } from './event-value-source';
 export { bindEventListener } from './event-listener-binding';
@@ -259,7 +309,6 @@ export type {
   IEventSubscription,
   IEventEmitterModule,
   INativeEventListener,
-  IDeviceEventSource,
 } from './native-events';
 
 export {
@@ -310,6 +359,10 @@ export {
   AnimatedStyle,
   AnimatedTransform,
   AnimatedMock,
+  AnimatedDrivers,
+  createAnimatedColor,
+  createAnimatedValue,
+  createAnimatedValueXY,
   reduceProps,
   isAnimatedNode,
   readPassthroughStyle,
@@ -317,6 +370,7 @@ export {
 } from './animated';
 export type {
   IAnimatedLeafLifecycle,
+  IAnimatedValueConfig,
   IValueXY,
   IRgbaValue,
   IColorInput,
@@ -336,6 +390,12 @@ export type {
   ITimingConfig,
   ISpringConfig,
   IDecayConfig,
+  IVectorTimingConfig,
+  IVectorSpringConfig,
+  IVectorDecayConfig,
+  IVectorNumbers,
+  IVectorTarget,
+  IVectorValue,
   IParallelConfig,
   ILoopAnimationConfig,
   INativeNodeConfig,
@@ -364,7 +424,6 @@ export type {
 // Imperative runtime modules: framework-agnostic native-bridge consumers (no visual, no
 // lifecycle), so every adapter re-exports the same module. The native module a JS API talks to is
 // chosen per platform and can only be confirmed on a real device or simulator, not headless.
-export { Alert } from './alert';
 export type {
   IAlertType,
   IAlertButtonStyle,
@@ -372,7 +431,6 @@ export type {
   IAlertButtons,
   IAlertOptions,
 } from './alert';
-export { Share } from './share';
 export type { IShareContent, IShareOptions, IShareAction } from './share';
 // Image statics (getSize/prefetch/queryCache/...): a stateful, native-bridge-touching module with
 // no view of its own, same shape as Alert/Share. The source-resolution seam it shares with
@@ -392,23 +450,16 @@ export {
   setAssetSourceResolver,
   resolveAssetSource,
 } from './asset-source-resolver';
-export { ActionSheetIOS } from './action-sheet-ios';
 export type {
   IActionSheetIOSOptions,
   IShareActionSheetIOSOptions,
   IShareActionSheetError,
 } from './action-sheet-ios';
-export { Linking } from './linking';
 export type { IUrlEvent } from './linking';
-export { Vibration } from './vibration';
-export { ToastAndroid } from './toast-android';
 export { SoundManager } from './sound-manager';
-export { Settings } from './settings';
-export { I18nManager } from './i18n-manager';
 export type { II18nManagerConstants } from './i18n-manager';
 
 // Device-state / event modules (Dimensions, Appearance, AppState, Keyboard, …).
-export { Dimensions } from './dimensions';
 export type {
   IDisplayMetrics,
   IDisplayMetricsAndroid,
@@ -418,19 +469,15 @@ export type {
   IDimensionsChangeListener,
   IDimensionsStatic,
 } from './dimensions';
-// PixelRatio: derives from the Dimensions singleton, framework-agnostic, so it lives
-// here; every adapter re-exports it.
-export { PixelRatio } from './pixel-ratio';
 export type { IPixelRatioStatic } from './pixel-ratio';
-export { Appearance } from './appearance';
 export type { IColorSchemeName, IColorSchemePreference } from './appearance';
-export { AppState } from './app-state';
 export type { IAppStateStatus, IAppStateEvent } from './app-state';
 // AppRegistry core: registry bookkeeping + host-registrar bridge + headless tasks, shared by
 // every adapter. Each adapter calls createAppRegistry with its own runnableFor (the one
 // framework-specific seam — how to build a runnable from a component provider).
-export { createAppRegistry } from './app-registry';
+export { createAppRegistry, HeadlessJsTaskError } from './app-registry';
 export type {
+  IAppConfig,
   IAppRegistry,
   ICreateAppRegistryResult,
   IAppParameters,
@@ -454,8 +501,9 @@ export {
   setInputBlurred,
   blurTextInput,
   focusTextInput,
+  TextInputState,
 } from './text-input-state';
-export { LayoutAnimation } from './layout-animation';
+export { coerceLayoutAnimationType } from './layout-animation';
 export type {
   ILayoutAnimationType,
   ILayoutAnimationProperty,
@@ -464,17 +512,12 @@ export type {
   ILayoutAnimationTypes,
   ILayoutAnimationProperties,
 } from './layout-animation';
-export { BackHandler, installBackHandler } from './back-handler';
 export type {
   IBackPressEventName,
   IBackPressHandler,
   IHardwareBackPressEvent,
 } from './back-handler';
-export {
-  PermissionsAndroid,
-  PERMISSIONS,
-  RESULTS,
-} from './permissions-android';
+export { PERMISSIONS, RESULTS } from './permissions-android';
 export type {
   IPermission,
   IPermissionStatus,
@@ -494,14 +537,12 @@ export type {
 // StatusBar: values from the platform-selected './status-bar', types from '-shared' (the
 // .ios re-export would otherwise duplicate-export the type symbols).
 export {
-  applyStatusBarProps,
+  createStatusBarEntry,
   statusBarImperative,
   statusBarCurrentHeight,
 } from './status-bar';
 export {
-  hideTransition,
   STATUS_BAR_MANAGER,
-  ANIMATED_HIDE_TRANSITION,
   STATIC_HIDE_TRANSITION,
 } from './status-bar/shared';
 export type {
@@ -509,9 +550,12 @@ export type {
   IStatusBarStyle,
   IStatusBarAnimation,
   IStatusBarImperative,
+  IStatusBarEntryHandle,
+  IStatusBarStackEntry,
 } from './status-bar/shared';
 export {
   registerHostBehavior,
+  registerLazyHostBehavior,
   hasHostBehaviors,
   hostBehaviorFor,
   clearHostBehaviors,

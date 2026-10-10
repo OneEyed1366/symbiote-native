@@ -23,18 +23,32 @@ export function removeClippedSubviewsOrDefault<TValue>(
 }
 
 // A row is the slice of items packed into one virtualized cell when numColumns > 1.
-export interface IRow<ItemT> {
+export type IRow<ItemT> = {
   items: ItemT[];
   startIndex: number;
+};
+
+// RN's `isArrayLike` is `typeof Object(data).length === 'number'`: a null, a number or an object
+// without a length is an empty list, never a throw
+export function arrayLikeLength(data: unknown): number {
+  if (data === null || data === undefined) return 0;
+  const length: unknown = Reflect.get(Object(data), 'length');
+  return typeof length === 'number' ? length : 0;
 }
 
 export function chunkIntoRows<ItemT>(
-  data: readonly ItemT[],
+  data: ArrayLike<ItemT> | null | undefined,
   columns: number,
 ): IRow<ItemT>[] {
   const rows: IRow<ItemT>[] = [];
-  for (let start = 0; start < data.length; start += columns) {
-    rows.push({ items: data.slice(start, start + columns), startIndex: start });
+  const length = arrayLikeLength(data);
+  if (data === null || data === undefined) return rows;
+  for (let start = 0; start < length; start += columns) {
+    const items: ItemT[] = [];
+    for (let at = start; at < Math.min(start + columns, length); at += 1) {
+      items.push(data[at]);
+    }
+    rows.push({ items, startIndex: start });
   }
   return rows;
 }
@@ -83,11 +97,11 @@ export function expandRowViewability<ItemT>(
 export function lastItemOfRow<ItemT>(
   row: IRow<ItemT> | undefined,
 ): ItemT | undefined {
-  return row !== undefined ? row.items[row.items.length - 1] : undefined;
+  return row === undefined ? undefined : row.items[row.items.length - 1];
 }
 
 export function firstItemOfRow<ItemT>(
   row: IRow<ItemT> | undefined,
 ): ItemT | undefined {
-  return row !== undefined ? row.items[0] : undefined;
+  return row === undefined ? undefined : row.items[0];
 }

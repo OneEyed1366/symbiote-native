@@ -30,7 +30,9 @@ export type IPayloadFold = (
 // What an owner does with a child it claims. See `IHostBehavior.claimedChildren`.
 export type IClaimMode = 'beside' | 'wrap';
 
-export interface IHostBehavior {
+export type IHostBehavior = {
+  // The tag takes strings as children although it is not a `<text>`: RN's TextInput content
+  readonly acceptsTextChildren?: boolean;
   // Listener names this behavior owns on its tag — engine event names, not `onX` props (`press`,
   // `startShouldSetResponder`, ...). setEventListener stashes an app listener for an owned name
   // instead of writing it into node.listeners, so the machine's dispatcher keeps the slot.
@@ -173,7 +175,7 @@ export interface IHostBehavior {
   // Flips `id`/`nativeID` precedence to nativeID-over-id — TouchableWithoutFeedback's, and only
   // its. See routeIdAlias in node.ts for why the flip exists.
   readonly nativeIdWinsOverId?: boolean;
-}
+};
 
 const behaviors = new Map<string, IHostBehavior>();
 
@@ -360,6 +362,60 @@ export function appListenerFor(node: ISymbioteNode, name: string): unknown {
 export function attachHostBehavior(node: ISymbioteNode, tag: string): void {
   const behavior = behaviors.get(tag);
   if (behavior === undefined) return;
+  attachBehavior(node, tag, behavior);
+}
+
+type ILazyHostBehavior = {
+  readonly tag: string;
+  readonly behavior: IHostBehavior;
+};
+
+// Поведение для Fabric-имени, которое садится на узел, когда приложение вешает один из
+// `ownedListeners`. Тег вроде `text` есть в каждом приложении, и attach при создании взвёл бы
+// `hasAttached` и обход при сносе везде
+const lazyBehaviors = new Map<string, ILazyHostBehavior>();
+const lazyTriggerNames = new Set<string>();
+
+// `component` это Fabric-имя, единственное, что известно узлу при записи слушателя, а `tag` это то,
+// под чем поведение знают реестр и хост
+export function registerLazyHostBehavior(
+  component: string,
+  tag: string,
+  behavior: IHostBehavior,
+): void {
+  dlog(`registerLazyHostBehavior: ${component} as ${tag}`);
+  lazyBehaviors.set(component, { tag, behavior });
+  for (const name of behavior.ownedListeners ?? []) lazyTriggerNames.add(name);
+  hasBehaviors = true;
+}
+
+// Зовёт `setEventListener` до записи обработчика, true значит имя теперь owned и идти надо по
+// owned-пути
+export function attachLazyHostBehavior(
+  node: ISymbioteNode,
+  name: string,
+): boolean {
+  if (node.hostBehavior !== undefined || !lazyTriggerNames.has(name)) {
+    return false;
+  }
+  const lazy = lazyBehaviors.get(node.component);
+  if (lazy?.behavior.ownedListeners?.includes(name) !== true) return false;
+  attachBehavior(node, lazy.tag, lazy.behavior);
+  // Слушатели, записанные до поведения, лежат в `node.listeners` под уже owned именами
+  for (const owned of lazy.behavior.ownedListeners ?? []) {
+    const earlier = node.listeners?.get(owned);
+    if (earlier === undefined) continue;
+    node.listeners?.delete(owned);
+    stashAppListener(node, owned, earlier);
+  }
+  return true;
+}
+
+function attachBehavior(
+  node: ISymbioteNode,
+  tag: string,
+  behavior: IHostBehavior,
+): void {
   node.hostBehavior = behavior;
   hasAttached = true;
   // The tag itself, over the wire, so the host can resolve its platform props without a trip back
@@ -595,6 +651,8 @@ function reattachOne(node: ISymbioteNode): void {
 // later test in the same file unless it is cleared.
 export function clearHostBehaviors(): void {
   behaviors.clear();
+  lazyBehaviors.clear();
+  lazyTriggerNames.clear();
   detachCandidates.clear();
   awaitingCommit.clear();
   committedEachTime.clear();

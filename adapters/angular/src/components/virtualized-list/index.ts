@@ -9,25 +9,32 @@ import {
   Component,
   ElementRef,
   ViewChild,
+  forwardRef,
   inject,
   type AfterViewChecked,
   type DoCheck,
   type OnDestroy,
+  type TemplateRef,
 } from '@angular/core';
 import {
   EMPTY_OFFSET,
   FIRST_INDEX,
   LIST_ACTION_KIND,
-  buildListPlan,
+  LIST_SEGMENT_KIND,
   buildScrollViewHandle,
   buildViewabilityPairs,
-  computeWindow,
   createInitialListState,
+  createListNesting,
+  deriveWindow,
   listEffectSignature,
+  listHasMore,
+  planFromMetrics,
   reduceList,
   resolveItemKey,
   type IListAction,
+  type IListNesting,
   type IListReducerInputs,
+  type IListScope,
   type IListState,
   type IScrollViewHandle,
   type IViewableItemsChangedInfo,
@@ -46,11 +53,14 @@ import {
   SymbioteStyleInputDirective,
   ViewHost,
 } from '../../primitives';
-import { CellRegistry, type IWindowCell } from './cell-registry';
+import { CellRegistry } from './cell-registry';
+import { buildCellRendererContext } from './cell-renderer-context';
 import { VListOutletDirective } from './directives';
 import { ListEffectRunner } from './list-effects';
 import { VirtualizedListBagsBase } from './list-bags';
 import type { IVirtualizedListInputs } from './list-props';
+import { injectVirtualizedListScope, ListScopeProvider } from './nested-scope';
+import { stampPlanRows, type IListRow, type IRowsParams } from './list-rows';
 import { resolveListStyles } from './list-styles';
 import { VIRTUALIZED_LIST_TEMPLATE } from './list-template';
 
@@ -66,15 +76,19 @@ export type {
   IVirtualizedListHandle,
 } from '@symbiote-native/components';
 export {
+  VListCellDirective,
   VListEmptyDirective,
   VListFooterDirective,
   VListHeaderDirective,
   VListItemDirective,
+  VListOutletDirective,
   VListSeparatorDirective,
 } from './directives';
-export type { IVListItemContext, IVListSeparatorContext } from './directives';
-
-type IListPlan = ReturnType<typeof buildListPlan>;
+export type {
+  IVListCellContext,
+  IVListItemContext,
+  IVListSeparatorContext,
+} from './directives';
 
 export type {
   IVirtualizedListInputs,
@@ -89,16 +103,31 @@ export type {
   ],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [SymbioteHostPropsDirective, VListOutletDirective, ViewHost],
+  providers: [
+    {
+      provide: ListScopeProvider,
+      useExisting: forwardRef(() => VirtualizedList),
+    },
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: VIRTUALIZED_LIST_TEMPLATE,
 })
 export class VirtualizedList<ItemT = unknown>
   extends VirtualizedListBagsBase<ItemT>
-  implements IVirtualizedListInputs<ItemT>, DoCheck, AfterViewChecked, OnDestroy
+  implements
+    IVirtualizedListInputs<ItemT>,
+    ListScopeProvider,
+    DoCheck,
+    AfterViewChecked,
+    OnDestroy
 {
   // A template ref on a bare intrinsic hands back the host node directly
   @ViewChild('scrollHost', { read: ElementRef })
   private scrollHostRef?: ElementRef<unknown>;
+
+  // The template holding a cell's item and separator, sits at the root so it resolves up front
+  @ViewChild('cellBody', { static: true })
+  private cellBody?: TemplateRef<unknown>;
 
   protected get scrollNode(): ISymbioteNode | null {
     const node = this.scrollHostRef?.nativeElement;
@@ -109,15 +138,16 @@ export class VirtualizedList<ItemT = unknown>
     () => this.scrollNode,
   );
 
+  // The template tells a spacer row from a cell row by this, a bare literal would repeat per host
+  protected readonly spacerKind = LIST_SEGMENT_KIND.spacer;
+
   // Template-bound view state, assembled by `recomputeView` in `ngDoCheck`
   itemCount = EMPTY_OFFSET;
-  windowCells: IWindowCell<ItemT>[] = [];
-  // The nearest sticky cell mounted outside the window, `gapSpacerStyle` fills up to the window
-  forcedStickyCell: IWindowCell<ItemT> | null = null;
-  leadingSpacerStyle: IViewStyle | null = null;
-  gapSpacerStyle: IViewStyle | null = null;
-  trailingSpacerStyle: IViewStyle | null = null;
+  // The plan's spacers and cells in document order
+  rows: IListRow<ItemT>[] = [];
   cellStyle: IViewStyle | undefined = undefined;
+  headerStyle: IViewStyle | undefined = undefined;
+  footerStyle: IViewStyle | undefined = undefined;
 
   // `renderVersion` bumps on every transition that changes render state, for the recompute dedup
   private readonly listState: IListState<ItemT> =
@@ -149,10 +179,33 @@ export class VirtualizedList<ItemT = unknown>
   // This component's own host, the anchor that `class="..."` at the use site resolves onto
   private readonly elementRef = inject(ElementRef);
 
-  private keyFor = (index: number): string => {
+  protected readonly keyFor = (index: number): string => {
     const item = this.getItem(this.data, index);
     return resolveItemKey(item, index, this.keyExtractor);
   };
+
+  private readonly parentScope = injectVirtualizedListScope();
+  private nestingMemo: IListNesting<ItemT> | undefined = undefined;
+
+  // Built on first use, the inputs that pick its axis are set only after construction
+  protected get nesting(): IListNesting<ItemT> {
+    this.nestingMemo ??= createListNesting<ItemT>({
+      parent: this.parentScope,
+      horizontal: this.isHorizontal,
+      getState: () => this.listState,
+      dispatch: action => this.dispatch(action),
+      getContainerNode: () => this.scrollNode,
+      getHasMore: () => listHasMore(this.listState),
+      keyFor: this.keyFor,
+      handlers: () => this.listHandlers,
+    });
+    return this.nestingMemo;
+  }
+
+  // The scope the lists in this list's cells inject
+  get listScope(): IListScope {
+    return this.nesting.scope;
+  }
 
   // Edge and viewability listeners map to `.observed`, so the reducer emits only if listened to
   private buildInputs(): IListReducerInputs<ItemT> {
@@ -164,6 +217,7 @@ export class VirtualizedList<ItemT = unknown>
       getItemLayout: this.getItemLayout,
       horizontal: this.isHorizontal,
       windowSize: this.windowSizeValue,
+      disableVirtualization: this.disableVirtualization,
       initialNumToRender: this.initialNumToRenderValue,
       maxToRenderPerBatch: this.maxToRenderPerBatchValue,
       updateCellsBatchingPeriod: this.updateCellsBatchingPeriodValue,
@@ -181,6 +235,8 @@ export class VirtualizedList<ItemT = unknown>
       ),
       maintainVisibleContentPosition: this.maintainVisibleContentPosition,
       initialScrollIndex: this.initialScrollIndex,
+      findFirstChildWithMore: (first, last) =>
+        this.nesting.findFirstChildWithMore(first, last),
     };
   }
 
@@ -204,15 +260,12 @@ export class VirtualizedList<ItemT = unknown>
     const m = this.listState.metrics;
     // Mid-fill the window climbs one batch step per render, only a render advances it
     if (m.first !== m.target.first || m.last !== m.target.last) return false;
-    const next = computeWindow(
+    const next = deriveWindow(
+      this.listState,
+      this.buildInputs(),
       m.count,
-      m.offsets,
-      m.lengths,
-      this.listState.scrollOffset,
-      this.listState.viewportLength,
-      this.windowSizeValue,
-      this.initialNumToRenderValue,
-    );
+      m,
+    ).target;
     const isSettled =
       next.first === m.target.first && next.last === m.target.last;
     if (!isSettled)
@@ -234,6 +287,7 @@ export class VirtualizedList<ItemT = unknown>
       this.isHorizontal,
       this.isInverted,
       this.windowSizeValue,
+      this.disableVirtualization,
       this.initialNumToRenderValue,
       this.maxToRenderPerBatchValue,
       this.stickyHeaderIndices,
@@ -242,11 +296,14 @@ export class VirtualizedList<ItemT = unknown>
       // Arrives through `addClass` and `removeClass`, never as an input
       anchorHostStyle(this.elementRef),
       this.contentContainerStyle,
+      this.listHeaderComponentStyle,
+      this.listFooterComponentStyle,
       this.renderVersion,
       this.headerDir !== undefined,
       this.footerDir !== undefined,
       this.emptyDir !== undefined,
       this.separatorTemplate !== undefined,
+      this.cellRendererTpl,
     ];
     const previous = this.lastRecompute;
     this.lastRecompute = recomputeInputs;
@@ -281,6 +338,7 @@ export class VirtualizedList<ItemT = unknown>
 
   ngOnDestroy(): void {
     this.effects.dispose();
+    this.nestingMemo?.detach();
   }
 
   private recomputeView(): void {
@@ -297,27 +355,33 @@ export class VirtualizedList<ItemT = unknown>
       this.showEmpty();
       return;
     }
-    const stickySet =
-      this.stickyHeaderIndices !== undefined
-        ? new Set(this.stickyHeaderIndices)
-        : undefined;
-    const plan = buildListPlan({
+    this.rows = stampPlanRows({
+      windowPlan: planFromMetrics(m, this.keyFor, this.stickyHeaderIndices),
+      cells: this.cells,
       count: m.count,
-      first: m.first,
-      last: m.last,
-      offsets: m.offsets,
-      lengths: m.lengths,
-      total: m.total,
-      keyFor: this.keyFor,
-      stickyIndices: stickySet,
-      hasHeader: this.headerDir !== undefined,
+      isHorizontal: this.isHorizontal,
+      hasSeparators: this.separatorTemplate !== undefined,
+      rendererFor: this.rendererFor(),
     });
-    this.applySpacers(plan);
-    this.buildCells(plan, stickySet);
+    this.cells.endPass();
     dlog(
       `Angular VirtualizedList window [${m.first}, ${m.last}] of ${m.count} ` +
-        `(offset=${this.listState.scrollOffset}, viewport=${this.listState.viewportLength}, rendered=${this.windowCells.length})`,
+        `(offset=${this.listState.scrollOffset}, viewport=${this.listState.viewportLength}, rows=${this.rows.length})`,
     );
+  }
+
+  // Only a list given a `vListCell` template builds the wrapper contexts
+  private rendererFor(): IRowsParams<ItemT>['rendererFor'] {
+    if (this.cellRendererTpl === undefined) return undefined;
+    return cell =>
+      buildCellRendererContext({
+        cell,
+        style: this.cellStyle,
+        body: this.cellBody,
+        layout: (measure, event, index) =>
+          this.handleCellLayout(measure, event, index),
+        focus: index => this.handleCellFocus(index),
+      });
   }
 
   private applyStyles(total: number): void {
@@ -328,75 +392,44 @@ export class VirtualizedList<ItemT = unknown>
       hasHeader: this.headerDir !== undefined,
       style: this.style,
       contentContainerStyle: this.contentContainerStyle,
+      listHeaderComponentStyle: this.listHeaderComponentStyle,
+      listFooterComponentStyle: this.listFooterComponentStyle,
       anchorStyle: anchorHostStyle(this.elementRef),
       maintainVisibleContentPosition: this.maintainVisibleContentPosition,
     });
     this.resolvedStyle = styles.style;
     this.resolvedContentContainerStyle = styles.contentContainerStyle;
     this.cellStyle = styles.cellStyle;
+    this.headerStyle = styles.headerStyle;
+    this.footerStyle = styles.footerStyle;
     this.resolvedMaintainVisibleContentPosition =
       styles.maintainVisibleContentPosition;
   }
 
   private showEmpty(): void {
     this.cells.clear();
-    this.windowCells = [];
-    this.forcedStickyCell = null;
-    this.leadingSpacerStyle = null;
-    this.gapSpacerStyle = null;
-    this.trailingSpacerStyle = null;
+    this.rows = [];
     dlog(
       `Angular VirtualizedList empty (viewport=${this.listState.viewportLength})`,
     );
-  }
-
-  private applySpacers(plan: IListPlan): void {
-    this.leadingSpacerStyle = this.spacerStyle(plan.leadingExtent);
-    this.gapSpacerStyle = this.spacerStyle(plan.gapExtent);
-    this.trailingSpacerStyle = this.spacerStyle(plan.trailingExtent);
-  }
-
-  private spacerStyle(extent: number): IViewStyle | null {
-    if (extent <= EMPTY_OFFSET) return null;
-    return this.isHorizontal ? { width: extent } : { height: extent };
-  }
-
-  private buildCells(
-    plan: IListPlan,
-    stickySet: Set<number> | undefined,
-  ): void {
-    const count = this.listState.metrics.count;
-    const forced = plan.forcedStickyCell;
-    dlog(
-      `STICKY[list] stickySet=${stickySet === undefined ? 'undefined' : JSON.stringify([...stickySet])} ` +
-        `childPositions=${JSON.stringify(plan.stickyChildPositions)} ` +
-        `forcedStickyCell=${forced === undefined ? 'none' : forced.index}`,
-    );
-    // Sticky by construction: a forced cell exists only for an index in `stickySet`
-    this.forcedStickyCell =
-      forced !== undefined
-        ? this.cells.windowCell(forced.index, forced.key, false, true)
-        : null;
-    const hasSeparators = this.separatorTemplate !== undefined;
-    // The separator gates on the last index of the data, not of the window, or a cell's height
-    // would shift as it slides past
-    this.windowCells = plan.cells.map(planned =>
-      this.cells.windowCell(
-        planned.index,
-        planned.key,
-        hasSeparators && planned.index < count - 1,
-        stickySet?.has(planned.index) === true,
-      ),
-    );
-    this.cells.endPass();
   }
 
   // Angular forbids an `[onLayout]` binding, so the event arrives untyped and is narrowed here
   handleCellLayout(
     measure: (event: ISymbioteEvent) => void,
     event: unknown,
+    index: number,
   ): void {
-    if (this.isSymbioteEvent(event)) measure(event);
+    if (!this.isSymbioteEvent(event)) return;
+    measure(event);
+    const cellKey = this.keyFor(index);
+    this.nesting.scope.registerCellNode(event.currentTarget, cellKey);
+    this.nesting.remeasureCell(cellKey);
+  }
+
+  // Focus inside a cell keeps a viewport of cells around it mounted, like RN's focus capture
+  handleCellFocus(index: number): void {
+    this.dispatch({ kind: LIST_ACTION_KIND.cellFocused, index });
   }
 
   private isSymbioteEvent(value: unknown): value is ISymbioteEvent {

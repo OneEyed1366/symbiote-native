@@ -8,6 +8,8 @@ import {
   type IClassNameValue,
 } from './style-registry';
 import { setProp } from './node-props';
+import { isRecord } from './type-guards';
+import { preprocessPublishedStyle } from './style-preprocessors';
 import type { IClassStyleParts, ISymbioteNode } from './node-types';
 
 // Narrowed rather than cast: `routeProp` takes `unknown`, and a bare `typeof v === 'function'`
@@ -65,43 +67,40 @@ const sharedPairByBase = new WeakMap<
   WeakMap<object, readonly unknown[]> | readonly unknown[]
 >();
 
-// The published array for this pair, the same object every time the same two parts are handed in.
-// `undefined` when the pair cannot be keyed, and the caller then builds its own array
-function sharedStylePair(
-  base: unknown,
-  explicit: unknown,
+function isKeyable(value: unknown): value is object {
+  return typeof value === 'object' && value !== null;
+}
+
+// Kept apart per shape of the pair so each cache lookup reads on its own
+function pairOverExplicit(explicit: object): readonly unknown[] {
+  const cached = sharedPairByExplicit.get(explicit);
+  if (cached !== undefined) return cached;
+  const made: readonly unknown[] = [undefined, explicit];
+  sharedPairByExplicit.set(explicit, made);
+  return made;
+}
+
+function pairOverBase(base: object): readonly unknown[] | undefined {
+  const cached = sharedPairByBase.get(base);
+  if (Array.isArray(cached)) return cached;
+  // A base already seen WITH an explicit half holds the second-level map here, and the base-only
+  // array has nowhere to live beside it. Rare enough not to earn a third map
+  if (cached !== undefined) return undefined;
+  const made: readonly unknown[] = [base, undefined];
+  sharedPairByBase.set(base, made);
+  return made;
+}
+
+function pairOverBoth(
+  base: object,
+  explicit: object,
 ): readonly unknown[] | undefined {
-  const baseIsKeyable = typeof base === 'object' && base !== null;
-  const explicitIsKeyable = typeof explicit === 'object' && explicit !== null;
-
-  if (base === undefined && explicitIsKeyable) {
-    const cached = sharedPairByExplicit.get(explicit);
-    if (cached !== undefined) return cached;
-    const made: readonly unknown[] = [base, explicit];
-    sharedPairByExplicit.set(explicit, made);
-    return made;
-  }
-  if (!baseIsKeyable) return undefined;
-
-  if (explicit === undefined) {
-    const cached = sharedPairByBase.get(base);
-    if (Array.isArray(cached)) return cached;
-    if (cached === undefined) {
-      const made: readonly unknown[] = [base, explicit];
-      sharedPairByBase.set(base, made);
-      return made;
-    }
-    // A base already seen WITH an explicit half holds the second-level map here, and the base-only
-    // array has nowhere to live beside it. Rare enough not to earn a third map
-    return undefined;
-  }
-  if (!explicitIsKeyable) return undefined;
-
   const existing = sharedPairByBase.get(base);
-  const byExplicit = existing instanceof WeakMap ? existing : new WeakMap();
-  if (existing === undefined) sharedPairByBase.set(base, byExplicit);
   // The same clash the other way round: this base is holding its base-only array, so leave it
-  if (Array.isArray(existing)) return undefined;
+  if (existing !== undefined && !(existing instanceof WeakMap))
+    return undefined;
+  const byExplicit = existing ?? new WeakMap<object, readonly unknown[]>();
+  if (existing === undefined) sharedPairByBase.set(base, byExplicit);
 
   const cached = byExplicit.get(explicit);
   if (cached !== undefined) return cached;
@@ -110,9 +109,18 @@ function sharedStylePair(
   return made;
 }
 
-// A plain style bag: not an array of styles, not a callback, not null
-function isStyleRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
+// The published array for this pair, the same object every time the same two parts are handed in.
+// `undefined` when the pair cannot be keyed, and the caller then builds its own array
+function sharedStylePair(
+  base: unknown,
+  explicit: unknown,
+): readonly unknown[] | undefined {
+  if (base === undefined) {
+    return isKeyable(explicit) ? pairOverExplicit(explicit) : undefined;
+  }
+  if (!isKeyable(base)) return undefined;
+  if (explicit === undefined) return pairOverBase(base);
+  return isKeyable(explicit) ? pairOverBoth(base, explicit) : undefined;
 }
 
 // Is this rebuilt style the same style, key for key? A component body writing its style inline
@@ -123,13 +131,13 @@ function isStyleRecord(value: unknown): value is Record<string, unknown> {
 export function isSameShallowStyle(next: unknown, standing: unknown): boolean {
   // THE SAME OBJECT IS THE SAME STYLE, checked first: without it a re-push of a hoisted constant
   // allocates two key arrays and walks them to reach the answer identity gives for free
-  if (next === standing) return isStyleRecord(next);
-  if (!isStyleRecord(next) || !isStyleRecord(standing)) return false;
+  if (next === standing) return isRecord(next);
+  if (!isRecord(next) || !isRecord(standing)) return false;
   const keys = Object.keys(next);
   if (keys.length !== Object.keys(standing).length) return false;
   for (const key of keys) {
     const value = next[key];
-    if (value === undefined || isStyleRecord(value) || Array.isArray(value)) {
+    if (value === undefined || isRecord(value) || Array.isArray(value)) {
       return false;
     }
     if (!Object.is(value, standing[key])) return false;
@@ -192,7 +200,7 @@ export function pushClassStyle(
       ? (sharedStylePair(base, explicit) ?? [base, explicit])
       : [base, explicit, parts.hiddenStyle];
   parts.published = published;
-  setProp(node, 'style', published);
+  setProp(node, 'style', preprocessPublishedStyle(published));
 }
 
 // `display: 'none'` is a real RN style value (Yoga's DisplayNone), so a hidden node keeps its

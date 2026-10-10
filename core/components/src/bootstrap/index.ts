@@ -1,25 +1,19 @@
-// Zero-config host bootstrap for @symbiote-native/components' four RN-backed seams
-// (colorProcessor, imageSourceResolver, deviceEventSource, nativeViewConfigSource), wired from
-// real react-native in one call - collapses what every canary example currently hand-wires at
-// startup. Lives OUTSIDE the package's main barrel (see package.json's separate "./bootstrap"
-// export): react-native's own source is Flow syntax Vitest's transform can't parse, so anything
-// importing it directly must stay unreachable from the tested main index.ts.
+// Zero-config host bootstrap: wires the RN-backed seams from real react-native in one call
+// Lives outside the main barrel (the "./bootstrap" export), so apps without RN never load it
 
-import {
-  processColor,
-  DeviceEventEmitter,
-  Image,
-  type ImageSourcePropType,
-} from 'react-native';
+import * as ReactNative from 'react-native';
+import { processColor } from 'react-native';
+// @ts-expect-error react-native ships no types for this internal path (plain .js)
+import resolveAssetSource from 'react-native/Libraries/Image/resolveAssetSource';
 import {
   setAssetSourceResolver,
-  installBackHandler,
   setColorProcessor,
-  setDeviceEventSource,
   setImageSourceResolver,
   setNativeViewConfigSource,
+  setPressabilityLoader,
+  setReactNativeHost,
   type IColorValue,
-  type IDeviceEventSource,
+  type IPressabilityClass,
   type INativeViewConfig,
   type INativeViewConfigSource,
 } from '@symbiote-native/engine';
@@ -31,8 +25,9 @@ export type IBootstrapHostOptions = {
   colorProcessor?: (value: IColorValue) => unknown;
   imageSourceResolver?: (source: unknown) => unknown;
   assetSourceResolver?: (source: unknown) => unknown;
-  deviceEventSource?: IDeviceEventSource;
   nativeViewConfigSource?: INativeViewConfigSource;
+  reactNative?: object;
+  pressabilityLoader?: () => IPressabilityClass;
   debug?: boolean;
 };
 
@@ -49,12 +44,11 @@ function defaultNativeViewConfigSource(
   }
 }
 
-// require('./x.png') asset ids and {uri} sources are resolved by RN's own resolver before they
-// reach the shared render fns. `source` is untyped at the setImageSourceResolver seam by design
-// (any component's resolved shape flows through it) - this is the I/O edge where it crosses
-// into RN's own typed Image API.
+// Asset ids and `{uri}` sources go through RN's resolver before the shared render fns
+// It is the module behind `Image.resolveAssetSource`, imported directly so the `Image` component
+// (which loads React's renderer) stays out of every other adapter's bundle
 function defaultImageSourceResolver(source: unknown): unknown {
-  return Image.resolveAssetSource(source as ImageSourcePropType);
+  return resolveAssetSource(source);
 }
 
 // IColorValue is our own structural mirror of the runtime shapes RN's processColor accepts
@@ -63,6 +57,15 @@ function defaultImageSourceResolver(source: unknown): unknown {
 function defaultColorProcessor(value: IColorValue): unknown {
   return processColor(value as Parameters<typeof processColor>[0]);
 }
+
+// RN's `Pressability` is not on its index and only `usePressability` needs it, so it loads on use
+function defaultPressabilityLoader(): IPressabilityClass {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  return require('react-native/Libraries/Pressability/Pressability').default;
+}
+
+// At import, not in `bootstrapHost`: `Dimensions.get('window')` atop an app file runs before it
+setReactNativeHost(ReactNative);
 
 export function bootstrapHost(options: IBootstrapHostOptions = {}): void {
   globalThis.__SYMBIOTE_DEBUG__ = options.debug ?? process.env.DEBUG === '1';
@@ -73,10 +76,14 @@ export function bootstrapHost(options: IBootstrapHostOptions = {}): void {
   setAssetSourceResolver(
     options.assetSourceResolver ?? defaultImageSourceResolver,
   );
-  setDeviceEventSource(options.deviceEventSource ?? DeviceEventEmitter);
-  // After the event source: the back button subscribes through it (see installBackHandler).
-  installBackHandler();
+  // RN subscribes to `hardwareBackPress` when its BackHandler loads, and Android exits only if JS
+  // answers it, so an app without a handler of its own needs it loaded at startup
+  Reflect.get(options.reactNative ?? ReactNative, 'BackHandler');
   setNativeViewConfigSource(
     options.nativeViewConfigSource ?? defaultNativeViewConfigSource,
+  );
+  setReactNativeHost(options.reactNative ?? ReactNative);
+  setPressabilityLoader(
+    options.pressabilityLoader ?? defaultPressabilityLoader,
   );
 }

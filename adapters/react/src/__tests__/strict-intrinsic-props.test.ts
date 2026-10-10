@@ -14,7 +14,7 @@ const jsxSource = readFileSync(join(SRC, 'jsx-runtime.ts'), 'utf8');
 
 // The names the table declares strictly: every key of `ICrossedPrimitiveProps`.
 function strictlyDeclared(): string[] {
-  const body = jsxSource.match(/interface ICrossedPrimitiveProps \{([^}]+)\}/s);
+  const body = jsxSource.match(/type ICrossedPrimitiveProps = \{([^}]+)\}/s);
   if (body === null) return [];
   return [...body[1].matchAll(/^\s*'?([a-zA-Z][a-zA-Z-]*)'?:/gm)]
     .map(match => match[1])

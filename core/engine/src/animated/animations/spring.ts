@@ -5,8 +5,7 @@
 // position/velocity/time (getInternalState) so retargeting mid-flight stays
 // continuous. The native-config export is dropped.
 
-import type { IAnimation, IEndCallback } from '../animation';
-import type { AnimatedValue } from '../value';
+import type { IAnimationRun } from '../animation';
 import { dlog } from '../../debug';
 import type { INativeAnimationConfig } from '../native/native-animated';
 import { BaseAnimation, type IAnimationConfig } from './base';
@@ -22,7 +21,7 @@ import {
   fromOrigamiTensionAndFriction,
 } from './spring-config';
 
-export interface ISpringAnimationConfig extends IAnimationConfig {
+export type ISpringAnimationConfig = IAnimationConfig & {
   toValue: number;
   overshootClamping?: boolean;
   restDisplacementThreshold?: number;
@@ -36,13 +35,13 @@ export interface ISpringAnimationConfig extends IAnimationConfig {
   damping?: number;
   mass?: number;
   delay?: number;
-}
+};
 
-interface ISpringInternalState {
+type ISpringInternalState = {
   lastPosition: number;
   lastVelocity: number;
   lastTime: number;
-}
+};
 
 function resolveStiffnessDampingMass(config: ISpringAnimationConfig): {
   stiffness: number;
@@ -79,6 +78,46 @@ function resolveStiffnessDampingMass(config: ISpringAnimationConfig): {
     stiffness: springConfig.stiffness,
     damping: springConfig.damping,
     mass: 1,
+  };
+}
+
+const MAX_STEPS = 64;
+
+type ISpringSample = { position: number; velocity: number };
+
+type IOscillator = {
+  zeta: number;
+  omega0: number;
+  omega1: number;
+  x0: number;
+  v0: number;
+  t: number;
+};
+
+function underDamped(
+  { zeta, omega0, omega1, x0, v0, t }: IOscillator,
+  toValue: number,
+): ISpringSample {
+  const envelope = Math.exp(-zeta * omega0 * t);
+  const sin = Math.sin(omega1 * t);
+  const cos = Math.cos(omega1 * t);
+  const drive = v0 + zeta * omega0 * x0;
+  return {
+    position: toValue - envelope * ((drive / omega1) * sin + x0 * cos),
+    velocity:
+      zeta * omega0 * envelope * ((sin * drive) / omega1 + x0 * cos) -
+      envelope * (cos * drive - omega1 * x0 * sin),
+  };
+}
+
+function criticallyDamped(
+  { omega0, x0, v0, t }: Pick<IOscillator, 'omega0' | 'x0' | 'v0' | 't'>,
+  toValue: number,
+): ISpringSample {
+  const envelope = Math.exp(-omega0 * t);
+  return {
+    position: toValue - envelope * (x0 + (v0 + omega0 * x0) * t),
+    velocity: envelope * (v0 * (t * omega0 - 1) + t * x0 * (omega0 * omega0)),
   };
 }
 
@@ -149,14 +188,9 @@ export class SpringAnimation extends BaseAnimation {
     };
   }
 
-  override start(
-    fromValue: number,
-    onUpdate: (value: number) => void,
-    onEnd: IEndCallback,
-    previousAnimation: IAnimation | null,
-    animatedValue: AnimatedValue,
-  ): void {
-    this.begin(onEnd);
+  override start(run: IAnimationRun): void {
+    const { fromValue, onUpdate, previousAnimation, animatedValue } = run;
+    this.begin(run);
     this.startPosition = fromValue;
     this.lastPosition = this.startPosition;
     this.onUpdate = onUpdate;
@@ -171,108 +205,70 @@ export class SpringAnimation extends BaseAnimation {
       this.lastTime = internalState.lastTime;
     }
 
-    // Native took over → the JS rAF loop is skipped entirely.
+    // Если native взял анимацию, JS-цикл кадров не нужен
     if (this.startNativeIfNeeded(animatedValue)) return;
 
-    if (this.delay !== 0) {
-      this.timeout = setTimer(() => this.onFrame(), this.delay);
-    } else {
+    if (this.delay === 0) {
       this.onFrame();
+    } else {
+      this.timeout = setTimer(() => this.onFrame(), this.delay);
     }
   }
 
-  // This spring model is based off of a damped harmonic oscillator
-  // (https://en.wikipedia.org/wiki/Harmonic_oscillator#Damped_harmonic_oscillator),
-  // using the closed form of the second-order differential equation. It matches
-  // the algorithm used by QuartzCore's CASpringAnimation.
-  private onFrame(): void {
-    // If a lot of frames were lost (a large payload, a paused debugger) advance
-    // by at most 4 frames so the spring keeps running fast rather than jumping
-    // to the end.
-    const MAX_STEPS = 64;
-    let now = Date.now();
-    if (now > this.lastTime + MAX_STEPS) {
-      now = this.lastTime + MAX_STEPS;
-    }
-
-    const deltaTime = (now - this.lastTime) / 1000;
-    this.frameTime += deltaTime;
-
-    const c = this.damping;
-    const m = this.mass;
+  // Затухающий гармонический осциллятор в замкнутой форме, как `CASpringAnimation` в QuartzCore
+  // Потерянные кадры (пауза отладчика) сжимаются до MAX_STEPS, чтобы пружина не прыгала в конец
+  private sample(now: number): ISpringSample {
+    this.frameTime += (now - this.lastTime) / 1_000;
     const k = this.stiffness;
+    const m = this.mass;
     const v0 = -this.initialVelocity;
-
-    const zeta = c / (2 * Math.sqrt(k * m));
-    const omega0 = Math.sqrt(k / m);
-    const omega1 = omega0 * Math.sqrt(1.0 - zeta * zeta);
-    const x0 = this.toValue - this.startPosition;
-
-    let position: number;
-    let velocity: number;
     const t = this.frameTime;
-    if (zeta < 1) {
-      // Under-damped.
-      const envelope = Math.exp(-zeta * omega0 * t);
-      position =
-        this.toValue -
-        envelope *
-          (((v0 + zeta * omega0 * x0) / omega1) * Math.sin(omega1 * t) +
-            x0 * Math.cos(omega1 * t));
-      velocity =
-        zeta *
-          omega0 *
-          envelope *
-          ((Math.sin(omega1 * t) * (v0 + zeta * omega0 * x0)) / omega1 +
-            x0 * Math.cos(omega1 * t)) -
-        envelope *
-          (Math.cos(omega1 * t) * (v0 + zeta * omega0 * x0) -
-            omega1 * x0 * Math.sin(omega1 * t));
-    } else {
-      // Critically damped.
-      const envelope = Math.exp(-omega0 * t);
-      position = this.toValue - envelope * (x0 + (v0 + omega0 * x0) * t);
-      velocity =
-        envelope * (v0 * (t * omega0 - 1) + t * x0 * (omega0 * omega0));
-    }
+    const zeta = this.damping / (2 * Math.sqrt(k * m));
+    const omega0 = Math.sqrt(k / m);
+    const x0 = this.toValue - this.startPosition;
+    if (zeta >= 1) return criticallyDamped({ omega0, x0, v0, t }, this.toValue);
+    const omega1 = omega0 * Math.sqrt(1 - zeta * zeta);
+    return underDamped({ zeta, omega0, omega1, x0, v0, t }, this.toValue);
+  }
 
+  private hasSettled(position: number, velocity: number): boolean {
+    const isOvershooting = this.isOvershooting(position);
+    const isResting = Math.abs(velocity) <= this.restSpeedThreshold;
+    const isAtTarget =
+      this.stiffness === 0 ||
+      Math.abs(this.toValue - position) <= this.restDisplacementThreshold;
+    return isOvershooting || (isResting && isAtTarget);
+  }
+
+  private isOvershooting(position: number): boolean {
+    if (!this.overshootClamping || this.stiffness === 0) return false;
+    return this.startPosition < this.toValue
+      ? position > this.toValue
+      : position < this.toValue;
+  }
+
+  private onFrame(): void {
+    const now = Math.min(Date.now(), this.lastTime + MAX_STEPS);
+    const { position, velocity } = this.sample(now);
     this.lastTime = now;
     this.lastPosition = position;
     this.lastVelocity = velocity;
 
     this.onUpdate(position);
-    if (!this.__active) {
-      // A listener may have stopped us inside onUpdate.
+    // Слушатель мог остановить пружину внутри `onUpdate`
+    if (!this.__active) return;
+
+    if (!this.hasSettled(position, velocity)) {
+      this.animationFrame = requestFrame(() => this.onFrame());
       return;
     }
-
-    let isOvershooting = false;
-    if (this.overshootClamping && this.stiffness !== 0) {
-      if (this.startPosition < this.toValue) {
-        isOvershooting = position > this.toValue;
-      } else {
-        isOvershooting = position < this.toValue;
-      }
-    }
-    const isVelocity = Math.abs(velocity) <= this.restSpeedThreshold;
-    let isDisplacement = true;
     if (this.stiffness !== 0) {
-      isDisplacement =
-        Math.abs(this.toValue - position) <= this.restDisplacementThreshold;
+      // Садимся точно в цель
+      this.lastPosition = this.toValue;
+      this.lastVelocity = 0;
+      this.onUpdate(this.toValue);
     }
-
-    if (isOvershooting || (isVelocity && isDisplacement)) {
-      if (this.stiffness !== 0) {
-        // Settle exactly on the target.
-        this.lastPosition = this.toValue;
-        this.lastVelocity = 0;
-        this.onUpdate(this.toValue);
-      }
-      this.__notifyAnimationEnd({ finished: true });
-      return;
-    }
-
-    this.animationFrame = requestFrame(() => this.onFrame());
+    this.__notifyAnimationEnd({ finished: true });
   }
 
   override stop(): void {

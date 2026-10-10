@@ -118,11 +118,8 @@ describe('the aria/role fold reaches Fabric on both spellings', () => {
     };
 
     for (const [arm, props] of Object.entries(arms)) {
-      // The engine reads the HYPHENATED form literally (`bag["aria-label"]`), so the authored
-      // spelling IS the contract — a camelised key is invisible to the rule and would commit raw.
-      // Svelte is the adapter where this is a live hazard rather than a theoretical one: its
-      // compiler lowercases every static attribute name (`fix_attribute_casing`), which is the
-      // whole reason `canonical-prop-names.ts` exists.
+      // The engine reads `aria-label` by its hyphenated spelling, and Svelte's compiler lowercases
+      // static attribute names (see `canonical-prop-names.ts`)
       expect(props.role, `${arm} role`).toBe('button');
       expect(props['aria-label'], `${arm} label`).toBe('close');
       expect(props, `${arm} never camelises`).not.toHaveProperty('ariaLabel');
@@ -131,9 +128,7 @@ describe('the aria/role fold reaches Fabric on both spellings', () => {
   });
 
   it('lets the alias win FIELD-BY-FIELD inside accessibilityState', async () => {
-    // The opposite precedence from a scalar, and the case worth pinning because the two rules read
-    // as contradictory: an explicit scalar prop beats its alias, but inside the composite the alias
-    // beats the field it names while every other field of the explicit object survives.
+    // The alias beats the field it names, other fields of the explicit object survive
     const arms = {
       attributes: await mountAndRead(
         attributeArm(
@@ -154,10 +149,7 @@ describe('the aria/role fold reaches Fabric on both spellings', () => {
     };
 
     for (const [arm, props] of Object.entries(arms)) {
-      // Both halves must ARRIVE, under both spellings — which of them wins is the engine's rule and
-      // it cannot apply a precedence to a bag missing one side. The composite has to survive as an
-      // OBJECT through a `p={{…}}` bag as well as through an attribute, which is the half a bag arm
-      // is here to catch.
+      // Both halves must arrive, the engine picks the winner, and the composite stays an object
       expect(props.accessibilityState, `${arm} state`).toMatchObject({
         checked: false,
         busy: true,
@@ -166,17 +158,8 @@ describe('the aria/role fold reaches Fabric on both spellings', () => {
     }
   });
 
-  // A QUOTED aria attribute is a STRING in every one of these templates — `aria-checked="true"`
-  // yields `'true'`, not `true` — and nothing anywhere coerces it: not this adapter, and not the
-  // engine's rule, which reads the value through as-is. So what eventually lands in
-  // `accessibilityState.checked` is the string, which is not what RN's native side expects
-  // (boolean | 'mixed').
-  //
-  // Asserted at THIS layer now rather than on the folded composite: the string is produced here, by
-  // the template, and that is the fact this file can still see. The consequence downstream — that
-  // the rule passes it along uncoerced — belongs to the rule and is pinned beside it. Recorded as an
-  // assertion rather than a comment so the day someone adds coercion, one of the two fails and says
-  // which layer made the decision.
+  // A quoted `aria-checked="true"` is the string `'true'` and nothing coerces it, as in RN
+  // The engine itest pins the other half, that the fold passes it through
   it('passes a quoted aria value through UNCOERCED, string and all', async () => {
     const props = await mountAndRead(
       attributeArm('quoted-attributes', `aria-checked="true"`),

@@ -1,14 +1,6 @@
-// Solid twin of adapters/react's virtualized-list tests, adapters/vue's and adapters/svelte's. Drives
-// REAL compiled Solid JSX through the universal renderer into the fake Fabric slot. Every expectation
-// below comes from a PRODUCT rule — React Native's documented VirtualizedList/FlatList behaviour, or
-// the surface adapters/react already ships (the reference adapter for P0 parity) — never from
-// reading this adapter's own source back.
-//
-// The `Reactivity` group is the Solid-specific half and has no counterpart in the React file: Solid
-// runs a component body ONCE and has no reconciler between what it returns and the host nodes —
-// `insert` REPLACES a subtree rather than diffing one — so "the cell updated" and "the cell was not
-// rebuilt in order to update" are two independent, silently-breakable claims. The node-creation
-// counter is the only headless line between them (.claude/rules/solid-descriptor-bridge.md §4).
+// Solid twin of the React, Vue and Svelte list tests, over compiled JSX and the fake Fabric slot
+// Expectations come from RN's documented list behavior, never from this adapter's own source
+// `Reactivity` is Solid-only, `insert` replaces a subtree so the node counter pins row reuse
 
 import { createSignal } from 'solid-js';
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
@@ -31,10 +23,12 @@ const ITEM_HEIGHT = 50;
 const VIEWPORT_HEIGHT = 100;
 const ROW_COUNT = 20;
 
-interface IRow {
+type IRow = {
   id: number;
   label: string;
-}
+};
+
+const RED_STYLE = { backgroundColor: 'red' };
 
 const fabric = installRecordingFabric();
 const live = createLiveTree(fabric);
@@ -86,6 +80,15 @@ const getItemLayout = (
 });
 const keyExtractor = (item: IRow): string => `k-${item.id}`;
 
+// A string `tag` wins, else the highlight decides
+function separatorLabel(separatorProps: {
+  tag?: unknown;
+  highlighted?: boolean;
+}): string {
+  if (typeof separatorProps.tag === 'string') return separatorProps.tag;
+  return separatorProps.highlighted ? 'sep-on' : 'sep-off';
+}
+
 function committed(viewName: string): ILiveNode {
   const found = live.findLive(
     live.appRoot(),
@@ -107,9 +110,8 @@ function committedLabels(): Set<string> {
   return new Set(live.texts(live.appRoot()));
 }
 
-// How many TIMES a node carrying this text was created. 1 means the row survived whatever happened in
-// between; >1 means it was destroyed and rebuilt. `findAll` searches the creation log — the AUTHORED
-// bag, which is what `text` on a raw-text node always is.
+// How many times a node carrying this text was created, 1 means the row survived and >1 a rebuild
+// `findAll` searches the creation log, the authored bag, which is what `text` on a raw node is
 function createdCountForText(text: string): number {
   return fabric.findAll(node => node.props.text === text).length;
 }
@@ -151,15 +153,9 @@ async function settleViewport(): Promise<void> {
 
 describe('Solid VirtualizedList on the engine', () => {
   describe('Positive', () => {
-    // why: RN renders a VirtualizedList through a ScrollView, which is a NESTED pair — a scroll view
-    // that pans a single content view holding the cells. A flat tree looks identical in JS and
-    // simply does not scroll on a device; on Android a second direct child of the scroll view is an
-    // outright addViewAt crash, which is why RN also pins the content view un-flattened
-    // (ScrollView.js preserveChildren / collapsable=false).
-    //
-    // THE UN-FLATTENING ITSELF is `foldScrollContentProps` in the engine, pinned in
-    // `scroll-content-payload.itest.ts`; this host carries no copy. What Solid owns is the
-    // NESTING, which is the half a flat tree gets wrong.
+    // RN renders a list through a nested pair, a scroll view panning one content view of cells
+    // A flat tree does not scroll on a device, the un-flattening is `foldScrollContentProps`
+    // in the engine, what Solid owns here is the nesting
     it('commits a nested scroll host holding a single content container', async () => {
       mount(ROOT_TAG, () => (
         <VirtualizedList<IRow>
@@ -200,10 +196,8 @@ describe('Solid VirtualizedList on the engine', () => {
       expect(labels.has('row-19')).toBe(false);
     });
 
-    // why: the unmounted cells still have to occupy space, or the scroll thumb and the total content
-    // size are wrong and the list scrolls to the wrong place. RN collapses the off-window extent into
-    // spacers: none above when the window starts at row 0, one below covering the rest (here 20 rows
-    // of 50pt = 1000, minus the 100pt the two mounted cells occupy).
+    // Unmounted cells still occupy space, RN collapses the off-window extent into spacers
+    // Here none above the window at row 0 and one below: 20 rows of 50pt minus the 100pt mounted
     it('reserves the off-window extent with a trailing spacer and none at the top', async () => {
       mount(ROOT_TAG, () => (
         <VirtualizedList<IRow>
@@ -224,11 +218,8 @@ describe('Solid VirtualizedList on the engine', () => {
       expect(trailing?.payload.height).toBe(900);
     });
 
-    // why: the resident window is a function of the MEASURED viewport and the live scroll offset —
-    // RN recomputes it on every scroll event and re-collapses what left the window back into the
-    // spacers. A list that paints its first window and then never moves looks fine at the top and is
-    // blank everywhere else. windowSize 1 means zero overscan, so at offset 500 with 50pt rows and a
-    // 100pt viewport exactly rows 10 and 11 are resident.
+    // The window follows the measured viewport and the live offset, `windowSize` 1 is zero overscan
+    // At offset 500 with 50pt rows and a 100pt viewport rows 10 and 11 are resident
     it('moves the window and both spacer extents as the list scrolls', async () => {
       mount(ROOT_TAG, () => (
         <VirtualizedList<IRow>
@@ -249,14 +240,21 @@ describe('Solid VirtualizedList on the engine', () => {
       const labels = committedLabels();
       expect(labels.has('row-10')).toBe(true);
       expect(labels.has('row-11')).toBe(true);
-      expect(labels.has('row-0'), 'the rows left behind are unmounted').toBe(
-        false,
+      expect(labels.has('row-0'), 'the initial region stays mounted').toBe(
+        true,
       );
+      expect(labels.has('row-5'), 'the rows past it are unmounted').toBe(false);
 
       const children = contentChildren();
-      expect(children[0]?.payload.height, 'leading spacer covers 10 rows').toBe(
-        500,
-      );
+      // Row 9 ends exactly at the offset, RN counts that inclusive end as visible
+      expect(
+        labels.has('row-9'),
+        'the cell ending at the offset is resident',
+      ).toBe(true);
+      expect(
+        children[2]?.payload.height,
+        'the spacer covers the 7 rows between the initial region and the window',
+      ).toBe(350);
       expect(
         children[children.length - 1]?.payload.height,
         'trailing spacer covers the remaining 8',
@@ -295,9 +293,8 @@ describe('Solid VirtualizedList on the engine', () => {
       expect(committedLabels().has('the-footer')).toBe(true);
     });
 
-    // why: RN renders ListEmptyComponent only while getItemCount() is 0, and swaps back to the cells
-    // the moment data arrives. A slot decided once at mount leaves an "empty" placeholder sitting
-    // above a list that has since loaded — the classic async-list bug.
+    // RN renders `ListEmptyComponent` only while `getItemCount()` is 0 and swaps back on data
+    // A slot decided once at mount would leave the placeholder above a list that has since loaded
     it('renders the empty slot only while there are no items', async () => {
       const [rows, setRows] = createSignal<IRow[]>([]);
       mount(ROOT_TAG, () => (
@@ -322,12 +319,9 @@ describe('Solid VirtualizedList on the engine', () => {
       expect(committedLabels().has('row-0')).toBe(true);
     });
 
-    // why: RN renders ItemSeparatorComponent BETWEEN cells and never after the last one — a trailing
-    // separator is the classic off-by-one that shows up as a stray divider above the footer. With
-    // the window holding exactly two cells there is exactly one gap.
-    // why: the gate is the last index of the DATA, not of the WINDOW (RN VirtualizedList.js:793).
-    // Since the separator lives inside the measuring wrapper, gating on the window would make a
-    // cell's own height change as the window slides past it. Every cell here is mid-list.
+    // RN renders `ItemSeparatorComponent` BETWEEN cells and never after the last one
+    // The gate is the last index of the DATA, not of the WINDOW, or a cell's height would change
+    // as the window slides past it
     it('gives every cell a separator while none of them is the last item', async () => {
       mount(ROOT_TAG, () => (
         <VirtualizedList<IRow>
@@ -374,9 +368,8 @@ describe('Solid VirtualizedList on the engine', () => {
       );
     });
 
-    // why: WHERE the separator sits is geometry, not decoration. As a SIBLING it would be an
-    // extra flex child, landing every cell below the leading spacer short. RN avoids this by
-    // rendering it INSIDE the measuring wrapper (VirtualizedListCellRenderer.js:218-221).
+    // The separator sits INSIDE the measuring wrapper, as a sibling it would be an extra flex child
+    // that lands every cell below the leading spacer short
     it('renders the separator inside its cell rather than beside it', async () => {
       mount(ROOT_TAG, () => (
         <VirtualizedList<IRow>
@@ -404,10 +397,8 @@ describe('Solid VirtualizedList on the engine', () => {
       }
     });
 
-    // why: RN hands renderItem a `separators` handle (CellRenderer._separators) so a row can drive
-    // its own dividers — highlight() flips `highlighted` on the separators flanking that cell, which
-    // is how a pressed row draws a full-bleed divider. A handle that mutates without repainting is
-    // the failure mode this pins.
+    // RN hands `renderItem` a `separators` handle so a row can drive its own dividers
+    // `highlight()` flips `highlighted` on the separators flanking the cell and must repaint
     it('repaints a separator when the row calls separators.highlight()', async () => {
       let highlight: (() => void) | undefined;
       mount(ROOT_TAG, () => (
@@ -439,10 +430,8 @@ describe('Solid VirtualizedList on the engine', () => {
       expect(committedLabels().has('sep-off')).toBe(true);
     });
 
-    // why: the other two members of RN's separators handle. updateProps('leading'|'trailing') merges
-    // ARBITRARY props onto one side's separator — that is how a row pushes its own colour/inset onto
-    // just the divider below it — and unhighlight() is the release half of the press pair. A handle
-    // that only implements highlight() type-checks and silently drops both.
+    // The other two members of the handle: `updateProps` merges arbitrary props onto one side's
+    // separator and `unhighlight` is the release half of the press pair
     it('lets a row push props onto one side and clear the highlight again', async () => {
       let separators:
         | {
@@ -462,13 +451,7 @@ describe('Solid VirtualizedList on the engine', () => {
           initialNumToRender={2}
           windowSize={1}
           ItemSeparatorComponent={separatorProps => (
-            <text>
-              {typeof separatorProps.tag === 'string'
-                ? separatorProps.tag
-                : separatorProps.highlighted
-                  ? 'sep-on'
-                  : 'sep-off'}
-            </text>
+            <text>{separatorLabel(separatorProps)}</text>
           )}
           renderItem={info => {
             if (info().index === 0) separators = info().separators;
@@ -494,10 +477,8 @@ describe('Solid VirtualizedList on the engine', () => {
       expect(committedLabels().has('sep-off')).toBe(true);
     });
 
-    // why: RN exposes scrollToOffset on the list ref and it rides the underlying ScrollView's NATIVE
-    // scrollTo command ([x, y, animated]), animated by default. A JS-only implementation would move
-    // nothing on a device, and dropping the animated flag turns every programmatic scroll into a
-    // jump.
+    // `scrollToOffset` rides the ScrollView's native `scrollTo` command ([x, y, animated]) and is
+    // animated by default, a JS-only move would do nothing on a device
     it('drives scrollToOffset through the native scrollTo command', async () => {
       let list:
         | {
@@ -532,10 +513,8 @@ describe('Solid VirtualizedList on the engine', () => {
       expect(fabric.commands[0]?.viewName).toBe(SCROLL_VIEW);
     });
 
-    // why: RN's scrollToIndex places item `index` in the viewport, and the placement is tunable:
-    // viewPosition 0 puts it at the top, 1 at the bottom, 0.5 centred, and viewOffset nudges the
-    // final offset by a fixed number of points (for a sticky header overlapping the top). Ignoring
-    // either lands the row under whatever is pinned above it.
+    // `scrollToIndex` placement is tunable: `viewPosition` 0 top, 1 bottom, 0.5 centred, and
+    // `viewOffset` nudges the final offset, ignoring either lands the row under a pinned header
     it('resolves scrollToIndex to an offset honouring viewPosition and viewOffset', async () => {
       let list:
         | {
@@ -637,11 +616,8 @@ describe('Solid VirtualizedList on the engine', () => {
       expect(fabric.commands[0]?.args).toEqual([0, 900, false]);
     });
 
-    // why: RN's list ref also exposes the inner-scroll routing tail — flashScrollIndicators is a
-    // native command on the scroll view, and getNativeScrollRef / getScrollableNode /
-    // getScrollResponder / getScrollNode all reach the SAME underlying scroll view (RN keeps three
-    // names for API history; external code pattern-matches on them). A null from any of them is how
-    // an Animated-driven or focus-scrolling integration silently stops working.
+    // `flashScrollIndicators` is a native command on the scroll view, and the three getters plus
+    // `getScrollNode` all reach the SAME scroll view, a null from any breaks Animated integrations
     it('routes flashScrollIndicators and the scroll-node getters to the scroll view', async () => {
       let list:
         | {
@@ -680,11 +656,8 @@ describe('Solid VirtualizedList on the engine', () => {
       expect(list?.getScrollResponder()).not.toBeNull();
     });
 
-    // why: without getItemLayout the list only knows the size of cells it has actually MEASURED, so
-    // a scrollToIndex past the highest measured frame cannot be placed. RN reports that through
-    // onScrollToIndexFailed({index, highestMeasuredFrameIndex, averageItemLength}) and scrolls
-    // nowhere — the callback exists precisely so the app can react (grow the window, retry) instead
-    // of the list silently jumping to a wrong offset.
+    // Without `getItemLayout` a `scrollToIndex` past the highest measured frame cannot be placed
+    // RN reports it through `onScrollToIndexFailed` and scrolls nowhere
     it('reports onScrollToIndexFailed for a target past the last measured cell', async () => {
       const onScrollToIndexFailed = vi.fn();
       let list: { scrollToIndex: (p: { index: number }) => void } | undefined;
@@ -703,10 +676,8 @@ describe('Solid VirtualizedList on the engine', () => {
         />
       ));
       await tick();
-      // Measure the first cell so the list has a highest-measured frame of 0. The viewport is left
-      // unmeasured on purpose: with no getItemLayout and no cell measured yet every cell is
-      // zero-length, and a measured viewport over zero-length cells collapses the window onto the
-      // last index — a shared-core property, not this adapter's.
+      // Measure the first cell so the highest measured frame is 0, the viewport stays unmeasured
+      // because a measured one over zero-length cells collapses the window onto the last index
       fireLayout(contentChildren()[0], ITEM_HEIGHT);
       await tick();
 
@@ -728,11 +699,9 @@ describe('Solid VirtualizedList on the engine', () => {
       ).toHaveLength(1);
     });
 
-    // why: with no getItemLayout RN learns cell sizes from each rendered cell's own onLayout and
-    // sizes the not-yet-measured ones from the running average, so the total content extent becomes
-    // plausible before everything has been seen. A list that never measures reports a zero content
-    // height, which on a device is a scroll view that refuses to scroll at all.
-    it('measures its cells and sizes the unmeasured tail from the average', async () => {
+    // Without `getItemLayout` RN stops the tail spacer at the highest measured cell, so the
+    // unmeasured rest reserves no room and a fling cannot scroll into it
+    it('measures its cells and holds the tail spacer at the highest measured cell', async () => {
       mount(ROOT_TAG, () => (
         <VirtualizedList<IRow>
           data={DATA}
@@ -753,15 +722,15 @@ describe('Solid VirtualizedList on the engine', () => {
       await tick();
 
       const trailing = contentChildren()[contentChildren().length - 1];
-      expect(trailing?.children.length, 'a trailing spacer appeared').toBe(0);
-      // 20 rows at the measured 50pt average, minus the 100pt the two rendered cells occupy.
-      expect(trailing?.payload.height).toBe(900);
+      expect(
+        trailing?.children.length,
+        'no trailing spacer past the measured cells',
+      ).toBeGreaterThan(0);
+      expect(contentChildren(), 'only the window is reserved').toHaveLength(2);
     });
 
-    // why: onEndReached is what drives every infinite list. RN fires it when the scroll position is
-    // within onEndReachedThreshold viewport-lengths of the end AND the real last cell is rendered,
-    // and dedups by content length so it fires ONCE per page rather than on every scroll frame — a
-    // handler that re-fires would issue a network request per frame.
+    // `onEndReached` fires within `onEndReachedThreshold` viewports of the end once the last cell
+    // renders, and dedups by content length so it fires ONCE per page
     it('fires onEndReached once at the bottom and not again for the same content', async () => {
       const onEndReached = vi.fn();
       mount(ROOT_TAG, () => (
@@ -793,10 +762,8 @@ describe('Solid VirtualizedList on the engine', () => {
       ).toHaveBeenCalledTimes(1);
     });
 
-    // why: onStartReached is onEndReached's top-edge twin (RN 0.71+), used for prepend-paging chat
-    // lists. Same contract in reverse: it fires while the first cell is rendered and within
-    // onStartReachedThreshold of the start, dedups against the same content, and RE-ARMS once the
-    // list has scrolled away — otherwise the second visit to the top loads nothing.
+    // `onStartReached` is the top-edge twin of `onEndReached`, it dedups the same way and RE-ARMS
+    // once the list has scrolled away, or the second visit to the top loads nothing
     it('fires onStartReached at the top and re-arms after scrolling away', async () => {
       const onStartReached = vi.fn();
       mount(ROOT_TAG, () => (
@@ -829,10 +796,8 @@ describe('Solid VirtualizedList on the engine', () => {
       ).toHaveBeenCalledTimes(2);
     });
 
-    // why: onViewableItemsChanged is RN's impression/analytics hook. It reports the items that pass
-    // viewabilityConfig, keyed by keyExtractor, and `changed` carries only the DELTA — the newly
-    // viewable ones (isViewable true) and the ones that just left (false). A handler fed the whole
-    // set every time double-counts every row on every scroll.
+    // `onViewableItemsChanged` reports the items passing `viewabilityConfig`, and `changed` carries
+    // only the DELTA, a handler fed the whole set would double-count every row
     it('reports viewable items by their extracted key and only the delta on a scroll', async () => {
       const changes: {
         viewableItems: { key: string; index: number; isViewable: boolean }[];
@@ -874,10 +839,8 @@ describe('Solid VirtualizedList on the engine', () => {
       ).toEqual(['k-0', 'k-1']);
     });
 
-    // why: RN accepts viewabilityConfigCallbackPairs as an alternative to the single
-    // config/callback, so one list can report against several thresholds at once (e.g. a 50% "seen"
-    // impression and a 100% "fully read" one). Every pair's callback has to be invoked, not just the
-    // first.
+    // `viewabilityConfigCallbackPairs` lets one list report against several thresholds at once
+    // and every pair's callback has to be invoked, not just the first
     it('invokes every viewabilityConfigCallbackPairs callback', async () => {
       const seen = vi.fn();
       const fullyVisible = vi.fn();
@@ -909,9 +872,8 @@ describe('Solid VirtualizedList on the engine', () => {
       expect(fullyVisible).toHaveBeenCalledTimes(1);
     });
 
-    // why: RN's minimumViewTime holds a row back until it has been continuously viewable for that
-    // long, so a fast flick past a row does not count as an impression. Reporting immediately makes
-    // every analytics number wrong in the direction that is hardest to notice.
+    // `minimumViewTime` holds a row back until it has been viewable that long, so a fast flick
+    // past a row is not an impression
     it('defers onViewableItemsChanged by minimumViewTime', async () => {
       const onViewableItemsChanged = vi.fn();
       mount(ROOT_TAG, () => (
@@ -943,9 +905,8 @@ describe('Solid VirtualizedList on the engine', () => {
       expect(onViewableItemsChanged).toHaveBeenCalledTimes(1);
     });
 
-    // why: RN's waitForInteraction suppresses every viewability report until the user has actually
-    // touched the list, so rows that merely happen to be on screen at mount are not counted as seen.
-    // A scroll is that interaction.
+    // `waitForInteraction` suppresses every viewability report until the user touches the list,
+    // a scroll is that interaction
     it('reports nothing under waitForInteraction until the list is scrolled', async () => {
       const onViewableItemsChanged = vi.fn();
       mount(ROOT_TAG, () => (
@@ -974,10 +935,8 @@ describe('Solid VirtualizedList on the engine', () => {
       expect(onViewableItemsChanged).toHaveBeenCalledTimes(1);
     });
 
-    // why: RN's VirtualizedList._onScroll runs its windowing bookkeeping and THEN calls
-    // props.onScroll — the user's handler COMPOSES with the internal one, it never replaces it.
-    // Letting the app's onScroll land raw on the host silently freezes the window at its first
-    // paint while the app's own handler keeps working, which reads as "virtualization is broken".
+    // RN runs its windowing bookkeeping and THEN calls `props.onScroll`, the user's handler
+    // composes with the internal one, a raw `onScroll` on the host would freeze the window
     it('composes the user onScroll with the internal windowing handler', async () => {
       const onScroll = vi.fn();
       mount(ROOT_TAG, () => (
@@ -1004,10 +963,8 @@ describe('Solid VirtualizedList on the engine', () => {
       ).toBe(true);
     });
 
-    // why: RN forwards the scroll-lifecycle callbacks straight to the inner ScrollView
-    // (VirtualizedList.js). They are how an app pauses video off-screen, hides a FAB while dragging,
-    // or knows momentum has settled; swallowed in the prop split they simply never fire, with no
-    // error anywhere.
+    // RN forwards the scroll-lifecycle callbacks straight to the inner ScrollView, swallowed in the
+    // prop split they would never fire and nothing would report it
     it('forwards the scroll-lifecycle callbacks to the native scroll host', async () => {
       const onScrollBeginDrag = vi.fn();
       const onScrollEndDrag = vi.fn();
@@ -1042,10 +999,8 @@ describe('Solid VirtualizedList on the engine', () => {
       expect(onMomentumScrollEnd).toHaveBeenCalledTimes(1);
     });
 
-    // why: keyboardDismissMode, keyboardShouldPersistTaps and scrollEventThrottle are read by NATIVE
-    // directly — there is no JS wiring for them — so the only way to get them wrong is to swallow
-    // them in the prop split. A list that never dismisses the keyboard on drag reads as a native
-    // bug rather than a dropped prop.
+    // Native reads the keyboard props and `scrollEventThrottle` directly, the only way to get them
+    // wrong is to swallow them in the prop split
     it('forwards the keyboard props and scrollEventThrottle to the native scroll host', async () => {
       mount(ROOT_TAG, () => (
         <VirtualizedList<IRow>
@@ -1069,10 +1024,8 @@ describe('Solid VirtualizedList on the engine', () => {
       expect(props.scrollEventThrottle).toBe(16);
     });
 
-    // why: a horizontal list is a different axis end to end, not a flag. RN lays the content out in
-    // a row and pins it to the full content WIDTH so the row overflows and there is something to
-    // scroll (without it the content is stretched to the viewport and iOS never scrolls), reads the
-    // scroll offset off contentOffset.X, and measures cells by width.
+    // A horizontal list is a different axis end to end: content pinned to the full row WIDTH so
+    // it overflows, the offset read off `contentOffset.x`, cells measured by width
     it('lays a horizontal list along the row axis and windows on the x offset', async () => {
       mount(ROOT_TAG, () => (
         <VirtualizedList<IRow>
@@ -1088,10 +1041,8 @@ describe('Solid VirtualizedList on the engine', () => {
       ));
       await tick();
       const scroll = committed(SCROLL_VIEW);
-      // The axis flag and the content node's row style are BOTH engine rules now
-      // (`scroll-view-payload.itest.ts`, `scroll-content-payload.itest.ts`). The WIDTH below is this
-      // list's own arithmetic — it pins the content to the row total, not the frame — and is what
-      // fails if the list stops treating itself as horizontal.
+      // The axis flag and the row style are engine rules, the width below is this list's own
+      // arithmetic: it pins the content to the row total
       expect(committed(CONTENT_VIEW).payload.width).toBe(
         ITEM_HEIGHT * ROW_COUNT,
       );
@@ -1107,17 +1058,15 @@ describe('Solid VirtualizedList on the engine', () => {
       await tick();
 
       expect(committedLabels().has('row-10')).toBe(true);
-      expect(committedLabels().has('row-0')).toBe(false);
+      expect(committedLabels().has('row-5')).toBe(false);
       expect(
-        contentChildren()[0]?.payload.width,
-        'the spacer sizes by width',
-      ).toBe(500);
+        contentChildren()[2]?.payload.width,
+        'the spacer after the initial region sizes by width',
+      ).toBe(350);
     });
 
-    // why: RN implements `inverted` as a scale(-1) transform on the scroll container plus a
-    // counter-flip on EVERY cell, so the list grows from the bottom while each row still reads
-    // upright. Flipping the content container as well would cancel the outer flip; flipping only the
-    // container renders every row upside down.
+    // `inverted` is a `scale(-1)` on the scroll container plus a counter-flip on EVERY cell, the
+    // content container must not flip too or it would cancel the outer flip
     it('flips the scroll container and counter-flips each cell when inverted', async () => {
       mount(ROOT_TAG, () => (
         <VirtualizedList<IRow>
@@ -1150,11 +1099,8 @@ describe('Solid VirtualizedList on the engine', () => {
       }
     });
 
-    // why: RN splits list styling in two — `style` dresses the scroll view that pans, while
-    // `contentContainerStyle` dresses the inner container the cells sit in (that is where padding
-    // between rows belongs; putting it on the outer view clips the scroll instead). This adapter
-    // additionally resolves a registered class name, matching its own View/Text/ScrollView, and
-    // accepts one for contentContainerStyle too.
+    // `style` dresses the scroll view and `contentContainerStyle` the inner container of cells
+    // This adapter also resolves a registered class name for both
     it('routes style to the scroll view and contentContainerStyle to the content container', async () => {
       registerRules([
         {
@@ -1179,7 +1125,7 @@ describe('Solid VirtualizedList on the engine', () => {
           initialNumToRender={2}
           windowSize={1}
           class="frame"
-          style={{ backgroundColor: 'red' }}
+          style={RED_STYLE}
           contentContainerStyle="padded"
           renderItem={info => <text>{info().item.label}</text>}
         />
@@ -1196,10 +1142,8 @@ describe('Solid VirtualizedList on the engine', () => {
       expect(committed(CONTENT_VIEW).payload.padding).toBe(20);
     });
 
-    // why: the React adapter spreads the list's whole accessibility surface onto the underlying
-    // ScrollView, and RN folds the aria-* aliases into their accessibility* twins. A list is the
-    // scrollable region a screen reader announces, so losing testID / labels here is what makes an
-    // e2e selector or a VoiceOver rotor entry disappear.
+    // The whole accessibility surface rides onto the ScrollView and `aria-*` folds into its
+    // `accessibility*` twin, losing `testID` or labels breaks e2e selectors and screen readers
     it('rides its accessibility surface down onto the scroll host', async () => {
       mount(ROOT_TAG, () => (
         <VirtualizedList<IRow>
@@ -1224,10 +1168,8 @@ describe('Solid VirtualizedList on the engine', () => {
       ).toBe('Orders');
     });
 
-    // why: renderItem, getItem, data and the windowing knobs are pure JS and are CONSUMED here.
-    // Leaking a function onto the native prop bag crashes Android's folly::dynamic serializer the
-    // moment it tries to stringify it, and leaking `data` ships the whole list payload across the
-    // bridge on every commit.
+    // `renderItem`, `getItem`, `data` and the windowing knobs are pure JS and consumed here, a
+    // function on the native bag crashes Android's serializer and `data` would cross the bridge
     it('never forwards its JS-only props onto the native bag', async () => {
       mount(ROOT_TAG, () => (
         <VirtualizedList<IRow>
@@ -1259,12 +1201,9 @@ describe('Solid VirtualizedList on the engine', () => {
       }
     });
 
-    // why: RN gives a list pull-to-refresh by handing the inner ScrollView a RefreshControl whenever
-    // onRefresh is set. On iOS that control is a CHILD of the scroll view placed BEFORE the content
-    // container (ScrollView.js: {refreshControl}{contentContainer}) — after it, or outside, the pull
-    // gesture never reaches it. `refreshing` is CONTROLLED: native raises its own spinner on the
-    // gesture and only the pushed-down prop takes it back, so a frozen prop leaves it spinning
-    // forever. RN also defaults it to false when nullish.
+    // With `onRefresh` the iOS RefreshControl is a child of the scroll view placed BEFORE the
+    // content container, `refreshing` is controlled so a frozen prop leaves the spinner forever
+    // and RN defaults it to false when nullish
     it('attaches the iOS RefreshControl before the content and keeps refreshing controlled', async () => {
       const [refreshing, setRefreshing] = createSignal(false);
       mount(ROOT_TAG, () => (
@@ -1305,10 +1244,8 @@ describe('Solid VirtualizedList on the engine', () => {
     // registered (`behaviors/scroll-view/index.{ios,android}.ts`), not by which VirtualizedList
     // factory an app imports — that's `wrap-android.test.ts`'s subject, not this file's.
 
-    // why: RN implements sticky headers PURELY IN JS — the native scroll view ignores
-    // stickyHeaderIndices entirely, so forwarding the array is a silent no-op that hides a missing
-    // implementation. The flagged CELL has to come out wrapped in the sticky header component
-    // instead, which is what pins it while the rows scroll under it.
+    // RN implements sticky headers in JS, native ignores `stickyHeaderIndices` so forwarding it is
+    // a silent no-op, the flagged CELL has to come out wrapped in the sticky header instead
     it('wraps a flagged cell in the sticky header and never forwards the indices to native', async () => {
       mount(ROOT_TAG, () => (
         <VirtualizedList<IRow>
@@ -1337,14 +1274,8 @@ describe('Solid VirtualizedList on the engine', () => {
       ).toBe(false);
     });
 
-    // why: RN's _ensureClosestStickyHeader force-mounts the nearest sticky index BELOW the window, so
-    // a pinned header survives the window sliding past its origin index. Without it the pinned header
-    // is destroyed the moment its origin leaves [first,last] and recreated (losing its measured
-    // layout, so its pin resets) every time the window slides back — the flickering sticky header
-    // this exists to fix. Only the NEAREST one below is kept; earlier sticky indices do not apply.
-    // why: the separator lives inside the measuring wrapper, so whatever decides to render it
-    // decides the cell's HEIGHT. Excluding the sticky cell would make its height depend on the
-    // window, shifting everything below it. RN excludes neither it nor anything window-shaped.
+    // The separator lives inside the measuring wrapper, so excluding the sticky cell would make its
+    // height depend on the window and shift everything below it
     it('gives the force-mounted sticky cell a separator like any other cell', async () => {
       mount(ROOT_TAG, () => (
         <VirtualizedList<IRow>
@@ -1372,6 +1303,8 @@ describe('Solid VirtualizedList on the engine', () => {
       ).toBe(true);
     });
 
+    // RN force-mounts the nearest sticky index off the window so a pinned header is not destroyed
+    // and rebuilt, losing its measured layout, each time the window slides past its origin
     it('keeps the nearest sticky header resident once the window scrolls past its origin', async () => {
       mount(ROOT_TAG, () => (
         <VirtualizedList<IRow>
@@ -1406,8 +1339,7 @@ describe('Solid VirtualizedList on the engine', () => {
       ).toBe(1);
     });
 
-    // why: the scroll view's rules (nestedScrollEnabled's refresh-wrap default among them) run in the
-    // engine; a list that hand-authors its scroll host must still commit one for them to land on.
+    // The scroll view's rules run in the engine, the list must still commit a scroll view for them
     it('commits a scroll view for the engine scroll rules to land on', async () => {
       mount(ROOT_TAG, () => (
         <VirtualizedList<IRow>
@@ -1422,18 +1354,13 @@ describe('Solid VirtualizedList on the engine', () => {
       ));
       await settleViewport();
 
-      // `nestedScrollEnabled` is `foldScrollViewProps` in the engine now
-      // (`core/engine/cpp/tests/js/scroll-view-payload.itest.ts`), and this host carries no copy of
-      // the tag rules. What a VirtualizedList still owes here is that it reaches a committed scroll
-      // view at all — the default has nothing to land on otherwise.
+      // `nestedScrollEnabled` is `foldScrollViewProps` in the engine, this host carries no copy
+      // and only owes a committed scroll view for the default to land on
       expect(committed(SCROLL_VIEW)).toBeDefined();
     });
 
-    // why: RN both FORWARDS maintainVisibleContentPosition to native (so the scroll view anchors the
-    // cells it can see) and keeps those cells un-flattened — Android Fabric would otherwise collapse
-    // a layout-only cell away and the native helper would have nothing to anchor to, so the list
-    // jumps on prepend. RN also bumps minIndexForVisible by one when a ListHeaderComponent occupies
-    // child 0, because the prop counts CHILDREN, not data indices.
+    // RN forwards `maintainVisibleContentPosition` to native and bumps `minIndexForVisible` by one
+    // when a `ListHeaderComponent` occupies child 0, because the prop counts CHILDREN
     it('forwards maintainVisibleContentPosition, un-flattens the cells, and bumps past the header', async () => {
       mount(ROOT_TAG, () => (
         <VirtualizedList<IRow>
@@ -1453,17 +1380,12 @@ describe('Solid VirtualizedList on the engine', () => {
       expect(
         committed(SCROLL_VIEW).payload.maintainVisibleContentPosition,
       ).toEqual({ minIndexForVisible: 1 });
-      // `collapsableChildren` is derived from the prop above by the ENGINE now, which reads it off
-      // the owner through `ownerProps` (`core/engine/cpp/tests/js/scroll-content-payload.itest.ts`).
-      // What this list owes is the FORWARDING asserted above it.
+      // `collapsableChildren` is derived from the prop above by the engine, this list owes the
+      // forwarding asserted above
     });
 
-    // why: native maintainVisibleContentPosition can only anchor cells it has MOUNTED. Items
-    // prepended above the window are collapsed into the leading spacer, which native cannot see, so
-    // RN replicates the shift in JS (getDerivedStateFromProps): it tracks the key at
-    // minIndexForVisible and, when a prepend moves it down, scrolls by exactly the inserted extent.
-    // Without it a chat list loading older messages yanks the reader to a different message.
-    it('shifts the scroll by the prepended extent that native cannot see', async () => {
+    // RN moves the window with the key at `minIndexForVisible`, native MVCP does the scroll
+    it('keeps the mounted rows and sends no scroll when rows are prepended above the window', async () => {
       const [rows, setRows] = createSignal(DATA);
       mount(ROOT_TAG, () => (
         <VirtualizedList<IRow>
@@ -1482,6 +1404,7 @@ describe('Solid VirtualizedList on the engine', () => {
       fireScroll(500);
       await tick();
       const before = fabric.commands.length;
+      const textsBefore = live.texts(live.appRoot());
 
       const older: IRow[] = Array.from({ length: 5 }, (_unused, offset) => ({
         id: -5 + offset,
@@ -1490,16 +1413,16 @@ describe('Solid VirtualizedList on the engine', () => {
       setRows([...older, ...DATA]);
       await tick();
 
-      const scrolls = fabric.commands.slice(before);
-      expect(scrolls.map(command => command.commandName)).toEqual(['scrollTo']);
-      // 5 prepended rows of 50pt, added to the 500pt the list was already scrolled to; instant, so
-      // the anchored row does not visibly travel.
-      expect(scrolls[0]?.args).toEqual([0, 750, false]);
+      // The first two cells are the retained initial render, now the new top rows
+      const initialRender = 2;
+      expect(live.texts(live.appRoot()).slice(initialRender)).toEqual(
+        textsBefore.slice(initialRender),
+      );
+      expect(fabric.commands.slice(before)).toEqual([]);
     });
 
-    // why: RN's initialScrollIndex starts the list part-way down, and does it ONCE and instantly —
-    // RN does not animate the initial jump, and re-applying it on every later layout pass would fight
-    // the user for control of the scroll position.
+    // `initialScrollIndex` starts the list part-way down ONCE and instantly, re-applying it on
+    // later layouts would fight the user for the scroll position
     it('jumps to initialScrollIndex once, instantly', async () => {
       mount(ROOT_TAG, () => (
         <VirtualizedList<IRow>
@@ -1531,10 +1454,8 @@ describe('Solid VirtualizedList on the engine', () => {
       ).toHaveLength(1);
     });
 
-    // why: a native scrollTo needs the node's COMMITTED Fabric handle, and this adapter commits on a
-    // microtask — a scroll requested in the same tick as mount has no handle to command and would
-    // silently no-op. RN's own fallback for that window is the ScrollView's `contentOffset` prop, and
-    // a real user scroll then supersedes it, or the prop would keep yanking the list back.
+    // A native `scrollTo` needs the committed handle and this adapter commits on a microtask, so
+    // a scroll in the tick of mount rides `contentOffset` until a real scroll supersedes it
     it('falls back to contentOffset for a scroll requested before the first commit', async () => {
       let list:
         | {
@@ -1568,25 +1489,19 @@ describe('Solid VirtualizedList on the engine', () => {
       fireScroll(120);
       await tick();
 
-      // ABSENT, not null: the literal null was the CLONE PROTOCOL's spelling of "reset to the
-      // default", held only inside the diff the stand-in merged. The engine's op stream says the
-      // same thing with `NO_VALUE`, and a host replaying that op deletes the key.
+      // Absent, not null: the engine's op stream spells "reset to the default" as `NO_VALUE`
       expect(
         Object.hasOwn(committed(SCROLL_VIEW).payload, 'contentOffset'),
         'a real scroll supersedes the commanded offset',
       ).toBe(false);
-      // …and the half that proves the engine ACTED: the record carried the offset after the commanded
-      // write above, so its being gone from the record means a clearing op was sent for it.
+      // The record carried the offset after the commanded write, so its absence means a clear op
       const recorded = fabric.find(node => node.viewName === SCROLL_VIEW);
       expect(Object.hasOwn(recorded?.props ?? {}, 'contentOffset')).toBe(false);
     });
 
-    // why: RN fills a widened window INCREMENTALLY — at most maxToRenderPerBatch new cells per batch,
-    // one batch every updateCellsBatchingPeriod ms — so a big jump costs a cheap first paint and then
-    // catches up, instead of mounting a screenful of cells in one frame and dropping it. Without the
-    // refill timer the window stops at the first throttled step and the rest of the list never
-    // appears at all, which is far worse than the jank the throttle exists to avoid.
-    it('fills a widened window incrementally and keeps going until it reaches the target', async () => {
+    // RN always renders the visible rows and fills the overscan INCREMENTALLY, at most
+    // `maxToRenderPerBatch` new cells per batch, one batch every `updateCellsBatchingPeriod` ms
+    it('fills the overscan incrementally and keeps going until it reaches the target', async () => {
       mount(ROOT_TAG, () => (
         <VirtualizedList<IRow>
           data={DATA}
@@ -1594,16 +1509,13 @@ describe('Solid VirtualizedList on the engine', () => {
           getItemCount={getItemCount}
           getItemLayout={getItemLayout}
           initialNumToRender={2}
-          windowSize={1}
+          windowSize={5}
           maxToRenderPerBatch={2}
           updateCellsBatchingPeriod={10}
           renderItem={info => <text>{info().item.label}</text>}
         />
       ));
-      await tick();
-      // A viewport 12 rows tall: the target window jumps from 2 cells to 12 in one layout.
-      fireLayout(committed(SCROLL_VIEW), ITEM_HEIGHT * 12);
-      await tick();
+      await settleViewport();
 
       expect(committedLabels().has('row-3'), 'one batch was added').toBe(true);
       expect(
@@ -1614,17 +1526,13 @@ describe('Solid VirtualizedList on the engine', () => {
       await new Promise(resolve => setTimeout(resolve, 120));
 
       expect(
-        committedLabels().has('row-11'),
+        committedLabels().has('row-5'),
         'the refill timer carried the window all the way to the target',
       ).toBe(true);
     });
 
-    // why: RN drives every sticky header off ONE scroll AnimatedValue. With the native animated
-    // driver present that value is attached on the UI thread; without it the value has to be fed from
-    // the JS onScroll, and RN raises the scroll-event rate for it (1 native / 16 JS) so a header does
-    // not pin a frame late. A sticky list left on the default event rate looks like the header
-    // stutters. The internal windowing and the app's own onScroll must both still run through the
-    // wrapped handler.
+    // Every sticky header runs off ONE scroll `AnimatedValue` fed from the JS `onScroll`, so RN
+    // raises the event rate (1 native, 16 JS) and both the windowing and the app handler still run
     it('raises the scroll-event rate for sticky headers and still runs both scroll handlers', async () => {
       const onScroll = vi.fn();
       mount(ROOT_TAG, () => (
@@ -1655,14 +1563,8 @@ describe('Solid VirtualizedList on the engine', () => {
     });
   });
 
-  // The Solid-specific half. Every claim here is about WHICH nodes moved, not about what they say —
-  // Solid has no reconciler between what a component returns and the host nodes, so "the cell
-  // updated" and "the cell was not rebuilt in order to update" are independent. None of these could
-  // be RED-first (the shapes they pin are the natural implementation), so each is proven by
-  // MUTATION instead: revert the guard, watch this test fail, restore.
-  // why: RN's recordInteraction() ungates waitForInteraction AND runs the viewability pass right
-  // there, so the app hears about its viewable items immediately — merely flipping the flag would
-  // leave a list that fits its viewport and is never scrolled with no windowing change to carry it.
+  // `recordInteraction()` ungates `waitForInteraction` AND runs the viewability pass right there,
+  // a list that fits its viewport and is never scrolled has no windowing change to carry the report
   it('reports the ungated viewable items as soon as an interaction is recorded', async () => {
     const onViewableItemsChanged = vi.fn();
     let list: { recordInteraction: () => void } | undefined;
@@ -1702,11 +1604,11 @@ describe('Solid VirtualizedList on the engine', () => {
     expect(onViewableItemsChanged).toHaveBeenCalledTimes(1);
   });
 
+  // The Solid-specific half: each claim is about WHICH nodes moved, Solid has no reconciler between
+  // a component and the host nodes, so the shapes are proven by mutation instead of red-first
   describe('Reactivity — updates must be re-props, not rebuilds', () => {
-    // why: renderItem is a render prop, and RN's contract is that a row re-renders when its item
-    // changes. Solid has no reconciler to do that for us, so the info has to cross the boundary as an
-    // ACCESSOR — a snapshot value would freeze the row at its mount-time item — while the CALL stays
-    // untracked, so only the leaf that reads it re-runs and nothing above it is torn down.
+    // A row re-renders when its item changes, so the info crosses as an ACCESSOR while the call
+    // stays untracked, only the leaf that reads it re-runs and nothing above it is torn down
     it('updates a cell in place when the data changes, creating no nodes', async () => {
       const [rows, setRows] = createSignal(DATA);
       mount(ROOT_TAG, () => (
@@ -1739,12 +1641,9 @@ describe('Solid VirtualizedList on the engine', () => {
       ).toBe(createdAtMount);
     });
 
-    // why: the other half of the same rule, and the one the test above cannot see. A renderItem that
-    // reads `info()` at its TOP LEVEL is exactly the shape whose tracked call would put the item
-    // signal in the cell's own `insert` effect; on device that rebuild lands mid-gesture and eats the
-    // native responder grant. Untracked, the top-level read is frozen instead — documented, and what
-    // Solid core's own <Show> does — which is survivable where a rebuild is not. Nothing about what
-    // the screen SAYS separates the two, so the node counter is the whole test.
+    // A `renderItem` reading `info()` at its TOP LEVEL would put the signal in the cell's `insert`
+    // effect and rebuild mid-gesture, untracked the read is frozen instead, as in Solid's `<Show>`
+    // Nothing on screen separates the two, so the node counter is the whole test
     it('never rebuilds a cell whose renderItem reads the info at its top level', async () => {
       const [rows, setRows] = createSignal(DATA);
       mount(ROOT_TAG, () => (
@@ -1776,10 +1675,8 @@ describe('Solid VirtualizedList on the engine', () => {
       expect(committedLabels().has('row-0-v2')).toBe(false);
     });
 
-    // why: a window step is the most frequent thing a list does, and the rows that survive it must
-    // MOVE, not be rebuilt. Keying the row list by position instead of by cell key would reuse row
-    // 0's node for a different item on every scroll step and rebuild its whole renderItem subtree —
-    // invisible in any assertion about what the screen says, which is why this counter is the test.
+    // Rows that survive a window step must MOVE, keyed by position they would be rebuilt on every
+    // scroll step, which no assertion about the screen can see
     it('reuses a cell that survives a window step instead of rebuilding it', async () => {
       mount(ROOT_TAG, () => (
         <VirtualizedList<IRow>
@@ -1807,10 +1704,8 @@ describe('Solid VirtualizedList on the engine', () => {
       ).toBe(1);
     });
 
-    // why: a Solid component body runs ONCE, so a prop read outside an accessor is frozen at its
-    // mount-time value. A single destructure of `props` would leave the list stuck on its initial
-    // config while every other test in this file still passed. The node counter is the other half of
-    // the claim — a later prop change must reach the SAME native node, not a rebuilt one.
+    // A body runs ONCE, so a prop read outside an accessor is frozen at its mount-time value
+    // A later prop change must reach the SAME native node, not a rebuilt one
     it('re-props the same scroll node when a plain prop changes after mount', async () => {
       const [dismiss, setDismiss] = createSignal<'none' | 'on-drag'>('none');
       mount(ROOT_TAG, () => (
@@ -1841,11 +1736,8 @@ describe('Solid VirtualizedList on the engine', () => {
       ).toBe(nodeAtMount);
     });
 
-    // why: the scroll AXIS resolves a different host TAG (on Android horizontal scrolling is its own
-    // ViewManager), and Solid cannot swap a tag under a live node — so the flip has to REBUILD,
-    // exactly as React remounts on an element-type change. The tag difference itself is unreachable
-    // headless (both axes resolve to RCTScrollView under vitest), so the node-creation count is its
-    // only proxy, and the risk the rebuild buys — losing the cells on the way — is asserted with it.
+    // The axis resolves a different host TAG and Solid cannot swap a tag under a live node, so the
+    // flip REBUILDS, both axes are `RCTScrollView` headless so the creation count is the proxy
     it('rebuilds and keeps its cells when the scroll axis flips', async () => {
       const [horizontal, setHorizontal] = createSignal(false);
       mount(ROOT_TAG, () => (
@@ -1870,8 +1762,7 @@ describe('Solid VirtualizedList on the engine', () => {
         totalCreated(),
         'the axis flip must rebuild the host tags',
       ).toBeGreaterThan(createdAtMount);
-      // The row style is the engine's rule (`scroll-content-payload.itest.ts`); what this case is
-      // about is that the flip REBUILT the host tags (above) without losing the cells (below).
+      // The row style is the engine's rule, the flip rebuilt the tags above without losing cells
       expect(committedLabels().has('row-0'), 'the cells survived').toBe(true);
     });
   });
@@ -1901,14 +1792,12 @@ describe('Solid VirtualizedList on the engine', () => {
       expect(() => list?.scrollToIndex({ index: 999 })).toThrow(
         'scrollToIndex out of range: requested index 999 is out of 0 to 19',
       );
-      // And nothing was scrolled: the rejection replaces the clamped command, it does not accompany it.
+      // Nothing was scrolled: the rejection replaces the clamped command, it does not accompany it
       expect(fabric.commands).toEqual([]);
     });
 
-    // why: Fabric has no bare-text host — RCTRawText is only ever valid as a child of a <Text> — so a
-    // renderItem that returns a raw string builds a tree native cannot mount. Failing loudly at mount
-    // is the correct behaviour: the alternative surfaces far deeper in native with an error that
-    // names neither the list nor the row.
+    // Fabric has no bare-text host, `RCTRawText` is only valid inside a `<Text>`, so a raw string
+    // from `renderItem` must fail loudly at mount instead of deep in native
     it('throws when a cell renders a bare string outside a Text', () => {
       expect(() =>
         mount(ROOT_TAG, () => (
@@ -1929,11 +1818,8 @@ describe('Solid VirtualizedList on the engine', () => {
   // Behaviours we could not justify from RN or the React adapter, captured as they are so a later
   // change to them is at least visible. Each carries the open question in a `// QUESTION:` comment.
   describe('Characterization', () => {
-    // QUESTION: RN's extraData exists to bust a PureComponent cell, and React/Vue consume it only as
-    // a render dependency. A Solid cell is a live reactive subtree, so a signal the app reads inside
-    // renderItem already updates its own leaf and extraData has nothing left to do — the same
-    // conclusion adapters/svelte reached. Kept in the surface for RN parity; is there a real app
-    // shape (a closure over a plain mutable object) where this silence would surprise someone?
+    // QUESTION: a Solid cell is a live reactive subtree, so `extraData` has nothing to bust, is
+    // there an app shape (a closure over a plain mutable object) where that silence would surprise
     it('accepts extraData and treats it as a no-op [characterization — behavior not confirmed]', async () => {
       const [extra, setExtra] = createSignal(1);
       mount(ROOT_TAG, () => (

@@ -1,24 +1,30 @@
-// Unit test for the zero-config host bootstrap (see bootstrap.ts's header for why this file
-// stays outside @symbiote-native/components' main barrel). react-native itself is mocked: its
-// real source is Flow syntax Vitest's Rolldown-based transform cannot parse.
-//
-// No Negative group beyond one guarded branch: bootstrapHost itself never throws (it only wires
-// four seams + a debug flag). The one real failure path in this module —
-// defaultNativeViewConfigSource swallowing RN's registry.get() throw for an unregistered name —
-// is covered under its own describe below.
+// Unit test for the zero-config host bootstrap, which stays outside the main barrel of the package
+// react-native is mocked, so the test sees exactly which of its members the bootstrap touches
+// Only one guarded branch can fail: the default view config source swallowing an unknown name
+
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const setColorProcessor = vi.fn();
-const setDeviceEventSource = vi.fn();
 const setNativeViewConfigSource = vi.fn();
 const setImageSourceResolver = vi.fn();
 const setAssetSourceResolver = vi.fn();
-const installBackHandler = vi.fn();
+const setReactNativeHost = vi.fn();
+const setPressabilityLoader = vi.fn();
+const { backHandlerLoaded } = vi.hoisted(() => ({
+  backHandlerLoaded: vi.fn(),
+}));
 
+// No `Image` member: the bootstrap must not reach for the component, it loads React's renderer
 vi.mock('react-native', () => ({
+  UIManager: { measure: vi.fn() },
   processColor: vi.fn(),
-  DeviceEventEmitter: { addListener: vi.fn() },
-  Image: { resolveAssetSource: vi.fn() },
+  get BackHandler() {
+    backHandlerLoaded();
+    return {};
+  },
+}));
+vi.mock('react-native/Libraries/Image/resolveAssetSource', () => ({
+  default: vi.fn(),
 }));
 vi.mock(
   'react-native/Libraries/Renderer/shims/ReactNativeViewConfigRegistry',
@@ -28,16 +34,18 @@ vi.mock(
 );
 vi.mock('@symbiote-native/engine', () => ({
   setColorProcessor,
-  setDeviceEventSource,
   setImageSourceResolver,
   setAssetSourceResolver,
   setNativeViewConfigSource,
-  installBackHandler,
+  setReactNativeHost,
+  setPressabilityLoader,
 }));
 
 const { bootstrapHost } = await import('./index');
-const { processColor, DeviceEventEmitter, Image } =
-  await import('react-native');
+const { processColor } = await import('react-native');
+const { default: resolveAssetSource } =
+  await import('react-native/Libraries/Image/resolveAssetSource');
+const hostWiredAtImport = setReactNativeHost.mock.calls.length;
 const ReactNativeViewConfigRegistry =
   await import('react-native/Libraries/Renderer/shims/ReactNativeViewConfigRegistry');
 
@@ -47,42 +55,42 @@ afterEach(() => {
   delete globalThis.__SYMBIOTE_DEBUG__;
 });
 
+describe('importing the bootstrap module', () => {
+  // `Dimensions.get('window')` at the top of an app file runs before `registerApp` is called
+  it('hands react-native to the engine before any app module can read it', () => {
+    expect(hostWiredAtImport).toBe(1);
+  });
+});
+
 describe('bootstrapHost — explicit overrides (Positive)', () => {
-  // why: a caller supplying its own seams (a non-RN host, or a test harness) must never be routed
-  // through react-native regardless — the whole point of the four seams being overridable.
+  // A caller supplying its own seams must never be routed through react-native
   it('forwards explicit overrides to every seam instead of touching react-native', () => {
     const colorProcessor = (): unknown => 'color';
     const imageSourceResolver = (): unknown => 'image';
-    const deviceEventSource = { addListener: vi.fn() };
     const nativeViewConfigSource = (): undefined => undefined;
 
     bootstrapHost({
       colorProcessor,
       imageSourceResolver,
-      deviceEventSource,
       nativeViewConfigSource,
       debug: true,
     });
 
     expect(setColorProcessor).toHaveBeenCalledWith(colorProcessor);
     expect(setImageSourceResolver).toHaveBeenCalledWith(imageSourceResolver);
-    expect(setDeviceEventSource).toHaveBeenCalledWith(deviceEventSource);
     expect(setNativeViewConfigSource).toHaveBeenCalledWith(
       nativeViewConfigSource,
     );
     expect(processColor).not.toHaveBeenCalled();
-    expect(Image.resolveAssetSource).not.toHaveBeenCalled();
+    expect(resolveAssetSource).not.toHaveBeenCalled();
   });
 
-  // why: `??` (not `||`) is the load-bearing operator on every seam — an explicit `debug: false`
-  // must win over a truthy DEBUG env var, or a caller could never force debug OFF in an
-  // environment that happens to have DEBUG=1 set globally.
+  // `??` and not `||`, so an explicit `debug: false` beats a truthy DEBUG env var
   it('an explicit debug:false is never promoted to the env value', () => {
     vi.stubEnv('DEBUG', '1');
     bootstrapHost({
       colorProcessor: () => undefined,
       imageSourceResolver: () => undefined,
-      deviceEventSource: { addListener: vi.fn() },
       nativeViewConfigSource: () => undefined,
       debug: false,
     });
@@ -91,41 +99,33 @@ describe('bootstrapHost — explicit overrides (Positive)', () => {
 });
 
 describe('bootstrapHost — Android back button (Positive)', () => {
-  // why: Android exits on back only when JS answers `hardwareBackPress`; RN subscribes when
-  // BackHandler.android.js loads, so the host must subscribe at startup — and only after the device
-  // event source exists, or the subscription lands on nothing.
-  it('installs the back handler after wiring the device event source', () => {
-    bootstrapHost({ deviceEventSource: { addListener: vi.fn() } });
+  // Android exits on back only when JS answers `hardwareBackPress`
+  // RN subscribes when `BackHandler.android.js` loads, so the host loads it at startup
+  it("loads RN's BackHandler at startup", () => {
+    bootstrapHost();
 
-    expect(installBackHandler).toHaveBeenCalledTimes(1);
-    expect(installBackHandler.mock.invocationCallOrder[0]).toBeGreaterThan(
-      setDeviceEventSource.mock.invocationCallOrder[0] ?? Infinity,
-    );
+    expect(backHandlerLoaded).toHaveBeenCalledTimes(1);
   });
 });
 
 describe('bootstrapHost — env-driven debug default (Positive)', () => {
-  // why: DEBUG is the documented opt-in toggle (see @symbiote-native/engine's dlog) — omitting
-  // `debug` entirely must read it, not silently default to off.
+  // `DEBUG` is the documented opt-in toggle, so omitting `debug` must read it
   it('turns debug on when DEBUG=1 and no override is given', () => {
     vi.stubEnv('DEBUG', '1');
     bootstrapHost({
       colorProcessor: () => undefined,
       imageSourceResolver: () => undefined,
-      deviceEventSource: { addListener: vi.fn() },
       nativeViewConfigSource: () => undefined,
     });
     expect(globalThis.__SYMBIOTE_DEBUG__).toBe(true);
   });
 
-  // why: the flag is OFF by default (per this repo's keep_logs_gate_behind_DEBUG rule) — any
-  // DEBUG value other than exactly '1' (unset, empty, '0', 'true') must not enable it.
+  // Any value other than exactly '1' (unset, empty, '0', 'true') leaves it off
   it('leaves debug off when DEBUG is unset', () => {
     vi.stubEnv('DEBUG', '');
     bootstrapHost({
       colorProcessor: () => undefined,
       imageSourceResolver: () => undefined,
-      deviceEventSource: { addListener: vi.fn() },
       nativeViewConfigSource: () => undefined,
     });
     expect(globalThis.__SYMBIOTE_DEBUG__).toBe(false);
@@ -133,10 +133,7 @@ describe('bootstrapHost — env-driven debug default (Positive)', () => {
 });
 
 describe("bootstrapHost — zero-config seams (Positive, the module's actual purpose)", () => {
-  // why: this is the whole point of bootstrapHost per its own header ("wired from real
-  // react-native in one call") — proving the DEFAULT seams (no overrides given) really delegate
-  // to RN's processColor / Image.resolveAssetSource / DeviceEventEmitter, not just that some
-  // function got registered.
+  // The default seams must reach RN's own functions, not just register some function
   it('wires the default color processor straight to RN processColor', () => {
     bootstrapHost();
     const registered = setColorProcessor.mock.calls[0][0] as (
@@ -146,25 +143,46 @@ describe("bootstrapHost — zero-config seams (Positive, the module's actual pur
     expect(processColor).toHaveBeenCalledWith('red');
   });
 
-  it('wires the default image source resolver straight to RN Image.resolveAssetSource', () => {
+  it("wires the default image source resolver straight to RN's resolveAssetSource", () => {
     bootstrapHost();
     const registered = setImageSourceResolver.mock.calls[0][0] as (
       value: unknown,
     ) => unknown;
     registered({ uri: 'x.png' });
-    expect(Image.resolveAssetSource).toHaveBeenCalledWith({ uri: 'x.png' });
+    expect(resolveAssetSource).toHaveBeenCalledWith({ uri: 'x.png' });
   });
 
-  it('wires the default device event source straight to RN DeviceEventEmitter', () => {
+  // The engine's `UIManager`, `LogBox` and the rest forward to RN's own module, handed over here
+  it('hands react-native to the engine', () => {
     bootstrapHost();
-    expect(setDeviceEventSource).toHaveBeenCalledWith(DeviceEventEmitter);
+    expect(setReactNativeHost).toHaveBeenCalledWith(
+      expect.objectContaining({ UIManager: expect.anything() }),
+    );
+  });
+
+  it('hands over a loader for RN Pressability instead of the class itself', () => {
+    bootstrapHost();
+
+    expect(setPressabilityLoader).toHaveBeenCalledWith(expect.any(Function));
+  });
+
+  it('hands over an explicit pressabilityLoader', () => {
+    const pressabilityLoader = vi.fn();
+    bootstrapHost({ pressabilityLoader });
+
+    expect(setPressabilityLoader).toHaveBeenCalledWith(pressabilityLoader);
+    expect(pressabilityLoader).not.toHaveBeenCalled();
+  });
+
+  it('hands over an explicit reactNative instead of the module', () => {
+    const reactNative = { UIManager: { measure: vi.fn() } };
+    bootstrapHost({ reactNative });
+    expect(setReactNativeHost).toHaveBeenCalledWith(reactNative);
   });
 });
 
 describe('bootstrapHost — default native-view-config source (Positive / guarded failure)', () => {
-  // why: a registered third-party Fabric view's config must reach the adapter unchanged — this is
-  // the seam <third_party_rn_packages_are_react_only>-adjacent code relies on to derive events for
-  // any RN view manager by name.
+  // A registered third-party Fabric view's config must reach the adapter unchanged
   it('returns whatever the RN registry has for a registered name', () => {
     const config = {
       validAttributes: {},
@@ -179,10 +197,7 @@ describe('bootstrapHost — default native-view-config source (Positive / guarde
     expect(registered('RCTSomeThirdPartyView')).toBe(config);
   });
 
-  // why: RN's registry throws (not returns undefined) for an unknown view name — the default
-  // source must swallow that and answer undefined, or every non-Fabric-registered name (which
-  // includes every one of this package's own built-ins) would crash bootstrap instead of falling
-  // through gracefully.
+  // RN's registry throws for an unknown name, bootstrap must answer undefined instead
   it('swallows the registry throw for an unregistered name and answers undefined', () => {
     vi.mocked(ReactNativeViewConfigRegistry.get).mockImplementationOnce(() => {
       throw new Error('view config not found');

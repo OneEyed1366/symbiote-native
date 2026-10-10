@@ -12,7 +12,25 @@ import type { ISymbioteEvent } from '@symbiote-native/engine';
 type IResponderGate = (event: ISymbioteEvent) => boolean;
 type IResponderHandler = (event: ISymbioteEvent) => void;
 
-export interface IResponderProps {
+export type IResponderProps = {
+  // RN's View touch props, run after the responder and with a `Capture` twin each
+  onTouchStart?: IResponderHandler;
+  onTouchStartCapture?: IResponderHandler;
+  onTouchMove?: IResponderHandler;
+  onTouchMoveCapture?: IResponderHandler;
+  onTouchEnd?: IResponderHandler;
+  onTouchEndCapture?: IResponderHandler;
+  onTouchCancel?: IResponderHandler;
+  onTouchCancelCapture?: IResponderHandler;
+  // The capture twins of the bubbling focus, blur and click events on RN's base ViewConfig
+  onFocusCapture?: IResponderHandler;
+  onBlurCapture?: IResponderHandler;
+  onClickCapture?: IResponderHandler;
+  // Android base ViewConfig (RN 0.84), `nativeEvent` carries key, code and the four modifier flags
+  onKeyDown?: IResponderHandler;
+  onKeyDownCapture?: IResponderHandler;
+  onKeyUp?: IResponderHandler;
+  onKeyUpCapture?: IResponderHandler;
   onStartShouldSetResponder?: IResponderGate;
   onStartShouldSetResponderCapture?: IResponderGate;
   onMoveShouldSetResponder?: IResponderGate;
@@ -25,4 +43,4 @@ export interface IResponderProps {
   onResponderRelease?: IResponderHandler;
   onResponderTerminate?: IResponderHandler;
   onResponderTerminationRequest?: IResponderGate;
-}
+};

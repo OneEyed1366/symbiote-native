@@ -7,10 +7,8 @@
 // almost entirely Solid's, incidental to component tests, and every other adapter's assertions pass
 // `accessibilityLabel` in its already-canonical form — so they never exercise the fold at all.
 //
-// That is the "shared infrastructure exercised elsewhere" shape where elsewhere is nowhere, and it
-// matters here more than usual: the fold carries two rules that point in OPPOSITE directions (see
-// the precedence blocks below), which is exactly the kind of thing a reimplementation gets wrong
-// while every component test stays green.
+// That is the "shared infrastructure exercised elsewhere" shape where elsewhere is nowhere, so a
+// reimplementation can get the precedence wrong while every component test stays green
 import { describe, expect, it } from 'vitest';
 import {
   resolveAccessibilityProps,
@@ -52,15 +50,20 @@ describe('resolveAccessibilityProps: simple aliases', () => {
 });
 
 describe('resolveAccessibilityProps: transformed values', () => {
-  it('maps a web role onto its RN spelling', () => {
-    expect(fold({ role: 'heading' }).accessibilityRole).toBe('header');
-    expect(fold({ role: 'img' }).accessibilityRole).toBe('image');
-    expect(fold({ role: 'presentation' }).accessibilityRole).toBe('none');
-    expect(fold({ role: 'slider' }).accessibilityRole).toBe('adjustable');
+  // RN 0.86's View.js never touches `role`: native reads it next to `accessibilityRole`
+  it('leaves role to native and returns the input untouched', () => {
+    const input = { role: 'heading' } as const;
+
+    expect(fold(input)).toBe(input);
+    expect(fold(input).accessibilityRole).toBeUndefined();
   });
 
-  it('passes a role with no mapping straight through', () => {
-    expect(fold({ role: 'button' }).accessibilityRole).toBe('button');
+  it('keeps role beside an alias that does fold', () => {
+    const out = fold({ role: 'img', 'aria-label': 'Logo' });
+
+    expect(out.role).toBe('img');
+    expect(out.accessibilityLabel).toBe('Logo');
+    expect(out.accessibilityRole).toBeUndefined();
   });
 
   // COMMA, not whitespace — and this is the one that reads wrong to anyone who knows the HTML
@@ -99,37 +102,65 @@ describe('resolveAccessibilityProps: aria-hidden fans out to two keys', () => {
   });
 });
 
-// THE FIRST OF TWO OPPOSING RULES: for every scalar, the explicit prop wins and the alias only
-// fills a hole.
-describe('resolveAccessibilityProps: an explicit prop beats its alias', () => {
-  it('keeps accessibilityLabel over aria-label', () => {
+// For every scalar the alias is written after the explicit prop, so it wins (`View.js` assigns
+// `processedProps.accessibilityLabel = ariaLabel` over the spread `otherProps`)
+describe('resolveAccessibilityProps: an alias beats its explicit prop', () => {
+  it('lets aria-label override accessibilityLabel', () => {
     const out = fold({ accessibilityLabel: 'explicit', 'aria-label': 'alias' });
 
-    expect(out.accessibilityLabel).toBe('explicit');
+    expect(out.accessibilityLabel).toBe('alias');
   });
 
-  it('keeps accessibilityRole over role', () => {
+  // The pair reaches native as two props, `accessibilityRole` is not rewritten by `role`
+  it('does not let role rewrite accessibilityRole', () => {
     const out = fold({ accessibilityRole: 'button', role: 'heading' });
 
     expect(out.accessibilityRole).toBe('button');
+    expect(out.role).toBe('heading');
   });
 
-  it('guards the two aria-hidden outputs independently', () => {
+  it('lets aria-hidden override both hide flags', () => {
     const out = fold({
       'aria-hidden': true,
+      accessibilityElementsHidden: false,
       importantForAccessibility: 'yes',
     });
 
-    // The unguarded half still lands; only the explicitly-set half is preserved.
     expect(out.accessibilityElementsHidden).toBe(true);
+    expect(out.importantForAccessibility).toBe('no-hide-descendants');
+  });
+
+  it('keeps an explicit importantForAccessibility for aria-hidden false', () => {
+    const out = fold({
+      'aria-hidden': false,
+      importantForAccessibility: 'yes',
+    });
+
+    expect(out.accessibilityElementsHidden).toBe(false);
     expect(out.importantForAccessibility).toBe('yes');
+  });
+
+  it('lets aria-live override accessibilityLiveRegion', () => {
+    const out = fold({
+      accessibilityLiveRegion: 'assertive',
+      'aria-live': 'off',
+    });
+
+    expect(out.accessibilityLiveRegion).toBe('none');
+  });
+
+  it('lets aria-labelledby override accessibilityLabelledBy', () => {
+    const out = fold({
+      accessibilityLabelledBy: 'old',
+      'aria-labelledby': 'a, b',
+    });
+
+    expect(out.accessibilityLabelledBy).toEqual(['a', 'b']);
   });
 });
 
-// THE SECOND, OPPOSITE RULE, and the reason this file exists. Inside the composites the polarity
-// INVERTS: the aria value wins per field (`ariaBusy ?? existingState?.busy`). One function, two
-// contradictory precedence rules — copy the scalar rule into the composite "by analogy" and every
-// component test stays green.
+// Inside the composites the alias also wins, but per field (`ariaBusy ?? existingState?.busy`), so
+// a field with no alias keeps the existing value
 describe('resolveAccessibilityProps: inside a composite the ALIAS wins', () => {
   it('lets aria-checked override an existing accessibilityState field', () => {
     const out = fold({
@@ -222,12 +253,10 @@ describe('resolveAccessibilityProps: idempotence', () => {
       'aria-valuetext': 't',
     });
 
-    // Present-but-undefined is fine — `setProp` and `fabricProps` both treat that as absent. What
-    // must not survive is a VALUE. Read through a Record view rather than a cast: the keys are
-    // dynamic, so there is no key type to narrow to.
+    // Undefined counts as absent for `setProp`, only a value must not survive
     const bag: Record<string, unknown> = { ...out };
     for (const key of Object.keys(bag)) {
-      if (key !== 'role' && !key.startsWith('aria-')) continue;
+      if (!key.startsWith('aria-')) continue;
       expect(bag[key], `${key} still carries a value`).toBeUndefined();
     }
   });

@@ -2,7 +2,7 @@
 // rootTag (via AppRegistry.registerRunnable); we create a surface for it and let
 // the reconciler drive shared, which commits into nativeFabricUIManager.
 
-import type { ReactNode } from 'react';
+import { createElement, type ReactNode } from 'react';
 import {
   createSurface,
   disposeRoot,
@@ -14,6 +14,7 @@ import {
 } from '@symbiote-native/engine';
 import reconciler, { flushExternalUpdate } from './host-config';
 import { ConcurrentRoot } from './reconciler-constants';
+import { RootTagContext } from './root-tag-context';
 
 const noop = (): void => {};
 
@@ -122,7 +123,12 @@ export function mount(rootTag: IRootTag, element: ReactNode): SymbioteSurface {
 
   // react-reconciler 0.33 renamed updateContainer/flushSync; @types 0.32 still has the old names.
   // @ts-expect-error updateContainerSync exists at runtime in react-reconciler 0.33
-  reconciler.updateContainerSync(element, container, null, noop);
+  reconciler.updateContainerSync(
+    createElement(RootTagContext.Provider, { value: rootTag }, element),
+    container,
+    null,
+    noop,
+  );
   // @ts-expect-error flushSyncWork exists at runtime in react-reconciler 0.33
   reconciler.flushSyncWork();
 

@@ -13,6 +13,7 @@
 <script lang="ts" generics="ItemT">
   import {
     SINGLE_COLUMN,
+    arrayLikeLength,
     chunkIntoRows,
     expandRowViewability,
     firstItemOfRow,
@@ -30,6 +31,7 @@
     type ISymbioteNode,
   } from '@symbiote-native/engine';
   import VirtualizedList from '../virtualized-list/index.svelte';
+  import { itemComponentOf } from '../virtualized-list/list-props';
   import { pickAccessibilityProps } from '../virtualized-list/virtualized-list-props';
   import type {
     IVirtualizedListHandle,
@@ -61,7 +63,7 @@
     return props.data[index];
   }
   function getSingleCount(): number {
-    return props.data.length;
+    return arrayLikeLength(props.data);
   }
   function getRow(_source: unknown, index: number): IRow<ItemT> {
     return rows[index];
@@ -76,13 +78,14 @@
     );
   }
 
+  function wrapperStyleOf(style: typeof props.columnWrapperStyle) {
+    if (typeof style === 'string') return resolveClassName(style);
+    return isStyleLike(style) ? style : undefined;
+  }
+
   const rowStyle = $derived.by(() => [
     { flexDirection: 'row' as const },
-    typeof props.columnWrapperStyle === 'string'
-      ? resolveClassName(props.columnWrapperStyle)
-      : isStyleLike(props.columnWrapperStyle)
-        ? props.columnWrapperStyle
-        : undefined,
+    wrapperStyleOf(props.columnWrapperStyle),
   ]);
 
   // The divider between rows shows real items (last of the row above, first of the row below), so
@@ -97,8 +100,8 @@
     };
   }
 
-  const rowKeyForRow = $derived(
-    (row: IRow<ItemT>): string => rowKeyExtractor(row, props.keyExtractor),
+  const rowKeyForRow = $derived((row: IRow<ItemT>): string =>
+    rowKeyExtractor(row, props.keyExtractor),
   );
 
   const rowOnViewableItemsChanged = $derived.by(() => {
@@ -154,7 +157,7 @@
   export function flashScrollIndicators(): void {
     inner?.flashScrollIndicators();
   }
-  export function getNativeScrollRef(): IScrollViewHandle | null {
+  export function getNativeScrollRef(): ISymbioteNode | null {
     return inner?.getNativeScrollRef() ?? null;
   }
   export function getScrollableNode(): IScrollViewHandle | null {
@@ -166,8 +169,14 @@
   export function getScrollNode(): ISymbioteNode | null {
     return inner?.getScrollNode() ?? null;
   }
+  export function getScrollRef(): ISymbioteNode | null {
+    return inner?.getScrollRef() ?? null;
+  }
   export function recordInteraction(): void {
     inner?.recordInteraction();
+  }
+  export function setNativeProps(props: Record<string, unknown>): void {
+    inner?.setNativeProps(props);
   }
 
   // `{@attach}` arrives as a symbol-keyed prop, which naming individual props below drops.
@@ -186,12 +195,18 @@
 })}
   <view p={{ style: rowStyle }}>
     {#each row.items as rowItem, column (props.keyExtractor ? props.keyExtractor(rowItem, row.startIndex + column) : String(row.startIndex + column))}
+      {@const info = {
+        item: rowItem,
+        index: row.startIndex + column,
+        separators,
+      }}
+      {@const ListItem = itemComponentOf(props)}
       <view p={{ style: { flex: 1 } }}>
-        {@render props.item({
-          item: rowItem,
-          index: row.startIndex + column,
-          separators,
-        })}
+        {#if ListItem}
+          <ListItem {...info} />
+        {:else}
+          {@render props.item?.(info)}
+        {/if}
       </view>
     {/each}
   </view>
@@ -210,7 +225,9 @@
     getItem={getSingleItem}
     getItemCount={getSingleCount}
     item={props.item}
+    listItemComponent={props.listItemComponent}
     separator={props.separator}
+    cellRenderer={props.cellRenderer}
     header={props.header}
     footer={props.footer}
     empty={props.empty}
@@ -235,9 +252,11 @@
     maxToRenderPerBatch={props.maxToRenderPerBatch}
     updateCellsBatchingPeriod={props.updateCellsBatchingPeriod}
     windowSize={props.windowSize}
+    disableVirtualization={props.disableVirtualization}
     stickyHeaderIndices={props.stickyHeaderIndices}
     maintainVisibleContentPosition={props.maintainVisibleContentPosition}
     onScroll={props.onScroll}
+    onContentSizeChange={props.onContentSizeChange}
     onScrollBeginDrag={props.onScrollBeginDrag}
     onScrollEndDrag={props.onScrollEndDrag}
     onMomentumScrollBegin={props.onMomentumScrollBegin}
@@ -247,8 +266,12 @@
     keyboardDismissMode={props.keyboardDismissMode}
     {removeClippedSubviews}
     nestedScrollEnabled={props.nestedScrollEnabled}
+    stickyHeaderHiddenOnScroll={props.stickyHeaderHiddenOnScroll}
+    innerViewRef={props.innerViewRef}
     style={props.style}
     contentContainerStyle={props.contentContainerStyle}
+    listHeaderComponentStyle={props.listHeaderComponentStyle}
+    listFooterComponentStyle={props.listFooterComponentStyle}
     class={props.class}
   />
 {:else}
@@ -261,6 +284,7 @@
     getItemCount={getRowCount}
     item={rowItem}
     separator={props.separator ? rowSeparator : undefined}
+    cellRenderer={props.cellRenderer}
     header={props.header}
     footer={props.footer}
     empty={props.empty}
@@ -285,9 +309,11 @@
     maxToRenderPerBatch={props.maxToRenderPerBatch}
     updateCellsBatchingPeriod={props.updateCellsBatchingPeriod}
     windowSize={props.windowSize}
+    disableVirtualization={props.disableVirtualization}
     stickyHeaderIndices={props.stickyHeaderIndices}
     maintainVisibleContentPosition={props.maintainVisibleContentPosition}
     onScroll={props.onScroll}
+    onContentSizeChange={props.onContentSizeChange}
     onScrollBeginDrag={props.onScrollBeginDrag}
     onScrollEndDrag={props.onScrollEndDrag}
     onMomentumScrollBegin={props.onMomentumScrollBegin}
@@ -297,8 +323,12 @@
     keyboardDismissMode={props.keyboardDismissMode}
     {removeClippedSubviews}
     nestedScrollEnabled={props.nestedScrollEnabled}
+    stickyHeaderHiddenOnScroll={props.stickyHeaderHiddenOnScroll}
+    innerViewRef={props.innerViewRef}
     style={props.style}
     contentContainerStyle={props.contentContainerStyle}
+    listHeaderComponentStyle={props.listHeaderComponentStyle}
+    listFooterComponentStyle={props.listFooterComponentStyle}
     class={props.class}
   />
 {/if}

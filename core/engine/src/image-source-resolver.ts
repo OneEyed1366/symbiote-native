@@ -24,6 +24,12 @@ export type IImageSource = {
   scale?: number;
   width?: number;
   height?: number;
+  // iOS asset bundle the image is in, defaults to the main bundle
+  bundle?: string;
+  method?: string;
+  headers?: Record<string, string>;
+  body?: string;
+  cache?: 'default' | 'reload' | 'force-cache' | 'only-if-cached';
 };
 
 export type IImageSourceProp = IImageSource | IImageSource[] | number;

@@ -51,6 +51,7 @@ export {
 
 export {
   hasListenerFor,
+  hasTouchPropListeners,
   listenerFor,
   setBehaviorListener,
   setEventListener,

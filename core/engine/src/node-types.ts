@@ -32,7 +32,7 @@ export const VOID_COMPONENT = '#void';
 // answers `undefined` for its parent. JS-side name only, т.к. what goes over the wire is `RCTView`
 export const SURFACE_COMPONENT = '#surface';
 
-export interface ISymbioteEvent {
+export type ISymbioteEvent = {
   type: string;
   // `target` is the node the gesture started on, `currentTarget` the node whose listener is running
   // right now as the event bubbles toward the root
@@ -40,7 +40,7 @@ export interface ISymbioteEvent {
   currentTarget: ISymbioteNode;
   nativeEvent: Record<string, unknown>;
   stopPropagation: () => void;
-}
+};
 
 // Returns `unknown`, not `void`: the responder negotiation reads a boolean back from
 // `onStartShouldSetResponder` / `onResponderTerminationRequest`, and the other two dispatch paths
@@ -75,7 +75,7 @@ export function isSymbioteEvent(value: unknown): value is ISymbioteEvent {
 // `class`/`className` and `style` can be set independently and out of order, and `setProp`
 // overwrites with no merge. Both halves are kept per node so `flattenStyle`'s later-wins collapse
 // resolves with `style` winning
-export interface IClassStyleParts {
+export type IClassStyleParts = {
   classStyle: unknown;
   explicitStyle: unknown;
 
@@ -101,9 +101,9 @@ export interface IClassStyleParts {
   // The array `pushClassStyle` last published, kept here т.к. `isAlreadyPublished` runs on every
   // class and style write. `setNativeProps` clears it, which is what keeps the restore path alive
   published: readonly unknown[] | undefined;
-}
+};
 
-export interface ISymbioteNode {
+export type ISymbioteNode = {
   readonly [BRAND]: true;
   // Fabric view name passed to `createNode`. NOT readonly: only `setNodeComponent` may write it,
   // т.к. a primitive whose native view depends on a prop (TextInput's `multiline`) must change
@@ -189,7 +189,29 @@ export interface ISymbioteNode {
   scrollTo(options?: { x?: number; y?: number; animated?: boolean }): void;
   scrollToEnd(options?: { animated?: boolean }): void;
   flashScrollIndicators(): void;
-}
+  // The rest of RN's ScrollView ref surface (`ScrollView.js:856-1021`). The node is its own
+  // responder and native ref, and the inner view is the content node a tag builds
+  getScrollResponder(): ISymbioteNode;
+  getScrollableNode(): ISymbioteNode;
+  getNativeScrollRef(): ISymbioteNode;
+  getInnerViewRef(): ISymbioteNode | undefined;
+  getInnerViewNode(): ISymbioteNode | undefined;
+  scrollResponderZoomTo(
+    rect: {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      animated?: boolean;
+    },
+    animated?: boolean,
+  ): void;
+  scrollResponderScrollNativeHandleToKeyboard(
+    target: ISymbioteNode | number,
+    additionalOffset?: number,
+    preventNegativeScrollOffset?: boolean,
+  ): void;
+};
 
 // `instanceHandle` round-trips through Fabric unchanged and comes back as the event target, so our
 // nodes are branded and the handler can confirm one is ours

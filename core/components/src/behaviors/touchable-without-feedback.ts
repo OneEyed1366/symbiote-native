@@ -49,9 +49,13 @@ import {
   propOf,
 } from '@symbiote-native/engine';
 
+import { resolveButtonDisabled } from '../view/render-button';
 import {
+  asAccessibilityState,
   attachPressMachine,
+  booleanOr,
   detachPressMachine,
+  type IDisabledResolver,
   type IPressConfigRefinement,
 } from './pressable';
 import {
@@ -93,11 +97,11 @@ const PRESS_LISTENERS: readonly string[] = [
 
 // The press-scheduling cell, keyed on the OWNER — the node that holds the props and outlives a
 // child swap. The machine itself lives on the child.
-interface ITimingState {
+type ITimingState = {
   readonly runtime: ITouchableFeedbackRuntime;
-  // A deferred press-out outlives the tree that armed it, so `detach` has to cancel them.
+  // A deferred press-out outlives the tree that armed it, so `detach` has to cancel them
   readonly timers: Set<ReturnType<typeof setTimeout>>;
-}
+};
 
 const states = new WeakMap<ISymbioteNode, ITimingState>();
 
@@ -169,6 +173,17 @@ function refinementFor(owner: ISymbioteNode): IPressConfigRefinement {
   };
 }
 
+// :172 `disabled !== null ? disabled : (aria-disabled ?? state)`: aria and state count only for a
+// null `disabled`, a missing one ignores them
+const disabledWhenNull: IDisabledResolver = props =>
+  props.disabled === null
+    ? resolveButtonDisabled(
+        undefined,
+        booleanOr(props['aria-disabled']),
+        asAccessibilityState(props.accessibilityState),
+      )
+    : booleanOr(props.disabled);
+
 // The app's callback, read at dispatch time so a fresh closure per render costs nothing.
 function trampolineFor(owner: ISymbioteNode, name: string) {
   return (event: ISymbioteEvent): void => {
@@ -197,6 +212,7 @@ function arm(owner: ISymbioteNode, child: ISymbioteNode): void {
   attachPressMachine(child, {
     source: owner,
     refine: refinementFor(owner),
+    disabledOf: disabledWhenNull,
   });
   for (const name of FORWARDED_LISTENERS) {
     forwardListener(

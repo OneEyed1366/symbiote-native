@@ -26,7 +26,7 @@
 //      React's table and therefore already accepts `<div>`, so re-exporting keeps that exactly as
 //      it is rather than regressing it. Closing the DOM tags is its own task.
 import type { ICrossTypedIntrinsics } from '@symbiote-native/components';
-import type { Key } from 'react';
+import type { JSX as ReactJsx, Key } from 'react';
 import type { IViewProps, ITextProps } from './components';
 import type { IPressableProps } from './components/pressable/pressable-props';
 import type { IButtonProps } from './components/button-props';
@@ -53,17 +53,17 @@ export { Fragment, jsx, jsxs } from 'react/jsx-runtime';
 // The loose host boundary for every tag without a dedicated prop type (`sticky-header`,
 // `horizontal-scroll-view`, ...). Its index signature already accepts `key` and any other name;
 // IWithKey below exists because a closed, crossed type doesn't get that for free.
-interface IHostProps {
+type IHostProps = {
   style?: unknown;
   children?: import('react').ReactNode;
   [key: string]: unknown;
-}
+};
 
 // Every tag with a real, non-generic prop type - mirrors Vue's/Solid's/Svelte's
 // `ICrossedPrimitiveProps` (`ICrossTypedIntrinsics`, `@symbiote-native/components`).
 // `FlatList`/`SectionList`/`VirtualizedList`/`KeyboardAvoidingView` are absent: composed from
 // several intrinsics, never a single tag an app writes.
-export interface ICrossedPrimitiveProps {
+export type ICrossedPrimitiveProps = {
   view: IViewProps;
   text: ITextProps;
   pressable: IPressableProps;
@@ -83,7 +83,7 @@ export interface ICrossedPrimitiveProps {
   'text-input': ITextInputProps;
   modal: IModalProps;
   'activity-indicator': IActivityIndicatorProps;
-}
+};
 
 // TypeScript only auto-merges `JSX.IntrinsicAttributes` (the `key` field) into a value-based
 // element's props, not into a crossed intrinsic - verified directly: a component under this same
@@ -94,27 +94,24 @@ type IWithKey<Props> = Props & { key?: Key | null };
 // The member names are TypeScript's own — the compiler looks each up by exact name — so the repo's
 // `I`-prefix convention cannot apply inside this namespace.
 /* eslint-disable @typescript-eslint/no-namespace */
-export namespace JSX {
-  export type ElementType = import('react').JSX.ElementType;
-  export type Element = import('react').JSX.Element;
-  export type ElementClass = import('react').JSX.ElementClass;
-  export type ElementAttributesProperty =
-    import('react').JSX.ElementAttributesProperty;
-  export type ElementChildrenAttribute =
-    import('react').JSX.ElementChildrenAttribute;
+export declare namespace JSX {
+  export type ElementType = ReactJsx.ElementType;
+  export type Element = ReactJsx.Element;
+  export type ElementClass = ReactJsx.ElementClass;
+  export type ElementAttributesProperty = ReactJsx.ElementAttributesProperty;
+  export type ElementChildrenAttribute = ReactJsx.ElementChildrenAttribute;
   export type LibraryManagedAttributes<C, P> =
-    import('react').JSX.LibraryManagedAttributes<C, P>;
-  export type IntrinsicAttributes = import('react').JSX.IntrinsicAttributes;
+    ReactJsx.LibraryManagedAttributes<C, P>;
+  export type IntrinsicAttributes = ReactJsx.IntrinsicAttributes;
   export type IntrinsicClassAttributes<T> =
-    import('react').JSX.IntrinsicClassAttributes<T>;
+    ReactJsx.IntrinsicClassAttributes<T>;
 
   // DERIVED from the intrinsic union rather than retyped, so a new host tag becomes valid JSX in
   // the commit that registers its Fabric name.
-  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-  export interface IntrinsicElements extends ICrossTypedIntrinsics<
+  export type IntrinsicElements = ICrossTypedIntrinsics<
     IHostProps,
     { [K in keyof ICrossedPrimitiveProps]: IWithKey<ICrossedPrimitiveProps[K]> }
-  > {}
+  >;
 }
 /* eslint-enable @typescript-eslint/no-namespace */
 

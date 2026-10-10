@@ -8,16 +8,15 @@ import { dlog } from '@symbiote-native/engine';
 import type { IAccessibilityStateValue } from '../../accessibility-props';
 import type { IPressHandlers } from '../../state/pressable';
 
-// RN merges `disabled` into the resolved accessibilityState so a disabled Pressable reports the
-// disabled state even if the caller passed none (Pressable.js: disabled != null ? {...state,
-// disabled} : state). Untouched when disabled is unset.
+// A disabled Pressable reports the disabled state even when the caller passed none (Pressable.js),
+// untouched while `disabled` is unset
 export function resolveDisabledAccessibilityState(
   accessibilityState: IAccessibilityStateValue | undefined,
   disabled: boolean | undefined,
 ): IAccessibilityStateValue | undefined {
-  return disabled !== undefined
-    ? { ...accessibilityState, disabled }
-    : accessibilityState;
+  return disabled === undefined
+    ? accessibilityState
+    : { ...accessibilityState, disabled };
 }
 
 // RN computes `focusable` in all five touchables; without it a DISABLED control stays focusable —
@@ -78,10 +77,8 @@ export function isTerminationAllowed(cancelable: boolean | undefined): boolean {
   return cancelable !== false;
 }
 
-// The listeners the responder View carries. When disabled, leave them off entirely - see
-// shouldSuppressPress. onResponderTerminationRequest itself is only attached when cancelable is
-// set at all, so an unset cancelable leaves RN's native default in charge rather than this
-// listener asserting one.
+// The listeners the responder View carries, none when disabled. The termination request is attached
+// only for a set `cancelable`, so an unset one leaves RN's native default in charge
 export function buildPressableListeners(
   handlers: IPressHandlers,
   options: {
@@ -96,6 +93,7 @@ export function buildPressableListeners(
   }
   const listeners: Record<string, unknown> = {
     onPress: handlers.handlePress,
+    onClick: handlers.handleClick,
     onPressIn: handlers.handlePressIn,
     onPressOut: handlers.handlePressOut,
     onStartShouldSetResponder: () => shouldClaimResponder(options.disabled),

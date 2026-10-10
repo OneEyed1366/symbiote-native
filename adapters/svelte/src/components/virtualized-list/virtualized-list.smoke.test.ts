@@ -205,18 +205,11 @@ async function loadMountableWithHandle(): Promise<Component> {
   return mod.default as Component;
 }
 
-// No Negative group: virtualized-list-props.ts is a permissive bag (every field but
-// data/getItem/getItemCount/item optional) with no runtime guard/throw path. The windowing STATE
-// machine (reduceList, buildListPlan, computeWindow) is core logic covered by
-// core/components/src/state/virtualized-list.test.ts and virtualized-list-reducer.test.ts; this
-// file's job is proving the Svelte WIRING: the reducer's effects actually reach the committed
-// Fabric tree and a real native command.
+// No Negative group, the props bag has no throw path
+// The windowing logic is covered in core, this file proves the Svelte wiring reaches the tree
 describe('VirtualizedList (real compiled index.svelte)', () => {
   describe('Positive', () => {
-    // why: proves the reducer's "before viewport known" branch (computeWindow's bounded-prefix
-    // path) actually reaches the committed tree as a small deterministic slice, not the whole
-    // 100-item list — this is the entire point of virtualization: unbounded data must not mean
-    // unbounded native views.
+    // Before the viewport is known the reducer commits a bounded prefix, not the whole list
     it('renders only the windowed slice of a large data set, not every item', async () => {
       const ListRoot = await loadMountable();
       const data = Array.from(
@@ -268,10 +261,7 @@ describe('VirtualizedList (real compiled index.svelte)', () => {
       expect(scrollView).toBeDefined();
       if (scrollView === undefined) return;
 
-      // Report a real viewport: computeWindow can now size a window off real geometry instead of the
-      // pre-layout bounded prefix. Every rendered cell has length 0 (nothing measured yet, no
-      // getItemLayout), so the window covers the WHOLE unmeasured content in one pass — still a
-      // proof the windowing math is live and reactive to a real event, not that it never changes.
+      // Unmeasured cells have length 0, so a real viewport covers the whole content in one pass
       fabric.fireEvent(scrollView.instanceHandle, 'topLayout', {
         layout: { width: 300, height: 600 },
       });
@@ -333,8 +323,7 @@ describe('VirtualizedList (real compiled index.svelte)', () => {
       ).toBeDefined();
       expect(scrollView?.viewName).toBe('RCTScrollView');
 
-      // Gap 2: onRefresh/refreshing produce a REAL refresh-control (PullToRefreshView) as a sibling
-      // of the content container inside the scroll view (iOS sibling attachment) — not an inert prop.
+      // Gap 2: `onRefresh` paints a real `PullToRefreshView` beside the content container
       const refresh = live.findLive(
         live.appRoot(),
         node => node.viewName === 'PullToRefreshView',
@@ -349,11 +338,7 @@ describe('VirtualizedList (real compiled index.svelte)', () => {
       ).toBe(true);
     });
 
-    // This file walks an indexable `plan.cells` list, so it MARKS a flagged cell by giving it the
-    // `sticky-header` tag rather than forwarding an index. Proves the wiring end to end: the cell
-    // paints through the engine's sticky behavior (real zIndex/collapsable), not as an inert prop
-    // on the native scroll view, which honors `stickyHeaderIndices` only by numbering its own paint
-    // children — a numbering a windowed list cannot supply, which is why the tag exists.
+    // A flagged cell gets the `sticky-header` tag, a windowed list has no paint indices
     it('marks a stickyHeaderIndices-flagged windowed cell with the sticky-header tag', async () => {
       compileVirtualizedList();
       compileToFile(
@@ -382,12 +367,7 @@ describe('VirtualizedList (real compiled index.svelte)', () => {
       await tick();
       await tick();
 
-      // THE TAG the engine was told, which is this case's own claim said directly. It used to look
-      // for `payload.zIndex === 10` and `collapsable === false` — both are a tag rule in
-      // `SymbioteFabricProps.cpp` now, and this harness builds payloads through the TypeScript
-      // `fabricProps`, which carries no copy of the tag rules. What the pin PAINTS is pinned in
-      // `core/engine/cpp/tests/js/sticky-header-payload.itest.ts`; what belongs here is that the
-      // windowed cell reached the behavior at all.
+      // Only the tag is checked, what the pin paints is `sticky-header-payload.itest.ts`'s
       const stickyHost = fabric.find(
         node => node.tagName === STICKY_HEADER_TAG,
       );
@@ -397,17 +377,8 @@ describe('VirtualizedList (real compiled index.svelte)', () => {
       ).toBeDefined();
     });
 
-    // why: the exported imperative surface (scrollToOffset, scrollToIndex, scrollToItem,
-    // scrollToEnd, flashScrollIndicators, getNativeScrollRef/getScrollableNode/getScrollResponder/
-    // getScrollNode, recordInteraction) had ZERO coverage before this test — every method is thin
-    // Svelte-side wiring (dispatch -> reducer effect -> scrollHandle call), not core reducer logic,
-    // so it belongs here. scrollToOffset is the representative case: it exercises the FULL chain
-    // (export -> dispatch({kind:'scroll-to-offset'}) -> reduceList's 'scroll-to' effect ->
-    // scrollToPixel -> scrollHandle.scrollTo -> a real dispatchViewCommand). The remaining
-    // imperative exports are structurally identical thin delegations through the SAME dispatch/
-    // scrollHandle wiring this test already exercises (getNativeScrollRef/getScrollableNode/
-    // getScrollResponder/getScrollNode are direct field reads with no branch of their own) — closed
-    // N/A on that basis rather than duplicated one-by-one.
+    // `scrollToOffset` stands for the exports: dispatch, reducer effect, `scrollHandle`, command
+    // The others are thin delegations through the same wiring
     it('dispatches a real scrollTo command through the exported scrollToOffset handle', async () => {
       const ListRoot = await loadMountableWithHandle();
       const data = Array.from(
@@ -436,9 +407,33 @@ describe('VirtualizedList (real compiled index.svelte)', () => {
       expect(fabric.commands[0]?.viewName).toBe('RCTScrollView');
     });
 
-    // why: WHERE a separator sits is geometry. RN renders it INSIDE the cell's own measuring
-    // wrapper (VirtualizedListCellRenderer.js:218-221) — as a SIBLING it would be an extra flex
-    // child. Counting dividers can't see this; the assertion asks which node CONTAINS one.
+    it('answers a scrolling node from the exported getScrollRef', async () => {
+      const ListRoot = await loadMountableWithHandle();
+      mount(ROOT_TAG, ListRoot, { data: ['item-0', 'item-1'] });
+      await tick();
+      await tick();
+
+      const handle = (globalThis as { __listHandle?: Record<string, unknown> })
+        .__listHandle;
+      const getScrollRef = handle?.getScrollRef as
+        (() => { scrollTo?: unknown } | null) | undefined;
+      expect(typeof getScrollRef).toBe('function');
+      expect(typeof getScrollRef?.()?.scrollTo).toBe('function');
+    });
+
+    it('exports setNativeProps as a function, like the shared list handle', async () => {
+      const ListRoot = await loadMountableWithHandle();
+      mount(ROOT_TAG, ListRoot, { data: ['item-0'] });
+      await tick();
+      await tick();
+
+      const handle = (globalThis as { __listHandle?: Record<string, unknown> })
+        .__listHandle;
+      expect(typeof handle?.setNativeProps).toBe('function');
+    });
+
+    // RN paints the separator inside the cell's measuring wrapper, a sibling would be an extra flex
+    // child, so the assertion asks which node contains one
     it('renders the separator inside its cell rather than beside it', async () => {
       mount(ROOT_TAG, await loadMountableWithSeparator(20, 1));
       await tick();

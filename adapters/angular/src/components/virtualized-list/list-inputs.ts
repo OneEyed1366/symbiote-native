@@ -8,12 +8,16 @@ import {
   Input,
   Output,
   TemplateRef,
+  type Type,
 } from '@angular/core';
 import {
   DEFAULT_INITIAL_NUM_TO_RENDER,
   DEFAULT_MAX_TO_RENDER_PER_BATCH,
   DEFAULT_UPDATE_CELLS_BATCHING_PERIOD,
   DEFAULT_WINDOW_SIZE,
+  ITEM_RENDERER,
+  pickItemRenderer,
+  type IInnerViewRef,
   type IViewabilityConfig,
   type IViewabilityConfigCallbackPair,
   type IViewableItemsChangedInfo,
@@ -24,11 +28,13 @@ import type {
   IViewStyle,
 } from '@symbiote-native/engine';
 import {
+  VListCellDirective,
   VListEmptyDirective,
   VListFooterDirective,
   VListHeaderDirective,
   VListItemDirective,
   VListSeparatorDirective,
+  type IVListCellContext,
   type IVListItemContext,
   type IVListSeparatorContext,
 } from './directives';
@@ -66,6 +72,8 @@ export abstract class ListInputsBase<ItemT> extends ListEventsBase {
   @Input() maxToRenderPerBatch?: number;
   @Input() updateCellsBatchingPeriod?: number;
   @Input() windowSize?: number;
+  // Mounts every cell from the top and paints no spacer, the window only grows toward the end
+  @Input() disableVirtualization?: boolean;
   @Input() stickyHeaderIndices?: number[];
   @Input() maintainVisibleContentPosition?: {
     minIndexForVisible: number;
@@ -76,15 +84,23 @@ export abstract class ListInputsBase<ItemT> extends ListEventsBase {
   @Input() onScrollEndDrag?: (event: ISymbioteEvent) => void;
   @Input() onMomentumScrollBegin?: (event: ISymbioteEvent) => void;
   @Input() onMomentumScrollEnd?: (event: ISymbioteEvent) => void;
+  @Input() onContentSizeChange?: (width: number, height: number) => void;
   @Input() scrollEventThrottle?: number;
   @Input() keyboardShouldPersistTaps?: boolean | 'always' | 'never' | 'handled';
   @Input() keyboardDismissMode?: 'none' | 'on-drag' | 'interactive';
   @Input() removeClippedSubviews?: boolean;
   @Input() nestedScrollEnabled?: boolean;
+  @Input() stickyHeaderHiddenOnScroll?: boolean;
+  @Input() innerViewRef?: IInnerViewRef;
   @Input() style?: IStyleProp<IViewStyle>;
   @Input() contentContainerStyle?: IStyleProp<IViewStyle>;
+  @Input() listHeaderComponentStyle?: IStyleProp<IViewStyle>;
+  @Input() listFooterComponentStyle?: IStyleProp<IViewStyle>;
   @Input() testID?: string;
   @Input() nativeID?: string;
+  // RN's `ListItemComponent`: a component taking `item`, `index` and `separators` inputs, in place
+  // of the `vListItem` template, and it wins when both are given
+  @Input() listItemComponent?: Type<unknown>;
 
   // The cell and slot templates the app authors, captured from projected <ng-template> content
   @ContentChild(VListItemDirective) itemDir?: VListItemDirective<ItemT>;
@@ -93,9 +109,26 @@ export abstract class ListInputsBase<ItemT> extends ListEventsBase {
   @ContentChild(VListEmptyDirective) emptyDir?: VListEmptyDirective;
   @ContentChild(VListSeparatorDirective)
   separatorDir?: VListSeparatorDirective<ItemT>;
+  @ContentChild(VListCellDirective) cellDir?: VListCellDirective;
 
   get isHorizontal(): boolean {
     return this.horizontal === true;
+  }
+
+  // The component to stamp per cell, RN's `_renderElement`: it wins over the item template, and a
+  // cell with neither throws
+  get itemComponent(): Type<unknown> | undefined {
+    const kind = pickItemRenderer({
+      hasRenderItem: this.hasItemTemplate,
+      hasComponent: this.listItemComponent !== undefined,
+    });
+    return kind === ITEM_RENDERER.component
+      ? this.listItemComponent
+      : undefined;
+  }
+
+  protected get hasItemTemplate(): boolean {
+    return this.itemDir !== undefined;
   }
 
   protected get isInverted(): boolean {
@@ -137,9 +170,18 @@ export abstract class VirtualizedListInputs<
   // outlet deep instead of a wrapper outlet around the app's own. Each wins over projection
   @Input() itemTemplate?: TemplateRef<IVListItemContext<ItemT>>;
   @Input() itemSeparatorTemplate?: TemplateRef<IVListSeparatorContext<ItemT>>;
+  @Input() cellRendererTemplate?: TemplateRef<IVListCellContext>;
+
+  get cellRendererTpl(): TemplateRef<IVListCellContext> | undefined {
+    return this.cellRendererTemplate ?? this.cellDir?.templateRef;
+  }
 
   get cellTemplate(): TemplateRef<IVListItemContext<ItemT>> | undefined {
     return this.itemTemplate ?? this.itemDir?.templateRef;
+  }
+
+  protected override get hasItemTemplate(): boolean {
+    return this.cellTemplate !== undefined;
   }
 
   get separatorTemplate():

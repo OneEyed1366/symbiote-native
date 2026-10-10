@@ -119,17 +119,12 @@ describe('AppRegistry', () => {
     });
   });
 
-  // No throwing/rejecting path exists on this surface (register/run/unmount all take a plain
-  // string key and a plain object; there is no invalid shape they reject). The one alternative-
-  // to-success outcome is silently ignoring an app key nothing registered — RN's own behavior
-  // (AppRegistryImpl logs and returns), not an error condition — so it gets its own group instead
-  // of a Negative one.
-  describe('Silent no-op (unknown app key)', () => {
-    // why: a typo'd or stale app key must not throw and must not mount anything — a host that
-    // races a runApplication call against an app that hasn't registered yet (or was torn down)
-    // should see nothing happen, not a crash.
-    it('runApplication does nothing for a key nothing registered', async () => {
-      AppRegistry.runApplication('does-not-exist', { rootTag: ROOT_TAG });
+  describe('Unknown app key', () => {
+    // RN's `AppRegistryImpl` raises an invariant for it instead of ignoring the call
+    it('runApplication throws and mounts nothing for a key nothing registered', async () => {
+      expect(() =>
+        AppRegistry.runApplication('does-not-exist', { rootTag: ROOT_TAG }),
+      ).toThrow('"does-not-exist" has not been registered');
       await tick();
 
       expect(fabric.findAll(() => true)).toHaveLength(0);

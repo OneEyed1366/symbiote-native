@@ -44,6 +44,7 @@ const PRIMITIVE_SELECTORS = new Set([
   'activity-indicator',
   'activity-indicator-spinner',
   'safe-area-view',
+  'layout-conformance',
   'modal',
   'refresh-control',
   // RN's JS sticky wrapper as a tag: the same RCTView again, carrying the pin the engine's

@@ -13,6 +13,7 @@ export const VIRTUALIZED_SECTION_LIST_TEMPLATE = `
     [stickyHeaderIndices]="stickyHeaderIndices"
     [extraData]="extraData"
     [inverted]="inverted"
+    [horizontal]="horizontal"
     [refreshing]="refreshing"
     [progressViewOffset]="progressViewOffset"
     [refreshRequested]="refreshRequested ?? refresh.observed"
@@ -26,25 +27,32 @@ export const VIRTUALIZED_SECTION_LIST_TEMPLATE = `
     [maxToRenderPerBatch]="maxToRenderPerBatch"
     [updateCellsBatchingPeriod]="updateCellsBatchingPeriod"
     [windowSize]="windowSize"
+    [disableVirtualization]="disableVirtualization"
     [maintainVisibleContentPosition]="maintainVisibleContentPosition"
     [onScroll]="onScroll"
     [onScrollBeginDrag]="onScrollBeginDrag"
     [onScrollEndDrag]="onScrollEndDrag"
     [onMomentumScrollBegin]="onMomentumScrollBegin"
     [onMomentumScrollEnd]="onMomentumScrollEnd"
+    [onContentSizeChange]="onContentSizeChange"
     [scrollEventThrottle]="scrollEventThrottle"
     [keyboardShouldPersistTaps]="keyboardShouldPersistTaps"
     [keyboardDismissMode]="keyboardDismissMode"
     [removeClippedSubviews]="removeClippedSubviews"
     [nestedScrollEnabled]="nestedScrollEnabled"
+    [stickyHeaderHiddenOnScroll]="stickyHeaderHiddenOnScroll"
+    [innerViewRef]="innerViewRef"
     [style]="resolvedStyle"
     [contentContainerStyle]="contentContainerStyle"
+    [listHeaderComponentStyle]="listHeaderComponentStyle"
+    [listFooterComponentStyle]="listFooterComponentStyle"
+    [cellRendererTemplate]="cellRendererTpl"
     [testID]="testID"
     [nativeID]="nativeID"
     ${LIST_ACCESSIBILITY_FORWARD}
   >
     <!-- The single synthesized cell template: dispatch per flattened entry tag -->
-    <ng-template vListItem let-entry let-separators="separators">
+    <ng-template vListItem let-entry let-index="index">
       @switch (entryKind(entry)) {
         @case ('header') {
           <ng-container
@@ -58,16 +66,32 @@ export const VIRTUALIZED_SECTION_LIST_TEMPLATE = `
             [vListOutletContext]="sectionContextOf(entry)"
           ></ng-container>
         }
-        @case ('section-separator') {
-          <ng-container
-            [vListOutlet]="sectionSeparatorDir?.templateRef"
-          ></ng-container>
-        }
         @case ('item') {
-          <ng-container
-            [vListOutlet]="sectionItemDir?.templateRef"
-            [vListOutletContext]="itemContextOf(entry, separators)"
-          ></ng-container>
+          @let plan = cellPlanOf(entry, index);
+          @if (plan !== undefined) {
+            <ng-container
+              vSectionCell
+              #cell="vSectionCell"
+              [board]="board"
+              [cellKey]="plan.cellKey"
+              [prevCellKey]="plan.prevCellKey"
+              [hasLeading]="plan.hasLeading"
+              [hasTrailing]="plan.hasTrailing"
+            >
+              <ng-container
+                [vListOutlet]="plan.first.template"
+                [vListOutletContext]="cell.contextOf(plan.first)"
+              ></ng-container>
+              <ng-container
+                [vListOutlet]="plan.itemTemplate"
+                [vListOutletContext]="itemContextOf(entry, cell.separators)"
+              ></ng-container>
+              <ng-container
+                [vListOutlet]="plan.second.template"
+                [vListOutletContext]="cell.contextOf(plan.second)"
+              ></ng-container>
+            </ng-container>
+          }
         }
       }
     </ng-template>
@@ -86,22 +110,6 @@ export const VIRTUALIZED_SECTION_LIST_TEMPLATE = `
     @if (listEmptyDir !== undefined) {
       <ng-template vListEmpty>
         <ng-container [vListOutlet]="listEmptyDir.templateRef"></ng-container>
-      </ng-template>
-    }
-    <!-- Item separator: unwrap each flattened entry back to its item -->
-    @if (itemSeparatorDir !== undefined) {
-      <ng-template
-        vListSeparator
-        let-highlighted
-        let-leadingItem="leadingItem"
-        let-trailingItem="trailingItem"
-      >
-        <ng-container
-          [vListOutlet]="itemSeparatorDir.templateRef"
-          [vListOutletContext]="
-            itemSeparatorContextOf(highlighted, leadingItem, trailingItem)
-          "
-        ></ng-container>
       </ng-template>
     }
   </VirtualizedList>

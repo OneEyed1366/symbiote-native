@@ -1,5 +1,6 @@
 import {
   dlog,
+  type IColorValue,
   type IImageSource,
   type IImageSourceProp,
   type IStyleProp,
@@ -16,7 +17,8 @@ export type { IImageSource, IImageSourceProp };
 
 type IImageEventHandler = (event: ISymbioteEvent) => void;
 
-export type IResizeMode = 'cover' | 'contain' | 'stretch' | 'repeat' | 'center';
+export type IResizeMode =
+  'cover' | 'contain' | 'stretch' | 'repeat' | 'center' | 'none';
 
 // iOS resizable-image cap insets: the unscaled border kept fixed while the
 // center stretches (a 9-patch on iOS). Forwarded as-is; native understands it.
@@ -45,7 +47,9 @@ export type IImageProps = IAccessibilityProps &
     resizeMode?: IResizeMode;
     // Android decode-time scaling strategy.
     resizeMethod?: IResizeMethod;
-    tintColor?: string;
+    // Android: scales the decode size up for small images on low-DPI devices, defaults to 1
+    resizeMultiplier?: number;
+    tintColor?: IColorValue;
     blurRadius?: number;
     // iOS: cap insets for a resizable (stretchable-center) image.
     capInsets?: IImageCapInsets;
@@ -106,7 +110,7 @@ export type IImageViewProps = {
   loadingIndicatorSource?: IImageSourceProp;
   style?: IStyleProp<IViewStyle>;
   resizeMode?: IResizeMode;
-  tintColor?: string;
+  tintColor?: IColorValue;
   src?: string;
   srcSet?: string;
   alt?: string;

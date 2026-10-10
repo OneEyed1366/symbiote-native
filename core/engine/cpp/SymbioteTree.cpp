@@ -106,15 +106,15 @@ constexpr int32_t kKindVoid = 3;
 // Fabric value meaning "reset to the default", and a merge-based clone needs the two distinguished.
 constexpr int32_t kNoValue = -1;
 
-// The one position-dependent view name. A text element inside another text element commits as a
-// virtual span — and the flag is STICKY, so `<Text><View><Text>` is virtual too. That is
-// `commit.ts:964`'s `node.isText || hasTextAncestor`, and it is the reason the name is resolved
-// while the child set is built rather than when a node is inserted: an insert cannot see the whole
-// chain, and a reparent would have to rewrite a subtree.
+// The one position-dependent view name: a text inside a text is a virtual span, a view ends it.
+// Resolved while the child set is built, since an insert cannot see the chain and a reparent
+// would rewrite a subtree
 // A `std::string` and not a `const char *` so `materialize` can bind a REFERENCE to either this or
 // the node's own name. As a `const char *` the ternary there has no common type but `std::string`,
 // so every call constructed one — see there.
 const std::string kVirtualTextViewName = "RCTVirtualText";
+// The one view that ends a text context, see `materialize`
+const std::string kViewViewName = "RCTView";
 
 // Tags identify a node to Fabric and must not collide with a surface's root tag. The JS side used to
 // allocate them; there is no reason for that to cross a boundary, so the counter lives here. The
@@ -1069,15 +1069,16 @@ IOwner ownerOf(const Node &node) {
       (node.parent->pressListeners & kPressListenerMask) != 0};
 }
 
-/** The node's own non-prop bits, unpacked from the mask the ops maintain. See `ISelf`. */
-ISelf selfOf(const Node &node) {
+/** The node's own non-prop bits, unpacked from the ops' mask (see `ISelf`) */
+ISelf selfOf(const Node &node, bool hasTextAncestor) {
   return ISelf{
       (node.pressListeners & kPressListenerPress) != 0,
       (node.pressListeners & kPressListenerMask) != 0,
       node.underlayShown,
       (node.pressListeners & kMomentumListenerMask) != 0,
       (node.pressListeners & kTextPressMask) != 0,
-      (node.pressListeners & kStartShouldSetResponder) != 0};
+      (node.pressListeners & kStartShouldSetResponder) != 0,
+      node.isText && hasTextAncestor};
 }
 
 /**
@@ -1341,9 +1342,9 @@ std::shared_ptr<const react::ShadowNode> materialize(
 
   auto children = std::make_shared<ChildSet>();
   IOwnerTally owners;
-  // STICKY, per `commit.ts:964` — once inside a text element everything below is virtual, including
-  // through a non-text element in between.
-  const bool childHasTextAncestor = hasTextAncestor || node.isText;
+  // Текстовый контекст липкий, кроме вью: у RN `View.js` отдаёт детям `TextAncestorContext` false
+  const bool childHasTextAncestor =
+      node.isText || (hasTextAncestor && node.viewName != kViewViewName);
   // BUMPED BEFORE THE CHILDREN ARE WALKED, which is the whole trick: the create branch below has
   // not run yet, so a child asking about its parent's family has to be told what it is ABOUT to be.
   // Same condition that branch tests — a node with no committed form is minting its first family,
@@ -1376,7 +1377,7 @@ std::shared_ptr<const react::ShadowNode> materialize(
         node.props,
         fold,
         ownerOf(node),
-        selfOf(node),
+        selfOf(node, hasTextAncestor),
         IAncestorLookup{&ancestorPropsOf, &node},
         firstChildOf(node));
     walkCost_.propsNs += nanosSince(startedAt);
@@ -1430,7 +1431,7 @@ std::shared_ptr<const react::ShadowNode> materialize(
           node.props,
           fold,
           ownerOf(node),
-          selfOf(node),
+          selfOf(node, hasTextAncestor),
           IAncestorLookup{&ancestorPropsOf, &node},
           firstChildOf(node));
       walkCost_.propsNs += nanosSince(startedAt);
@@ -1459,8 +1460,11 @@ std::shared_ptr<const react::ShadowNode> materialize(
       //
       // AND WHEN IT DID CHANGE, IT STILL DOES NOT HAVE TO BE HANDED OVER WHOLE. See
       // `replacedChangedChildren` below — the same argument taken one step further.
-      auto rawProps =
-          node.selfDirty ? react::RawProps(std::move(payload)) : react::RawProps();
+      // An empty object is not an empty `RawProps` (it is `Mode::Dynamic`): handing one over
+      // re-parses the props, and the new pointer makes the differ emit an `Update` for a parent
+      // whose only change is its child list
+      auto rawProps = node.selfDirty && !payload.empty() ? react::RawProps(std::move(payload))
+                                                         : react::RawProps();
       if (canReplaceInPlace(
               node,
               liveChildrenOf(node),
@@ -2209,6 +2213,18 @@ jsi::Value Tree::committedRecordOf(
   record.setProperty(
       runtime, "rootTag", jsi::Value(static_cast<double>(node->committedSurfaceId)));
   return record;
+}
+
+jsi::Value Tree::shadowNodeOf(
+    jsi::Runtime &runtime,
+    const jsi::Value *arguments,
+    size_t count) {
+  if (count < 1) {
+    throw jsi::JSError(runtime, "symbiote engine: expected shadowNodeOf(handle)");
+  }
+  const auto node = nodeFrom(runtime, arguments[0].asObject(runtime), "shadowNodeOf");
+  if (node->committed == nullptr) return jsi::Value::undefined();
+  return react::valueFromShadowNode(runtime, node->committed);
 }
 
 jsi::Value Tree::committedPayloadOf(

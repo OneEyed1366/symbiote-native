@@ -12,6 +12,8 @@ export type { ITextProps } from './components/text-props';
 // `SafeAreaView` is a TAG — `<safe-area-view>` — and there is nothing to import in its place. The
 // host owns the inset math; the wrapper only forwarded a bag.
 export type { ISafeAreaViewProps } from './components/safe-area-view-props';
+export type { ILayoutConformanceProps } from './components/layout-conformance-props';
+export type { ILayoutConformanceMode } from '@symbiote-native/components';
 
 // `Image` is a TAG — `<image>` — and there is nothing to import in its place. The whole
 // `renderImage` fold runs in the tag's own behavior; the STATICS (`getSize`, `prefetch`, …) moved
@@ -96,9 +98,13 @@ export type { IScrollViewHandle } from '@symbiote-native/components';
 // for the same import as the component. `IVirtualizedListComponent` stays internal — it is the
 // platform factory's return type, not API.
 export { VirtualizedList } from './components/virtualized-list';
+export { useVirtualizedListScope } from './components/virtualized-list/nested-scope';
+export type { IListScope } from '@symbiote-native/components';
 export type {
   IVirtualizedListProps,
   IVirtualizedListHandle,
+  ICellRendererComponent,
+  ICellRendererProps,
   IVirtualizedListCellInfo,
   IVirtualizedListRenderItem,
   ICellLayout,

@@ -16,12 +16,14 @@
 // The base is fully agnostic, so it lives ONCE in @symbiote-native/components
 // (<prop_types_split_agnostic_vs_per_adapter>). `class` and `ref` are per-adapter: `ref` is typed
 // over solid-js's Ref union, matching View's own `ref?: Ref<IHostInstance>`.
-import type { Ref } from 'solid-js';
+import type { JSX, Ref } from 'solid-js';
 import type { ITextInputProps as ITextInputBaseProps } from '@symbiote-native/components';
 import type { IClassNameValue } from '@symbiote-native/engine';
 import type { IHostInstance } from '../host-instance';
 
+// `children` is a framework element, RN reads a string child as the input's text
 export type ITextInputProps = ITextInputBaseProps & {
   class?: IClassNameValue;
   ref?: Ref<IHostInstance>;
+  children?: JSX.Element;
 };

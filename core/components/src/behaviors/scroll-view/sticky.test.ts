@@ -35,23 +35,23 @@ import { STICKY_HEADER_TAG, STICKY_TRANSLATE_PROP } from './sticky';
 
 const fabric = installRecordingFabric();
 const live = createLiveTree(fabric);
-let nextRootTag = 9800;
+let nextRootTag = 9_800;
 
 // iOS's debounce window (`stickyDebounceMs`), which is what the headless Platform reports. The
 // committed translateY only appears once it fires.
 const DEBOUNCE_MS = 64;
 
-function node(tag: string): ISymbioteNode {
+function createTagged(tag: string): ISymbioteNode {
   return createElement(descriptorFor(tag).component, false, tag);
 }
 
-interface IMounted {
+type IMounted = {
   owner: ISymbioteNode;
   headers: ISymbioteNode[];
   commit: () => ILiveNode;
   scroll: (y: number) => void;
   measure: (header: ISymbioteNode, y: number, height: number) => void;
-}
+};
 
 // One ScrollView with `count` sticky headers, each with a plain child so the tree is the shape an
 // app writes. Committed once, which is what registers them — `attachAfterCommit` is where a header
@@ -63,11 +63,11 @@ function mountSticky(
   const surface = createSurface((nextRootTag += 1));
   const root = createElement('RCTView');
   surface.appendChild(root);
-  const owner = node(SCROLL_VIEW_TAG);
+  const owner = createTagged(SCROLL_VIEW_TAG);
   for (const key of Object.keys(props)) routeProp(owner, key, props[key]);
   const headers: ISymbioteNode[] = [];
   for (let index = 0; index < count; index += 1) {
-    const header = node(STICKY_HEADER_TAG);
+    const header = createTagged(STICKY_HEADER_TAG);
     appendChild(header, createElement('RCTText'));
     appendChild(owner, header);
     headers.push(header);
@@ -121,16 +121,22 @@ function mountSticky(
 // the thing under test is a locator that expires with it.
 function committedHeaders(scrollView: ILiveNode): ILiveNode[] {
   const found: ILiveNode[] = [];
-  const walk = (node: ILiveNode): void => {
-    if (node.tagName === STICKY_HEADER_TAG) found.push(node);
-    for (const child of node.children) walk(child);
+  const walk = (current: ILiveNode): void => {
+    if (current.tagName === STICKY_HEADER_TAG) found.push(current);
+    for (const child of current.children) walk(child);
   };
   walk(scrollView);
   return found;
 }
 
-function committedTranslateY(node: ILiveNode): unknown {
-  const transform = node.payload.transform;
+// Что хост записал для узла, пусто если он узла не видел
+function recordedProps(target: ISymbioteNode): Record<string, unknown> {
+  const recorded = fabric.find(n => n.handle === target);
+  return recorded === undefined ? {} : recorded.props;
+}
+
+function committedTranslateY(header: ILiveNode): unknown {
+  const transform = header.payload.transform;
   if (!Array.isArray(transform)) return undefined;
   const entry: unknown = transform[transform.length - 1];
   if (typeof entry !== 'object' || entry === null) return undefined;
@@ -163,25 +169,44 @@ describe('a sticky header child is what the index array could not be', () => {
     expect(commit().payload.scrollEventThrottle).toBe(16);
 
     removeChild(owner, headers[0] as ISymbioteNode);
-    // ABSENT, not null. Fabric has no prop removal — the engine's op stream spells "clear" with
-    // NO_VALUE, and a host replaying that op deletes the key; `null` was only ever the old mirror's
-    // clone-protocol spelling (`.claude/rules/…` — see mirror-elimination.md "RESOLVED: the
-    // onLayout === null decision").
+    // Ключ пропадает, не становится `null`: Fabric снимает проп операцией `NO_VALUE`
     expect(Object.hasOwn(commit().payload, 'scrollEventThrottle')).toBe(false);
-    // The half that proves the engine ACTED rather than merely stopping: the record carried
-    // `scrollEventThrottle` after the first commit above, so it being gone from the record means a
-    // clearing op was sent for it.
-    expect(
-      Object.hasOwn(
-        fabric.find(n => n.handle === owner)?.props ?? {},
-        'scrollEventThrottle',
-      ),
-    ).toBe(false);
+    // Запись хоста держала ключ после первого коммита, значит ушла операция снятия
+    expect(Object.hasOwn(recordedProps(owner), 'scrollEventThrottle')).toBe(
+      false,
+    );
   });
 
   it('leaves an app throttle alone', () => {
     const { commit } = mountSticky(1, { scrollEventThrottle: 8 });
     expect(commit().payload.scrollEventThrottle).toBe(8);
+  });
+});
+
+// The shared value starts at `contentOffset.y` and carries `contentInset.top` as its offset
+describe('the scroll value of the pin', () => {
+  it('adds the top contentInset to the scroll offset', () => {
+    const { headers, commit, scroll, measure } = mountSticky(1, {
+      contentInset: { top: 50 },
+    });
+    measure(headers[0] as ISymbioteNode, 0, 50);
+    scroll(70);
+    vi.advanceTimersByTime(DEBOUNCE_MS);
+
+    expect(
+      committedTranslateY(committedHeaders(commit())[0] as ILiveNode),
+    ).toBe(120);
+  });
+
+  it('starts at the initial contentOffset before any scroll event', () => {
+    const { headers, measure } = mountSticky(1, {
+      contentOffset: { x: 0, y: 30 },
+    });
+    const [header] = headers as [ISymbioteNode];
+    measure(header, 0, 50);
+    vi.advanceTimersByTime(DEBOUNCE_MS);
+
+    expect(propsOf(header)[STICKY_TRANSLATE_PROP]).toBe(30);
   });
 });
 
@@ -238,6 +263,61 @@ describe('the pin', () => {
   });
 });
 
+// RN `stickyHeaderHiddenOnScroll`: the pin plus a `diffClamp` offset over the header's own height.
+// Header at y=100, height 50: scrolling DOWN slides the pinned header up out of view (translate =
+// base pin + the clamped offset), scrolling UP reveals it again
+describe('stickyHeaderHiddenOnScroll', () => {
+  function pinned(): ReturnType<typeof mountSticky> {
+    const mounted = mountSticky(1, { stickyHeaderHiddenOnScroll: true });
+    mounted.measure(mounted.headers[0] as ISymbioteNode, 100, 50);
+    return mounted;
+  }
+
+  function settledTranslate(mounted: ReturnType<typeof mountSticky>): unknown {
+    vi.advanceTimersByTime(DEBOUNCE_MS);
+    return committedTranslateY(
+      committedHeaders(mounted.commit())[0] as ILiveNode,
+    );
+  }
+
+  it('slides the pinned header out by its own height on a downward scroll', () => {
+    const mounted = pinned();
+    mounted.scroll(200);
+    // base pin 100, offset clamped to -50 (the header height)
+    expect(settledTranslate(mounted)).toBe(50);
+    mounted.scroll(300);
+    expect(settledTranslate(mounted)).toBe(150);
+  });
+
+  it('reveals it again, only as far as the scroll came back', () => {
+    const mounted = pinned();
+    mounted.scroll(300);
+    settledTranslate(mounted);
+    mounted.scroll(280);
+    // base 180, the offset gives back 20 of the 50 hidden
+    expect(settledTranslate(mounted)).toBe(180 - 30);
+    mounted.scroll(200);
+    // back at 200 the offset is 0: header fully shown at the viewport top
+    expect(settledTranslate(mounted)).toBe(100);
+  });
+
+  it('is off by default: the header stays pinned at the viewport top', () => {
+    const mounted = mountSticky(1);
+    mounted.measure(mounted.headers[0] as ISymbioteNode, 100, 50);
+    mounted.scroll(200);
+    expect(settledTranslate(mounted)).toBe(100);
+  });
+
+  it('turning the prop on after mount takes effect', () => {
+    const mounted = mountSticky(1);
+    mounted.measure(mounted.headers[0] as ISymbioteNode, 100, 50);
+    routeProp(mounted.owner, 'stickyHeaderHiddenOnScroll', true);
+    mounted.commit();
+    mounted.scroll(200);
+    expect(settledTranslate(mounted)).toBe(50);
+  });
+});
+
 describe('the owner keeps every listener it borrowed', () => {
   it('forwards the app onScroll it had to displace', () => {
     const seen: number[] = [];
@@ -281,14 +361,9 @@ describe('the owner keeps every listener it borrowed', () => {
     });
     expect(commit().payload.onLayout).toBe(true);
     removeChild(owner, headers[0] as ISymbioteNode);
-    // ABSENT, not null — same protocol correction as the throttle case above.
+    // Ключ пропадает, как у throttle выше
     expect(Object.hasOwn(commit().payload, 'onLayout')).toBe(false);
-    expect(
-      Object.hasOwn(
-        fabric.find(n => n.handle === owner)?.props ?? {},
-        'onLayout',
-      ),
-    ).toBe(false);
+    expect(Object.hasOwn(recordedProps(owner), 'onLayout')).toBe(false);
     expect(listenerFor(owner, 'layout')).toBeUndefined();
   });
 

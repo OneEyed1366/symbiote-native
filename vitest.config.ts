@@ -1,31 +1,26 @@
 import babel from '@babel/core';
+import { existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { dirname, resolve } from 'node:path';
 import { defineConfig } from 'vitest/config';
 import solidPlugin from 'vite-plugin-solid';
 
-// Root unit/integration runner. Tests are co-located with what they exercise. `@symbiote-native/*`
-// packages resolve to raw `src/*.ts` (their package `main`), so they must be inlined for Vitest.
-// examples/* is a standalone npm tree outside the pnpm workspace and out of scope here.
+// Root unit/integration runner, tests are co-located with what they exercise
+// `@symbiote-native/*` resolve to raw `src/*.ts`, so they are inlined. `examples/*` is out of scope
 
-// A single `react` copy is enforced by pnpm-workspace.yaml's `overrides` (else "Invalid hook
-// call"), so no Vitest-side dedupe/alias is needed.
+// A single `react` copy is enforced by pnpm-workspace.yaml `overrides`, else "Invalid hook call"
 
 const INCLUDE_ALL = [
   'core/**/src/**/*.test.{ts,tsx}',
   'adapters/**/src/**/*.test.{ts,tsx}',
-  // A Metro transformer must be a hand-authored, package-root .cjs (Metro requires() it
-  // directly; a compiled-from-src ESM file wouldn't load) — its co-located test lives at
-  // the same root level, not under src/. See adapters/vue/metro-vue-transformer.cjs.
+  // A Metro transformer is a hand-authored package-root .cjs, so its test sits at the same level
   'adapters/*/*.test.{ts,tsx}',
   'packages/**/src/**/*.test.{ts,tsx}',
-  // Cross-cutting checks that belong to no single package — they read several packages' sources
-  // and assert a contract BETWEEN them (e.g. adapter barrel parity).
+  // Cross-cutting checks that read several packages' sources and assert a contract between them
   'tests/**/*.test.{ts,tsx}',
 ];
 
-// `vitest bench` files, co-located next to the tests of the thing they time. Scoped
-// explicitly because both projects below would otherwise match the same file by default and
-// run every benchmark twice.
+// Benchmarks sit next to the tests of what they time, scoped so two projects do not run them twice
 const BENCH_ALL = [
   'core/**/src/**/*.bench.ts',
   'adapters/**/src/**/*.bench.ts',
@@ -33,37 +28,25 @@ const BENCH_ALL = [
 ];
 const SVELTE_BENCH = ['adapters/svelte/**/*.bench.ts'];
 
-// `**/e2e/**` keeps the Detox on-device suite (jest-based) out of the vitest run.
-// Its `*.test.ts` files import `detox` and drive a real device, not the fake-Fabric slot.
+// `**/e2e/**` keeps the Detox on-device suite (jest-based) out of the run
 const EXCLUDE_ALL = ['**/node_modules/**', '**/build/**', '**/e2e/**'];
 
-// Everything that actually mounts Svelte. NOT just the adapter: each `@symbiote-native/*`
-// package ships a per-framework entry, so its `src/svelte/**` smokes drive the same mount() path
-// and need the same condition. Find new ones with
-// `grep -rl --include='*.test.ts' svelte core packages adapters`.
+// Everything that mounts Svelte, including each package's `src/svelte/**` smokes
+// Find new ones with `grep -rl --include='*.test.ts' svelte core packages adapters`
 const SVELTE_TESTS = [
   'adapters/svelte/**/*.test.{ts,tsx}',
   'packages/**/src/svelte/**/*.test.{ts,tsx}',
 ];
 
-// Everything that compiles Solid JSX. adapters/solid builds with `jsx: 'preserve'` — tsc type-checks
-// the JSX and emits it untouched, because the real compilation is babel-preset-solid's job in the
-// consuming app's Metro. That leaves nothing executable for Vitest, so this project runs the same
-// transform through Vite, with the SAME two options ../adapters/solid/babel-preset.cjs pins for the
-// app. They must not drift: a test running against `generate: 'dom'` would exercise DOM operations
-// that never appear on a device.
+// Everything that compiles Solid JSX, which tsc leaves as `preserve` for the app's Metro to compile
+// The plugin pins the same two options as adapters/solid/babel-preset.cjs, they must not drift
 const SOLID_TESTS = [
   'adapters/solid/**/*.test.{ts,tsx}',
   'packages/**/src/solid/**/*.test.{ts,tsx}',
 ];
 
-// `dev: false` is NOT a production-mode nicety — without it this project loads TWO solid-js
-// builds (dist/dev.js for the plugin's own path, dist/solid.js elsewhere), so signals live in one
-// runtime and the renderer's prop effects in the other and THEY NEVER SEE EACH OTHER.
-//
-// `conditions: ['browser']` picks solid-js's client build over its `node` -> dist/server.js entry,
-// and BOTH resolve and ssr.resolve are needed for the reason the svelte project states below:
-// Vitest runs test files through Vite's SSR module graph.
+// Without `dev: false` two solid-js builds load and signals never reach the renderer's effects
+// `conditions: ['browser']` picks the client build, see the svelte note below
 const SOLID_TRANSFORM = solidPlugin({
   dev: false,
   hot: false,
@@ -73,25 +56,18 @@ const SOLID_TRANSFORM = solidPlugin({
   },
 });
 
-// Vitest imports Angular adapter source directly. The production AOT path is still ngc partial
-// compilation, but source tests need Vite/Oxc to lower Angular's legacy TS decorators before
-// Node evaluates @Component/@Directive files.
-// react-native's own source is Flow, which Rolldown cannot parse - importing any of it from a
-// module a test reaches kills the run with `Parse failure: Flow is not supported`. That is the
-// single reason this repo hand-ported 36 RN modules (symbiote-rn-port-elimination); stripping the
-// types here is what lets a port be deleted in favour of the upstream implementation.
-//
-// The parser swap is load-bearing. @babel/preset-flow, the obvious choice, is BEHIND Flow's
-// syntax and dies on the conditional type at flattenStyle.js:19 with a bare `Missing semicolon`.
-// react-native compiles itself with Hermes' parser for exactly that reason.
+// Vitest imports Angular adapter source directly, so Oxc lowers its legacy decorators first
+// The production AOT path is still ngc partial compilation
+
+// RN's source is Flow, which Rolldown cannot parse, a test reaching it dies on `Parse failure`
+// Stripping the types here is what lets a hand-written port give way to the upstream module
+// Hermes' parser, not `@babel/preset-flow`, which dies on the conditional type in `flattenStyle`
 const require_ = createRequire(import.meta.url);
 const HERMES_SYNTAX = require_.resolve('babel-plugin-syntax-hermes-parser');
 const FLOW_STRIP = require_.resolve('@babel/plugin-transform-flow-strip-types');
 
-// RN mixes ESM `import` with top-level `require('./X')` in ONE file (PanResponder.js:15). Vite
-// rewrites the imports and leaves the require, so Node loads the next hop RAW - as Flow - and the
-// failure reads as a syntax error in a file this transform was never asked about. Hoisting those
-// requires into real imports keeps every hop inside the transform.
+// RN mixes ESM `import` with a top-level `require('./X')` in one file (`PanResponder.js:15`)
+// Vite leaves the require, so Node loads the next hop raw, as Flow, hence hoisting it to an import
 const requireToImport = ({ types: t }: { types: typeof babel.types }) => ({
   visitor: {
     CallExpression(path: babel.NodePath<babel.types.CallExpression>, state) {
@@ -100,9 +76,8 @@ const requireToImport = ({ types: t }: { types: typeof babel.types }) => ({
       if (!t.isStringLiteral(arg)) return;
       if (path.scope.getBinding('require')) return;
       const ns = path.scope.generateUidIdentifier('req');
-      // A namespace object is not callable, so a CJS target (`invariant`) is read through
-      // `.default`. But RN writes `require('./X').default` against its own ESM files, where that
-      // unwrap is already the caller's - doing it twice yields undefined.
+      // A namespace is not callable, so a CJS target is read through `.default`
+      // RN writes `require('./X').default` against its own ESM files, a second unwrap is undefined
       const callerUnwraps =
         path.parentPath.isMemberExpression({ computed: false }) &&
         t.isIdentifier(path.parentPath.node.property, { name: 'default' });
@@ -126,7 +101,7 @@ const requireToImport = ({ types: t }: { types: typeof babel.types }) => ({
   },
 });
 
-// NOT just `react-native/`: its Flow reaches into sibling @react-native/* packages.
+// Not just `react-native/`: its Flow reaches into sibling `@react-native/*` packages
 const RN_SOURCE =
   /\/node_modules\/(react-native|@react-native\/[^/]+)\/.*\.jsx?$/;
 
@@ -150,42 +125,13 @@ const REACT_NATIVE_FLOW = {
   },
 };
 
-// `Libraries/Utilities/Platform.js` is a back-compat shim whose entire body is
-// `import Platform from './Platform'`. Metro resolves that by platform extension to
-// `Platform.ios.js` / `Platform.android.js`; Vite has no such step, so `./Platform` resolves back
-// to the shim ITSELF. The default export is then undefined, and the first `Platform.OS` read
-// throws - inside our own catch, so it surfaces as an empty result rather than a stack. That one
-// self-import is what blocked importing processColor, and with it every colour-touching upstream
-// processor.
-//
-// Pinned to `.ios.js` because that is already this repo's headless answer: core/engine/src/
-// platform/index.ts re-exports the iOS implementation for the same reason - headless has no
-// platform, so the filename is the selector.
-//
-// A resolver rather than `resolve.extensions`: putting `.ios.js` ahead of `.js` repo-wide would
-// silently change which platform variant EVERY react-native-* package resolves to under test, a
-// far larger blast radius than the one file that needs it. Scoped to an importer inside RN's own
-// source so our code, which never imports RN's Platform, cannot be caught by it.
+// The `Platform.js` shim imports `./Platform`, Metro picks the platform file and Vite loops back
+// The default is then undefined, so the import is pinned to `.ios.js`
 const RN_PLATFORM_IOS = require_.resolve(
   'react-native/Libraries/Utilities/Platform.ios.js',
 );
 
-// Platform.ios then reaches `TurboModuleRegistry.getEnforcing('PlatformConstants')` at MODULE
-// scope, so the import throws without a native host - and satisfying that through
-// `global.__turboModuleProxy` is the wrong lever, because that global is itself the SUBJECT of
-// several tests: platform.test.ts sets it to undefined to prove Platform degrades gracefully, and
-// a dozen others install a single-module proxy of their own. A host fake living there either
-// breaks those tests or gets broken by them, depending on load order.
-//
-// Resolving the spec module instead keeps the two apart entirely: RN's chain is satisfied at the
-// import boundary, and `__turboModuleProxy` keeps meaning exactly what every existing test already
-// assumes. The values are an iOS simulator's.
-//
-// `isTesting: false` is the one that is not cosmetic. It stands in for a DEVICE, not for a test
-// runner, and core/engine/src/platform/index.ios.ts:92 derives `isDisableAnimations` from it - set
-// it true and animations switch off engine-wide, which took the native Animated driver down with
-// it in ten tests across three adapters, none of them near this file.
-const RN_PLATFORM_CONSTANTS = '\0symbiote:rn-platform-constants';
+// `isTesting: false` stands in for a device, `true` switches animations off engine-wide
 const PLATFORM_CONSTANTS = {
   forceTouchAvailable: false,
   interfaceIdiom: 'phone',
@@ -195,23 +141,97 @@ const PLATFORM_CONSTANTS = {
   systemName: 'iOS',
 };
 
+// The native modules RN asks `TurboModuleRegistry` for, by name
+// A name missing here is `null` for `get` and a throw for `getEnforcing`, as on a binary without it
+const SIMULATOR_SCREEN = { width: 390, height: 844, scale: 3, fontScale: 1 };
+type IStubbedModule = { constants?: object; returns?: Record<string, unknown> };
+const STUBBED_NATIVE_MODULES: Record<string, IStubbedModule> = {
+  PlatformConstants: { constants: PLATFORM_CONSTANTS },
+  DeviceInfo: {
+    constants: {
+      Dimensions: { window: SIMULATOR_SCREEN, screen: SIMULATOR_SCREEN },
+    },
+  },
+  I18nManager: { constants: { isRTL: false, doLeftAndRightSwapInRTL: true } },
+  Appearance: { returns: { getColorScheme: 'light' } },
+  AppState: { constants: { initialAppState: 'active' } },
+  SettingsManager: { constants: { settings: { foo: 1 } } },
+  DeviceEventManager: {},
+  LinkingManager: {
+    returns: {
+      openURL: { $promise: undefined },
+      canOpenURL: { $promise: true },
+      getInitialURL: { $promise: null },
+      openSettings: { $promise: undefined },
+    },
+  },
+  AlertManager: {},
+  Vibration: {},
+  ToastAndroid: {
+    constants: { SHORT: 0, LONG: 1, TOP: 49, BOTTOM: 81, CENTER: 17 },
+  },
+  ActionSheetManager: {},
+  ShareModule: {},
+  PermissionsAndroid: {},
+  UIManager: {},
+  DevSettings: {},
+  StatusBarManager: { constants: { HEIGHT: 20 } },
+};
+const REGISTRY_ID = '\0symbiote:rn-turbo-module-registry';
+const NATIVE_MODULES_ID = '\0symbiote:rn-native-modules';
+
+// `getConstants` answers `constants`, a method in `returns` answers its value
+// A `{ $promise: v }` value settles as a promise, calls land in `__symbioteNativeCalls`
+const REGISTRY_SOURCE = `const modules = ${JSON.stringify(STUBBED_NATIVE_MODULES)};
+const settle = value =>
+  value !== null && typeof value === 'object' && '$promise' in value
+    ? Promise.resolve(value.$promise)
+    : value;
+function stub(name) {
+  const { constants = {}, returns = {} } = modules[name];
+  return new Proxy({ getConstants: () => constants }, {
+    get(target, key) {
+      if (key in target || typeof key !== 'string' || key === 'then') return target[key];
+      return (...args) => {
+        (globalThis.__symbioteNativeCalls ??= []).push({ module: name, method: key, args });
+        return settle(returns[key]);
+      };
+    },
+  });
+}
+export function get(name) {
+  return name in modules ? stub(name) : null;
+}
+export function getEnforcing(name) {
+  if (name in modules) return stub(name);
+  throw new Error("TurboModuleRegistry.getEnforcing(...): '" + name + "' could not be found.");
+}
+export default { get, getEnforcing };`;
+
+// Metro picks `X.ios.js` for `./X`, so RN's own files get the same pin as `Platform`
+function iosVariantOf(source: string, importer: string): string | null {
+  if (!source.startsWith('.')) return null;
+  const variant = resolve(dirname(importer.split('?')[0]), `${source}.ios.js`);
+  return existsSync(variant) ? variant : null;
+}
+
 const REACT_NATIVE_PLATFORM = {
   name: 'react-native-platform-ios',
   enforce: 'pre' as const,
   resolveId(source: string, importer: string | undefined) {
-    if (source === RN_PLATFORM_CONSTANTS) return source;
+    if (source === REGISTRY_ID || source === NATIVE_MODULES_ID) return source;
     if (importer == null) return null;
     if (!RN_SOURCE.test(importer.split('?')[0])) return null;
-    if (/NativePlatformConstants(IOS|Android)$/.test(source)) {
-      return RN_PLATFORM_CONSTANTS;
+    if (/(^|\/)TurboModuleRegistry$/.test(source)) return REGISTRY_ID;
+    if (/(^|\/)BatchedBridge\/NativeModules$/.test(source)) {
+      return NATIVE_MODULES_ID;
     }
-    return /(^|\/)Platform(\.js)?$/.test(source) ? RN_PLATFORM_IOS : null;
+    if (/(^|\/)Platform(\.js)?$/.test(source)) return RN_PLATFORM_IOS;
+    return iosVariantOf(source, importer);
   },
   load(id: string) {
-    if (id !== RN_PLATFORM_CONSTANTS) return null;
-    return `export default { getConstants: () => (${JSON.stringify(
-      PLATFORM_CONSTANTS,
-    )}) };`;
+    if (id === REGISTRY_ID) return REGISTRY_SOURCE;
+    return id === NATIVE_MODULES_ID ? 'export default {};' : null;
   },
 };
 
@@ -220,23 +240,18 @@ const SHARED = {
   plugins: [REACT_NATIVE_FLOW, REACT_NATIVE_PLATFORM],
   test: {
     environment: 'node' as const,
-    // ./vitest.setup.ts defines __DEV__, which react-native's own source reads bare.
-    setupFiles: ['./vitest.setup.ts'],
+    // `vitest.setup.ts` defines `__DEV__`, which react-native's own source reads bare
+    setupFiles: ['./vitest.setup.ts', './vitest.rn-host.setup.ts'],
     server: { deps: { inline: [/@symbiote-native\//, /react-native/] } },
   },
 };
 
-// svelte's package.json "." export splits on a `browser` condition (client runtime, mount()/
-// unmount()) vs `default`/`worker` (SSR runtime, where mount() throws `lifecycle_function_
-// unavailable`). Vite/Vitest's default Node conditions pick the SSR build, which crashes the
-// first call adapters/svelte/src/render.ts makes. Both `resolve` and `ssr.resolve` are needed —
-// Vitest runs test files through Vite's SSR module graph, which reads `ssr.resolve.conditions`,
-// not the plain `resolve.conditions`. Metro needs the equivalent `conditionNames` fix for a real
-// device build; tracked in the svelte-adapter-dom-shim skill.
-//
-// Scoped to the svelte project, not global: `less`/`sass`/`stylus` each declare a `browser` key
-// first in their own exports, so a global condition would resolve them to browser bundles that
-// fail under Node — Node/Vite pick the first matching key in the PACKAGE's own declaration order.
+// svelte's "." export splits on a `browser` condition, the SSR runtime throws in `mount()`
+// Vitest reads `ssr.resolve.conditions`, so both `resolve` and `ssr.resolve` set it
+// Metro needs the equivalent `conditionNames` fix, see the svelte-adapter-dom-shim skill
+
+// Scoped to the svelte project: `less`/`sass`/`stylus` list a `browser` key first in their exports
+// A global condition would resolve them to browser bundles that fail under Node
 const BROWSER_CONDITIONS = {
   resolve: { conditions: ['browser'] },
   ssr: { resolve: { conditions: ['browser'] } },
@@ -261,9 +276,7 @@ export default defineConfig({
       {
         ...SHARED,
         ...BROWSER_CONDITIONS,
-        // SHARED.plugins is REPLACED, not merged, so the Flow transform has to be restated.
-        // SHARED.plugins is REPLACED, not merged, by a project that declares its own - so every
-        // react-native plugin has to be restated here or solid's tests lose them silently.
+        // `plugins` is replaced, not merged, so every react-native plugin is restated here
         plugins: [REACT_NATIVE_FLOW, REACT_NATIVE_PLATFORM, SOLID_TRANSFORM],
         test: {
           ...SHARED.test,

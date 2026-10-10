@@ -9,6 +9,7 @@ import {
   appendChild,
   createElement,
   createRawText,
+  hostBehaviorFor,
   insertBefore,
   removeChild,
   routeProp,
@@ -40,9 +41,9 @@ import { resolveIntrinsicTag } from '@symbiote-native/components/resolve-intrins
 
 type IProps = Record<string, unknown>;
 
-interface IHostContext {
+type IHostContext = {
   isInsideText: boolean;
-}
+};
 
 // React-reserved prop keys that must never reach Fabric. `children` is the element
 // tree (handled via appendChild). `ref`/`key` are React 19 plain props: the reconciler
@@ -146,7 +147,9 @@ const reconciler = createReconciler<
 
   getRootHostContext: () => ({ isInsideText: false }),
   getChildHostContext(parentHostContext, type) {
-    const isInsideText = descriptorFor(type).isText;
+    const isInsideText =
+      descriptorFor(type).isText ||
+      hostBehaviorFor(type)?.acceptsTextChildren === true;
     return parentHostContext.isInsideText === isInsideText
       ? parentHostContext
       : { isInsideText };
@@ -251,9 +254,9 @@ const reconciler = createReconciler<
   },
   getCurrentUpdatePriority: () => currentUpdatePriority,
   resolveUpdatePriority: () =>
-    currentUpdatePriority !== NoEventPriority
-      ? currentUpdatePriority
-      : DefaultEventPriority,
+    currentUpdatePriority === NoEventPriority
+      ? DefaultEventPriority
+      : currentUpdatePriority,
 
   maySuspendCommit: () => false,
   NotPendingTransition: null,

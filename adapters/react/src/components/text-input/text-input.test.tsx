@@ -283,7 +283,7 @@ describe('<text-input>', () => {
     // why: setSelection reuses the same stale-safe setTextAndSelection command as a controlled
     // write (echoing the current text, not clobbering it) — a caller moving the cursor
     // programmatically must not accidentally erase what the user typed.
-    it('setSelection(start, end) commands setTextAndSelection carrying the current text', () => {
+    it('setSelection(start, end) commands setTextAndSelection with a null text', () => {
       mountHandle().setSelection(1, 3);
       const setText = commands.find(
         c => c.commandName === 'setTextAndSelection',
@@ -292,7 +292,7 @@ describe('<text-input>', () => {
         setText,
         'a setTextAndSelection command was dispatched',
       ).toBeDefined();
-      expect(setText!.args[1]).toBe('hello');
+      expect(setText!.args[1]).toBe(null);
       expect(setText!.args[2]).toBe(1);
       expect(setText!.args[3]).toBe(3);
     });

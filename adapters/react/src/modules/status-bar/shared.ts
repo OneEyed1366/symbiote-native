@@ -1,13 +1,12 @@
-// StatusBar is the React-side contract. The pure types + the imperative API + applyStatusBarProps
-// live in @symbiote-native/engine (shared verbatim with every adapter); React supplies only the
-// declarative component shape: an FC that renders null and applies the props in an effect, with
-// the imperative statics attached to the function object (RN's StatusBar). IStatusBarComponent
-// is the one React-coupled type (it names React's FC), so it stays here, not in the engine.
+// StatusBar is the React-side contract. Types, the imperative API and the props stack live in
+// @symbiote-native/engine, React supplies the declarative component: an FC that renders null and
+// keeps one stack entry for as long as it is mounted
 
-import type { FC } from 'react';
-import type {
-  IStatusBarImperative,
-  IStatusBarProps,
+import { useEffect, useState, type FC } from 'react';
+import {
+  createStatusBarEntry,
+  type IStatusBarImperative,
+  type IStatusBarProps,
 } from '@symbiote-native/engine';
 export type {
   IStatusBarProps,
@@ -15,9 +14,46 @@ export type {
   IStatusBarAnimation,
 } from '@symbiote-native/engine';
 
-// The declarative component plus the imperative surface, mirroring RN. currentHeight is
-// Android-only; on iOS it is absent (RN sets it to null), so it stays optional on the contract.
-export interface IStatusBarComponent
-  extends FC<IStatusBarProps>, IStatusBarImperative {
-  currentHeight?: number;
-}
+// `currentHeight` is Android-only, on iOS it is absent (RN sets it to null)
+export type IStatusBarComponent = FC<IStatusBarProps> &
+  IStatusBarImperative & { currentHeight?: number };
+
+// Every field is a dependency, the engine ignores the ones its platform has no use for
+export const StatusBarComponent: FC<IStatusBarProps> = props => {
+  const {
+    barStyle,
+    hidden,
+    animated,
+    showHideTransition,
+    networkActivityIndicatorVisible,
+    backgroundColor,
+    translucent,
+  } = props;
+  const [entry] = useState(createStatusBarEntry);
+
+  useEffect(() => {
+    entry.apply({
+      barStyle,
+      hidden,
+      animated,
+      showHideTransition,
+      networkActivityIndicatorVisible,
+      backgroundColor,
+      translucent,
+    });
+  }, [
+    entry,
+    barStyle,
+    hidden,
+    animated,
+    showHideTransition,
+    networkActivityIndicatorVisible,
+    backgroundColor,
+    translucent,
+  ]);
+
+  // Popping on unmount restores what the stack held below this entry
+  useEffect(() => () => entry.release(), [entry]);
+
+  return null;
+};

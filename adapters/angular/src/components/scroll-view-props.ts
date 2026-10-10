@@ -15,8 +15,11 @@
 import type {
   IAccessibilityProps,
   IAriaProps,
+  IInnerViewRef,
+  IScrollViewNativeOnlyProps,
 } from '@symbiote-native/components';
 import type {
+  IColorValue,
   IStyleProp,
   ISymbioteEvent,
   IViewStyle,
@@ -27,80 +30,85 @@ export type { IScrollViewHandle } from '@symbiote-native/components';
 type IScrollHandler = (event: ISymbioteEvent) => void;
 type IContentSizeHandler = (width: number, height: number) => void;
 
-export interface IAngularScrollViewProps
-  extends IAccessibilityProps, IAriaProps {
-  style?: IStyleProp<IViewStyle>;
-  // A bare string resolves through the shared style registry, like `class` on the host node.
-  contentContainerStyle?: IStyleProp<IViewStyle> | string;
-  scrollEnabled?: boolean;
-  showsVerticalScrollIndicator?: boolean;
-  showsHorizontalScrollIndicator?: boolean;
-  pagingEnabled?: boolean;
-  bounces?: boolean;
-  decelerationRate?: 'normal' | 'fast' | number;
-  scrollEventThrottle?: number;
-  contentInset?: {
-    top?: number;
-    left?: number;
-    bottom?: number;
-    right?: number;
+export type IAngularScrollViewProps = IAccessibilityProps &
+  IAriaProps &
+  IScrollViewNativeOnlyProps & {
+    style?: IStyleProp<IViewStyle>;
+    // A bare string resolves through the shared style registry, like `class` on the host node.
+    contentContainerStyle?: IStyleProp<IViewStyle> | string;
+    scrollEnabled?: boolean;
+    showsVerticalScrollIndicator?: boolean;
+    showsHorizontalScrollIndicator?: boolean;
+    pagingEnabled?: boolean;
+    bounces?: boolean;
+    decelerationRate?: 'normal' | 'fast' | number;
+    scrollEventThrottle?: number;
+    contentInset?: {
+      top?: number;
+      left?: number;
+      bottom?: number;
+      right?: number;
+    };
+    contentOffset?: { x: number; y: number };
+    removeClippedSubviews?: boolean;
+    snapToInterval?: number;
+    snapToOffsets?: number[];
+    snapToAlignment?: 'start' | 'center' | 'end';
+    snapToStart?: boolean;
+    snapToEnd?: boolean;
+    disableIntervalMomentum?: boolean;
+    experimental_endDraggingSensitivityMultiplier?: number;
+    // Sticky headers: RN implements stickiness PURELY IN JS — the native scroll view does not honor
+    // an index array. The engine's behavior resolves the indices against its own content children.
+    stickyHeaderIndices?: number[];
+    invertStickyHeaders?: boolean;
+    stickyHeaderHiddenOnScroll?: boolean;
+    // Gets the content view after the first commit and null when it goes away
+    innerViewRef?: IInnerViewRef;
+    keyboardDismissMode?: 'none' | 'on-drag' | 'interactive';
+    keyboardShouldPersistTaps?: boolean | 'always' | 'never' | 'handled';
+    maintainVisibleContentPosition?: {
+      minIndexForVisible: number;
+      autoscrollToTopThreshold?: number;
+    };
+    // iOS-only forwarding props (harmless on Android: its manager ignores unknown props).
+    alwaysBounceHorizontal?: boolean;
+    alwaysBounceVertical?: boolean;
+    centerContent?: boolean;
+    scrollIndicatorInsets?: {
+      top?: number;
+      left?: number;
+      bottom?: number;
+      right?: number;
+    };
+    indicatorStyle?: 'default' | 'black' | 'white';
+    directionalLockEnabled?: boolean;
+    automaticallyAdjustKeyboardInsets?: boolean;
+    contentInsetAdjustmentBehavior?:
+      'automatic' | 'scrollableAxes' | 'never' | 'always';
+    minimumZoomScale?: number;
+    maximumZoomScale?: number;
+    zoomScale?: number;
+    bouncesZoom?: boolean;
+    pinchGestureEnabled?: boolean;
+    // Android-only forwarding props (harmless on iOS).
+    nestedScrollEnabled?: boolean;
+    overScrollMode?: 'auto' | 'always' | 'never';
+    fadingEdgeLength?: number;
+    persistentScrollbar?: boolean;
+    endFillColor?: IColorValue;
+    onLayout?: IScrollHandler;
+    onScroll?: IScrollHandler;
+    onScrollBeginDrag?: IScrollHandler;
+    onScrollEndDrag?: IScrollHandler;
+    onMomentumScrollBegin?: IScrollHandler;
+    onMomentumScrollEnd?: IScrollHandler;
+    // iOS-only: user tapped the status bar to scroll to top. Inert on Android.
+    onScrollToTop?: IScrollHandler;
+    // Synthesized in JS from the content view's onLayout (RN _handleContentOnLayout); deduped.
+    onContentSizeChange?: IContentSizeHandler;
+    onAccessibilityAction?: (event: ISymbioteEvent) => void;
+    onAccessibilityTap?: (event: ISymbioteEvent) => void;
+    onMagicTap?: (event: ISymbioteEvent) => void;
+    onAccessibilityEscape?: (event: ISymbioteEvent) => void;
   };
-  contentOffset?: { x: number; y: number };
-  removeClippedSubviews?: boolean;
-  snapToInterval?: number;
-  snapToOffsets?: number[];
-  snapToAlignment?: 'start' | 'center' | 'end';
-  snapToStart?: boolean;
-  snapToEnd?: boolean;
-  disableIntervalMomentum?: boolean;
-  // Sticky headers: RN implements stickiness PURELY IN JS — the native scroll view does not honor
-  // an index array. The engine's behavior resolves the indices against its own content children.
-  stickyHeaderIndices?: number[];
-  invertStickyHeaders?: boolean;
-  keyboardDismissMode?: 'none' | 'on-drag' | 'interactive';
-  keyboardShouldPersistTaps?: boolean | 'always' | 'never' | 'handled';
-  maintainVisibleContentPosition?: {
-    minIndexForVisible: number;
-    autoscrollToTopThreshold?: number;
-  };
-  // iOS-only forwarding props (harmless on Android: its manager ignores unknown props).
-  alwaysBounceHorizontal?: boolean;
-  alwaysBounceVertical?: boolean;
-  centerContent?: boolean;
-  scrollIndicatorInsets?: {
-    top?: number;
-    left?: number;
-    bottom?: number;
-    right?: number;
-  };
-  indicatorStyle?: 'default' | 'black' | 'white';
-  directionalLockEnabled?: boolean;
-  automaticallyAdjustKeyboardInsets?: boolean;
-  contentInsetAdjustmentBehavior?:
-    'automatic' | 'scrollableAxes' | 'never' | 'always';
-  minimumZoomScale?: number;
-  maximumZoomScale?: number;
-  zoomScale?: number;
-  bouncesZoom?: boolean;
-  pinchGestureEnabled?: boolean;
-  // Android-only forwarding props (harmless on iOS).
-  nestedScrollEnabled?: boolean;
-  overScrollMode?: 'auto' | 'always' | 'never';
-  fadingEdgeLength?: number;
-  persistentScrollbar?: boolean;
-  endFillColor?: string;
-  onLayout?: IScrollHandler;
-  onScroll?: IScrollHandler;
-  onScrollBeginDrag?: IScrollHandler;
-  onScrollEndDrag?: IScrollHandler;
-  onMomentumScrollBegin?: IScrollHandler;
-  onMomentumScrollEnd?: IScrollHandler;
-  // iOS-only: user tapped the status bar to scroll to top. Inert on Android.
-  onScrollToTop?: IScrollHandler;
-  // Synthesized in JS from the content view's onLayout (RN _handleContentOnLayout); deduped.
-  onContentSizeChange?: IContentSizeHandler;
-  onAccessibilityAction?: (event: ISymbioteEvent) => void;
-  onAccessibilityTap?: (event: ISymbioteEvent) => void;
-  onMagicTap?: (event: ISymbioteEvent) => void;
-  onAccessibilityEscape?: (event: ISymbioteEvent) => void;
-}

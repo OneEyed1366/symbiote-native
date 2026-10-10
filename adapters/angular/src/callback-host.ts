@@ -40,14 +40,25 @@ const CALLBACK_INPUTS = [
   'onAccessibilityEscape',
   'onAccessibilityTap',
   'onBlur',
+  'onBlurCapture',
   'onChangeText',
+  'onClickCapture',
   'onContentSizeChange',
   'onEndEditing',
   'onError',
   'onFocus',
+  'onFocusCapture',
   'onHoverIn',
   'onHoverOut',
+  'onKeyDown',
+  'onKeyDownCapture',
   'onKeyPress',
+  'onKeyUp',
+  'onKeyUpCapture',
+  'onKeyboardDidHide',
+  'onKeyboardDidShow',
+  'onKeyboardWillHide',
+  'onKeyboardWillShow',
   'onLayout',
   'onLoad',
   'onLoadEnd',
@@ -73,6 +84,7 @@ const CALLBACK_INPUTS = [
   'onResponderStart',
   'onResponderTerminate',
   'onResponderTerminationRequest',
+  'onScrollAnimationEnd',
   'onScrollBeginDrag',
   'onScrollEndDrag',
   'onScrollToTop',
@@ -80,6 +92,14 @@ const CALLBACK_INPUTS = [
   'onStartShouldSetResponder',
   'onStartShouldSetResponderCapture',
   'onSubmitEditing',
+  'onTouchCancel',
+  'onTouchCancelCapture',
+  'onTouchEnd',
+  'onTouchEndCapture',
+  'onTouchMove',
+  'onTouchMoveCapture',
+  'onTouchStart',
+  'onTouchStartCapture',
   'onValueChange',
 ] as const;
 
@@ -95,15 +115,19 @@ const CALLBACK_INPUTS = [
  */
 export const CALLBACK_ATTRIBUTE_SELECTOR =
   '[onAccessibilityAction],[onAccessibilityEscape],[onAccessibilityTap],[onBlur],' +
-  '[onChangeText],[onContentSizeChange],[onEndEditing],[onError],[onFocus],[onHoverIn],[onHoverOut],' +
-  '[onKeyPress],[onLayout],[onLoad],[onLoadEnd],[onLoadStart],[onLongPress],[onMagicTap],' +
+  '[onBlurCapture],[onChangeText],[onClickCapture],[onContentSizeChange],[onEndEditing],[onError],' +
+  '[onFocus],[onFocusCapture],[onHoverIn],[onHoverOut],' +
+  '[onKeyDown],[onKeyDownCapture],[onKeyPress],[onKeyUp],[onKeyUpCapture],' +
+  '[onKeyboardDidHide],[onKeyboardDidShow],[onKeyboardWillHide],[onKeyboardWillShow],' +
+  '[onLayout],[onLoad],[onLoadEnd],[onLoadStart],[onLongPress],[onMagicTap],' +
   '[onMomentumScrollBegin],[onMomentumScrollEnd],[onMoveShouldSetResponder],' +
   '[onMoveShouldSetResponderCapture],[onPartialLoad],[onPress],[onPressIn],[onPressMove],' +
   '[onPressOut],[onProgress],[onRefresh],[onResponderEnd],[onResponderGrant],[onResponderMove],' +
   '[onResponderReject],[onResponderRelease],[onResponderStart],[onResponderTerminate],' +
-  '[onResponderTerminationRequest],[onScrollBeginDrag],[onScrollEndDrag],[onScrollToTop],' +
+  '[onResponderTerminationRequest],[onScrollAnimationEnd],[onScrollBeginDrag],[onScrollEndDrag],[onScrollToTop],' +
   '[onSelectionChange],[onStartShouldSetResponder],[onStartShouldSetResponderCapture],' +
-  '[onSubmitEditing],[onValueChange]';
+  '[onSubmitEditing],[onTouchCancel],[onTouchCancelCapture],[onTouchEnd],[onTouchEndCapture],' +
+  '[onTouchMove],[onTouchMoveCapture],[onTouchStart],[onTouchStartCapture],[onValueChange]';
 
 /** Exported for the guard alone — the decorator below must spell its own list for ngtsc. */
 export const CALLBACK_INPUT_NAMES: readonly string[] = CALLBACK_INPUTS;
@@ -111,15 +135,19 @@ export const CALLBACK_INPUT_NAMES: readonly string[] = CALLBACK_INPUTS;
 @Directive({
   selector:
     '[onAccessibilityAction],[onAccessibilityEscape],[onAccessibilityTap],[onBlur],' +
-    '[onContentSizeChange],[onEndEditing],[onError],[onFocus],[onHoverIn],[onHoverOut],' +
-    '[onKeyPress],[onLayout],[onLoad],[onLoadEnd],[onLoadStart],[onLongPress],[onMagicTap],' +
+    '[onBlurCapture],[onClickCapture],[onContentSizeChange],[onEndEditing],[onError],' +
+    '[onFocus],[onFocusCapture],[onHoverIn],[onHoverOut],' +
+    '[onKeyDown],[onKeyDownCapture],[onKeyPress],[onKeyUp],[onKeyUpCapture],' +
+    '[onKeyboardDidHide],[onKeyboardDidShow],[onKeyboardWillHide],' +
+    '[onKeyboardWillShow],[onLayout],[onLoad],[onLoadEnd],[onLoadStart],[onLongPress],[onMagicTap],' +
     '[onMomentumScrollBegin],[onMomentumScrollEnd],[onMoveShouldSetResponder],' +
     '[onMoveShouldSetResponderCapture],[onPartialLoad],[onPress],[onPressIn],[onPressMove],' +
     '[onPressOut],[onProgress],[onRefresh],[onResponderEnd],[onResponderGrant],[onResponderMove],' +
     '[onResponderReject],[onResponderRelease],[onResponderStart],[onResponderTerminate],' +
-    '[onResponderTerminationRequest],[onScrollBeginDrag],[onScrollEndDrag],[onScrollToTop],' +
+    '[onResponderTerminationRequest],[onScrollAnimationEnd],[onScrollBeginDrag],[onScrollEndDrag],[onScrollToTop],' +
     '[onSelectionChange],[onStartShouldSetResponder],[onStartShouldSetResponderCapture],' +
-    '[onSubmitEditing],[onValueChange]',
+    '[onSubmitEditing],[onTouchCancel],[onTouchCancelCapture],[onTouchEnd],[onTouchEndCapture],' +
+    '[onTouchMove],[onTouchMoveCapture],[onTouchStart],[onTouchStartCapture],[onValueChange]',
   // DECLARED, and this is not an optimisation — it is what makes withholding the tag directives
   // possible at all. `ɵɵproperty` on an element no directive claimed ends in `setDomProperty`, which
   // runs `validateAgainstEventProperties` and THROWS NG0306 on any name beginning with `on`
@@ -136,13 +164,24 @@ export const CALLBACK_INPUT_NAMES: readonly string[] = CALLBACK_INPUTS;
     'onAccessibilityEscape',
     'onAccessibilityTap',
     'onBlur',
+    'onBlurCapture',
+    'onClickCapture',
     'onContentSizeChange',
     'onEndEditing',
     'onError',
     'onFocus',
+    'onFocusCapture',
     'onHoverIn',
     'onHoverOut',
+    'onKeyDown',
+    'onKeyDownCapture',
     'onKeyPress',
+    'onKeyUp',
+    'onKeyUpCapture',
+    'onKeyboardDidHide',
+    'onKeyboardDidShow',
+    'onKeyboardWillHide',
+    'onKeyboardWillShow',
     'onLayout',
     'onLoad',
     'onLoadEnd',
@@ -168,6 +207,7 @@ export const CALLBACK_INPUT_NAMES: readonly string[] = CALLBACK_INPUTS;
     'onResponderStart',
     'onResponderTerminate',
     'onResponderTerminationRequest',
+    'onScrollAnimationEnd',
     'onScrollBeginDrag',
     'onScrollEndDrag',
     'onScrollToTop',
@@ -175,6 +215,14 @@ export const CALLBACK_INPUT_NAMES: readonly string[] = CALLBACK_INPUTS;
     'onStartShouldSetResponder',
     'onStartShouldSetResponderCapture',
     'onSubmitEditing',
+    'onTouchCancel',
+    'onTouchCancelCapture',
+    'onTouchEnd',
+    'onTouchEndCapture',
+    'onTouchMove',
+    'onTouchMoveCapture',
+    'onTouchStart',
+    'onTouchStartCapture',
     'onValueChange',
   ],
   standalone: true,

@@ -430,7 +430,7 @@ describe('Solid TextInput on the engine', () => {
         'setTextAndSelection',
         'blur',
       ]);
-      expect(fabric.commands[1]?.args).toEqual([3, 'hey', 1, 2]);
+      expect(fabric.commands[1]?.args).toEqual([3, null, 1, 2]);
       expect(fabric.commands[2]?.args).toEqual([3, '', 0, 0]);
     });
 

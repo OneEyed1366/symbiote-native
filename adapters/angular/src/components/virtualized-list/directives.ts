@@ -30,36 +30,60 @@ import {
   TemplateRef,
   ViewContainerRef,
   inject,
+  reflectComponentType,
+  type ComponentRef,
   type EmbeddedViewRef,
   type OnChanges,
   type OnDestroy,
   type SimpleChanges,
+  type Type,
 } from '@angular/core';
-import { dlog, isDebug } from '@symbiote-native/engine';
+import { dlog, isDebug, type IViewStyle } from '@symbiote-native/engine';
 import { countAngular } from '../../diagnostics';
 import type { ISeparators } from '@symbiote-native/components';
 
 let vListOutletInstanceCounter = 0;
 
+function nextOutletInstanceId(): number {
+  vListOutletInstanceCounter += 1;
+  return vListOutletInstanceCounter;
+}
+
 // The context a `vListItem` template receives, mirroring RN's renderItem info arg
 // ({ item, index, separators }). `$implicit` is the item, so `let-item` (no key) binds it.
-export interface IVListItemContext<ItemT> {
+export type IVListItemContext<ItemT> = {
   $implicit: ItemT;
   index: number;
   separators: ISeparators;
-}
+};
 
 // The context a `vListSeparator` template receives, mirroring RN's ItemSeparatorComponent props
 // (the highlight flag the cell toggles + the items flanking the gap). `$implicit` is the highlight
 // flag, so `let-highlighted` binds it.
-export interface IVListSeparatorContext<ItemT> {
+export type IVListSeparatorContext<ItemT> = {
   $implicit: boolean;
   highlighted: boolean;
   leadingItem?: ItemT;
   trailingItem?: ItemT;
   // RN lets a row drive arbitrary separator props via separators.updateProps; they ride here.
   [key: string]: unknown;
-}
+};
+
+// The context a `vListCell` template receives, RN's `CellRendererComponent` props
+// The template draws the wrapper and stamps the item and its separator through `content`
+// The item is `unknown`, a wrapping list hands it an entry or a row, not its own item type
+export type IVListCellContext = {
+  $implicit: unknown;
+  cellKey: string;
+  index: number;
+  style: IViewStyle | undefined;
+  // Wire both onto the wrapper: `(layout)="cell.layout($event)"`, `(focus)="cell.focus()"`
+  layout: (event: unknown) => void;
+  focus: () => void;
+  // Stamp it with `[vListOutlet]="cell.content" [vListOutletContext]="cell.contentContext"`
+  content: TemplateRef<unknown> | undefined;
+  contentContext: unknown;
+};
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -114,6 +138,20 @@ export class VListSeparatorDirective<ItemT = unknown> {
   }
 }
 
+// `<ng-template vListCell>` replaces the view around each cell (RN CellRendererComponent)
+// It must wire `layout` and `focus` itself, as RN's custom cell must wire `onLayout`
+@Directive({ selector: '[vListCell]', standalone: true })
+export class VListCellDirective {
+  readonly templateRef = inject<TemplateRef<IVListCellContext>>(TemplateRef);
+
+  static ngTemplateContextGuard(
+    _dir: VListCellDirective,
+    _ctx: unknown,
+  ): _ctx is IVListCellContext {
+    return true;
+  }
+}
+
 // Core-only NgTemplateOutlet twin. The adapter cannot import @angular/common's NgTemplateOutlet
 // (not a dependency), so the list stamps templates through this: it creates the embedded view when
 // the template changes and updates the live view's context IN PLACE on a context change, so a
@@ -122,19 +160,32 @@ export class VListSeparatorDirective<ItemT = unknown> {
 export class VListOutletDirective<C = unknown> implements OnChanges, OnDestroy {
   @Input({ alias: 'vListOutlet' }) templateRef?: TemplateRef<C>;
   @Input({ alias: 'vListOutletContext' }) context?: C;
+  // RN's `ListItemComponent`: stamped instead of the template, its inputs are the item context
+  @Input({ alias: 'vListOutletComponent' }) component?: Type<unknown>;
 
   private viewRef: EmbeddedViewRef<C> | null = null;
+  private componentRef: ComponentRef<unknown> | null = null;
   private readonly viewContainer = inject(ViewContainerRef);
-  private readonly instanceId = (vListOutletInstanceCounter += 1);
+  private readonly instanceId = nextOutletInstanceId();
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes['templateRef'] !== undefined) {
+    if (
+      changes['templateRef'] !== undefined ||
+      changes['component'] !== undefined
+    ) {
       if (isDebug())
         dlog(
-          `Angular VListOutlet#${this.instanceId} templateRef CHANGED (was=${changes['templateRef'].previousValue !== undefined} now=${this.templateRef !== undefined}) -> clear + recreate`,
+          `Angular VListOutlet#${this.instanceId} templateRef CHANGED (was=${changes['templateRef']?.previousValue !== undefined} now=${this.templateRef !== undefined}) -> clear + recreate`,
         );
       this.viewContainer.clear();
       countAngular('outletCreates');
+      this.componentRef = null;
+      this.viewRef = null;
+      if (this.component !== undefined) {
+        this.componentRef = this.viewContainer.createComponent(this.component);
+        this.writeComponentInputs(this.componentRef);
+        return;
+      }
       this.viewRef =
         this.templateRef === undefined
           ? null
@@ -142,6 +193,11 @@ export class VListOutletDirective<C = unknown> implements OnChanges, OnDestroy {
               this.templateRef,
               this.context,
             );
+      return;
+    }
+    if (this.componentRef !== null) {
+      countAngular('outletUpdates');
+      this.writeComponentInputs(this.componentRef);
       return;
     }
     if (this.viewRef !== null && this.context !== undefined) {
@@ -159,6 +215,26 @@ export class VListOutletDirective<C = unknown> implements OnChanges, OnDestroy {
     countAngular('outletDestroys');
     if (isDebug()) dlog(`Angular VListOutlet#${this.instanceId} destroyed`);
     this.viewContainer.clear();
+  }
+
+  // The item context becomes the component's inputs, only those it declares: RN hands a
+  // `ListItemComponent` item, index and separators, and one may not read all three
+  private writeComponentInputs(ref: ComponentRef<unknown>): void {
+    const { context } = this;
+    if (!isRecord(context)) return;
+    const declared = new Set(
+      reflectComponentType(ref.componentType)?.inputs.map(
+        input => input.propName,
+      ),
+    );
+    const inputs = {
+      item: context['$implicit'],
+      index: context['index'],
+      separators: context['separators'],
+    };
+    for (const [name, value] of Object.entries(inputs)) {
+      if (declared.has(name)) ref.setInput(name, value);
+    }
   }
 
   // Copy the new context's fields onto the live embedded view's context object (whose identity the

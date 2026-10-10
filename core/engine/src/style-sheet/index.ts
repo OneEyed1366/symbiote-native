@@ -5,10 +5,15 @@
 // constants. The typed ViewStyle/TextStyle live next door in styles.ts, so `create`
 // is typed against them like RN's, not left generic over a plain Record.
 
-import { dlog } from '../debug';
-import { getNativeModule } from '../native-modules';
+import { isDevBuild } from '../platform/shared';
+import { PixelRatio } from '../react-native-host';
 import { flattenStyle } from '../style';
+import {
+  preprocessFlatStyle,
+  setStylePreprocessor,
+} from '../style-preprocessors';
 import type { INamedStyles, IViewStyle, ITextStyle } from '../styles';
+import { isRecord } from '../type-guards';
 
 // RN constrains create with `T & NamedStyles<any>` to catch typos; we name the index
 // shape concretely instead of `any`: every value must be a real style object.
@@ -22,50 +27,6 @@ type IStyleObject = Record<string, unknown>;
 // nearest device pixel. Named so the 0.4 isn't a bare magic number (RN source uses
 // the same literal in PixelRatio.roundToNearestPixel(0.4)).
 const HAIRLINE_LOGICAL_FACTOR = 0.4;
-
-// Fallback when DeviceInfo isn't resolvable (headless, or before native bring-up).
-// RN can't run without it; we degrade to a sane 1px line rather than crash.
-const HAIRLINE_FALLBACK = 1;
-
-// The shape we read off DeviceInfo's constants, RN's source of truth for screen
-// scale. The key is platform-specific: iOS ships it under Dimensions.window, Android
-// under Dimensions.windowPhysicalPixels (the same scale value: toPointSpace divides
-// width/height, never scale). Both optional so a missing/renamed key degrades to the
-// hairline fallback instead of throwing mid-render. Narrowed at the native trust
-// boundary by getNativeModule<T>.
-interface IDisplayMetrics {
-  scale?: number;
-}
-interface IDeviceInfoModule {
-  getConstants(): {
-    Dimensions: {
-      window?: IDisplayMetrics;
-      windowPhysicalPixels?: IDisplayMetrics;
-    };
-  };
-}
-
-// Resolve the screen pixel scale lazily from native, or null when unavailable.
-// Lazy (not at import) so this module is importable headless before a fake
-// __turboModuleProxy exists, same precedent as StatusBar's in-effect resolve.
-function resolveScreenScale(): number | null {
-  const deviceInfo = getNativeModule<IDeviceInfoModule>('DeviceInfo');
-  if (deviceInfo === null) {
-    dlog('StyleSheet: DeviceInfo not resolvable — hairlineWidth falls back');
-    return null;
-  }
-  const dimensions = deviceInfo.getConstants().Dimensions;
-  const scale =
-    dimensions.window?.scale ?? dimensions.windowPhysicalPixels?.scale;
-  // A non-positive scale would make the round/divide nonsensical; treat as missing.
-  if (typeof scale !== 'number' || scale <= 0) {
-    dlog(
-      `StyleSheet: DeviceInfo scale invalid (${String(scale)}) — hairlineWidth falls back`,
-    );
-    return null;
-  }
-  return scale;
-}
 
 // Compute the hairline width for a given scale, mirroring RN exactly: round the
 // logical factor to the nearest device pixel, and if that rounds to 0 (scale < ~1.25)
@@ -96,52 +57,23 @@ function compose<A, B>(style1: A, style2: B): A | B | [A, B] {
   return [style1, style2];
 }
 
-// Per-attribute style preprocessors, keyed by property name. RN keeps these in
-// ReactNativeStyleAttributes and runs them as a value passes to native; here the
-// registry is consulted by `flatten` (the one place a style collapses to the flat
-// payload before commit), so a registered process() rewrites the matching key.
-type IStylePreprocessor = (value: unknown) => unknown;
-const stylePreprocessors = new Map<string, IStylePreprocessor>();
-
-// Register a value-rewriter for one style property (RN's setStyleAttributePreprocessor,
-// StyleSheetExports.js:151). EXPERIMENTAL in RN; used internally for color/transform.
-// Overwriting an existing preprocessor warns, matching RN's __DEV__ guard.
-function setStyleAttributePreprocessor(
-  property: string,
-  process: IStylePreprocessor,
-): void {
-  if (stylePreprocessors.has(property)) {
-    dlog(
-      `StyleSheet.setStyleAttributePreprocessor: overwriting "${property}" preprocessor`,
-    );
-  }
-  stylePreprocessors.set(property, process);
+// RN `flattenStyle`: null и не-объект дают `undefined`, одиночный объект возвращается как есть
+function flattenLikeRn(style: unknown): Record<string, unknown> | undefined {
+  if (style === null || typeof style !== 'object') return undefined;
+  if (Array.isArray(style)) return flattenStyle(style);
+  return isRecord(style) ? style : undefined;
 }
 
-// Flatten, then run any registered preprocessor over the matching keys. Kept as a
-// wrapper over the single flattenStyle collapse so the preprocessor map is applied
-// exactly once, at the same seam RN applies it (the style->payload boundary), without
-// reaching into the commit path.
-function flattenWithPreprocessors(style: unknown): Record<string, unknown> {
-  const flat = flattenStyle(style);
-  if (stylePreprocessors.size === 0) return flat;
-  for (const [property, process] of stylePreprocessors) {
-    if (Object.hasOwn(flat, property)) {
-      flat[property] = process(flat[property]);
-    }
-  }
-  return flat;
+function flattenWithPreprocessors(
+  style: unknown,
+): Record<string, unknown> | undefined {
+  const flat = flattenLikeRn(style);
+  return flat === undefined ? undefined : preprocessFlatStyle(flat);
 }
 
-// Snap a dp size to the nearest value that maps to a whole number of device pixels.
-// RN's StyleSheet.roundToNearestPixel delegates to PixelRatio.roundToNearestPixel
-// (Math.round(size * scale) / scale). PixelRatio lives in the react adapter, which
-// shared cannot import, so the same math runs here over the scale shared already
-// resolves; an unresolvable scale (headless) leaves the value unrounded.
+// RN's `StyleSheet.roundToNearestPixel` is `PixelRatio.roundToNearestPixel`
 function roundToNearestPixel(value: number): number {
-  const scale = resolveScreenScale();
-  if (scale === null) return value;
-  return Math.round(value * scale) / scale;
+  return PixelRatio.roundToNearestPixel(value);
 }
 
 export const StyleSheet = {
@@ -151,6 +83,10 @@ export const StyleSheet = {
   create<T extends INamedStyles<T> | IStyleRecord>(
     styles: T & IStyleRecord,
   ): T {
+    // RN freezes each entry in a dev bundle, so a mutation fails at the line that makes it
+    if (isDevBuild()) {
+      for (const entry of Object.values(styles)) Object.freeze(entry);
+    }
     return styles;
   },
 
@@ -161,17 +97,14 @@ export const StyleSheet = {
 
   compose,
 
-  setStyleAttributePreprocessor,
+  setStyleAttributePreprocessor: setStylePreprocessor,
   roundToNearestPixel,
 
   absoluteFill,
   absoluteFillObject: absoluteFill,
 
-  // Lazy compute, recomputed each read (cheap, and avoids caching a fallback taken
-  // before native was ready). RN memoizes; we keep it simple until that's a cost.
+  // Read lazily, since `PixelRatio` is only wired once the host hands `react-native` over
   get hairlineWidth(): number {
-    const scale = resolveScreenScale();
-    if (scale === null) return HAIRLINE_FALLBACK;
-    return computeHairlineWidth(scale);
+    return computeHairlineWidth(PixelRatio.get());
   },
 };

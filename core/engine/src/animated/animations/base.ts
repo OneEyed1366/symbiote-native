@@ -9,7 +9,12 @@
 // class fields) so a subclass override is not shadowed under
 // useDefineForClassFields.
 
-import type { IAnimation, IEndCallback, IEndResult } from '../animation';
+import type {
+  IAnimation,
+  IAnimationRun,
+  IEndCallback,
+  IEndResult,
+} from '../animation';
 import type { AnimatedValue } from '../value';
 import { dlog, isDebug } from '../../debug';
 import {
@@ -20,7 +25,12 @@ import {
   type IPlatformConfig,
 } from '../native/native-animated';
 
-export interface IAnimationConfig {
+export const MISSING_DRIVER_WARNING =
+  'Animated: `useNativeDriver` was not specified. This is a required option and must be explicitly set to `true` or `false`';
+const JS_ON_NATIVE_MESSAGE =
+  'Attempting to run JS driven animation on animated node that has been moved to "native" earlier by starting an animation with `useNativeDriver: true`';
+
+export type IAnimationConfig = {
   isInteraction?: boolean;
   iterations?: number;
   // Offload the curve to the stock native module (zero JS per frame).
@@ -31,7 +41,7 @@ export interface IAnimationConfig {
   // native diagnostics. Optional. Current callers pass nothing.
   platformConfig?: IPlatformConfig;
   debugID?: string;
-}
+};
 
 export abstract class BaseAnimation implements IAnimation {
   // `protected` so subclasses read it inside their rAF loop to decide whether to
@@ -50,6 +60,7 @@ export abstract class BaseAnimation implements IAnimation {
   private nativeId: number | undefined;
 
   constructor(config: IAnimationConfig) {
+    if (config.useNativeDriver == null) console.warn(MISSING_DRIVER_WARNING);
     this.__iterations = config.iterations ?? 1;
     this.nativeDriverRequested = config.useNativeDriver === true;
     this.__platformConfig = config.platformConfig;
@@ -62,17 +73,16 @@ export abstract class BaseAnimation implements IAnimation {
     return isDebug() ? this.__debugID : undefined;
   }
 
-  abstract start(
-    fromValue: number,
-    onUpdate: (value: number) => void,
-    onEnd: IEndCallback,
-    previousAnimation: IAnimation | null,
-    animatedValue: AnimatedValue,
-  ): void;
+  abstract start(run: IAnimationRun): void;
 
-  // Subclasses call super.start(...) shape via this helper to wire the end
-  // callback and arm the active flag before launching their loop.
-  protected begin(onEnd: IEndCallback): void {
+  // Подключает колбэк конца и взводит флаг до запуска цикла в потомке
+  // JS-анимация над native-значением бросает сразу, даже если запуск отложен `delay`
+  protected begin({ onEnd, animatedValue }: IAnimationRun): void {
+    const isNativeDriven =
+      this.nativeDriverRequested && isNativeAnimatedAvailable();
+    if (!isNativeDriven && animatedValue.__isNative()) {
+      throw new Error(JS_ON_NATIVE_MESSAGE);
+    }
     this.onEndCallback = onEnd;
     this.__active = true;
   }
@@ -84,11 +94,8 @@ export abstract class BaseAnimation implements IAnimation {
     );
   }
 
-  // If useNativeDriver was requested and the module is present, mirror the value
-  // graph into native and hand the curve to native. The JS rAF loop is then
-  // skipped entirely. Returns true when native took over. Falls back to JS (false)
-  // when the module is missing, so an app without RCTAnimation
-  // still animates.
+  // Отдаёт кривую native, если драйвер запрошен и модуль есть, тогда цикл rAF не нужен
+  // Возвращает true, когда native взял анимацию, иначе остаётся JS
   protected startNativeIfNeeded(animatedValue: AnimatedValue): boolean {
     if (!this.nativeDriverRequested) return false;
     if (!isNativeAnimatedAvailable()) {
@@ -104,7 +111,7 @@ export abstract class BaseAnimation implements IAnimation {
     animatedValue.__startNativeAnimation(
       this.getNativeAnimationConfig(),
       this.nativeId,
-      finished => this.__notifyAnimationEnd({ finished }),
+      result => this.__notifyAnimationEnd(result),
       this.__platformConfig,
     );
     return true;

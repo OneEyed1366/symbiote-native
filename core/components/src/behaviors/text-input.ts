@@ -11,9 +11,11 @@
 import {
   appListenerFor,
   blurTextInput,
+  currentlyFocusedInput,
   dispatchViewCommand,
   dlog,
   focusTextInput,
+  isSymbioteNode,
   Platform,
   propOf,
   propsOf,
@@ -24,6 +26,7 @@ import {
   setNodeDispatch,
   setProp,
   type IEventDispatch,
+  type IPayloadFold,
   type ISymbioteEvent,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
@@ -51,7 +54,7 @@ import {
 export const TEXT_INPUT_TAG = 'text-input';
 export const TEXT_INPUT_MULTILINE_TAG = 'text-input-multiline';
 
-interface IBehaviorState {
+type IBehaviorState = {
   // The count native last acknowledged, echoed back on every controlled write so native's own
   // `eventLag` lands on 0 and the write applies rather than being discarded as stale.
   mostRecentEventCount: number;
@@ -59,9 +62,6 @@ interface IBehaviorState {
   // `text` prop already carried that value down at createNode — so the FIRST value is not a
   // divergence and must NOT re-command.
   lastNativeText: string | undefined;
-  // Mirrored from the focus/blur events. Native exposes no synchronous focus getter, and RN's own
-  // TextInputState holds the same mirror for the same reason.
-  isFocused: boolean;
   // Whether the mirror was seeded on THIS commit, so the beat that follows has nothing to compare:
   // attachAfterCommit and afterCommit both run on the landing commit, and the first seeds
   // lastNativeText from the value the second would read back. TEXT ONLY — see lastNativeSelection.
@@ -71,7 +71,7 @@ interface IBehaviorState {
   // a real selection always differs from it, so an authored `selection` moves the caret on the
   // very first commit, with no preceding value write.
   lastNativeSelection: { start: number; end: number };
-}
+};
 
 const states = new WeakMap<ISymbioteNode, IBehaviorState>();
 
@@ -177,16 +177,12 @@ function onChange(node: ISymbioteNode, event: ISymbioteEvent): void {
 }
 
 function onFocus(node: ISymbioteNode, event: ISymbioteEvent): void {
-  const state = stateOf(node);
-  if (state !== undefined) state.isFocused = true;
   // App-wide, so `Keyboard.dismiss()` can blur this input without holding a ref to it.
   setInputFocused(node);
   callAppListener(node, 'focus', event);
 }
 
 function onBlur(node: ISymbioteNode, event: ISymbioteEvent): void {
-  const state = stateOf(node);
-  if (state !== undefined) state.isFocused = false;
   setInputBlurred(node);
   callAppListener(node, 'blur', event);
 }
@@ -268,7 +264,6 @@ function attach(node: ISymbioteNode): void {
   states.set(node, {
     mostRecentEventCount: INITIAL_EVENT_COUNT,
     lastNativeText: undefined,
-    isFocused: false,
     isMirrorFreshlySeeded: false,
     lastNativeSelection: { start: SELECTION_NONE, end: SELECTION_NONE },
   });
@@ -285,16 +280,38 @@ function attach(node: ISymbioteNode): void {
   // AFTER the machine, which points the node at its own: a node holds exactly one dispatch, and
   // `TEXT_INPUT_DISPATCH` is the union that delegates the machine's seven back to it
   setNodeDispatch(node, TEXT_INPUT_DISPATCH);
+  putRnApiOnNode(node);
+}
+
+// A `<text-input>` ref IS its node, so RN's ref API (`TextInput.js` `ref` callback) sits on it
+// `focus`/`blur` replace the raw commands: RN routes them through `TextInputState`
+function putRnApiOnNode(node: ISymbioteNode): void {
+  const handle = buildTextInputHandle(node);
+  Object.assign(node, {
+    focus: handle.focus,
+    blur: handle.blur,
+    clear: handle.clear,
+    isFocused: handle.isFocused,
+    setSelection: handle.setSelection,
+    getNativeRef: handle.getNativeRef,
+  });
+}
+
+// TextInput.js passes `onSelectionChangeShouldSetResponder` on its iOS branch only, so a drag on
+// the selection handles keeps the gesture
+function claimsSelectionDrag(): boolean {
+  return Platform.OS === 'ios';
 }
 
 const OWN_HANDLERS: ReadonlyMap<
   string,
-  (node: ISymbioteNode, event: ISymbioteEvent) => void
+  (node: ISymbioteNode, event: ISymbioteEvent) => unknown
 > = new Map([
   ['change', onChange],
   ['focus', onFocus],
   ['blur', onBlur],
   ['selectionChange', onSelectionChange],
+  ['selectionChangeShouldSetResponder', claimsSelectionDrag],
 ]);
 
 const TEXT_INPUT_DISPATCH: IEventDispatch = {
@@ -410,7 +427,9 @@ export function buildTextInputHandle(node: ISymbioteNode): ITextInputHandle {
     // Through TextInputState, NOT a raw command: a raw command looks equivalent and isn't, since
     // Keyboard.dismiss() reads currentlyFocusedInput() and a stale entry blurs the wrong node.
     blur: () => blurTextInput(node),
-    isFocused: () => stateOf(node)?.isFocused === true,
+    // The app-wide tracker, as RN reads it: a command moves it before any native event
+    isFocused: () => currentlyFocusedInput() === node,
+    getNativeRef: () => node,
     clear: () => {
       const state = stateOf(node);
       if (state === undefined) return;
@@ -420,22 +439,38 @@ export function buildTextInputHandle(node: ISymbioteNode): ITextInputHandle {
         0,
         0,
       ]);
-      state.lastNativeText = '';
     },
     setSelection: (start: number, end: number) => {
       const state = stateOf(node);
       if (state === undefined) return;
-      // The CURRENT text, not the app's `value`: a selection move must not also rewrite the text,
-      // and native discards a command whose text disagrees with what it holds.
+      // A null text, as RN sends: a selection move must not rewrite what native holds
       dispatchViewCommand(node, 'setTextAndSelection', [
         state.mostRecentEventCount,
-        state.lastNativeText,
+        null,
         start,
         end,
       ]);
     },
   };
 }
+
+// The typed view of a `<text-input>` ref, which is the node with RN's methods on it
+export function textInputOf(value: unknown): ITextInputHandle | undefined {
+  if (!isSymbioteNode(value) || !states.has(value)) return undefined;
+  return buildTextInputHandle(value);
+}
+
+// Android's TextInput.js:737-741 throws for a `value` together with children. It is checked when a
+// child lands, so a `value` written after the children is not seen
+function rejectValueWithChildren(node: ISymbioteNode): void {
+  if (propOf(node, 'value') != null) {
+    throw new Error('Cannot specify both value and children.');
+  }
+}
+
+// RN forces `caretHidden` under `Platform.isTesting` (TextInput.js:623). The flag is native
+// state C++ cannot read, and it is fixed for the process, so the fold exists only in a test run
+const hideCaret: IPayloadFold = props => ({ ...props, caretHidden: true });
 
 // Idempotent: an adapter entry may be imported more than once in a bundle, and re-registering the
 // same tag with an equivalent behavior must not double-install anything.
@@ -447,6 +482,12 @@ export function registerTextInputBehavior(): void {
     attachAfterCommit,
     afterCommit,
     detach,
+    acceptsTextChildren: true,
+    ...(Platform.isTesting ? { foldPayload: hideCaret } : {}),
+    ...Platform.select({
+      android: { onChildInserted: rejectValueWithChildren },
+      default: {},
+    }),
     // The three the change/focus/blur machine needs as INPUTS, plus the press family the
     // tap-to-focus machine composes. Without the stash the app's own `onChange` would evict the
     // machine from the very event the controlled handshake runs on.

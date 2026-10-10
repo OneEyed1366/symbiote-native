@@ -6,19 +6,25 @@
 
 import type { AnimatedValue } from './value';
 
-export interface IEndResult {
+// `value` and `offset` come only from a native driver, they are what native ended on
+export type IEndResult = {
   finished: boolean;
-}
+  value?: number;
+  offset?: number;
+};
 
 export type IEndCallback = (result: IEndResult) => void;
 
-export interface IAnimation {
-  start(
-    fromValue: number,
-    onUpdate: (value: number) => void,
-    onEnd: IEndCallback,
-    previousAnimation: IAnimation | null,
-    animatedValue: AnimatedValue,
-  ): void;
+// Всё, что значение отдаёт драйверу при запуске, у RN это позиционные аргументы
+export type IAnimationRun = {
+  readonly fromValue: number;
+  readonly onUpdate: (value: number) => void;
+  readonly onEnd: IEndCallback;
+  readonly previousAnimation: IAnimation | null;
+  readonly animatedValue: AnimatedValue;
+};
+
+export type IAnimation = {
+  start(run: IAnimationRun): void;
   stop(): void;
-}
+};

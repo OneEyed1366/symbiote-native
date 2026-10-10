@@ -31,6 +31,12 @@
 #else
 #include <JSCRuntime.h>
 #endif
+#include <ReactCommon/CallInvoker.h>
+#include <jsi/JSIDynamic.h>
+#include <react/renderer/animated/AnimatedModule.h>
+#include <react/renderer/animated/NativeAnimatedNodesManagerProvider.h>
+#include <react/renderer/animationbackend/AnimationChoreographer.h>
+#include <react/featureflags/ReactNativeFeatureFlags.h>
 #include <react/renderer/componentregistry/ComponentDescriptorProviderRegistry.h>
 #include <react/renderer/components/image/ImageComponentDescriptor.h>
 #include <react/renderer/components/modal/ModalHostViewComponentDescriptor.h>
@@ -41,10 +47,14 @@
 #include <react/renderer/components/text/TextComponentDescriptor.h>
 #include <react/renderer/components/view/ViewComponentDescriptor.h>
 #include <react/renderer/core/EventBeat.h>
+#include <react/renderer/dom/DOM.h>
 #include <react/renderer/core/EventQueueProcessor.h>
 #include <react/renderer/mounting/ShadowTree.h>
 #include <react/renderer/mounting/stubs/stubs.h>
 #include <react/renderer/runtimescheduler/RuntimeScheduler.h>
+#include <react/renderer/scheduler/Scheduler.h>
+#include <react/renderer/scheduler/SchedulerDelegate.h>
+#include <react/renderer/scheduler/SchedulerToolbox.h>
 #include <react/renderer/uimanager/UIManager.h>
 #include <react/renderer/uimanager/UIManagerBinding.h>
 
@@ -72,6 +82,51 @@ class TickingEventBeat final : public EventBeat {
   void tick() const { induce(); }
 };
 
+// The clock a native animation reads, moved only by `Host::produceFrames`
+inline std::chrono::steady_clock::time_point &stubNow() {
+  static auto now = std::chrono::steady_clock::now();
+  return now;
+}
+inline std::chrono::steady_clock::time_point readStubNow() { return stubNow(); }
+
+// Fantom's `TesterAnimationChoreographer`: the shared animation backend ticks only when told to
+class TestAnimationChoreographer final : public AnimationChoreographer {
+ public:
+  void resume() override { isPaused_ = false; }
+  void pause() override { isPaused_ = true; }
+  AnimationTimestamp now() const override {
+    return std::chrono::duration_cast<AnimationTimestamp>(stubNow().time_since_epoch());
+  }
+  void runUiTick() {
+    if (isPaused_) return;
+    ShadowNode::setUseRuntimeShadowNodeReferenceUpdateOnThread(false);
+    onAnimationFrame(now());
+    ShadowNode::setUseRuntimeShadowNodeReferenceUpdateOnThread(true);
+  }
+
+ private:
+  bool isPaused_{false};
+};
+
+// `jsInvoker` for the animation module: work for the JS thread waits here until the Host drains it
+class QueuedCallInvoker final : public CallInvoker {
+ public:
+  explicit QueuedCallInvoker(jsi::Runtime &runtime) : runtime_(runtime) {}
+  void invokeAsync(CallFunc &&func) noexcept override { queue_.push_back(std::move(func)); }
+  void invokeSync(CallFunc &&func) override { func(runtime_); }
+  void drain() {
+    while (!queue_.empty()) {
+      auto func = std::move(queue_.front());
+      queue_.pop_front();
+      func(runtime_);
+    }
+  }
+
+ private:
+  jsi::Runtime &runtime_;
+  std::deque<CallFunc> queue_;
+};
+
 constexpr SurfaceId kSurfaceId = 1;
 constexpr Float kViewportWidth = 500;
 constexpr Float kViewportHeight = 500;
@@ -83,42 +138,44 @@ struct RecordedCommand {
   folly::dynamic args;
 };
 
-/**
- * The one `UIManagerDelegate` hook this harness needs, over the thirteen it does not.
- *
- * `UIManager::dispatchCommand` (`UIManager.cpp`) only reaches a delegate at all when one is set —
- * `delegate_` is null by default, so a command a test dispatches is silently DROPPED with no error,
- * no crash, nothing to read back. The other thirteen methods on the interface are TRANSACTION/
- * MOUNTING notifications a real host uses to drive its OWN mounting pipeline; this Host already
- * pulls transactions itself (`mount()`, `mountingCoordinator_->pullTransaction()`), so they are
- * safe no-ops here rather than a second, competing mounting path.
- */
-class CommandRecorder final : public UIManagerDelegate {
+// What a platform hands the `Scheduler`. Commands and animation writes are kept for a test to read
+// back; mounting notifications are no-ops, since this Host pulls transactions itself
+class HostSchedulerDelegate final : public SchedulerDelegate {
  public:
   std::vector<RecordedCommand> commands;
+  // The last props an animation wrote straight into a view, and the ones it committed to Fabric
+  std::unordered_map<Tag, folly::dynamic> directManipulation;
+  std::unordered_map<Tag, folly::dynamic> fabricUpdates;
+  std::function<void(SurfaceId)> onMergeReactRevision;
 
-  void uiManagerDidDispatchCommand(const std::shared_ptr<const ShadowNode> &shadowNode,
-                                    const std::string &commandName,
-                                    const folly::dynamic &args) override {
-    commands.push_back({shadowNode->getTag(), commandName, args});
+  void schedulerDidFinishTransaction(const std::shared_ptr<const MountingCoordinator> &) override {}
+  void schedulerShouldRenderTransactions(const std::shared_ptr<const MountingCoordinator> &) override {}
+  void schedulerShouldMergeReactRevision(SurfaceId surfaceId) override {
+    if (onMergeReactRevision) onMergeReactRevision(surfaceId);
   }
+  void schedulerDidRequestPreliminaryViewAllocation(const ShadowNode &) override {}
+  void schedulerDidDispatchCommand(const ShadowView &shadowView, const std::string &commandName,
+                                   const folly::dynamic &args) override {
+    commands.push_back({shadowView.tag, commandName, args});
+  }
+  void schedulerDidSendAccessibilityEvent(const ShadowView &, const std::string &) override {}
+  void schedulerDidSetIsJSResponder(const ShadowView &, bool, bool) override {}
+  void schedulerShouldSynchronouslyUpdateViewOnUIThread(Tag tag,
+                                                        const folly::dynamic &props) override {
+    merge(directManipulation[tag], props);
+  }
+  void schedulerDidUpdateShadowTree(const std::unordered_map<Tag, folly::dynamic> &updates) override {
+    for (const auto &[tag, props] : updates) merge(fabricUpdates[tag], props);
+  }
+  void schedulerDidCaptureViewSnapshot(Tag, SurfaceId) override {}
+  void schedulerDidSetViewSnapshot(Tag, Tag, SurfaceId) override {}
+  void schedulerDidClearPendingSnapshots() override {}
 
-  void uiManagerDidFinishTransaction(std::shared_ptr<const MountingCoordinator>, bool) override {}
-  void uiManagerDidCreateShadowNode(const ShadowNode &) override {}
-  void uiManagerDidSendAccessibilityEvent(const std::shared_ptr<const ShadowNode> &,
-                                           const std::string &) override {}
-  void uiManagerDidSetIsJSResponder(const std::shared_ptr<const ShadowNode> &, bool, bool) override {}
-  void uiManagerShouldSynchronouslyUpdateViewOnUIThread(Tag, const folly::dynamic &) override {}
-  void uiManagerDidUpdateShadowTree(const std::unordered_map<Tag, folly::dynamic> &) override {}
-  void uiManagerShouldAddEventListener(std::shared_ptr<const EventListener>) override {}
-  void uiManagerShouldRemoveEventListener(const std::shared_ptr<const EventListener> &) override {}
-  void uiManagerDidStartSurface(const ShadowTree &) override {}
-  void uiManagerDidFinishReactCommit(const ShadowTree &) override {}
-  void uiManagerDidPromoteReactRevision(const ShadowTree &) override {}
-  void uiManagerShouldSetOnSurfaceStartCallback(OnSurfaceStartCallback &&) override {}
-  void uiManagerDidCaptureViewSnapshot(Tag, SurfaceId) override {}
-  void uiManagerDidSetViewSnapshot(Tag, Tag, SurfaceId) override {}
-  void uiManagerDidClearPendingSnapshots() override {}
+ private:
+  static void merge(folly::dynamic &into, const folly::dynamic &props) {
+    if (!into.isObject()) into = folly::dynamic::object();
+    for (const auto &[key, value] : props.items()) into[key] = value;
+  }
 };
 
 /**
@@ -151,89 +208,66 @@ inline std::unique_ptr<facebook::jsi::Runtime> makeRuntime() {
 class Host {
  public:
   Host() : runtime_(makeRuntime()) {
-    contextContainer_ = std::make_shared<ContextContainer>();
-
-    // Events reach JS the way they reach it on a device, because the pipeline is React Native's own
-    // — `Scheduler.cpp` assembles these four pieces in this order and we assemble the same four.
-    // Building a shortcut instead (calling a registered handler directly, as the fake Fabric does)
-    // is what makes an event test prove that the test double works.
-    //
-    // The executor runs INLINE: there is one thread here, and a test that has to pump a queue to
-    // observe a press is measuring the harness.
+    // The pipeline is RN's own `Scheduler`: an event test proves the engine, not a test double.
+    // The executor runs INLINE, there is one thread
     RuntimeExecutor inline_ = [this](std::function<void(jsi::Runtime &)> &&work) {
       work(*runtime_);
     };
-    runtimeScheduler_ = std::make_unique<RuntimeScheduler>(inline_);
-    uiManager_ = std::make_shared<UIManager>(inline_, contextContainer_);
+    runtimeScheduler_ = std::make_shared<RuntimeScheduler>(inline_);
+    auto container = std::make_shared<ContextContainer>();
+    container->insert(RuntimeSchedulerKey, std::weak_ptr<RuntimeScheduler>(runtimeScheduler_));
+    contextContainer_ = container;
 
-    auto eventOwnerBox = std::make_shared<EventBeat::OwnerBox>();
-    eventDispatcher_ = std::make_shared<std::optional<const EventDispatcher>>();
-    eventOwnerBox->owner = eventDispatcher_;
-
-    auto uiManager = uiManager_;
-    auto eventPipe = [uiManager](jsi::Runtime &runtime, EventTarget *eventTarget,
-                                 const std::string &type, ReactEventPriority priority,
-                                 const EventPayload &payload, HighResTimeStamp eventTimestamp) {
-      uiManager->visitBinding(
-          [&](const UIManagerBinding &binding) {
-            binding.dispatchEvent(runtime, eventTarget, type, priority, payload, eventTimestamp);
-          },
-          runtime);
-    };
-    auto statePipe = [uiManager](const StateUpdate &stateUpdate) {
-      uiManager->updateState(stateUpdate);
-    };
-    auto eventBeat = std::make_unique<TickingEventBeat>(eventOwnerBox, *runtimeScheduler_);
-    // Kept as an observer so the beat can be INDUCED. `request()` only raises a flag; on a device
-    // the platform's run-loop observer calls `induce()` on the next tick and that is what actually
-    // delivers. This process has no run loop, so the tick is explicit.
-    eventBeat_ = eventBeat.get();
-    eventDispatcher_->emplace(
-        EventQueueProcessor(eventPipe, [](jsi::Runtime &) {}, statePipe,
-                            std::weak_ptr<EventLogger>{}),
-        std::move(eventBeat),
-        statePipe,
-        std::weak_ptr<EventLogger>{});
-
-    auto registry = providers_.createComponentDescriptorRegistry(ComponentDescriptorParameters{
-        .eventDispatcher = EventDispatcher::Shared{eventDispatcher_, &eventDispatcher_->value()},
-        .contextContainer = contextContainer_,
-        .flavor = nullptr});
     providers_.add(concreteComponentDescriptorProvider<RootComponentDescriptor>());
     providers_.add(concreteComponentDescriptorProvider<ViewComponentDescriptor>());
     providers_.add(concreteComponentDescriptorProvider<ParagraphComponentDescriptor>());
     providers_.add(concreteComponentDescriptorProvider<TextComponentDescriptor>());
     providers_.add(concreteComponentDescriptorProvider<RawTextComponentDescriptor>());
     providers_.add(concreteComponentDescriptorProvider<ScrollViewComponentDescriptor>());
-    // `Modal` and `SafeAreaView` need the codegen'd core spec, which React Native SHIPS already
-    // generated (`React/FBReactNativeSpec`) — see the CMakeLists. A third-party Fabric view
-    // (Slider, screens, PullToRefresh) has no C++ in this repo at all and never will.
-    //
-    // The trap is that a missing descriptor does not FAIL: an unregistered name falls back to a
-    // plain View, so the test reads `View` where it expected `ModalHostView` and looks like a wrong
-    // assertion rather than a missing component. That is how `symbiote-view` once appeared to work.
+    // `Modal` and `SafeAreaView` use the codegen'd spec RN ships (see the CMakeLists). A missing
+    // descriptor does not fail: the name falls back to a View and reads like a wrong assertion
     providers_.add(concreteComponentDescriptorProvider<ImageComponentDescriptor>());
     providers_.add(concreteComponentDescriptorProvider<ModalHostViewComponentDescriptor>());
 
-    uiManager_->setComponentDescriptorRegistry(registry);
-    uiManager_->setDelegate(&commandRecorder_);
+    SchedulerToolbox toolbox{
+        .contextContainer = contextContainer_,
+        .componentRegistryFactory =
+            [this](const EventDispatcher::Weak &eventDispatcher,
+                   const std::shared_ptr<const ContextContainer> &context) {
+              return providers_.createComponentDescriptorRegistry(ComponentDescriptorParameters{
+                  .eventDispatcher = eventDispatcher, .contextContainer = context, .flavor = nullptr});
+            },
+        .bridgelessBindingsExecutor = std::nullopt,
+        .runtimeExecutor = inline_,
+        // `request()` only raises a flag, a device's run-loop observer induces the delivery; here
+        // the tick is explicit, so the beat is kept
+        .eventBeatFactory =
+            [this](std::shared_ptr<EventBeat::OwnerBox> ownerBox) -> std::unique_ptr<EventBeat> {
+          auto beat = std::make_unique<TickingEventBeat>(std::move(ownerBox), *runtimeScheduler_);
+          eventBeat_ = beat.get();
+          return beat;
+        },
+        .commitHooks = {},
+        .animationChoreographer = makeChoreographer(),
+    };
+    scheduler_ = std::make_unique<Scheduler>(toolbox, nullptr, &schedulerDelegate_);
+    uiManager_ = scheduler_->getUIManager();
+    schedulerDelegate_.onMergeReactRevision = [this](SurfaceId surfaceId) {
+      uiManager_->getShadowTreeRegistry().visit(
+          surfaceId, [](const ShadowTree &shadowTree) { shadowTree.mergeReactRevision(); });
+    };
     openSurface();
 
-    UIManagerBinding::createAndInstallIfNeeded(*runtime_, uiManager_);
     symbiote::installBindings(*runtime_);
   }
 
   ~Host() { uiManager_->getShadowTreeRegistry().remove(kSurfaceId); }
 
-  /**
-   * Throw the surface away and open an empty one, so the next test starts on an empty platform.
-   *
-   * The RUNTIME is kept. A test file is one process and the engine's JS holds module state that a
-   * fresh runtime would drop on the floor; what has to be empty between cases is the tree.
-   */
+  // Throw the surface away and open an empty one, so the next test starts on an empty platform.
+  // The RUNTIME is kept: the engine's JS holds module state a fresh runtime would drop
   void reset() {
     uiManager_->getShadowTreeRegistry().remove(kSurfaceId);
-    commandRecorder_.commands.clear();
+    schedulerDelegate_.commands.clear();
     // Discards, rather than reads: any mutation log left over from a `mount()` the previous test
     // never read back would otherwise bleed into the next test's first `mountingLogs()` call.
     mounted_.takeMountingLogs();
@@ -245,17 +279,14 @@ class Host {
 
   jsi::Runtime &runtime() { return *runtime_; }
 
-  /**
-   * Drain every committed revision into the stub platform, the way a host's mounting thread does.
-   *
-   * Call it after the JS under test has committed and before reading anything back: until a
-   * transaction is pulled, a commit exists only as a shadow-tree revision and no platform — real or
-   * stub — has seen it.
-   */
+  // Drain the committed revisions into the stub platform, as a host's mounting thread does.
+  // Call it before reading anything back: until pulled, a commit has no platform view
   size_t mount() {
     size_t applied = 0;
     while (auto transaction = mountingCoordinator_->pullTransaction()) {
       const auto &mutations = transaction->getMutations();
+      // A running animation overrides every pull with a transaction, empty when nothing changed
+      if (mutations.empty()) break;
       applied += mutations.size();
       mounted_.mutate(mutations);
     }
@@ -362,6 +393,144 @@ class Host {
     return true;
   }
 
+  // Fantom's `runWorkLoop`: the beat a run loop gives and the tasks it scheduled, which is where a
+  // state update such as a ScrollView's content size turns into the next commit
+  void runWorkLoop() {
+    eventBeat_->tick();
+    runtimeScheduler_->callExpiredTasks(*runtime_);
+    if (callInvoker_ != nullptr) {
+      // What native handed the JS thread, then the immediates it scheduled, before the UI tick
+      callInvoker_->drain();
+      flushJsTimers();
+    }
+    runUiTick();
+  }
+
+  void flushJsTimers() {
+    auto flush = runtime_->global().getProperty(*runtime_, "__symbioteFlushTimers");
+    if (flush.isObject() && flush.getObject(*runtime_).isFunction(*runtime_)) {
+      flush.getObject(*runtime_).getFunction(*runtime_).call(*runtime_);
+    }
+  }
+
+  // RN's `NativeAnimatedModule`, the C++ half of `Animated`, created on first ask. The JS that
+  // wants it hands it out as `NativeAnimatedModule` from its `__turboModuleProxy`
+  jsi::Value animatedModule(jsi::Runtime &runtime) {
+    if (animatedModule_ == nullptr) {
+      g_setNativeAnimatedNowTimestampFunction(&readStubNow);
+      animatedProvider_ = std::make_shared<NativeAnimatedNodesManagerProvider>(
+          [this](std::function<void()> &&onRender, bool) { onAnimationRender_ = std::move(onRender); },
+          [this](bool) { onAnimationRender_ = nullptr; });
+      callInvoker_ = std::make_shared<QueuedCallInvoker>(runtime);
+      animatedModule_ = std::make_shared<AnimatedModule>(callInvoker_, animatedProvider_);
+      TurboModuleWithJSIBindings::installJSIBindings(animatedModule_, runtime);
+    }
+    return jsi::Object::createFromHostObject(runtime, animatedModule_);
+  }
+
+  // One animation tick on the current clock, what Fantom's `flushMessageQueue` ends with. Work it
+  // hands to the JS thread waits in the invoker for the next `runWorkLoop`
+  void runUiTick() {
+    if (choreographer_ != nullptr) choreographer_->runUiTick();
+    else if (onAnimationRender_) onAnimationRender_();
+  }
+
+  // Only a run with `useSharedAnimatedBackend` has one, the Scheduler builds the backend on it
+  std::shared_ptr<AnimationChoreographer> makeChoreographer() {
+    if (!ReactNativeFeatureFlags::useSharedAnimatedBackend()) return nullptr;
+    choreographer_ = std::make_shared<TestAnimationChoreographer>();
+    return choreographer_;
+  }
+
+  // Fantom's `unstable_produceFramesForDuration`: a 16.333 ms frame at a time, the animation
+  // clock moving with each
+  void produceFrames(double milliseconds) {
+    constexpr double kStepMicroseconds = 16'333;
+    for (double left = milliseconds * 1000; left > 0; left -= kStepMicroseconds) {
+      stubNow() += std::chrono::microseconds(static_cast<long>(std::min(left, kStepMicroseconds)));
+      runUiTick();
+    }
+  }
+
+  // `getBoundingClientRect` of a mounted view from the committed shadow tree, transform included
+  folly::dynamic boundingClientRect(Tag tag) {
+    folly::dynamic rect = folly::dynamic::object("x", 0)("y", 0)("width", 0)("height", 0);
+    auto node = findByTag(tag);
+    if (node == nullptr) return rect;
+    uiManager_->getShadowTreeRegistry().visit(kSurfaceId, [&](const ShadowTree &shadowTree) {
+      const auto found = dom::getBoundingClientRect(
+          shadowTree.getCurrentRevision().rootShadowNode, *node, true);
+      rect = folly::dynamic::object("x", found.x)("y", found.y)("width", found.width)(
+          "height", found.height);
+    });
+    return rect;
+  }
+
+  // Fantom's `unstable_getDirectManipulationProps` / `unstable_getFabricUpdateProps`
+  folly::dynamic directManipulationProps(Tag tag) { return propsOf(schedulerDelegate_.directManipulation, tag); }
+  folly::dynamic fabricUpdateProps(Tag tag) { return propsOf(schedulerDelegate_.fabricUpdates, tag); }
+
+  // Resize the surface like `SurfaceHandler::constraintLayout`, Fantom's `createRoot({viewport…})`
+  void setViewport(double width, double height) {
+    const auto size = Size{.width = static_cast<Float>(width), .height = static_cast<Float>(height)};
+    const auto constraints = LayoutConstraints{.minimumSize = size, .maximumSize = size};
+    const auto parserContext = PropsParserContext{kSurfaceId, *contextContainer_};
+    uiManager_->getShadowTreeRegistry().visit(kSurfaceId, [&](const ShadowTree &shadowTree) {
+      shadowTree.commit(
+          [&](const RootShadowNode &oldRoot) {
+            return oldRoot.clone(parserContext, constraints, LayoutContext{});
+          },
+          {});
+    });
+    runWorkLoop();
+  }
+
+  // `NativeFantom::enqueueScrollEvent`: the offset on the emitter, then in the node's state, which
+  // is what the differ reads to cull. Nothing is delivered until the next tick
+  bool enqueueScroll(Tag tag, double x, double y) {
+    auto node = findByTag(tag);
+    const auto *scrollView = dynamic_cast<const ScrollViewShadowNode *>(node.get());
+    if (scrollView == nullptr) return false;
+
+    const auto point = Point{.x = static_cast<Float>(x), .y = static_cast<Float>(y)};
+    auto scrollEvent = ScrollEvent();
+    scrollEvent.contentOffset = point;
+    scrollEvent.contentSize = scrollView->getStateData().getContentSize();
+    scrollEvent.containerSize = scrollView->getLayoutMetrics().frame.size;
+    scrollEvent.contentInset = scrollView->getConcreteProps().contentInset;
+    scrollView->getConcreteEventEmitter().onScroll(scrollEvent);
+
+    auto state = std::static_pointer_cast<const ScrollViewShadowNode::ConcreteState>(
+        scrollView->getState());
+    state->updateState([point](const ScrollViewShadowNode::ConcreteState::Data &oldData)
+                           -> ScrollViewShadowNode::ConcreteState::SharedData {
+      auto newData = oldData;
+      newData.contentOffset = point;
+      return std::make_shared<const ScrollViewShadowNode::ConcreteState::Data>(newData);
+    });
+    return true;
+  }
+
+  bool scrollTo(Tag tag, double x, double y) {
+    if (!enqueueScroll(tag, x, y)) return false;
+    runWorkLoop();
+    return true;
+  }
+
+  // `NativeFantom::enqueueModalSizeUpdate`: the host's screen size for a mounted Modal
+  bool setModalSize(Tag tag, double width, double height) {
+    auto node = findByTag(tag);
+    const auto *modal = dynamic_cast<const ModalHostViewShadowNode *>(node.get());
+    if (modal == nullptr) return false;
+
+    auto state =
+        std::static_pointer_cast<const ModalHostViewShadowNode::ConcreteState>(modal->getState());
+    state->updateState(ModalHostViewState(
+        Size{.width = static_cast<Float>(width), .height = static_cast<Float>(height)}));
+    runWorkLoop();
+    return true;
+  }
+
   /**
    * The committed SHADOW tree as `name(children…)`, which is a different tree from the mounted one.
    *
@@ -453,17 +622,19 @@ class Host {
    */
   std::string shape() const { return shapeOf(root()); }
 
-  /**
-   * Every command dispatched at a mounted view since the last `reset()`, in order.
-   *
-   * `nativeFabricUIManager.dispatchCommand(shadowNode, name, args)` — the entry an imperative ref
-   * call (`setNativeProps`'s sibling, `focus`, `scrollTo`, a controlled `<text-input>`'s write-back)
-   * actually reaches on a device. Reading `shadowNode->getTag()` here is the REAL committed Fabric
-   * tag, the same one `mounted()`/`committedTags()` read — not a value this harness invented.
-   */
-  const std::vector<RecordedCommand> &commands() const { return commandRecorder_.commands; }
+  // Every command dispatched at a mounted view since the last `reset()`, in order, by the real
+  // committed Fabric tag. The delegate hears a command as a queued rendering update, so run them
+  const std::vector<RecordedCommand> &commands() {
+    runtimeScheduler_->callExpiredTasks(*runtime_);
+    return schedulerDelegate_.commands;
+  }
 
  private:
+  static folly::dynamic propsOf(const std::unordered_map<Tag, folly::dynamic> &byTag, Tag tag) {
+    const auto found = byTag.find(tag);
+    return found == byTag.end() ? folly::dynamic::object() : found->second;
+  }
+
 #ifdef SYMBIOTE_USE_HERMES
   // Static lifetime per `makeHermesRootAPI`'s own contract, so a reference is safe to hand out.
   static facebook::hermes::IHermesRootAPI &hermesRoot() {
@@ -503,6 +674,8 @@ class Host {
     mountingCoordinator_ = shadowTree->getMountingCoordinator();
     mounted_ = buildStubViewTreeWithoutUsingDifferentiator(
         *shadowTree->getCurrentRevision().rootShadowNode);
+    // The animation provider listens for surfaces that start after it was created
+    scheduler_->uiManagerDidStartSurface(*shadowTree);
     uiManager_->getShadowTreeRegistry().add(std::move(shadowTree));
   }
 
@@ -525,13 +698,19 @@ class Host {
   std::unique_ptr<jsi::Runtime> runtime_;
   ComponentDescriptorProviderRegistry providers_{};
   std::shared_ptr<const ContextContainer> contextContainer_;
-  std::unique_ptr<RuntimeScheduler> runtimeScheduler_;
-  std::shared_ptr<std::optional<const EventDispatcher>> eventDispatcher_;
+  std::shared_ptr<RuntimeScheduler> runtimeScheduler_;
   TickingEventBeat *eventBeat_ = nullptr;
   std::shared_ptr<UIManager> uiManager_;
   std::shared_ptr<const MountingCoordinator> mountingCoordinator_;
   StubViewTree mounted_;
-  CommandRecorder commandRecorder_;
+  HostSchedulerDelegate schedulerDelegate_;
+  std::shared_ptr<QueuedCallInvoker> callInvoker_;
+  std::shared_ptr<TestAnimationChoreographer> choreographer_;
+  std::shared_ptr<NativeAnimatedNodesManagerProvider> animatedProvider_;
+  std::shared_ptr<AnimatedModule> animatedModule_;
+  std::function<void()> onAnimationRender_;
+  // Last, so it is destroyed first, while the delegate and the runtime it reports to still exist
+  std::unique_ptr<Scheduler> scheduler_;
 };
 
 } // namespace symbiote::testing
