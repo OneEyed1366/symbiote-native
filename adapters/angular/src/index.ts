@@ -51,6 +51,9 @@ export {
   VSectionItemDirective,
   VSectionSeparatorDirective,
 } from './components';
+// What a list built on `FlatList` needs to keep its template and its accessibility gate
+export { FLAT_LIST_TEMPLATE } from './components/flat-list/flat-list-template';
+export { provideGateDemand } from './gate-demand';
 export { Animated } from './modules/animated';
 // Named top-level too, as the ngtsc static evaluator cannot trace `Animated.View` property access
 // A template tag like `<AnimatedView>` needs a direct import, only a real ngc run catches it
@@ -120,6 +123,7 @@ export type {
   IVirtualizedListProps,
   IVirtualizedSectionListHandle,
   IVirtualizedSectionListProps,
+  IVListCellContext,
   IVListItemContext,
   IVListSeparatorContext,
   IVSectionContext,

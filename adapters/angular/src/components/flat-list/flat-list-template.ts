@@ -53,7 +53,7 @@ export const FLAT_LIST_TEMPLATE = `
       [contentContainerStyle]="contentContainerStyle"
       [listHeaderComponentStyle]="listHeaderComponentStyle"
       [listFooterComponentStyle]="listFooterComponentStyle"
-      [cellRendererTemplate]="cellDir?.templateRef"
+      [cellRendererTemplate]="cellRendererTpl"
       ${LIST_ACCESSIBILITY_FORWARD}
     >
       <ng-template vListItem let-row let-separators="separators">
@@ -149,7 +149,7 @@ export const FLAT_LIST_TEMPLATE = `
       [contentContainerStyle]="contentContainerStyle"
       [listHeaderComponentStyle]="listHeaderComponentStyle"
       [listFooterComponentStyle]="listFooterComponentStyle"
-      [cellRendererTemplate]="cellDir?.templateRef"
+      [cellRendererTemplate]="cellRendererTpl"
       [itemTemplate]="itemDir?.templateRef"
       [listItemComponent]="listItemComponent"
       [itemSeparatorTemplate]="separatorDir?.templateRef"

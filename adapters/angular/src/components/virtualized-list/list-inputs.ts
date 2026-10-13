@@ -115,6 +115,11 @@ export abstract class ListInputsBase<ItemT> extends ListEventsBase {
     return this.horizontal === true;
   }
 
+  // The app's `vListCell`, which a list built on this one may replace with its own
+  get cellRendererTpl(): TemplateRef<IVListCellContext> | undefined {
+    return this.cellDir?.templateRef;
+  }
+
   // The component to stamp per cell, RN's `_renderElement`: it wins over the item template, and a
   // cell with neither throws
   get itemComponent(): Type<unknown> | undefined {
@@ -172,7 +177,7 @@ export abstract class VirtualizedListInputs<
   @Input() itemSeparatorTemplate?: TemplateRef<IVListSeparatorContext<ItemT>>;
   @Input() cellRendererTemplate?: TemplateRef<IVListCellContext>;
 
-  get cellRendererTpl(): TemplateRef<IVListCellContext> | undefined {
+  override get cellRendererTpl(): TemplateRef<IVListCellContext> | undefined {
     return this.cellRendererTemplate ?? this.cellDir?.templateRef;
   }
 

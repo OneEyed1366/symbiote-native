@@ -24,7 +24,6 @@ import {
   removeClippedSubviewsOrDefault,
   rowKeyExtractor,
   type IRow,
-  type IScrollViewHandle,
   type ISeparators,
   type IViewabilityConfigCallbackPair,
   type IViewableItemsChangedInfo,
@@ -36,7 +35,6 @@ import {
   flattenStyle,
   resolveClassName,
   type IStyleProp,
-  type ISymbioteNode,
   type IViewStyle,
 } from '@symbiote-native/engine';
 import {
@@ -51,7 +49,7 @@ import {
   type IVListSeparatorContext,
 } from '../virtualized-list';
 import { VListOutletDirective } from '../virtualized-list/directives';
-import { ListInputsBase } from '../virtualized-list/list-inputs';
+import { FlatListHandleBase } from './flat-list-handle';
 import { provideGateDemand } from '../../gate-demand';
 import {
   stableAnchorStyle,
@@ -152,7 +150,7 @@ export type IFlatListInputs<ItemT> = Omit<
   template: FLAT_LIST_TEMPLATE,
 })
 export class FlatList<ItemT = unknown>
-  extends ListInputsBase<ItemT>
+  extends FlatListHandleBase<ItemT>
   implements IFlatListInputs<ItemT>, IVirtualizedListHandle, DoCheck, OnChanges
 {
   @Input({ required: true }) data!: readonly ItemT[];
@@ -167,8 +165,7 @@ export class FlatList<ItemT = unknown>
     );
   }
 
-  // The composed inner list, whichever branch rendered, its instance is the scroll handle
-  @ViewChild(VirtualizedList) private listRef?: VirtualizedList;
+  @ViewChild(VirtualizedList) protected override listRef?: VirtualizedList;
 
   // This component's own host, the anchor `class="..."` resolves onto, not the inner list's
   private readonly elementRef = inject(ElementRef);
@@ -291,51 +288,5 @@ export class FlatList<ItemT = unknown>
         ? firstItemOfRow(trailingRow)
         : undefined,
     };
-  }
-
-  scrollToOffset(params: { offset: number; animated?: boolean }): void {
-    this.listRef?.scrollToOffset(params);
-  }
-  scrollToIndex(params: {
-    index: number;
-    animated?: boolean;
-    viewOffset?: number;
-    viewPosition?: number;
-  }): void {
-    this.listRef?.scrollToIndex(params);
-  }
-  scrollToItem(params: {
-    item: unknown;
-    animated?: boolean;
-    viewPosition?: number;
-  }): void {
-    this.listRef?.scrollToItem(params);
-  }
-  scrollToEnd(params?: { animated?: boolean }): void {
-    this.listRef?.scrollToEnd(params);
-  }
-  flashScrollIndicators(): void {
-    this.listRef?.flashScrollIndicators();
-  }
-  getNativeScrollRef(): ISymbioteNode | null {
-    return this.listRef?.getNativeScrollRef() ?? null;
-  }
-  getScrollableNode(): IScrollViewHandle | null {
-    return this.listRef?.getScrollableNode() ?? null;
-  }
-  getScrollResponder(): IScrollViewHandle | null {
-    return this.listRef?.getScrollResponder() ?? null;
-  }
-  getScrollNode(): ISymbioteNode | null {
-    return this.listRef?.getScrollNode() ?? null;
-  }
-  getScrollRef(): ISymbioteNode | null {
-    return this.listRef?.getScrollRef() ?? null;
-  }
-  recordInteraction(): void {
-    this.listRef?.recordInteraction();
-  }
-  setNativeProps(props: Record<string, unknown>): void {
-    this.listRef?.setNativeProps(props);
   }
 }
