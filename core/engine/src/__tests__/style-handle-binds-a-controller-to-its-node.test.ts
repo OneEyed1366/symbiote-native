@@ -161,6 +161,71 @@ describe('an animated style handle in a node style', () => {
     expect(attach).not.toHaveBeenCalled();
   });
 
+  describe('merged with plain style keys into one record by the framework', () => {
+    const MARKER = 'wornHandle';
+
+    // A framework that flattens a style array copies every key of the handle into one record
+    function merged(handle: IHandle, plain: Record<string, unknown>) {
+      return { ...plain, ...handle, [MARKER]: handle };
+    }
+
+    function claimingMergedHandles() {
+      const attach = vi.fn();
+      releases.push(
+        registerStyleHandleClaim({
+          isHandle,
+          initialOf: handle => (isHandle(handle) ? handle.initial : undefined),
+          unwrap: record => {
+            const handle: unknown = Reflect.get(record, MARKER);
+            if (!isHandle(handle)) return undefined;
+            const rest = Object.fromEntries(
+              Object.entries(record).filter(
+                ([key]) => key !== MARKER && !(key in handle),
+              ),
+            );
+            return { handle, rest };
+          },
+          attach: (node, handle) => attach(node, handle),
+        }),
+      );
+      return { attach };
+    }
+
+    it('keeps the plain keys, shows the starting values and leaves the handle keys out', () => {
+      claimingMergedHandles();
+      const handle: IHandle = { initial: { opacity: 0.5 } };
+      const { surface, node } = mountedNode(merged(handle, { width: 10 }));
+      surface.commit();
+
+      const { payload } = live.nodeOf(node);
+      expect(payload.width).toBe(10);
+      expect(payload.opacity).toBe(0.5);
+      expect(Object.hasOwn(payload, 'initial')).toBe(false);
+      expect(Object.hasOwn(payload, MARKER)).toBe(false);
+    });
+
+    it('binds the handle itself, not the record that carried it', () => {
+      const { attach } = claimingMergedHandles();
+      const handle: IHandle = { initial: { opacity: 0.5 } };
+      const { surface, node } = mountedNode(merged(handle, { width: 10 }));
+
+      surface.commit();
+
+      expect(attach).toHaveBeenCalledWith(node, handle);
+    });
+
+    it('is bound once when a new record carries the same handle', () => {
+      const { attach } = claimingMergedHandles();
+      const handle: IHandle = { initial: { opacity: 0.5 } };
+      const { surface, node } = mountedNode(merged(handle, { width: 10 }));
+      surface.commit();
+
+      routeProp(node, 'style', merged(handle, { width: 20 }));
+
+      expect(attach).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('and its starting values', () => {
     function recordsWithOpacity(batchValues: readonly unknown[]) {
       return batchValues

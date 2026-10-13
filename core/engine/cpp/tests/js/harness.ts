@@ -42,6 +42,11 @@ declare const __symbioteTester: {
   directManipulationProps: (tag: number) => Record<string, unknown>;
   fabricUpdateProps: (tag: number) => Record<string, unknown>;
   mountingLogs: () => string[];
+  proxyUse: (enabled: boolean) => void;
+  proxyConfigureExiting: (tag: number) => void;
+  proxyConfigureEntering: (nativeId: number) => void;
+  proxyProgress: (tag: number, props: Record<string, unknown>) => void;
+  proxyEnd: (tag: number, shouldRemove: boolean) => void;
   commitNumber: () => number;
   heapInfo: () => Record<string, number>;
   collectGarbage: () => void;
@@ -354,6 +359,37 @@ export function commands(): IRecordedCommand[] {
  */
 export function mountingLogs(): string[] {
   return __symbioteTester.mountingLogs();
+}
+
+/**
+ * Reanimated's layout animations proxy between the shadow tree and the stub platform, or off again
+ * The surface opens again, so what was mounted is gone
+ */
+export function useLayoutAnimationsProxy(enabled: boolean): void {
+  __symbioteTester.proxyUse(enabled);
+}
+
+/** An exiting animation config for a committed tag, as `updateLayoutAnimations` leaves it */
+export function configureExiting(tag: number): void {
+  __symbioteTester.proxyConfigureExiting(tag);
+}
+
+/** An entering animation config under the native id a node is about to carry */
+export function configureEntering(nativeId: number): void {
+  __symbioteTester.proxyConfigureEntering(nativeId);
+}
+
+/** One frame of an animation the UI runtime would report to the proxy */
+export function progressLayoutAnimation(
+  tag: number,
+  props: Record<string, unknown>,
+): void {
+  __symbioteTester.proxyProgress(tag, props);
+}
+
+/** The end of an animation, and whether the view goes with it */
+export function endLayoutAnimation(tag: number, shouldRemove: boolean): void {
+  __symbioteTester.proxyEnd(tag, shouldRemove);
 }
 
 /**

@@ -19,6 +19,9 @@ export type IStyleClaim = {
 // A style part a package builds itself (an animated style) and binds to the node that wears it
 export type IStyleHandleClaim = {
   isHandle: (part: unknown) => boolean;
+  // A framework that flattens a style array hands the keys of the handle over in one record with
+  // the plain ones. It answers with the handle that record carries, so that one gets bound
+  unwrap?: (record: object) => IUnwrapped | undefined;
   // What the host sees in the handle's place
   initialOf: (handle: object) => unknown;
   // Called once for each handle a node starts to wear, before the node commits
@@ -26,6 +29,9 @@ export type IStyleHandleClaim = {
   // Called once the node has committed; the returned release runs when the handle goes
   attach: (node: ISymbioteNode, handle: object) => (() => void) | undefined;
 };
+
+// The handle a flattened record carried, and the plain style keys that came with it
+export type IUnwrapped = { handle: object; rest: object };
 
 export type IFoundHandle = { handle: object; claim: IStyleHandleClaim };
 
@@ -116,9 +122,35 @@ function splitHandle(record: object, claim: IStyleHandleClaim): ISplitStyle {
   };
 }
 
+function splitUnwrapped(
+  { handle, rest }: IUnwrapped,
+  claim: IStyleHandleClaim,
+): ISplitStyle {
+  const base = splitStyle(rest);
+  return {
+    kept: [base.kept, claim.initialOf(handle)],
+    settled: base.settled,
+    owned: base.owned,
+    handles: [...base.handles, { handle, claim }],
+  };
+}
+
+function unwrappedSplit(record: object): ISplitStyle | undefined {
+  for (const claim of handleClaims) {
+    const found = claim.unwrap?.(record);
+    if (found !== undefined) return splitUnwrapped(found, claim);
+  }
+  return undefined;
+}
+
 function splitRecord(record: object): ISplitStyle {
   const cached = splits.get(record);
   if (cached !== undefined) return cached;
+  const flattened = unwrappedSplit(record);
+  if (flattened !== undefined) {
+    splits.set(record, flattened);
+    return flattened;
+  }
   const handleClaim = handleClaims.find(claim => claim.isHandle(record));
   if (handleClaim !== undefined) {
     const split = splitHandle(record, handleClaim);
