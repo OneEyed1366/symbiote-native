@@ -78,7 +78,7 @@
     }
   },
   "scripts": {
-    "typecheck": "node ../../node_modules/typescript7/bin/tsc --build",
+    "typecheck": "tsc --build",
     "format": "prettier --write \"src/**/*.{ts,tsx}\""
   },
   "dependencies": {

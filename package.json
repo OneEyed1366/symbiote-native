@@ -15,8 +15,8 @@
     "registry:publish": "node scripts/local-registry.mjs publish",
     "registry:sync": "node scripts/local-registry.mjs sync",
     "registry:refresh": "node scripts/local-registry.mjs refresh",
-    "typecheck": "node node_modules/typescript7/bin/tsc --build",
-    "typecheck:watch": "node node_modules/typescript7/bin/tsc --build --watch",
+    "typecheck": "tsc --build",
+    "typecheck:watch": "tsc --build --watch",
     "clean:build": "node scripts/clean-build-outputs.mjs",
     "clean:examples": "node scripts/clean-examples.mjs",
     "clean": "pnpm run clean:build && pnpm run clean:examples",
@@ -76,7 +76,6 @@
     "svelte2tsx": "catalog:",
     "syncpack": "catalog:",
     "typescript": "catalog:",
-    "typescript7": "catalog:",
     "typescript-eslint": "catalog:",
     "vite-plugin-solid": "catalog:",
     "vitest": "catalog:"
