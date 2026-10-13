@@ -3,9 +3,7 @@ import * as upstream from 'react-native-reanimated';
 import * as ours from './index';
 
 // What the entry does not carry yet, each with what stands in the way. The list only shrinks
-const NOT_YET: Record<string, string> = {
-  NativeEventsManager: 'replaced by the event-binding seam',
-};
+const NOT_YET: Record<string, string> = {};
 
 describe('the React entry', () => {
   it('carries every runtime export of upstream, but the ones listed as not yet', () => {

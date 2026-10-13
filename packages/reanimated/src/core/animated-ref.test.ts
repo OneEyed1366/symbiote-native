@@ -41,6 +41,25 @@ describe('an animated ref made by the controller', () => {
     expect(ref.current).toBe(node);
   });
 
+  it('takes the node a component hands out under `hostNode`, as a ref on a component gets that', () => {
+    const ref = createAnimatedRef();
+    const { surface, node } = mounted();
+
+    ref({ hostNode: node });
+    surface.commit();
+
+    expect(ref.current).toBe(node);
+    expect(ref()).toBe(host.wrapperOf(node));
+  });
+
+  it('ignores a value that holds no node', () => {
+    const ref = createAnimatedRef();
+
+    ref({ hostNode: 'not a node' });
+
+    expect(ref.current).toBeNull();
+  });
+
   it('knows the native tag of the node once it has committed', () => {
     const ref = createAnimatedRef();
     const { surface, node } = mounted();

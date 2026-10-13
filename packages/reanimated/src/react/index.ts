@@ -11,11 +11,20 @@ export {
   TextInput,
 } from './animated';
 export type { IAnimatedHostProps } from './animated';
+// Upstream's spellings of the prop types, which carry no `I` there
+export type { IAnimatedScrollViewProps as AnimatedScrollViewProps } from './animated-scroll-view';
+export type { IAnimatedFlatListProps as FlatListPropsWithLayout } from './animated-flat-list';
 export { LayoutAnimationConfig } from './layout-animation-config';
 export { SharedTransitionBoundary } from './shared-transition-boundary';
-export type { ISharedTransitionBoundaryProps } from './shared-transition-boundary';
+export type {
+  ISharedTransitionBoundaryProps,
+  ISharedTransitionBoundaryProps as SharedTransitionBoundaryProps,
+} from './shared-transition-boundary';
 export { PerformanceMonitor } from './performance-monitor';
-export type { IPerformanceMonitorProps } from './performance-monitor';
+export type {
+  IPerformanceMonitorProps,
+  IPerformanceMonitorProps as PerformanceMonitorProps,
+} from './performance-monitor';
 // Only an effect over the reduced-motion manager, nothing in it touches a renderer
 export { ReducedMotionConfig } from 'react-native-reanimated';
 export type { ILayoutAnimationConfigProps } from './layout-animation-config';

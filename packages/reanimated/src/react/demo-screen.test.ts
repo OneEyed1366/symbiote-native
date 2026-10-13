@@ -31,6 +31,7 @@ const NATIVE_ONLY = [
   'ra-measure-run',
   'ra-measure-write',
   'ra-measure-focus',
+  'ra-shared-read',
 ];
 
 const SECTION_TITLES = [
@@ -38,10 +39,13 @@ const SECTION_TITLES = [
   'Derived values and animated props',
   'Entering and exiting',
   'Layout transitions',
+  'Transform origin',
   'Scroll',
   'Frames and sensors',
   'CSS',
   'Worklets',
+  'Shared state',
+  'Shared element transition',
   'Measure and refs',
   'Parity with Reanimated 4.7.1',
 ];
@@ -153,6 +157,84 @@ describe('the Reanimated demo screen', () => {
     await press('ra-preset-next');
 
     expect(live.texts(root)).toContain('preset: Slide');
+  });
+
+  it('turns the box around the corner that was picked and says which', async () => {
+    const root = await mountScreen();
+
+    await press('ra-origin-top-left');
+
+    expect(live.texts(root)).toContain('origin: top left');
+  });
+
+  // Both live at module level, so earlier tests of this file may already have counted on them
+  function countOf(root: ISymbioteNode, label: string): number {
+    const line = live.texts(root).find(text => text.startsWith(`${label}: `));
+    return Number(line?.slice(label.length + 2));
+  }
+
+  it('counts on a mutable made outside any component', async () => {
+    const root = await mountScreen();
+    const before = countOf(root, 'mutable');
+
+    await press('ra-shared-mutable');
+    await press('ra-shared-mutable');
+
+    expect(countOf(root, 'mutable')).toBe(before + 2);
+  });
+
+  it('counts on a synchronizable read back on the JS thread', async () => {
+    const root = await mountScreen();
+    const before = countOf(root, 'synchronizable');
+
+    await press('ra-shared-sync');
+
+    expect(countOf(root, 'synchronizable')).toBe(before + 1);
+  });
+
+  it('reaches the entry-exit transition after the others', async () => {
+    const root = await mountScreen();
+
+    // Each press reads the transition the one before it set, so they cannot run together
+    await press('ra-layout-next');
+    await press('ra-layout-next');
+    await press('ra-layout-next');
+    await press('ra-layout-next');
+    await press('ra-layout-next');
+
+    expect(live.texts(root)).toContain('transition: EntryExit');
+  });
+
+  it('moves the shared element to the second fake screen and back', async () => {
+    const root = await mountScreen();
+    const boundaries = () =>
+      host.fabric.findAll(
+        node => node.viewName === 'REASharedTransitionBoundary',
+      ).length;
+    const before = boundaries();
+
+    await press('ra-shared-toggle');
+
+    expect(live.texts(root)).toContain('showing: second');
+    expect(boundaries()).toBe(before + 1);
+
+    await press('ra-shared-toggle');
+
+    expect(live.texts(root)).toContain('showing: first');
+  });
+
+  it('moves the first row to the end when shuffled, with no row added before', async () => {
+    const root = await mountScreen();
+    // The layout section comes before the scroll section, which has rows of its own
+    const rowsOf = () =>
+      live
+        .texts(root)
+        .filter(text => /^row \d+$/.test(text))
+        .slice(0, 4);
+
+    await press('ra-layout-shuffle');
+
+    expect(rowsOf()).toEqual(['row 1', 'row 2', 'row 3', 'row 0']);
   });
 
   it('adds a row to the list that reflows', async () => {

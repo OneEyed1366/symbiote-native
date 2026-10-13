@@ -6,13 +6,13 @@ import {
 } from '@symbiote-native/engine';
 import type { WorkletEventHandler } from 'react-native-reanimated/src/WorkletEventHandler';
 
-type IHolder = { workletEventHandler: WorkletEventHandler<object> };
+export type IHolder = { workletEventHandler: WorkletEventHandler<object> };
 type IRegistration = {
   handler: WorkletEventHandler<object>;
   unbind: () => void;
 };
 
-function isHolder(value: unknown): value is IHolder {
+export function isHolder(value: unknown): value is IHolder {
   return (
     typeof value === 'object' &&
     value !== null &&

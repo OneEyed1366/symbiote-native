@@ -2,14 +2,22 @@
 // starts taking what it should not. `@ts-expect-error` is itself an error when its line compiles
 import type { ReactElement } from 'react';
 import Animated from './animated';
+import { bouncingBall } from '../core/animated-host-props.type-check';
 import {
-  css,
   FadeIn,
   FadeOut,
   LinearTransition,
   measure,
   scrollTo,
+  SharedTransition,
 } from '../core';
+import type {
+  AnimatedScrollViewProps,
+  FlatListPropsWithLayout,
+  LayoutAnimationsValues,
+  PerformanceMonitorProps,
+  SharedTransitionBoundaryProps,
+} from './index';
 import { useAnimatedScrollHandler } from './hooks/use-animated-scroll-handler';
 import { useSharedValue } from './hooks/use-shared-value';
 import { useAnimatedStyle } from './hooks/use-animated-style';
@@ -35,10 +43,12 @@ export function AnimatedViewTakesWhatUpstreamsTakes({
     <Animated.View
       ref={ref}
       style={[sized, style]}
-      animatedProps={animatedProps}
+      animatedProps={[animatedProps, [animatedProps]]}
       entering={FadeIn}
       exiting={FadeOut.duration(100)}
       layout={LinearTransition}
+      sharedTransitionTag="box"
+      sharedTransitionStyle={new SharedTransition()}
     />
   );
 }
@@ -58,13 +68,9 @@ export function AnimatedScrollViewTakesAScrollHandler(): ReactElement {
 }
 
 export function AnimatedViewTakesCssCallbacksAndAnimationStyle(): ReactElement {
-  const bounce = css.keyframes({ from: { opacity: 0 }, to: { opacity: 1 } });
-  const styles = css.create({
-    ball: { animationName: bounce, animationDuration: '1s' },
-  });
   return (
     <Animated.View
-      style={styles.ball}
+      style={bouncingBall.ball}
       onCSSAnimationEnd={() => {}}
       onCSSTransitionStart={() => {}}
     />
@@ -84,3 +90,12 @@ export function AnimatedViewRefusesAWrongEnteringAnimation(): ReactElement {
     <Animated.View entering={5} />
   );
 }
+
+// The type names upstream's entry carries under its own spelling, next to ours
+export type IUpstreamTypeNames = [
+  LayoutAnimationsValues,
+  FlatListPropsWithLayout<number>,
+  PerformanceMonitorProps,
+  AnimatedScrollViewProps,
+  SharedTransitionBoundaryProps,
+];

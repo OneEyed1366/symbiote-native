@@ -32,6 +32,15 @@ export type IAnimatedRef = {
   sharedWrapper: ISharedWrapper;
 };
 
+// A ref on a host tag gets the node, a ref on a component gets what the component exposes, and a
+// component that wraps a node exposes it as `hostNode`
+function hostNodeOf(instance: unknown): ISymbioteNode | null {
+  if (isSymbioteNode(instance)) return instance;
+  if (typeof instance !== 'object' || instance === null) return null;
+  const exposed: unknown = Reflect.get(instance, 'hostNode');
+  return isSymbioteNode(exposed) ? exposed : null;
+}
+
 function tagOf(node: ISymbioteNode | null): number | null {
   return node === null ? null : (getNativeTag(node) ?? null);
 }
@@ -78,7 +87,8 @@ export function createAnimatedRef(): IAnimatedRef {
 
   function readWrapper(instance?: unknown): ShadowNodeWrapper;
   function readWrapper(instance?: unknown): ShadowNodeWrapper | null {
-    if (isSymbioteNode(instance)) attach(instance);
+    const host = hostNodeOf(instance);
+    if (host !== null) attach(host);
     return channel.read();
   }
 

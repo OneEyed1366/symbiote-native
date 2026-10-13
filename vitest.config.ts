@@ -1,9 +1,23 @@
 import babel from '@babel/core';
 import { existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { defineConfig } from 'vitest/config';
 import solidPlugin from 'vite-plugin-solid';
+import {
+  EXAMPLE_IMPORTS,
+  REANIMATED_ALIAS,
+  REANIMATED_SOLID_ALIAS,
+  REANIMATED_SOLID_TESTS,
+  REANIMATED_SVELTE_TESTS,
+  REANIMATED_SVELTE_WORKLETS,
+  REANIMATED_TESTS,
+  REANIMATED_VUE_SFC,
+  REANIMATED_VUE_TSX,
+  REANIMATED_WORKLETS,
+  SVELTE_MODULES,
+  WORKLETS_NATIVE_SIBLINGS,
+} from './vitest.reanimated';
 
 // Root unit/integration runner, tests are co-located with what they exercise
 // `@symbiote-native/*` resolve to raw `src/*.ts`, so they are inlined. `examples/*` is out of scope
@@ -257,72 +271,6 @@ const BROWSER_CONDITIONS = {
   ssr: { resolve: { conditions: ['browser'] } },
 };
 
-// Reanimated reads `react-native` and `react-native-worklets` at module scope, so the bare names
-// move to a stub and to the worklets Jest mock while deep `react-native/...` imports stay real
-const REANIMATED_TESTS = ['packages/reanimated/**/*.test.{ts,tsx}'];
-
-// The package source and the demo screens of examples/react get the plugin an app's Metro runs,
-// so a test drives them as written. Tests stay out: they build their worklets by hand
-const REANIMATED_SOURCE =
-  /\/(packages\/reanimated\/src|examples\/react\/screens\/reanimated)\/.*\.tsx?$/;
-const WORKLETS_PLUGIN = require_.resolve('react-native-worklets/plugin');
-
-const REANIMATED_WORKLETS = {
-  name: 'worklets-plugin-for-reanimated-source',
-  enforce: 'pre' as const,
-  async transform(code: string, id: string) {
-    const file = id.split('?')[0];
-    if (!REANIMATED_SOURCE.test(file) || /\.test\.tsx?$/.test(file)) {
-      return null;
-    }
-    const out = await babel.transformAsync(code, {
-      filename: file,
-      babelrc: false,
-      configFile: false,
-      sourceMaps: true,
-      parserOpts: { plugins: ['typescript', 'jsx'] },
-      plugins: [WORKLETS_PLUGIN],
-    });
-    return out?.code == null ? null : { code: out.code, map: out.map };
-  },
-};
-
-// The demo sits in a tree that installs its own react and published packages, so its imports
-// go to the workspace here, or it would render against a second react
-const REANIMATED_ALIAS = [
-  { find: /^react$/, replacement: require_.resolve('react') },
-  {
-    find: /^@symbiote-native\/react\/jsx-runtime$/,
-    replacement: require_.resolve('./adapters/react/src/jsx-runtime.ts'),
-  },
-  {
-    find: /^@symbiote-native\/react\/jsx-dev-runtime$/,
-    replacement: require_.resolve('./adapters/react/src/jsx-dev-runtime.ts'),
-  },
-  {
-    find: /^@symbiote-native\/reanimated\/react$/,
-    replacement: require_.resolve('./packages/reanimated/src/react/index.ts'),
-  },
-  {
-    find: /^@symbiote-native\/reanimated$/,
-    replacement: require_.resolve('./packages/reanimated/src/core/index.ts'),
-  },
-  {
-    find: /^react-native$/,
-    replacement: require_.resolve(
-      './packages/reanimated/test-support/react-native.ts',
-    ),
-  },
-  {
-    find: /^react-native-worklets$/,
-    replacement: join(
-      dirname(require_.resolve('react-native-worklets/package.json')),
-      'src',
-      'mock.ts',
-    ),
-  },
-];
-
 export default defineConfig({
   ...SHARED,
   test: {
@@ -334,12 +282,65 @@ export default defineConfig({
           REACT_NATIVE_FLOW,
           REACT_NATIVE_PLATFORM,
           REANIMATED_WORKLETS,
+          WORKLETS_NATIVE_SIBLINGS,
+          REANIMATED_VUE_TSX,
+          REANIMATED_VUE_SFC,
+          EXAMPLE_IMPORTS,
         ],
         resolve: { alias: REANIMATED_ALIAS },
         test: {
           ...SHARED.test,
           name: 'reanimated',
           include: REANIMATED_TESTS,
+          exclude: [
+            ...EXCLUDE_ALL,
+            ...REANIMATED_SVELTE_TESTS,
+            ...REANIMATED_SOLID_TESTS,
+          ],
+        },
+      },
+      {
+        ...SHARED,
+        ...BROWSER_CONDITIONS,
+        plugins: [
+          REACT_NATIVE_FLOW,
+          REACT_NATIVE_PLATFORM,
+          REANIMATED_WORKLETS,
+          WORKLETS_NATIVE_SIBLINGS,
+          SOLID_TRANSFORM,
+          EXAMPLE_IMPORTS,
+        ],
+        resolve: {
+          ...BROWSER_CONDITIONS.resolve,
+          alias: REANIMATED_SOLID_ALIAS,
+        },
+        test: {
+          ...SHARED.test,
+          name: 'reanimated-solid',
+          include: REANIMATED_SOLID_TESTS,
+          exclude: EXCLUDE_ALL,
+        },
+      },
+      {
+        ...SHARED,
+        ...BROWSER_CONDITIONS,
+        plugins: [
+          REACT_NATIVE_FLOW,
+          REACT_NATIVE_PLATFORM,
+          REANIMATED_WORKLETS,
+          WORKLETS_NATIVE_SIBLINGS,
+          SVELTE_MODULES,
+          REANIMATED_SVELTE_WORKLETS,
+          EXAMPLE_IMPORTS,
+        ],
+        resolve: {
+          ...BROWSER_CONDITIONS.resolve,
+          alias: REANIMATED_ALIAS,
+        },
+        test: {
+          ...SHARED.test,
+          name: 'reanimated-svelte',
+          include: REANIMATED_SVELTE_TESTS,
           exclude: EXCLUDE_ALL,
         },
       },
@@ -350,7 +351,7 @@ export default defineConfig({
           ...SHARED.test,
           name: 'svelte',
           include: SVELTE_TESTS,
-          exclude: EXCLUDE_ALL,
+          exclude: [...EXCLUDE_ALL, ...REANIMATED_SVELTE_TESTS],
           benchmark: { include: SVELTE_BENCH, exclude: EXCLUDE_ALL },
         },
       },
@@ -363,7 +364,7 @@ export default defineConfig({
           ...SHARED.test,
           name: 'solid',
           include: SOLID_TESTS,
-          exclude: EXCLUDE_ALL,
+          exclude: [...EXCLUDE_ALL, ...REANIMATED_SOLID_TESTS],
         },
       },
       {

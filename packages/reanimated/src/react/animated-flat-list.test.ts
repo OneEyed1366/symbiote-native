@@ -90,3 +90,63 @@ describe('Animated.FlatList', () => {
     expect(enteringCancelled()).toBe(true);
   });
 });
+
+describe('Animated.FlatList rows', () => {
+  const slide = { build: () => fade };
+
+  function layoutConfigured(): boolean {
+    return update.mock.calls.some(([, type, config]) => {
+      return type === LayoutAnimationType.LAYOUT && config === fade;
+    });
+  }
+
+  it('gives every row the layout animation of the list', () => {
+    scrollerOf({ itemLayoutAnimation: slide });
+
+    expect(
+      update.mock.calls.filter(
+        ([, type]) => type === LayoutAnimationType.LAYOUT,
+      ),
+    ).toHaveLength(DATA.length);
+    expect(layoutConfigured()).toBe(true);
+  });
+
+  it('gives the rows no layout animation unless the author names one', () => {
+    scrollerOf({});
+
+    expect(layoutConfigured()).toBe(false);
+  });
+
+  it('styles every row with the style object the author passes', () => {
+    const scroller = scrollerOf({
+      CellRendererComponentStyle: { opacity: 0.5 },
+    });
+    const rows = live.findAllLive(
+      scroller?.handle ?? live.appRoot(),
+      node => node.payload.opacity === 0.5,
+    );
+
+    expect(rows).toHaveLength(DATA.length);
+  });
+
+  it('asks the style function for the item and the index of each row', () => {
+    const asked: Array<{ id: string; index: number }> = [];
+    scrollerOf({
+      CellRendererComponentStyle: ({
+        item,
+        index,
+      }: {
+        item: { id: string };
+        index: number;
+      }) => {
+        asked.push({ id: item.id, index });
+        return { opacity: 1 };
+      },
+    });
+
+    expect(asked).toEqual([
+      { id: 'a', index: 0 },
+      { id: 'b', index: 1 },
+    ]);
+  });
+});

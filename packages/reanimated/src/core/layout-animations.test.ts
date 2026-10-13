@@ -134,6 +134,17 @@ describe.each([
     expect(update).toHaveBeenCalledWith(getNativeTag(node), type, undefined);
   });
 
+  it('is left in place when the node leaves the tree, for the animation that runs then', () => {
+    const { surface, node } = mounted(target => routeProp(target, key, fade));
+    surface.commit();
+    update.mockClear();
+
+    surface.removeChild(node);
+    surface.commit();
+
+    expect(update).not.toHaveBeenCalled();
+  });
+
   it('stays out of the committed payload', () => {
     const { surface, node } = mounted(target => routeProp(target, key, fade));
 

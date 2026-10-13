@@ -49,6 +49,18 @@ test('leaves the public entry and other packages alone', () => {
   assert.equal(rewritten, 0);
 });
 
+test('both builds that ship declarations get them rewritten', () => {
+  const manifest = JSON.parse(
+    fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
+  );
+
+  assert.match(manifest.scripts.build, /rewrite-upstream-declarations\.mjs build$/);
+  assert.match(
+    manifest.scripts['ng:build'],
+    /rewrite-upstream-declarations\.mjs build-ngc$/,
+  );
+});
+
 test('rewrites every declaration file under a directory, and only those', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rewrite-dts-'));
   fs.mkdirSync(path.join(dir, 'core'));

@@ -1,11 +1,30 @@
 import type { ISymbioteNode } from '@symbiote-native/engine';
-import { getViewProp as getUpstreamViewProp } from 'react-native-reanimated/src/core';
 import { wrapperOfNode } from './shadow-node-wrapper';
 
-// Upstream finds the wrapper through the React renderer; this hands it a component that already
-// carries the wrapper where its lookup reads it, `__internalInstanceHandle.stateNode.node`
+const MODULE_PROXY = '__reanimatedModuleProxy';
+const ERROR_PREFIX = 'error:';
+
+type IViewPropProxy = {
+  getViewProp<Value>(
+    wrapper: unknown,
+    propName: string,
+    answer: (result: Value) => void,
+  ): void;
+};
+
+function isViewPropProxy(value: unknown): value is IViewPropProxy {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'getViewProp' in value &&
+    typeof value.getViewProp === 'function'
+  );
+}
+
+// Asked of the native proxy, as upstream's route loads the renderer of React Native on first use
+// and that renderer takes over the one event handler of the runtime
 export function getViewProp<Value>(
-  viewTag: number,
+  _viewTag: number,
   propName: string,
   node: ISymbioteNode | null | undefined,
 ): Promise<Value> {
@@ -15,7 +34,17 @@ export function getViewProp<Value>(
       '[Reanimated] Function `getViewProp` requires a component to be passed as an argument on Fabric.',
     );
   }
-  return getUpstreamViewProp<Value>(viewTag, propName, {
-    __internalInstanceHandle: { stateNode: { node: wrapper } },
+  const proxy: unknown = Reflect.get(globalThis, MODULE_PROXY);
+  if (!isViewPropProxy(proxy)) {
+    throw new Error('[Reanimated] The native module is not installed.');
+  }
+  return new Promise((resolve, reject) => {
+    proxy.getViewProp<Value>(wrapper, propName, result => {
+      if (typeof result === 'string' && result.startsWith(ERROR_PREFIX)) {
+        reject(result);
+      } else {
+        resolve(result);
+      }
+    });
   });
 }

@@ -1,19 +1,26 @@
 import { createElement, createSurface } from '@symbiote-native/engine';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import * as core from 'react-native-reanimated/src/core';
-import { getShadowNodeWrapperFromRef } from 'react-native-reanimated/src/fabricUtils.native';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { installWrapperHost } from '../../test-support/wrapper-host';
 import { getViewProp } from './view-prop';
 
-vi.mock('react-native-reanimated/src/core', async importOriginal => ({
-  ...(await importOriginal<typeof core>()),
-  getViewProp: vi.fn(),
-}));
-
 const host = installWrapperHost();
-const upstream = vi.mocked(core.getViewProp);
+const PROXY = '__reanimatedModuleProxy';
 
-beforeEach(() => upstream.mockReset());
+type IAnswer = (result: unknown) => void;
+const asked =
+  vi.fn<(wrapper: unknown, propName: string, answer: IAnswer) => void>();
+
+beforeEach(() => {
+  asked.mockReset();
+  Object.defineProperty(globalThis, PROXY, {
+    value: { getViewProp: asked },
+    configurable: true,
+  });
+});
+
+afterEach(() => {
+  Reflect.deleteProperty(globalThis, PROXY);
+});
 
 function committedNode() {
   const surface = createSurface(19_501);
@@ -24,20 +31,26 @@ function committedNode() {
 }
 
 describe('getViewProp', () => {
-  it('asks upstream for the prop, with a component upstream can find the wrapper of', async () => {
+  it('asks the native module for the prop of the wrapper of the node', async () => {
     const node = committedNode();
-    upstream.mockResolvedValue(0.5);
+    asked.mockImplementation((_wrapper, _name, answer) => answer(0.5));
 
     const value = await getViewProp(7, 'opacity', node);
 
     expect(value).toBe(0.5);
-    const [tag, name, component] = upstream.mock.calls[0] ?? [];
-    expect(tag).toBe(7);
-    expect(name).toBe('opacity');
-    if (component === undefined || component === null) {
-      throw new Error('no component was handed over');
-    }
-    expect(getShadowNodeWrapperFromRef(component)).toBe(host.wrapperOf(node));
+    expect(asked.mock.calls[0]?.[0]).toBe(host.wrapperOf(node));
+    expect(asked.mock.calls[0]?.[1]).toBe('opacity');
+  });
+
+  it('rejects with the message native answers an error with', async () => {
+    const node = committedNode();
+    asked.mockImplementation((_wrapper, _name, answer) =>
+      answer('error: no such prop'),
+    );
+
+    await expect(getViewProp(7, 'nope', node)).rejects.toBe(
+      'error: no such prop',
+    );
   });
 
   it('refuses a node that has not committed, as upstream refuses a missing component', () => {

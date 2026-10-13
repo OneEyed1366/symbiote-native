@@ -1,4 +1,5 @@
 import { logger } from 'react-native-reanimated/src/common';
+import type { SharedValue } from 'react-native-reanimated/src/commonTypes';
 import type {
   AnimatedRef,
   ReanimatedScrollEvent,
@@ -42,6 +43,19 @@ export function scrollDispatcher<Context extends Record<string, unknown>>(
     );
     if (found === undefined) return;
     handlers[found[0]]?.(event, context);
+  };
+}
+
+// The horizontal offset when there is one, as upstream's `useScrollOffset` reads it
+export function scrollOffsetWriter(
+  offset: SharedValue<number>,
+): (event: ReanimatedScrollEvent) => void {
+  return (event: ReanimatedScrollEvent) => {
+    'worklet';
+    offset.value =
+      event.contentOffset.x === 0
+        ? event.contentOffset.y
+        : event.contentOffset.x;
   };
 }
 

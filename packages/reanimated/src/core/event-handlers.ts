@@ -7,6 +7,11 @@ import {
 } from 'react-native-reanimated/src/hook/useHandlerCommon';
 import { WorkletEventHandler } from 'react-native-reanimated/src/WorkletEventHandler';
 
+export type IEventHandler<
+  Event extends object,
+  Context extends Record<string, unknown> = never,
+> = (event: ReanimatedEvent<Event>, context?: Context) => void;
+
 type IWorkletHandlers = Record<string, WorkletFunction>;
 
 export function isWorkletHandlers(

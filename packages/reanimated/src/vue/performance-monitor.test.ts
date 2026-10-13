@@ -1,0 +1,89 @@
+import { mount, unmount } from '@symbiote-native/vue';
+import { h, nextTick } from '@vue/runtime-core';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { updateProps } from 'react-native-reanimated/src/updateProps';
+import { stubCancelAnimationFrame } from '../../test-support/cancel-animation-frame';
+import {
+  recordUpdateWrites,
+  type IUpdateWrite,
+} from '../../test-support/update-writes';
+import { installWrapperHost } from '../../test-support/wrapper-host';
+import { settle } from '../../test-support/worklet';
+import { PerformanceMonitor } from './performance-monitor';
+import '../register';
+
+vi.mock('react-native-reanimated/src/updateProps', () => ({
+  updateProps: vi.fn(),
+}));
+
+const host = installWrapperHost();
+const ROOT_TAG = 17_501;
+const writes: IUpdateWrite[] = [];
+
+beforeEach(() => {
+  stubCancelAnimationFrame();
+  vi.useFakeTimers();
+  recordUpdateWrites(updateProps, writes);
+});
+
+afterEach(async () => {
+  unmount(ROOT_TAG);
+  await settle();
+  vi.useRealTimers();
+});
+
+function textInputs() {
+  return host.fabric.findAll(node => node.props.editable === false);
+}
+
+function writtenTexts(): string[] {
+  return writes.flatMap(write =>
+    typeof write.updates === 'object' &&
+    write.updates !== null &&
+    'text' in write.updates &&
+    typeof write.updates.text === 'string'
+      ? [write.updates.text]
+      : [],
+  );
+}
+
+async function mountMonitor() {
+  mount(ROOT_TAG, { render: () => h(PerformanceMonitor) });
+  await nextTick();
+}
+
+describe('PerformanceMonitor', () => {
+  it('shows a JS and a UI reading, neither editable', async () => {
+    await mountMonitor();
+
+    expect(textInputs()).toHaveLength(2);
+  });
+
+  // A frame every 16 ms of the mocked clock is 62.5 frames a second, shown rounded
+  it('reports the UI frame rate once frames have been counted', async () => {
+    await mountMonitor();
+
+    await settle();
+    await vi.advanceTimersByTimeAsync(500);
+
+    expect(writtenTexts()).toContain('UI: 63 ');
+  });
+
+  it('reports the JS frame rate once frames have been counted', async () => {
+    await mountMonitor();
+
+    await settle();
+    await vi.advanceTimersByTimeAsync(500);
+
+    expect(writtenTexts()).toContain('JS: 63 ');
+  });
+
+  it('leaves no frame loop running once it is unmounted', async () => {
+    await mountMonitor();
+    await settle();
+    unmount(ROOT_TAG);
+    await settle();
+
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});

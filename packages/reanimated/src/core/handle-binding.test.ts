@@ -63,6 +63,14 @@ function animatedLabel(start: string) {
   return { shared, controller };
 }
 
+function animatedOpacityProps(start: number) {
+  const { shared } = createSharedValue(start);
+  const updater = workletOf(() => ({ opacity: shared.value }), [shared]);
+  const controller = createAnimatedPropsController(updater);
+  controller.start(updater);
+  return { shared, controller };
+}
+
 function mounted(write: (node: ReturnType<typeof createElement>) => void) {
   const surface = createSurface((nextRootTag += 1));
   const node = createElement('RCTView');
@@ -212,6 +220,75 @@ describe('animated props worn by a node', () => {
         isAnimatedProps: true,
       },
     ]);
+  });
+
+  it('show the starting values of every handle in an array, nested ones too', () => {
+    const label = animatedLabel('named');
+    const opacity = animatedOpacityProps(0.5);
+    const { surface, node } = mounted(target =>
+      routeProp(target, 'animatedProps', [
+        label.controller.handle,
+        [opacity.controller.handle],
+      ]),
+    );
+
+    surface.commit();
+
+    expect(live.nodeOf(node).payload).toMatchObject({
+      accessibilityLabel: 'named',
+      opacity: 0.5,
+    });
+  });
+
+  it('are all written to the node once it has committed', async () => {
+    const label = animatedLabel('named');
+    const opacity = animatedOpacityProps(0.5);
+    const { surface, node } = mounted(target =>
+      routeProp(target, 'animatedProps', [
+        label.controller.handle,
+        opacity.controller.handle,
+      ]),
+    );
+    surface.commit();
+    await settle();
+    writes.length = 0;
+
+    label.shared.value = 'renamed';
+    opacity.shared.value = 0.25;
+    await settle();
+
+    const reached = writes.filter(write => write.views.length > 0);
+    expect(reached.map(write => write.updates)).toEqual([
+      { accessibilityLabel: 'renamed' },
+      { opacity: 0.25 },
+    ]);
+    expect(reached[0]?.views).toEqual([
+      { tag: getNativeTag(node), shadowNodeWrapper: host.wrapperOf(node) },
+    ]);
+  });
+
+  it('let go of a handle that left the array and keep the others', async () => {
+    const label = animatedLabel('named');
+    const opacity = animatedOpacityProps(0.5);
+    const { surface, node } = mounted(target =>
+      routeProp(target, 'animatedProps', [
+        label.controller.handle,
+        opacity.controller.handle,
+      ]),
+    );
+    surface.commit();
+    await settle();
+
+    routeProp(node, 'animatedProps', [opacity.controller.handle]);
+    surface.commit();
+    await settle();
+    writes.length = 0;
+    label.shared.value = 'stale';
+    opacity.shared.value = 0.1;
+    await settle();
+
+    const reached = writes.filter(write => write.views.length > 0);
+    expect(reached.map(write => write.updates)).toEqual([{ opacity: 0.1 }]);
   });
 
   it('move to the new animated props when another handle is passed', async () => {
