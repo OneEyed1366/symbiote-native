@@ -8,10 +8,11 @@ import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 SymbioteNative ships a from-scratch, framework-agnostic port of React Native's
 `Animated` API. The value graph, easing curves, interpolation, and composition
 helpers (`timing`, `spring`, `decay`, `parallel`, `sequence`, `stagger`,
-`loop`, `delay`) live once in `@symbiote-native/engine` — every adapter re-exports the
-same `Animated` namespace and the same `createAnimatedComponent` mechanism, so
-`Animated.Value`, `Animated.spring`, and the rest behave identically no matter
-which framework renders them.
+`loop`, `delay`) live once in `@symbiote-native/engine`.
+
+Every adapter re-exports the same `Animated` namespace and the same
+`createAnimatedComponent` mechanism. So `Animated.Value`, `Animated.spring`, and the
+rest behave identically no matter which framework renders them.
 
 ## The same API, every adapter
 
@@ -120,10 +121,12 @@ which framework renders them.
 React, Vue, and Angular still export `Animated.View`/`.Text`/`.Image` as
 RN-compatible aliases (vestigial on React and Vue — the tag form works there
 too), so their snippets above are unchanged. Angular is the one that needs a
-**named import**: `ngc`'s AOT partial-mode compiler statically evaluates
-template type-checking and can't trace a component class through property
-access on an external, pre-compiled namespace object — only through a direct
-named import binding. `@symbiote-native/angular` exports `AnimatedView`,
+**named import**.
+
+`ngc`'s AOT partial-mode compiler statically evaluates template type-checking.
+It can't trace a component class through property access on an external,
+pre-compiled namespace object, only through a direct named import binding.
+`@symbiote-native/angular` exports `AnimatedView`,
 `AnimatedText`, `AnimatedImage`, `AnimatedScrollView`, `AnimatedFlatList`, and
 `AnimatedSectionList` as top-level named symbols for exactly this reason;
 plain `tsc`/Vitest won't catch a dotted reference slipping through, only a
@@ -137,8 +140,8 @@ Those directives — along with `use:`, `class:`, and `style:` — are Svelte's 
 **element**-only directives, rejected on a component tag ("This type of
 directive is not valid on components"). Every SymbioteNative primitive is now a
 lowercase intrinsic tag (`<view>`, `<pressable>`, …), which Svelte's compiler
-treats as a plain element, so these directives do compile there today — this is
-different from when the primitives were capitalized components. Whether
+treats as a plain element. So these directives do compile there today, unlike when
+the primitives were capitalized components. Whether
 `transition:`/`animate:` actually animate anything through the DOM shim's
 Fabric-backed properties is unverified; nothing in this adapter tests or
 supports that path. `Animated` plus the `$effect`-driven lifecycle shown above
@@ -151,9 +154,10 @@ the underlying host node for anything else.
 driver (`NativeAnimated`) — once started, zero JS runs per frame, and the
 animation keeps running even if the JS thread is busy. `useNativeDriver: false`
 (the default) runs the same math in JS and commits a new value through the
-engine on every frame — necessary for properties the native driver can't
-touch (most non-`transform`/`opacity` style properties), at the cost of a
-commit per frame.
+engine on every frame.
+
+That costs a commit per frame, and it is necessary for the properties the native
+driver can't touch (most non-`transform`/`opacity` style properties).
 
 Both drivers use the exact same `Animated.Value`/`Animated.timing` call —
 `useNativeDriver` is the only thing that changes. See
@@ -189,10 +193,9 @@ value (tracking), and a `diffClamp`-driven collapsing header.
 
 ## What is not built
 
-SymbioteNative's `Animated` is the RN `Animated` API, not Reanimated — there is no
-worklet system, no `useSharedValue`/`useAnimatedStyle`, and no gesture-handler
-integration beyond what `PanResponder` already provides. `react-native-reanimated`
-itself is not tested against SymbioteNative's engine; it hooks much deeper into RN's
-runtime than a plain native-view library does, so treat it as unverified
-rather than assuming it works the same way a
-[wrapped third-party native view](/docs/howtos/third-party-views/) would.
+SymbioteNative's `Animated` is the RN `Animated` API. Worklets, `useSharedValue` and
+`useAnimatedStyle` live in a separate package, `@symbiote-native/reanimated`, which brings
+`react-native-reanimated` 4.7 to all five adapters. See the [Reanimated page](/docs/packages/reanimated/)
+for install steps and the full API.
+
+There is still no gesture-handler integration beyond what `PanResponder` already provides.

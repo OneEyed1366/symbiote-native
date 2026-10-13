@@ -9,19 +9,6 @@ import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 every SymbioteNative adapter gets a `GLView` with a WebGL2 context, headless contexts and
 snapshots, not just React.
 
-| OS platform | Support |
-| ----------- | ------- |
-| iOS         | live    |
-| Android     | live    |
-
-| Framework adapter | Support |
-| ----------------- | ------- |
-| React             | live    |
-| Vue               | live    |
-| Angular           | live    |
-| Svelte            | live    |
-| Solid             | live    |
-
 ## Installation
 
 ```sh
@@ -202,13 +189,15 @@ about 10 MB per reload was reported when textures were never destroyed.
 **How do I see a result without a view?** `createContextAsync()` makes a headless context. Draw into
 it and read the picture back with `takeSnapshotAsync`, then `destroyContextAsync` it.
 
-Sources: [Expo docs: GLView](https://docs.expo.dev/versions/latest/sdk/gl-view/),
-[expo/expo#7367 expo-gl crashes calling OpenGL ES in the background on iOS](https://github.com/expo/expo/issues/7367),
-[expo/expo#18483 text and images missing in production](https://github.com/expo/expo/issues/18483),
-[expo/expo#2693 texImage2D and asset localUri](https://github.com/expo/expo/issues/2693),
-[expo/expo#11267 animation values as uniforms](https://github.com/expo/expo/issues/11267),
-[expo/expo#25375 PanResponder on GLView](https://github.com/expo/expo/issues/25375),
-[expo/expo#12468 memory leak with createCameraTextureAsync](https://github.com/expo/expo/issues/12468).
+Sources:
+
+- [Expo docs: GLView](https://docs.expo.dev/versions/latest/sdk/gl-view/)
+- [expo/expo#7367 expo-gl crashes calling OpenGL ES in the background on iOS](https://github.com/expo/expo/issues/7367)
+- [expo/expo#18483 text and images missing in production](https://github.com/expo/expo/issues/18483)
+- [expo/expo#2693 texImage2D and asset localUri](https://github.com/expo/expo/issues/2693)
+- [expo/expo#11267 animation values as uniforms](https://github.com/expo/expo/issues/11267)
+- [expo/expo#25375 PanResponder on GLView](https://github.com/expo/expo/issues/25375)
+- [expo/expo#12468 memory leak with createCameraTextureAsync](https://github.com/expo/expo/issues/12468)
 
 ## How the wrapper works
 

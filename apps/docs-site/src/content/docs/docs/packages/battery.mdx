@@ -14,19 +14,6 @@ the [slider](/docs/packages/slider/) (a native **view**) or [splash screen](/doc
   battery exposes three independent subscriptions (level, state, low-power-mode), each with its own
   hook, plus `usePowerState`, which merges all three into one `PowerState` value.
 
-| OS platform | Support |
-| ----------- | ------- |
-| iOS         | ✅ live |
-| Android     | ✅ live |
-
-| Framework adapter | Support |
-| ----------------- | ------- |
-| React             | ✅ live |
-| Vue               | ✅ live |
-| Angular           | ✅ live |
-| Svelte            | ✅ live |
-| Solid             | ✅ live |
-
 <Aside type="note">
   `isBatteryOptimizationEnabledAsync()` is Android-only — it always resolves
   `false` on iOS, since iOS has no equivalent concept of per-app battery
@@ -44,16 +31,16 @@ Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --b
 [`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
 
 `expo-battery` and `expo-modules-core` come along as regular dependencies, pinned to exact
-versions — never install either yourself, and never add the `expo` meta-package to your project
-(it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
+versions. Never install either yourself. Never add the `expo` meta-package to your project either,
+as it bundles its own Metro/Babel pipeline, which conflicts with this project's own.
 
 <Aside type="danger" title="Native setup is required before first use">
   `expo-battery`'s native code is discovered by `expo-modules-autolinking`, a
   different mechanism from the `react-native.config.cjs`/podspec autolinking
-  every other SymbioteNative wrapper uses — and it isn't the standard Expo setup
-  flow either, since this project never installs the `expo` meta-package. Follow
-  [How to: wire up an Expo native
-  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers
+  every other SymbioteNative wrapper uses. It isn't the standard Expo setup
+  flow either, since this project never installs the `expo` meta-package.
+  Follow [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first. It covers
   this package and every other `expo-modules-core` package with zero further
   native changes.
 </Aside>
@@ -360,7 +347,7 @@ runes are lexically scoped to the file that declares them.
 
 - **Android stops delivering events while the app is backgrounded.** The native module unregisters
   its broadcast receivers when the activity enters the background and registers them again on
-  return, and emits no catch-up event — so after a return to the foreground your listener still
+  return. It emits no catch-up event, so after a return to the foreground your listener still
   holds the last value it saw until the next real change. Re-seed from `getPowerStateAsync()` if
   you need to be current at that moment.
 - **`addBatteryLevelListener` fires far less often on Android.** The Android receiver subscribes to
@@ -368,8 +355,8 @@ runes are lexically scoped to the file that declares them.
   nothing in between; iOS listens to `UIDevice.batteryLevelDidChangeNotification`, which fires on
   every reported percentage change. Don't build a percentage readout on the Android event alone.
 - **The iOS Simulator resolves sentinels instead of failing.** `isSupported` is compiled to `false`
-  under `targetEnvironment(simulator)`, but the level and state functions have no simulator branch
-  at all — they read `UIDevice.current` straight through and resolve whatever it reports there. Gate
+  under `targetEnvironment(simulator)`. The level and state functions have no simulator branch
+  at all: they read `UIDevice.current` straight through and resolve whatever it reports there. Gate
   on `isAvailableAsync()` rather than treating a `-1` level as a real reading.
 
 ## Common questions
@@ -386,10 +373,10 @@ Sources: [Expo docs: Battery](https://docs.expo.dev/versions/latest/sdk/battery/
 
 ## How the wrapper works
 
-`@symbiote-native/battery` ships **zero React/Vue/Angular/Svelte/Solid logic in `expo-battery` itself** — that
-package's own JS hard-imports the `expo` meta-package (which this project never installs), so its
+`@symbiote-native/battery` ships **zero React/Vue/Angular/Svelte/Solid logic in `expo-battery` itself**.
+That package's own JS hard-imports the `expo` meta-package, which this project never installs. So its
 free functions and event-name constants are hand-ported, verbatim, into this package's own
-`core/`, changing only the one import line that now pulls `EventSubscription` from
+`core/`. Only one import line changes: it now pulls `EventSubscription` from
 `expo-modules-core` instead of `expo`:
 
 ```

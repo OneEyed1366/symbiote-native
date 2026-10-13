@@ -11,23 +11,10 @@ SymbioteNative adapter can render it — without importing that library's React 
 the reference implementation of the [third-party native-view wrapper](#how-the-wrapper-works)
 pattern: the recipe to follow for any future community RN view. Its counterpart is
 [splash screen](/docs/packages/splash-screen/), which wraps a community library that ships an
-imperative native module and no view at all — both are autolinked through a
+imperative native module and no view at all. Both are autolinked through a
 `react-native.config.cjs` + podspec proxy, unlike the `expo-modules-core` packages such as
 [local auth](/docs/packages/local-auth/), whose native code `expo-modules-autolinking` discovers
 instead.
-
-| OS platform | Support |
-| ----------- | ------- |
-| iOS         | ✅ live |
-| Android     | ✅ live |
-
-| Framework adapter | Support |
-| ----------------- | ------- |
-| React             | ✅ live |
-| Vue               | ✅ live |
-| Angular           | ✅ live |
-| Svelte            | ✅ live |
-| Solid             | ✅ live |
 
 ## Installation
 
@@ -166,7 +153,7 @@ as a workspace dependency the same way the examples do.
     two-way-binding sugar — the compiler wires the sync at the call site, no
     adapter plumbing involved. The explicit `value={x} onValueChange={setX}`
     form still works too and is required if you need to see or react to every
-    reported value yourself; don't pass both on the same instance, since
+    reported value yourself. Don't pass both on the same instance, since
     supplying `onValueChange` takes over and the bound variable stops updating
     from native reports.
 
@@ -293,10 +280,10 @@ report mid-drag.
 
 ### Props
 
-Every prop below is framework-agnostic and shared verbatim by every adapter, **except**
+Every prop below is framework-agnostic and shared verbatim by every adapter. The exception is
 `StepMarker`, which is per-adapter because it returns a framework element (a React component, a
-Vue scoped slot, a Svelte snippet, or a Solid render-prop over an accessor — no Angular
-equivalent yet, see the caution above) — see [shared vs
+Vue scoped slot, a Svelte snippet, or a Solid render-prop over an accessor; there is no Angular
+equivalent yet, see the caution above). See [shared vs
 framework-specific](/docs/api/components/#shared-vs-framework-specific).
 
 | Prop                                                                                              | Type                                | Default        | Description                                                                                                         |
@@ -325,7 +312,7 @@ framework-specific](/docs/api/components/#shared-vs-framework-specific).
   mirroring the community component. A slider that must start at zero wants `minimumValue={0}` and
   no explicit `value`.
 - **A bare slider measures differently per platform.** The iOS entry gives the wrapper a 40pt
-  default height and nudges the step row down 10pt; the Android entry supplies no default height at
+  default height and nudges the step row down 10pt. The Android entry supplies no default height at
   all, leaving the native view's intrinsic size to decide, and keeps the row at the top. Set an
   explicit height through `style` if the two have to agree.
 - **A custom `StepMarker` takes over the native thumb.** With a marker present, `thumbImage` is not
@@ -356,6 +343,6 @@ packages/slider/src/
 Every adapter imports `../register` first (never the library's `Slider.tsx`), then calls into the
 same `core` render — the same logic/view/lifecycle split as every other SymbioteNative component (see
 [how it works](/docs/how-it-works/)). Wrapping a different third-party native view follows
-this same recipe: register its `ViewConfig` fallback and processors as a side effect, then implement the
-shared `core` render once and add a thin per-framework lifecycle bridge around it — never the library's
+this same recipe. Register its `ViewConfig` fallback and processors as a side effect, then implement the
+shared `core` render once and add a thin per-framework lifecycle bridge around it. Never use the library's
 own React component.

@@ -5,7 +5,7 @@ description: "Porting react-native-reanimated 4 and react-native-worklets to eve
 
 # Reanimated port
 
-Status: React adapter BUILT and verified headless only (see "Built so far"); Vue, Svelte, Solid, Angular not started (the user said React first). E-1 ran once on the iOS simulator
+Status: React adapter BUILT and verified headless only (see "Built so far"); All five adapters have the full export surface and a demo screen (headless tests); the device checks of Vue, Svelte, Solid and Angular are still open. E-1 ran once on the iOS simulator
 (bind works). Decisions marked PROV stand on hypothesis H-1 (Reanimated's native half works unmodified on a tree
 our C++ engine commits) and are re-decided, not patched, if a device run disproves it. The package is not
 published and has no changeset or docs-site page on purpose: repo P0 parity needs all five adapters first.
@@ -96,6 +96,13 @@ or a deviation is unavoidable, and say in one line what the choice changes for a
   channel keyed by tag) are not ViewConfig events: the seam must claim those props before `routeEvent`/`setProp`,
   or a function lands in the Fabric payload.
 - The RN source vendored locally is main (1000.0.0), not the pinned 0.86: re-check any RN claim against the pin.
+- RN's own renderer takes over the one event handler of the runtime the moment it loads, and Metro loads upstream modules lazily. `getViewProp` through upstream reached `fabricUtils`, which requires `ReactFabricPublicInstance`, so the first press of it broke every touch after it (`Cannot read property 'canonical' of undefined` from `getListener`). Ours asks `__reanimatedModuleProxy` directly. Before calling any upstream function from a press handler, check that its chain does not require RN's renderer.
+
+- CLOSURE FREEZE (Vue, Solid, Svelte): the worklets serializer caches a clone by object identity and, in a dev build, turns every key of what it cloned into a getter whose setter ignores writes. A framework's props object in a closure would stop updating. `snapshotWorklet` (`core/worklet-snapshot.ts`) hands the runtime a copy of the current values, and a change takes a new snapshot, so the mapper restarts over a fresh clone. Proven against the real serializer in `vue/real-runtime-closure.test.ts`; the UI-thread read of the copy is device-only.
+
+- STYLE ARRAYS (Vue): `createVNode` flattens a `style` array into one record, copying every key of a handle into it. A handle carries its own name under `symbioteWornHandle` (`markFlattenable`), and the style handle claim has `unwrap`, which gives the engine the handle and the plain keys apart. Without it the handle is lost and its keys reach Fabric.
+
+- COMPONENT REFS (Vue): a function ref on a component gets what the component exposes, not its node. A component that wraps a node (`Animated.ScrollView`) exposes it as `hostNode`, and `createAnimatedRef` reads it from there.
 
 ## E-1 (prepared, run by the user)
 
@@ -121,9 +128,22 @@ shared element transitions behind upstream's flag, the D-7 ref functions and `Pe
 upstream `CSSManager`: animations, transitions, `onCSS*` callbacks and five states. css-parser compiles `@keyframes`,
 `animation`, `transition` and the five states.
 
+The list to work from, in the order it is built. Names and types are guarded by `src/surface-parity.test.ts`, which compares every export of upstream's entry with each adapter's entry (a started adapter lists what it lacks, an unstarted one must not have an entry yet).
+
 | Piece | React | Vue | Svelte | Solid | Angular |
 |---|---|---|---|---|---|
-| hooks, Animated.*, layout, CSS | built | no | no | no | no |
+| shared snapshot, `followReads`, hook factories in core | built | built | built | built | built (a signal in a closure goes over as `valueGetter`, see `readAccessor`) |
+| useSharedValue, useAnimatedStyle, useAnimatedProps | built | built | built | built | built (injection context: constructor, field initializer or `runInInjectionContext`) |
+| useDerivedValue, useAnimatedReaction | built | built | built | built | built |
+| useAnimatedRef, useEvent, useHandler, useAnimatedScrollHandler, useComposedEventHandler | built | built | built | built | built |
+| useFrameCallback, useTimestamp, useScrollOffset (+ `useScrollViewOffset`), useAnimatedSensor, useAnimatedKeyboard, useReducedMotion | built | built | built | built | built |
+| Animated.View/Text/Image/TextInput, createAnimatedComponent | built | built | built (host tags, `<view>`) | built (host tags) | built (the tag names, a template writes `<view>`) |
+| Animated.ScrollView, Animated.FlatList (+ their prop types) | built | built | built (`.svelte` components; the list forwards the FlatList handle method by method, `reuse.json` allows that copy) | built (plain `.ts` components over `descriptorToSolid`; `ref` rides down to the list, no delegation) | built (`AnimatedScrollView` takes the tag's props as `[scrollViewProps]`; `AnimatedFlatList` extends `FlatList` with a template of its own over `FLAT_LIST_TEMPLATE`, so it keeps every input, output and slot) |
+| LayoutAnimationConfig, SharedTransitionBoundary, PerformanceMonitor, ReducedMotionConfig | built (`ReducedMotionConfig` is upstream's own) | built (own `ReducedMotionConfig`, as upstream's is a React component) | built (all four are `.svelte` components) | built (`.ts`, `hostNode` helper over `descriptorToSolid`) | built (`@Component`s with a bag over `SymbioteHostPropsDirective`) |
+| entry file `src/<fw>/index.ts`, `surface-parity.test.ts` `NOT_YET` empty | built | built | built | built | built |
+| `*.type-check` file next to `animated.ts` (the shared host props in `core/animated-host-props.type-check.ts`) | built | built | built | built | built (the scroll view inputs) |
+| the same 14-section demo screen in `examples/<fw>` plus a test that mounts it (`test-support/demo-screen-suite.ts` for all but React) | built | built (`vue-tsx` JSX and `vue-sfc` with sections as child SFCs, tests `demo-screen.test.ts` and `demo-screen-sfc.test.ts`) | built (`ReanimatedScreen.svelte`, `demo-screen.test.ts`) | built (`ReanimatedScreen.tsx`, `demo-screen.test.tsx`) | built (`ReanimatedScreen.ts`, `demo-screen.test.ts`; field-initializer factories, tag bags over `symbioteHostProps`) |
+| README section for the adapter | built | built | built | built | built |
 
 Traps found while building (each cost a red test or a hook round):
 
@@ -138,9 +158,54 @@ Traps found while building (each cost a red test or a hook round):
 - Upstream types `AnimatedRef` as returning a wrapper though it is null until commit; `IAnimatedRef` copies that through a function overload (no cast) so `scrollTo(ref)` and `measure(ref)` typecheck.
 - Headless, Vite resolves the web file of `scrollTo`, `measure` and the like, which wants a DOM element: do not press such buttons in a screen test, the device runs the `.native` file.
 - The demo screen is the integration test nobody else writes: `demo-screen.test.ts` mounts it over the workspace and presses every button, and `tsconfig.demo.json` type-checks it. A type or runtime gap in `Animated.*` shows up there first.
-- Not ported yet: `Animated.FlatList` `itemLayoutAnimation` and `CellRendererComponentStyle`, which need `CellRendererComponent` on the list components.
+- The non-React demos sit in trees with no install, so `vitest.reanimated.ts` does what Metro does for them. `babelStep` runs the worklets plugin after the Vue JSX pair, after `compileSfc` plus a TypeScript transpile, or on what the Svelte compiler emitted.
+- `EXAMPLE_IMPORTS` reads a bare import of those demos from the install of the package (`vue` becomes `@vue/runtime-core`). Break the plugin on purpose to see the test go red with `useAnimatedStyle needs a worklet`.
+- The `template` depth limit of the hooks (5) pushes a Vue SFC demo into child SFCs, one per section. A scroll view takes `class` through its attrs, so no wrapper `view` is needed.
+- SFC TRANSFORMERS RENAME THE FILE: the Vue and Svelte Metro transformers pass Babel `X.vue.tsx` / `X.svelte.tsx` (a name not on disk, so RN's preset strips TS). The worklets plugin reads `inputMap.sources` from disk for its source map and dies with `ENOENT ... X.vue.tsx`. Both transformers call `relabelForUpstream` (`core/css-parser/src/metro-transformer/relabel-for-upstream.ts`), which adds the app's own worklets plugin entry with `disableSourceMaps` on and keeps its other options; its test compiles a worklet under the invented name. No vitest pipeline of ours goes through the rename, which is why the demo-screen tests stayed green. The app writes nothing by hand.
+- CLI: `--reanimated` on `new` and `add` (`packages/cli`, `core-layers.ts` row `reanimated`). It merges `templates/layers/reanimated/package.json.fragment.json` (package `latest`, `react-native-reanimated` 4.7.1, `react-native-worklets` 0.13.0: bump them with the peers) and `addWorkletsPlugin` appends the plugin last in `plugins` of `babel.config.js`, or the outro asks for it by hand when the config has no list.
+- `Animated.FlatList` `itemLayoutAnimation` and `CellRendererComponentStyle` ride on the list's `CellRendererComponent`; the style function reads its item from the list's `data` by index, so it is single-column only, as upstream's layout animation is.
+- ANGULAR INPUTS (setup-once): an `@Input` arrives after the constructor, so anything that needs one (`smoothingFrames`, `scrollViewOffset`) starts in `ngOnInit` under `runInInjectionContext`. Signal inputs `input()` need the compiler's JIT transform, which the vitest project lacks: declare `@Input` and, for reactivity, hold it in a `signal` set by the setter.
+- ANGULAR COMMIT TIMING: a hook test on fake timers lets the clock move (`vi.advanceTimersByTimeAsync(0)`) for effects to run; `renderComposable` in `test-support/render-angular-composable.ts` does that. A component host needs its own selector per test, or NG0912 on the id.
+- SVELTE / SOLID: `mount` returns before the engine commit (a microtask), so a Svelte test awaits `tick()` (`mountSvelte` does). A test host sets `window` at mount, not at import, or upstream takes the web branch at load.
+- THE SIX DEMO SCREENS ARE ONE SCREEN: same sections, same `ra-*` test ids, byte-identical `sections.css` and `keyframes.css` (the user's rule, only the app's brand colour may differ, and this screen has no brand slot). `describeDemoScreen` presses every button of each, so a test id that drifts fails there. A section is a file per framework idiom, never a copy of another framework's code.
+- `useTimestamp(isActive)` reads its flag once in Vue, Svelte, Solid and Angular, so those demos pause the clock readout with a shared `frozenAt` and `isPaused` instead. Reading `timestamp.value` on the JS thread at the pause is what freezes it.
+- Angular demo components take no input at all: the `lib-reuse` hook blocks a new `@Input` in favour of `input()`, and a signal input throws NG0950 under the JIT harness. A section draws its own wrapper, and `RaBadge` owns its style and ref and exposes methods to `@ViewChild`.
+- A bare import from `examples/solid` has its own install, so a second `solid-js` split the reactive graph and no signal moved. `EXAMPLE_IMPORTS` now covers Solid too.
+- `ng:build` ends with `rewrite-upstream-declarations.mjs build-ngc`: without it the `.d.ts` name `react-native-reanimated/src/*`, so an Angular app's ngtsc type-checks upstream `.ts` under the app's options (dozens of TS7017 on `globalThis`). The app needs `registry:sync` and a reinstall to see it.
+- Editing a workspace `package.json` makes the next `pnpm exec` run `prepare` across the whole workspace (about 30 s). Never pipe it into `head`: the cut leaves `build-ngc` folders half built.
+- An Angular `scrollViewProps` is typed `IAnimatedHostProps<IAngularScrollViewProps>`, which is what lets a worklet handler (`onScroll: useComposedEventHandler(...)`) in; `animated.type-check.ts` holds the case.
+- The vitest harness runs Angular under JIT, which checks no template: an `[entering]` on a tag or `imports: [createAnimatedComponent(X)]` passes there and fails in the app (NG8002, NG1010). The AOT check that needs no build or launch: `examples/angular/node_modules/.bin/ngc -p examples/angular/tsconfig.angular.json --noEmit`. A host tag takes layout animations only through `[symbioteHostProps]`, and `imports` names a class.
 
 ## Open
 
-`useAnimatedKeyboard` is deprecated upstream (keep for parity); the `'worklet'` directive survives Vue `compileScript`, Svelte 5, `babel-preset-solid` and TypeScript emit (probed; ngtsc and the linker not run, the Metro transformer chains not run end to end);
+`useAnimatedKeyboard` is deprecated upstream (keep for parity); the `'worklet'` directive survives Vue `compileScript`, Svelte 5, `babel-preset-solid`, TypeScript emit and ngtsc partial compilation (`pnpm --dir packages/reanimated run ng:build`, the composed `AnimatedFlatList` template compiles); the Angular linker and the Metro transformer chains are not run end to end;
 gesture-handler is the next epic (D-29), after this one; `screenTransition` wiring into `packages/navigation` waits for it.
+
+## Ledger: an exiting Flip tile hides the buttons below it (device, iOS, every adapter)
+
+Symptom: after the exit of `FlipOutXDown` (hide, or next preset) the buttons under the stage are invisible, still tappable; a second press brings them back. Reproduced in React, so not an adapter.
+
+Status: no longer reproduces. On the iOS simulator `Flip` and every other preset are fine in all five adapters, with the diagnostic presets and `collapsable={false}` already removed from the React example. The cause was never pinned down, so H6, H9, H11, H12 and H14 are closed as "not reproducing", not as refuted. If the symptom returns, start from H14 and the pull after the end of the exit.
+
+| id | hypothesis | status | evidence |
+|---|---|---|---|
+| H1 | the exit worklet reports NaN or never ends, given real metrics | refuted | `src/core/exit-animation.test.ts`, 6 cases: finite every frame, ends with remove |
+| H2 | new proxy at fault | refuted | `USE_LEGACY_LAYOUT_ANIMATIONS_PROXY` (needs shared transitions off) fails the same |
+| H3 | `perspective` alone | refuted | perspective with a fade exit is fine on device |
+| H4 | any translateY | refuted | `translateY` by constant 60 and `translateX` 60 are fine |
+| H5 | native `currentHeight` arrives empty or NaN | refuted for our node | `reanimated-proxy.itest.ts`: the real proxy hands the exit `currentHeight: 60`, `currentOriginY: 17`, a correct window; a missing value would make `translateY` NaN, but ours is not missing. The device print is still not read |
+| H6 | perspective together with `scale` to 0 | open | ends fine headless; fails on device, unexplained |
+| H7 | our engine flattens differently from stock around the exiting node | refuted | `reanimated-exit-mutations.itest.ts` on the real differ: section, tile and both buttons mount as SIBLINGS under the root (host indexes 0 to 3), as RN's flattening does for any painted view that forms no stacking context |
+| H8 | the withheld `Remove` shifts later index-based mutations, or the proxy loses a view | refuted | `reanimated-proxy.itest.ts` runs the real `LayoutAnimationsProxy` (4.7.1, compiled into `symbiote_tester`) over the real differ and the stub platform: a hide, and a preset change with a pressed button and a new entering tile, keep every button mounted; the old tile goes at the animation's end with one Remove and one Delete |
+| H13 | the Flip frames themselves (perspective, rotateX, translateY) break the proxy or the props parse | refuted | `reanimated-proxy.itest.ts`: three frames through the real proxy give one Update each, on the tile only; the final transform parses to `rotateX -1.5708rad, translateY 60`; every button keeps its props |
+| H9 | in that flat host list the proxy reorders or re-inserts the section view (an unflattened ancestor of the exiting tile) over the buttons: invisible, yet the buttons keep the touch | open | device experiment: `collapsable={false}` on `ra-section`, which nests tile and buttons inside the section view (itest: Remove at index 0 of the section, not of the root) |
+| H10 | the engine emits a stream that is not minimal (an extra Create or Insert of a withheld tag makes the proxy flush it, `reconcileContradictedRemovals`) | refuted | same itest: a hide is one Remove and one Delete, a swap is one each of Remove, Delete, Create, Insert, a restyle one Update |
+| H11 | a leftover of Reanimated's synchronous props on iOS (4.7.1 changelog: synchronously updated props reset when a commit moves a view within its parent; the proxy writes opacity 0 for entering views) lands on a button | open | no itest can reach it without the proxy and a mounted UIKit tree |
+| H12 | upstream reports | open | no issue for FlipOut found. Near: #5349 (iOS, exits break as a sibling of an absolutely positioned view, an extra wrapping view fixes it), #4927 (view loses its space when an exit starts). Docs: a removed non-animated parent does not wait for its children's exits, fix `collapsable={false}`. The changelog lists iOS exit fixes up to 4.4.2 (re-add the LightNode before an exit, #9646), all older than the installed 4.7.1 |
+| H14 | the exit never removes its tile until the next commit; only exits that move the tile onto the buttons make it visible | open | geometry: stage is 70 high, the tile 60, the gap 12, so `translateY` 60 puts the tile over the button row; a faded exit leaves an invisible tile, a stuck one is unnoticed. Fits screenshots 7 and 9 (tile visible, buttons gone) and the second press, which commits. The itest end-of-exit case needs a pull to remove it; on a device the pull comes from `notifyDelegatesOfUpdates` in `performOperations`. Device test: preset "Exit to half" (ends at opacity 0.5): a half-faded tile left behind after the exit confirms it |
+| H15 | upstream #10275 (closed, not reproduced): a late end of the entering animation of the same tag drops the exit's removal; our tile carries both | refuted for the order the JS manager emits | `reanimated-proxy.itest.ts`: entering over and pulled, entering over and not pulled, exit started while entering still runs: the tile goes at the end each time. The JS manager sends no end on a cancelled animation (`finished` guards it), so the order that does drop the removal (end false after the exit started) cannot come from it. 4.7.1 has no counter either |
+| H16 | something in the whole chain of the real screen: React section, our claim, the proxy, Reanimated's own animation manager running FlipOutXDown on a stepped clock | refuted | `reanimated-exit-screen.itest.tsx`: hide, hide during the entering, next preset, and hide/show/hide/next in a row. The tile leaves at the natural end of its exit (about 18 frames), both buttons stay mounted and opaque on EVERY frame, one tile remains after a swap. Rests on the end being delivered and pulled, as a device does. `reanimated-real-section.itest.tsx` runs the example's own `EnteringExitingSection`, all 10 presets, hide then show then next: each tile is present on the first frame of its exit, gone at the end, buttons intact on every frame |
+
+The proxy runs headless now: `symbiote_tester` compiles Reanimated's `LayoutAnimationsProxy` from the installed package (`tests/CMakeLists.txt`, `reanimated-worklets-stubs.cpp` answers the few Worklets calls, `reanimated-stubs/` the one generated props type), and a test turns it on with `useLayoutAnimationsProxy(true)`. What it settles is structure and numbers. What it cannot settle is what UIKit does with the views, which is where the bug now has to be.
+
+No device facts are pending. The diagnostic presets (`Exit perspective`, `Exit to half` and the rest) lived only in the React example and are gone; the itests keep the structural proof.

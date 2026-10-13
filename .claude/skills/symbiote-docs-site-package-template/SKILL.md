@@ -16,11 +16,12 @@ native-VIEW wrapper) or `symbiote-expo-native-module` (a native-MODULE wrapper) 
 
 1. Frontmatter: `title` (the package's short display name, e.g. "Splash screen") + `description`
    (one sentence).
-2. Intro paragraph — what it wraps, why it's a wrapper at all (one-line contrast against the
-   closest sibling package, e.g. splash-screen.mdx contrasts itself against slider.mdx's
-   native-view wrapping since it wraps an imperative TurboModule instead).
-3. OS-platform support table + framework-adapter support table (`| OS platform | Support |` /
-   `| Framework adapter | Support |`) — copy verbatim shape from either reference page.
+2. Intro paragraph: what it wraps and why it's a wrapper at all. Add a one-line contrast against
+   the closest sibling package. Example: splash-screen.mdx contrasts itself against slider.mdx's
+   native-view wrapping, since it wraps an imperative TurboModule instead.
+3. No OS-platform or framework-adapter support tables. Every package ships on both platforms and
+   all five adapters, so a table only suggests a gap that is not there. A real limit (a platform
+   where it is a no-op or throws, an adapter missing one part) is one sentence in the intro or Notes.
 4. `## Installation` — the real npm install command, per `docs-site.md`'s install-snippet rule
    (never `workspace:*` in a snippet — the published version comes from the Changesets flow in
    `symbiote-release-publishing`).
@@ -30,8 +31,8 @@ native-VIEW wrapper) or `symbiote-expo-native-module` (a native-MODULE wrapper) 
    this exact text, see the astro.config.mjs head scripts). If the package has more than one
    usage shape (e.g. splash-screen's imperative `hide()` vs the animated `useHideAnimation()`),
    use a separate `<Tabs syncKey="framework">` block per shape, each still broken out by adapter.
-   (Superseded the older "one `###` sub-heading per adapter" shape in 2026-07 — every package/
-   howto/example/learn page with a genuine React+Vue+Angular triad now uses Tabs instead of
+   (This replaced the older "one `###` sub-heading per adapter" shape. Every package, howto,
+   example and learn page with a genuine React+Vue+Angular triad now uses Tabs instead of
    stacked headings, synced to the same site-wide framework preference.)
 6. **`## API`** — see below, the section this skill exists to enforce.
 7. `## How the wrapper works` (or `## How it works`) — the implementation-level section: what the
@@ -46,21 +47,23 @@ it, one `###` sub-table per distinct surface group the package exposes:
 - A view/component package (slider) → `### Props` (a single table covering every prop, event
   callback, and the accessibility/style passthrough row).
 - An imperative-function + hook package (splash-screen) → one table per shape:
-  `### \`hide()\` / \`isVisible()\`` (a **Signature / Description** table, not Prop/Type/Default —
-  there's no "prop" here, just function signatures), `### \`useHideAnimation()\` config` (the
-  hook's input, Field/Type/Default/Description), `### \`useHideAnimation()\` return value` (the
-  hook's output shape, Field/Type/Description — no Default column, since a return value has none).
+  - `### \`hide()\` / \`isVisible()\``: a **Signature / Description** table, not Prop/Type/Default,
+    since there's no "prop" here, just function signatures.
+  - `### \`useHideAnimation()\` config`: the hook's input, Field/Type/Default/Description.
+  - `### \`useHideAnimation()\` return value`: the hook's output shape, Field/Type/Description.
+    No Default column, since a return value has none.
 
-Every table's last column is **Description**, always prose, always filled — the exact convention
-VueUse pages use (its `Type Declarations` section pairs each field with an inline
-`/** … */` JSDoc comment right above it: `useMouse`'s `type` field reads
-"Mouse position based by page, client, screen, or relative to previous position", `touch` reads
-"Listen to `touchmove` events", etc. — never a bare type with no explanation). We render the same
-idea as a markdown table cell instead of a JSDoc block (no build-time TSDoc-to-markdown extractor
-exists yet in this repo), but the bar is identical: **a reader must never have to open the source
-to learn what a field does.** An empty Description cell is a template violation, not a stylistic
-choice — if you can't write one honest sentence for a field, that's a signal the field itself
-needs a better name or a code comment first.
+Every table's last column is **Description**, always prose, always filled. It is the exact
+convention VueUse pages use. Its `Type Declarations` section pairs each field with an inline
+`/** … */` JSDoc comment right above it. `useMouse`'s `type` field reads
+"Mouse position based by page, client, screen, or relative to previous position", and `touch` reads
+"Listen to `touchmove` events". Never a bare type with no explanation.
+
+We render the same idea as a markdown table cell instead of a JSDoc block, as no build-time
+TSDoc-to-markdown extractor exists yet in this repo. The bar is identical: **a reader must never
+have to open the source to learn what a field does.** An empty Description cell is a template
+violation, not a stylistic choice. If you can't write one honest sentence for a field, that's a
+signal the field itself needs a better name or a code comment first.
 
 ## Applying this to a new package
 
@@ -125,26 +128,30 @@ needs a better name or a code comment first.
 - **Example shape follows the package.** Pure-function packages get ONE shared example. Hook
   packages get Tabs per adapter with the real return shape: React tuple or value, Vue ref, Solid
   accessor (`create*` name), Svelte `{ current }`, Angular signal (`connect()` or `inject*`).
-- **Support tables use plain `live`.** The writing hook bans emoji and long dashes.
+- **Platform limits go in prose.** Android-only, iOS-only or no-op-off-iOS is a sentence in the
+  intro, not a table row.
 - **Document manual native steps the linker does not generate** (iOS entitlements, capabilities,
   Play Integrity setup) next to Install.
 - **Common questions section (2026-10).** Every Expo package page ends with `## Common questions`
-  (symptom in bold, cause and fix after it) plus one `Sources:` line of cited links. Sections map
+  (symptom in bold, cause and fix after it). After it comes a `Sources:` bullet list of cited
+  links, one per bullet, as a run of links in one paragraph trips the sentence-length hook. Sections map
   to the Diataxis kinds: Usage = tutorial, Common questions = how-to, API = reference,
   How the wrapper works = explanation. Answers must not assume the Expo manifest (not ported) or
   an Expo config plugin (this project wires native steps by hand).
 - **No dates in package docs.** README and mdx text never carry a date or "as of" time, not in a
   heading and not in a parenthesis ("Scope decision (2026-09-28)"). State the condition instead,
   such as the version a limit holds for. A date goes stale and says nothing a reader can act on.
-- **Tier 3 and 4 view packages (2026-10).** A view package page also gets `## API` with `###` sub-sections
-  (Props, Reaching the view functions, Functions), never a loose `## Props`, and its Usage is Tabs for all five
-  adapters taken from the real `examples/expo-*` screens, with the handle and hook shapes checked against
-  `packages/<pkg>/src/<adapter>/`. The README follows `symbiote-package-readme-template`
-  (Install, Shape, Use it, API, Notes, Common questions, Test it), so write the page first and lift Usage and
-  Notes from it. Question sources that worked: `gh search issues --repo expo/expo "<name>" --match title
-  --sort comments` (read-only), then `gh issue view <n> --json title,body,comments` for the outcome, and the
-  local `.vendors/expo/docs/pages/versions/unversioned/sdk/<name>.mdx` for known-issues text. Drop an issue whose
-  fix is already in the pinned version, and say "reported" for one without a confirmed cause.
+- **Tier 3 and 4 view packages (2026-10).** A view package page also gets `## API` with `###`
+  sub-sections (Props, Reaching the view functions, Functions), never a loose `## Props`. Its Usage
+  is Tabs for all five adapters taken from the real `examples/expo-*` screens, with the handle and
+  hook shapes checked against `packages/<pkg>/src/<adapter>/`.
+  The README follows `symbiote-package-readme-template` (Install, Shape, Use it, API, Notes, Common
+  questions, Test it), so write the page first and lift Usage and Notes from it.
+  Question sources that worked: `gh search issues --repo expo/expo "<name>" --match title
+  --sort comments` (read-only), then `gh issue view <n> --json title,body,comments` for the outcome.
+  The local `.vendors/expo/docs/pages/versions/unversioned/sdk/<name>.mdx` has known-issues text.
+  Drop an issue whose fix is already in the pinned version, and say "reported" for one without a
+  confirmed cause.
 - **MDX traps.** A `{` or a bare `<tag>` in prose outside backticks breaks the build, check with a script that strips
   fences and inline code first. Do not leave an unused `Aside` import.
 

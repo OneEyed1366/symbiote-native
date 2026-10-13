@@ -13,19 +13,6 @@ modern `Query`/`Asset`/`Album` API built on JSI shared objects; the legacy funct
 at the `/legacy` subpath. Permissions include the granular Android 13+ ones and the limited-access
 picker (iOS, Android 14+).
 
-| OS platform | Support |
-| ----------- | ------- |
-| iOS         | ✅ live |
-| Android     | ✅ live |
-
-| Framework adapter | Support |
-| ------------------ | ------- |
-| React              | ✅ live |
-| Vue                | ✅ live |
-| Angular            | ✅ live |
-| Svelte             | ✅ live |
-| Solid              | ✅ live |
-
 ## Installation
 
 ```sh
@@ -245,10 +232,12 @@ read only when you pass `resolveWithFullInfo: true`. The modern `Asset` API read
 **The user picked "limited access".** You then see only the photos they shared. Use
 `presentPermissionsPicker()` (Android 14+ and iOS) to let them choose more.
 
-Sources: [Expo docs: MediaLibrary (legacy)](https://docs.expo.dev/versions/latest/sdk/media-library-legacy/),
-[Expo guide: migrate to the new expo-media-library API](https://docs.expo.dev/guides/sdk-libraries-migration/media-library/),
-[expo/expo#50670 fix the screenshot save on SDK 57 by using Asset.create](https://github.com/expo/expo/pull/50670),
-[bluesky-social/social-app#11662 migrate Expo media library API](https://github.com/bluesky-social/social-app/pull/11662).
+Sources:
+
+- [Expo docs: MediaLibrary (legacy)](https://docs.expo.dev/versions/latest/sdk/media-library-legacy/)
+- [Expo guide: migrate to the new expo-media-library API](https://docs.expo.dev/guides/sdk-libraries-migration/media-library/)
+- [expo/expo#50670 fix the screenshot save on SDK 57 by using Asset.create](https://github.com/expo/expo/pull/50670)
+- [bluesky-social/social-app#11662 migrate Expo media library API](https://github.com/bluesky-social/social-app/pull/11662)
 
 ## Legacy API notes
 

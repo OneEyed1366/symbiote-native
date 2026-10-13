@@ -6,29 +6,19 @@ description: expo-standard-web-crypto wrapped for every SymbioteNative adapter �
 import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 
 `@symbiote-native/standard-web-crypto` wraps
-[`expo-standard-web-crypto`](https://github.com/expo/expo/tree/main/packages/expo-standard-web-crypto)
-— a partial W3C [Web Crypto API](https://www.w3.org/TR/WebCryptoAPI/) polyfill exposing
-`crypto.getRandomValues` — usable from **every** SymbioteNative adapter, not just React. Unlike
-every other Expo port in this repo, it ships **no native module of its own**: upstream is a
-~15-line pure-JS shim that delegates straight to `expo-crypto`'s own `getRandomValues`, and this
-port delegates to [`@symbiote-native/crypto`](/docs/packages/crypto/)'s `getRandomValues` instead,
-since this repo already ships that native random source as a sibling package. Like
-[`@symbiote-native/crypto`](/docs/packages/crypto/), every export here is a plain function/object
-with no per-instance state or event stream, so there is no hook/composable/service to reach for —
-the React, Vue, Angular, Svelte, and Solid entry points are plain re-exports of the same `core`.
+[`expo-standard-web-crypto`](https://github.com/expo/expo/tree/main/packages/expo-standard-web-crypto) for
+a partial W3C [Web Crypto API](https://www.w3.org/TR/WebCryptoAPI/) polyfill exposing
+`crypto.getRandomValues`. It is usable from **every** SymbioteNative adapter, not just React.
 
-| OS platform | Support |
-| ----------- | ------- |
-| iOS         | ✅ live |
-| Android     | ✅ live |
+Unlike every other Expo port in this repo, it ships **no native module of its own**. Upstream is a
+~15-line pure-JS shim that delegates straight to `expo-crypto`'s own `getRandomValues`.
 
-| Framework adapter | Support |
-| ----------------- | ------- |
-| React             | ✅ live |
-| Vue               | ✅ live |
-| Angular           | ✅ live |
-| Svelte            | ✅ live |
-| Solid             | ✅ live |
+This port delegates to [`@symbiote-native/crypto`](/docs/packages/crypto/)'s `getRandomValues`
+instead. This repo already ships that native random source as a sibling package.
+
+Like that package, every export here is a plain function/object with no per-instance state or
+event stream. So there is no hook/composable/service to reach for. The React, Vue, Angular, Svelte,
+and Solid entry points are plain re-exports of the same `core`.
 
 ## Installation
 
@@ -51,8 +41,8 @@ what `@symbiote-native/crypto` already contributes.
 
 ## Usage
 
-All five adapters — React, Vue, Angular, Svelte, Solid — re-export the exact same default export
-and named function; there is no per-adapter hook/composable/service to reach for, since nothing
+All five adapters (React, Vue, Angular, Svelte, Solid) re-export the exact same default export
+and named function. There is no per-adapter hook/composable/service to reach for, since nothing
 here holds live state or a subscription.
 
 <Tabs syncKey="framework">
@@ -252,10 +242,16 @@ packages/standard-web-crypto/src/
 ```
 
 Because the package needs no native module, it also needs **no Android/iOS autolinking
-registration step** — unlike every other `expo-modules-core` wrapper in this repo (see [how to:
-wire up an Expo native module](/docs/howtos/expo-native-module-setup/)), there is nothing here for
-`expo-modules-autolinking` to discover. The only native dependency in the chain is
-`@symbiote-native/crypto`'s own module, already covered by that package's install step. Same
-re-export shape as [device](/docs/packages/device/) and [local auth](/docs/packages/local-auth/):
-single-file re-exports with no lifecycle code at all, since every export here is a stateless
-function/object — there is nothing for a hook, composable, or service to subscribe to or clean up.
+registration step**.
+
+Unlike every other `expo-modules-core` wrapper in this repo, there is nothing here for
+`expo-modules-autolinking` to discover. See [how to: wire up an Expo native
+module](/docs/howtos/expo-native-module-setup/) for the others.
+
+The only native dependency in the chain is `@symbiote-native/crypto`'s own module. That package's
+install step already covers it.
+
+The adapter entries have the same shape as [device](/docs/packages/device/) and
+[local auth](/docs/packages/local-auth/). They are single-file re-exports with no lifecycle code at
+all, since every export here is a stateless function/object. There is nothing for a hook,
+composable, or service to subscribe to or clean up.

@@ -13,19 +13,6 @@ permission surface (`getPermissionsAsync`/`requestPermissionsAsync`) shares the 
 `usePermissions()` hook/composable/service shape as `@symbiote-native/brightness`; what's unique to
 cellular is that almost the entire carrier/SIM surface is Android-only — iOS exposes none of it.
 
-| OS platform | Support |
-| ----------- | ------- |
-| iOS         | ✅ live |
-| Android     | ✅ live |
-
-| Framework adapter | Support |
-| ----------------- | ------- |
-| React             | ✅ live |
-| Vue               | ✅ live |
-| Angular           | ✅ live |
-| Svelte            | ✅ live |
-| Solid             | ✅ live |
-
 <Aside type="caution" title="Every field except generation is Android-only">
   `allowsVoipAsync`, `getIsoCountryCodeAsync`, `getCarrierNameAsync`,
   `getMobileCountryCodeAsync`, and `getMobileNetworkCodeAsync` each
@@ -54,16 +41,16 @@ Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --c
 [`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
 
 `expo-cellular` and `expo-modules-core` come along as regular dependencies, pinned to exact
-versions — never install either yourself, and never add the `expo` meta-package to your project
-(it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
+versions. Never install either yourself. Never add the `expo` meta-package to your project either,
+as it bundles its own Metro/Babel pipeline, which conflicts with this project's own.
 
 <Aside type="danger" title="Native setup is required before first use">
   `expo-cellular`'s native code is discovered by `expo-modules-autolinking`, a
   different mechanism from the `react-native.config.cjs`/podspec autolinking
-  every other SymbioteNative wrapper uses — and it isn't the standard Expo setup
-  flow either, since this project never installs the `expo` meta-package. Follow
-  [How to: wire up an Expo native
-  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers
+  every other SymbioteNative wrapper uses. It isn't the standard Expo setup
+  flow either, since this project never installs the `expo` meta-package.
+  Follow [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first. It covers
   this package and every other `expo-modules-core` package with zero further
   native changes. Reading carrier/SIM info on Android additionally needs the
   `READ_PHONE_STATE` permission declared in your app's `AndroidManifest.xml`.
@@ -360,10 +347,10 @@ caller. Angular's auto-fetch is latched to at most one run per service instance,
   comes back instead of reading it as "no cellular data".
 - **The carrier/SIM getters need the SIM _ready_, not merely present.** All five go through a
   `TelephonyManager` accessor that yields `null` unless `simState == SIM_STATE_READY`, so a
-  PIN-locked or still-initializing SIM produces exactly the `null` an iPhone produces —
-  and `getCellularGenerationAsync` falls to `UNKNOWN` on the same check.
+  PIN-locked or still-initializing SIM produces exactly the `null` an iPhone produces.
+  And `getCellularGenerationAsync` falls to `UNKNOWN` on the same check.
 - **On iOS the generation describes the cellular radio, not the path your traffic takes.** It reads
-  the telephony service's current radio access technology and takes the first entry, so on a
+  the telephony service's current radio access technology and takes the first entry. So on a
   dual-SIM device the value can belong to whichever service comes first. Pair it with
   [network](/docs/packages/network/)'s `NetworkStateType` if what you actually need is the
   connection currently in use.
@@ -382,10 +369,10 @@ Sources: [Expo docs: Cellular](https://docs.expo.dev/versions/v54.0.0/sdk/cellul
 
 ## How the wrapper works
 
-`@symbiote-native/cellular` ships **zero React/Vue/Angular/Svelte/Solid logic in `expo-cellular` itself** — that
-package's own types file hard-imports `PermissionResponse`/`PermissionStatus` from the `expo`
-meta-package (which this project never installs), so its functions, enum, and types are hand-ported,
-verbatim, into this package's own `core/`, changing only that one import line to pull from
+`@symbiote-native/cellular` ships **zero React/Vue/Angular/Svelte/Solid logic in `expo-cellular` itself**.
+That package's own types file hard-imports `PermissionResponse`/`PermissionStatus` from the `expo`
+meta-package, which this project never installs. So its functions, enum, and types are hand-ported,
+verbatim, into this package's own `core/`. Only that one import line changes, to pull from
 `expo-modules-core` instead:
 
 ```
