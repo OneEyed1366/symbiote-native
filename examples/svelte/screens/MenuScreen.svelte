@@ -1,17 +1,13 @@
 <script lang="ts">
-  // Root menu for the @symbiote-native/navigation demo suite: one row per navigator/feature, each
-  // pushing its own dedicated demo screen onto the same root Stack. Replaces Canary as the initial
-  // route; Canary itself is unchanged (just relocated) and reachable from the first row.
-  //
-  // Rows are grouped into 6 thematic "lines" (navigation-lines.ts's ROUTE_LINE_INFO) — a color +
-  // 2-letter badge per line, carried through onto each demo screen's own line tag — so the tour
-  // reads as one system instead of a flat bag of unrelated test screens. Svelte twin of
-  // examples/vue-sfc/screens/MenuScreen.vue.
-  //
-  // Whitespace in this markup is free, unlike when the screen was written. The shim maps a
-  // whitespace-only text node under a parent that takes no raw text to an anchor, so a gap
-  // between siblings never reaches Fabric as an RCTRawText (svelte-adapter-dom-shim §16b), and
-  // svelte.config.js's collapseTextWhitespace() folds a sentence wrapped across source lines.
+  // Root menu of the demo tour: one row per feature, each pushing its demo screen onto the Stack
+  // Canary is the first row
+
+  // Rows share a color and a two-letter badge per line, as `ROUTE_LINE_INFO` sets them
+
+  // Whitespace in this markup is free, as the shim turns a whitespace-only text node into an anchor
+  // A gap between siblings never reaches Fabric as a raw text node
+
+  // `collapseTextWhitespace()` of svelte.config.js folds a sentence wrapped across source lines
   import { useStackNavigation } from '@symbiote-native/navigation/svelte';
   import { ROUTE_NAME } from '../routes';
   import type { ITourRouteName } from '../navigation-lines';
@@ -94,6 +90,11 @@
       route: ROUTE_NAME.PrimitiveBench,
       hint: 'the same ops, one primitive at a time',
     },
+    {
+      label: 'Reanimated',
+      route: ROUTE_NAME.Reanimated,
+      hint: 'spring, derived values, entering and exiting, layout, scroll offset',
+    },
   ];
 </script>
 
@@ -105,7 +106,7 @@
   >
     <view class="menu-hero">
       <text class="menu-eyebrow">NAVIGATION DEMO SUITE</text>
-      <text class="menu-hero-title">Twelve stops along the stack</text>
+      <text class="menu-hero-title">Thirteen stops along the stack</text>
       <text class="menu-hero-subtitle">
         Each row below drives a different line of @symbiote-native/navigation —
         Primitives, Presentation, Structure, Introspection, Routing — on a real

@@ -1,12 +1,8 @@
-// Route-name constants shared between the navigator's <Stack.Screen name="..."> registrations and
-// every screen's navigation().push(...) calls — one source of truth so a typo cannot silently
-// create a dead route on one side only. Ported from examples/react/routes.ts and
-// examples/svelte/routes.ts; the names are framework-agnostic.
-//
-// ITourRouteName lives HERE rather than in navigation-lines.ts (where the React and Svelte ports
-// keep it) because MENU_ROWS below needs it, and navigation-lines.ts already imports ROUTE_NAME
-// from this file — the type would close a module cycle for no gain. Route identity belongs with
-// the route names; navigation-lines.ts keeps only the visual line mapping.
+// Route names shared by the <Stack.Screen name="..."> markers and every `push` call
+// One source of truth, so a typo cannot create a dead route on one side only
+
+// Ported from examples/react/routes.ts and examples/svelte/routes.ts, the names are agnostic
+// `ITourRouteName` lives here, as `MENU_ROWS` needs it and navigation-lines.ts imports this file
 
 export const ROUTE_NAME = {
   Menu: 'Menu',
@@ -23,6 +19,7 @@ export const ROUTE_NAME = {
   DeepLinking: 'DeepLinking',
   StatePersistence: 'StatePersistence',
   Benchmark: 'Benchmark',
+  Reanimated: 'Reanimated',
 } as const;
 
 export type IRouteName = (typeof ROUTE_NAME)[keyof typeof ROUTE_NAME];
@@ -107,5 +104,11 @@ export const MENU_ROWS: readonly IMenuRow[] = [
     route: ROUTE_NAME.Benchmark,
     label: 'Benchmark',
     blurb: 'js-framework-benchmark ops + JS-thread FPS',
+  },
+  {
+    route: ROUTE_NAME.Reanimated,
+    label: 'Reanimated',
+    blurb:
+      'spring, derived values, entering and exiting, layout, scroll offset',
   },
 ];

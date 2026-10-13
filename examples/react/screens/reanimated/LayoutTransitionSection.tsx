@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import Animated, {
   CurvedTransition,
+  EntryExitTransition,
   FadeIn,
   FadeOut,
   FadingTransition,
@@ -28,6 +29,10 @@ const TRANSITIONS: readonly ITransition[] = [
   { name: 'Sequenced', layout: SequencedTransition },
   { name: 'Jumping', layout: JumpingTransition },
   { name: 'Curved', layout: CurvedTransition },
+  {
+    name: 'EntryExit',
+    layout: EntryExitTransition.entering(FadeIn).exiting(FadeOut),
+  },
 ];
 
 function nextTransition(current: ITransition): ITransition {

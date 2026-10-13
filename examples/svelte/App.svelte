@@ -16,10 +16,8 @@
   // the wiring re-runs the moment the binding resolves — no mount-ordering guarantee needed. See
   // packages/navigation/src/svelte/linking.svelte.ts's header.
   //
-  // The markers below can be laid out normally. A whitespace-only text node under a parent that
-  // takes no raw text becomes an anchor in the shim, so the gap between two <Screen> markers
-  // never reaches Fabric as an RCTRawText (svelte-adapter-dom-shim §16b) — on top of the
-  // navigator already parking the markers inside a collapsed text.
+  // The markers below can be laid out normally, as the shim turns a whitespace-only text into
+  // an anchor, so the gap between two <Screen> markers never reaches Fabric as a raw text node
   import './App.css';
   import {
     Screen,
@@ -48,6 +46,7 @@
   import BenchmarkScreen from './screens/BenchmarkScreen.svelte';
   import PrimitiveBenchScreen from './screens/PrimitiveBenchScreen.svelte';
   import StyleShowcaseScreen from './screens/StyleShowcaseScreen.svelte';
+  import ReanimatedScreen from './screens/ReanimatedScreen.svelte';
   import { APP_LINKING_CONFIG } from './navigation-linking';
   import { ROUTE_NAME } from './routes';
   import { LINE_COLOR } from './navigation-lines';
@@ -107,17 +106,11 @@
   const sheetDemoScreenOptions: IScreenOptions = {
     title: 'Sheet Demo',
     headerShown: true,
-    // NOT translucent, unlike every other screen's headerStyle: formSheet has its own separate
-    // header-height accounting in react-native-screens (RNSScreenContentWrapper's
-    // headerHeightErrata walk). An opaque headerStyle still gets a dark, on-theme bar without
-    // touching that sizing path.
-    //
-    // SheetDemoScreen wraps its content in a ScrollView on purpose: react-native-screens only
-    // resizes a ScrollView child directly to fill a taller detent
-    // (RNSScreenContentWrapper.mm's coerceChildScrollViewComponentSizeToSize), bypassing
-    // Yoga/flex entirely — a plain View stays sized to its own content and leaves a gap on the
-    // 60%/100% detents. The ScrollView must be the FIRST direct child of RNSScreenContentWrapper
-    // for that native search to find it, which is why the screen skips SafeAreaView.
+    // Not translucent, as `formSheet` has its own header height accounting in react-native-screens
+    // An opaque `headerStyle` leaves that sizing path alone
+
+    // The screen wraps its content in a `ScrollView`, the one child react-native-screens resizes
+    // It has to be the first direct child of the wrapper, so the screen skips `SafeAreaView`
     headerTintColor: LINE_COLOR.presentation,
     headerTitleColor: '#ffffff',
     headerStyle: { backgroundColor: HEADER_BACKGROUND },
@@ -165,6 +158,10 @@
     'Styling showcase',
     LINE_COLOR.styling,
   );
+  const reanimatedScreenOptions: IScreenOptions = darkHeader(
+    'Reanimated',
+    LINE_COLOR.performance,
+  );
 
   // `unknown` + a runtime guard, not `INavigatorHandle | null` directly. @symbiote-native/navigation
   // ships Stack as a raw `.svelte` file, and TypeScript resolves an imported `.svelte` module from
@@ -187,10 +184,8 @@
     isNavigatorHandle(stackInstance) ? stackInstance : null,
   );
 
-  // Bare hide(), matching examples/react's App.tsx and examples/vue-sfc's App.vue — this app has
-  // no manifest/logo assets wired up for the full useHideAnimation fade, so a plain mount-time
-  // hide() is the right-sized fix here. It lives at the root rather than inside a screen because
-  // the first-mounted route is Menu, not the canary.
+  // Bare `hide()` at mount, as no logo assets are wired up for the `useHideAnimation` fade
+  // It sits at the root, not in a screen, as the first route mounted is Menu
   $effect(() => {
     hide();
   });
@@ -271,5 +266,10 @@
     name={ROUTE_NAME.StyleShowcase}
     component={StyleShowcaseScreen}
     options={styleShowcaseScreenOptions}
+  />
+  <Screen
+    name={ROUTE_NAME.Reanimated}
+    component={ReanimatedScreen}
+    options={reanimatedScreenOptions}
   />
 </Stack>

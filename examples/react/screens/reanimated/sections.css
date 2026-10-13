@@ -52,6 +52,21 @@
   border-radius: 8px;
   background-color: #4ea1ff;
 }
+.ra-fake-screen {
+  width: 12.5rem;
+  height: 7.5rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background-color: #2d4157;
+}
+.ra-shared-first {
+  background-color: #ff5c5c;
+}
+.ra-shared-second {
+  background-color: #4ea1ff;
+  transform: rotate(-225deg);
+}
 .ra-tile {
   width: 3.75rem;
   height: 3.75rem;

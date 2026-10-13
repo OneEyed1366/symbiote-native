@@ -77,17 +77,17 @@ const MENU_ITEMS: readonly IMenuItem[] = [
     route: ROUTE_NAME.Benchmark,
     hint: 'js-framework-benchmark ops + JS-thread FPS',
   },
+  {
+    label: 'Reanimated',
+    route: ROUTE_NAME.Reanimated,
+    hint: 'spring, derived values, entering and exiting, layout, scroll offset',
+  },
 ];
 
 /**
- * Root menu for the demo tour: one row per navigator/feature @symbiote-native/navigation exports.
- * Each row pushes its own dedicated demo screen onto the same root Stack. Replaces Canary as the
- * initial route; Canary itself is unchanged and reachable from the first row. Angular twin of
- * ../../react/screens/MenuScreen.tsx.
- *
- * Rows are grouped into thematic "lines" (navigation-lines.ts's ROUTE_LINE_INFO) — a color +
- * 2-letter badge per line, carried through onto each demo screen's own line tag — so the tour
- * reads as one system instead of a flat bag of unrelated test screens.
+ * Root menu of the demo tour: one row per feature of the navigation package
+ * Each row pushes its demo screen onto the root Stack, and Canary is the first row
+ * Rows share a color and a two-letter badge per line, as `ROUTE_LINE_INFO` sets them
  */
 @Component({
   selector: 'MenuScreen',

@@ -62,6 +62,11 @@
     "typescript": "~6.0.0",
     "vitest": "^4.1.9"
   },
+  "reanimated": {
+    "staticFeatureFlags": {
+      "ENABLE_SHARED_ELEMENT_TRANSITIONS": true
+    }
+  },
   "engines": {
     "node": ">= 22.11.0"
   }

@@ -1,10 +1,14 @@
 import { useState } from 'react';
-import Animated, { FadeIn } from '@symbiote-native/reanimated/react';
+import Animated, {
+  FadeIn,
+  LinearTransition,
+} from '@symbiote-native/reanimated/react';
 import { ActionButton } from '../../components/ActionButton';
 import { Section } from './Section';
 
 const FIRST_ROWS = 3;
 const ADD_COLOR = '#6ad48b';
+const DIMMED = 0.6;
 
 type IRow = { id: string };
 
@@ -16,6 +20,11 @@ function renderFadingRow({ item }: { item: IRow }) {
       <text className="ra-item-text">{`item ${item.id}`}</text>
     </Animated.View>
   );
+}
+
+// Every other row is dimmed by the cell style, which gets the item and its index
+function tintOfRow({ index }: { item: IRow; index: number }) {
+  return { opacity: index % 2 === 0 ? 1 : DIMMED };
 }
 
 function startingRows(): IRow[] {
@@ -32,7 +41,7 @@ export function FlatListSection() {
   return (
     <Section
       title="Animated.FlatList"
-      note="skipEnteringExitingAnimations: the first rows appear at once, an added one fades in"
+      note="first rows appear at once, an added one fades in, the rest slide; odd rows are dimmed"
     >
       <Animated.FlatList
         testID="ra-flat-list"
@@ -40,6 +49,8 @@ export function FlatListSection() {
         data={rows}
         keyExtractor={keyOf}
         renderItem={renderFadingRow}
+        itemLayoutAnimation={LinearTransition}
+        CellRendererComponentStyle={tintOfRow}
         skipEnteringExitingAnimations
       />
       <ActionButton

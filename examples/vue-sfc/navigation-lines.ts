@@ -1,18 +1,12 @@
 import { ROUTE_NAME } from './routes';
 import type { IRouteName } from './routes';
 
-// The @symbiote-native/navigation demo suite groups its tour screens into thematic "lines" — which
-// part of the package each screen exercises, plus a Performance line for the benchmark stop and a
-// Styling line for the CSS-compiler showcase — carried through MenuScreen's row badges, each demo
-// screen's own line tag, and (where the native header/tab bar already takes a tint color) the OS
-// chrome itself. One color per line replaces the single flat accent every row/button used to share.
-// Kept in sync by hand with App.css's `:root` `--line-*` tokens — CSS custom properties and this
-// module are different runtimes with no shared import path.
-//
-// Composition is the odd one out: ApiPlayground doesn't exercise @symbiote-native/navigation at
-// all — it's a live demo of Vue's OWN template/Composition API surface running under Symbiote's
-// renderer (see .docs/framework-api-surface/vue.md). It still gets a line entry so it can reuse
-// the exact same wayfinding pill/badge/row language as every other tour stop.
+// The tour groups its screens into lines by the part of the navigation package each exercises
+// A line's color shows in the menu badge, the screen's line tag and the native header tint
+// Kept in sync by hand with the `--line-*` tokens of App.css, as the two share no import path
+
+// Composition is the odd one out, as ApiPlayground shows the API of Vue itself
+// It still gets a line, so it reuses the badge and row look of every other stop
 export const NAV_LINE = {
   Primitives: 'primitives',
   Presentation: 'presentation',
@@ -27,12 +21,8 @@ export const NAV_LINE = {
 export type INavLine = (typeof NAV_LINE)[keyof typeof NAV_LINE];
 
 export const LINE_COLOR: Record<INavLine, string> = {
-  // Vue's own brand green (vuejs.org's logo/accent green) — CanaryScreen is the "every
-  // @symbiote-native/vue primitive" showcase, so its line wears Vue's actual color instead of
-  // React's. The ONE deliberate difference vs the React port's navigation-lines.ts (which uses
-  // React's brand blue #149eca here) — every other line below stays byte-identical across
-  // frameworks. #42b883 is vuejs.org's primary green, already used throughout this app's
-  // pre-existing canary content (App.vue, before this navigation port).
+  // Green of Vue, as CanaryScreen shows every primitive of this adapter
+  // The one color that differs from the React canary, every other line is the same
   [NAV_LINE.Primitives]: '#42b883',
   [NAV_LINE.Presentation]: '#5ec8f2',
   [NAV_LINE.Structure]: '#4fd1a5',
@@ -44,9 +34,8 @@ export const LINE_COLOR: Record<INavLine, string> = {
   [NAV_LINE.Composition]: '#f6ad55',
   // Amber — the only line color tied to timing rather than to a package feature.
   [NAV_LINE.Performance]: '#f5a524',
-  // Yellow-green, the one wide hue gap the lines above leave open — far enough from Structure's
-  // mint (#4fd1a5) and Performance's amber (#f5a524) to read apart at badge size, and the CSS
-  // showcase is not a navigation line either.
+  // Yellow-green, the one wide hue gap the lines above leave open
+  // It reads apart from Structure's mint and Performance's amber at badge size
   [NAV_LINE.Styling]: '#a3d94f',
 };
 
@@ -123,5 +112,10 @@ export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
     line: NAV_LINE.Styling,
     code: 'ST',
     label: 'STYLING LINE',
+  },
+  [ROUTE_NAME.Reanimated]: {
+    line: NAV_LINE.Performance,
+    code: 'RA',
+    label: 'PERFORMANCE LINE',
   },
 };

@@ -117,4 +117,9 @@ export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
     code: 'ST',
     label: 'STYLING LINE',
   },
+  [ROUTE_NAME.Reanimated]: {
+    line: NAV_LINE.Performance,
+    code: 'RA',
+    label: 'PERFORMANCE LINE',
+  },
 };

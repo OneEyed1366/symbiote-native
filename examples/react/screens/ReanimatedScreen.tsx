@@ -8,6 +8,9 @@ import { FlatListSection } from './reanimated/ListSection';
 import { MeasureSection } from './reanimated/MeasureSection';
 import { ParitySection } from './reanimated/ParitySection';
 import { ScrollSection } from './reanimated/ScrollSection';
+import { SharedStateSection } from './reanimated/SharedStateSection';
+import { SharedTransitionSection } from './reanimated/SharedTransitionSection';
+import { TransformOriginSection } from './reanimated/TransformOriginSection';
 import { WorkletsSection } from './reanimated/WorkletsSection';
 import './reanimated/keyframes.css';
 import './reanimated/sections.css';
@@ -23,11 +26,14 @@ export function ReanimatedScreen() {
         <DerivedSection />
         <EnteringExitingSection />
         <LayoutTransitionSection />
+        <TransformOriginSection />
         <ScrollSection />
         <FlatListSection />
         <FramesSection />
         <CssSection />
         <WorkletsSection />
+        <SharedStateSection />
+        <SharedTransitionSection />
         <MeasureSection />
         <ParitySection />
       </scroll-view>

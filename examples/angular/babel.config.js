@@ -31,14 +31,15 @@ module.exports = {
     // First in the list so the class body is plain by the time the two plugins below read the
     // `ɵɵngDeclare*` calls out of it.
     require('@babel/plugin-transform-class-static-block'),
-    // Must run BEFORE the linker below: reads `selector` off the still-partial
-    // ɵɵngDeclareComponent(...) shape and auto-calls registerComposedComponent for every
-    // composed component in the bundle — see the angular-adapter-build skill.
+    // Runs before the linker, as it reads `selector` off the partial `ɵɵngDeclareComponent`
+    // It then calls `registerComposedComponent` for every composed component in the bundle
     require('@symbiote-native/angular/babel-register-composed'),
     // Stage B of Angular AOT: Metro sees the partial-Ivy JS emitted by `pnpm ng:build`;
     // @symbiote-native/angular's linker turns every ɵɵngDeclareComponent into full Ivy before
     // Hermes sees it.
     require('@symbiote-native/angular/babel-linker'),
     inlineDebugFlag,
+    // Has to stay last in this list
+    'react-native-worklets/plugin',
   ],
 };

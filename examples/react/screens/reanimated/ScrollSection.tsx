@@ -91,6 +91,7 @@ export function ScrollSection() {
         className="ra-scroller"
         scrollViewOffset={offset}
         onScroll={onScroll}
+        nestedScrollEnabled
       >
         {ROWS.map(row => (
           <view key={row} className="ra-item">

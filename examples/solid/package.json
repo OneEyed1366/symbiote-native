@@ -18,11 +18,14 @@
     "@symbiote-native/components": "latest",
     "@symbiote-native/engine": "latest",
     "@symbiote-native/navigation": "latest",
+    "@symbiote-native/reanimated": "latest",
     "@symbiote-native/slider": "latest",
     "@symbiote-native/solid": "latest",
     "@symbiote-native/splash-screen": "latest",
     "react": "19.2.3",
     "react-native": "0.86.0",
+    "react-native-reanimated": "4.7.1",
+    "react-native-worklets": "0.13.0",
     "solid-js": "^1.9.14"
   },
   "devDependencies": {
@@ -47,6 +50,11 @@
     "sass": "^1.101.0",
     "stylus": "^0.64.0",
     "typescript": "~6.0.0"
+  },
+  "reanimated": {
+    "staticFeatureFlags": {
+      "ENABLE_SHARED_ELEMENT_TRANSITIONS": true
+    }
   },
   "engines": {
     "node": ">= 22.11.0"
