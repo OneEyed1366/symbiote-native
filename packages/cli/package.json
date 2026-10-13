@@ -55,8 +55,8 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc --build",
-    "dev": "tsc --build && node build/index.js",
+    "typecheck": "node ../../node_modules/typescript7/bin/tsc --build",
+    "dev": "node ../../node_modules/typescript7/bin/tsc --build && node build/index.js",
     "build": "rolldown -c build.config.ts",
     "format": "prettier --write \"src/**/*.ts\""
   },

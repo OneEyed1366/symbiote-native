@@ -94,7 +94,7 @@
     "prepare": "pnpm run ng:build",
     "clean": "rm -rf build-ngc",
     "ng:build": "pnpm run clean && ngc -p tsconfig.angular.json",
-    "typecheck": "tsc --build",
+    "typecheck": "node ../../node_modules/typescript7/bin/tsc --build",
     "format": "prettier --write \"src/**/*.{ts,tsx}\""
   },
   "dependencies": {
