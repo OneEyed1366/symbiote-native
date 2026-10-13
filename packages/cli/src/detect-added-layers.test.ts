@@ -2,9 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { detectAddedLayers } from './detect-added-layers.js';
 import { EXPO_PACKAGE_LAYERS } from './expo-package-layers.js';
 
-// `add` offers only layers NOT already present when run with no flags — this is what tells it
-// which ones already are, from the same package.json dependency markers each layer's own
-// package.json.fragment.json declares.
+// `add` with no flags offers only the layers NOT already present, and this tells it which are
+// It reads the same package.json dependency markers each layer's own fragment declares
 describe('detectAddedLayers', () => {
   it('detects navigation via @symbiote-native/navigation', () => {
     expect(
@@ -34,6 +33,19 @@ describe('detectAddedLayers', () => {
     expect(
       detectAddedLayers({ '@symbiote-native/splash-screen': 'latest' }),
     ).toEqual(new Set(['splash-screen']));
+  });
+
+  // Only the package of this project marks the layer, as the native peers are installed by others
+  it('detects reanimated via @symbiote-native/reanimated', () => {
+    expect(
+      detectAddedLayers({ '@symbiote-native/reanimated': 'latest' }),
+    ).toEqual(new Set(['reanimated']));
+  });
+
+  it('does not take the upstream react-native-reanimated for the layer', () => {
+    expect(detectAddedLayers({ 'react-native-reanimated': '4.7.1' })).toEqual(
+      new Set(),
+    );
   });
 
   it('detects multiple layers at once', () => {
