@@ -87,7 +87,7 @@ export function EnteringExitingSection() {
       <text class="ra-note">{`preset: ${preset().name}`}</text>
       <view class="ra-stage">
         <Show keyed when={isTileShown() ? preset() : undefined}>
-          {current => (
+          {(current: IPreset) => (
             <view
               testID="ra-preset-tile"
               class="ra-tile"

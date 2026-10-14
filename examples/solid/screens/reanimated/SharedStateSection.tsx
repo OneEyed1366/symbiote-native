@@ -7,7 +7,6 @@ import {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
-  type IAnimatedHostProps,
 } from '@symbiote-native/reanimated/solid';
 import type { IViewProps } from '@symbiote-native/solid';
 import { createSynchronizable } from 'react-native-worklets';
@@ -22,7 +21,7 @@ const SMALL = 1;
 const clicks = makeMutable(0);
 const reads = createSynchronizable(0);
 
-function Badge(props: IAnimatedHostProps<IViewProps>) {
+function Badge(props: IViewProps) {
   return <view class="ra-tile ra-tile-small" {...props} />;
 }
 

@@ -8,6 +8,7 @@ import Reanimated, {
   useSharedValue,
   withSpring,
 } from '@symbiote-native/reanimated/vue';
+import type { IHostInstance } from '@symbiote-native/vue';
 import { createSynchronizable } from 'react-native-worklets';
 import { ActionButton } from '../../components/ActionButton';
 import { ACCENT } from './colors';
@@ -22,8 +23,8 @@ const reads = createSynchronizable(0);
 
 // A ref on a component gets what it exposes, so the node goes out as `hostNode`
 const Badge = defineComponent(
-  (_props, { attrs, expose }) => {
-    const hostNode = shallowRef<unknown>(null);
+  (props, { expose }) => {
+    const hostNode = shallowRef<IHostInstance | null>(null);
     expose({
       get hostNode() {
         return hostNode.value;
@@ -32,12 +33,12 @@ const Badge = defineComponent(
     return () => (
       <Reanimated.View
         class="ra-tile ra-tile-small"
-        ref={(node: unknown) => (hostNode.value = node)}
-        {...attrs}
+        style={props.style}
+        ref={hostNode}
       />
     );
   },
-  { name: 'Badge', inheritAttrs: false },
+  { name: 'Badge', props: ['style'] },
 );
 
 // Returns the component itself: every host tag already takes an animated style
