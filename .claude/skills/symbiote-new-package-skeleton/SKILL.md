@@ -13,19 +13,20 @@ package should exist after this session?**
 
 | Tier | What exists after | When it's actually wanted |
 |---|---|---|
-| **1. Bare-skeleton** | `package.json` + `README.md` only, zero functional code | User wants to reserve the npm scope/name now and publish `0.0.1` by hand, implementation comes later, possibly in a different session/PR |
+| **1. Bare-skeleton** | `package.json` + `README.md` only, zero functional code | User wants to reserve the npm scope/name now and publish `0.0.0` by hand, implementation comes later, possibly in a different session/PR |
 | **2. Core-only** | `src/core/` ported and working, no adapter entry points | User wants the framework-agnostic logic verified first, adapters deferred |
 | **3. Core + full adapter parity** | `src/core` + `src/react` + `src/vue` + `src/angular`, matching `<adapters_reach_full_feature_parity>` | The repo's usual default for a component/module that's actually shipping |
 
 **Do not assume tier 3 by default just because it's the repo-wide convention for components.**
 A new *package* (as opposed to a component inside an existing package) has a real reason to
-start at tier 1: publishing early to claim the name is a one-way door (someone else can squat
-an unclaimed scope/name at any time — see the `npm-oidc-trusted-publishing` skill's own scope-
-squatting warnings), while the implementation is not. The cost of asking which tier is wanted
-is one `AskUserQuestion` call; the cost of not asking is building the wrong-sized thing — this
-has already happened twice in a row on the same task (first an adapter-scope question, then a
-full pivot down to tier 1 after the user clarified they wanted "just README and skeleton, not
-functional").
+start at tier 1. Publishing early to claim the name is a one-way door: someone else can squat
+an unclaimed scope/name at any time (see the `npm-oidc-trusted-publishing` skill's own
+scope-squatting warnings). The implementation is not a one-way door.
+
+Asking which tier is wanted costs one `AskUserQuestion` call. Not asking costs a wrong-sized
+build, and that has already happened twice in a row on the same task. First came an
+adapter-scope question, then a full pivot down to tier 1 after the user said they wanted
+"just README and skeleton, not functional".
 
 **Ask, don't assume**, whenever the request is "create/port a new package for X" and the tier
 isn't already stated. Use `grill-me` or a direct `AskUserQuestion` with these three tiers as the
@@ -41,7 +42,7 @@ and `packages/local-auth` (built 2026-07, a planned `expo-local-authentication` 
 ```json
 {
   "name": "@symbiote-native/<pkg>",
-  "version": "0.0.1",
+  "version": "0.0.0",
   "description": "...",
   "license": "MIT",
   "repository": { "type": "git", "url": "git+https://github.com/OneEyed1366/symbiote-native.git", "directory": "packages/<pkg>" },
@@ -54,9 +55,13 @@ and `packages/local-auth` (built 2026-07, a planned `expo-local-authentication` 
 
 Do **not** add, at this tier: `main`/`module`/`types`/`exports` (nothing to point at yet),
 `type: "module"`, `dependencies`/`peerDependencies`/`devDependencies`, or a `scripts` block
-(`typecheck`, `prepare`, `ng:build`) — any of these either breaks resolution against a
-nonexistent path or forces wiring (tsconfig project references, vitest `include`, a root
-typecheck pass) that has nothing real to check yet.
+(`typecheck`, `prepare`, `ng:build`). Any of these either breaks resolution against a
+nonexistent path or forces wiring that has nothing real to check yet: tsconfig project
+references, vitest `include`, a root typecheck pass.
+
+The starter version is `0.0.0`, not `0.0.1`. The first `trust:publishers` run publishes that
+placeholder by hand, and the first changeset then lifts it to a real version (`0.0.0` plus a
+`minor` is `0.1.0`).
 
 **`README.md`** must:
 
@@ -99,7 +104,7 @@ typecheck pass) that has nothing real to check yet.
   setup the user runs after a tier-1 skeleton is ready.
 - `grill-me` — the interview mechanism for resolving the tier question with the user.
 - `symbiote-release-publishing` — versioning/changesets/CI publish mechanics for the *real*
-  release once a package moves past its first manual `0.0.1` publish.
+  release once a package moves past its first manual `0.0.0` publish.
 - `symbiote-file-layout` — where `packages/<pkg>` sits in the monorepo map and the adapter
   bucket conventions (`components/`/`modules/`/`utils/` vs the framework-idiomatic lifecycle
   folder) once tier 3 starts adding adapter code.
