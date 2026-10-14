@@ -6,6 +6,11 @@
   "keywords": [
     "react-native",
     "symbiote-native",
+    "react",
+    "vue",
+    "svelte",
+    "solid",
+    "angular",
     "reanimated",
     "worklets",
     "animation"
@@ -41,7 +46,8 @@
     "build",
     "build-ngc",
     "!src/**/*.test.*",
-    "!src/**/*.spec.*"
+    "!src/**/*.spec.*",
+    "!src/**/*.detox.*"
   ],
   "publishConfig": {
     "access": "public",
