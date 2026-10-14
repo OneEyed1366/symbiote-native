@@ -197,6 +197,7 @@ export type {
   IViewStyle,
   ITextStyle,
   IStyleProp,
+  IStyleClaims,
   IDimensionValue,
   IFlexAlign,
   IFlexJustify,
