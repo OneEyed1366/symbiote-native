@@ -245,8 +245,8 @@ withTiming, withSpring, withDecay, Easing, interpolate, FadeIn, …, measure, sc
   Turn it on in the app's `package.json` under `reanimated.staticFeatureFlags` and reinstall the pods or
   rebuild Android: the flag is baked into the native build. Every example app has it on.
 - Checked on an iOS simulator and on Android in all five adapters.
-  In a dev build a prop that changes in Vue, Svelte or Solid reaches the UI thread as a copy; the headless
-  test proves the copy.
+- In a dev build a prop that changes in Vue, Svelte or Solid reaches the UI thread as a copy.
+  The headless test proves the copy.
 - `animatedProps` takes handles only. Upstream also copies a plain object into static props, which a normal prop does as well.
 - Every example app has the same demo screen of fourteen sections: `react`, `vue-tsx`, `vue-sfc`, `svelte`,
   `solid` and `angular`. `useTimestamp(isActive)` reads its flag once in the setup-once frameworks, so their
