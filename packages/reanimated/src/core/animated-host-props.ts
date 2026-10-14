@@ -24,6 +24,14 @@ type INestedHandles = IAnimatedHandle | readonly INestedHandles[];
 // The CSS animation and transition keys a style may carry next to the view's own
 type ICssStyle = CSSAnimationProperties & CSSTransitionProperties;
 
+// Every `style` prop of every tag takes both, which is what a bare tag needs to wear an animation
+declare module '@symbiote-native/engine' {
+  interface IStyleClaims {
+    animatedStyle: IAnimatedHandle;
+    cssAnimation: ICssStyle;
+  }
+}
+
 type IStylePart<Style> =
   Style | IAnimatedHandle | ICssStyle | false | null | undefined;
 

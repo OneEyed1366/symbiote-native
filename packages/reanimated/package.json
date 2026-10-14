@@ -67,7 +67,10 @@
         "types": "./build/vue/index.d.ts",
         "default": "./build/vue/index.js"
       },
-      "./svelte": "./src/svelte/index.ts",
+      "./svelte": {
+        "types": "./build/svelte/index.d.ts",
+        "default": "./src/svelte/index.ts"
+      },
       "./solid": {
         "types": "./build/solid/index.d.ts",
         "default": "./build/solid/index.js"

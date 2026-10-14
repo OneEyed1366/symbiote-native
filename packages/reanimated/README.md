@@ -277,5 +277,7 @@ Tests run under vitest with `react-native-worklets` aliased to its mock and the 
 to the package source, over the fake Fabric. `pnpm exec vitest run packages/reanimated`.
 
 The demo screen of `examples/react` is mounted by `src/react/demo-screen.test.ts` against the working tree,
-and `tsc -p packages/reanimated/tsconfig.demo.json` type-checks it the same way. The layout animation
+and `tsc -p packages/reanimated/tsconfig.demo.json` type-checks it the same way.
+The other examples have the same check in `tsconfig.demo-solid.json`, `tsconfig.demo-vue-tsx.json`,
+`tsconfig.demo-vue-sfc.json` (`vue-tsc`) and `tsconfig.demo-svelte.json` (`svelte-check`). The layout animation
 proxy is exercised against the real native sources by the itests in `core/engine/cpp/tests/js`.
