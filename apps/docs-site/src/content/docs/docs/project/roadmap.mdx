@@ -92,8 +92,8 @@ and `@symbiote-native/splash-screen` do: they ship a passive manifest, and a sin
 `@symbiote-native/expo-modules-link` postinstall registers whichever ones are installed (see [How
 to: wire up an Expo native module](/docs/howtos/expo-native-module-setup/)). `npx @symbiote-native/cli new`/`add`
 picks up each one as its own flag (`--battery`, `--sensors`, ...) and wires the autolinking for
-you. Reanimated, the worklet-driven animation layer, is built for all five adapters as
-[`@symbiote-native/reanimated`](/docs/packages/reanimated/), and its device checks continue. The end goal is package-surface parity with Expo's SDK: whatever a real app can
+you. Reanimated, the worklet-driven animation layer, is done for all five adapters as
+[`@symbiote-native/reanimated`](/docs/packages/reanimated/). The end goal is package-surface parity with Expo's SDK: whatever a real app can
 reach for in Expo, a SymbioteNative app can reach for too, off the same untouched native core.
 
 ## Styling / CSS compiler

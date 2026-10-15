@@ -67,9 +67,9 @@ dependency of the consuming app**. It is a runtime singleton and the Metro versi
 anchor (same class as `react` / `expo`): exactly one copy, declared at the app root.
 The adapter facade hides only **imports** — app _code_ names only `@symbiote-native/*`, but
 the app _manifest_ still pins `react-native`. Do NOT try to make RN a hidden /
-transitive dependency to keep it out of the app's `package.json`: modern Expo
+transitive dependency to keep it out of the app's `package.json`. Modern Expo
 autolinking would resolve it, but it forfeits version-pinning and breaks pnpm
-isolated installs — an ecosystem anti-pattern. The future `@symbiote-native/cli`
+isolated installs. It is an ecosystem anti-pattern. The future `@symbiote-native/cli`
 scaffolder owns the top-level pin so the developer never writes it by hand.
 </react_native_is_an_explicit_top_level_peer>
 
@@ -83,9 +83,9 @@ null`). SymbioteNative only makes the _native view_ framework-agnostic (it deriv
 ViewConfig — events + prop processors — at runtime); it does NOT make the library's
 React _component_ framework-agnostic. So: examples and canaries for a non-React
 adapter must NOT import RN component packages. A native third-party view is reachable
-from a non-React adapter ONLY through that adapter's own thin wrapper over the engine
-(the same `createNode`-by-ViewConfig path SymbioteNative uses for its own primitives) — never
-by importing the library's React component. Until such a wrapper exists, the component
+from a non-React adapter ONLY through that adapter's own thin wrapper over the engine.
+The wrapper uses the same `createNode`-by-ViewConfig path SymbioteNative uses for its own
+primitives, never the library's React component. Until such a wrapper exists, the component
 is React-adapter-only.
 </third_party_rn_packages_are_react_only>
 
@@ -106,24 +106,31 @@ grows framework-specific layout or commit logic, that logic belongs in the engin
 </adapters_stay_thin>
 
 <adapter_src_follows_framework_idioms>
-An adapter is written in IDIOMATIC code for the framework it targets — respect that
-framework's own best-practices and naming conventions, do NOT force a foreign one
-across adapters for the sake of looking symmetric. The concrete tell is the lifecycle
-bucket inside `<package>/src/`: it is named for the framework's term — React groups its
-lifecycle files under `hooks/`, Vue under `composables/` — because that is what each
-ecosystem calls them; a Vue `hooks/` folder or a React `composables/` folder would be
-wrong even though the role is identical. The framework-AGNOSTIC buckets, by contrast,
-carry the SAME name in every adapter: `components/` (visual primitives — folders +
-flat), `modules/` (imperative RN-API namespaces with no view — `Alert`, `Share`,
-`Animated`, `StatusBar`, `PanResponder`…), `utils/` (small agnostic helpers). The
-adapter's reconciler wiring stays FLAT at the package root, never in a bucket: `index`,
-`render`/`renderer`, `host-config`, `host-instance`, `descriptor-to-<fw>`, the
-`components.ts` re-export barrel, `*.d.ts`. The public package barrel (`@symbiote-native/<fw>`,
-i.e. `src/index.ts`) is the ONLY thing external code imports — grouping is internal, so
-moving files between buckets never changes the package's surface. This idiom rule is
-orthogonal to the folder-as-module rule under **Build & platform** (that governs a
-single module's platform/shared variants; this governs the top-level category
-grouping of `src/`).
+An adapter is written in IDIOMATIC code for the framework it targets. Respect that
+framework's own best-practices and naming conventions. Do NOT force a foreign one
+across adapters for the sake of looking symmetric.
+
+The concrete tell is the lifecycle bucket inside `<package>/src/`: it is named for the
+framework's term. React groups its lifecycle files under `hooks/`, Vue under `composables/`,
+because that is what each ecosystem calls them. A Vue `hooks/` folder or a React
+`composables/` folder would be wrong even though the role is identical.
+
+The framework-AGNOSTIC buckets carry the SAME name in every adapter:
+
+- `components/`: visual primitives, folders + flat
+- `modules/`: imperative RN-API namespaces with no view (`Alert`, `Share`, `Animated`,
+  `StatusBar`, `PanResponder`)
+- `utils/`: small agnostic helpers
+
+The adapter's reconciler wiring stays FLAT at the package root, never in a bucket. That is
+`index`, `render`/`renderer`, `host-config`, `host-instance`, `descriptor-to-<fw>`, the
+`components.ts` re-export barrel and `*.d.ts`.
+
+The public package barrel (`@symbiote-native/<fw>`, i.e. `src/index.ts`) is the ONLY thing
+external code imports. Grouping is internal, so moving files between buckets never changes the
+package's surface. This idiom rule is orthogonal to the folder-as-module rule under
+**Build & platform**. That one governs a single module's platform/shared variants; this one
+governs the top-level category grouping of `src/`.
 </adapter_src_follows_framework_idioms>
 
 <angular_no_template_transform>
@@ -138,17 +145,17 @@ not change what a template compiles to, and it must stay that way.
 <adapters_reach_full_feature_parity>
 **P0 — MANDATORY, NO EXCEPTIONS.** Every component / primitive / runtime module
 ships at **full feature-parity across ALL adapters**. A "minimal", "basic",
-"partial", or "stub" port is FORBIDDEN — if React's `ScrollView` carries sticky
+"partial", or "stub" port is FORBIDDEN. Example: React's `ScrollView` carries sticky
 headers, RefreshControl, the imperative scroll handle, `maintainVisibleContent-
-Position`, and native scroll-attach, then Vue's `ScrollView` (and every future
+Position`, and native scroll-attach. Vue's `ScrollView` (and every future
 adapter's) exposes that SAME complete prop + behavior surface. The same holds for
 every prop, event, imperative method, and platform branch of every component.
 
 The rule is not "copy the surface into each adapter" — that would violate
 `<adapters_stay_thin>`. It is: extract the shared logic (state machine, render,
 prop resolution, platform-invariant assembly) into `@symbiote-native/engine` /
-`@symbiote-native/components` so EVERY adapter inherits the full surface for free, and the
-adapter supplies ONLY its lifecycle + descriptor bridge. Parity must be
+`@symbiote-native/components` so EVERY adapter inherits the full surface for free.
+The adapter supplies ONLY its lifecycle + descriptor bridge. Parity must be
 **structural**, not maintained by hand. If a component's shared half does not yet
 exist (e.g. React's lives in `adapters/react/src/scroll-view-shared.ts`, not yet in
 `core/`), extracting it to the shared layer is PART OF the task of bringing it to a
@@ -189,9 +196,9 @@ dependency is a literal version, `@symbiote-native/*` included, matching the rea
 consumer experience. Install with plain `npm install` INSIDE the example directory,
 never `pnpm install` from repo root.
 
-**`examples/bare-rn` is the one exception and it is deliberate: it is NOT a canary.** Plain
-react-native 0.86 driven by React's own Fabric renderer, carrying a port of the same
-`BenchmarkScreen`, so adapter numbers have something to be compared AGAINST. Its value is
+**`examples/bare-rn` is the one exception and it is deliberate: it is NOT a canary.**
+It is plain react-native 0.86 driven by React's own Fabric renderer. It carries a port of the
+same `BenchmarkScreen`, so adapter numbers have something to be compared AGAINST. Its value is
 precisely that it contains **zero `@symbiote-native/*` dependencies** — adding one, or "closing
 its parity gap", destroys the only thing it is for. Every parity audit
 (`tests/adapter-barrel-parity.test.ts`, `tests/package-subpath-parity.test.ts`) is about
@@ -201,7 +208,7 @@ adapters and companion packages and does not reach it; if a future audit starts 
 **Getting a local build of a `@symbiote-native/*` package into an example is a LOCAL
 VERDACCIO REGISTRY, not a `file:` tarball** (as of 2026-09-01). The manifest is never
 touched — a **gitignored** `examples/<app>/.npmrc` decides where its ordinary version
-literal resolves from, and that pointer may NEVER be tracked: npm has no registry
+literal resolves from. That pointer may NEVER be tracked: npm has no registry
 fallback chain, so a committed `registry=http://localhost:4873` turns `npm install` into a
 hard failure for every clone not running Verdaccio. Guarded by
 `tests/no-tracked-local-registry.test.ts`.
@@ -212,10 +219,11 @@ pnpm run registry:sync     # publish everything, point every example at it, pull
 cd examples/<app>/ios && pod install
 ```
 
-**Read the `symbiote-local-dev-registry` skill before touching any of this** — it holds why
-the registry replaced the tarball dance, what it does NOT fix (npm's lockfile still
-short-circuits: same version + new bytes = `up to date` and stale code), and the four iOS
-build failures that follow a reinstall and read as anything but an install problem.
+**Read the `symbiote-local-dev-registry` skill before touching any of this.** It holds:
+
+- why the registry replaced the tarball dance
+- what it does NOT fix: npm's lockfile still short-circuits (same version + new bytes = `up to date` and stale code)
+- the four iOS build failures that follow a reinstall and read as anything but an install problem
 </examples_are_one_tree>
 
 <components_split_logic_view_lifecycle>
@@ -273,10 +281,13 @@ asserted against a second copy of itself is asserted against nothing, so the con
 is an itest over the committed payload.
 
 **Read the `symbiote-engine-tag-rules` skill before adding a rule, keeping a JS fold,
-or concluding that a rule cannot move** — it holds every seam a C++ rule can reach
-(including the parent's props and tag, the nearest tagged ancestor, the first child,
-and listener existence), the dirty-marking obligation a cross-node rule takes on, the
-cost model, and the traps.
+or concluding that a rule cannot move.** It holds:
+
+- every seam a C++ rule can reach (including the parent's props and tag, the nearest tagged
+  ancestor, the first child, and listener existence)
+- the dirty-marking obligation a cross-node rule takes on
+- the cost model
+- the traps
 </platform_behavior_is_a_tag_rule_in_cpp>
 
 <prop_types_split_agnostic_vs_per_adapter>
@@ -290,22 +301,29 @@ re-export, never redeclare. Done so far: `IResponderProps`, `IActivityIndicatorP
 `ISwitchProps`, `IButtonProps` (+ the style / Platform / accessibility / native-view-config
 types already in the engine).
 
-A prop type is **inherently per-adapter** — it CANNOT move to the shared layer as-is — the
-moment any field carries a _framework element or framework ref_: `children` (React
-`ReactNode` vs Vue slots/`VNode`), a host `ref` (`Ref<IHostInstance>` vs a Vue template
-ref), or a render callback returning a framework element (`renderItem: (info) => ReactNode`
-vs `=> VNode`). For these, each adapter DECLARES ITS OWN public prop type, sharing only the
-agnostic FIELD BASE from the shared layer and adding its framework-specific children/ref/
-render fields. The reference precedent is `IPressableProps`: React's and Vue's are separate
-declarations (Vue's comment: "mirrors React's IPressableProps minus children, which Vue
-takes via slots") — by design, not by omission. Still-per-adapter: `IViewProps`, `ITextProps`,
-the `ITouchable*Props` family, `IKeyboardAvoidingViewProps`, `ISectionListProps`,
-`IVirtualizedSectionListProps`. Bringing one of these to a new adapter means writing that
-adapter's flavored prop type over the shared agnostic base — NOT importing the React one
-(an adapter never imports another adapter's types; see `<third_party_rn_packages_are_react_only>`
-for the same React-dispatcher reason). Promoting such a type to "fully shared" requires
-making the shared base generic over the element type — a deliberate design step recorded in
-its own project skill, never a silent verbatim move.
+A prop type is **inherently per-adapter** the moment any field carries a _framework element
+or framework ref_. It CANNOT move to the shared layer as-is. Such fields are:
+
+- `children` (React `ReactNode` vs Vue slots/`VNode`)
+- a host `ref` (`Ref<IHostInstance>` vs a Vue template ref)
+- a render callback returning a framework element (`renderItem: (info) => ReactNode`
+  vs `=> VNode`)
+
+For these, each adapter DECLARES ITS OWN public prop type, sharing only the agnostic FIELD
+BASE from the shared layer and adding its framework-specific children/ref/render fields.
+
+The reference precedent is `IPressableProps`: React's and Vue's are separate declarations
+(Vue's comment: "mirrors React's IPressableProps minus children, which Vue takes via slots").
+That is by design, not by omission. Still-per-adapter: `IViewProps`, `ITextProps`, the
+`ITouchable*Props` family, `IKeyboardAvoidingViewProps`, `ISectionListProps`,
+`IVirtualizedSectionListProps`.
+
+Bringing one of these to a new adapter means writing that adapter's flavored prop type over
+the shared agnostic base, NOT importing the React one. An adapter never imports another
+adapter's types; see `<third_party_rn_packages_are_react_only>` for the same React-dispatcher
+reason. Promoting such a type to "fully shared" requires making the shared base generic over
+the element type. That is a deliberate design step recorded in its own project skill, never a
+silent verbatim move.
 </prop_types_split_agnostic_vs_per_adapter>
 
 <native_module_name_is_platform_specific>
@@ -340,8 +358,8 @@ New code with non-trivial runtime behavior (a commit path, an event, a native
 bring-up step) should add a `dlog` at its seam as a matter of course.
 
 **A `dlog` ARGUMENT is not gated.** A template string built at the call site is
-built whether or not anything listens, so a site on a per-node commit path must sit
-behind `isDebug()` — gating the call alone left nine such sites in Angular's renderer
+built whether or not anything listens. So a site on a per-node commit path must sit
+behind `isDebug()`. Gating the call alone left nine such sites in Angular's renderer
 costing 5-25% of a step in a Release build that emits none of them. The engine's own
 C++ side has the same trap and the same answer: `SYMBIOTE_DLOG` tests the flag before
 evaluating its argument.
@@ -353,80 +371,99 @@ evaluating its argument.
   templates). Metro owns the RN-native contract — Hermes bytecode, native-module
   resolution, `.ios.js`/`.android.js` extensions, Fast Refresh — that we cannot
   cheaply reimplement. Not Vite, not Re.Pack.
-- **Never make correctness depend on a module's load-time side effect (a `register*` / `set*`
-  callback) when that module is reached only through a barrel.** Metro turns on `inlineRequires`
-  for production ONLY: it moves a `require()` from the top of a module down to the first place
-  its binding is USED, and a barrel's `export { Thing } from './thing'` compiles to a lazy
-  getter. If nothing ever names `Thing` as a VALUE, `./thing` never evaluates and its
-  registration silently never happens — in RELEASE builds only. Device-diagnosed 2026-08-14:
-  `interpolation-node.ts` registered the factory `AnimatedNode.interpolate()` needed; nothing
-  named `AnimatedInterpolation` as a value (adapters only TYPE it, which `verbatimModuleSyntax`
-  erases), so the first `.interpolate()` threw `interpolation factory not registered` and blanked
-  `examples/vue-sfc`'s screen while dev was perfectly fine. Invisible to `tsc`, to vitest (eager
-  evaluation), and even to grepping the bundle — the code IS bundled, it just never runs.
-  **A bare `import './thing';` next to the re-export does NOT fix it** (tried on device first):
+- **Never make correctness depend on a module's load-time side effect when that module is
+  reached only through a barrel.** The typical case is a `register*` / `set*` callback.
+  Metro turns on `inlineRequires` for production ONLY. It moves a `require()` from the top of a
+  module down to the first place its binding is USED, and a barrel's
+  `export { Thing } from './thing'` compiles to a lazy getter. If nothing ever names `Thing` as
+  a VALUE, `./thing` never evaluates and its registration silently never happens, in RELEASE
+  builds only.
+
+  Device-diagnosed 2026-08-14: `interpolation-node.ts` registered the factory
+  `AnimatedNode.interpolate()` needed. Nothing named `AnimatedInterpolation` as a value
+  (adapters only TYPE it, which `verbatimModuleSyntax` erases). So the first `.interpolate()`
+  threw `interpolation factory not registered` and blanked `examples/vue-sfc`'s screen while dev
+  was perfectly fine. It is invisible to `tsc`, to vitest (eager evaluation), and even to
+  grepping the bundle: the code IS bundled, it just never runs.
+
+  **A bare `import './thing';` next to the re-export does NOT fix it** (tried on device first).
   Babel merges the two imports of the same specifier into one dependency, and the merged
-  dependency stays lazy. Two shapes actually work: (a) the module is imported ONLY as a bare
-  side-effect import and never re-exported from that barrel — the pattern in
-  `packages/slider/src/{react,vue,svelte,angular}/index.ts` (`import '../register';`); or (b),
-  preferred, **delete the indirection** so nothing needs registering — which is why
-  `AnimatedInterpolation` now lives inside `core/engine/src/animated/graph.ts` next to the base
-  class it extends, with `interpolate()` constructing it directly. See that file's comment.
-- **File layout — folder-as-module for platform/shared groups.** A module that has
+  dependency stays lazy. Two shapes actually work:
+
+  - (a) the module is imported ONLY as a bare side-effect import and never re-exported from that
+    barrel, the pattern in `packages/slider/src/{react,vue,svelte,angular}/index.ts`
+    (`import '../register';`)
+  - (b), preferred: **delete the indirection** so nothing needs registering. That is why
+    `AnimatedInterpolation` now lives inside `core/engine/src/animated/graph.ts` next to the base
+    class it extends, with `interpolate()` constructing it directly. See that file's comment
+- **File layout, folder-as-module for platform/shared groups.** A module that has
   platform (`X.ios`/`X.android`) and/or shared (`X-shared`) variants lives in its OWN
-  folder `X/` with an `index` barrel: `X/index.ts` (base — re-exports the
-  platform variant for headless), `X/index.ios.ts`, `X/index.android.ts`, `X/shared.ts`,
-  plus the co-located `X/X.test.ts` / `X/X.detox.ts`. The import contract is
-  UNCHANGED — `from '.../X'` (no suffix) resolves to the folder (Metro picks
-  `X/index.ios` per platform, tsx/headless picks `X/index.ts`); only an EXPLICIT platform
-  import changes form (`'.../X.ios'` → `'.../X/index.ios'`, `'.../X-shared'` →
-  `'.../X/shared'`). Inside a folder, a sibling is `./shared` / `./index.ios`; a
-  package-root module (one level up) is `../debug` / `../native-modules`. **Single-file
-  modules with no platform/shared variant STAY FLAT** — only genuine groups get a folder.
-  New components/modules follow this from the start; the flat
-  `X.ts`/`X.ios.ts`/`X.android.ts`/`X-shared.ts` form is retired for grouped modules.
-- **Platform:** iOS + Android both shipping (alpha). iOS stays the reference
+  folder `X/` with an `index` barrel:
+  - `X/index.ts`: the base, re-exports the platform variant for headless
+  - `X/index.ios.ts`, `X/index.android.ts`, `X/shared.ts`
+  - the co-located `X/X.test.ts` / `X/X.detox.ts`
+
+  The import contract is UNCHANGED. `from '.../X'` (no suffix) resolves to the folder (Metro
+  picks `X/index.ios` per platform, tsx/headless picks `X/index.ts`). Only an EXPLICIT platform
+  import changes form (`'.../X.ios'` -> `'.../X/index.ios'`, `'.../X-shared'` ->
+  `'.../X/shared'`).
+
+  Inside a folder, a sibling is `./shared` / `./index.ios`; a package-root module (one level up)
+  is `../debug` / `../native-modules`. **Single-file modules with no platform/shared variant STAY
+  FLAT**: only genuine groups get a folder. New components/modules follow this from the start;
+  the flat `X.ts`/`X.ios.ts`/`X.android.ts`/`X-shared.ts` form is retired for grouped modules.
+- **Platform:** iOS + Android both shipping (stable). iOS stays the reference
   surface (shortest simulator loop on macOS, widest prop-edge coverage); Android
   is at canary parity. The `RCTFabricSurface` bootstrap and the Android native
   host-shims (`packages/android`) are both wired.
 - **Primitives:** `View` · `Text` · `Image` · `ScrollView` all done. `Text` carries
-  the only position-dependent view name — a `<Text>` inside another `<Text>` commits
-  as `RCTVirtualText` instead of `RCTText` — and **no adapter implements that.** It is
+  the only position-dependent view name: a `<Text>` inside another `<Text>` commits
+  as `RCTVirtualText` instead of `RCTText`. **No adapter implements that.** It is
   resolved once in the engine's commit walk (`viewNameFor` in `core/engine/src/commit.ts`,
-  which threads `hasTextAncestor` down and re-creates the node when the kind flips);
-  every adapter emits a flat `symbiote-text` and stays out of it. React's original
-  `TextAncestorContext` is gone — do not reintroduce a per-adapter context for this.
-- **Styling — CSS classes are the convention; `StyleSheet.create` remains fully
-  supported.** Every current example app styles its static look with a CSS class
-  (`className`/`class`/`[class]`) against a `.css` file or, for Vue, an SFC `<style>`
-  block — none of them call `StyleSheet.create`. `StyleSheet.create({…})` (engine
-  export, re-exported by every adapter) is still identity at runtime — the engine
-  flattens a raw object literal the same way — and stays the right tool for a value
-  genuinely computed at runtime, or for an app that would rather not introduce CSS at
-  all; its only value beyond a raw literal is preserving literal types
-  (`flexDirection: 'row'` stays `'row'`). A Vue-SFC `<style>` block is
-  supported, including `<style scoped>` (a per-file scope-suffixed class name, both
-  static and dynamic `:class` bindings), `<style module>`, and a `:global()` escape hatch —
-  `@symbiote-native/css-parser` compiles the CSS at build time and a class-name registry
-  resolves it at runtime. The class+style merge and resolution is CROSS-ADAPTER, not
-  Vue-only: `core/engine/src/node.ts`'s `routeProp` centralizes it, so a registered class
-  resolves identically from React's `className` prop, Vue's `class`/`:class`, and Angular's
-  `class`/`[ngClass]`. A standalone `.css`/`.module.css` file import
-  (`import styles from './Card.module.css'`) works the same way from ANY adapter's own source
-  file, not just inside a `.vue` SFC. `@symbiote-native/css-parser` is a regular dependency of each
-  adapter package (not a per-app devDependency) — each adapter re-exports it via a
-  `metro-css-parser.cjs`/`./metro-css-parser` subpath, so a consuming app needs zero extra
-  install step. SCSS/Sass, Less, and Stylus are ALSO supported (2026-07) — each preprocessor
-  source reduces to plain CSS text before the same parser/registry pipeline runs, so every
-  scoped/module/`:global()` mechanism above applies identically regardless of source language;
-  `sass`/`less`/`stylus` are lazy-optional devDependencies of `@symbiote-native/css-parser` only, never
-  forced on a project that doesn't author them. **The whole surface — plain CSS, CSS Modules
-  (`composes`, `:global()`), all three preprocessors, and what the compiler deliberately refuses
-  — is exercised by one screen present in all five examples, `StyleShowcaseScreen` (2026-08-20);
-  React's is device-verified, the other four are ported but not yet built.** Every tile is built
-  so a dropped rule is VISIBLE rather than silent, which is what makes it a regression canary and
-  not a gallery — read it before claiming any part of this pipeline is broken or missing. And
-  `filter` carries a platform caveat worth knowing before demoing it: on iOS RN paints only
+  which threads `hasTextAncestor` down and re-creates the node when the kind flips).
+
+  Every adapter emits a flat `symbiote-text` and stays out of it. React's original
+  `TextAncestorContext` is gone; do not reintroduce a per-adapter context for this.
+- **Styling: CSS classes are the convention; `StyleSheet.create` remains fully supported.**
+  Every current example app styles its static look with a CSS class
+  (`className`/`class`/`[class]`) against a `.css` file or, for Vue, an SFC `<style>` block.
+  None of them call `StyleSheet.create`.
+
+  `StyleSheet.create({...})` (engine export, re-exported by every adapter) is still identity at
+  runtime, and the engine flattens a raw object literal the same way. It stays the right tool
+  for a value genuinely computed at runtime, or for an app that would rather not introduce CSS
+  at all. Its only value beyond a raw literal is preserving literal types (`flexDirection: 'row'`
+  stays `'row'`).
+
+  A Vue-SFC `<style>` block is supported, including `<style scoped>` (a per-file scope-suffixed
+  class name, both static and dynamic `:class` bindings), `<style module>`, and a `:global()`
+  escape hatch. `@symbiote-native/css-parser` compiles the CSS at build time and a class-name
+  registry resolves it at runtime.
+
+  The class+style merge and resolution is CROSS-ADAPTER, not Vue-only. `core/engine/src/node.ts`'s
+  `routeProp` centralizes it, so a registered class resolves identically from React's
+  `className` prop, Vue's `class`/`:class`, and Angular's `class`/`[ngClass]`. A standalone
+  `.css`/`.module.css` file import (`import styles from './Card.module.css'`) works the same way
+  from ANY adapter's own source file, not just inside a `.vue` SFC.
+
+  `@symbiote-native/css-parser` is a regular dependency of each adapter package (not a per-app
+  devDependency). Each adapter re-exports it via a `metro-css-parser.cjs`/`./metro-css-parser`
+  subpath, so a consuming app needs zero extra install step.
+
+  SCSS/Sass, Less, and Stylus are ALSO supported (2026-07). Each preprocessor source reduces to
+  plain CSS text before the same parser/registry pipeline runs, so every scoped/module/`:global()`
+  mechanism above applies identically regardless of source language. `sass`/`less`/`stylus` are
+  lazy-optional devDependencies of `@symbiote-native/css-parser` only, never forced on a project
+  that doesn't author them.
+
+  **One screen, `StyleShowcaseScreen`, exercises the whole surface (2026-08-20).** That covers
+  plain CSS, CSS Modules (`composes`, `:global()`), all three preprocessors, and what the compiler
+  deliberately refuses. It is present in all five examples; React's is device-verified, the other
+  four are ported but not yet built. Every tile is built so a dropped rule is VISIBLE rather than
+  silent, which is what makes it a regression canary and not a gallery. Read it before claiming
+  any part of this pipeline is broken or missing.
+
+  And `filter` carries a platform caveat worth knowing before demoing it. On iOS RN paints only
   `brightness` and `opacity` unless the `enableSwiftUIBasedFilters` flag is on, so
   `grayscale`/`blur`/`saturate`/`contrast`/`hue-rotate` silently do nothing there. JS style
   objects via `StyleSheet.create` remain the baseline every adapter supports; the CSS path is
@@ -443,17 +480,24 @@ evaluating its argument.
 
 ## Milestones
 
-The milestones separate the risks: **R1** native pipe/bootstrap/slot, **R2** the
-engine's mutation→clone-on-write commit path, **R3** event→recommit, **R4** a
-non-React framework driving the engine (proves the core is genuinely
-framework-agnostic). What ships today is summarised in [`README.md`](./README.md)'s Status section.
+The milestones separate the risks:
 
-**M1 + M2 — React, done (alpha).** `@symbiote-native/react`: a `react-reconciler` host
+- **R1** native pipe/bootstrap/slot
+- **R2** the engine's mutation->clone-on-write commit path
+- **R3** event->recommit
+- **R4** a non-React framework driving the engine (proves the core is genuinely
+  framework-agnostic)
+
+What ships today is summarised in [`README.md`](./README.md)'s Status section.
+
+**M1 + M2 — React, done (stable).** `@symbiote-native/react`: a `react-reconciler` host
 config in **mutation mode** (`supportsMutation: true`, `appendChild`/`insertBefore`/
-`removeChild` → the engine's mutation API) drives the full canary surface — `View` ·
-`Text` · `Image` · `ScrollView`, the responder/gesture lifecycle, accessibility,
-and RN's JS style processors — green on **iOS + Android**, with RN's own renderer
-never in the path. React is a known-good driver, so a failure isolates to the engine /
+`removeChild` -> the engine's mutation API). It drives the full canary surface: `View`,
+`Text`, `Image`, `ScrollView`, the responder/gesture lifecycle, accessibility,
+and RN's JS style processors. It is green on **iOS + Android**, with RN's own renderer
+never in the path.
+
+React is a known-good driver, so a failure isolates to the engine /
 slot / bootstrap (the `@wolf-tui/react` shape with a Fabric-backed engine). **React
 goes through the engine in mutation mode** — NOT its native persistent mode straight to
 the slot, which would skip R2. The bar for "done" is the canary green on both
@@ -462,8 +506,8 @@ accepted: a keyed MOVE costs React ~15 ms of fiber walking that a persistent ren
 does not pay, which is the whole of its `Swap` deficit and reaches no other adapter.
 
 **M3 — Vue, done (isolated R4).** Vue (`@vue/runtime-core` `createRenderer`) renders
-the full canary surface on the shared engine — first non-React proof of the
-framework-agnostic seam, built in layers (static paint → reactive update → event) so
+the full canary surface on the shared engine. It is the first non-React proof of the
+framework-agnostic seam, built in layers (static paint -> reactive update -> event) so
 a break stayed localizable. The `core/`+`adapters/` layout and the `@symbiote-native/engine`
 rename (from the former `shared` package) both landed as part of this milestone.
 
@@ -484,6 +528,10 @@ destroyed component. So `destroy()` may only PUBLISH what it holds — releasing
 `beforeFlush` registration there kills style publishing for every surviving view after
 the first keyed `@for` replace. The registration follows the SURFACE
 (`SymbioteRendererFactory.dispose()`, called from `render/index.ts`'s teardown).
+
+**Reanimated, done.** `@symbiote-native/reanimated` ports `react-native-reanimated` 4 and
+`react-native-worklets` to all five adapters. Hooks are core controllers over upstream Common
+modules.
 
 **Workstream B — `core/components` (in progress).** Extract every reusable
 component out of `@symbiote-native/react` into the three-layer split of
@@ -509,8 +557,8 @@ module we already carry as a `peerDependency`. It has already cost a real Androi
 Step 0 is a ~30-minute experiment that has never been run and decides whether the cheap tier
 exists at all.
 
-**Read the `symbiote-rn-port-elimination` skill before hand-porting ANY further RN module** —
-it holds the Tier A/B/C split, the three modules that must stay ported, the two traps, and Step 0.
+**Before hand-porting ANY further RN module, check whether `react-native` already ships it.**
+Import that one instead.
 
 ## Performance, against stock React Native
 
@@ -533,9 +581,14 @@ Three rules that hold whatever is being measured:
 - **Small-ms rows carry no verdict without best-of-N.** Timing noise is one-sided, so the minimum
   is the reading and a mean carries every interruption into the ratio.
 
-**Read the `symbiote-perf-measurement` skill before quoting any ratio, editing a fixture under
-`core/engine/cpp/tests/js/**`, or attributing a regression** — it holds the current table, the
-oracles, the harness traps, and the changes that were priced and deliberately NOT taken.
+**Read the `symbiote-perf-measurement` skill before any of these:**
+
+- quoting a ratio
+- editing a fixture under `core/engine/cpp/tests/js/**`
+- attributing a regression
+
+It holds the current table, the oracles, the harness traps, and the changes that were priced
+and deliberately NOT taken.
 `README.md` publishes a reader-facing version of the same table.
 
 ## Reference material
@@ -551,6 +604,6 @@ oracles, the harness traps, and the changes that were priced and deliberately NO
   The Vue adapter there (`packages/vue/src/renderer/{nodeOps,patchProp}.ts`) is the
   reference shape for ours — `createRenderer` + nodeOps mapping each RendererOptions
   call onto the engine mutation API. Caveat: wolf-tui drives a TUI layout engine, so
-  the framework seam transfers verbatim but the host-call targets differ (its
-  `createComment` fakes an empty text node — we use a real anchor node the commit walk
-  skips, because an empty RCTRawText would actually paint in Fabric).
+  the framework seam transfers verbatim but the host-call targets differ.
+  Its `createComment` fakes an empty text node, while we use a real anchor node the commit walk
+  skips, because an empty RCTRawText would actually paint in Fabric.
