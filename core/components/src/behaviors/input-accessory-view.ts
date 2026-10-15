@@ -2,7 +2,6 @@
 // inside it: flex 1, window wide, holding the app's children (`InputAccessoryView.js:97-99`)
 
 // NOTE: RN renders nothing for zero children, we still mount an empty zero-sized accessory
-// (see symbiote-rn-behavior-parity, InputAccessoryView)
 
 // Android resolves to `VOID_COMPONENT`, which drops the subtree, so no structure is built there
 import {

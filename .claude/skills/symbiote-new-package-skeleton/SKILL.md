@@ -108,5 +108,3 @@ placeholder by hand, and the first changeset then lifts it to a real version (`0
 - `symbiote-file-layout` — where `packages/<pkg>` sits in the monorepo map and the adapter
   bucket conventions (`components/`/`modules/`/`utils/` vs the framework-idiomatic lifecycle
   folder) once tier 3 starts adding adapter code.
-- `symbiote-expo-package-catalog` — the audited inventory of `.vendors/expo/packages` and
-  priority queue for picking which Expo package to port next.

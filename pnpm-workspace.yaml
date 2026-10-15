@@ -255,7 +255,7 @@ catalog:
   expo-device: 57.0.1
   # The hand-ported JS skips the `aes/` subfolder, out of scope for this pass
   expo-crypto: 57.0.1
-  # Tier-1 of the `symbiote-expo-package-catalog` queue, versions verified at origin/sdk-57
+  # Tier-1 Expo packages, versions verified at origin/sdk-57
   # `expo-standard-web-crypto` has no native folders, so it needs no entry
   expo-localization: 57.0.1
   expo-keep-awake: 57.0.1

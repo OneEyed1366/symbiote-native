@@ -1,11 +1,6 @@
-// Hand-ported from .vendors/expo/packages/expo-store-review/src/StoreReview.ts (sdk-57), with
-// one deliberate deviation: upstream's `storeUrl()` reads
-// `Constants.expoConfig.ios.appStoreUrl`/`.android.playStoreUrl` off `expo-constants`, which this
-// project doesn't depend on (symbiote-expo-package-catalog skill, row 9 — expo-constants hard-
-// depends on an Expo-CLI-generated manifest a bare/Metro-only project like this one never
-// produces). So the store URL is supplied explicitly by the caller instead of being read from a
-// manifest — every function below takes an optional `IStoreReviewUrlOptions` in place of
-// upstream's implicit `Constants` read.
+// Hand-ported from .vendors/expo/packages/expo-store-review/src/StoreReview.ts (sdk-57)
+// Deviation: upstream's `storeUrl()` reads `expo-constants`, which needs an Expo-CLI manifest
+// a bare Metro project never has, so the caller passes the URLs in `IStoreReviewUrlOptions`
 import { Platform } from 'expo-modules-core';
 import { Linking } from 'react-native';
 
@@ -40,14 +35,9 @@ function urlFor(options?: IStoreReviewUrlOptions): string | null {
 }
 
 /**
- * In ideal circumstances this opens a native modal letting the user pick a star rating that's
- * then applied to the App Store/Play Store, without leaving the app. If the native flow is
- * unavailable, falls back to opening the store URL supplied via `options`.
- *
- * Resolving does NOT mean a prompt appeared — neither store reports that back, by design, so
- * there is nothing to branch on. On Android it only shows for a build installed from Google
- * Play; a sideloaded build runs the whole Play Core flow and displays nothing. Both stores also
- * enforce a quota.
+ * Opens the native rating modal, else the store URL from `options`.
+ * Resolving does not mean a prompt showed: stores report nothing, enforce a quota, and Android
+ * shows it only for a Play-installed build
  */
 export async function requestReview(
   options?: IStoreReviewUrlOptions,
@@ -58,10 +48,10 @@ export async function requestReview(
   const url = urlFor(options);
   if (url) {
     const supported = await Linking.canOpenURL(url);
-    if (!supported) {
-      console.warn(`StoreReview.requestReview(): Can't open store url: ${url}`);
-    } else {
+    if (supported) {
       await Linking.openURL(url);
+    } else {
+      console.warn(`StoreReview.requestReview(): Can't open store url: ${url}`);
     }
   } else {
     console.warn(

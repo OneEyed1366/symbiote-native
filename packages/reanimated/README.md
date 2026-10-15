@@ -6,7 +6,7 @@ CSS animations and the worklets API run on the UI thread, against the native hal
 
 All five adapters carry the whole upstream export list. `src/surface-parity.test.ts` compares every name
 with the entry of each adapter. The hooks are built on the upstream hook helpers with the React bindings
-replaced by the engine's own: see the `symbiote-reanimated-port` skill.
+replaced by the engine's own.
 
 ## Install
 
