@@ -10,6 +10,7 @@ export const packagesSidebar = {
       items: [
         { label: 'Android host shims', slug: 'docs/packages/android' },
         { label: 'CSS parser', slug: 'docs/packages/css-parser' },
+        { label: 'Reanimated', slug: 'docs/packages/reanimated' },
         { label: 'Slider', slug: 'docs/packages/slider' },
         { label: 'Splash screen', slug: 'docs/packages/splash-screen' },
         { label: 'Test utils', slug: 'docs/packages/test-utils' },

@@ -8,19 +8,6 @@ import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 `@symbiote-native/camera` wraps [`expo-camera`](https://docs.expo.dev/versions/latest/sdk/camera/),
 so every SymbioteNative adapter can show a camera, not just React.
 
-| OS platform | Support |
-| ----------- | ------- |
-| iOS         | live    |
-| Android     | live    |
-
-| Framework adapter | Support |
-| ----------------- | ------- |
-| React             | live    |
-| Vue               | live    |
-| Angular           | live    |
-| Svelte            | live    |
-| Solid             | live    |
-
 ## Installation
 
 ```sh
@@ -226,15 +213,17 @@ the device has it, and `onModernBarcodeScanned` delivers the results.
 camera view were reported not to reach the gesture library on iOS from SDK 51 on. Put the gesture
 area on its own transparent view above the camera and not on the camera itself.
 
-Sources: [Expo docs: Camera](https://docs.expo.dev/versions/latest/sdk/camera/),
-[expo/expo#11736 iOS requires NSMicrophoneUsageDescription](https://github.com/expo/expo/issues/11736),
-[expo/expo#34305 facing front is a black box](https://github.com/expo/expo/issues/34305),
-[expo/expo#16126 barcode scanned only once on Android](https://github.com/expo/expo/issues/16126),
-[expo/expo#37150 CameraView does not support children](https://github.com/expo/expo/issues/37150),
-[expo/expo#34957 conditional rendering crashes on iOS](https://github.com/expo/expo/issues/34957),
-[expo/expo#48780 mounting and unmounting freezes the iOS Simulator](https://github.com/expo/expo/issues/48780),
-[expo/expo#36352 torch stays on for a split second](https://github.com/expo/expo/issues/36352),
-[expo/expo#28966 gesture handler and CameraView](https://github.com/expo/expo/issues/28966).
+Sources:
+
+- [Expo docs: Camera](https://docs.expo.dev/versions/latest/sdk/camera/)
+- [expo/expo#11736 iOS requires NSMicrophoneUsageDescription](https://github.com/expo/expo/issues/11736)
+- [expo/expo#34305 facing front is a black box](https://github.com/expo/expo/issues/34305)
+- [expo/expo#16126 barcode scanned only once on Android](https://github.com/expo/expo/issues/16126)
+- [expo/expo#37150 CameraView does not support children](https://github.com/expo/expo/issues/37150)
+- [expo/expo#34957 conditional rendering crashes on iOS](https://github.com/expo/expo/issues/34957)
+- [expo/expo#48780 mounting and unmounting freezes the iOS Simulator](https://github.com/expo/expo/issues/48780)
+- [expo/expo#36352 torch stays on for a split second](https://github.com/expo/expo/issues/36352)
+- [expo/expo#28966 gesture handler and CameraView](https://github.com/expo/expo/issues/28966)
 
 ## How the wrapper works
 

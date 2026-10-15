@@ -33,6 +33,8 @@ export type ICommittedRecord = {
   handle: object;
   tag: number;
   rootTag: IRootTag;
+  // Fabric families minted so far, a change means registries keyed by the old family went stale
+  familyGeneration?: number;
 };
 
 // A structural census of the host's tree: how many nodes it holds, how many the commit skips, and
@@ -42,7 +44,7 @@ export type ICommittedRecord = {
 // Anchor count is an adapter property, not an app one: Angular's components bind to a host element
 // and always allocate one, where React/Vue/Svelte/Solid don't — the same screen is anchor-free
 // under four adapters and carries one per instance under the fifth.
-export interface ITreeCensus {
+export type ITreeCensus = {
   nodes: number;
   anchors: number;
   emptyRawTexts: number;
@@ -50,7 +52,7 @@ export interface ITreeCensus {
   renderable: number;
   // children.length of every parent holding at least one skipped child, widest first.
   flattenWidths: number[];
-}
+};
 
 // The census of a tree nobody counted — what a host with no walk answers, and what
 // censusRetainedTree answers with no host installed. Not exported from the package barrel: an app
@@ -81,6 +83,9 @@ export type ITreeHost = {
   // with a DERIVED payload has; see `markPropsDirty` (node.ts).
   markPropsDirty: (handle: object) => void;
   committedRecordOf: (handle: object) => ICommittedRecord | undefined;
+  // `ShadowNodeWrapper` over the committed node, what Fabric-level native libraries take for a view
+  // NOTE: a snapshot that pins its revision, so drop it together with the binding
+  shadowNodeWrapperOf?: (handle: object) => object | undefined;
   // A test read: the payload the last commit handed Fabric for this node, undefined before one.
   // Exists because the alternative reads are blind — Props::getDebugProps() is hand-written per
   // component, and RN's rawProps needs a flag that doesn't compile on a host build.
@@ -294,7 +299,7 @@ export function commitSurfaceOps(
 
 // propWrites comes from node.ts and prices the layer above the host: how many prop writes an
 // adapter pushed at the engine in this window.
-export interface ICommitProfile {
+export type ICommitProfile = {
   commits: number;
   propWrites: number;
   // Fresh Fabric families minted in this window — the same quantity a stock RN app counts by
@@ -315,7 +320,7 @@ export interface ICommitProfile {
   // harness's JavaScriptCore, so this number must be read on a phone, not estimated headless.
   applyMs: number;
   decodeMs: number;
-}
+};
 
 // Reading this now drains the surface telemetry too — nodesCreated is folded in from
 // readSurfaceTelemetry, which zeroes on read in C++, so a sampler polling this on an interval

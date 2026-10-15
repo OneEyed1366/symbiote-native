@@ -223,6 +223,10 @@ catalog:
   # would use native types our snapshot never generated (rule `native-proxy-package-files`)
   react-native-screens: 4.26.0
   react-native-safe-area-context: ^5.5.2
+  # Exact pins: packages/reanimated imports hook helpers that Reanimated does not publish
+  # (`src/hook/*Common`), so a caret range could resolve a release where they moved
+  react-native-reanimated: 4.7.1
+  react-native-worklets: 0.13.0
   # Exact pins for every `expo-*` entry below: the package is used ONLY for its native folders.
   # Its JS is hand-ported into our own core, so a caret range could drift the two apart
   expo-sensors: 57.0.2

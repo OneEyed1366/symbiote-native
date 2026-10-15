@@ -1,11 +1,6 @@
-// Route-name constants shared between a navigator's <Screen name="..."> registrations and every
-// screen's navigation.push(...)/navigation.jumpTo(...) calls — a single source of truth so a
-// typo can't silently create a dead route on one side only. Verbatim port of
-// examples/vue-sfc/routes.ts (itself a verbatim port of examples/react/routes.ts) — the route
-// names/keys are framework-agnostic.
-//
-// Read by App.svelte's <Screen name={...}> registrations, by every screen's
-// navigation.current.push(...), and by CanaryScreen's own "you are here" line tag.
+// Route names shared by the `<Screen name>` markers in App.svelte and every `push` call
+// One source of truth, so a typo cannot create a dead route on one side only
+// CanaryScreen reads them too, for its own line tag
 
 export const ROUTE_NAME = {
   Menu: 'Menu',
@@ -23,6 +18,7 @@ export const ROUTE_NAME = {
   Benchmark: 'Benchmark',
   PrimitiveBench: 'PrimitiveBench',
   StyleShowcase: 'StyleShowcase',
+  Reanimated: 'Reanimated',
 } as const;
 
 export type IRouteName = (typeof ROUTE_NAME)[keyof typeof ROUTE_NAME];

@@ -1,8 +1,6 @@
-// Inline `process.env.DEBUG` at bundle time so the @symbiote diagnostic logs can
-// be toggled from the shell without a dependency:
+// Inlines `process.env.DEBUG` at bundle time, so the diagnostic logs toggle from the shell
 //   DEBUG=1 npx react-native start --reset-cache
-// The value is read from Metro's own environment when this config is evaluated
-// and baked into every transformed module (the app entry and the shared source).
+// Metro's environment is read when this config is evaluated, then baked into every module
 const debugFlag = process.env.DEBUG === '1' ? '1' : '0';
 
 function inlineFlags({ types: t }) {
@@ -20,5 +18,6 @@ function inlineFlags({ types: t }) {
 
 module.exports = {
   presets: ['module:@react-native/babel-preset'],
-  plugins: [inlineFlags],
+  // The worklets plugin has to stay last in this list
+  plugins: [inlineFlags, 'react-native-worklets/plugin'],
 };

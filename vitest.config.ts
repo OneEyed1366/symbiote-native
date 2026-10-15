@@ -4,6 +4,20 @@ import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { defineConfig } from 'vitest/config';
 import solidPlugin from 'vite-plugin-solid';
+import {
+  EXAMPLE_IMPORTS,
+  REANIMATED_ALIAS,
+  REANIMATED_SOLID_ALIAS,
+  REANIMATED_SOLID_TESTS,
+  REANIMATED_SVELTE_TESTS,
+  REANIMATED_SVELTE_WORKLETS,
+  REANIMATED_TESTS,
+  REANIMATED_VUE_SFC,
+  REANIMATED_VUE_TSX,
+  REANIMATED_WORKLETS,
+  SVELTE_MODULES,
+  WORKLETS_NATIVE_SIBLINGS,
+} from './vitest.reanimated';
 
 // Root unit/integration runner, tests are co-located with what they exercise
 // `@symbiote-native/*` resolve to raw `src/*.ts`, so they are inlined. `examples/*` is out of scope
@@ -264,12 +278,80 @@ export default defineConfig({
     projects: [
       {
         ...SHARED,
+        plugins: [
+          REACT_NATIVE_FLOW,
+          REACT_NATIVE_PLATFORM,
+          REANIMATED_WORKLETS,
+          WORKLETS_NATIVE_SIBLINGS,
+          REANIMATED_VUE_TSX,
+          REANIMATED_VUE_SFC,
+          EXAMPLE_IMPORTS,
+        ],
+        resolve: { alias: REANIMATED_ALIAS },
+        test: {
+          ...SHARED.test,
+          name: 'reanimated',
+          include: REANIMATED_TESTS,
+          exclude: [
+            ...EXCLUDE_ALL,
+            ...REANIMATED_SVELTE_TESTS,
+            ...REANIMATED_SOLID_TESTS,
+          ],
+        },
+      },
+      {
+        ...SHARED,
+        ...BROWSER_CONDITIONS,
+        plugins: [
+          REACT_NATIVE_FLOW,
+          REACT_NATIVE_PLATFORM,
+          REANIMATED_WORKLETS,
+          WORKLETS_NATIVE_SIBLINGS,
+          SOLID_TRANSFORM,
+          EXAMPLE_IMPORTS,
+        ],
+        resolve: {
+          ...BROWSER_CONDITIONS.resolve,
+          alias: REANIMATED_SOLID_ALIAS,
+        },
+        test: {
+          ...SHARED.test,
+          name: 'reanimated-solid',
+          include: REANIMATED_SOLID_TESTS,
+          exclude: EXCLUDE_ALL,
+        },
+      },
+      {
+        ...SHARED,
+        ...BROWSER_CONDITIONS,
+        plugins: [
+          REACT_NATIVE_FLOW,
+          REACT_NATIVE_PLATFORM,
+          REANIMATED_WORKLETS,
+          WORKLETS_NATIVE_SIBLINGS,
+          SVELTE_MODULES,
+          REANIMATED_SVELTE_WORKLETS,
+          EXAMPLE_IMPORTS,
+        ],
+        resolve: {
+          ...BROWSER_CONDITIONS.resolve,
+          alias: REANIMATED_ALIAS,
+        },
+        test: {
+          ...SHARED.test,
+          name: 'reanimated-svelte',
+          include: REANIMATED_SVELTE_TESTS,
+          exclude: EXCLUDE_ALL,
+        },
+      },
+      {
+        ...SHARED,
         ...BROWSER_CONDITIONS,
         test: {
           ...SHARED.test,
           name: 'svelte',
           include: SVELTE_TESTS,
-          exclude: EXCLUDE_ALL,
+          exclude: [...EXCLUDE_ALL, ...REANIMATED_SVELTE_TESTS],
           benchmark: { include: SVELTE_BENCH, exclude: EXCLUDE_ALL },
         },
       },
@@ -282,7 +364,7 @@ export default defineConfig({
           ...SHARED.test,
           name: 'solid',
           include: SOLID_TESTS,
-          exclude: EXCLUDE_ALL,
+          exclude: [...EXCLUDE_ALL, ...REANIMATED_SOLID_TESTS],
         },
       },
       {
@@ -291,7 +373,12 @@ export default defineConfig({
           ...SHARED.test,
           name: 'default',
           include: INCLUDE_ALL,
-          exclude: [...EXCLUDE_ALL, ...SVELTE_TESTS, ...SOLID_TESTS],
+          exclude: [
+            ...EXCLUDE_ALL,
+            ...SVELTE_TESTS,
+            ...SOLID_TESTS,
+            ...REANIMATED_TESTS,
+          ],
           benchmark: {
             include: BENCH_ALL,
             exclude: [...EXCLUDE_ALL, ...SVELTE_BENCH],

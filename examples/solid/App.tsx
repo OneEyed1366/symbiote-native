@@ -1,24 +1,14 @@
-// Solid canary app entry: composes the native stack navigator (@symbiote-native/navigation/solid,
-// driven by react-native-screens' RNSScreen/RNSScreenStack native views) over the demo screen
-// surface. Menu is the initial route; Canary — the app's whole former root content, the
-// every-primitive tab surface — is the menu's first row. Details carries no menu row: it is the
-// DeepLinking stop's resolution target (symbiotecanarysolid://details/:id) and nothing else.
-//
-// SCREEN DISCOVERY, as on Svelte: Solid cannot inspect its children, so <Stack.Screen> markers
-// register THEMSELVES on a collector the navigator publishes on context. The registry is therefore
-// still empty while the Stack body runs — the navigator seeds lazily from it, which is why marker
-// order in here is declaration order and nothing else (packages/navigation/src/solid/stack, note 1).
-//
-// THE LINKING HANDLE. Neither the React nor the Svelte shape ports:
-//   - React mounts a separate <LinkingRunner> child once the ref lands, because a ref is null on
-//     the first render pass and React gets a SECOND pass to mount it on. Solid has no second pass.
-//   - Svelte hands a GETTER over `bind:this` and re-runs an $effect when the binding resolves,
-//     because `bind:this` only lands during mount.
-// Solid needs neither, and the reason is an ordering guarantee the other two lack:
-// createLinkingIntegration takes an Accessor and reads it inside onMount, while a `ref` on a
-// component is invoked during that component's own creation — strictly before any effect runs. So
-// the signal is already populated by the time linking reads it, and one plain signal wired straight
-// through is the whole answer. It is called BEFORE the JSX below only because onMount just queues.
+// Solid canary app entry: the native stack navigator over the demo screens
+// Menu is the initial route and Canary is its first row
+// Details has no menu row, the DeepLinking stop resolves to it (symbiotecanarysolid://details/:id)
+
+// SCREEN DISCOVERY, as on Svelte: Solid cannot inspect its children
+// `<Stack.Screen>` markers register themselves on a collector the navigator publishes on context
+// The registry is still empty while the Stack body runs, so marker order is declaration order
+
+// THE LINKING HANDLE, which neither the React nor the Svelte shape ports
+// `createLinkingIntegration` reads an Accessor in `onMount`, and a `ref` is called while its
+// component is created, before any effect, so one plain signal wired through is enough
 
 import { createSignal, onMount } from 'solid-js';
 import {
@@ -45,6 +35,7 @@ import {
   SheetDemoScreen,
   sheetDemoScreenOptions,
 } from './screens/SheetDemoScreen';
+import { ReanimatedScreen } from './screens/ReanimatedScreen';
 import { StatePersistenceScreen } from './screens/StatePersistenceScreen';
 import { StyleShowcaseScreen } from './screens/StyleShowcaseScreen';
 import { TabsDemoScreen } from './screens/TabsDemoScreen';
@@ -110,6 +101,10 @@ const styleShowcaseScreenOptions = darkHeader(
   'Styling Showcase',
   LINE_COLOR.styling,
 );
+const reanimatedScreenOptions = darkHeader(
+  'Reanimated',
+  LINE_COLOR.performance,
+);
 
 // Not darkHeader(): Details is the one screen arrived at by deep link rather than by tap, so it
 // pins its own push animation instead of inheriting whatever the OS default is.
@@ -131,10 +126,8 @@ export default function App() {
 
   createLinkingIntegration(APP_LINKING_CONFIG, stackHandle);
 
-  // Bare hide(), matching examples/react's App.tsx, examples/vue-sfc's App.vue and
-  // examples/svelte's App.svelte — none of the canaries wire the full useHideAnimation fade, so a
-  // plain mount-time hide is the right-sized call. It sits at the root, not in a screen, because
-  // the first route mounted is Menu.
+  // Bare `hide()` as in the other canaries, none of which wires the full `useHideAnimation` fade
+  // It sits at the root, not in a screen, as the first route mounted is Menu
   onMount(() => {
     hide();
   });
@@ -163,6 +156,11 @@ export default function App() {
         name={ROUTE_NAME.StyleShowcase}
         component={StyleShowcaseScreen}
         options={styleShowcaseScreenOptions}
+      />
+      <Stack.Screen
+        name={ROUTE_NAME.Reanimated}
+        component={ReanimatedScreen}
+        options={reanimatedScreenOptions}
       />
       <Stack.Screen
         name={ROUTE_NAME.Details}

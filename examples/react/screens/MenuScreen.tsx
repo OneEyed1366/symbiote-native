@@ -75,6 +75,11 @@ const MENU_ITEMS: readonly IMenuItem[] = [
     route: ROUTE_NAME.JsiNavigationCost,
     hint: 'prices one host-navigation query across the JSI boundary',
   },
+  {
+    label: 'Reanimated',
+    route: ROUTE_NAME.Reanimated,
+    hint: 'spring, CSS animations and transitions, :active, entering and exiting',
+  },
 ];
 
 /**
@@ -82,12 +87,8 @@ const MENU_ITEMS: readonly IMenuItem[] = [
  * each pushing its own dedicated demo screen onto the same root Stack. Replaces Canary as the
  * initial route; Canary itself is unchanged and reachable from the first row.
  *
- * Rows are grouped into 7 thematic "lines" (navigation-lines.ts's ROUTE_LINE_INFO) — a color +
- * 2-letter badge per line, carried through onto each demo screen's own line tag — so the tour
- * reads as one system instead of a flat bag of unrelated test screens. API Playground is the
- * one row that isn't about @symbiote-native/navigation at all — it demos React's OWN API
- * surface (hooks, Suspense, Context, refs…) running under the custom renderer, grouped onto the
- * Introspection line alongside HooksDemo since both verify the renderer's internals.
+ * Rows are grouped into lines (`ROUTE_LINE_INFO`), a color and a badge each
+ * API Playground is no navigation row, it sits on the Introspection line beside HooksDemo
  */
 export function MenuScreen() {
   const navigation = useStackNavigation();

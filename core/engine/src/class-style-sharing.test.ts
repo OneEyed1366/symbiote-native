@@ -8,7 +8,7 @@
 // fresh style object per render gets nothing — correctly, since two structurally equal objects are
 // two values to anyone reading them later, and a deep compare would cost the size of the style.
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   resetMutationBuffer,
@@ -16,6 +16,7 @@ import {
   type IMutationBatch,
 } from './mutation-buffer';
 import { createElement, routeProp } from './node';
+import { clearGlobalStyles, registerRules } from './index';
 
 /** The style arrays a batch carried, which is what the host will convert one by one. */
 function styleValuesOf(batch: IMutationBatch): readonly unknown[] {
@@ -118,5 +119,80 @@ describe('the style slot is shared between nodes styled the same way', () => {
 
     const values = styleValuesOf(takeBatch());
     expect(values.length).toBe(2);
+  });
+});
+
+describe('the style slot is shared when a node is styled by class', () => {
+  afterEach(() => clearGlobalStyles());
+
+  function registerCard() {
+    registerRules([
+      {
+        tokens: ['card'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { padding: 10 },
+      },
+    ]);
+  }
+
+  it('sends one array when many nodes carry the same class alone', () => {
+    registerCard();
+    resetMutationBuffer();
+    for (let at = 0; at < 5; at += 1) {
+      routeProp(createElement('RCTView'), 'className', 'card');
+    }
+
+    expect(styleValuesOf(takeBatch()).length).toBe(1);
+  });
+
+  it('sends one array when many nodes carry the same class and the same style', () => {
+    registerCard();
+    resetMutationBuffer();
+    const style = { margin: 2 };
+    for (let at = 0; at < 5; at += 1) {
+      const node = createElement('RCTView');
+      routeProp(node, 'className', 'card');
+      routeProp(node, 'style', style);
+    }
+
+    const values = styleValuesOf(takeBatch());
+    const last = values[values.length - 1];
+    if (!Array.isArray(last)) throw new Error('style did not publish an array');
+    expect(last[1]).toBe(style);
+    expect(values.filter(value => value === last).length).toBe(1);
+  });
+
+  // The cache holds one shape per class: a class first seen with a style and later seen alone has
+  // nowhere to cache the second form, so the node must still publish its own correct pair
+  it('still publishes the right pair when a class seen with a style appears alone', () => {
+    registerCard();
+    resetMutationBuffer();
+    const withStyle = createElement('RCTView');
+    routeProp(withStyle, 'className', 'card');
+    routeProp(withStyle, 'style', { margin: 2 });
+    takeBatch();
+
+    resetMutationBuffer();
+    routeProp(createElement('RCTView'), 'className', 'card');
+
+    const values = styleValuesOf(takeBatch());
+    expect(values.length).toBe(1);
+    expect(values[0]).toEqual([{ padding: 10 }, undefined]);
+  });
+
+  it('still publishes the right pair when a class seen alone appears with a style', () => {
+    registerCard();
+    resetMutationBuffer();
+    routeProp(createElement('RCTView'), 'className', 'card');
+    takeBatch();
+
+    resetMutationBuffer();
+    const node = createElement('RCTView');
+    routeProp(node, 'className', 'card');
+    routeProp(node, 'style', { margin: 2 });
+
+    const values = styleValuesOf(takeBatch());
+    expect(values[values.length - 1]).toEqual([{ padding: 10 }, { margin: 2 }]);
   });
 });

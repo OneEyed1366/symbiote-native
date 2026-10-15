@@ -1,7 +1,7 @@
 /*
  * The whole native stack a headless test needs, assembled once: a real JSI runtime, a real
- * `UIManager` over a real `ShadowTree`, the engine's own bindings, and — the part that makes this
- * more than a compile check — React Native's own `StubViewTree` standing in for the platform.
+ * `UIManager` over a real `ShadowTree` and the engine's own bindings.
+ * React Native's `StubViewTree` stands in for the platform, so this is more than a compile check
  *
  * `StubViewTree` consumes the differ's mutations, which is exactly what iOS and Android consume. So
  * what a test reads back here is the tree that WAS MOUNTED, arrived at by the code that ships, and
@@ -57,6 +57,10 @@
 #include <react/renderer/scheduler/SchedulerToolbox.h>
 #include <react/renderer/uimanager/UIManager.h>
 #include <react/renderer/uimanager/UIManagerBinding.h>
+#ifdef SYMBIOTE_WITH_REANIMATED
+#include <reanimated/LayoutAnimations/LayoutAnimationsManager.h>
+#include <reanimated/LayoutAnimations/LayoutAnimationsProxy.h>
+#endif
 
 #include <cstdio>
 #include <memory>
@@ -276,6 +280,20 @@ class Host {
 
   Host(const Host &) = delete;
   Host &operator=(const Host &) = delete;
+
+#ifdef SYMBIOTE_WITH_REANIMATED
+  // Reanimated's layout animations proxy between the shadow tree and the stub platform, as a device
+  // has it. The surface opens again, so nothing mounted before is kept
+  void useLayoutAnimationsProxy(bool enabled) {
+    proxyEnabled_ = enabled;
+    uiManager_->getShadowTreeRegistry().remove(kSurfaceId);
+    proxy_.reset();
+    openSurface();
+  }
+
+  reanimated::LayoutAnimationsManager &animationsManager() { return *animationsManager_; }
+  reanimated::LayoutAnimationsProxy &layoutAnimationsProxy() { return *proxy_; }
+#endif
 
   jsi::Runtime &runtime() { return *runtime_; }
 
@@ -534,10 +552,8 @@ class Host {
   /**
    * The committed SHADOW tree as `name(children…)`, which is a different tree from the mounted one.
    *
-   * Both are needed and neither substitutes for the other. A mounted tree answers "what does the
-   * platform hold", and it is flatter: a flattened view is not in it, and a VIRTUAL node — the text
-   * a `<Text>` is made of — is not in it at all, because a paragraph's characters are an attributed
-   * string rather than a view. The virtual-text rule is therefore invisible there and lives here.
+   * The mounted tree is flatter: it holds no flattened view and no VIRTUAL node (a `<Text>`'s text)
+   * The virtual-text rule is therefore invisible there and lives here
    */
   std::string committedShape() const {
     std::string out;
@@ -616,9 +632,8 @@ class Host {
   /**
    * The mounted tree as `name(children…)`, which is the one-line form every shape assertion needs.
    *
-   * The ROOT is React Native's own surface root, and the app's container view is its first child —
-   * reading one level too high here is the mistake that made two C++ tests pass falsely and 474
-   * vitest tests disagree about what the app root is.
+   * The ROOT is React Native's own surface root, the app's container view is its first child.
+   * Reading one level too high made two C++ tests pass falsely
    */
   std::string shape() const { return shapeOf(root()); }
 
@@ -674,10 +689,39 @@ class Host {
     mountingCoordinator_ = shadowTree->getMountingCoordinator();
     mounted_ = buildStubViewTreeWithoutUsingDifferentiator(
         *shadowTree->getCurrentRevision().rootShadowNode);
+#ifdef SYMBIOTE_WITH_REANIMATED
+    if (proxyEnabled_) startProxy(*shadowTree);
+#endif
     // The animation provider listens for surfaces that start after it was created
     scheduler_->uiManagerDidStartSurface(*shadowTree);
     uiManager_->getShadowTreeRegistry().add(std::move(shadowTree));
   }
+
+#ifdef SYMBIOTE_WITH_REANIMATED
+  // What ReanimatedModuleProxy hands the proxy on a device, minus the UI runtime and the thread:
+  // the proxy runs on the calling thread, and a flush request is only noted
+  void startProxy(const ShadowTree &shadowTree) {
+    const auto container = scheduler_->getContextContainer();
+    const auto registry =
+        container
+            ->at<std::weak_ptr<const ComponentDescriptorRegistry>>(
+                "ComponentDescriptorRegistry_DO_NOT_USE_PRETTY_PLEASE")
+            .lock();
+    animationsManager_ = std::make_shared<reanimated::LayoutAnimationsManager>();
+    reanimated::LayoutAnimationsProxyDependencies dependencies{
+        animationsManager_,
+        registry,
+        container,
+        *runtime_,
+        nullptr,
+        uiManager_,
+        [](SurfaceId) {},
+        [](Tag) { return false; },
+        nullptr};
+    proxy_ = std::make_shared<reanimated::LayoutAnimationsProxy>(kSurfaceId, dependencies);
+    proxy_->startSurface(shadowTree, proxy_);
+  }
+#endif
 
   static std::string shadowShapeOf(const ShadowNode &node) {
     std::string out = node.getComponentName();
@@ -709,6 +753,11 @@ class Host {
   std::shared_ptr<NativeAnimatedNodesManagerProvider> animatedProvider_;
   std::shared_ptr<AnimatedModule> animatedModule_;
   std::function<void()> onAnimationRender_;
+#ifdef SYMBIOTE_WITH_REANIMATED
+  bool proxyEnabled_ = false;
+  std::shared_ptr<reanimated::LayoutAnimationsManager> animationsManager_;
+  std::shared_ptr<reanimated::LayoutAnimationsProxy> proxy_;
+#endif
   // Last, so it is destroyed first, while the delegate and the runtime it reports to still exist
   std::unique_ptr<Scheduler> scheduler_;
 };

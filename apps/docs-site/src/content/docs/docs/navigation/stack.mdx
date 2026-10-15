@@ -6,23 +6,11 @@ description: Native push/pop screen transitions for @symbiote-native/navigation,
 import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 
 `Stack` is `@symbiote-native/navigation`'s push/pop navigator. Each screen you push mounts as a
-real `RNSScreen` inside a real `RNSScreenStack` — [`react-native-screens`](https://github.com/software-mansion/react-native-screens)'
-native views — so the push/pop transition, the native header, the interactive back-swipe gesture,
-and modal/sheet presentation are all driven by the platform's own navigation controller. Nothing
+real `RNSScreen` inside a real `RNSScreenStack`. These are
+[`react-native-screens`](https://github.com/software-mansion/react-native-screens)' native views.
+So the push/pop transition, the native header, the interactive back-swipe gesture, and
+modal/sheet presentation are all driven by the platform's own navigation controller. Nothing
 here is a JS-simulated animation.
-
-| OS platform | Support |
-| ----------- | ------- |
-| iOS         | ✅ live |
-| Android     | ✅ live |
-
-| Framework adapter | Support |
-| ----------------- | ------- |
-| React             | ✅ live |
-| Vue               | ✅ live |
-| Angular           | ✅ live |
-| Svelte            | ✅ live |
-| Solid             | ✅ live |
 
 ## Usage
 
@@ -206,11 +194,13 @@ here is a JS-simulated animation.
     ```
 
     `<Screen>`'s `component` prop takes a compiled Svelte `Component` (an ordinary `.svelte`
-    file's default export), not a render prop — the navigator mounts it itself. `<Screen>` is
+    file's default export), not a render prop. The navigator mounts it itself. `<Screen>` is
     exported both as `Stack.Screen` and standalone, matching Vue's `Screen`/`Stack.Screen` pair
-    (`examples/svelte` uses the standalone form throughout). `HomeScreen.svelte`/
-    `DetailsScreen.svelte` read their `route`/`navigation` with `useRoute()`/`useStackNavigation()` —
-    both return a **boxed getter** (`{ readonly current }`), unwrapped with `.current` inside a
+    (`examples/svelte` uses the standalone form throughout).
+
+    `HomeScreen.svelte`/
+    `DetailsScreen.svelte` read their `route`/`navigation` with `useRoute()`/`useStackNavigation()`.
+    Both return a **boxed getter** (`{ readonly current }`), unwrapped with `.current` inside a
     `$derived`/template/`$effect`, the same pattern as Vue's `ComputedRef.value`.
     `useStackNavigation()` hands back a concretely-typed Stack handle, no union to narrow. Any
     component under the stack reads them the same way, at any nesting depth. See

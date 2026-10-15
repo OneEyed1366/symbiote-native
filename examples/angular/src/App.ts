@@ -49,6 +49,7 @@ import { ReactiveStyleScreen } from './screens/ReactiveStyleScreen';
 import { ApiPlaygroundScreen } from './screens/ApiPlaygroundScreen';
 import { BenchmarkScreen } from './screens/BenchmarkScreen';
 import { StyleShowcaseScreen } from './screens/StyleShowcaseScreen';
+import { ReanimatedScreen } from './screens/ReanimatedScreen';
 import { APP_LINKING_CONFIG } from './navigation-linking';
 import { LINE_COLOR } from './navigation-lines';
 // Static look lives in App.css — a plain global .css file, compiled at build time by
@@ -154,6 +155,12 @@ const DARK_HEADER_STYLE = { backgroundColor: '#0b1622' } as const;
         [component]="styleShowcaseScreen"
         [options]="styleShowcaseOptions"
       ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="Reanimated"
+        [component]="reanimatedScreen"
+        [options]="reanimatedOptions"
+      ></ng-template>
     </Stack>
   `,
 })
@@ -176,6 +183,7 @@ export class AppComponent implements OnInit, AfterViewInit {
   readonly apiPlaygroundScreen = ApiPlaygroundScreen;
   readonly benchmarkScreen = BenchmarkScreen;
   readonly styleShowcaseScreen = StyleShowcaseScreen;
+  readonly reanimatedScreen = ReanimatedScreen;
 
   readonly menuOptions: IAngularScreenOptions = {
     title: 'Navigation Demos',
@@ -307,6 +315,16 @@ export class AppComponent implements OnInit, AfterViewInit {
     headerShown: true,
     headerTranslucent: true,
     headerTintColor: LINE_COLOR.styling,
+    headerTitleColor: '#ffffff',
+    headerStyle: DARK_HEADER_STYLE,
+    headerUserInterfaceStyle: 'dark',
+  };
+
+  readonly reanimatedOptions: IAngularScreenOptions = {
+    title: 'Reanimated',
+    headerShown: true,
+    headerTranslucent: true,
+    headerTintColor: LINE_COLOR.performance,
     headerTitleColor: '#ffffff',
     headerStyle: DARK_HEADER_STYLE,
     headerUserInterfaceStyle: 'dark',

@@ -49,6 +49,7 @@ export {
   childrenOf,
   firstChildOf,
   nextSiblingOf,
+  isInSurface,
   isTextContainer,
   isRawTextNode,
   componentOf,
@@ -107,6 +108,8 @@ export {
   setNativeProps,
   getNativeTag,
   getNativeNode,
+  getShadowNodeWrapper,
+  getFamilyGeneration,
   whenCommitted,
   measure,
   measureInWindow,
@@ -194,6 +197,7 @@ export type {
   IViewStyle,
   ITextStyle,
   IStyleProp,
+  IStyleClaims,
   IDimensionValue,
   IFlexAlign,
   IFlexJustify,
@@ -212,12 +216,15 @@ export type {
 } from './styles';
 export { StyleSheet, computeHairlineWidth } from './style-sheet';
 export {
-  registerRules,
   resolveClassName,
   styleOfProps,
-  clearGlobalStyles,
   isClassNameValue,
 } from './style-registry';
+export {
+  registerRules,
+  clearGlobalStyles,
+  keyframesNamed,
+} from './keyframes-registry';
 export type { IClassNameValue, IStyleRule } from './style-registry';
 export { renameClassTokens } from './style-registry/scope';
 export type {
@@ -567,6 +574,19 @@ export {
 // composed primitive assigns a fold to its own slot (`behaviors/scroll-view.ts`), and the owner's
 // `foldPayload` field cannot type that.
 export type { IClaimMode, IHostBehavior, IPayloadFold } from './host-behavior';
+export { registerPropClaim } from './prop-claim';
+export type { IPropClaim } from './prop-claim';
+export { registerStyleClaim } from './style-claim';
+export type {
+  IFoundHandle,
+  IOwnedStyle,
+  IStyleClaim,
+  IStyleHandleClaim,
+  IVariantBase,
+} from './style-claim';
+export { registerStyleHandleClaim } from './style-handle';
+export { settleNodeStyle } from './node-style';
+export { bindToNode } from './node-binding';
 // markPropsDirty is a behavior's only way to say "the fold reads state I just changed" — every
 // other dirtying route goes through a prop write, and a derived-payload behavior has no prop to
 // write. Pair it with requestCommitFor: dirtying is not publishing.

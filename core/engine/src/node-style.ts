@@ -2,12 +2,18 @@
 // order, merged into the one array the payload carries
 
 import { recordSetUnderlayShown } from './mutation-buffer';
-import {
-  EMPTY_STYLE,
-  resolveActiveClassName,
-  type IClassNameValue,
-} from './style-registry';
+import { EMPTY_STYLE, type IClassNameValue } from './style-registry';
 import { setProp } from './node-props';
+import {
+  claimedKeysIn,
+  hasStyleClaims,
+  offerOwnedStyle,
+  settleHandles,
+  settleStyle,
+  syncStyleHandles,
+  withoutClaimedKeys,
+  withSettledLayer,
+} from './style-claim';
 import { isRecord } from './type-guards';
 import { preprocessPublishedStyle } from './style-preprocessors';
 import type { IClassStyleParts, ISymbioteNode } from './node-types';
@@ -35,21 +41,54 @@ export function stylePartsOf(node: ISymbioteNode): IClassStyleParts {
   });
 }
 
-// Slot 1's twin of `baseStyleOf`: the variant replaces slot 1, not slot 0, so it beats the class
-// cascade the way the authored style does while a `:active` rule can still win slot 0 underneath
-function explicitStyleOf(parts: IClassStyleParts): unknown {
+// The pressed variant replaces slot 1, so it beats the class cascade like the authored style
+function rawExplicitStyleOf(parts: IClassStyleParts): unknown {
   return parts.isPressed && parts.activeStyle !== undefined
     ? parts.activeStyle
     : parts.explicitStyle;
 }
 
-// `resolveActiveClassName` resolves the element's tokens PLUS `:active` through the same matcher,
-// so the result already contains everything the base class gave. Resolved LAZILY at press time,
-// т.к. eager would double the resolutions on every class WRITE to serve a rare state
+// What slots 0 and 1 publish: the style minus the keys a style claim took, and the very same
+// object when it took none
 function baseStyleOf(parts: IClassStyleParts): unknown {
-  return parts.isPressed && typeof parts.className === 'string'
-    ? resolveActiveClassName(parts.className)
-    : parts.classStyle;
+  const raw = parts.classStyle;
+  return hasStyleClaims() ? withoutClaimedKeys(raw, parts) : raw;
+}
+
+function explicitStyleOf(parts: IClassStyleParts): unknown {
+  const raw = rawExplicitStyleOf(parts);
+  if (!hasStyleClaims()) return raw;
+  return withSettledLayer(parts, withoutClaimedKeys(raw, parts));
+}
+
+// Values an animation settled on are kept over the author's style, so a publish after the animation
+// has ended cannot take the node back to the value it started from
+export function settleNodeStyle(
+  node: ISymbioteNode,
+  settled: Readonly<Record<string, unknown>>,
+): void {
+  const parts = stylePartsOf(node);
+  if (settleStyle(parts, settled)) pushClassStyle(node, parts);
+}
+
+// The starting values of a node's style handles go out with its first publish only
+function settleClaimedHandles(parts: IClassStyleParts): void {
+  if (!hasStyleClaims()) return;
+  settleHandles(parts, [parts.classStyle, rawExplicitStyleOf(parts)]);
+}
+
+function offerClaimedStyle(node: ISymbioteNode, parts: IClassStyleParts): void {
+  if (!hasStyleClaims()) return;
+  offerOwnedStyle(node, {
+    ...claimedKeysIn(parts.classStyle),
+    ...claimedKeysIn(rawExplicitStyleOf(parts)),
+  });
+}
+
+// Asked before the publish guard: two handles can hide behind one published style
+function bindStyleHandles(node: ISymbioteNode, parts: IClassStyleParts): void {
+  if (!hasStyleClaims()) return;
+  syncStyleHandles(node, [parts.classStyle, rawExplicitStyleOf(parts)]);
 }
 
 // What a node publishes when NOTHING resolves. Length 0 is the marker and needs no second field,
@@ -183,12 +222,15 @@ export function pushClassStyle(
 ): void {
   // An unchanged class still reaches this write, т.к. Solid has no diff. The guard keys off
   // `published`, which `setNativeProps` clears, so an imperative restore still re-publishes
+  bindStyleHandles(node, parts);
   if (isAlreadyPublished(parts)) return;
+  offerClaimedStyle(node, parts);
   // Emits NO_VALUE rather than `[undefined, undefined]`, so the host skips a real array with one
   // pointer check instead of building and diffing a `folly::dynamic`
   if (hasNothingToPublish(parts)) {
     parts.published = PUBLISHED_NOTHING;
     setProp(node, 'style', undefined);
+    settleClaimedHandles(parts);
     return;
   }
   // Third slot only appended while hidden: a permanent 3-element array would add an allocation to
@@ -201,6 +243,7 @@ export function pushClassStyle(
       : [base, explicit, parts.hiddenStyle];
   parts.published = published;
   setProp(node, 'style', preprocessPublishedStyle(published));
+  settleClaimedHandles(parts);
 }
 
 // `display: 'none'` is a real RN style value (Yoga's DisplayNone), so a hidden node keeps its

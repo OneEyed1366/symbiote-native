@@ -7,20 +7,7 @@ import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 
 `@symbiote-native/live-photo` wraps
 [`expo-live-photo`](https://docs.expo.dev/versions/latest/sdk/live-photo/), so every
-SymbioteNative adapter can show a Live Photo, not just React.
-
-| OS platform | Support                         |
-| ----------- | ------------------------------- |
-| iOS         | live                            |
-| Android     | renders nothing                 |
-
-| Framework adapter | Support |
-| ----------------- | ------- |
-| React             | live    |
-| Vue               | live    |
-| Angular           | live    |
-| Svelte            | live    |
-| Solid             | live    |
+SymbioteNative adapter can show a Live Photo, not just React. On Android the view renders nothing.
 
 ## Installation
 
@@ -208,10 +195,12 @@ you when the state changes.
 
 **Does it work on Android?** No, Live Photo is an Apple format. The view renders nothing there.
 
-Sources: [Expo docs: LivePhoto](https://docs.expo.dev/versions/latest/sdk/live-photo/),
-[expo/expo#47730 Asset.getLivePhotoPhotoUri for Live Photo playback](https://github.com/expo/expo/issues/47730),
-[expo/expo#46512 getAssetInfoAsync crashes on Live Photos](https://github.com/expo/expo/issues/46512),
-[expo/expo#48658 iCloud-offloaded assets in the image picker](https://github.com/expo/expo/issues/48658).
+Sources:
+
+- [Expo docs: LivePhoto](https://docs.expo.dev/versions/latest/sdk/live-photo/)
+- [expo/expo#47730 Asset.getLivePhotoPhotoUri for Live Photo playback](https://github.com/expo/expo/issues/47730)
+- [expo/expo#46512 getAssetInfoAsync crashes on Live Photos](https://github.com/expo/expo/issues/46512)
+- [expo/expo#48658 iCloud-offloaded assets in the image picker](https://github.com/expo/expo/issues/48658)
 
 ## How the wrapper works
 
@@ -221,7 +210,8 @@ engine's `defineExpoViewMethods` makes that call and the core `createLivePhotoVi
 wraps it. Each adapter only hands over its host node: React and Vue a function `ref` in the
 descriptor props, Solid the same through `spread`, Svelte `bind:this`, Angular the outlet's root
 node. The handle is a `ref` in React and Solid, `expose` in Vue, exported functions in Svelte and
-methods in Angular. The package declares only `ios.upstreamPackage` in `native-link.json`, since
-upstream has no Android folder and no config plugin. The native code is never vendored:
-`expo-modules-autolinking` resolves it from `node_modules` (see
-[the native setup guide](/docs/howtos/expo-native-module-setup/)).
+methods in Angular.
+
+The package declares only `ios.upstreamPackage` in `native-link.json`, since upstream has no
+Android folder and no config plugin. The native code is never vendored: `expo-modules-autolinking`
+resolves it from `node_modules` (see [the native setup guide](/docs/howtos/expo-native-module-setup/)).

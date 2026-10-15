@@ -344,10 +344,16 @@ type IWithAnimated<T> = T extends AnimatedNode
         ? { [K in keyof T]: IWithAnimated<T[K]> }
         : T;
 
+// A package whose own object may stand in a style merges it in here, as reanimated does
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface IStyleClaims {}
+type IStyleClaim = IStyleClaims[keyof IStyleClaims];
+
 export type IStyleProp<T> =
   | IWithAnimated<T>
   | IStyleFalsy
-  | IRecursiveArray<IWithAnimated<T> | IStyleFalsy>;
+  | IStyleClaim
+  | IRecursiveArray<IWithAnimated<T> | IStyleFalsy | IStyleClaim>;
 
 // The constraint behind StyleSheet.create, like RN's NamedStyles<T>: validates each entry
 // It also keeps string-literal props (`flexDirection: 'row'`) from widening to `string`

@@ -1,6 +1,5 @@
-// The accessors most renderer seams need, and the three distinctions a seam would only discover
-// on a device: anchors being VISIBLE to traversal, a text CONTAINER not being a writable text
-// node, and a view name that changes under a stable identity.
+// Accessors renderer seams need, and the distinctions only a device shows: anchors are visible to
+// traversal, a text container is no writable text node, a view name can change under one identity
 
 import { describe, expect, it } from 'vitest';
 import { installRecordingFabric } from '@symbiote-native/test-utils';
@@ -17,6 +16,7 @@ import {
   childrenOf,
   componentOf,
   firstChildOf,
+  isInSurface,
   isRawTextNode,
   isTextContainer,
   nextSiblingOf,
@@ -40,10 +40,25 @@ describe('engine host navigation', () => {
     expect(parentOf(parent)).toBeUndefined();
   });
 
+  it('tells a node whose chain reaches a surface from one built apart from it', () => {
+    installRecordingFabric();
+    const surface = createSurface(3);
+    const top = createElement('RCTView');
+    const middle = createElement('RCTView');
+    const leaf = createElement('RCTView');
+    appendChild(middle, leaf);
+    appendChild(top, middle);
+    expect(isInSurface(leaf)).toBe(false);
+
+    surface.appendChild(top);
+
+    expect(isInSurface(leaf)).toBe(true);
+    expect(isInSurface(top)).toBe(true);
+  });
+
   it('keeps anchors visible to traversal', () => {
-    // The load-bearing case. Anchors are skipped by the COMMIT walk, and hiding them here too
-    // would desync a framework runtime from the tree it built: solid-js/universal re-derives
-    // positions through these lookups, so a node it inserted must be a node it can find.
+    // The commit walk skips anchors but they stay visible here, т.к. solid-js/universal re-derives
+    // positions through these lookups and must find a node it inserted
     const parent = createElement('RCTView');
     const anchor = createAnchor();
     const view = createElement('RCTView');
@@ -75,9 +90,8 @@ describe('engine host navigation', () => {
     surface.appendChild(second);
 
     expect(nextSiblingOf(first, surface)).toBe(second);
-    // The surface is an ordinary node in the host's tree, so nextSiblingOf resolves through the
-    // node's real parent and answers right even with the `surface` arg omitted — it stays in the
-    // signature only because three adapters still pass it.
+    // The surface is an ordinary node in the host's tree, so `nextSiblingOf` answers without the
+    // `surface` arg, which stays in the signature only because three adapters still pass it
     expect(nextSiblingOf(first)).toBe(second);
   });
 

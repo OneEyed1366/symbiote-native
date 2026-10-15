@@ -71,16 +71,17 @@ const MENU_ITEMS: readonly IMenuItem[] = [
     route: ROUTE_NAME.Benchmark,
     hint: 'js-framework-benchmark ops + JS-thread FPS',
   },
+  {
+    label: 'Reanimated',
+    route: ROUTE_NAME.Reanimated,
+    hint: 'spring, derived values, entering and exiting, layout, scroll offset',
+  },
 ];
 
 /**
- * Root menu for the @symbiote-native/navigation demo surface: one row per navigator/feature,
- * each pushing its own dedicated demo screen onto the same root Stack. Replaces Canary as the
- * initial route; Canary itself is unchanged and reachable from the first row.
- *
- * Rows are grouped into 8 thematic "lines" (navigation-lines.ts's ROUTE_LINE_INFO) — a color +
- * 2-letter badge per line, carried through onto each demo screen's own line tag — so the tour
- * reads as one system instead of a flat bag of unrelated test screens.
+ * Root menu of the demo tour: one row per feature of the navigation package
+ * Each row pushes its demo screen onto the root Stack, and Canary is the first row
+ * Rows share a color and a two-letter badge per line, as `ROUTE_LINE_INFO` sets them
  */
 export const MenuScreen = defineComponent(
   () => {
@@ -94,7 +95,7 @@ export const MenuScreen = defineComponent(
         >
           <view class="menu-hero">
             <text class="menu-eyebrow">NAVIGATION DEMO SUITE</text>
-            <text class="menu-hero-title">Twelve stops along the stack</text>
+            <text class="menu-hero-title">Thirteen stops along the stack</text>
             <text class="menu-hero-subtitle">
               Each row below drives a different line of
               @symbiote-native/navigation — Primitives, Presentation, Structure,

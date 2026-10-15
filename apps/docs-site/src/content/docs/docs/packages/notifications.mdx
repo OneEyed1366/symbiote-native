@@ -15,19 +15,6 @@ adapter.
 Every core export is a plain async function or a module-level listener registration, shared by all
 adapters. One adapter-specific binding, `useLastNotificationResponse`, is ported to all five.
 
-| OS platform | Support |
-| ----------- | ------- |
-| iOS         | ✅ live |
-| Android     | ✅ live |
-
-| Framework adapter | Support |
-| ------------------ | ------- |
-| React              | ✅ live |
-| Vue                | ✅ live |
-| Angular            | ✅ live |
-| Svelte             | ✅ live |
-| Solid              | ✅ live |
-
 ## Installation
 
 ```sh
@@ -300,7 +287,7 @@ The response is deduplicated by notification identifier and kept in sync with
 </Aside>
 
 - **Android channel/channel-group functions branch on platform at runtime** rather than shipping
-  as separate iOS/Android builds — off Android they resolve to the documented no-op values
+  as separate iOS/Android builds. Off Android they resolve to the documented no-op values
   (`[]`/`null`/void) without touching native.
 
 ## Common questions
@@ -328,8 +315,10 @@ work on emulators or simulators.
 **Do I need push to show a reminder?** No. Scheduled local notifications work with no Firebase or
 APNs setup.
 
-Sources: [Expo docs: Notifications](https://docs.expo.dev/versions/latest/sdk/notifications/),
-[Expo docs: push notifications setup](https://docs.expo.dev/push-notifications/push-notifications-setup/),
-[expo/expo#49638 response listener does not fire for a foreground tap on Android](https://github.com/expo/expo/issues/49638),
-[expo/expo#9745 FCM notifications not received in the foreground](https://github.com/expo/expo/issues/9745),
-[DEV: basics and caveats of expo-notifications](https://dev.to/marianapatcosta/basics-and-caveats-of-expo-notifications-23cd).
+Sources:
+
+- [Expo docs: Notifications](https://docs.expo.dev/versions/latest/sdk/notifications/)
+- [Expo docs: push notifications setup](https://docs.expo.dev/push-notifications/push-notifications-setup/)
+- [expo/expo#49638 response listener does not fire for a foreground tap on Android](https://github.com/expo/expo/issues/49638)
+- [expo/expo#9745 FCM notifications not received in the foreground](https://github.com/expo/expo/issues/9745)
+- [DEV: basics and caveats of expo-notifications](https://dev.to/marianapatcosta/basics-and-caveats-of-expo-notifications-23cd)

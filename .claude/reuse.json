@@ -3,6 +3,14 @@
     {
       "path": "packages/audio/src/svelte/use-audio-stream.svelte.ts",
       "why": "$effect is a compiler macro and can't be passed by reference, so it needs its own cleanups-array shim not shareable with Solid/Vue/Angular's use-audio-stream.ts bodies, approved by the user 2026-09-29"
+    },
+    {
+      "path": "{adapters/svelte/src/components/flat-list/index.svelte,packages/reanimated/src/svelte/animated-flat-list.svelte}",
+      "why": "a Svelte component cannot inherit or spread another's exports, so Animated.FlatList forwards the FlatList handle method by method; approved by the user 2026-10-12"
+    },
+    {
+      "path": "adapters/angular/src/components/{flat-list/flat-list-handle.ts,section-list/index.ts,virtualized-section-list/index.ts}",
+      "why": "three lists forward the scroll handle to the list inside each, and extracting a base for the two section lists means rewriting classes that carry their own limits; approved by the user 2026-10-12"
     }
   ]
 }

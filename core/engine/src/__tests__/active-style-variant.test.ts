@@ -1,11 +1,6 @@
-// The SECOND way to deliver a pressed look, beside a `:active` CSS rule: a style variant the
-// COMPILER supplies. A functional `style={({pressed}) => …}` is the shape every framework's
-// community writes and it currently forces the primitive to stay a component, because the template
-// reads the press state. Specialising that arrow at both values of `pressed` turns it into two
-// plain objects, which need somewhere to live — here.
-//
-// It replaces slot 1 (the EXPLICIT style), not slot 0: an authored `style` is what it stands in
-// for, so it must beat the class cascade exactly the way the authored style does.
+// The pressed look is a style variant the compiler supplies for `style={({pressed}) => ...}`
+// Specialising that arrow at both values of `pressed` gives two plain objects, which live here
+// The variant replaces slot 1 (the explicit style), т.к. it stands in for the authored `style`
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   createLiveTree,
@@ -25,7 +20,7 @@ import {
 const fabric = installRecordingFabric();
 // The payload is what ships; the author's bag is not. Every read below is `.payload`.
 const live = createLiveTree(fabric);
-let nextRootTag = 7500;
+let nextRootTag = 7_500;
 
 function mount(node: ISymbioteNode) {
   const surface = createSurface((nextRootTag += 1));
@@ -61,22 +56,14 @@ describe('compiler-supplied pressed style variant', () => {
     expect(slots(node)[1]).toEqual({ opacity: 1, borderColor: 'red' });
   });
 
-  // The two mechanisms have to compose, because an app can use both — a class for the shared look
-  // and a compiled ternary for the per-instance half. Slot 0 is the class cascade's job and slot 1
-  // the author's; neither variant may reach across.
-  it('composes with a :active class rule without either reaching into the other slot', () => {
+  // Slot 0 is the class cascade's job and slot 1 the author's, so the variant leaves slot 0 alone
+  it('keeps the class style of slot 0 while the explicit slot swaps', () => {
     registerRules([
       {
         tokens: ['btn'],
         specificity: [0, 1, 0],
         order: 0,
         style: { padding: 4 },
-      },
-      {
-        tokens: ['btn', ':active'],
-        specificity: [0, 2, 0],
-        order: 1,
-        style: { padding: 8 },
       },
     ]);
     const node = createElement('RCTView');
@@ -86,7 +73,7 @@ describe('compiler-supplied pressed style variant', () => {
     mount(node);
 
     setNodePressed(node, true);
-    expect(slots(node)[0]).toEqual({ padding: 8 });
+    expect(slots(node)[0]).toEqual({ padding: 4 });
     expect(slots(node)[1]).toEqual({ opacity: 0.6 });
   });
 

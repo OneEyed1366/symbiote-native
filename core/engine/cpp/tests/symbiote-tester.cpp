@@ -48,12 +48,8 @@ folly::dynamic describe(const facebook::react::StubView &view) {
   layout["width"] = view.layoutMetrics.frame.size.width;
   layout["height"] = view.layoutMetrics.frame.size.height;
 
-  // What FABRIC parsed, asked for the way React Native asks itself: `getDebugProps` is the
-  // renderer's own introspection of a props struct, so a key present here is a key that reached a
-  // real `ViewProps` field, not one that merely travelled in a payload. Values arrive as the
-  // strings the renderer prints, because a props struct is typed C++ and has no other honest
-  // serialisation without the Android-only `RN_SERIALIZABLE_STATE` — and building this harness with
-  // a flag the device build does not carry would make it a different renderer.
+  // What FABRIC parsed, read through `getDebugProps`: a key here reached a real field.
+  // Values are the strings the renderer prints, as the typed struct has no other form here
   folly::dynamic props = folly::dynamic::object;
   if (view.props != nullptr) {
     for (const auto &one : view.props->getDebugProps()) {
@@ -360,6 +356,46 @@ void install(Host &host) {
                           std::chrono::steady_clock::now() - origin)
                           .count());
   });
+
+#ifdef SYMBIOTE_WITH_REANIMATED
+  // Reanimated's layout animations proxy, driven the way its native module drives it: a config for
+  // a tag, a progress frame, an end. What the animation does in between is the test's own JS
+  bind("proxyUse", 1,
+       [&host](jsi::Runtime &, const jsi::Value &, const jsi::Value *arguments, size_t) {
+         host.useLayoutAnimationsProxy(arguments[0].getBool());
+         return jsi::Value::undefined();
+       });
+  bind("proxyConfigureExiting", 1,
+       [&host](jsi::Runtime &, const jsi::Value &, const jsi::Value *arguments, size_t) {
+         host.animationsManager().configureAnimationBatch({reanimated::LayoutAnimationConfig{
+             static_cast<int>(arguments[0].asNumber()),
+             LayoutAnimationType::EXITING,
+             worklets::Serializable::undefined(),
+             ""}});
+         return jsi::Value::undefined();
+       });
+  bind("proxyConfigureEntering", 1,
+       [&host](jsi::Runtime &, const jsi::Value &, const jsi::Value *arguments, size_t) {
+         host.animationsManager().configureAnimationBatch({reanimated::LayoutAnimationConfig{
+             static_cast<int>(arguments[0].asNumber()),
+             LayoutAnimationType::ENTERING,
+             worklets::Serializable::undefined(),
+             ""}});
+         return jsi::Value::undefined();
+       });
+  bind("proxyProgress", 2,
+       [&host](jsi::Runtime &runtime, const jsi::Value &, const jsi::Value *arguments, size_t) {
+         host.layoutAnimationsProxy().progressLayoutAnimation(
+             static_cast<int>(arguments[0].asNumber()), arguments[1].asObject(runtime));
+         return jsi::Value::undefined();
+       });
+  bind("proxyEnd", 2,
+       [&host](jsi::Runtime &, const jsi::Value &, const jsi::Value *arguments, size_t) {
+         host.layoutAnimationsProxy().endLayoutAnimation(
+             static_cast<int>(arguments[0].asNumber()), arguments[1].getBool());
+         return jsi::Value::undefined();
+       });
+#endif
 
   runtime.global().setProperty(runtime, "__symbioteTester", tester);
 }

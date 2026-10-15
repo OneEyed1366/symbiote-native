@@ -15,9 +15,9 @@ import {
 
 // Present one resolved set of bindings as the engine's tree host.
 
-// `census` is the only member that never reaches native — deliberately not on the ABI, since its
-// one caller (censusRetainedTree) is diagnostics and answering honestly costs a full native walk
-// of the tree the design exists to avoid walking. The empty census matches the no-host answer.
+// `census` never reaches native, so it is not on the ABI: its one caller is diagnostics, and an
+// honest answer costs a full walk of the tree this design exists to avoid walking
+// The empty census matches the no-host answer
 export function nativeTreeHost(bindings: INativeEngineBindings): ITreeHost {
   return {
     // Spread rather than passed as the batch object: JSI reads five arguments cheaper than five
@@ -34,6 +34,12 @@ export function nativeTreeHost(bindings: INativeEngineBindings): ITreeHost {
     propsOf: bindings.getProps,
     markPropsDirty: bindings.markPropsDirty,
     committedRecordOf: bindings.committedRecordOf,
+    shadowNodeWrapperOf: handle => {
+      const shadowNode = bindings.shadowNodeOf?.(handle);
+      return typeof shadowNode === 'object' && shadowNode !== null
+        ? shadowNode
+        : undefined;
+    },
     committedPayloadOf: bindings.committedPayloadOf,
     parentOf: bindings.parentOf,
     childrenOf: bindings.childrenOf,

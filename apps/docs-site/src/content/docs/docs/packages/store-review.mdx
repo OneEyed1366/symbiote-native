@@ -13,19 +13,6 @@ not just React. Like [device](/docs/packages/device/) and
 per-instance state, so there is no hook/composable/service to wrap — the React, Vue, Angular, Svelte, and
 Solid entry points are plain re-exports of the same `core`.
 
-| OS platform | Support |
-| ----------- | ------- |
-| iOS         | ✅ live |
-| Android     | ✅ live |
-
-| Framework adapter | Support |
-| ----------------- | ------- |
-| React             | ✅ live |
-| Vue               | ✅ live |
-| Angular           | ✅ live |
-| Svelte            | ✅ live |
-| Solid             | ✅ live |
-
 <Aside
   type="caution"
   title="Deliberate deviation from upstream — no expo-constants dependency"
@@ -33,8 +20,8 @@ Solid entry points are plain re-exports of the same `core`.
   Upstream's `storeUrl()` reads
   `Constants.expoConfig.ios.appStoreUrl`/`.android.playStoreUrl` off
   `expo-constants`, which requires an Expo-CLI-generated manifest
-  (`app.config`/EAS/updates) that this bare, Metro-only project never produces —
-  this repo doesn't run the Expo CLI at all, so there is no manifest for
+  (`app.config`/EAS/updates) that this bare, Metro-only project never produces.
+  This repo doesn't run the Expo CLI at all, so there is no manifest for
   `expo-constants` to read. This port trims that surface instead: every function
   that would have read the manifest takes an optional `IStoreReviewUrlOptions`
   argument (`iosAppStoreUrl` / `androidPlayStoreUrl`), and the caller supplies
@@ -55,16 +42,16 @@ Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --s
 [`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
 
 `expo-store-review` and `expo-modules-core` come along as regular dependencies, pinned to exact
-versions — never install either yourself, and never add the `expo` meta-package to your project
-(it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
+versions. Never install either yourself. Never add the `expo` meta-package to your project either,
+as it bundles its own Metro/Babel pipeline, which conflicts with this project's own.
 
 <Aside type="danger" title="Native setup is required before first use">
   `expo-store-review`'s native code is discovered by `expo-modules-autolinking`,
   a different mechanism from the `react-native.config.cjs`/podspec autolinking
-  every other SymbioteNative wrapper uses — and it isn't the standard Expo setup
+  every other SymbioteNative wrapper uses. It isn't the standard Expo setup
   flow either, since this project never installs the `expo` meta-package. Follow
   [How to: wire up an Expo native
-  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers
+  module](/docs/howtos/expo-native-module-setup/) once per app first. It covers
   this package and every other `expo-modules-core` package with zero further
   native changes.
 </Aside>
@@ -198,8 +185,8 @@ subscription.
 ## Notes
 
 - **`requestReview()` prefers the native in-app review flow** (iOS `SKStoreReviewController`,
-  Android's Play Core in-app review API) and only falls back to opening the supplied store URL via
-  `Linking` when the native flow is unavailable — matching upstream's own fallback order.
+  Android's Play Core in-app review API). It falls back to opening the supplied store URL via
+  `Linking` only when the native flow is unavailable, matching upstream's own fallback order.
 - **A missing URL on the fallback path logs a warning, never throws** — matching upstream's own
   `console.warn`-and-continue behavior, just with different wording (pointing at the
   `IStoreReviewUrlOptions` argument instead of `app.json`).
@@ -234,9 +221,9 @@ Sources: [expo/expo#38163](https://github.com/expo/expo/issues/38163),
 ## How the wrapper works
 
 `@symbiote-native/store-review` ships zero React/Vue/Angular/Svelte/Solid logic in
-`expo-store-review` itself — its functions are hand-ported, verbatim apart from the
-`expo-constants` deviation above, into this package's own `core/`, resolving the native module
-through `expo-modules-core`'s `requireNativeModule` rather than the `expo` meta-package this
+`expo-store-review` itself. Its functions are hand-ported, verbatim apart from the
+`expo-constants` deviation above, into this package's own `core/`. The native module resolves
+through `expo-modules-core`'s `requireNativeModule`, not the `expo` meta-package this
 project never installs:
 
 ```
@@ -251,9 +238,10 @@ packages/store-review/src/
 └── solid/    # @symbiote-native/store-review/solid   — export * from '../core'
 ```
 
-Same shape as [device](/docs/packages/device/)'s and [local auth](/docs/packages/local-auth/)'s
-adapter entries: single-file re-exports with no lifecycle code at all, since every export
-here is a stateless one-shot async call — there is nothing for a hook, composable, or service to
-subscribe to or clean up. The native code itself is never vendored or copied —
-`expo-modules-autolinking` resolves it straight out of `node_modules` (see [the native setup
-guide](/docs/howtos/expo-native-module-setup/)).
+The adapter entries have the same shape as [device](/docs/packages/device/)'s and
+[local auth](/docs/packages/local-auth/)'s. They are single-file re-exports with no lifecycle code
+at all, since every export here is a stateless one-shot async call. There is nothing for a hook,
+composable, or service to subscribe to or clean up.
+
+The native code itself is never vendored or copied. `expo-modules-autolinking` resolves it straight
+out of `node_modules` (see [the native setup guide](/docs/howtos/expo-native-module-setup/)).

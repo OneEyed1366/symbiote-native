@@ -370,6 +370,48 @@ target_include_directories(symbiote_tester PRIVATE
   ${REACT_COMMON_DIR} ${REACT_COMMON_DIR}/jsi ${REACT_COMMON_DIR}/jsc
   ${CMAKE_CURRENT_SOURCE_DIR}/..)
 target_compile_options(symbiote_tester PRIVATE -fexceptions -frtti -Wall)
+
+# ── Reanimated's layout animations proxy ─────────────────────────────────────────────────────────
+# The native half that withholds the removal of an exiting view and rewrites the mutations after it,
+# compiled from the installed package so a test sees what a device runs. It takes three things from
+# its surroundings, each answered here: Worklets (`reanimated-worklets-stubs.cpp`), the one
+# generated props type (`reanimated-stubs/`), and its static flags, which a device build bakes in
+# from the app's package.json.
+set(SYMBIOTE_REANIMATED_SHARED_TRANSITIONS true CACHE STRING
+  "ENABLE_SHARED_ELEMENT_TRANSITIONS of the proxy under test: true, as the example apps have it")
+execute_process(
+  COMMAND node -e "const p=require('path');const r=require.resolve;process.stdout.write(p.dirname(r('react-native-reanimated/package.json'))+'\\n'+p.dirname(r('react-native-worklets/package.json')))"
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../../../../packages/reanimated
+  OUTPUT_VARIABLE _reanimated_dirs
+  RESULT_VARIABLE _reanimated_status)
+if(_reanimated_status EQUAL 0)
+  string(REPLACE "\n" ";" _reanimated_dirs "${_reanimated_dirs}")
+  list(GET _reanimated_dirs 0 REANIMATED_DIR)
+  list(GET _reanimated_dirs 1 WORKLETS_DIR)
+  set(_proxy_dir ${REANIMATED_DIR}/Common/cpp/reanimated)
+  set(_reanimated_flags
+    "[RUNTIME_TEST_FLAG:false][DISABLE_COMMIT_PAUSING_MECHANISM:false][ANDROID_SYNCHRONOUSLY_UPDATE_UI_PROPS:false][IOS_SYNCHRONOUSLY_UPDATE_UI_PROPS:false][EXPERIMENTAL_CSS_ANIMATIONS_FOR_SVG_COMPONENTS:true][IOS_CSS_CORE_ANIMATION:false][ANDROID_CSS_PLATFORM_TRANSITIONS:false][USE_COMMIT_HOOK_ONLY_FOR_REACT_COMMITS:true][ENABLE_SHARED_ELEMENT_TRANSITIONS:${SYMBIOTE_REANIMATED_SHARED_TRANSITIONS}][USE_LEGACY_LAYOUT_ANIMATIONS_PROXY:false][FORCE_REACT_RENDER_FOR_SETTLED_ANIMATIONS:true][USE_ANIMATION_BACKEND:false]")
+  target_sources(symbiote_tester PRIVATE
+    ${_proxy_dir}/LayoutAnimations/LayoutAnimationsManager.cpp
+    ${_proxy_dir}/LayoutAnimations/LayoutAnimationsProxy.cpp
+    ${_proxy_dir}/LayoutAnimations/LayoutAnimationsProxyCommon.cpp
+    ${_proxy_dir}/LayoutAnimations/LayoutAnimationsProxyRegistry.cpp
+    ${_proxy_dir}/LayoutAnimations/PropsDiffer.cpp
+    ${_proxy_dir}/LayoutAnimations/SharedTransitions.cpp
+    ${_proxy_dir}/LayoutAnimations/StaleSynchronousPropsTracker.cpp
+    ${_proxy_dir}/Tools/FeatureFlags.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/reanimated-worklets-stubs.cpp)
+  target_include_directories(symbiote_tester PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/reanimated-stubs
+    ${REANIMATED_DIR}/Common/cpp
+    ${WORKLETS_DIR}/Common/cpp)
+  target_compile_definitions(symbiote_tester PRIVATE
+    SYMBIOTE_WITH_REANIMATED
+    "REANIMATED_FEATURE_FLAGS=\"${_reanimated_flags}\"")
+else()
+  message(STATUS "no react-native-reanimated next to packages/reanimated: the proxy stays out")
+endif()
+
 if(SYMBIOTE_JS_ENGINE STREQUAL "hermes")
   target_compile_definitions(symbiote_tester PRIVATE SYMBIOTE_USE_HERMES)
   # The pod's own headers, LAST: `jsi.h` is identical in both trees, and Hermes's `hermes/hermes.h`

@@ -1,25 +1,13 @@
-<!--
-  Root menu for the @symbiote-native/navigation demo suite: one row per navigator/feature, each
-  pushing its own dedicated demo screen onto the same root Stack. Replaces Canary as the initial
-  route; Canary itself is unchanged (just relocated) and reachable from the first row.
+<!-- Root menu of the demo tour: one row per feature, each pushing its demo screen -->
 
-  Rows are grouped into thematic "lines" (navigation-lines.ts's ROUTE_LINE_INFO) — a color +
-  2-letter badge per line, carried through onto each demo screen's own line tag — so the tour
-  reads as one system instead of a flat bag of unrelated test screens. Five of the lines are
-  @symbiote-native/navigation itself; Composition (the API Playground row) is Vue's own
-  template/API surface and Styling (the showcase row) is the CSS compiler — no navigation package
-  involved in either, both still wearing the same wayfinding language. Vue SFC twin of
-  .examples/react/screens/MenuScreen.tsx.
--->
+<!-- Rows share a color and a two-letter badge per line, as `ROUTE_LINE_INFO` sets them -->
 <script setup lang="ts">
 import { useStackNavigation } from '@symbiote-native/navigation/vue';
 import { ROUTE_NAME } from '../routes';
 import type { ITourRouteName } from '../navigation-lines';
 import { ROUTE_LINE_INFO } from '../navigation-lines';
 
-// This screen is only ever mounted under a Stack (see App.vue's <Screen :name="ROUTE_NAME.Menu">),
-// so useStackNavigation() hands back the Stack-specific handle (push/pop/…) directly — no union
-// narrowing.
+// The screen is only mounted under a Stack, so the handle has `push` and `pop` directly
 const navigation = useStackNavigation();
 
 type IMenuItem = {
@@ -89,6 +77,11 @@ const MENU_ITEMS: readonly IMenuItem[] = [
     route: ROUTE_NAME.Benchmark,
     hint: 'js-framework-benchmark ops + JS-thread FPS',
   },
+  {
+    label: 'Reanimated',
+    route: ROUTE_NAME.Reanimated,
+    hint: 'spring, derived values, entering and exiting, layout, scroll offset',
+  },
 ];
 
 function lineInfoFor(route: ITourRouteName) {
@@ -105,14 +98,14 @@ function lineInfoFor(route: ITourRouteName) {
     >
       <view class="menu-hero">
         <text class="menu-eyebrow"> NAVIGATION DEMO SUITE </text>
-        <text class="menu-hero-title"> Twelve stops along the stack </text>
+        <text class="menu-hero-title"> Thirteen stops along the stack</text>
         <text class="menu-hero-subtitle">
           Ten rows drive a different line of @symbiote-native/navigation —
           Primitives, Presentation, Structure, Introspection, Routing — on a
-          real native stack, plus a Performance stop timing the engine's own
-          commit path and a Styling stop showing the whole CSS compiler surface.
-          The remaining stop is Composition: Vue's own template/API surface
-          instead.
+          real native stack, plus two Performance stops, one timing the commit
+          path of the engine and one for Reanimated, and a Styling stop showing
+          the whole CSS compiler surface. The remaining stop is Composition:
+          Vue's own template/API surface instead.
         </text>
       </view>
       <pressable

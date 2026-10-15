@@ -12,19 +12,6 @@ MagnetometerUncalibrated, and Pedometer — so every SymbioteNative adapter can 
 (one imperative **TurboModule**), `expo-sensors` is built on `expo-modules-core`: every sensor is a
 pure `EventEmitter` + async-function surface, with no Fabric view or `ViewConfig` involved at all.
 
-| OS platform | Support |
-| ----------- | ------- |
-| iOS         | ✅ live |
-| Android     | ✅ live |
-
-| Framework adapter | Support |
-| ----------------- | ------- |
-| React             | ✅ live |
-| Vue               | ✅ live |
-| Angular           | ✅ live |
-| Svelte            | ✅ live |
-| Solid             | ✅ live |
-
 ## Installation
 
 ```sh
@@ -36,16 +23,16 @@ Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --s
 [`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
 
 `expo-sensors` and `expo-modules-core` come along as regular dependencies, pinned to exact
-versions — never install either yourself, and never add the `expo` meta-package to your project
-(it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
+versions. Never install either yourself. Never add the `expo` meta-package to your project either,
+as it bundles its own Metro/Babel pipeline, which conflicts with this project's own.
 
 <Aside type="danger" title="Native setup is required before first use">
   `expo-sensors`' native code is discovered by `expo-modules-autolinking`, a
   different mechanism from the `react-native.config.cjs`/podspec autolinking
-  every other SymbioteNative wrapper uses — and it isn't the standard Expo setup
-  flow either, since this project never installs the `expo` meta-package. Follow
-  [How to: wire up an Expo native
-  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers
+  every other SymbioteNative wrapper uses. It isn't the standard Expo setup
+  flow either, since this project never installs the `expo` meta-package.
+  Follow [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first. It covers
   this package and every future `expo-modules-core` package with zero further
   native changes. DeviceMotion and Pedometer need an `NSMotionUsageDescription`
   string on iOS; `symbiote-expo-link` inserts a generic default when that key is
@@ -264,17 +251,19 @@ subscribes to underneath.
 | `useMagnetometerUncalibrated` | `useMagnetometerUncalibrated` | `MagnetometerUncalibratedService.connect()` | `useMagnetometerUncalibrated` | `createMagnetometerUncalibrated` | `(updateIntervalMs?: number \| Accessor<number>)` | Live `IMagnetometerUncalibratedMeasurement \| null` |
 | `usePedometer`                | `usePedometer`                | `PedometerService.connect()`                | `usePedometer`                | `createPedometer`                | `()` — no interval, Pedometer has none            | Live `IPedometerResult \| null`                     |
 
-React/Vue return the measurement directly; Angular's `connect()` returns a `Signal` — read it as
-`accelerometer()` in code or `accelerometer()` in a template. Svelte's rune returns a boxed getter,
-`{ readonly current: IAccelerometerMeasurement | null }` — read it as `.current`, same reason Vue's
-`Ref` needs `.value`: Svelte 5 reactivity is lexically scoped to the declaring module and does not
-survive being returned as a raw value from a plain function. Solid's primitive returns the same
-plain `Accessor<... | null>` shape covered above. Passing `updateIntervalMs` re-subscribes with
-the new native sampling rate whenever it changes across renders on React; Vue and Svelte both
-apply it once at subscribe time and never react to a later change, since neither takes it as a
-getter. Solid takes either form: a plain number applies once at subscribe time like Vue/Svelte,
-or an `Accessor<number | undefined>` re-applies the rate on every later change, with the
-mount-time value still applying synchronously before the first sample.
+- React and Vue return the measurement directly.
+- Angular's `connect()` returns a `Signal`. Read it as `accelerometer()` in code or in a template.
+- Svelte's rune returns a boxed getter, `{ readonly current: IAccelerometerMeasurement | null }`.
+  Read it as `.current`, for the same reason Vue's `Ref` needs `.value`. Svelte 5 reactivity is
+  lexically scoped to the declaring module and does not survive being returned as a raw value from
+  a plain function.
+- Solid's primitive returns the same plain `Accessor<... | null>` shape covered above.
+- Passing `updateIntervalMs` re-subscribes with the new native sampling rate whenever it changes
+  across renders on React. Vue and Svelte both apply it once at subscribe time and never react to
+  a later change, since neither takes it as a getter.
+- Solid takes either form. A plain number applies once at subscribe time like Vue/Svelte. An
+  `Accessor<number | undefined>` re-applies the rate on every later change, with the mount-time
+  value still applying synchronously before the first sample.
 
 ### Measurement shapes
 
@@ -350,10 +339,10 @@ Sources: [Expo docs: Accelerometer](https://docs.expo.dev/versions/latest/sdk/ac
 
 ## How the wrapper works
 
-`@symbiote-native/sensors` ships **zero React/Vue/Angular/Svelte/Solid logic in `expo-sensors` itself** — that
-package's own JS hard-imports the `expo` meta-package (which this project never installs), so
+`@symbiote-native/sensors` ships **zero React/Vue/Angular/Svelte/Solid logic in `expo-sensors` itself**.
+That package's own JS hard-imports the `expo` meta-package, which this project never installs. So
 every sensor's `DeviceSensor` base class and per-sensor subclass is hand-ported, verbatim, into
-this package's own `core/`, changing only the one import line that now pulls
+this package's own `core/`. Only one import line changes: it now pulls
 `PermissionResponse`/`PermissionStatus` from `expo-modules-core` instead of `expo`:
 
 ```
@@ -368,9 +357,9 @@ packages/sensors/src/
 └── angular/services/    @symbiote-native/sensors/angular — AccelerometerService, BarometerService, ...
 ```
 
-Each adapter's hook/composable/rune/service is a thin lifecycle wrapper — subscribe on mount,
-unsubscribe on unmount — over the same `core` singleton; the subscription, permission, and
-update-interval logic is written once and shared by all four, the same logic/lifecycle split as
+Each adapter's hook/composable/rune/service is a thin lifecycle wrapper (subscribe on mount,
+unsubscribe on unmount) over the same `core` singleton. The subscription, permission, and
+update-interval logic is written once and shared by all four. It is the same logic/lifecycle split as
 every other SymbioteNative component (see [how it works](/docs/how-it-works/)). The native code
-itself is never vendored or copied — `expo-modules-autolinking` resolves it straight out of
+itself is never vendored or copied: `expo-modules-autolinking` resolves it straight out of
 `node_modules` (see [the native setup guide](/docs/howtos/expo-native-module-setup/)).

@@ -41,6 +41,7 @@ import { StatePersistenceScreen } from './screens/StatePersistenceScreen';
 import { ApiPlaygroundScreen } from './screens/ApiPlaygroundScreen';
 import { BenchmarkScreen } from './screens/BenchmarkScreen';
 import { JsiNavigationCostScreen } from './screens/JsiNavigationCostScreen';
+import { ReanimatedScreen } from './screens/ReanimatedScreen';
 import { StyleShowcaseScreen } from './screens/StyleShowcaseScreen';
 import { APP_LINKING_CONFIG } from './navigation-linking';
 import { ROUTE_NAME } from './routes';
@@ -48,11 +49,8 @@ import { LINE_COLOR } from './navigation-lines';
 import { hide } from '@symbiote-native/splash-screen/react';
 import './App.css';
 
-// useLinkingIntegration needs a REAL (non-null) INavigatorHandle, but a plain ref only gets
-// attached during commit — reading stackRef.current straight from App()'s render body would
-// still be null on the very first pass. Mounting this as a separate child (only once `handle` is
-// non-null) sidesteps that: the `ref={setStackHandle}` callback fires during commit, scheduling
-// the re-render that mounts LinkingRunner with the now-real handle.
+// `useLinkingIntegration` needs a real `INavigatorHandle`, but a ref is attached during commit
+// Mounting this as a child once `handle` is set, т.к. a ref read in the render body is null
 function LinkingRunner({
   handle,
   config,
@@ -221,6 +219,19 @@ function App() {
           component={JsiNavigationCostScreen}
           options={{
             title: 'JSI navigation cost',
+            headerShown: true,
+            headerTintColor: LINE_COLOR.performance,
+            headerTranslucent: true,
+            headerTitleColor: '#ffffff',
+            headerStyle: { backgroundColor: '#0b1622' },
+            headerUserInterfaceStyle: 'dark',
+          }}
+        />
+        <Stack.Screen
+          name={ROUTE_NAME.Reanimated}
+          component={ReanimatedScreen}
+          options={{
+            title: 'Reanimated',
             headerShown: true,
             headerTintColor: LINE_COLOR.performance,
             headerTranslucent: true,

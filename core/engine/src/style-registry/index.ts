@@ -3,44 +3,20 @@
 // names; components look them up via resolveClassName(). No CSS parsing here - just an
 // inverted Map<token, rules> and a subset test.
 //
-// A rule matches when its tokens are a SUBSET of the element's class list, in any order and
-// at any length, and the matches cascade by (derived-scope, specificity, epoch, order).
-// That replaced an earlier flat Map<key, style>, where the compiler COLLAPSED a selector's
-// tokens into one camelCase name (`.a.b` -> `aB`) and the runtime guessed the split back
-// apart by permuting the class string: 60 built keys on a 4-token miss, a camelCase
-// round-trip that could not survive a scope suffix, no real cascade, and a silent cliff at
-// 5 tokens where the compound branch stopped running at all. Tokens now arrive AS AUTHORED,
-// so there is nothing left to guess.
+// A rule matches when its tokens are a subset of the element's classes, in any order
+// Tokens arrive as authored, т.к. a key collapsed from them could not be split back reliably
 
 import type { IViewStyle, ITextStyle } from '../styles';
+import { hasVariants, mergeStyle } from './variants';
 
 type IResolvedStyle = Partial<IViewStyle & ITextStyle>;
 
 export type IClassNameValue =
   string | IResolvedStyle | Array<string | IResolvedStyle> | undefined | null;
 
-// The scope tail as OUR OWN compilers emit it — all three shapes, the hash being css-parser's
-// base36 hashFilePath:
-//   `card__data-v-<h>`   Vue `<style scoped>`
-//   `card__svelte-<h>`   Svelte `<style>`
-//   `card__module__<h>`  CSS Modules — BOTH a standalone `.module.css` and Vue's `<style module>`
-// (A preprocessor source — SCSS/Less/Stylus — reduces to plain CSS before any of this, so it
-// carries whichever of the three its host block uses; there is no fourth shape.)
-//
-// Matched by SHAPE, never by "there is a `__` somewhere in the name" — a BEM class
-// (`card__title`) must never be read as a scoped `card`, which would silently merge the block's
-// styles into the element's.
-//
-// Matched as ONE TAIL UNIT anchored at the end, rather than as "split on the last `__`, then
-// shape-test what follows": the module form carries its own `__`, so a `lastIndexOf` split cuts
-// `badge__module__<h>` into base `badge__module` + scope `<h>` and the base it hands back names
-// no class. Widening the shape test alone would NOT fix that — the split POINT is wrong, not the
-// alphabet.
-//
-// Note this suffix scheme is ours, not the frameworks'. Svelte appends a SEPARATE token
-// (`class="card svelte-<h>"`) and Vue `<style scoped>` renames nothing at all (it adds a
-// `data-v-<h>` attribute). We have no DOM and no attribute matching, so a scope is expressed by
-// renaming the token; the names only borrow their vocabulary.
+// The scope tail our compilers emit: `card__data-v-<h>` (Vue scoped), `card__svelte-<h>`,
+// `card__module__<h>` (CSS Modules), the hash being the css-parser `hashFilePath`
+// Matched by shape as one tail, т.к. a BEM `card__title` is no scope and the module form has a `__`
 const SCOPE_TAIL_PATTERN = /__((?:data-v|svelte)-[0-9a-z]+|module__[0-9a-z]+)$/;
 
 type IScopedToken = {
@@ -82,15 +58,9 @@ type IIndexedRule = {
 const ruleIndex = new Map<string, IIndexedRule[]>();
 let ruleEpoch = 0;
 
-// resolveClassName runs from routeProp on every class-prop WRITE, per node, and a screen only
-// ever uses a few dozen distinct class strings — so after warm-up the whole resolution collapses
-// to one Map.get. Only the STRING branch is memoized: an object/array argument has no stable key
-// (a fresh literal every render) and would just fill the map.
-//
-// Safe to hand the SAME object out repeatedly because no caller mutates it — every consumer
-// (routeProp's commitClassStyle, and the ScrollView / VirtualizedList / FlatList / ImageBackground
-// class-to-style props in all five adapters) spreads it or drops it into a style array, and
-// flattenStyle shallow-copies.
+// `resolveClassName` runs on every class-prop write, so after warm-up it is one `Map.get`
+// Only the string branch is memoized: an object or array has no stable key
+// The same object is handed out each time, т.к. every consumer spreads it or copies it
 const resolvedCache = new Map<string, IResolvedStyle>();
 
 // Bounded so a screen generating unique class strings at runtime cannot grow it without limit.
@@ -99,29 +69,12 @@ const resolvedCache = new Map<string, IResolvedStyle>();
 // total miss on every lookup.
 const RESOLVED_CACHE_LIMIT = 512;
 
-// The pressed variant, keyed by the SAME authored string. Separate from `resolvedCache` so the two
-// can never collide on one key, and string-keyed for the same reason that one is: identity is the
-// whole point. `isAlreadyPublished` (node.ts) turns a re-push away by comparing slot 0 with
-// Object.is, so a thousand unpressed rows only cost zero writes if they all publish the SAME
-// object. Resolve an array or an object instead and every call returns a fresh one, the guard can
-// never fire, and the re-push storm it was added for comes back with a new cause.
-//
-// This doubles the distinct strings a screen can hold. A SECOND state would multiply them, and the
-// cache clears WHOLE on overflow rather than evicting — so a drop breaks identity for every node at
-// once. That is the wall a `:focus` or `:hover` would hit, and it would read as an unexplained
-// regression rather than as a cache limit.
-const activeCache = new Map<string, IResolvedStyle>();
+// Whether a registered rule holds a value with states, which the host paints as its base
+let isAnyRuleWithStates = false;
 
-// The token the css-parser emits for `:active` (its `STATE_TOKEN`). Duplicated as a literal rather
-// than imported: the engine does not depend on the parser, and a CSS identifier cannot carry an
-// unescaped `:`, so this can never collide with a real class name.
-const STATE_TOKEN = ':active';
-
-// Whether ANY registered rule carries the state token. Not derivable from `ruleIndex`, which hooks
-// a rule on `tokens[0]` — for `.btn:active` that is `btn`, so `ruleIndex.has(':active')` is always
-// false and a gate built on it silently disables the whole feature. Found by a test, not by
-// reading: the wrong gate makes pressing a no-op with everything green.
-let hasActiveRules = false;
+export function hasRulesWithStates(): boolean {
+  return isAnyRuleWithStates;
+}
 
 // Every registration is a cascade change, so nothing resolved before it can be trusted. Clearing
 // wholesale beats versioning each entry — registration happens at import time, resolution happens
@@ -129,15 +82,10 @@ let hasActiveRules = false;
 function invalidateResolved(): void {
   resolvedCache.clear();
   resolvedKeys.length = 0;
-  activeCache.clear();
-  activeKeys.length = 0;
 }
 
-// The victim pool for the two caches below — a plain array of the keys each holds, so a random
-// eviction is an index rather than a scan. This is the entire bookkeeping cost of the policy, and
-// it is less than FIFO's would be: nothing about recency or order is tracked.
+// The victim pool of the cache: the keys it holds, so a random eviction is an index, not a scan
 const resolvedKeys: string[] = [];
-const activeKeys: string[] = [];
 
 /**
  * Memoise, evicting a RANDOM entry when full.
@@ -180,7 +128,7 @@ export function registerRules(rules: readonly IStyleRule[]): void {
   const epoch = ruleEpoch++;
 
   for (const rule of rules) {
-    if (rule.tokens.includes(STATE_TOKEN)) hasActiveRules = true;
+    if (hasVariants(rule.style)) isAnyRuleWithStates = true;
     const hook = rule.tokens[0];
     // The empty set is a subset of every element's tokens, so a token-less rule would paint
     // everything. It names no class and can only come from a broken compile.
@@ -198,33 +146,21 @@ export function registerRules(rules: readonly IStyleRule[]): void {
 // Used between tests to reset registry state.
 export function clearGlobalStyles(): void {
   ruleIndex.clear();
-  hasActiveRules = false;
+  isAnyRuleWithStates = false;
   ruleEpoch = 0;
   invalidateResolved();
 }
 
-// A `class`/`className` prop arrives as `unknown` at the routeProp boundary (any adapter can
-// hand over anything); this narrows before resolveClassName without an `as` cast. Shared with
-// adapters/vue/src/components/scroll-view/shared.ts's identical need, rather than each keeping
-// its own copy - that file imports this one instead of redeclaring it.
+// A class prop arrives as `unknown` at the `routeProp` boundary, so this narrows it without `as`
+// The Vue scroll-view shares it instead of keeping a copy
 export function isClassNameValue(value: unknown): value is IClassNameValue {
   return (
     typeof value === 'string' || (typeof value === 'object' && value !== null)
   );
 }
 
-// An ARRAY of plain strings joined into one, so it takes the memoised string path like any other
-// class. Everything downstream keys off identity — `resolveClassName`'s cache, the `:active`
-// variant, and `isAlreadyPublished`'s Object.is on slot 0 — and the array branch below reduces
-// into a FRESH object on every call, so an array class silently opted out of all three: no pressed
-// styling, and a re-push that re-dirties the node on every update.
-//
-// Only an ALL-STRING array converts. A mixed array carries IResolvedStyle entries — the channel
-// ScrollView / VirtualizedList / FlatList / ImageBackground use to pass a style through the class
-// prop — and those are not tokens; folding them into a string would be a category error rather
-// than a fix. No adapter produces an all-string array today (Vue's createVNode normalises class to
-// a string, Angular joins its accumulated tokens, React's className is a string by convention), so
-// this closes a gap an APPLICATION can reach rather than one we can.
+// An array of plain strings joins into one, so it takes the memoised string path
+// A mixed array carries style objects (the list components pass a style that way) and stays as is
 export function canonicalClassName(
   className: IClassNameValue,
 ): IClassNameValue {
@@ -236,19 +172,8 @@ export function canonicalClassName(
     : className;
 }
 
-/**
- * The one object every "this class styles nothing" answer hands back.
- *
- * A FRESH `{}` was the previous answer, and it quietly cost two things. `isAlreadyPublished`
- * compares slot 0 with `Object.is`, so a node whose class is absent or matches no rule republished
- * its whole style — and re-dirtied itself — on every class or style write, which is precisely the
- * storm that guard exists to stop; and `pushClassStyle` had no way to tell "resolved to nothing"
- * from "resolved to something", so the empty result crossed the wire as a real value.
- *
- * Frozen because it is now shared by every such node in the app: a caller that mutated the result
- * used to corrupt one node's style and would now corrupt all of them. No caller does — every one
- * spreads it — and freezing is what keeps that true.
- */
+// The one object every "this class styles nothing" answer hands back
+// A fresh `{}` would defeat the `Object.is` check of `isAlreadyPublished` and read as a real style
 export const EMPTY_STYLE: IResolvedStyle = Object.freeze({});
 
 export function resolveClassName(className: IClassNameValue): IResolvedStyle {
@@ -288,38 +213,6 @@ export function styleOfProps(props: object): readonly [unknown, unknown] {
   return [classStyle, Reflect.get(props, 'style')];
 }
 
-// The same element's style with `:active` added to its token list — so a `.btn:active` rule joins
-// the cascade exactly as its specificity says, merged by the SAME matcher. That makes the result a
-// complete REPLACEMENT for the unpressed style rather than an overlay, which is why no extra style
-// slot is needed on the node: pressing swaps what sits in slot 0.
-//
-// Non-string input resolves to the plain style, unchanged. An object or array has no stable key to
-// cache under, and the guard above is worthless without one.
-export function resolveActiveClassName(
-  className: IClassNameValue,
-): IResolvedStyle {
-  if (typeof className !== 'string') return resolveClassName(className);
-  // No `:active` rule anywhere in the app — hand back the very SAME object the unpressed path
-  // returns, not an equal one. Two cache keys give two objects even when their contents are
-  // byte-identical, and `isAlreadyPublished` compares with Object.is: pressing a node that has no
-  // pressed styling would otherwise publish a fresh base, dirty the node and pay a walk for a
-  // payload Fabric then rejects as unchanged. One node rather than a thousand, so not a storm —
-  // but it is a cost for literally nothing, and this makes the whole feature free for every app
-  // that does not use it.
-  if (!hasActiveRules) return resolveClassName(className);
-
-  const cached = activeCache.get(className);
-  if (cached !== undefined) return cached;
-
-  const parts = className.trim().split(/\s+/).filter(Boolean);
-  const resolved =
-    parts.length === 0 ? {} : (matchRules([...parts, STATE_TOKEN]) ?? {});
-
-  memoise(activeCache, activeKeys, className, resolved);
-
-  return resolved;
-}
-
 function resolveClassString(className: string): IResolvedStyle {
   const parts = className.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return EMPTY_STYLE;
@@ -346,8 +239,8 @@ function matchRules(parts: string[]): IResolvedStyle | null {
   const tokens = elementTokens(parts);
   let matched: IRuleMatch[] | null = null;
 
-  for (const token of tokens) {
-    const bucket = ruleIndex.get(token);
+  for (const hook of tokens) {
+    const bucket = ruleIndex.get(hook);
     if (bucket === undefined) continue;
 
     for (const indexed of bucket) {
@@ -355,7 +248,7 @@ function matchRules(parts: string[]): IResolvedStyle | null {
       matched ??= [];
       matched.push({
         indexed,
-        derivedTokens: indexed.rule.tokens.filter(token => !literal.has(token))
+        derivedTokens: indexed.rule.tokens.filter(name => !literal.has(name))
           .length,
       });
     }
@@ -365,15 +258,13 @@ function matchRules(parts: string[]): IResolvedStyle | null {
 
   matched.sort(byCascadeOrder);
   return matched.reduce<IResolvedStyle>(
-    (acc, match) => ({ ...acc, ...match.indexed.rule.style }),
+    (acc, match) => mergeStyle(acc, match.indexed.rule.style),
     {},
   );
 }
 
-// A scoped token contributes its BASE as well: the scope is expressed by RENAMING the token
-// rather than adding a second one, so a global `.card` in App.css only survives a component
-// defining its own `.card` if the base is put back into the set here. On the web the element
-// would carry both names and no such step would exist.
+// A scoped token contributes its base as well, so a global `.card` still matches an element
+// whose component renamed its own `.card` to a scoped token
 function elementTokens(parts: string[]): ReadonlySet<string> {
   const tokens = new Set<string>();
 

@@ -1,16 +1,9 @@
 import { ROUTE_NAME } from './routes';
 import type { IRouteName } from './routes';
 
-// The @symbiote-native/navigation demo suite groups its 11 tour screens into 6 thematic "lines"
-// — which part of the package each screen exercises — plus a Performance line for the benchmark
-// stop, which times the engine rather than the navigator, and a Styling line for the CSS-compiler
-// showcase, which times nothing and exercises @symbiote-native/css-parser instead. Carried through MenuScreen's row
-// badges, each demo screen's own line tag, and (where the native header/tab bar already takes a
-// tint color) the OS chrome itself. One color per line replaces the single flat accent every
-// row/button used to share. Kept in sync by hand with App.css's `:root` `--line-*` tokens — CSS
-// custom properties and this module are different runtimes with no shared import path.
-//
-// Ported from examples/vue-sfc/navigation-lines.ts.
+// The tour groups its screens into lines by the part of the navigation package each exercises
+// A line's color shows in the menu badge, the screen's line tag and the native header tint
+// Kept in sync by hand with the `--line-*` tokens of App.css, as the two share no import path
 export const NAV_LINE = {
   Primitives: 'primitives',
   Presentation: 'presentation',
@@ -124,5 +117,10 @@ export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
     line: NAV_LINE.Styling,
     code: 'ST',
     label: 'STYLING LINE',
+  },
+  [ROUTE_NAME.Reanimated]: {
+    line: NAV_LINE.Performance,
+    code: 'RA',
+    label: 'PERFORMANCE LINE',
   },
 };

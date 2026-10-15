@@ -26,6 +26,11 @@ import { fileURLToPath } from 'node:url';
 
 import esbuild from 'esbuild';
 
+import {
+  reanimatedItestSeams,
+  reanimatedNodePaths,
+} from './reanimated-itest-seams.mjs';
+
 const require_ = createRequire(import.meta.url);
 
 /**
@@ -207,6 +212,7 @@ const RN_SOURCE =
  * (`NativePlatformConstantsIOS` needs a native module), so our own sources keep plain resolution
  */
 const PLATFORM_EXTENSIONS_DIRECTIVE = '@symbiote-platform-extensions';
+const REACT_JSX_DIRECTIVE = '@symbiote-react-jsx';
 
 /**
  * Count what a STOCK arm asks Fabric to create, by view name — the headless twin of
@@ -780,7 +786,7 @@ const nodePaths = [
   ...[...workspaceRoots.values()].map(source =>
     path.join(path.dirname(source), 'node_modules'),
   ),
-].filter(existsSync);
+].filter(existsSync).concat(reanimatedNodePaths(root));
 
 // The tester binary is a clean per-process invocation — one bundle in on argv, stdout/stderr out,
 // no shared file or port across runs — so nothing here needs the runs to be sequential. The binary
@@ -905,6 +911,10 @@ try {
         compilerOptions: {
           experimentalDecorators: true,
           useDefineForClassFields: false,
+          // A test that names the directive renders JSX of the adapter, as an example app does
+          ...(readFileSync(file, 'utf8').includes(REACT_JSX_DIRECTIVE)
+            ? { jsx: 'react-jsx', jsxImportSource: '@symbiote-native/react' }
+            : {}),
         },
       },
       banner: {
@@ -936,6 +946,7 @@ try {
       // `__DEV__` above instead, which is exactly what ships, so these arms measure that.
       plugins: [
         workspaceSources,
+        reanimatedItestSeams(root),
         solidJsx,
         svelteComponents,
         vueSfc,
