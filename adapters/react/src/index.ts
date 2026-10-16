@@ -90,6 +90,9 @@ export type { IActivityIndicatorProps } from './components/activity-indicator-pr
 // the engine's `fabricProps`, `id -> nativeID` to `foldHostBag`). The prop type stays, for a
 // component forwarding a bag.
 export type { ISafeAreaViewProps } from './components/safe-area-view-props';
+// RN's `experimental_LayoutConformance` is a TAG too: `<layout-conformance mode="strict">`
+export type { ILayoutConformanceProps } from './components/layout-conformance-props';
+export type { ILayoutConformanceMode } from '@symbiote-native/components';
 // `RefreshControl` is a TAG — `<refresh-control>` — and there is nothing to import in its place.
 // Its wrapper was a passthrough; the controlled-spinner handshake lives on the engine node
 // (`registerRefreshControlBehavior`). The prop type stays, for a component forwarding a bag.
@@ -144,7 +147,11 @@ export type {
   IVirtualizedSectionListHandle,
 } from './components/virtualized-section-list';
 export { VirtualizedList } from './components/virtualized-list';
+export { useVirtualizedListScope } from './components/virtualized-list/nested-scope';
+export type { IListScope } from '@symbiote-native/components';
 export type {
+  ICellRendererComponent,
+  ICellRendererProps,
   IVirtualizedListProps,
   IVirtualizedListHandle,
   IViewToken,
@@ -160,14 +167,11 @@ export type {
   IFlexJustify,
 } from './utils/styles';
 export { mount, unmount } from './render';
-// createPortal: react-reconciler's Fiber-level portal, working here because @symbiote-native/react is
-// mutation-mode (unlike stock RN's persistent-mode Fabric renderer, which doesn't support it —
-// see create-portal.ts). v1 scope: target must be an already-mounted node in the SAME surface.
+// `createPortal` needs mutation mode, stock RN's persistent-mode renderer has no portal
+// The target must be a mounted node of the same surface, see create-portal.ts
 export { createPortal, type IPortalContainer } from './create-portal';
-// createTunnel: cross-surface content sharing. createPortal/Teleport stay same-surface-only
-// by design — a real React portal can't reach across two separate reconciler roots either
-// (see github.com/facebook/react/issues/17147), so reaching a different surface means letting
-// that surface commit its own content by reading from a shared store instead.
+// `createTunnel` shares content across surfaces, since a React portal cannot reach another root
+// (github.com/facebook/react/issues/17147) and the other surface reads a shared store instead
 export { createTunnel, type ITunnel } from './create-tunnel';
 // descriptorToReact: the @symbiote-native/components Descriptor → React.createElement bridge. Exported so
 // an external wrapper package (e.g. @symbiote-native/slider/react over a third-party native view) can map
@@ -178,9 +182,14 @@ export { findNodeHandle } from './host-instance';
 export type { IHostInstance } from './host-instance';
 // AppRegistry: RN's app entry point over `mount`. setHostRegistrar wires RN's own
 // registrar so the native Fabric host finds our runnable by app key.
-export { AppRegistry, setHostRegistrar } from './modules/app-registry';
+export {
+  AppRegistry,
+  HeadlessJsTaskError,
+  setHostRegistrar,
+} from './modules/app-registry';
 export type {
   IComponentProvider,
+  IAppConfig,
   IAppParameters,
   IRunnable,
   IHostRegistrar,
@@ -213,14 +222,11 @@ export type {
   IOpaqueColorValue,
   IDynamicColorIOSTuple,
 } from '@symbiote-native/engine';
-// The three app-entry seams, wired once on a real host, so the barrel exposes them together.
-// setNativeViewConfigSource hands the engine RN's ViewConfig registry, which is how third-party
-// Fabric views auto-derive their metadata:
-//   setNativeViewConfigSource(name => ReactNativeViewConfigRegistry.get(name))
+// Seams wired once on a real host: `setNativeViewConfigSource` derives third-party view configs
+//   `setNativeViewConfigSource(name => ReactNativeViewConfigRegistry.get(name))`
 export {
   setNativeViewConfigSource,
   setColorProcessor,
-  setDeviceEventSource,
 } from '@symbiote-native/engine';
 // Diagnostics, gated by DEBUG (<keep_logs_gate_behind_DEBUG>): app code logs through the same
 // seam the engine does instead of a bare console.log.
@@ -254,6 +260,7 @@ export {
   AppState,
   Keyboard,
   KEYBOARD_EVENT,
+  TextInputState,
   BackHandler,
   PermissionsAndroid,
   PERMISSIONS,
@@ -304,6 +311,16 @@ export type {
 // React lifecycle over those core device-state modules.
 export { useWindowDimensions } from './hooks/use-window-dimensions';
 export { useColorScheme } from './hooks/use-color-scheme';
+export { RootTagContext } from './root-tag-context';
+export { unstable_batchedUpdates } from './batched-updates';
+export { unstable_NativeText, unstable_NativeView } from './native-host-tags';
+export { usePressability } from './hooks/use-pressability';
+export type { IPressabilityConfig } from './hooks/use-pressability';
+export {
+  useAnimatedColor,
+  useAnimatedValue,
+  useAnimatedValueXY,
+} from './hooks/use-animated-value';
 export { createPermissionHook } from './hooks/create-permission-hook';
 export { createResourceHook } from './hooks/create-resource-hook';
 export { useNativeViewController } from './hooks/use-native-view-controller';
@@ -372,3 +389,44 @@ export type {
   ITextInputSelection,
   IImageStatics,
 } from '@symbiote-native/components';
+
+// The device event bus and the easing curves, shared verbatim from the engine
+export {
+  DeviceEventEmitter,
+  Easing,
+  EventEmitter,
+  NativeAppEventEmitter,
+  NativeEventEmitter,
+} from '@symbiote-native/engine';
+export type {
+  IEasing,
+  IEasingFunction,
+  IEmitterSubscription,
+  IEventEmitter,
+  IEventEmitterModule,
+  IEventSubscription,
+  INativeEventListener,
+} from '@symbiote-native/engine';
+
+// RN's dev and native-module utilities, shared verbatim from the engine. The ones RN owns forward
+// to its own module, which `registerApp` hands over
+export {
+  codegenNativeCommands,
+  codegenNativeComponent,
+  DevMenu,
+  DevSettings,
+  LogBox,
+  NativeComponentRegistry,
+  NativeModules,
+  Networking,
+  PushNotificationIOS,
+  ReactNativeVersion,
+  registerCallableModule,
+  requireNativeComponent,
+  Systrace,
+  Touchable,
+  TurboModuleRegistry,
+  UIManager,
+  UTFSequence,
+} from '@symbiote-native/engine';
+export type { IDevSettings } from '@symbiote-native/engine';

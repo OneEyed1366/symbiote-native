@@ -70,23 +70,36 @@ export abstract class VirtualizedListHandleBase<ItemT>
     this.scrollHandle.flashScrollIndicators();
   }
 
-  getNativeScrollRef(): IScrollViewHandle | null {
-    return this.scrollNode !== null ? this.scrollHandle : null;
+  // Null until the scroll tag commits, RN's "no scroll view yet" answer
+  private handleOrNull(): IScrollViewHandle | null {
+    return this.scrollNode === null ? null : this.scrollHandle;
+  }
+
+  getNativeScrollRef(): ISymbioteNode | null {
+    return this.scrollHandle.getScrollNode();
   }
 
   getScrollableNode(): IScrollViewHandle | null {
-    return this.scrollNode !== null ? this.scrollHandle : null;
+    return this.handleOrNull();
   }
 
   getScrollResponder(): IScrollViewHandle | null {
-    return this.scrollNode !== null ? this.scrollHandle : null;
+    return this.handleOrNull();
   }
 
   getScrollNode(): ISymbioteNode | null {
     return this.scrollHandle.getScrollNode();
   }
 
+  getScrollRef(): ISymbioteNode | null {
+    return this.scrollHandle.getScrollNode();
+  }
+
   recordInteraction(): void {
     this.dispatch({ kind: LIST_ACTION_KIND.recordInteraction });
+  }
+
+  setNativeProps(props: Record<string, unknown>): void {
+    this.scrollNode?.setNativeProps(props);
   }
 }

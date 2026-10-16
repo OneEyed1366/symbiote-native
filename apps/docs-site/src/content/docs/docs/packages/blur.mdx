@@ -9,19 +9,6 @@ import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 a native view that blurs the content behind it, so every SymbioteNative adapter can reach it, not
 just React. `BlurView` paints the blur, `BlurTargetView` marks the content Android blurs.
 
-| OS platform | Support |
-| ----------- | ------- |
-| iOS         | live    |
-| Android     | live    |
-
-| Framework adapter | Support |
-| ----------------- | ------- |
-| React             | live    |
-| Vue               | live    |
-| Angular           | live    |
-| Svelte            | live    |
-| Solid             | live    |
-
 ## Installation
 
 ```sh
@@ -194,14 +181,16 @@ every project by default. The build fails if you set `react.includeJitpackReposi
 BlurView 2.0.3. In that case update `expo-blur` through the package rather than pinning the library
 by hand.
 
-Sources: [Expo docs: BlurView](https://docs.expo.dev/versions/latest/sdk/blur-view/),
-[expo/expo#6613 BlurView does not update the blur](https://github.com/expo/expo/issues/6613),
-[expo/expo#44165 BlurView inside a Modal on Android](https://github.com/expo/expo/issues/44165),
-[expo/expo#18615 borderRadius on expo-blur](https://github.com/expo/expo/issues/18615),
-[expo/expo#34737 blur missing on a physical device](https://github.com/expo/expo/issues/34737),
-[expo/expo#49240 no option to render a blur without a tint](https://github.com/expo/expo/issues/49240),
-[expo/expo#32781 animating BlurView intensity with Reanimated](https://github.com/expo/expo/issues/32781),
-[expo/expo#34141 Android build cannot find BlurView 2.0.3](https://github.com/expo/expo/issues/34141).
+Sources:
+
+- [Expo docs: BlurView](https://docs.expo.dev/versions/latest/sdk/blur-view/)
+- [expo/expo#6613 BlurView does not update the blur](https://github.com/expo/expo/issues/6613)
+- [expo/expo#44165 BlurView inside a Modal on Android](https://github.com/expo/expo/issues/44165)
+- [expo/expo#18615 borderRadius on expo-blur](https://github.com/expo/expo/issues/18615)
+- [expo/expo#34737 blur missing on a physical device](https://github.com/expo/expo/issues/34737)
+- [expo/expo#49240 no option to render a blur without a tint](https://github.com/expo/expo/issues/49240)
+- [expo/expo#32781 animating BlurView intensity with Reanimated](https://github.com/expo/expo/issues/32781)
+- [expo/expo#34141 Android build cannot find BlurView 2.0.3](https://github.com/expo/expo/issues/34141)
 
 ## How the wrapper works
 

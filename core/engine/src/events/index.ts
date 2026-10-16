@@ -9,7 +9,11 @@
 import { dlog, isDebug } from '../debug';
 import { runWrapped } from '../dispatch';
 import { getSlot } from '../fabric';
-import { isSymbioteNode, type ISymbioteNode } from '../node';
+import {
+  hasTouchPropListeners,
+  isSymbioteNode,
+  type ISymbioteNode,
+} from '../node';
 import { registeredNativeEvent } from '../registry';
 import {
   attachTouchHistory,
@@ -38,10 +42,15 @@ import {
   RESPONDER_RELEASE,
   RESPONDER_START,
   RESPONDER_TERMINATE,
+  SELECTION_CHANGE,
   TOUCH_CANCEL,
+  TOUCH_CANCEL_PROP,
   TOUCH_END,
+  TOUCH_END_PROP,
   TOUCH_MOVE,
+  TOUCH_MOVE_PROP,
   TOUCH_START,
+  TOUCH_START_PROP,
 } from './names';
 import {
   activePresses,
@@ -74,6 +83,16 @@ function armLongPress(
     dlog('synthesized longPress -> dispatch');
     runWrapped(() => bubble(press.owner, LONG_PRESS, nativeEvent));
   }, DEFAULT_LONG_PRESS_MS);
+}
+
+// The app's `onTouch*` props run after the responder, as in RN. The tree is walked only once an
+// app has wired one
+function deliverTouchProp(
+  target: ISymbioteNode,
+  name: string,
+  nativeEvent: Record<string, unknown>,
+): void {
+  if (hasTouchPropListeners()) bubble(target, name, nativeEvent);
 }
 
 function onTouchStart(
@@ -121,6 +140,7 @@ function onTouchStart(
     negotiateResponder(target, 'start', nativeEvent);
     const responder = heldResponder();
     if (responder) callOwnListener(responder, RESPONDER_START, nativeEvent);
+    deliverTouchProp(target, TOUCH_START_PROP, nativeEvent);
   });
 }
 
@@ -157,6 +177,7 @@ function onTouchMove(
     // The only consumer of a move is the responder; without one RN drops it too
     const responder = heldResponder();
     if (responder) callOwnListener(responder, RESPONDER_MOVE, nativeEvent);
+    deliverTouchProp(target, TOUCH_MOVE_PROP, nativeEvent);
   });
 }
 
@@ -192,31 +213,43 @@ function finishResponder(
   releaseResponderToNative(responder);
 }
 
+type ILeftResponder = {
+  responder: ISymbioteNode | undefined;
+  isLeaving: boolean;
+};
+
+// RN releases the responder only when no remaining touch still down started inside it, so
+// lifting ONE finger of a multi-touch gesture must not release. `onResponderEnd` still fires
+function leaveResponder(nativeEvent: Record<string, unknown>): ILeftResponder {
+  const responder = heldResponder();
+  const isLeaving =
+    responder !== undefined && !hasRemainingTouchWithin(responder, nativeEvent);
+  if (isLeaving) clearResponder();
+  return { responder, isLeaving };
+}
+
 function onTouchEnd(
   target: ISymbioteNode,
   nativeEvent: Record<string, unknown>,
 ): void {
   recordTouchTrack('end', nativeEvent);
   attachTouchHistory(nativeEvent);
-  const hadActivePress = activePresses.size > 0;
+  const hasActivePress = activePresses.size > 0;
   const completedPresses = takeEndedPresses(nativeEvent);
-  const responder = heldResponder();
-  // RN releases the responder only when no remaining touch still down started inside it, so
-  // lifting ONE finger of a multi-touch gesture must not release. `onResponderEnd` still fires
-  const releases =
-    responder !== undefined && !hasRemainingTouchWithin(responder, nativeEvent);
-  if (releases) clearResponder();
+  const { responder, isLeaving } = leaveResponder(nativeEvent);
   runWrapped(() => {
     for (const press of completedPresses)
       completePress(press, target, nativeEvent);
-    if (!hadActivePress) {
+    if (!hasActivePress) {
       if (isDebug()) dlog(`event ${TOUCH_END} ignored (no matching start)`);
     } else if (completedPresses.length === 0)
       dlog('press retained (another touch remains inside its owner)');
-    if (!responder) return;
-    finishResponder(responder, RESPONDER_RELEASE, releases, nativeEvent);
-    if (!releases)
-      dlog('responderEnd without release (touches remain inside responder)');
+    if (responder) {
+      finishResponder(responder, RESPONDER_RELEASE, isLeaving, nativeEvent);
+      if (!isLeaving)
+        dlog('responderEnd without release (touches remain inside responder)');
+    }
+    deliverTouchProp(target, TOUCH_END_PROP, nativeEvent);
   });
   // Once no touch is down, clear the bank so the next gesture starts clean
   if (touchHistory.numberActiveTouches === 0) resetTouchHistory();
@@ -234,15 +267,13 @@ function onTouchCancel(
   // A cancel is scoped to the fingers removed from `touches`, just like an end, so an unrelated
   // Pressable, or another finger under the same owner, keeps its press and long-press state
   const cancelledPresses = takeEndedPresses(nativeEvent);
-  const responder = heldResponder();
-  const terminates =
-    responder !== undefined && !hasRemainingTouchWithin(responder, nativeEvent);
-  if (terminates) clearResponder();
+  const { responder, isLeaving } = leaveResponder(nativeEvent);
   runWrapped(() => {
     for (const press of cancelledPresses)
       bubble(press.owner, PRESS_OUT, nativeEvent);
-    if (!responder) return;
-    finishResponder(responder, RESPONDER_TERMINATE, terminates, nativeEvent);
+    if (responder)
+      finishResponder(responder, RESPONDER_TERMINATE, isLeaving, nativeEvent);
+    deliverTouchProp(target, TOUCH_CANCEL_PROP, nativeEvent);
   });
   if (touchHistory.numberActiveTouches === 0) resetTouchHistory();
 }
@@ -267,6 +298,11 @@ function deliverNonTouch(
   nativeEvent: Record<string, unknown>,
 ): boolean {
   const direct = DIRECT_EVENTS[topLevelType];
+  // RN's `canTriggerTransfer`: a selection change only moves the responder while a touch is down
+  if (topLevelType === SELECTION_CHANGE && touchHistory.numberActiveTouches > 0)
+    runWrapped(() =>
+      negotiateResponder(target, 'selectionChange', nativeEvent),
+    );
   if (direct !== undefined) {
     if (isDebug()) dlog(`event ${topLevelType} -> ${direct} (direct)`);
     runWrapped(() => deliverDirect(target, direct, nativeEvent));

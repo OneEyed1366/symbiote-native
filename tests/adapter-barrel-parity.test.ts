@@ -45,6 +45,11 @@ const KNOWN_GAPS: Readonly<Record<string, readonly IAdapter[]>> = {
   // of <prop_types_split_agnostic_vs_per_adapter>. Angular takes props as @Input()s and exposes
   // no per-component prop type at all, its barrel carrying no IScrollViewProps/IModalProps either.
   ITextInputProps: ['angular'],
+  // RN's `useAnimatedValue` family is the engine factory under each adapter's own idiom: `use*`
+  // (React, Vue, Svelte), `create*` (Solid, the engine's own spelling), `inject*` (Angular)
+  createAnimatedColor: ['angular', 'react', 'svelte', 'vue'],
+  createAnimatedValue: ['angular', 'react', 'svelte', 'vue'],
+  createAnimatedValueXY: ['angular', 'react', 'svelte', 'vue'],
 };
 
 // Candidate file names for a relative `export *` target, in resolution order.

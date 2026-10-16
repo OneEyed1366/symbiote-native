@@ -33,9 +33,11 @@ const GATES: ReadonlyArray<readonly [string, string, string]> = [
   ['accessibilityEscape', 'onAccessibilityEscape', 'RCTView'],
   ['accessibilityAction', 'onAccessibilityAction', 'RCTView'],
   ['textLayout', 'onTextLayout', 'RCTText'],
+  ['click', 'onClick', 'RCTView'],
+  ['clickCapture', 'onClickCapture', 'RCTView'],
 ];
 
-let nextRootTag = 7300;
+let nextRootTag = 7_300;
 
 function commitOne(build: (node: ISymbioteNode) => void, view: string) {
   const surface = createSurface((nextRootTag += 1));

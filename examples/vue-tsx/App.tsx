@@ -1,13 +1,6 @@
 /**
- * Symbiote canary app entry: composes the native stack navigator
- * (@symbiote-native/navigation/vue, driven by react-native-screens' RNSScreen/
- * RNSScreenStack native views) over the full demo screen surface. Menu is the initial
- * route — a menu of buttons, one per navigator/feature @symbiote-native/navigation exports;
- * Canary is unchanged and reachable from the menu's first row. Details has no menu row of its
- * own — it's the DeepLinking demo's resolution target (symbiotecanaryvuetsx://details/:id), reached
- * only through that tour stop. The actual canary surface (every @symbiote-native/vue
- * primitive) lives in ./screens/CanaryScreen — the FORMER content of this file, relocated
- * once the app grew a real Menu as its initial route.
+ * Canary app entry: the native stack navigator over the demo screens, Menu first
+ * Details has no menu row, the DeepLinking stop resolves to it (symbiotecanaryvuetsx://details/:id)
  *
  * @format
  */
@@ -36,6 +29,7 @@ import { StatePersistenceScreen } from './screens/StatePersistenceScreen';
 import { ApiPlaygroundScreen } from './screens/ApiPlaygroundScreen';
 import { BenchmarkScreen } from './screens/BenchmarkScreen';
 import { StyleShowcaseScreen } from './screens/StyleShowcaseScreen';
+import { ReanimatedScreen } from './screens/ReanimatedScreen';
 import { APP_LINKING_CONFIG } from './navigation-linking';
 import { ROUTE_NAME } from './routes';
 import { LINE_COLOR } from './navigation-lines';
@@ -48,13 +42,8 @@ const App = defineComponent({
 
     onMounted(() => hide());
 
-    // Vue's useLinkingIntegration takes the Stack's Ref ITSELF (not a resolved handle) and reads
-    // `.value` lazily inside its own onMounted — Vue's onMounted callbacks fire bottom-up
-    // (children mount, and their onMounted queues drain, before the parent's own onMounted
-    // queue runs), so by the time this composable's onMounted fires, Stack below has already
-    // mounted and populated `stackHandle.value` via its own expose(). No React-style
-    // LinkingRunner child-mount workaround is needed here — see linking.ts's header comment for
-    // the full React-vs-Vue timing rationale.
+    // Takes the Ref of the Stack itself and reads `.value` in its own `onMounted`
+    // Children mount first, so the Stack has filled `stackHandle` through `expose()` by then
     useLinkingIntegration(APP_LINKING_CONFIG, stackHandle);
 
     return () => (
@@ -93,9 +82,7 @@ const App = defineComponent({
             headerTitleColor: '#ffffff',
             headerStyle: { backgroundColor: '#0b1622' },
             headerUserInterfaceStyle: 'dark',
-            // Edge-flicker investigation experiment: 'default' resolved to an ~480ms native
-            // transition (measured via dlog). Explicit values here to check whether pinning
-            // stackAnimation/transitionDuration changes the artifact's presence/character.
+            // Pinned, as the default animation resolved to a slower native transition
             stackAnimation: 'slide_from_right',
             transitionDuration: 300,
           }}
@@ -221,6 +208,19 @@ const App = defineComponent({
             title: 'Styling showcase',
             headerShown: true,
             headerTintColor: LINE_COLOR.styling,
+            headerTranslucent: true,
+            headerTitleColor: '#ffffff',
+            headerStyle: { backgroundColor: '#0b1622' },
+            headerUserInterfaceStyle: 'dark',
+          }}
+        />
+        <Stack.Screen
+          name={ROUTE_NAME.Reanimated}
+          component={ReanimatedScreen}
+          options={{
+            title: 'Reanimated',
+            headerShown: true,
+            headerTintColor: LINE_COLOR.performance,
             headerTranslucent: true,
             headerTitleColor: '#ffffff',
             headerStyle: { backgroundColor: '#0b1622' },

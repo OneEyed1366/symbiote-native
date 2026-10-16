@@ -54,7 +54,7 @@
 //      this granularity, so this test proves the end-to-end contract (native event -> reducer ->
 //      node actually removed) rather than the unobservable intermediate frame.
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { compile } from 'svelte/compiler';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -195,12 +195,7 @@ describe('Modal (real compiled index.svelte)', () => {
       mount(ROOT_TAG, Dismissible);
       await settle();
 
-      // appRoot() is the engine's synthetic box-none AppContainer; its one child is this Svelte
-      // adapter's own root view (root-element.ts), under which the mounted component's
-      // own output lands — hence the extra RCTView wrapper vs React's/Vue's own tests. `toContain`
-      // (not exact equality), matching mount-pipeline.smoke.test.ts's own precedent: mount()'s
-      // component boundary contributes a couple of empty RCTRawText siblings alongside the real
-      // content that aren't this test's concern.
+      // The adapter's root view wraps the output, and `mount()` adds empty raw-text siblings
       expect(live.serialize(live.appRoot())).toContain(
         'ModalHostView(RCTView(RCTView))',
       );
@@ -217,10 +212,7 @@ describe('Modal (real compiled index.svelte)', () => {
       expect(host.children[0]?.payload.backgroundColor).toBe('white');
     });
 
-    // why: proves the keep-alive reducer (modalReducer/shouldRenderModal) is actually wired
-    // through the Svelte `$state`/`$effect` lifecycle end to end — a real native event flips the
-    // controlling parent's own state, which must flow back through the reducer and eventually
-    // drop the committed node, never leaving it stuck mounted after the transition settles.
+    // A native event reaches the parent's state, through the reducer, and drops the node
     it('round-trips a native topRequestClose through the reducer and drops the node once it settles', async () => {
       const Dismissible = await loadDismissible();
       mount(ROOT_TAG, Dismissible);
@@ -249,10 +241,7 @@ describe('Modal (real compiled index.svelte)', () => {
       ).toBeUndefined();
     });
 
-    // why: onOrientationChange rides the object bag like every other DirectEvent, but it is the
-    // only one carrying a payload — the engine registers it as `(event) => handler(event)`, so the
-    // orientation arrives on nativeEvent, never on the event itself. A signature promising a bare
-    // { orientation } would leave every Svelte caller reading undefined.
+    // The handler gets the event wrapper, a bare `{ orientation }` signature would read `undefined`
     it('routes topOrientationChange to onOrientationChange with the orientation on nativeEvent', async () => {
       const Modal = await loadModal();
       let received: ISymbioteEvent | undefined;
@@ -276,10 +265,7 @@ describe('Modal (real compiled index.svelte)', () => {
       expect(received?.nativeEvent.orientation).toBe('landscape');
     });
 
-    // why: `shouldRender` gates the `{#if}` around the host tag entirely — a modal that starts
-    // hidden must never commit a node at all (not commit-then-immediately-remove), matching
-    // `createInitialModalState`'s seed-from-initial-visibility contract.
-    // why: Modal.js `defaultProps.visible = true` — a `<Modal>` without `visible` shows.
+    // RN `defaultProps.visible` is true
     it('shows a modal mounted without visible, as RN defaults it', async () => {
       mount(ROOT_TAG, await loadModal(), {});
       await settle();
@@ -287,6 +273,7 @@ describe('Modal (real compiled index.svelte)', () => {
       expect(committedModalNode().payload.visible).toBe(true);
     });
 
+    // A modal that starts hidden never commits a node, not commit-then-remove
     it('commits no modal node when visible starts false', async () => {
       const Hidden = await loadHidden();
       mount(ROOT_TAG, Hidden);
@@ -295,6 +282,40 @@ describe('Modal (real compiled index.svelte)', () => {
       expect(
         findInCommittedTree(n => n.viewName === 'ModalHostView'),
       ).toBeUndefined();
+    });
+  });
+
+  describe('dev warnings', () => {
+    const MISUSED = {
+      visible: true,
+      transparent: true,
+      presentationStyle: 'pageSheet',
+    };
+
+    afterEach(() => {
+      Reflect.deleteProperty(globalThis, '__DEV__');
+      vi.restoreAllMocks();
+    });
+
+    it('warns in a dev build about a prop combination RN cannot honour', async () => {
+      Reflect.set(globalThis, '__DEV__', true);
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      mount(ROOT_TAG, await loadModal(), MISUSED);
+      await settle();
+
+      expect(warn).toHaveBeenCalledWith(
+        "Modal with 'pageSheet' presentation style and 'transparent' value is not supported.",
+      );
+    });
+
+    it('stays quiet in a release build', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      mount(ROOT_TAG, await loadModal(), MISUSED);
+      await settle();
+
+      expect(warn).not.toHaveBeenCalled();
     });
   });
 });

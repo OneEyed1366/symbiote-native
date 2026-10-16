@@ -41,3 +41,10 @@ export function focusTextInput(node: ISymbioteNode | null): void {
   setInputFocused(node);
   dispatchViewCommand(node, 'focus', []);
 }
+
+// RN's `TextInput.State`: TextInput is a tag here, so the handle is its own export
+export const TextInputState = {
+  blurTextInput,
+  currentlyFocusedInput,
+  focusTextInput,
+};

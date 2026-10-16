@@ -13,29 +13,33 @@ import type {
   IAccessibilityProps,
   IAriaProps,
 } from '@symbiote-native/components';
-import type { IStyleProp, IViewStyle } from '@symbiote-native/engine';
+import type {
+  IColorValue,
+  IStyleProp,
+  IViewStyle,
+} from '@symbiote-native/engine';
 
-export interface IAngularRefreshControlProps
-  extends IAccessibilityProps, IAriaProps {
-  refreshing: boolean;
-  // `id` — RN's W3C alias for `nativeID`, folded by the spec entry's ID_ALIAS.
-  id?: string;
-  // RN's onRefresh is `() => void | Promise<void>`, the handler may be async; the promise is
-  // fire-and-forget (native already starts refreshing on the gesture).
-  onRefresh?: () => void | Promise<void>;
-  tintColor?: string;
-  title?: string;
-  titleColor?: string;
-  progressViewOffset?: number;
-  // Android-only spinner styling (RN RefreshControlPropsAndroid): `colors` are the indicator's
-  // animated stroke colors, `progressBackgroundColor` the disc behind it, `size` the diameter
-  // preset. AndroidSwipeRefreshLayout reads them; PullToRefreshView on iOS ignores unknown props.
-  colors?: readonly string[];
-  progressBackgroundColor?: string;
-  size?: 'default' | 'large';
-  // Android-only native prop forwarded to AndroidSwipeRefreshLayout; iOS native never reads it.
-  enabled?: boolean;
-  // The Android scroll-view wrap injects the layout half of the style onto this host; iOS leaves it
-  // unset (the RefreshControl is a childless sibling). Harmless to forward on both.
-  style?: IStyleProp<IViewStyle>;
-}
+export type IAngularRefreshControlProps = IAccessibilityProps &
+  IAriaProps & {
+    refreshing: boolean;
+    // `id` — RN's W3C alias for `nativeID`, folded by the spec entry's ID_ALIAS.
+    id?: string;
+    // RN's onRefresh is `() => void | Promise<void>`, the handler may be async; the promise is
+    // fire-and-forget (native already starts refreshing on the gesture).
+    onRefresh?: () => void | Promise<void>;
+    tintColor?: IColorValue;
+    title?: string;
+    titleColor?: IColorValue;
+    progressViewOffset?: number;
+    // Android-only spinner styling (RN RefreshControlPropsAndroid): `colors` are the indicator's
+    // animated stroke colors, `progressBackgroundColor` the disc behind it, `size` the diameter
+    // preset. AndroidSwipeRefreshLayout reads them; PullToRefreshView on iOS ignores unknown props.
+    colors?: readonly IColorValue[];
+    progressBackgroundColor?: IColorValue;
+    size?: 'default' | 'large';
+    // Android-only native prop forwarded to AndroidSwipeRefreshLayout; iOS native never reads it.
+    enabled?: boolean;
+    // The Android scroll-view wrap injects the layout half of the style onto this host; iOS leaves it
+    // unset (the RefreshControl is a childless sibling). Harmless to forward on both.
+    style?: IStyleProp<IViewStyle>;
+  };

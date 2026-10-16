@@ -1,8 +1,5 @@
-// useWindowDimensions is the preferred API for components that need window metrics,
-// a port of RN's Libraries/Utilities/useWindowDimensions.js. It seeds from
-// Dimensions.get('window'), subscribes to 'change', and re-checks once after
-// subscribing to close the gap between the render-time get and the effect-time
-// listener. Only the window metrics changing triggers a re-render.
+// Port of RN's `useWindowDimensions`: seeds from `Dimensions.get('window')`, subscribes to 'change'
+// TODO(rn-port): RN's module loads `NativeDeviceInfo` eagerly, which needs a bridge itests lack
 
 import { useEffect, useState } from 'react';
 import {
@@ -18,14 +15,12 @@ export function useWindowDimensions(): IDisplayMetrics {
 
   useEffect(() => {
     function handleChange(window: IDisplayMetrics): void {
-      if (
+      const hasChanged =
         dimensions.width !== window.width ||
         dimensions.height !== window.height ||
         dimensions.scale !== window.scale ||
-        dimensions.fontScale !== window.fontScale
-      ) {
-        setDimensions(window);
-      }
+        dimensions.fontScale !== window.fontScale;
+      if (hasChanged) setDimensions(window);
     }
 
     const subscription = Dimensions.addEventListener(
@@ -34,8 +29,7 @@ export function useWindowDimensions(): IDisplayMetrics {
         handleChange(set.window);
       },
     );
-    // We may have missed an update between calling `get` in render and subscribing
-    // here; re-check now. If nothing changed, React filters the no-op set.
+    // An update may land between `get` in render and the subscription, so re-check now
     handleChange(Dimensions.get('window'));
     return () => {
       subscription.remove();

@@ -23,12 +23,15 @@
     "@symbiote-native/components": "latest",
     "@symbiote-native/engine": "latest",
     "@symbiote-native/navigation": "latest",
+    "@symbiote-native/reanimated": "latest",
     "@symbiote-native/slider": "latest",
     "@symbiote-native/splash-screen": "latest",
     "@symbiote-native/vue": "latest",
     "@vue/runtime-core": "^3.5.13",
     "react": "19.2.3",
-    "react-native": "0.86.0"
+    "react-native": "0.86.0",
+    "react-native-reanimated": "4.7.1",
+    "react-native-worklets": "0.13.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
@@ -62,6 +65,11 @@
     "vitest": "^4.1.9",
     "vue": "^3.5.38",
     "vue-tsc": "^2.2.12"
+  },
+  "reanimated": {
+    "staticFeatureFlags": {
+      "ENABLE_SHARED_ELEMENT_TRANSITIONS": true
+    }
   },
   "engines": {
     "node": ">= 22.11.0"

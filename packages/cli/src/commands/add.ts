@@ -1,5 +1,10 @@
 import * as clack from '@clack/prompts';
 import pc from 'picocolors';
+import {
+  explicitLayersFromFlags,
+  resolveAddLayers,
+  resolveAddOverwrite,
+} from '../add-layer-prompts.js';
 import { addLayersToApp } from '../add-layers.js';
 import type { IParsedCommand } from '../cli.js';
 import { detectAddedLayers } from '../detect-added-layers.js';
@@ -10,28 +15,15 @@ import {
 import { CliUsageError, NotSymbioteAppError } from '../errors.js';
 import { expoPackagesWithOptionalManifestBundles } from '../expo-package-layers.js';
 import { getCommand } from '../get-command.js';
-import {
-  applyBundle,
-  discoveredBundlesFromLayers,
-  type IDiscoveredBundle,
-} from '../grant-bundles.js';
-import {
-  explicitLayersFromFlags,
-  resolveAddLayers,
-  resolveAddOverwrite,
-  resolveGrantSelection,
-  resolvePackageManager,
-} from '../prompts.js';
-import type { IFramework } from '../types.js';
-import { printGrantedNotes } from './grant-summary.js';
+import { resolvePackageManager } from '../prompts.js';
+import type { IAddLayerName, IFramework, IPackageManager } from '../types.js';
+import { offerGrants } from './offer-grants.js';
+import { reanimatedNotes } from './reanimated-notes.js';
 
 type IAddCommand = Extract<IParsedCommand, { kind: 'add' }>;
 
-// `add` extends an EXISTING @symbiote-native/* app — it does not bootstrap symbiote into a plain
-// RN project (that would mean reconciling native files against real, already-customized project
-// state with no safe way to do it; see `new` for scaffolding one from scratch). So unlike every
-// other resolver in prompts.ts, this has no interactive fallback: no @symbiote-native/<adapter>
-// dependency means there is nothing for `add` to extend, in any terminal.
+// `add` extends an EXISTING @symbiote-native/* app, it does not bootstrap one into plain RN
+// With no @symbiote-native/<adapter> dependency there is nothing to extend, so no prompt fallback
 export function resolveFrameworkForAdd(
   explicit: IFramework | undefined,
   cwd: string = process.cwd(),
@@ -50,42 +42,79 @@ export function resolveFrameworkForAdd(
   return detected;
 }
 
+type IPickedLayers = {
+  readonly layers: readonly IAddLayerName[];
+  // Layers a flag named but that were dropped as already present, without --force
+  // They are reported apart from `skippedLayers`, which only holds `testing` declining
+  readonly alreadyPresentSkips: readonly IAddLayerName[];
+};
+
+async function pickLayers(
+  parsed: IAddCommand,
+  alreadyAdded: ReadonlySet<IAddLayerName>,
+): Promise<IPickedLayers> {
+  const layers = await resolveAddLayers(parsed, alreadyAdded, parsed.hasForce);
+  const alreadyPresentSkips = parsed.hasForce
+    ? []
+    : explicitLayersFromFlags(parsed).filter(layer => alreadyAdded.has(layer));
+  return { layers, alreadyPresentSkips };
+}
+
+function nothingToAddMessage(
+  alreadyPresentSkips: readonly IAddLayerName[],
+): string {
+  return alreadyPresentSkips.length > 0
+    ? `Nothing to add — already present: ${alreadyPresentSkips.join(', ')}.`
+    : 'Nothing to add — every optional layer @symbiote-native/cli offers is already present.';
+}
+
+async function installLines(
+  applied: readonly IAddLayerName[],
+  requested: IPackageManager | undefined,
+): Promise<string[]> {
+  if (applied.length === 0) return [];
+  const packageManager = await resolvePackageManager(requested);
+  return [
+    `Added: ${applied.join(', ')}.`,
+    '',
+    pc.bold(pc.green(`  ${getCommand(packageManager, 'install')}`)),
+  ];
+}
+
+function skippedLines(skipped: readonly IAddLayerName[]): string[] {
+  return skipped.length === 0
+    ? []
+    : ['', `Skipped (already present, left untouched): ${skipped.join(', ')}.`];
+}
+
+// `navigation` never touches App source, so wiring the Stack is the one step `add` cannot do
+function navigationLines(
+  applied: readonly IAddLayerName[],
+  framework: IFramework,
+): string[] {
+  if (!applied.includes('navigation')) return [];
+  return [
+    '',
+    'Wire it up in your App entry:',
+    pc.dim(
+      `  import { Stack } from '@symbiote-native/navigation/${framework}';`,
+    ),
+  ];
+}
+
 export async function runAdd(parsed: IAddCommand): Promise<void> {
   clack.intro('@symbiote-native/cli add');
 
   const cwd = process.cwd();
   const framework = resolveFrameworkForAdd(parsed.framework, cwd);
   const alreadyAdded = detectAddedLayers(readCwdDependencies(cwd));
-  const layerFlags = {
-    hasExpoModules: parsed.hasExpoModules,
-    hasNavigation: parsed.hasNavigation,
-    hasTesting: parsed.hasTesting,
-    hasSlider: parsed.hasSlider,
-    hasSplashScreen: parsed.hasSplashScreen,
-    expoPackages: parsed.expoPackages,
-  };
-
-  const layers = await resolveAddLayers(
-    layerFlags,
+  const { layers, alreadyPresentSkips } = await pickLayers(
+    parsed,
     alreadyAdded,
-    parsed.hasForce,
   );
 
-  // Layers named by an explicit flag but dropped because they're already present (and --force
-  // wasn't given) — reported distinctly from `result.skippedLayers` below, which is only ever
-  // 'testing' declining a file overwrite.
-  const alreadyPresentSkips = parsed.hasForce
-    ? []
-    : explicitLayersFromFlags(layerFlags).filter(layer =>
-        alreadyAdded.has(layer),
-      );
-
   if (layers.length === 0) {
-    const outro =
-      alreadyPresentSkips.length > 0
-        ? `Nothing to add — already present: ${alreadyPresentSkips.join(', ')}.`
-        : 'Nothing to add — every optional layer @symbiote-native/cli offers is already present.';
-    clack.outro(outro);
+    clack.outro(nothingToAddMessage(alreadyPresentSkips));
     return;
   }
 
@@ -100,71 +129,17 @@ export async function runAdd(parsed: IAddCommand): Promise<void> {
       ),
   });
 
-  const lines: string[] = [];
-
-  if (result.appliedLayers.length > 0) {
-    const packageManager = await resolvePackageManager(parsed.packageManager);
-    lines.push(
-      `Added: ${result.appliedLayers.join(', ')}.`,
-      '',
-      pc.bold(pc.green(`  ${getCommand(packageManager, 'install')}`)),
-    );
-  }
-  const allSkips = [...alreadyPresentSkips, ...result.skippedLayers];
-  if (allSkips.length > 0) {
-    lines.push(
-      '',
-      `Skipped (already present, left untouched): ${allSkips.join(', ')}.`,
-    );
-  }
-  // navigation deliberately never touches App source (see add-layers.ts) — the developer wires
-  // the Stack in themselves, so this is the one manual step `add` can't do for them.
-  if (result.appliedLayers.includes('navigation')) {
-    lines.push(
-      '',
-      'Wire it up in your App entry:',
-      pc.dim(
-        `  import { Stack } from '@symbiote-native/navigation/${framework}';`,
-      ),
-    );
-  }
-  // Offered here — not just documented under a separate `grant` command the developer has to
-  // already know about — because printing a command to run later is bad DX. applyBundle only
-  // needs the app's own AndroidManifest.xml, which already exists; it doesn't need the package to
-  // be installed yet, so this can apply the developer's choice immediately.
-  const grantable = expoPackagesWithOptionalManifestBundles(
-    new Set(result.appliedLayers),
-  );
-  if (grantable.length > 0) {
-    const candidates = discoveredBundlesFromLayers(grantable);
-    let granted: IDiscoveredBundle[] = [];
-    let asked = false;
-    try {
-      granted = await resolveGrantSelection(candidates);
-      asked = true;
-    } catch (error) {
-      // resolveGrantSelection's own documented contract: it fails fast when there is no terminal
-      // to ask in (piped stdin, CI) — that must not abort the rest of `add`, just fall through to
-      // the printed hint below so the developer still hears about it.
-      if (!(error instanceof CliUsageError)) throw error;
-    }
-
-    if (granted.length > 0) {
-      for (const entry of granted) applyBundle(cwd, entry.bundle);
-      printGrantedNotes(granted);
-      lines.push(
-        '',
-        `Granted: ${granted.map(entry => entry.bundle.label).join(', ')}.`,
-      );
-    } else if (!asked) {
-      lines.push(
-        '',
-        `${grantable.map(layer => layer.label).join(', ')} also offer${grantable.length === 1 ? 's' : ''} optional, policy-sensitive Android permissions — after installing:`,
-        ...grantable.map(layer =>
-          pc.dim(`  npx @symbiote-native/cli grant ${layer.id}`),
-        ),
-      );
-    }
-  }
+  const lines = [
+    ...(await installLines(result.appliedLayers, parsed.packageManager)),
+    ...skippedLines([...alreadyPresentSkips, ...result.skippedLayers]),
+    ...navigationLines(result.appliedLayers, framework),
+    ...(result.appliedLayers.includes('reanimated')
+      ? reanimatedNotes(result.hasManualBabelStep)
+      : []),
+    ...(await offerGrants(
+      cwd,
+      expoPackagesWithOptionalManifestBundles(new Set(result.appliedLayers)),
+    )),
+  ];
   clack.outro(lines.length > 0 ? lines.join('\n') : 'Nothing changed.');
 }

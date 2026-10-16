@@ -1,10 +1,10 @@
-// Per-native-component event declarations: symbiote's slimmed ViewConfigRegistry. Mirrors RN's
-// ViewConfig — each Fabric component declares which event names it can emit — shared by every
-// adapter, so it lives here rather than in any one framework adapter.
+// Per-native-component event names, shared by every adapter, the event-vs-prop split reads it
+// TODO(rn-port): RN's `BaseViewConfig` keys events by `topXxx` and registration names, not by flat
+// prop names, so it is not importable as is, `view-config-parity.test.ts` pins the gap against it
 
-// Flat-bag adapters (React/Vue/Solid) hand props and handlers mixed together and must split them:
-// they consult this registry to tell an event handler (onChange -> change) from a native prop that
-// merely looks like one. Structural adapters (Svelte, Angular) deliver events pre-separated.
+// Flat-bag adapters (React/Vue/Solid) mix props and handlers and consult this to split them
+// It tells an event handler (`onChange` -> `change`) from a native prop that looks like one
+// Structural adapters (Svelte, Angular) deliver events pre-separated
 
 import { isRegisteredEvent } from './registry';
 
@@ -32,6 +32,21 @@ const BASE_EVENTS: readonly string[] = [
   'layout',
   'focus',
   'blur',
+  'click',
+  'keyDown',
+  'keyUp',
+  // Every bubbling event of RN's base ViewConfig declares a `captured` registration name, and an
+  // ancestor of any view can listen for it
+  'pressCapture',
+  'focusCapture',
+  'blurCapture',
+  'clickCapture',
+  'changeCapture',
+  'submitEditingCapture',
+  'endEditingCapture',
+  'keyPressCapture',
+  'keyDownCapture',
+  'keyUpCapture',
   ...A11Y_EVENTS,
 ];
 
@@ -68,6 +83,12 @@ const SCROLL_EVENTS: readonly string[] = [
   // iOS-only: emitted when the user taps the status bar to scroll to top. Inert on
   // Android (no native producer), so keying it here is harmless cross-platform.
   'scrollToTop',
+  // Not native events: the ScrollView behavior fires them off `Keyboard`, they are listed so the
+  // `onKeyboard*` props reach it
+  'keyboardWillShow',
+  'keyboardWillHide',
+  'keyboardDidShow',
+  'keyboardDidHide',
 ];
 
 // Text emits a glyph-layout event (onTextLayout) beyond the base press/layout set.

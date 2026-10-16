@@ -9,19 +9,6 @@ import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 so every SymbioteNative adapter gets the same image view, cache functions and hash generators, not
 just React.
 
-| OS platform | Support |
-| ----------- | ------- |
-| iOS         | live    |
-| Android     | live    |
-
-| Framework adapter | Support |
-| ----------------- | ------- |
-| React             | live    |
-| Vue               | live    |
-| Angular           | live    |
-| Svelte            | live    |
-| Solid             | live    |
-
 ## Installation
 
 ```sh
@@ -264,12 +251,14 @@ the image is not cached. The cache key is the source URL unless you set `cacheKe
 **Why is it called `ExpoImage` in Angular?** `Image` and `ImageBackground` are already tags of the
 Angular adapter, so the selectors are `ExpoImage` and `ExpoImageBackground`.
 
-Sources: [Expo docs: Image](https://docs.expo.dev/versions/latest/sdk/image/),
-[expo/expo#21211 expo-image and FlashList component recycling](https://github.com/expo/expo/issues/21211),
-[expo/expo#26781 RAM usage when many images are rendered](https://github.com/expo/expo/issues/26781),
-[expo/expo#24557 animated WebP freezes on iOS](https://github.com/expo/expo/issues/24557),
-[expo/expo#25920 animated WebP plays in slow motion on iOS](https://github.com/expo/expo/issues/25920),
-[expo/expo#37229 Android crash on 16 KB page size devices](https://github.com/expo/expo/issues/37229).
+Sources:
+
+- [Expo docs: Image](https://docs.expo.dev/versions/latest/sdk/image/)
+- [expo/expo#21211 expo-image and FlashList component recycling](https://github.com/expo/expo/issues/21211)
+- [expo/expo#26781 RAM usage when many images are rendered](https://github.com/expo/expo/issues/26781)
+- [expo/expo#24557 animated WebP freezes on iOS](https://github.com/expo/expo/issues/24557)
+- [expo/expo#25920 animated WebP plays in slow motion on iOS](https://github.com/expo/expo/issues/25920)
+- [expo/expo#37229 Android crash on 16 KB page size devices](https://github.com/expo/expo/issues/37229)
 
 ## How the wrapper works
 

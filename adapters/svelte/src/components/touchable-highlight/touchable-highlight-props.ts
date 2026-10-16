@@ -1,8 +1,9 @@
+import type { IColorValue } from '@symbiote-native/engine';
 import type { ITouchableBaseProps } from '../touchable-base-props';
 
-export interface ITouchableHighlightProps extends ITouchableBaseProps {
+export type ITouchableHighlightProps = ITouchableBaseProps & {
   activeOpacity?: number;
-  underlayColor?: string;
+  underlayColor?: IColorValue;
   // TouchableHighlight.js:205 — forwarded to Pressability as `android_disableSound`. Named
   // differently from Pressable's own `android_disableSound`, matching vendor.
   touchSoundDisabled?: boolean;
@@ -16,4 +17,4 @@ export interface ITouchableHighlightProps extends ITouchableBaseProps {
   // arrives through ITouchableBaseProps' IPressTimingProps.
   onShowUnderlay?: () => void;
   onHideUnderlay?: () => void;
-}
+};

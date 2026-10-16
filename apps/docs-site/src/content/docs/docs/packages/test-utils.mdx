@@ -7,34 +7,22 @@ import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 
 `@symbiote-native/test-utils` is the fake Fabric slot [Testing](/docs/testing/) refers to.
 `installFabric()` puts a fake `nativeFabricUIManager` on `globalThis` and returns a recorder
-handle: what was created, what was committed, what commands were dispatched, and a `fireEvent`
-to push a native event back into the renderer. Unlike every other package documented here —
-[slider](/docs/packages/slider/), [local auth](/docs/packages/local-auth/),
-[system UI](/docs/packages/system-ui/) — it wraps no native library and ships nothing your app
-imports at runtime: it is a `devDependency` test double standing in for the native side of the
-[engine](/docs/api/core/)'s commit path, imported by the co-located Vitest suites across the
-engine, all five adapters, the wrapper packages, and the example apps. Its persistence
-semantics are faithful, not simplified — every clone is a new identity, `clone*WithNewProps`
-merges the engine's minimal diff onto the previous props, and `appendChild` throws on an illegal
-Fabric family reparent.
+handle. It records what was created, what was committed and what commands were dispatched. It also
+has a `fireEvent` to push a native event back into the renderer.
 
-There is no native code here, so the usual platform table has nothing to vary on: the fake slot
-is plain JavaScript running in Node under Vitest, on whatever machine the suite runs on.
+Unlike every other package documented here, such as [slider](/docs/packages/slider/),
+[local auth](/docs/packages/local-auth/) or [system UI](/docs/packages/system-ui/), it wraps no
+native library. It ships nothing your app imports at runtime. It is a `devDependency` test double
+standing in for the native side of the [engine](/docs/api/core/)'s commit path. The co-located
+Vitest suites import it across the engine, all five adapters, the wrapper packages, and the
+example apps.
 
-| OS platform | Support                                                       |
-| ----------- | ------------------------------------------------------------- |
-| iOS         | n/a — the fake slot replaces Fabric; nothing reaches a device |
-| Android     | n/a — same                                                    |
+Its persistence semantics are faithful, not simplified. Every clone is a new identity,
+`clone*WithNewProps` merges the engine's minimal diff onto the previous props, and `appendChild`
+throws on an illegal Fabric family reparent.
 
-The adapter table, by contrast, is real: each adapter's own suite drives this harness.
-
-| Framework adapter | Support |
-| ----------------- | ------- |
-| React             | ✅ live |
-| Vue               | ✅ live |
-| Angular           | ✅ live |
-| Svelte            | ✅ live |
-| Solid             | ✅ live |
+There is no native code here. The fake slot is plain JavaScript running in Node under Vitest, on
+whatever machine the suite runs on. Each adapter's own suite drives this harness.
 
 ## Installation
 
@@ -251,8 +239,8 @@ under it.
     ```
 
     Trimmed from `adapters/svelte/src/mount-pipeline.smoke.test.ts`. Svelte is the one adapter
-    whose own suites can't lean on a loader to transform `.svelte` source — there is no
-    `@sveltejs/vite-plugin-svelte` wired into this repo's Vitest config — so its tests compile
+    whose own suites can't lean on a loader to transform `.svelte` source, as there is no
+    `@sveltejs/vite-plugin-svelte` wired into this repo's Vitest config. So its tests compile
     real source through `svelte/compiler` by hand before mounting it, unlike the other three tabs.
 
   </TabItem>
@@ -360,11 +348,12 @@ the returned recorder.
   The fake slot is a `globalThis` singleton, and the engine reads it exactly
   once: `getSlot()` destructures the slot's methods on its first commit and
   caches them for the rest of the process. So every suite in this repo calls
-  `installFabric()` a single time at module scope and `reset()`s between tests —
-  a second `installFabric()` after anything has committed replaces the global,
-  but the engine keeps writing to the handle it already bound, and the new
+  `installFabric()` a single time at module scope and `reset()`s between tests.
+
+  A second `installFabric()` after anything has committed replaces the global,
+  but the engine keeps writing to the handle it already bound. The new
   recorder stays silently empty. Vitest isolates test files from one another, so
-  per-file is per-clean-slate; within a file, `reset()` is what gives each test
+  per-file is per-clean-slate. Within a file, `reset()` is what gives each test
   a clean recorder.
 </Aside>
 
@@ -386,7 +375,7 @@ the returned recorder.
   measures its responder rect on grant). After the first commit it is too late — see the caution
   above.
 - **`appendChild` throws on a Fabric family reparent.** Clones keep their tag and family, so
-  moving a committed node under a different parent is illegal in real Fabric; the fake raises it
+  moving a committed node under a different parent is illegal in real Fabric. The fake raises it
   as an error instead of quietly producing a tree that could never exist natively.
 - **This is the headless layer only.** It proves JS-side behavior — reducer logic, render output,
   adapter lifecycle, commit shape. It does not stand in for a real native host; see
@@ -405,9 +394,9 @@ core/test-utils/src/
 ```
 
 It lives under `core/`, not `packages/`, because it belongs to the same layer as
-[`@symbiote-native/engine`](/docs/api/core/) — it is the test double for the native side that
-engine's commit path drives — and it has no adapter entry points: one framework-agnostic export
-that React, Vue, Angular, Svelte, and Solid suites all import unchanged. It also has no tests of
-its own; it
-_is_ the test double every other package's suite runs against, so a regression in it surfaces as
-a failure there.
+[`@symbiote-native/engine`](/docs/api/core/). It is the test double for the native side that the
+engine's commit path drives.
+
+It has no adapter entry points: one framework-agnostic export that React, Vue, Angular, Svelte, and
+Solid suites all import unchanged. It also has no tests of its own. It _is_ the test double every
+other package's suite runs against, so a regression in it surfaces as a failure there.

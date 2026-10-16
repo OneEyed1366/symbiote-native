@@ -16,6 +16,7 @@
     { "path": "packages/splash-screen" },
     { "path": "packages/navigation" },
     { "path": "packages/sensors" },
+    { "path": "packages/reanimated" },
     { "path": "packages/local-auth" },
     { "path": "packages/secure-store" },
     { "path": "packages/sharing" },

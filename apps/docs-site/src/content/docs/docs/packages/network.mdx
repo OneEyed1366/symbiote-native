@@ -10,22 +10,9 @@ so every SymbioteNative adapter can read the device's network connection state. 
 [battery](/docs/packages/battery/), it's built on `expo-modules-core` and mixes stateless one-shot
 calls with exactly one live subscription: `useNetworkState`/`NetworkStateService.connect()` seed from
 a one-shot `getNetworkStateAsync()` call and then subscribe to `addNetworkStateListener` for live
-updates, the same seed-then-subscribe shape as battery's own hooks — everything else
+updates. This is the same seed-then-subscribe shape as battery's own hooks. Everything else
 (`getIpAddressAsync`, `isAirplaneModeEnabledAsync`) is a plain stateless function, same as
 [local-auth](/docs/packages/local-auth/).
-
-| OS platform | Support |
-| ----------- | ------- |
-| iOS         | ✅ live |
-| Android     | ✅ live |
-
-| Framework adapter | Support |
-| ----------------- | ------- |
-| React             | ✅ live |
-| Vue               | ✅ live |
-| Angular           | ✅ live |
-| Svelte            | ✅ live |
-| Solid             | ✅ live |
 
 <Aside type="note">
   `NetworkStateType.BLUETOOTH`, `WIMAX`, `VPN`, and `OTHER` are Android-only —
@@ -46,16 +33,16 @@ Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --n
 [`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
 
 `expo-network` and `expo-modules-core` come along as regular dependencies, pinned to exact
-versions — never install either yourself, and never add the `expo` meta-package to your project
-(it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
+versions. Never install either yourself. Never add the `expo` meta-package to your project either,
+as it bundles its own Metro/Babel pipeline, which conflicts with this project's own.
 
 <Aside type="danger" title="Native setup is required before first use">
   `expo-network`'s native code is discovered by `expo-modules-autolinking`, a
   different mechanism from the `react-native.config.cjs`/podspec autolinking
-  every other SymbioteNative wrapper uses — and it isn't the standard Expo setup
-  flow either, since this project never installs the `expo` meta-package. Follow
-  [How to: wire up an Expo native
-  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers
+  every other SymbioteNative wrapper uses. It isn't the standard Expo setup
+  flow either, since this project never installs the `expo` meta-package.
+  Follow [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first. It covers
   this package and every other `expo-modules-core` package with zero further
   native changes.
 </Aside>
@@ -203,7 +190,7 @@ const airplaneMode = await isAirplaneModeEnabledAsync();
   not "the call failed".
 - **A one-shot `getNetworkStateAsync()` on iOS can block for up to five seconds and then look
   offline.** The native module starts a throwaway `NWPathMonitor` for the call and waits on a
-  semaphore; if no path update arrives in time it returns the same
+  semaphore. If no path update arrives in time it returns the same
   `{ type: 'NONE', isConnected: false, isInternetReachable: false }` a genuinely disconnected
   device returns. The event path (`addNetworkStateListener`, and so `useNetworkState`) does not pay
   this cost — it reads the module's own long-lived monitor.
@@ -230,9 +217,9 @@ Sources: [expo/expo#14527](https://github.com/expo/expo/issues/14527),
 
 ## How the wrapper works
 
-`@symbiote-native/network` ships **zero React/Vue/Angular/Svelte/Solid logic in `expo-network` itself** — that
-package's own JS is hand-ported, verbatim, into this package's own `core/` (its types file has no
-`expo` meta-package import to swap out in the first place, unlike local-auth's or brightness's):
+`@symbiote-native/network` ships **zero React/Vue/Angular/Svelte/Solid logic in `expo-network` itself**.
+That package's own JS is hand-ported, verbatim, into this package's own `core/`. Its types file has no
+`expo` meta-package import to swap out in the first place, unlike local-auth's or brightness's:
 
 ```
 packages/network/src/
@@ -246,9 +233,9 @@ packages/network/src/
 └── angular/services/network-state.service @symbiote-native/network/angular
 ```
 
-Each adapter's `useNetworkState`/`NetworkStateService` is a thin lifecycle wrapper — seed from the
-one-shot call, subscribe on mount, unsubscribe on unmount — over the same `core` functions, the
+Each adapter's `useNetworkState`/`NetworkStateService` is a thin lifecycle wrapper (seed from the
+one-shot call, subscribe on mount, unsubscribe on unmount) over the same `core` functions. It is the
 same one-listener seed-then-subscribe shape as
 [battery](/docs/packages/battery/#how-the-wrapper-works)'s three hooks. The native code itself is
-never vendored or copied — `expo-modules-autolinking` resolves it straight out of `node_modules`
+never vendored or copied: `expo-modules-autolinking` resolves it straight out of `node_modules`
 (see [the native setup guide](/docs/howtos/expo-native-module-setup/)).

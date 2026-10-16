@@ -15,7 +15,10 @@ import {
 import { resolveStructuredStyle } from './structured-style';
 import {
   IMAGE_SOURCE_PROPS,
+  assertSinglePlaceholder,
   resolveImageSourceProp,
+  warnOnBadSrcSet,
+  warnOnEmptyImageUri,
 } from './image-source-write';
 import { Platform } from './platform';
 import { isDebug } from './debug';
@@ -84,6 +87,16 @@ export function setProp(
   writeProp(node, key, value);
 }
 
+// То, что RN проверяет в render `Image` и что видно только при записи source-пропа
+function checkImageSourceWrite(
+  node: ISymbioteNode,
+  key: string,
+  value: unknown,
+): void {
+  warnOnEmptyImageUri(key, value);
+  assertSinglePlaceholder(node, key, value);
+}
+
 // The one place a prop reaches the wire, and the only place that can keep a function off it.
 // `setNativeProps` calls this rather than `recordSetProp`, т.к. it has no `routeProp` in front
 export function writeProp(
@@ -105,10 +118,13 @@ export function writeProp(
   if (key === 'style' || key === 'activeStyle') {
     written = resolveStructuredStyle(value);
   } else if (node.resolvesImageSources && IMAGE_SOURCE_PROPS.has(key)) {
+    checkImageSourceWrite(node, key, value);
     written = resolveImageSourceProp(
       value,
       key === 'source' && Platform.OS === 'android',
     );
+  } else if (node.resolvesImageSources) {
+    warnOnBadSrcSet(key, value);
   }
   if (typeof written === 'function') {
     let bag = functionProps.get(node);

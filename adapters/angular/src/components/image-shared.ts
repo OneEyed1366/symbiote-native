@@ -1,6 +1,4 @@
-// The input surface and prop fold `AnimatedImage` builds on. The primitive is the `<image>` tag
-// (`ImageElement`), which folds its source via `registerImageBehavior`; `Animated.Image` stays a
-// component and is the only consumer left, one flat file (`symbiote-file-layout`).
+// The input surface and prop fold `Animated.Image` builds on, the `<image>` tag is `ImageElement`
 import { EventEmitter, computed, signal } from '@angular/core';
 import {
   gateWanted,
@@ -9,20 +7,12 @@ import {
 } from '../gate-demand';
 import {
   imageStatics,
-  renderImage,
-  resolveAccessibilityProps,
   type IAccessibilityProps,
   type IAriaProps,
   type IImageProps,
-  type IImageSourceProp,
-  type IResizeMode,
 } from '@symbiote-native/components';
-import {
-  isSymbioteEvent,
-  type IStyleProp,
-  type ISymbioteEvent,
-  type IViewStyle,
-} from '@symbiote-native/engine';
+import { isSymbioteEvent, type ISymbioteEvent } from '@symbiote-native/engine';
+import { resolveImageProps } from './image-props-resolve';
 
 export { setImageSourceResolver } from '@symbiote-native/components';
 export type {
@@ -33,284 +23,8 @@ export type {
   IImageSize,
   IImageCacheStatus,
 } from '@symbiote-native/components';
-
-export const IMAGE_INPUTS = [
-  'source',
-  'defaultSource',
-  'loadingIndicatorSource',
-  'style',
-  'resizeMode',
-  'resizeMethod',
-  'tintColor',
-  'blurRadius',
-  'capInsets',
-  'fadeDuration',
-  'progressiveRenderingEnabled',
-  'src',
-  'srcSet',
-  'alt',
-  'width',
-  'height',
-  'crossOrigin',
-  'referrerPolicy',
-  'testID',
-  'nativeID',
-  'accessible',
-  'accessibilityLabel',
-  'accessibilityHint',
-  'accessibilityRole',
-  'accessibilityState',
-  'accessibilityValue',
-  'accessibilityActions',
-  'accessibilityLabelledBy',
-  'importantForAccessibility',
-  'accessibilityLiveRegion',
-  'screenReaderFocusable',
-  'accessibilityViewIsModal',
-  'accessibilityElementsHidden',
-  'accessibilityIgnoresInvertColors',
-  'accessibilityLanguage',
-  'accessibilityRespondsToUserInteraction',
-  'accessibilityShowsLargeContentViewer',
-  'accessibilityLargeContentTitle',
-  'role',
-  'ariaLabel: aria-label',
-  'ariaLabelledBy: aria-labelledby',
-  'ariaLive: aria-live',
-  'ariaHidden: aria-hidden',
-  'ariaBusy: aria-busy',
-  'ariaChecked: aria-checked',
-  'ariaDisabled: aria-disabled',
-  'ariaExpanded: aria-expanded',
-  'ariaSelected: aria-selected',
-  'ariaModal: aria-modal',
-  'ariaValueMax: aria-valuemax',
-  'ariaValueMin: aria-valuemin',
-  'ariaValueNow: aria-valuenow',
-  'ariaValueText: aria-valuetext',
-  'onAccessibilityAction',
-  'onAccessibilityTap',
-  'onMagicTap',
-  'onAccessibilityEscape',
-  'onLoadStart',
-  'onLoad',
-  'onLoadEnd',
-  'onError',
-  'onProgress',
-  'onPartialLoad',
-];
-
-export const IMAGE_OUTPUTS = [
-  'accessibilityAction',
-  'accessibilityTap',
-  'magicTap',
-  'accessibilityEscape',
-  'loadStart',
-  'load',
-  'loadEnd',
-  'error',
-  'progress',
-  'partialLoad',
-];
-
-type IImagePassthroughProps = Record<string, unknown> &
-  IAccessibilityProps &
-  IAriaProps &
-  Pick<
-    IImageProps,
-    | 'resizeMethod'
-    | 'blurRadius'
-    | 'capInsets'
-    | 'fadeDuration'
-    | 'progressiveRenderingEnabled'
-    | 'onLoadStart'
-    | 'onLoad'
-    | 'onLoadEnd'
-    | 'onError'
-    | 'onProgress'
-    | 'onPartialLoad'
-  >;
-
-function asSource(value: unknown): IImageSourceProp | undefined {
-  if (typeof value === 'number') return value;
-  if (typeof value === 'object' && value !== null) return value;
-  return undefined;
-}
-
-function asResizeMode(value: unknown): IResizeMode | undefined {
-  if (
-    value === 'cover' ||
-    value === 'contain' ||
-    value === 'stretch' ||
-    value === 'repeat' ||
-    value === 'center'
-  ) {
-    return value;
-  }
-  return undefined;
-}
-
-function asString(value: unknown): string | undefined {
-  return typeof value === 'string' ? value : undefined;
-}
-
-function asNumber(value: unknown): number | undefined {
-  return typeof value === 'number' ? value : undefined;
-}
-
-function asCrossOrigin(
-  value: unknown,
-): 'anonymous' | 'use-credentials' | undefined {
-  return value === 'anonymous' || value === 'use-credentials'
-    ? value
-    : undefined;
-}
-
-function asStyle(value: unknown): IStyleProp<IViewStyle> | undefined {
-  return typeof value === 'object' && value !== null ? value : undefined;
-}
-
-// Narrows a value out of the untyped animated prop bag. A runtime guard rather than a cast: the
-// bag is built at runtime from merged animated values, so nothing upstream has proven the shape.
-export function isImageEventCallback(
-  value: unknown,
-): value is (event: ISymbioteEvent) => void {
-  return typeof value === 'function';
-}
-
-export function resolveImageProps(
-  input: Record<string, unknown>,
-): Record<string, unknown> {
-  const passthrough: IImagePassthroughProps = {
-    resizeMethod: input['resizeMethod'] as IImageProps['resizeMethod'],
-    blurRadius: asNumber(input['blurRadius']),
-    capInsets: input['capInsets'] as IImageProps['capInsets'],
-    fadeDuration: asNumber(input['fadeDuration']),
-    progressiveRenderingEnabled:
-      typeof input['progressiveRenderingEnabled'] === 'boolean'
-        ? input['progressiveRenderingEnabled']
-        : undefined,
-    testID: asString(input['testID']),
-    nativeID: asString(input['nativeID']),
-    accessible:
-      typeof input['accessible'] === 'boolean'
-        ? input['accessible']
-        : undefined,
-    accessibilityLabel: asString(input['accessibilityLabel']),
-    accessibilityHint: asString(input['accessibilityHint']),
-    accessibilityRole: input[
-      'accessibilityRole'
-    ] as IAccessibilityProps['accessibilityRole'],
-    accessibilityState: input[
-      'accessibilityState'
-    ] as IAccessibilityProps['accessibilityState'],
-    accessibilityValue: input[
-      'accessibilityValue'
-    ] as IAccessibilityProps['accessibilityValue'],
-    accessibilityActions: input[
-      'accessibilityActions'
-    ] as IAccessibilityProps['accessibilityActions'],
-    accessibilityLabelledBy: input[
-      'accessibilityLabelledBy'
-    ] as IAccessibilityProps['accessibilityLabelledBy'],
-    importantForAccessibility: input[
-      'importantForAccessibility'
-    ] as IAccessibilityProps['importantForAccessibility'],
-    accessibilityLiveRegion: input[
-      'accessibilityLiveRegion'
-    ] as IAccessibilityProps['accessibilityLiveRegion'],
-    screenReaderFocusable:
-      typeof input['screenReaderFocusable'] === 'boolean'
-        ? input['screenReaderFocusable']
-        : undefined,
-    accessibilityViewIsModal:
-      typeof input['accessibilityViewIsModal'] === 'boolean'
-        ? input['accessibilityViewIsModal']
-        : undefined,
-    accessibilityElementsHidden:
-      typeof input['accessibilityElementsHidden'] === 'boolean'
-        ? input['accessibilityElementsHidden']
-        : undefined,
-    accessibilityIgnoresInvertColors:
-      typeof input['accessibilityIgnoresInvertColors'] === 'boolean'
-        ? input['accessibilityIgnoresInvertColors']
-        : undefined,
-    accessibilityLanguage: asString(input['accessibilityLanguage']),
-    accessibilityRespondsToUserInteraction:
-      typeof input['accessibilityRespondsToUserInteraction'] === 'boolean'
-        ? input['accessibilityRespondsToUserInteraction']
-        : undefined,
-    accessibilityShowsLargeContentViewer:
-      typeof input['accessibilityShowsLargeContentViewer'] === 'boolean'
-        ? input['accessibilityShowsLargeContentViewer']
-        : undefined,
-    accessibilityLargeContentTitle: asString(
-      input['accessibilityLargeContentTitle'],
-    ),
-    role: input['role'] as IAriaProps['role'],
-    'aria-label': asString(input['ariaLabel'] ?? input['aria-label']),
-    'aria-labelledby': asString(
-      input['ariaLabelledBy'] ?? input['aria-labelledby'],
-    ),
-    'aria-live': input['ariaLive'] as IAriaProps['aria-live'],
-    'aria-hidden':
-      typeof input['ariaHidden'] === 'boolean'
-        ? input['ariaHidden']
-        : undefined,
-    'aria-busy':
-      typeof input['ariaBusy'] === 'boolean' ? input['ariaBusy'] : undefined,
-    'aria-checked': input['ariaChecked'] as IAriaProps['aria-checked'],
-    'aria-disabled':
-      typeof input['ariaDisabled'] === 'boolean'
-        ? input['ariaDisabled']
-        : undefined,
-    'aria-expanded':
-      typeof input['ariaExpanded'] === 'boolean'
-        ? input['ariaExpanded']
-        : undefined,
-    'aria-selected':
-      typeof input['ariaSelected'] === 'boolean'
-        ? input['ariaSelected']
-        : undefined,
-    'aria-modal':
-      typeof input['ariaModal'] === 'boolean' ? input['ariaModal'] : undefined,
-    'aria-valuemax': asNumber(input['ariaValueMax']),
-    'aria-valuemin': asNumber(input['ariaValueMin']),
-    'aria-valuenow': asNumber(input['ariaValueNow']),
-    'aria-valuetext': asString(input['ariaValueText']),
-    onAccessibilityAction: input[
-      'onAccessibilityAction'
-    ] as IImageProps['onLoad'],
-    onAccessibilityTap: input['onAccessibilityTap'] as IImageProps['onLoad'],
-    onMagicTap: input['onMagicTap'] as IImageProps['onLoad'],
-    onAccessibilityEscape: input[
-      'onAccessibilityEscape'
-    ] as IImageProps['onLoad'],
-    onLoadStart: input['onLoadStart'] as IImageProps['onLoadStart'],
-    onLoad: input['onLoad'] as IImageProps['onLoad'],
-    onLoadEnd: input['onLoadEnd'] as IImageProps['onLoadEnd'],
-    onError: input['onError'] as IImageProps['onError'],
-    onProgress: input['onProgress'] as IImageProps['onProgress'],
-    onPartialLoad: input['onPartialLoad'] as IImageProps['onPartialLoad'],
-  };
-
-  return renderImage({
-    source: asSource(input['source']),
-    defaultSource: asSource(input['defaultSource']),
-    loadingIndicatorSource: asSource(input['loadingIndicatorSource']),
-    style: asStyle(input['style']),
-    resizeMode: asResizeMode(input['resizeMode']),
-    tintColor: asString(input['tintColor']),
-    src: asString(input['src']),
-    srcSet: asString(input['srcSet']),
-    alt: asString(input['alt']),
-    width: asNumber(input['width']),
-    height: asNumber(input['height']),
-    crossOrigin: asCrossOrigin(input['crossOrigin']),
-    referrerPolicy: asString(input['referrerPolicy']),
-    passthrough: resolveAccessibilityProps(passthrough),
-  }).props;
-}
+export { IMAGE_INPUTS, IMAGE_OUTPUTS } from './image-inputs';
+export { isImageEventCallback, resolveImageProps } from './image-props-resolve';
 
 export abstract class ImageBase {
   static readonly getSize = imageStatics.getSize;
@@ -326,6 +40,7 @@ export abstract class ImageBase {
   style: unknown;
   resizeMode: unknown;
   resizeMethod: IImageProps['resizeMethod'];
+  resizeMultiplier: number | undefined;
   tintColor: unknown;
   blurRadius: number | undefined;
   capInsets: IImageProps['capInsets'];
@@ -462,7 +177,16 @@ export abstract class ImageBase {
     this.partialLoad.emit(event);
   }
 
+  // Three groups, so no single getter holds every input name at once
   protected get imageInputProps(): Record<string, unknown> {
+    return {
+      ...this.sourceInputProps,
+      ...this.accessibilityInputProps,
+      ...this.handlerInputProps,
+    };
+  }
+
+  private get sourceInputProps(): Record<string, unknown> {
     return {
       source: this.source,
       defaultSource: this.defaultSource,
@@ -470,6 +194,7 @@ export abstract class ImageBase {
       style: this.style,
       resizeMode: this.resizeMode,
       resizeMethod: this.resizeMethod,
+      resizeMultiplier: this.resizeMultiplier,
       tintColor: this.tintColor,
       blurRadius: this.blurRadius,
       capInsets: this.capInsets,
@@ -482,6 +207,11 @@ export abstract class ImageBase {
       height: this.height,
       crossOrigin: this.crossOrigin,
       referrerPolicy: this.referrerPolicy,
+    };
+  }
+
+  private get accessibilityInputProps(): Record<string, unknown> {
+    return {
       testID: this.testID,
       nativeID: this.nativeID,
       accessible: this.accessible,
@@ -519,6 +249,11 @@ export abstract class ImageBase {
       ariaValueMin: this.ariaValueMin,
       ariaValueNow: this.ariaValueNow,
       ariaValueText: this.ariaValueText,
+    };
+  }
+
+  private get handlerInputProps(): Record<string, unknown> {
+    return {
       onAccessibilityAction: this.gatedAccessibilityHandler(
         'accessibilityAction',
         this.onAccessibilityAction,

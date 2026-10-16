@@ -1,10 +1,9 @@
-// PermissionsAndroid off Android: RN's PermissionsAndroid.js `Platform.OS !== 'android'` branches.
-// Every call warns that the module is Android-only and resolves a fixed answer; nothing reaches
-// native.
+// RN's `PermissionsAndroid` through the host off Android: every call warns and resolves a fixed
+// answer, nothing reaches native
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-
-import { PERMISSIONS, PermissionsAndroid, RESULTS } from './index.ios';
+import { PermissionsAndroid } from '../react-native-host';
+import { PERMISSIONS, RESULTS } from './index';
 
 const ANDROID_ONLY =
   '"PermissionsAndroid" module works only for Android platform.';
@@ -14,7 +13,6 @@ afterEach(() => {
 });
 
 describe('PermissionsAndroid (iOS)', () => {
-  // why: RN resolves false / DENIED / {} and warns each time, instead of failing silently.
   it('check, request and requestMultiple warn and resolve the fixed answers', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
@@ -27,6 +25,7 @@ describe('PermissionsAndroid (iOS)', () => {
     await expect(
       PermissionsAndroid.requestMultiple([PERMISSIONS.CAMERA]),
     ).resolves.toEqual({});
+
     expect(warn.mock.calls).toEqual([
       [ANDROID_ONLY],
       [ANDROID_ONLY],
@@ -34,7 +33,6 @@ describe('PermissionsAndroid (iOS)', () => {
     ]);
   });
 
-  // why: the deprecated pair warns its deprecation FIRST, then the Android-only warning.
   it('the deprecated pair warns twice and resolves false', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
@@ -44,6 +42,7 @@ describe('PermissionsAndroid (iOS)', () => {
     await expect(
       PermissionsAndroid.requestPermission(PERMISSIONS.CAMERA),
     ).resolves.toBe(false);
+
     expect(warn.mock.calls).toEqual([
       [
         '"PermissionsAndroid.checkPermission" is deprecated. Use "PermissionsAndroid.check" instead',

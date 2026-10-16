@@ -1,16 +1,15 @@
 // AnimatedValueXY: a 2D value for pan-gesture-style animations. It is not a
 // driving node itself: it multiplexes two ordinary AnimatedValues (x, y), so the
 // same clone-on-write and listener machinery that powers AnimatedValue applies
-// per-axis. Ported from RN's AnimatedValueXY.js with the native-driver and
-// platform-config branches removed. The two child values carry their
-// own native state if they are ever made native.
+// per-axis. Ported from RN's AnimatedValueXY.js: `useNativeDriver` makes both
+// axes native, each axis carries its own native state
 
-import { AnimatedValue } from './value';
+import { AnimatedValue, type IAnimatedValueConfig } from './value';
 
-export interface IValueXY {
+export type IValueXY = {
   x: number;
   y: number;
-}
+};
 
 type IValueXYListener = (value: IValueXY) => void;
 
@@ -37,6 +36,7 @@ export class AnimatedValueXY {
       x: 0,
       y: 0,
     },
+    config?: IAnimatedValueConfig,
   ) {
     if (typeof value.x === 'number' && typeof value.y === 'number') {
       this.x = new AnimatedValue(value.x);
@@ -48,6 +48,10 @@ export class AnimatedValueXY {
       throw new Error(
         'AnimatedValueXY must be initialized with an object of numbers or AnimatedValues.',
       );
+    }
+    if (config?.useNativeDriver) {
+      this.x.__makeNative();
+      this.y.__makeNative();
     }
   }
 

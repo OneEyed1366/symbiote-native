@@ -26,7 +26,10 @@ import { DEFAULT_ACTIVE_OPACITY } from '../state/touchable';
 
 const fabric = installRecordingFabric();
 const live = createLiveTree(fabric);
-let nextRootTag = 7100;
+let nextRootTag = 7_100;
+
+// Pressability only judges drift once the responder is measured, so every node is a 50x50 view
+fabric.measure = (_node, callback) => callback(0, 0, 50, 50, 0, 0);
 
 // The JS driver reads requestAnimationFrame off the host at call time and Node has none. A ~16ms
 // setTimeout shim, the same one `animated-timing.test.ts` installs, so the fade's frame loop runs

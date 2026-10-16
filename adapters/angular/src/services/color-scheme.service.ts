@@ -11,7 +11,7 @@ import { Appearance, type IColorSchemeName } from '@symbiote-native/engine';
  */
 @Injectable({ providedIn: 'root' })
 export class ColorSchemeService {
-  readonly colorScheme = signal<IColorSchemeName | null>(
+  readonly colorScheme = signal<IColorSchemeName | null | undefined>(
     Appearance.getColorScheme(),
   );
 

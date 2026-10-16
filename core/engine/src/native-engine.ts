@@ -87,6 +87,8 @@ export type INativeEngineBindings = {
   /** The upward twin, deepest first — one crossing for a chain the event path walks per event. */
   ancestorsOf: (handle: object) => readonly object[];
   committedRecordOf: (handle: object) => ICommittedRecord | undefined;
+  // Optional: an older pod has no such read
+  shadowNodeOf?: (handle: object) => unknown;
   /** A TEST read — the payload the last commit sent. See `ITreeHost.committedPayloadOf`. */
   committedPayloadOf: (
     handle: object,

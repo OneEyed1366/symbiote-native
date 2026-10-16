@@ -16,6 +16,8 @@ export abstract class AccessibilityInputsBase {
   @Input() accessibilityState?: IAccessibilityStateValue;
   @Input() accessibilityValue?: IAccessibilityProps['accessibilityValue'];
   @Input() accessibilityActions?: IAccessibilityProps['accessibilityActions'];
+  @Input()
+  experimental_accessibilityOrder?: IAccessibilityProps['experimental_accessibilityOrder'];
   @Input() accessibilityLabelledBy?: string | string[];
   @Input()
   importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
@@ -56,6 +58,7 @@ export abstract class AccessibilityInputsBase {
       accessibilityState: this.accessibilityState,
       accessibilityValue: this.accessibilityValue,
       accessibilityActions: this.accessibilityActions,
+      experimental_accessibilityOrder: this.experimental_accessibilityOrder,
       accessibilityLabelledBy: this.accessibilityLabelledBy,
       importantForAccessibility: this.importantForAccessibility,
       accessibilityLiveRegion: this.accessibilityLiveRegion,

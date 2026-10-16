@@ -1,27 +1,21 @@
-// Unit test for the StyleSheet API. create/flatten/compose/absoluteFill run
-// against plain objects; for hairlineWidth/roundToNearestPixel we install a fake
-// __turboModuleProxy so getNativeModule('DeviceInfo') returns a known screen scale, then
-// assert the width/rounding matches RN's own formula for that scale — never a value copied
-// from this module's implementation. Every StyleSheet member is pure/total (never throws),
-// so there is no Negative group.
+// Unit test for the StyleSheet API. create/flatten/compose/absoluteFill run against plain
+// objects; hairlineWidth/roundToNearestPixel read the scale off RN's own `Dimensions`.
+// Every StyleSheet member is total (never throws), so there is no Negative group
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { Dimensions } from '../react-native-host';
 import { StyleSheet, computeHairlineWidth } from './index';
 
-function isType<T>(value: unknown): value is T {
-  return value !== null && value !== undefined;
-}
+const SIMULATOR_SCALE = 3;
 
-function installFakeDeviceInfo(getConstants: () => unknown): void {
-  globalThis.__turboModuleProxy = <T>(name: string): T | null => {
-    if (name !== 'DeviceInfo') return null;
-    const deviceInfo = { getConstants };
-    return isType<T>(deviceInfo) ? deviceInfo : null;
-  };
+function setWindowScale(scale: number): void {
+  const metrics = { width: 390, height: 844, scale, fontScale: 1 };
+  Dimensions.set({ window: metrics, screen: metrics });
 }
 
 afterEach(() => {
-  globalThis.__turboModuleProxy = undefined;
+  setWindowScale(SIMULATOR_SCALE);
+  vi.unstubAllGlobals();
 });
 
 describe('StyleSheet', () => {
@@ -31,6 +25,25 @@ describe('StyleSheet', () => {
       const created = StyleSheet.create(input);
       expect(created).toEqual(input);
       expect(created.box.flex).toBe(1);
+    });
+
+    // RN freezes each entry under `__DEV__`, so a write to one fails where it is made
+    it('freezes every entry in a dev bundle', () => {
+      vi.stubGlobal('__DEV__', true);
+      const created = StyleSheet.create({
+        box: { flex: 1 },
+        title: { top: 2 },
+      });
+
+      expect(Object.isFrozen(created.box)).toBe(true);
+      expect(Object.isFrozen(created.title)).toBe(true);
+    });
+
+    it('leaves the entries writable in a release bundle', () => {
+      vi.stubGlobal('__DEV__', false);
+      const created = StyleSheet.create({ box: { flex: 1 } });
+
+      expect(Object.isFrozen(created.box)).toBe(false);
     });
   });
 
@@ -42,9 +55,100 @@ describe('StyleSheet', () => {
       });
     });
 
-    // why: setStyleAttributePreprocessor's whole purpose is rewriting one style key's value
-    // AFTER flattenStyle collapses the array — this is the seam that lets, e.g., a color
-    // preprocessor run exactly once regardless of how many style-array entries carried it.
+    // Порт `flattenStyle-test.js` RN
+    describe('RN flattenStyle semantics', () => {
+      const classes = StyleSheet.create({
+        elementA: { width: 1, height: 2 },
+        elementB: { height: 3 },
+      });
+
+      it('overrides properties, null and undefined included', () => {
+        expect(
+          StyleSheet.flatten([
+            { backgroundColor: '#000', width: 10 },
+            { backgroundColor: undefined, width: null },
+          ]),
+        ).toEqual({ backgroundColor: undefined, width: null });
+      });
+
+      it('does not fail on falsy entries', () => {
+        expect(() =>
+          StyleSheet.flatten([null, false, undefined]),
+        ).not.toThrow();
+      });
+
+      it('flattens nested arrays', () => {
+        const flat = StyleSheet.flatten([
+          null,
+          [],
+          [{ width: 10 }, { height: 20 }],
+          { width: 30 },
+        ]);
+        expect(flat).toEqual({ width: 30, height: 20 });
+      });
+
+      it('returns undefined and allocates nothing for no style', () => {
+        expect(StyleSheet.flatten(null)).toBeUndefined();
+        expect(StyleSheet.flatten(undefined)).toBeUndefined();
+      });
+
+      it('returns a single style object itself', () => {
+        const style = { a: 'b' };
+        expect(StyleSheet.flatten(style)).toBe(style);
+        expect(StyleSheet.flatten(classes.elementA)).toBe(classes.elementA);
+      });
+
+      it('merges classes, the later one winning', () => {
+        expect(
+          StyleSheet.flatten([classes.elementA, classes.elementB]),
+        ).toEqual({
+          width: 1,
+          height: 3,
+        });
+        expect(
+          StyleSheet.flatten([classes.elementB, classes.elementA]),
+        ).toEqual({
+          width: 1,
+          height: 2,
+        });
+      });
+
+      it('merges classes with an inline style and nested arrays', () => {
+        const nested = [{ width: 10, height: 11 }, { width: 12 }];
+        expect(
+          StyleSheet.flatten([classes.elementA, classes.elementB, nested]),
+        ).toEqual({ width: 12, height: 11 });
+      });
+
+      it('ignores an invalid style such as a number', () => {
+        expect(StyleSheet.flatten(JSON.parse('1234'))).toBeUndefined();
+      });
+    });
+
+    describe('setStyleAttributePreprocessor warning', () => {
+      it('warns like RN when a preprocessor is overwritten', () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        StyleSheet.setStyleAttributePreprocessor('fontFamily', value => value);
+        expect(warn).not.toHaveBeenCalled();
+        StyleSheet.setStyleAttributePreprocessor('fontFamily', value => value);
+        expect(warn).toHaveBeenCalledWith(
+          'Overwriting fontFamily style attribute preprocessor',
+        );
+        warn.mockRestore();
+      });
+
+      // RN предупреждает, только когда новая функция отличается от прежней
+      it('stays silent when the same preprocessor is set again', () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const process = (value: unknown) => value;
+        StyleSheet.setStyleAttributePreprocessor('__testSame', process);
+        StyleSheet.setStyleAttributePreprocessor('__testSame', process);
+        expect(warn).not.toHaveBeenCalled();
+        warn.mockRestore();
+      });
+    });
+
+    // Preprocessor переписывает значение одного ключа после схлопывания массива
     it('applies a registered per-attribute preprocessor to the matching flattened key', () => {
       StyleSheet.setStyleAttributePreprocessor('__testDoubled', value =>
         typeof value === 'number' ? value * 2 : value,
@@ -95,11 +199,7 @@ describe('StyleSheet', () => {
       expect(StyleSheet.compose(null, null)).toBeNull();
     });
 
-    // why: nullish, not falsy - and that is the CORRECT behavior, not a gap. React Native's
-    // composeStyles branches on `== null` (src/private/styles/composeStyles.js), so `0` is a
-    // present style there too, which matters wherever a raw number reaches compose (an animated
-    // scale or opacity, say). The file comment used to say "falsy" and was the thing that was
-    // wrong; it has been corrected. This test pins the parity so neither drifts again.
+    // RN `composeStyles` сравнивает с `== null`, поэтому `0` это присутствующий стиль
     it('treats 0 as a present style rather than falsy, matching RN composeStyles', () => {
       expect(StyleSheet.compose(0, y)).toEqual([0, y]);
       expect(StyleSheet.compose(x, 0)).toEqual([x, 0]);
@@ -107,40 +207,9 @@ describe('StyleSheet', () => {
   });
 
   describe('hairlineWidth', () => {
-    const FAKE_SCALE = 3;
-
-    it('matches RN formula for the faked DeviceInfo screen scale', () => {
-      installFakeDeviceInfo(() => ({
-        Dimensions: { window: { scale: FAKE_SCALE } },
-      }));
-
-      const width = StyleSheet.hairlineWidth;
-      expect(typeof width).toBe('number');
-      expect(width).toBeGreaterThan(0);
-      expect(width).toBe(computeHairlineWidth(FAKE_SCALE));
-    });
-
-    // why: Android exposes the scale under windowPhysicalPixels, not window — hairlineWidth
-    // must resolve either key, or every Android device would silently fall back to 1px.
-    it('falls back to windowPhysicalPixels.scale when window.scale is absent', () => {
-      installFakeDeviceInfo(() => ({
-        Dimensions: { windowPhysicalPixels: { scale: 2 } },
-      }));
+    it('follows the window scale RN reports', () => {
+      setWindowScale(2);
       expect(StyleSheet.hairlineWidth).toBe(computeHairlineWidth(2));
-    });
-
-    // why: a headless run (no DeviceInfo linked) must degrade to a sane constant, never
-    // throw mid-render — the module comment calls this out explicitly.
-    it('falls back to 1 when DeviceInfo is not resolvable', () => {
-      globalThis.__turboModuleProxy = undefined;
-      expect(StyleSheet.hairlineWidth).toBe(1);
-    });
-
-    // why: a non-positive scale would make round/divide nonsensical (division by zero, or a
-    // negative line width) — the guard treats it as missing rather than propagating garbage.
-    it('falls back to 1 when the resolved scale is non-positive', () => {
-      installFakeDeviceInfo(() => ({ Dimensions: { window: { scale: 0 } } }));
-      expect(StyleSheet.hairlineWidth).toBe(1);
     });
   });
 
@@ -159,18 +228,10 @@ describe('StyleSheet', () => {
   });
 
   describe('roundToNearestPixel', () => {
-    // why: RN's PixelRatio.roundToNearestPixel snaps a dp size to the nearest value that
-    // maps to a WHOLE device pixel — used so a hairline border or icon doesn't blur across
-    // pixel boundaries; the formula must match RN's exactly (Math.round(size*scale)/scale).
-    it('snaps a size to the nearest whole device pixel at the faked scale', () => {
-      installFakeDeviceInfo(() => ({ Dimensions: { window: { scale: 3 } } }));
-      // Math.round(10.2 * 3) / 3 = Math.round(30.6) / 3 = 31/3.
+    it('snaps a size to the nearest whole device pixel at the window scale', () => {
+      setWindowScale(3);
+      // Math.round(10.2 * 3) / 3 = Math.round(30.6) / 3 = 31/3
       expect(StyleSheet.roundToNearestPixel(10.2)).toBeCloseTo(31 / 3, 10);
-    });
-
-    it('leaves the value unrounded when the scale is unresolvable (headless)', () => {
-      globalThis.__turboModuleProxy = undefined;
-      expect(StyleSheet.roundToNearestPixel(10.2)).toBe(10.2);
     });
   });
 });

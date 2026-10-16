@@ -21,16 +21,22 @@ import {
   type VNode,
 } from '@vue/runtime-core';
 import {
+  cellGapsFor,
+  createSeparatorBoard,
   flattenSections,
+  layoutOverSections,
+  renderSectionEntry,
+  resolveScrollLocation,
   resolveStickySectionHeaders,
-  scrollLocationToFlatIndex,
+  routeScrollHandle,
   sectionEntryKey,
-  unwrapEntryItem,
-  type ISection,
+  type IInnerViewRef,
+  type ISection as ICoreSection,
   type ISectionEntry,
+  type ISeparatorBoard,
+  type ISeparatorGap,
   type ISeparatorProps,
   type ISeparators,
-  type IScrollViewHandle,
   type IVirtualizedListHandle,
   type IVirtualizedSectionListHandle,
 } from '@symbiote-native/components';
@@ -39,12 +45,12 @@ import {
   dlog,
   type IStyleProp,
   type ISymbioteEvent,
-  type ISymbioteNode,
   type IViewStyle,
 } from '@symbiote-native/engine';
 import { VirtualizedList } from '../virtualized-list';
 import { normalizeVueAttrs } from '../../utils/normalize-attrs';
 import type { ICtx } from '../../utils/component-helpers';
+import { SectionItemCell, type ISeparatorState } from './section-item-cell';
 
 // VirtualizedList's generic construct signature can't be resolved by h()'s overloads, so drive
 // it through a loose functional-component handle instead.
@@ -52,11 +58,21 @@ const VirtualizedListHost = VirtualizedList as unknown as FunctionalComponent<
   Record<string, unknown>
 >;
 
-export type { ISection } from '@symbiote-native/components';
 // Re-export the shared handle type so section-list imports it from '../virtualized-section-list'.
 export type { IVirtualizedSectionListHandle };
 
-export interface IVirtualizedSectionListProps<ItemT> {
+// A section may bring its own item render and separator, which beat the list's slots
+export type ISection<ItemT> = ICoreSection<ItemT> & {
+  renderItem?: (info: {
+    item: ItemT;
+    index: number;
+    section: ISection<ItemT>;
+    separators: ISeparators;
+  }) => VNode[] | VNode;
+  ItemSeparatorComponent?: (props: ISeparatorProps<ItemT>) => VNode[] | VNode;
+};
+
+export type IVirtualizedSectionListProps<ItemT> = {
   sections: ReadonlyArray<ISection<ItemT>>;
   // Cell + section chrome are Vue scoped slots (#item / #sectionHeader / #sectionFooter /
   // #separator / #sectionSeparator / #header / #footer / #empty), typed by
@@ -87,7 +103,9 @@ export interface IVirtualizedSectionListProps<ItemT> {
   maxToRenderPerBatch?: number;
   updateCellsBatchingPeriod?: number;
   windowSize?: number;
+  disableVirtualization?: boolean;
   inverted?: boolean;
+  horizontal?: boolean;
   maintainVisibleContentPosition?: {
     minIndexForVisible: number;
     autoscrollToTopThreshold?: number;
@@ -98,15 +116,20 @@ export interface IVirtualizedSectionListProps<ItemT> {
   onScrollEndDrag?: (event: ISymbioteEvent) => void;
   onMomentumScrollBegin?: (event: ISymbioteEvent) => void;
   onMomentumScrollEnd?: (event: ISymbioteEvent) => void;
+  onContentSizeChange?: (width: number, height: number) => void;
   scrollEventThrottle?: number;
   keyboardShouldPersistTaps?: boolean | 'always' | 'never' | 'handled';
   keyboardDismissMode?: 'none' | 'on-drag' | 'interactive';
   removeClippedSubviews?: boolean;
   nestedScrollEnabled?: boolean;
+  stickyHeaderHiddenOnScroll?: boolean;
+  innerViewRef?: IInnerViewRef;
   style?: IStyleProp<IViewStyle>;
   contentContainerStyle?: IStyleProp<IViewStyle>;
+  listHeaderComponentStyle?: IStyleProp<IViewStyle>;
+  listFooterComponentStyle?: IStyleProp<IViewStyle>;
   [key: string]: unknown;
-}
+};
 
 // ItemT flows in from `sections`, so #item / #sectionHeader are typed without annotation.
 export type IVirtualizedSectionListSlots<ItemT> = {
@@ -118,9 +141,9 @@ export type IVirtualizedSectionListSlots<ItemT> = {
   }) => VNode[] | VNode;
   sectionHeader?: (info: { section: ISection<ItemT> }) => VNode[] | VNode;
   sectionFooter?: (info: { section: ISection<ItemT> }) => VNode[] | VNode;
-  // Painted between adjacent sections (RN's SectionSeparatorComponent).
-  sectionSeparator?: () => VNode[] | VNode;
-  // Typed on ItemT; VSL unwraps each entry back to its ItemT before the inner list invokes it.
+  // Painted before a section's first item and after its last (RN's SectionSeparatorComponent)
+  sectionSeparator?: (props: ISeparatorProps<ItemT>) => VNode[] | VNode;
+  // Painted between the items of one section, an item cell renders it itself
   separator?: (props: ISeparatorProps<ItemT>) => VNode[] | VNode;
   header?: () => VNode[] | VNode;
   footer?: () => VNode[] | VNode;
@@ -148,6 +171,11 @@ const PROP_KEYS = [
 
 const EMIT_KEYS = ['endReached', 'startReached', 'refresh'];
 
+type ISectionCtx<ItemT> = ICtx<
+  IVirtualizedSectionListEmits,
+  IVirtualizedSectionListSlots<ItemT>
+>;
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -157,18 +185,20 @@ function isVirtualizedListHandle(
   return isRecord(value) && typeof value.scrollToOffset === 'function';
 }
 
+type IScrollLocationParams = Parameters<
+  IVirtualizedSectionListHandle['scrollToLocation']
+>[0];
+
 function buildSectionDelegate(
   getInner: () => IVirtualizedListHandle | null,
-  getHeaderIndices: () => number[],
+  locate: (
+    params: IScrollLocationParams,
+  ) => ReturnType<typeof resolveScrollLocation>,
 ): IVirtualizedSectionListHandle {
   return {
     scrollToLocation: (params): void => {
-      const flatIndex = scrollLocationToFlatIndex(
-        getHeaderIndices(),
-        params.sectionIndex,
-        params.itemIndex,
-      );
-      if (flatIndex === undefined) {
+      const target = locate(params);
+      if (target === undefined) {
         dlog(
           `Vue VirtualizedSectionList scrollToLocation: section ${params.sectionIndex} out of range`,
         );
@@ -176,48 +206,114 @@ function buildSectionDelegate(
       }
       dlog(
         `Vue VirtualizedSectionList scrollToLocation section=${params.sectionIndex} ` +
-          `item=${params.itemIndex} -> flat ${flatIndex}`,
+          `item=${params.itemIndex} -> flat ${target.index}`,
       );
-      getInner()?.scrollToIndex({
-        index: flatIndex,
-        viewOffset: params.viewOffset,
-        viewPosition: params.viewPosition,
-        animated: params.animated,
-      });
+      getInner()?.scrollToIndex(target);
     },
-    flashScrollIndicators: () => getInner()?.flashScrollIndicators(),
-    getNativeScrollRef: (): IScrollViewHandle | null =>
-      getInner()?.getNativeScrollRef() ?? null,
-    getScrollableNode: (): IScrollViewHandle | null =>
-      getInner()?.getScrollableNode() ?? null,
-    getScrollResponder: (): IScrollViewHandle | null =>
-      getInner()?.getScrollResponder() ?? null,
-    getScrollNode: (): ISymbioteNode | null =>
-      getInner()?.getScrollNode() ?? null,
-    recordInteraction: () => getInner()?.recordInteraction(),
+    ...routeScrollHandle(getInner),
+  };
+}
+
+type IEntry<ItemT> = ISectionEntry<ItemT, ISection<ItemT>>;
+
+type IEntryRendering<ItemT> = {
+  slots: ISectionCtx<ItemT>['slots'];
+  entries: ReadonlyArray<IEntry<ItemT>>;
+  board: ISeparatorBoard<Record<string, unknown>>;
+  keyOf(entry: IEntry<ItemT>): string;
+  isInverted: boolean;
+};
+
+// The separator slot for a gap: the section one, or the item one where a section's own beats
+// the list's
+function separatorRenderFor<ItemT>(
+  gap: ISeparatorGap<ItemT, ISection<ItemT>>,
+  slots: ISectionCtx<ItemT>['slots'],
+): ((state: ISeparatorState) => VNode[] | VNode) | undefined {
+  if (gap.props === undefined) return undefined;
+  const { props } = gap;
+  const slot =
+    gap.kind === 'section'
+      ? slots.sectionSeparator
+      : (props.section.ItemSeparatorComponent ?? slots.separator);
+  if (slot === undefined) return undefined;
+  return ({ isHighlighted, override }) =>
+    slot({ highlighted: isHighlighted, ...props, ...override });
+}
+
+// The inner list's #item slot: each flattened entry goes to the matching consumer slot, an item
+// to a cell that paints its own separators. A slot the consumer left off renders nothing
+function entryRendererFor<ItemT>(
+  rendering: IEntryRendering<ItemT>,
+): (info: { item: IEntry<ItemT>; index: number }) => VNode[] | VNode {
+  const { slots, entries, board, keyOf } = rendering;
+  return info =>
+    renderSectionEntry<ItemT, VNode[] | VNode, ISection<ItemT>>(
+      {
+        header: ({ section }) => slots.sectionHeader?.({ section }) ?? [],
+        footer: ({ section }) => slots.sectionFooter?.({ section }) ?? [],
+        item: entry => {
+          const gaps = cellGapsFor(entries, info.index);
+          const previous = entries[info.index - 1];
+          const render = entry.section.renderItem ?? slots.item;
+          return h(SectionItemCell, {
+            board,
+            cellKey: keyOf(entry),
+            prevCellKey: previous === undefined ? undefined : keyOf(previous),
+            renderItem: separators =>
+              render?.({
+                item: entry.item,
+                index: entry.itemIndex,
+                section: entry.section,
+                separators,
+              }) ?? [],
+            leadingSeparator: separatorRenderFor(gaps.leading, slots),
+            trailingSeparator: separatorRenderFor(gaps.trailing, slots),
+            inverted: rendering.isInverted,
+          });
+        },
+      },
+      info.item,
+    );
+}
+
+// The three synthesized events become inner-list handlers ONLY when listened, so the inner list
+// keeps gating (no parasitic RefreshControl / edge-reached work for an unlistened event)
+function synthesizedEvents(
+  listens: (onName: string) => boolean,
+  emit: ISectionCtx<unknown>['emit'],
+): Record<string, ((...args: never[]) => void) | undefined> {
+  return {
+    onEndReached: listens('onEndReached')
+      ? (eventInfo: { distanceFromEnd: number }): void =>
+          emit('endReached', eventInfo)
+      : undefined,
+    onStartReached: listens('onStartReached')
+      ? (eventInfo: { distanceFromStart: number }): void =>
+          emit('startReached', eventInfo)
+      : undefined,
+    onRefresh: listens('onRefresh') ? (): void => emit('refresh') : undefined,
   };
 }
 
 export const VirtualizedSectionList = defineComponent(
   <ItemT>(
     props: IVirtualizedSectionListProps<ItemT>,
-    {
-      attrs,
-      expose,
-      emit,
-      slots,
-    }: ICtx<IVirtualizedSectionListEmits, IVirtualizedSectionListSlots<ItemT>>,
+    { attrs, expose, emit, slots }: ISectionCtx<ItemT>,
   ) => {
+    const board = createSeparatorBoard<Record<string, unknown>>();
     const inner = shallowRef<IVirtualizedListHandle | null>(null);
     const setInner = (instance: unknown): void => {
       inner.value = isVirtualizedListHandle(instance) ? instance : null;
     };
-    // headerIndices change each render (sections may change); the delegate reads them lazily.
+    // Both change every render (sections may change), the delegate reads them lazily
     let headerIndices: number[] = [];
+    let stickyHeaderIndices: number[] | undefined;
     expose(
       buildSectionDelegate(
         () => inner.value,
-        () => headerIndices,
+        params =>
+          resolveScrollLocation(headerIndices, stickyHeaderIndices, params),
       ),
     );
 
@@ -235,132 +331,46 @@ export const VirtualizedSectionList = defineComponent(
       )
         ? props.sections
         : [];
-      const keyExtractor = props.keyExtractor;
-      // The passthrough tail: declared props + declared emits' onX are already removed from $attrs,
-      // so what's left is the VirtualizedList passthrough (kebab-folded for the inner list).
-      const forwarded = normalizeVueAttrs(attrs);
-
-      const { entries, headerIndices: indices } = flattenSections(
-        sections,
-        slots.sectionSeparator !== undefined,
-      );
+      const { entries, headerIndices: indices } = flattenSections<
+        ItemT,
+        ISection<ItemT>
+      >(sections);
       headerIndices = indices;
-
+      const keyOf = (entry: IEntry<ItemT>): string =>
+        sectionEntryKey(entry, props.keyExtractor);
       // RN sticks section headers by default only on iOS; Android does not unless asked.
-      const stickyHeaderIndices = resolveStickySectionHeaders(
+      stickyHeaderIndices = resolveStickySectionHeaders(
         props.stickySectionHeadersEnabled,
         indices,
         Platform.OS,
       );
-
       dlog(
         `Vue VirtualizedSectionList: ${sections.length} sections flattened to ${entries.length} entries`,
       );
 
-      // The inner list's #item slot: dispatch each flattened entry to the matching consumer slot,
-      // returning its VNode[] (empty when the consumer left that slot off).
-      const renderEntry = (info: {
-        item: ISectionEntry<ItemT>;
-        index: number;
-        separators: ISeparators;
-      }): VNode[] | VNode => {
-        const entry = info.item;
-        if (entry.kind === 'header') {
-          return slots.sectionHeader
-            ? slots.sectionHeader({ section: entry.section })
-            : [];
-        }
-        if (entry.kind === 'footer') {
-          return slots.sectionFooter
-            ? slots.sectionFooter({ section: entry.section })
-            : [];
-        }
-        if (entry.kind === 'section-separator') {
-          return slots.sectionSeparator ? slots.sectionSeparator() : [];
-        }
-        return slots.item
-          ? slots.item({
-              item: entry.item,
-              index: entry.itemIndex,
-              section: entry.section,
-              separators: info.separators,
-            })
-          : [];
-      };
-
-      // The user's #separator is typed on ItemT, but the inner stream is the entry wrapper; unwrap
-      // each entry back to its ItemT (shared unwrapEntryItem) before the inner list invokes it.
-      const entrySeparatorSlot =
-        slots.separator === undefined
-          ? undefined
-          : (
-              entryProps: ISeparatorProps<ISectionEntry<ItemT>>,
-            ): VNode[] | VNode =>
-              slots.separator!({
-                ...entryProps,
-                leadingItem: unwrapEntryItem(entryProps.leadingItem),
-                trailingItem: unwrapEntryItem(entryProps.trailingItem),
-              });
-
-      const entryKeyExtractor = (
-        entry: ISectionEntry<ItemT>,
-        index: number,
-      ): string => sectionEntryKey(entry, index, keyExtractor);
-
-      // Hand the callback `sections`, not the entries: RN's inner VirtualizedList gets
-      // `data={this.props.sections}` (VirtualizedSectionList.js:216) while ours streams the
-      // FLATTENED entries, so the same user code would otherwise see a different argument here
-      // than on RN.
-      //
-      // UPSTREAM-DIVERGENCE(react-native): the flat INDEX matches RN's (two rows per section,
-      // header and footer) only while the #sectionSeparator slot is unset. With it,
-      // flattenSections emits an extra 'section-separator' row per boundary that RN renders inside
-      // the neighbouring cell, so indices shift by one per boundary from the second section on.
-      // Deliberate - that row is how this adapter paints the separator; a caller combining the two
-      // must account for it.
-      const getItemLayout = props.getItemLayout;
-      const entryItemLayout =
-        getItemLayout === undefined
-          ? undefined
-          : (
-              _entries: unknown,
-              index: number,
-            ): { length: number; offset: number; index: number } =>
-              getItemLayout(sections, index);
-
-      // The three synthesized events become inner-VL handlers ONLY when listened, so the inner list
-      // keeps gating (no parasitic RefreshControl / edge-reached work for an unlistened event).
-      const endReached = listens('onEndReached')
-        ? (eventInfo: { distanceFromEnd: number }): void =>
-            emit('endReached', eventInfo)
-        : undefined;
-      const startReached = listens('onStartReached')
-        ? (eventInfo: { distanceFromStart: number }): void =>
-            emit('startReached', eventInfo)
-        : undefined;
-      const refresh = listens('onRefresh')
-        ? (): void => emit('refresh')
-        : undefined;
-
       return h(
         VirtualizedListHost,
         {
-          ...forwarded,
+          // The passthrough tail: declared props and emits are already out of $attrs
+          ...normalizeVueAttrs(attrs),
           ref: setInner,
           data: entries,
-          getItem: (_source: unknown, index: number): ISectionEntry<ItemT> =>
+          getItem: (_source: unknown, index: number): IEntry<ItemT> =>
             entries[index],
           getItemCount: (): number => entries.length,
-          keyExtractor: entryKeyExtractor,
-          getItemLayout: entryItemLayout,
+          keyExtractor: keyOf,
+          getItemLayout: layoutOverSections(props.getItemLayout, sections),
           stickyHeaderIndices,
-          onEndReached: endReached,
-          onStartReached: startReached,
-          onRefresh: refresh,
+          ...synthesizedEvents(listens, emit),
         },
         {
-          item: renderEntry,
-          separator: entrySeparatorSlot,
+          item: entryRendererFor({
+            slots,
+            entries,
+            board,
+            keyOf,
+            isInverted: attrs.inverted === true,
+          }),
           header: slots.header,
           footer: slots.footer,
           empty: slots.empty,

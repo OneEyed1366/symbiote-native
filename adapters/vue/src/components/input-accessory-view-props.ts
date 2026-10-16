@@ -9,15 +9,16 @@ import type {
 } from '@symbiote-native/components';
 import type {
   IClassNameValue,
+  IColorValue,
   IStyleProp,
   IViewStyle,
 } from '@symbiote-native/engine';
 
-export interface IInputAccessoryViewProps
-  extends IAccessibilityProps, IAriaProps {
-  // The id a TextInput's inputAccessoryViewID points at to dock above its keyboard.
-  nativeID?: string;
-  backgroundColor?: string;
-  style?: IStyleProp<IViewStyle>;
-  class?: IClassNameValue;
-}
+export type IInputAccessoryViewProps = IAccessibilityProps &
+  IAriaProps & {
+    // The id a TextInput's inputAccessoryViewID points at to dock above its keyboard.
+    nativeID?: string;
+    backgroundColor?: IColorValue;
+    style?: IStyleProp<IViewStyle>;
+    class?: IClassNameValue;
+  };

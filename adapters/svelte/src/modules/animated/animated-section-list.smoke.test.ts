@@ -51,6 +51,11 @@ const VIRTUALIZED_SECTION_LIST_OUT = join(
   'virtualized-section-list',
   '.smoke-compiled-virtualized-section-list-for-animated.mjs',
 );
+const SECTION_CELL_OUT = join(
+  COMPONENTS_DIR,
+  'virtualized-section-list',
+  '.smoke-compiled-section-item-cell-for-animated.mjs',
+);
 const SECTION_LIST_OUT = join(
   COMPONENTS_DIR,
   'section-list',
@@ -75,6 +80,7 @@ afterEach(() => {
   for (const out of [
     VIRTUALIZED_LIST_OUT,
     VIRTUALIZED_SECTION_LIST_OUT,
+    SECTION_CELL_OUT,
     SECTION_LIST_OUT,
     PARENT_OUT,
   ]) {
@@ -130,6 +136,18 @@ function compileChain(): void {
     'VirtualizedList.svelte',
     VIRTUALIZED_LIST_OUT,
   );
+  compileToFile(
+    readFileSync(
+      join(
+        COMPONENTS_DIR,
+        'virtualized-section-list',
+        'section-item-cell.svelte',
+      ),
+      'utf8',
+    ),
+    'SectionItemCell.svelte',
+    SECTION_CELL_OUT,
+  );
   compileRewritten(
     join(COMPONENTS_DIR, 'virtualized-section-list', 'index.svelte'),
     'VirtualizedSectionList.svelte',
@@ -138,6 +156,10 @@ function compileChain(): void {
       [
         "from '../virtualized-list/index.svelte'",
         "from '../virtualized-list/.smoke-compiled-virtualized-list-for-animated-section-list.mjs'",
+      ],
+      [
+        "from './section-item-cell.svelte'",
+        "from './.smoke-compiled-section-item-cell-for-animated.mjs'",
       ],
     ],
   );

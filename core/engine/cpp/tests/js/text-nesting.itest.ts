@@ -41,8 +41,7 @@ function text(testID: string) {
 }
 
 describe('text nesting decides the native view name', () => {
-  // why: the baseline. A lone text element is a paragraph and its characters are a raw text under
-  // it — if this shape is wrong, nothing below means anything.
+  // Базовый случай: одинокий текст это абзац с сырым текстом внутри
   it('a lone text element commits as a paragraph holding its characters', () => {
     const surface = createSurface(1);
     const paragraph = text('lead');
@@ -53,8 +52,7 @@ describe('text nesting decides the native view name', () => {
     expect(committedShape()).toBe('RootView(View(Paragraph(RawText())))');
   });
 
-  // why: THE rule. The inner element is the same authored component as the outer one and has to
-  // arrive under a different native name.
+  // Внутренний элемент тот же компонент, что и внешний, но уходит под другим нативным именем
   it('a text element under a text element commits as virtual text', () => {
     const surface = createSurface(1);
     const outer = text('outer');
@@ -67,10 +65,9 @@ describe('text nesting decides the native view name', () => {
     expect(committedShape()).toBe('RootView(View(Paragraph(Text(RawText()))))');
   });
 
-  // why: the rule is STICKY through a non-text element. A `<View>` in the middle does not end the
-  // text context, so the text below it is still virtual — the case an adapter would get wrong if it
-  // tried to decide this from its own parent chain.
-  it('stays virtual through a view in the middle', () => {
+  // `<View>` обрывает текстовый контекст, как `TextAncestorContext` в `View.js` у RN
+  // Текст под инлайн-вью остаётся абзацем: виртуальному тексту там негде лежать и он не рисуется
+  it('starts a paragraph again below a view in the middle', () => {
     const surface = createSurface(1);
     const outer = text('outer');
     const middle = createElement('RCTView');
@@ -83,12 +80,11 @@ describe('text nesting decides the native view name', () => {
     surface.commit();
 
     expect(committedShape()).toBe(
-      'RootView(View(Paragraph(View(Text(RawText())))))',
+      'RootView(View(Paragraph(View(Paragraph(RawText())))))',
     );
   });
 
-  // why: and none of that nesting is a native view. A sentence is one paragraph view whatever it is
-  // made of — which is why a test may not read text structure off the mounted tree.
+  // Вложенность не даёт нативных вью, предложение это один абзац из чего бы оно ни состояло
   it('mounts one view for the paragraph, whatever it contains', () => {
     const surface = createSurface(1);
     const outer = text('outer');
@@ -101,10 +97,8 @@ describe('text nesting decides the native view name', () => {
     expect(shapeOf(mounted())).toBe('RootView(Paragraph())');
   });
 
-  // why: an empty raw text must not reach Fabric at all — `AttributedString::appendFragment` drops
-  // an empty fragment while the text walk has already recorded "the last child was raw text", so
-  // the next raw sibling merges into an empty vector and the process aborts. `node.ts` says this in
-  // a comment; here the committed tree says it.
+  // Пустой сырой текст не должен дойти до Fabric, следующий сырой сосед
+  // слился бы в пустой вектор и процесс упал бы
   it('skips an empty raw text', () => {
     const surface = createSurface(1);
     const paragraph = text('p');

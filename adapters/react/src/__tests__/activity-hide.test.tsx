@@ -15,6 +15,7 @@ import {
 } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 11;
+const PANEL_BACKGROUND = '#24304a';
 
 const fabric = installRecordingFabric();
 const live = createLiveTree(fabric);
@@ -37,10 +38,16 @@ function panelProps(): Record<string, unknown> {
   return panelNode()?.payload ?? {};
 }
 
-function Panel({ hidden }: { hidden: boolean }): ReactElement {
+function Panel({
+  hidden,
+  background,
+}: {
+  hidden: boolean;
+  background: string;
+}): ReactElement {
   return (
     <Activity mode={hidden ? 'hidden' : 'visible'}>
-      <view testID="activity-panel" style={{ backgroundColor: '#24304a' }}>
+      <view testID="activity-panel" style={{ backgroundColor: background }}>
         <text>panel</text>
       </view>
     </Activity>
@@ -51,7 +58,7 @@ function Host(): ReactElement {
   const [hidden, setHidden] = useState(false);
   return (
     <view testID="activity-host" onPress={() => setHidden(value => !value)}>
-      <Panel hidden={hidden} />
+      <Panel hidden={hidden} background={PANEL_BACKGROUND} />
     </view>
   );
 }
@@ -78,6 +85,6 @@ describe('Activity hides a subtree without unmounting it', () => {
     // author's own style intact — that reversibility is why the slot lives in the engine. A
     // vanished prop is a missing PAYLOAD key, not a `null`/`undefined` value.
     expect(Object.hasOwn(panelProps(), 'display')).toBe(false);
-    expect(panelProps().backgroundColor).toBe('#24304a');
+    expect(panelProps().backgroundColor).toBe(PANEL_BACKGROUND);
   });
 });

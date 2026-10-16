@@ -5,9 +5,11 @@
 // IAccessibilityProps/IAriaProps (testID, accessibilityLabel, aria-*, …) and onRefresh/refreshing/
 // progressViewOffset ride in for free through the Omit — IVirtualizedListProps already extends
 // them and none of those fields are in the Omit list — so this type needs no explicit `extends`.
+import type { Snippet } from 'svelte';
 import type { IStyleProp, IViewStyle } from '@symbiote-native/engine';
 import type { IViewabilityConfigCallbackPair } from '@symbiote-native/components';
 import type {
+  ICellRendererProps,
   IVirtualizedListHandle,
   IVirtualizedListProps,
 } from '../virtualized-list/virtualized-list-props';
@@ -16,9 +18,15 @@ export type { IVirtualizedListHandle as IFlatListHandle };
 
 export type IFlatListProps<ItemT> = Omit<
   IVirtualizedListProps<ItemT>,
-  'data' | 'getItem' | 'getItemCount' | 'viewabilityConfigCallbackPairs'
+  | 'data'
+  | 'getItem'
+  | 'getItemCount'
+  | 'viewabilityConfigCallbackPairs'
+  | 'cellRenderer'
 > & {
   data: readonly ItemT[];
+  // The cell's `item` is the list's own, a row of items when `numColumns` is above 1
+  cellRenderer?: Snippet<[ICellRendererProps<unknown>]>;
   numColumns?: number;
   // A bare string resolves through the shared style registry (like a class name); a style
   // object/array flows through unchanged. Mirrors the Vue adapter's columnWrapperStyle.

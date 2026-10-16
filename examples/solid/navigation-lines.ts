@@ -1,15 +1,11 @@
 import { ROUTE_NAME } from './routes';
 import type { ITourRouteName } from './routes';
 
-// The @symbiote-native/navigation demo suite groups its tour screens into 5 thematic "lines" —
-// which part of the package each screen exercises — plus a Performance line for the benchmark stop
-// and a Styling line for the CSS-compiler showcase,
-// carried through MenuScreen's row badges, each demo screen's own line tag, and (where the native
-// header/tab bar already takes a tint color) the OS chrome itself.
-//
-// Ported from examples/svelte/navigation-lines.ts. ROUTE_LINE_INFO stays exhaustive over every
-// tour route even though only the registered ones appear in MENU_ROWS, so adding a screen needs no
-// edit here.
+// Each tour screen sits on a thematic line, plus a Performance and a Styling line
+// A line shows on the row badge of MenuScreen, on the line tag of the screen and on the header
+
+// Ported from examples/svelte/navigation-lines.ts
+// `ROUTE_LINE_INFO` is exhaustive over every tour route, so a new screen needs no edit here
 export const NAV_LINE = {
   Primitives: 'primitives',
   Presentation: 'presentation',
@@ -108,5 +104,10 @@ export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
     line: NAV_LINE.Styling,
     code: 'ST',
     label: 'STYLING LINE',
+  },
+  [ROUTE_NAME.Reanimated]: {
+    line: NAV_LINE.Performance,
+    code: 'RA',
+    label: 'PERFORMANCE LINE',
   },
 };

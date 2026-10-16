@@ -16,11 +16,16 @@ import { AnimatedNode, AnimatedWithChildren } from './graph';
 import { setNativeProps, getNativeTag } from '../imperative';
 import { isSymbioteNode, type ISymbioteNode } from '../node';
 import { registerPostCommit } from '../post-commit';
+import { nativeEngine } from '../native-engine';
 import {
   nativeAnimated,
+  usesSharedBackend,
   type INativeNodeConfig,
 } from './native/native-animated';
+import { animatedNodeOrObject } from './object';
 import { AnimatedStyle } from './style';
+
+const CHILDREN_PROP = 'children';
 
 function isAnimatedNode(value: unknown): value is AnimatedNode {
   return value instanceof AnimatedNode;
@@ -53,23 +58,21 @@ function createAnimatedProps(inputProps: Record<string, unknown>): {
     // config strips it from every prop bag; the Animated flush must too, else each
     // frame's setNativeProps sends the element to Fabric and folly::dynamic throws
     // "JS Symbols are not convertible to dynamic" (Android is strict; iOS ignores it).
-    if (key === 'children') continue;
-    if (key === 'style') {
-      const styleNode = AnimatedStyle.from(value);
-      if (styleNode !== undefined) {
-        props[key] = styleNode;
-        nodes.push(styleNode);
-      } else {
-        props[key] = value;
-      }
-    } else if (isAnimatedNode(value)) {
-      props[key] = value;
-      nodes.push(value);
-    } else {
-      props[key] = value;
-    }
+    if (key === CHILDREN_PROP) continue;
+    const node = animatedNodeForProp(key, value);
+    props[key] = node ?? value;
+    if (node !== undefined) nodes.push(node);
   }
   return { nodes, props };
+}
+
+// Узел для значения prop: `style`, сам анимированный узел или вложенный объект с такими узлами
+function animatedNodeForProp(
+  key: string,
+  value: unknown,
+): AnimatedNode | undefined {
+  if (key === 'style') return AnimatedStyle.from(value);
+  return animatedNodeOrObject(value);
 }
 
 export class AnimatedProps extends AnimatedWithChildren {
@@ -82,11 +85,15 @@ export class AnimatedProps extends AnimatedWithChildren {
   // Kept so __detach can disconnect exactly what it connected.
   private connectedViewTag: number | null = null;
 
-  constructor(inputProps: Record<string, unknown>) {
+  // Вызывается на каждый flush значения, как `callback` в `AnimatedProps` из RN
+  private readonly onUpdate: (() => void) | undefined;
+
+  constructor(inputProps: Record<string, unknown>, onUpdate?: () => void) {
     super();
     const { nodes, props } = createAnimatedProps(inputProps);
     this.nodes = nodes;
     this.props = props;
+    this.onUpdate = onUpdate;
   }
 
   // Rasterize the whole props map: animated entries to their current value, static
@@ -121,13 +128,29 @@ export class AnimatedProps extends AnimatedWithChildren {
     if (this.__isNative()) this.connectToView();
   }
 
-  // The leaf seam (a method, never a field). flushValue calls this once per frame;
-  // re-pull the current values and push them through the scoped commit. Skipped
-  // until the view is captured and committed at least once (setNativeProps no-ops
-  // on an uncommitted node).
+  // Метод, не поле: `flushValue` ищет лист по функции `update`
+  // Пока вид не захвачен и не закоммичен, `setNativeProps` ничего не делает
   update(): void {
+    this.onUpdate?.();
     if (this.target === null) return;
     setNativeProps(this.target, this.__getValue());
+  }
+
+  // Узлы остаются, статика берётся из новых props: flush пишет props целиком и не должен
+  // вернуть во вью прошлую ширину, когда лист не пересобирали
+  refreshStatics(inputProps: Record<string, unknown>): void {
+    for (const key of Object.keys(this.props)) {
+      if (!isAnimatedNode(this.props[key])) delete this.props[key];
+    }
+    for (const key of Object.keys(inputProps)) {
+      if (key === CHILDREN_PROP) continue;
+      const current = this.props[key];
+      if (current instanceof AnimatedStyle) {
+        current.refreshStatics(inputProps[key]);
+      } else if (!isAnimatedNode(current)) {
+        this.props[key] = inputProps[key];
+      }
+    }
   }
 
   override __attach(): void {
@@ -168,7 +191,18 @@ export class AnimatedProps extends AnimatedWithChildren {
     }
     pendingViewConnects.delete(this);
     nativeAnimated.connectAnimatedNodeToView(this.__getNativeTag(), viewTag);
+    this.connectShadowNode(this.target);
     this.connectedViewTag = viewTag;
+  }
+
+  private connectShadowNode(target: ISymbioteNode): void {
+    if (!usesSharedBackend()) return;
+    const shadowNode = nativeEngine()?.shadowNodeOf?.(target);
+    if (shadowNode === undefined) return;
+    nativeAnimated.connectAnimatedNodeToShadowNodeFamily(
+      this.__getNativeTag(),
+      shadowNode,
+    );
   }
 
   // Post-commit retry of a connect deferred because the view tag wasn't assigned yet.

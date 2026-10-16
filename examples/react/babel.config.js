@@ -20,7 +20,8 @@ function inlineDebugFlag({ types: t }) {
 
 module.exports = {
   presets: ['module:@react-native/babel-preset'],
-  plugins: [inlineDebugFlag],
+  // The worklets plugin has to stay last in this list
+  plugins: [inlineDebugFlag, 'react-native-worklets/plugin'],
   // @react-native/babel-preset hardcodes its own @babel/plugin-transform-typescript call with no
   // allowDeclareFields, so `declare context: ContextType<...>` (the official React docs' own class-
   // component context typing idiom, used by ContextProviderDemo.tsx) throws at build time. Running our

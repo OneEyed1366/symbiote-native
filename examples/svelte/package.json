@@ -22,11 +22,14 @@
     "@symbiote-native/components": "latest",
     "@symbiote-native/engine": "latest",
     "@symbiote-native/navigation": "latest",
+    "@symbiote-native/reanimated": "latest",
     "@symbiote-native/slider": "latest",
     "@symbiote-native/splash-screen": "latest",
     "@symbiote-native/svelte": "latest",
     "react": "19.2.3",
     "react-native": "0.86.0",
+    "react-native-reanimated": "4.7.1",
+    "react-native-worklets": "0.13.0",
     "svelte": "^5.56.0"
   },
   "devDependencies": {
@@ -61,6 +64,11 @@
     "svelte-check": "^4.0.0",
     "ts-jest": "^29.4.11",
     "typescript": "~6.0.0"
+  },
+  "reanimated": {
+    "staticFeatureFlags": {
+      "ENABLE_SHARED_ELEMENT_TRANSITIONS": true
+    }
   },
   "engines": {
     "node": ">= 22.11.0"

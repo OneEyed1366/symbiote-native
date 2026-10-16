@@ -1,5 +1,6 @@
 import { Directive, Input } from '@angular/core';
 import type { INativeFeedbackBackground } from '@symbiote-native/components';
+import type { IColorValue } from '@symbiote-native/engine';
 import type { ITextElementProps } from './element-props';
 import type { ICheckboxProps } from './components/checkbox-props';
 import type { IAngularPressableProps } from './components/pressable-props';
@@ -73,7 +74,7 @@ export class TouchableOpacityElement extends PressableElement {
 @Directive({ selector: 'touchable-highlight', standalone: true })
 export class TouchableHighlightElement extends PressableElement {
   @Input() activeOpacity?: number;
-  @Input() underlayColor?: string;
+  @Input() underlayColor?: IColorValue;
   @Input() delayPressIn?: number;
   @Input() delayPressOut?: number;
   @Input() minPressDuration?: number;
@@ -112,7 +113,7 @@ export class TouchableWithoutFeedbackElement extends PressableElement {
 @Directive({ selector: 'button, symbiote-button', standalone: true })
 export class ButtonElement extends TouchableOpacityElement {
   @Input() title?: string;
-  @Input() color?: string;
+  @Input() color?: IColorValue;
   @Input() touchSoundDisabled?: boolean;
 }
 
@@ -142,4 +143,11 @@ export class TextElement extends SymbioteElement {
   @Input() maxFontSizeMultiplier?: ITextElementProps['maxFontSizeMultiplier'];
   @Input() selectionColor?: ITextElementProps['selectionColor'];
   @Input() disabled?: ITextElementProps['disabled'];
+  @Input()
+  android_hyphenationFrequency?: ITextElementProps['android_hyphenationFrequency'];
+  @Input() dataDetectorType?: ITextElementProps['dataDetectorType'];
+  @Input() dynamicTypeRamp?: ITextElementProps['dynamicTypeRamp'];
+  @Input() lineBreakMode?: ITextElementProps['lineBreakMode'];
+  @Input() lineBreakStrategyIOS?: ITextElementProps['lineBreakStrategyIOS'];
+  @Input() textBreakStrategy?: ITextElementProps['textBreakStrategy'];
 }

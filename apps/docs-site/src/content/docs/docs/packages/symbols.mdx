@@ -10,19 +10,6 @@ so every SymbioteNative adapter can draw SF Symbols on iOS and Material Symbols 
 React. On Android the glyph comes from a font loaded through
 [`@symbiote-native/font`](/docs/packages/font/).
 
-| OS platform | Support                       |
-| ----------- | ----------------------------- |
-| iOS         | live, native SF Symbols       |
-| Android     | live, Material Symbols font   |
-
-| Framework adapter | Support |
-| ----------------- | ------- |
-| React             | live    |
-| Vue               | live    |
-| Angular           | live    |
-| Svelte            | live    |
-| Solid             | live    |
-
 ## Installation
 
 ```sh
@@ -188,12 +175,14 @@ size, color)` renders a Material Symbol to an image source for APIs that take an
 **Can I use my own SF Symbol?** The native view takes system SF Symbol names. Custom symbols
 exported from the SF Symbols app are not covered by this package.
 
-Sources: [Expo docs: Symbols](https://docs.expo.dev/versions/latest/sdk/symbols/),
-[expo/expo#29889 symbols are stretched](https://github.com/expo/expo/issues/29889),
-[expo/expo#46850 filled Material Symbols on Android and web](https://github.com/expo/expo/issues/46850),
-[expo/expo#36847 SymbolView does not accept rgb colors](https://github.com/expo/expo/issues/36847),
-[expo/expo#43614 symbol fonts bundled although unused](https://github.com/expo/expo/issues/43614),
-[expo/expo#48552 SymbolView ignores style on Android and web](https://github.com/expo/expo/issues/48552).
+Sources:
+
+- [Expo docs: Symbols](https://docs.expo.dev/versions/latest/sdk/symbols/)
+- [expo/expo#29889 symbols are stretched](https://github.com/expo/expo/issues/29889)
+- [expo/expo#46850 filled Material Symbols on Android and web](https://github.com/expo/expo/issues/46850)
+- [expo/expo#36847 SymbolView does not accept rgb colors](https://github.com/expo/expo/issues/36847)
+- [expo/expo#43614 symbol fonts bundled although unused](https://github.com/expo/expo/issues/43614)
+- [expo/expo#48552 SymbolView ignores style on Android and web](https://github.com/expo/expo/issues/48552)
 
 ## How the wrapper works
 
@@ -202,7 +191,8 @@ resolution, the Material Symbols table and the descriptors. On iOS `renderSymbol
 native `SymbolView` with every prop forwarded. Elsewhere it returns a sized `View` holding a `Text`
 in the Material Symbols font, loaded once on mount through
 [`@symbiote-native/font`](/docs/packages/font/). The descriptor shape changes when the font arrives,
-from an empty `View` to a `View` with a glyph, so each adapter rebuilds the node for that change,
-and `fallback` is each framework's own idiom (a prop, a slot, a snippet, projected content). The
-native code is never vendored: `expo-modules-autolinking` resolves it from `node_modules` (see
+from an empty `View` to a `View` with a glyph. So each adapter rebuilds the node for that change.
+`fallback` is each framework's own idiom (a prop, a slot, a snippet, projected content).
+
+The native code is never vendored: `expo-modules-autolinking` resolves it from `node_modules` (see
 [the native setup guide](/docs/howtos/expo-native-module-setup/)).

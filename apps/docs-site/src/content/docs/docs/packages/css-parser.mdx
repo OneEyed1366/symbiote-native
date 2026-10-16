@@ -17,24 +17,16 @@ Metro build, and what it exports.
 
 Unlike every other package documented here, this one wraps no native module and ships no
 component. It is a Node-only build tool: it runs on the build machine and never enters the app's
-native JS bundle, so there is no per-OS support table to give — the same compiled style objects
-are produced for iOS and Android from one transform.
-
-| Framework adapter | Support |
-| ----------------- | ------- |
-| React             | ✅ live |
-| Vue               | ✅ live |
-| Angular           | ✅ live |
-| Svelte            | ✅ live |
-| Solid             | ✅ live |
+native JS bundle. There is no per-OS difference, as one transform produces the same compiled style
+objects for iOS and Android.
 
 ## Installation
 
 **For the Metro transformer: nothing to install.** `@symbiote-native/react`,
 `@symbiote-native/vue`, `@symbiote-native/angular`, and `@symbiote-native/svelte` each depend on
 `@symbiote-native/css-parser` directly and re-export it through their own `./metro-css-parser`
-subpath, so an app that already has an adapter installed can point Metro at the transformer with
-no extra dependency.
+subpath. An app that already has an adapter installed can point Metro at the transformer with no
+extra dependency.
 
 Install it directly only for the two development-time pieces — the `css-dts` CLI and the
 TypeScript plugin, which your app's own `package.json` and `tsconfig.json` reference by name:
@@ -161,11 +153,10 @@ object, not the factory — so no local wrapper file is needed.
   </TabItem>
   <TabItem label="Svelte">
     A Svelte app points `babelTransformerPath` at `@symbiote-native/svelte/metro-svelte-transformer`
-    instead — the `.svelte` transformer requires `@symbiote-native/css-parser` itself, both to
-    compile a component's own `<style>` block (via its scoped-styles preprocessor, before the
-    markup even reaches `svelte/compiler`) and to handle a standalone `.css`/`.scss`/`.less`/`.styl`
-    import through the exact same `isStyleFile`/`compileCssFile` branch React's transformer uses —
-    and delegates everything else.
+    instead. That transformer requires `@symbiote-native/css-parser` itself, to compile a
+    component's own `<style>` block (via its scoped-styles preprocessor, before the markup reaches
+    `svelte/compiler`). It also handles a standalone `.css`/`.scss`/`.less`/`.styl` import through
+    the same `createCssMetroTransformer` React's transformer uses, and delegates everything else.
 
     ```js
     // metro.config.js
@@ -274,6 +265,7 @@ code that ships to the device.
 | --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `createCssMetroTransformer(upstreamTransformer?: IMetroTransformer): IMetroTransformer` | Builds the `{ transform, getCacheKey }` object Metro's `babelTransformerPath` expects: compiles a recognized style file, delegates every other file to the upstream transformer unchanged. Defaults the upstream to `resolveUpstreamTransformer()` |
 | `resolveUpstreamTransformer(): IMetroTransformer`                                       | Resolves `@react-native/metro-babel-transformer` relative to this package (a real dependency of it), so a custom per-framework transformer can delegate its own passthrough branch without a fragile direct `require`                              |
+| `relabelForUpstream(params: IMetroTransformParams, src: string, extension: string): IMetroTransformParams` | Builds the params for the upstream call when a framework transformer hands it compiled JS under a made-up name (`Home.vue` as `Home.vue.tsx`). If the app lists the worklets plugin, its entry is added with `disableSourceMaps` on and its other options kept, as the plugin would otherwise read a file that is not on disk |
 
 `transform()` is async for every recognized extension, plain `.css` included — Metro's own
 transform worker awaits the call either way, and Less/Stylus have no synchronous render API.
@@ -335,7 +327,7 @@ name for error reporting.
   device. The runtime counterpart — resolving a class name back to a style object — is
   `@symbiote-native/engine`'s `style-registry`.
 - **The transformer is delegating, not replacing.** Any file whose extension `isStyleFile` does
-  not recognize is passed straight through to the upstream RN Babel transformer, so wiring it as
+  not recognize is passed straight through to the upstream RN Babel transformer. Wiring it as
   `babelTransformerPath` does not change how your `.ts`/`.tsx` files are compiled.
 - **`sourceExts` is the half that's easy to forget.** Without the extension additions Metro never
   routes a `.css` import to the transformer at all, and the import fails to resolve. Note that

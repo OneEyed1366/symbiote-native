@@ -1,23 +1,18 @@
-// SoundManager: plays the Android system touch-sound feedback. Mirrors RN's
-// Libraries/Components/Sound/SoundManager.js — a single method, `playTouchSound`, wrapping the
-// TurboModule the same way (`NativeSoundManager` resolves via `TurboModuleRegistry.get`, not
-// `getEnforcing`, so a missing module degrades to a no-op there too).
-//
-// The native contract, from `src/private/specs_DEPRECATED/modules/NativeSoundManager.js`:
-//   playTouchSound(): void
-//
-// Called from `core/components/src/state/pressable.ts`'s press machine, on Android, right before
-// `onPress` fires, gated by `android_disableSound !== true` — Pressability.js:754-756. Not a Fabric
-// prop: no ViewConfig declares `android_disableSound`, it only ever gates this JS-side call.
+// Plays the Android touch sound, a copy of RN's `SoundManager` over `NativeSoundManager`
+// TODO(rn-port): not a member of the `react-native` index, so no host entry exists
+// A static deep import would pull RN's `TurboModuleRegistry` into every adapter's main barrel
+
+// Called from the press machine in `core/components`, on Android, right before `onPress`
+// Gated by `android_disableSound !== true`, as in `Pressability.js`
 
 import { dlog } from '../debug';
 import { getNativeModule } from '../native-modules';
 
 const SOUND_MODULE = 'SoundManager';
 
-interface INativeSoundManager {
+type INativeSoundManager = {
   playTouchSound(): void;
-}
+};
 
 // Lazily resolved so importing this module has no native side effect.
 let soundModule: INativeSoundManager | null | undefined;

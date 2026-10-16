@@ -10,19 +10,6 @@ import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 native views of iOS 26, so every SymbioteNative adapter can reach them, not just React. Off iOS
 both components render a plain `View`.
 
-| OS platform | Support             |
-| ----------- | ------------------- |
-| iOS         | live                |
-| Android     | plain View fallback |
-
-| Framework adapter | Support |
-| ----------------- | ------- |
-| React             | live    |
-| Vue               | live    |
-| Angular           | live    |
-| Svelte            | live    |
-| Solid             | live    |
-
 ## Installation
 
 ```sh
@@ -182,13 +169,15 @@ plain `View`, so give it a background yourself if the design needs one.
 cycles has been reported upstream without a fix. Keep the glass views you create and destroy to a
 minimum.
 
-Sources: [Expo docs: GlassEffect](https://docs.expo.dev/versions/latest/sdk/glass-effect/),
-[expo/expo#41024 glass does not work with animated parent opacity](https://github.com/expo/expo/issues/41024),
-[expo/expo#50097 glass that fades out leaves later views without glass](https://github.com/expo/expo/issues/50097),
-[expo/expo#43743 colorScheme does not update the glass](https://github.com/expo/expo/issues/43743),
-[expo/expo#40778 per-corner radius regression](https://github.com/expo/expo/issues/40778),
-[expo/expo#50466 degradation after repeated mount cycles](https://github.com/expo/expo/issues/50466),
-[Apple: set the correct alpha value on a visual effect view](https://developer.apple.com/documentation/uikit/uivisualeffectview#Set-the-correct-alpha-value).
+Sources:
+
+- [Expo docs: GlassEffect](https://docs.expo.dev/versions/latest/sdk/glass-effect/)
+- [expo/expo#41024 glass does not work with animated parent opacity](https://github.com/expo/expo/issues/41024)
+- [expo/expo#50097 glass that fades out leaves later views without glass](https://github.com/expo/expo/issues/50097)
+- [expo/expo#43743 colorScheme does not update the glass](https://github.com/expo/expo/issues/43743)
+- [expo/expo#40778 per-corner radius regression](https://github.com/expo/expo/issues/40778)
+- [expo/expo#50466 degradation after repeated mount cycles](https://github.com/expo/expo/issues/50466)
+- [Apple: set the correct alpha value on a visual effect view](https://developer.apple.com/documentation/uikit/uivisualeffectview#Set-the-correct-alpha-value)
 
 ## How the wrapper works
 

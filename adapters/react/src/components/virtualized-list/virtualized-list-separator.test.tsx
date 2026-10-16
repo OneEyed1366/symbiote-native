@@ -1,17 +1,21 @@
 /** @jsxRuntime automatic */
-// WHERE a separator sits, and WHAT decides to render it, are both geometry — as a SIBLING it's an
-// extra flex child that breaks the leading-spacer math, and gated on the WINDOW instead of the
-// DATA a cell's height changes as it slides past. These assertions ask which node CONTAINS it.
+// Разделитель сидит внутри ячейки и скрыт у последнего элемента данных, а не окна
+// Соседний flex-элемент ломает расчёт спейсера, поэтому смотрим, какой узел его содержит
 
 import { createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { VirtualizedList, mount, unmount } from '@symbiote-native/react';
+import {
+  VirtualizedList,
+  mount,
+  unmount,
+  type IVirtualizedListProps,
+} from '@symbiote-native/react';
 import { childrenOf, type ISymbioteNode } from '@symbiote-native/engine';
 import { installRecordingFabric } from '@symbiote-native/test-utils';
 
-interface IRow {
-  id: number;
-}
+type IRow = { id: number };
+
+type ISeparatorSlot = IVirtualizedListProps<IRow>['ItemSeparatorComponent'];
 
 const ROOT_TAG = 51;
 const ITEM_HEIGHT = 100;
@@ -37,10 +41,13 @@ function carriesText(handle: ISymbioteNode, text: string): boolean {
   return childrenOf(handle).some(child => carriesText(child, text));
 }
 
-// windowSize is a parameter because the gate test needs the LAST data index actually rendered:
-// with windowSize=1 the overscan is zero, so a two-row list windows down to cell 0 alone and the
-// cell under test never commits.
-function listOf(rows: number, windowSize: number): ReactElement {
+// `windowSize` параметр, т.к. тест гейта должен увидеть последний индекс данных
+// При `windowSize` 1 запаса нет и двухстрочный список сжимается до ячейки 0
+function listOf(
+  rows: number,
+  windowSize: number,
+  separator: ISeparatorSlot = () => createElement('text', {}, 'divider'),
+): ReactElement {
   const data: IRow[] = Array.from({ length: rows }, (_unused, id) => ({ id }));
   return createElement(VirtualizedList<IRow>, {
     data,
@@ -53,7 +60,7 @@ function listOf(rows: number, windowSize: number): ReactElement {
       index,
     }),
     windowSize,
-    ItemSeparatorComponent: () => createElement('text', {}, 'divider'),
+    ItemSeparatorComponent: separator,
     renderItem: ({ item }) => createElement('text', {}, `row-${item.id}`),
   });
 }
@@ -75,15 +82,14 @@ describe('VirtualizedList separator placement', () => {
       carriesText(child, 'divider'),
     );
     expect(withDivider.length).toBeGreaterThan(0);
-    // A sibling separator shows up here as a child carrying the divider and no row label.
+    // Соседний разделитель виден здесь как ребёнок с divider и без метки строки
     for (const [position, child] of withDivider.entries()) {
       expect(carriesText(child, `row-${position}`)).toBe(true);
     }
   });
 
-  // The window's last cell is mid-DATA, so it keeps its separator. This is the assertion that
-  // separates the two gates: under the window gate that cell is exactly the one that loses it, and
-  // its height then changes every time the window slides past.
+  // Последняя ячейка окна лежит посреди данных, поэтому разделитель у неё остаётся
+  // Гейт по окну снял бы его именно здесь, и высота менялась бы при каждом сдвиге окна
   it('keeps the separator on the window-last cell, which is mid-data', () => {
     mount(ROOT_TAG, listOf(20, 1));
     layoutViewport();
@@ -96,6 +102,20 @@ describe('VirtualizedList separator placement', () => {
     expect(rendered.length).toBeGreaterThan(0);
     const windowLast = rendered[rendered.length - 1];
     expect(carriesText(windowLast, 'divider')).toBe(true);
+  });
+
+  // RN 0.83 (`isValidElement(ItemSeparatorComponent)`): an element is rendered as it is
+  it('renders a separator given as a ready element, not only as a component', () => {
+    mount(
+      ROOT_TAG,
+      listOf(20, 1, createElement('text', {}, 'element-divider')),
+    );
+    layoutViewport();
+
+    const withDivider = contentChildren().filter(child =>
+      carriesText(child, 'element-divider'),
+    );
+    expect(withDivider.length).toBeGreaterThan(0);
   });
 
   it('withholds the separator from the last item of the DATA', () => {

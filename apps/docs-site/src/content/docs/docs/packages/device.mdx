@@ -6,26 +6,13 @@ description: expo-device wrapped for every SymbioteNative adapter — device bra
 import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 
 `@symbiote-native/device` wraps
-[`expo-device`](https://github.com/expo/expo/tree/main/packages/expo-device) — physical device
+[`expo-device`](https://github.com/expo/expo/tree/main/packages/expo-device) for physical device
 information: brand/model/OS constants, uptime, max-memory, root/jailbreak detection,
-side-loading detection, and platform-feature queries — so every SymbioteNative adapter can read
+side-loading detection, and platform-feature queries. So every SymbioteNative adapter can read
 it. Like [local auth](/docs/packages/local-auth/), every export here is either an
-eagerly-resolved constant or a one-shot async call with no per-instance state — no hook/
+eagerly-resolved constant or a one-shot async call with no per-instance state. There is no hook/
 composable/service to reach for, unlike [sensors](/docs/packages/sensors/)' `EventEmitter` +
 live-subscription surface.
-
-| OS platform | Support |
-| ----------- | ------- |
-| iOS         | ✅ live |
-| Android     | ✅ live |
-
-| Framework adapter | Support |
-| ----------------- | ------- |
-| React             | ✅ live |
-| Vue               | ✅ live |
-| Angular           | ✅ live |
-| Svelte            | ✅ live |
-| Solid             | ✅ live |
 
 ## Installation
 
@@ -38,16 +25,16 @@ Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --d
 [`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
 
 `expo-device` and `expo-modules-core` come along as regular dependencies, pinned to exact
-versions — never install either yourself, and never add the `expo` meta-package to your project
-(it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
+versions. Never install either yourself. Never add the `expo` meta-package to your project either,
+as it bundles its own Metro/Babel pipeline, which conflicts with this project's own.
 
 <Aside type="danger" title="Native setup is required before first use">
   `expo-device`'s native code is discovered by `expo-modules-autolinking`, a
   different mechanism from the `react-native.config.cjs`/podspec autolinking
-  every other SymbioteNative wrapper uses — and it isn't the standard Expo setup
-  flow either, since this project never installs the `expo` meta-package. Follow
-  [How to: wire up an Expo native
-  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers
+  every other SymbioteNative wrapper uses. It isn't the standard Expo setup
+  flow either, since this project never installs the `expo` meta-package.
+  Follow [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first. It covers
   this package and every future `expo-modules-core` package with zero further
   native changes.
 </Aside>
@@ -57,8 +44,8 @@ reads plain system/build information, nothing gated by a permission prompt.
 
 ## Usage
 
-All five adapters — React, Vue, Angular, Svelte, Solid — re-export the exact same constants and
-free functions; there is no per-adapter hook/composable/service to reach for, since nothing here
+All five adapters (React, Vue, Angular, Svelte, Solid) re-export the exact same constants and
+free functions. There is no per-adapter hook/composable/service to reach for, since nothing here
 holds live state or a subscription.
 
 <Tabs syncKey="framework">
@@ -326,8 +313,8 @@ Resolved once, eagerly, at import time, straight off the native module:
   title="Every function except the platform-feature pair throws when unavailable"
 >
   Every function above throws `UnavailabilityError` when its native method is
-  missing, **except** `getPlatformFeaturesAsync`/`hasPlatformFeatureAsync`,
-  which resolve to `[]`/`false` instead — a platform-feature query on a platform
+  missing. The exception is `getPlatformFeaturesAsync`/`hasPlatformFeatureAsync`,
+  which resolve to `[]`/`false` instead. A platform-feature query on a platform
   with no such concept (iOS) is a normal "no" answer, not an error, matching
   upstream's own behavior.
 </Aside>
@@ -348,8 +335,8 @@ Sources: [Expo docs: Device](https://docs.expo.dev/versions/latest/sdk/device/),
 
 ## How the wrapper works
 
-`@symbiote-native/device` ships zero React/Vue/Angular/Svelte/Solid logic in `expo-device` itself — its
-constants and functions are hand-ported, verbatim, into this package's own `core/`, resolving the
+`@symbiote-native/device` ships zero React/Vue/Angular/Svelte/Solid logic in `expo-device` itself. Its
+constants and functions are hand-ported, verbatim, into this package's own `core/`. They resolve the
 native module through `expo-modules-core`'s `requireNativeModule` rather than the `expo`
 meta-package this project never installs:
 
@@ -366,7 +353,8 @@ packages/device/src/
 
 Same shape as [local auth](/docs/packages/local-auth/)'s five adapter entries: single-file
 re-exports with no lifecycle code at all, since every export here is either an eagerly-resolved
-constant or a stateless one-shot call — there is nothing for a hook, composable, or service to
-subscribe to or clean up. The native code itself is never vendored or copied —
+constant or a stateless one-shot call.
+There is nothing for a hook, composable, or service to
+subscribe to or clean up. The native code itself is never vendored or copied.
 `expo-modules-autolinking` resolves it straight out of `node_modules` (see [the native setup
 guide](/docs/howtos/expo-native-module-setup/)).

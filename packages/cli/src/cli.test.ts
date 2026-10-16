@@ -3,6 +3,25 @@ import { parseArgv } from './cli.js';
 import { CliUsageError } from './errors.js';
 import { EXPO_PACKAGE_LAYERS } from './expo-package-layers.js';
 
+const NEW_DEFAULTS = {
+  kind: 'new',
+  appName: 'my-app',
+  framework: undefined,
+  vueFlavor: undefined,
+  isJavascript: false,
+  hasForce: false,
+  bundleId: undefined,
+  hasExpoModules: false,
+  hasNavigation: false,
+  hasTesting: false,
+  hasSplashScreen: false,
+  hasSlider: false,
+  hasReanimated: false,
+  expoPackages: new Set(),
+  styling: undefined,
+  packageManager: undefined,
+};
+
 describe('parseArgv', () => {
   it('shows help on no args', () => {
     expect(parseArgv([])).toEqual({ kind: 'help' });
@@ -82,81 +101,38 @@ describe('parseArgv', () => {
         '--navigation',
       ]),
     ).toEqual({
-      kind: 'new',
-      appName: 'my-app',
+      ...NEW_DEFAULTS,
       framework: 'vue',
       vueFlavor: 'sfc',
-      isJavascript: false,
-      hasForce: false,
-      bundleId: undefined,
-      hasExpoModules: false,
       hasNavigation: true,
-      hasTesting: false,
-      hasSplashScreen: false,
-      hasSlider: false,
-      expoPackages: new Set(),
-      styling: undefined,
-      packageManager: undefined,
     });
   });
 
   it('parses --force', () => {
     expect(parseArgv(['new', 'my-app', '--force'])).toEqual({
-      kind: 'new',
-      appName: 'my-app',
-      framework: undefined,
-      vueFlavor: undefined,
-      isJavascript: false,
+      ...NEW_DEFAULTS,
       hasForce: true,
-      bundleId: undefined,
-      hasExpoModules: false,
-      hasNavigation: false,
-      hasTesting: false,
-      hasSplashScreen: false,
-      hasSlider: false,
-      expoPackages: new Set(),
-      styling: undefined,
-      packageManager: undefined,
     });
   });
 
   it('parses --splash-screen', () => {
     expect(parseArgv(['new', 'my-app', '--splash-screen'])).toEqual({
-      kind: 'new',
-      appName: 'my-app',
-      framework: undefined,
-      vueFlavor: undefined,
-      isJavascript: false,
-      hasForce: false,
-      bundleId: undefined,
-      hasExpoModules: false,
-      hasNavigation: false,
-      hasTesting: false,
+      ...NEW_DEFAULTS,
       hasSplashScreen: true,
-      hasSlider: false,
-      expoPackages: new Set(),
-      styling: undefined,
-      packageManager: undefined,
     });
   });
 
   it('parses --slider', () => {
     expect(parseArgv(['new', 'my-app', '--slider'])).toEqual({
-      kind: 'new',
-      appName: 'my-app',
-      framework: undefined,
-      vueFlavor: undefined,
-      isJavascript: false,
-      hasForce: false,
-      bundleId: undefined,
-      hasExpoModules: false,
-      hasNavigation: false,
-      hasTesting: false,
-      hasSplashScreen: false,
+      ...NEW_DEFAULTS,
       hasSlider: true,
-      expoPackages: new Set(),
-      styling: undefined,
-      packageManager: undefined,
+    });
+  });
+
+  it('parses --reanimated', () => {
+    expect(parseArgv(['new', 'my-app', '--reanimated'])).toEqual({
+      ...NEW_DEFAULTS,
+      hasReanimated: true,
     });
   });
 
@@ -172,19 +148,10 @@ describe('parseArgv', () => {
         '--pm=pnpm',
       ]),
     ).toEqual({
-      kind: 'new',
-      appName: 'my-app',
+      ...NEW_DEFAULTS,
       framework: 'vue',
       vueFlavor: 'sfc',
-      isJavascript: false,
-      hasForce: false,
       bundleId: 'com.example.app',
-      hasExpoModules: false,
-      hasNavigation: false,
-      hasTesting: false,
-      hasSplashScreen: false,
-      hasSlider: false,
-      expoPackages: new Set(),
       styling: 'scss',
       packageManager: 'pnpm',
     });
@@ -214,12 +181,11 @@ describe('parseArgv', () => {
     );
   });
 
+  // "=" is a legal bundle-id character, so only the first "=" splits the flag from its value
   it('a bundle id value that itself contains "=" is preserved verbatim', () => {
-    // Contrived, but "=" is a legal bundle-id character per no pattern check at parse time —
-    // only the first "=" should split the flag from its value.
     expect(
-      parseArgv(['new', 'my-app', '--bundle-id=com.example.a=b']).kind,
-    ).toBe('new');
+      parseArgv(['new', 'my-app', '--bundle-id=com.example.a=b']),
+    ).toMatchObject({ bundleId: 'com.example.a=b' });
   });
 
   it('still parses a fully valid "add" invocation', () => {
@@ -232,29 +198,31 @@ describe('parseArgv', () => {
       hasTesting: true,
       hasSplashScreen: false,
       hasSlider: false,
+      hasReanimated: false,
       expoPackages: new Set(),
       hasForce: false,
       packageManager: undefined,
     });
   });
 
-  // --slider parsed into `hasSlider` for "new" but the "add" branch of parseArgv never carried the
-  // field on its return object — the flag was silently dropped for "add" alone.
+  // "add" once dropped --slider, as only the "new" branch carried the field
   it('"add" carries --slider through, same as "new"', () => {
     expect(parseArgv(['add', '--slider'])).toMatchObject({ hasSlider: true });
   });
 
+  it('"add" carries --reanimated through, same as "new"', () => {
+    expect(parseArgv(['add', '--reanimated'])).toMatchObject({
+      hasReanimated: true,
+    });
+  });
+
   // --force lets a non-interactive "add" overwrite an already-generated testing layer file
-  // (detox.config.js / e2e/*) instead of erroring — same flag shape "new" already has for
-  // overwriting a non-empty target directory.
   it('"add" accepts --force', () => {
     expect(parseArgv(['add', '--force'])).toMatchObject({ hasForce: true });
   });
 
-  // `add` takes no positional argument at all (it wires into the CURRENT project) — a stray one
-  // used to fall through the parse loop untouched, silently ignored rather than reported. A typo
-  // like "add my-app" (thinking of "new"'s shape) or a misplaced short flag then does nothing
-  // instead of erroring, which is worse than a wrong guess: nothing signals the mistake at all.
+  // "add" takes no positional at all, as it wires into the CURRENT project
+  // A stray one was once ignored silently, which hides a typo like "add my-app"
   it('rejects a stray positional argument on "add"', () => {
     expect(() => parseArgv(['add', 'my-app'])).toThrow(CliUsageError);
     expect(() => parseArgv(['add', 'my-app'])).toThrow(
@@ -262,8 +230,7 @@ describe('parseArgv', () => {
     );
   });
 
-  // "new" takes exactly one positional (the app name) — a second one used to vanish the same way,
-  // so "new my-app extra-arg" silently scaffolded "my-app" and said nothing about "extra-arg".
+  // "new" takes exactly one positional, the app name, and a second one used to vanish silently
   it('rejects a second positional argument on "new"', () => {
     expect(() => parseArgv(['new', 'my-app', 'extra-arg'])).toThrow(
       CliUsageError,
@@ -273,8 +240,7 @@ describe('parseArgv', () => {
     );
   });
 
-  // Every EXPO_PACKAGE_LAYERS entry gets its own `--<id>` boolean flag, generically derived from
-  // the registry — same shape as --slider, just for the 21 Expo-backed packages.
+  // Every EXPO_PACKAGE_LAYERS entry gets its own `--<id>` boolean flag, derived from the registry
   it.each(EXPO_PACKAGE_LAYERS)('parses --$id for "new"', layer => {
     const parsed = parseArgv(['new', 'my-app', `--${layer.id}`]);
     if (parsed.kind !== 'new') throw new Error('expected "new"');
@@ -293,9 +259,8 @@ describe('parseArgv', () => {
     expect(parsed.expoPackages).toEqual(new Set(['battery', 'sensors']));
   });
 
-  // why: `grant` with no argument offers every policy-sensitive bundle across every installed
-  // package — the layer isn't known until runGrant scans node_modules, so parseArgv can't (and
-  // shouldn't) validate it against a fixed list the way --framework/--styling do.
+  // "grant" with no argument offers every bundle of every installed package
+  // The layer is only known once `runGrant` scans node_modules, so `parseArgv` cannot validate it
   it('parses "grant" with no layer', () => {
     expect(parseArgv(['grant'])).toEqual({ kind: 'grant', layer: undefined });
   });

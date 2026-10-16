@@ -3,13 +3,14 @@
 // public prop type every adapter re-exports and the event shape it fires with.
 
 import type {
+  IColorValue,
   IStyleProp,
   IViewStyle,
   ISymbioteEvent,
 } from '@symbiote-native/engine';
 import type { IAccessibilityProps, IAriaProps } from '../accessibility-props';
 
-export type ISwitchTrackColor = { false?: string; true?: string };
+export type ISwitchTrackColor = { false?: IColorValue; true?: IColorValue };
 
 // The event `onValueChange` fires with. Svelte's compiler treats any individual `on*`-prefixed
 // attribute as a native listener attachment and always calls it with exactly one argument, a real
@@ -21,14 +22,15 @@ export type ISwitchChangeEvent = ISymbioteEvent & { value: boolean };
 // Author-facing props: the framework-agnostic public surface every adapter exposes (the
 // controlled value/onValueChange contract, track/thumb colors, style). Identical across
 // adapters; each supplies only its hook + bridge.
-export interface ISwitchProps extends IAccessibilityProps, IAriaProps {
-  value?: boolean;
-  // Fires once per native toggle with the event, `value` carried on it — one argument, always a
-  // real object; see `ISwitchChangeEvent`.
-  onValueChange?: (event: ISwitchChangeEvent) => void;
-  disabled?: boolean;
-  trackColor?: ISwitchTrackColor;
-  thumbColor?: string;
-  ios_backgroundColor?: string;
-  style?: IStyleProp<IViewStyle>;
-}
+export type ISwitchProps = IAccessibilityProps &
+  IAriaProps & {
+    value?: boolean;
+    // Fires once per native toggle with the event, `value` carried on it — one argument, always a
+    // real object; see `ISwitchChangeEvent`.
+    onValueChange?: (event: ISwitchChangeEvent) => void;
+    disabled?: boolean;
+    trackColor?: ISwitchTrackColor;
+    thumbColor?: IColorValue;
+    ios_backgroundColor?: IColorValue;
+    style?: IStyleProp<IViewStyle>;
+  };

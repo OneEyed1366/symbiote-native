@@ -1,0 +1,88 @@
+// `disableVirtualization` mounts every cell from the top down to the end of the window, with no
+// spacer standing in for the rows left out
+import '@angular/compiler';
+import { Component } from '@angular/core';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import {
+  createListHarness,
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
+
+import '../../register';
+import { mount, unmount } from '../../render';
+import { FlatList } from './index';
+import { VListItemDirective } from '../virtualized-list/directives';
+
+const ROOT_TAG = 907;
+const ITEM_HEIGHT = 100;
+const ROW_COUNT = 20;
+const NEAR_END_OFFSET = 1_800;
+const BATCH_PERIOD_MS = 80;
+const VIEWPORT = { width: 320, height: 100 };
+const CONTENT = { width: 320, height: ITEM_HEIGHT * ROW_COUNT };
+
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
+const harness = createListHarness(fabric, live);
+const wait = (ms: number): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, ms));
+
+// The case's flag is read by the host when it is created, a decorator takes no parameters
+let isDisabled = false;
+
+@Component({
+  selector: 'symbiote-flatlist-disable-virtualization-host',
+  standalone: true,
+  imports: [FlatList, VListItemDirective],
+  template: `
+    <FlatList
+      [data]="data"
+      [getItemLayout]="layout"
+      [initialNumToRender]="2"
+      [windowSize]="1"
+      [disableVirtualization]="disable"
+    >
+      <ng-template vListItem let-item>
+        <text>{{ item }}</text>
+      </ng-template>
+    </FlatList>
+  `,
+})
+class DisableVirtualizationHost {
+  data = Array.from({ length: ROW_COUNT }, (_unused, id) => `row-${id}`);
+  disable = isDisabled;
+  layout = (_data: unknown, index: number) => ({
+    length: ITEM_HEIGHT,
+    offset: ITEM_HEIGHT * index,
+    index,
+  });
+}
+
+beforeEach(() => fabric.reset());
+afterEach(() => unmount(ROOT_TAG));
+
+async function shapeAfterScroll(
+  disableVirtualization: boolean,
+): Promise<string> {
+  isDisabled = disableVirtualization;
+  mount(ROOT_TAG, DisableVirtualizationHost);
+  await wait(0);
+  harness.simulateLayout({ viewport: VIEWPORT, content: CONTENT });
+  harness.simulateScroll(NEAR_END_OFFSET);
+  await wait(BATCH_PERIOD_MS);
+  return harness.shape();
+}
+
+describe('Angular FlatList disableVirtualization', () => {
+  it('mounts the rows from the top with no spacer', async () => {
+    const shape = await shapeAfterScroll(true);
+
+    expect(shape.startsWith('row-0 row-1 row-2')).toBe(true);
+    expect(shape).not.toContain('[');
+  });
+
+  it('leaves a spacer between the rows when virtualized', async () => {
+    expect(await shapeAfterScroll(false)).toContain('[');
+  });
+});

@@ -36,6 +36,7 @@ import {
 import type { JSX } from '../../jsx-runtime';
 import {
   SINGLE_COLUMN,
+  arrayLikeLength,
   chunkIntoRows,
   expandRowViewability,
   firstItemOfRow,
@@ -54,8 +55,10 @@ import {
   type IStyleProp,
   type IViewStyle,
 } from '@symbiote-native/engine';
+import { renderItemContent } from '../virtualized-list/item-content';
 import {
   VirtualizedList,
+  type ICellRendererComponent,
   type IVirtualizedListCellInfo,
   type IVirtualizedListHandle,
   type IVirtualizedListProps,
@@ -70,9 +73,11 @@ export type IFlatListHandle = IVirtualizedListHandle;
 // callbacks and every windowing knob ride in through that Omit for free.
 export type IFlatListProps<ItemT> = Omit<
   IVirtualizedListProps<ItemT>,
-  'data' | 'getItem' | 'getItemCount'
+  'data' | 'getItem' | 'getItemCount' | 'CellRendererComponent'
 > & {
   data: readonly ItemT[];
+  // The cell's `item` is the list's own, a row of items when `numColumns` is above 1
+  CellRendererComponent?: ICellRendererComponent<unknown>;
   numColumns?: number;
   // Style for the auto-generated row View when numColumns > 1 (RN's columnWrapperStyle). A bare
   // string resolves through the shared style registry, like `class` — same widening React's and
@@ -87,6 +92,7 @@ const OWN_PROPS = [
   'numColumns',
   'columnWrapperStyle',
   'renderItem',
+  'ListItemComponent',
   'keyExtractor',
   'ItemSeparatorComponent',
   'onViewableItemsChanged',
@@ -114,7 +120,7 @@ export function FlatList<ItemT>(props: IFlatListProps<ItemT>): JSX.Element {
     // Logged from inside the memo, not from the body: a Solid body runs ONCE, so a line emitted
     // there would report the mount-time shape forever and be actively misleading on a data change.
     dlog(
-      `Solid FlatList over ${props.data.length} items, ${columns} column(s)`,
+      `Solid FlatList over ${arrayLikeLength(props.data)} items, ${columns} column(s)`,
     );
     return columns > SINGLE_COLUMN ? chunkIntoRows(props.data, columns) : [];
   });
@@ -139,7 +145,7 @@ export function FlatList<ItemT>(props: IFlatListProps<ItemT>): JSX.Element {
             // tracked call would put every signal renderItem reads into this column's insert
             // effect and rebuild the subtree instead of updating its leaf.
             const content = untrack(() =>
-              props.renderItem(() => ({
+              renderItemContent(props, () => ({
                 item: item(),
                 index: info().item.startIndex + column,
                 // The row IS the virtualized cell, so every column in it shares the row's
@@ -195,12 +201,8 @@ export function FlatList<ItemT>(props: IFlatListProps<ItemT>): JSX.Element {
       })),
   );
 
-  // The two paths instantiate VirtualizedList over DIFFERENT item types — ItemT vs IRow<ItemT> —
-  // so they are two elements, not one with switching props: a single instantiation would have to
-  // union the two and narrow ItemT | IRow<ItemT> back apart at runtime, which nothing can do
-  // soundly for an arbitrary ItemT. <Show> memoizes on the flip alone, so a numColumns change
-  // rebuilds (RN documents changing it live as unsupported — "change the key prop" — which is the
-  // same fresh start) while every other prop change re-props the live list.
+  // Два списка с разными типами элементов, `ItemT` и `IRow<ItemT>`, одним элементом их не выразить
+  // `<Show>` пересобирает список только при смене `numColumns`, остальные props обновляют живой
   return (
     <Show
       when={isMultiColumn()}
@@ -212,8 +214,9 @@ export function FlatList<ItemT>(props: IFlatListProps<ItemT>): JSX.Element {
           getItem={(_source: unknown, index: number): ItemT =>
             props.data[index]
           }
-          getItemCount={(): number => props.data.length}
+          getItemCount={(): number => arrayLikeLength(props.data)}
           renderItem={props.renderItem}
+          ListItemComponent={props.ListItemComponent}
           keyExtractor={props.keyExtractor}
           ItemSeparatorComponent={props.ItemSeparatorComponent}
           onViewableItemsChanged={props.onViewableItemsChanged}

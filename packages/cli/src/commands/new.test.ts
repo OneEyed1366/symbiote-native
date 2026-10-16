@@ -20,8 +20,7 @@ vi.mock('../prompts.js', async importOriginal => ({
   resolveStyling: vi.fn(),
   resolveVueFlavor: vi.fn(),
 }));
-// discoveredBundlesFromLayers stays real (pure, trivial) — only applyBundle needs mocking, since
-// it writes files.
+// `discoveredBundlesFromLayers` stays real, as it is pure, and only `applyBundle` writes files
 vi.mock('../grant-bundles.js', async importOriginal => ({
   ...(await importOriginal<typeof import('../grant-bundles.js')>()),
   applyBundle: vi.fn(),
@@ -72,6 +71,7 @@ const BASE_PARSED: INewCommand = {
   hasTesting: false,
   hasSplashScreen: false,
   hasSlider: false,
+  hasReanimated: false,
   expoPackages: new Set(),
   styling: undefined,
   packageManager: undefined,
@@ -79,6 +79,7 @@ const BASE_PARSED: INewCommand = {
 
 function mockHappyPath(
   expoPackages: readonly IExpoPackageLayerName[] = [],
+  hasReanimated = false,
 ): void {
   vi.mocked(resolveAppName).mockResolvedValue('my-app');
   vi.mocked(resolveFramework).mockResolvedValue('react');
@@ -90,6 +91,7 @@ function mockHappyPath(
     hasTesting: false,
     hasSplashScreen: false,
     hasSlider: false,
+    hasReanimated,
     expoPackages: new Set(expoPackages),
   });
   vi.mocked(resolveStyling).mockResolvedValue('css');
@@ -98,14 +100,20 @@ function mockHappyPath(
   vi.mocked(scaffoldApp).mockReturnValue('/fake/my-app');
 }
 
+function outroText(): string {
+  return vi
+    .mocked(clack.outro)
+    .mock.calls.map(([message]) => message)
+    .join('\n');
+}
+
 describe('runNew', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  // why: a developer who just scaffolded a new app with --audio won't know it also offers an
-  // optional, policy-sensitive Android bundle unless `new` OFFERS it right there — same reason
-  // `add` asks interactively rather than only printing a command to run later.
+  // A developer who just scaffolded with --audio will not know it also offers an optional,
+  // policy-sensitive Android bundle unless `new` offers it there, as `add` does interactively
   it('offers to grant a bundle for a scaffolded package that has one, and applies what was picked', async () => {
     mockHappyPath(['audio']);
     const bundle = {
@@ -125,11 +133,7 @@ describe('runNew', () => {
       expect.stringContaining(bundle.warning),
       bundle.label,
     );
-    const outroText = vi
-      .mocked(clack.outro)
-      .mock.calls.map(([message]) => message)
-      .join('\n');
-    expect(outroText).toContain(bundle.label);
+    expect(outroText()).toContain(bundle.label);
   });
 
   it('applies nothing when the developer declines every offered bundle', async () => {
@@ -139,15 +143,11 @@ describe('runNew', () => {
     await runNew(BASE_PARSED);
 
     expect(applyBundle).not.toHaveBeenCalled();
-    const outroText = vi
-      .mocked(clack.outro)
-      .mock.calls.map(([message]) => message)
-      .join('\n');
-    expect(outroText).not.toContain('grant');
+    expect(outroText()).not.toContain('grant');
   });
 
-  // why: same non-interactive fallback as `add` — a piped/CI `new` can't pop a multiselect, so it
-  // falls back to the printed hint instead of aborting the whole scaffold.
+  // The same non-interactive fallback as `add`: a piped or CI `new` cannot pop a multiselect
+  // So it falls back to the printed hint instead of aborting the whole scaffold
   it('falls back to a printed hint when resolveGrantSelection cannot ask (non-interactive)', async () => {
     mockHappyPath(['audio']);
     vi.mocked(resolveGrantSelection).mockRejectedValue(
@@ -157,11 +157,7 @@ describe('runNew', () => {
     await runNew(BASE_PARSED);
 
     expect(applyBundle).not.toHaveBeenCalled();
-    const outroText = vi
-      .mocked(clack.outro)
-      .mock.calls.map(([message]) => message)
-      .join('\n');
-    expect(outroText).toContain('@symbiote-native/cli grant audio');
+    expect(outroText()).toContain('@symbiote-native/cli grant audio');
   });
 
   it('does not ask or hint at `grant` for a package with no optional manifest bundle', async () => {
@@ -170,11 +166,7 @@ describe('runNew', () => {
     await runNew(BASE_PARSED);
 
     expect(resolveGrantSelection).not.toHaveBeenCalled();
-    const outroText = vi
-      .mocked(clack.outro)
-      .mock.calls.map(([message]) => message)
-      .join('\n');
-    expect(outroText).not.toContain('grant');
+    expect(outroText()).not.toContain('grant');
   });
 
   it('does not ask or hint at `grant` when no Expo package was selected', async () => {
@@ -183,15 +175,40 @@ describe('runNew', () => {
     await runNew(BASE_PARSED);
 
     expect(resolveGrantSelection).not.toHaveBeenCalled();
-    const outroText = vi
-      .mocked(clack.outro)
-      .mock.calls.map(([message]) => message)
-      .join('\n');
-    expect(outroText).not.toContain('grant');
+    expect(outroText()).not.toContain('grant');
   });
 
-  // why: `new` never runs `git init` unasked — the developer might already have their own git
-  // workflow (a monorepo, a template they'll copy in by hand) that a silent init would surprise.
+  // Reanimated has a native half, so the scaffolded app needs its pods and a rebuild
+  describe('reanimated layer', () => {
+    it('hands the layer to the scaffold when the features include it', async () => {
+      mockHappyPath([], true);
+
+      await runNew(BASE_PARSED);
+
+      expect(scaffoldApp).toHaveBeenCalledWith(
+        expect.objectContaining({ hasReanimated: true }),
+      );
+    });
+
+    it('tells the developer to run pod install and rebuild', async () => {
+      mockHappyPath([], true);
+
+      await runNew(BASE_PARSED);
+
+      expect(outroText()).toContain('pod install');
+    });
+
+    it('prints no pod install note for an app without it', async () => {
+      mockHappyPath();
+
+      await runNew(BASE_PARSED);
+
+      expect(outroText()).not.toContain('pod install');
+    });
+  });
+
+  // `new` never runs `git init` unasked: the developer may have their own git workflow
+  // (a monorepo, a template they copy in by hand) that a silent init would surprise
   describe('git init offer', () => {
     it('does not ask when the scaffold is already a git repository', async () => {
       mockHappyPath();
@@ -203,8 +220,8 @@ describe('runNew', () => {
       expect(tryGitInit).not.toHaveBeenCalled();
     });
 
-    // why: `new` never commits on the developer's behalf (their call what goes in, what message)
-    // — only the repository itself gets created.
+    // `new` never commits on the developer's behalf, as what goes in and the message are theirs
+    // Only the repository itself gets created
     it('initializes git and reports it when accepted, without committing', async () => {
       mockHappyPath();
       vi.mocked(fs.existsSync).mockReturnValue(false);
@@ -214,11 +231,7 @@ describe('runNew', () => {
       await runNew(BASE_PARSED);
 
       expect(tryGitInit).toHaveBeenCalledWith('/fake/my-app');
-      const outroText = vi
-        .mocked(clack.outro)
-        .mock.calls.map(([message]) => message)
-        .join('\n');
-      expect(outroText).not.toContain('git add -A');
+      expect(outroText()).not.toContain('git add -A');
     });
 
     it('does not init and keeps the manual instructions when declined', async () => {
@@ -229,15 +242,11 @@ describe('runNew', () => {
       await runNew(BASE_PARSED);
 
       expect(tryGitInit).not.toHaveBeenCalled();
-      const outroText = vi
-        .mocked(clack.outro)
-        .mock.calls.map(([message]) => message)
-        .join('\n');
-      expect(outroText).toContain('git init && git add -A');
+      expect(outroText()).toContain('git init && git add -A');
     });
 
-    // why: a missing `git` binary must fall back to the manual instructions, not report success
-    // for a repository that was never actually created.
+    // A missing `git` binary must fall back to the manual instructions
+    // Reporting success for a repository that was never created would be wrong
     it('falls back to the manual instructions when the accepted git init itself fails', async () => {
       mockHappyPath();
       vi.mocked(fs.existsSync).mockReturnValue(false);
@@ -246,11 +255,7 @@ describe('runNew', () => {
 
       await runNew(BASE_PARSED);
 
-      const outroText = vi
-        .mocked(clack.outro)
-        .mock.calls.map(([message]) => message)
-        .join('\n');
-      expect(outroText).toContain('git init && git add -A');
+      expect(outroText()).toContain('git init && git add -A');
     });
   });
 });

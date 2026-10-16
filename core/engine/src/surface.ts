@@ -26,6 +26,7 @@ import {
   registerSurfaceCommit,
 } from './imperative';
 import { runPostCommitHooks } from './post-commit';
+import { releaseNodeBindings } from './node-binding';
 import {
   appendChild,
   createSurfaceRoot,
@@ -42,6 +43,12 @@ const NO_CO_COMMITTERS: readonly (readonly [IRootTag, ISymbioteNode])[] = [];
 // `inlineRequires`.
 const isNodeCommitted = (node: ISymbioteNode): boolean =>
   getNativeTag(node) !== undefined;
+
+// What the teardown sweep runs on a node that really left the tree
+function releaseNode(node: ISymbioteNode): void {
+  detachAnimatedProps(node);
+  releaseNodeBindings(node);
+}
 
 export class SymbioteSurface {
   readonly rootTag: IRootTag;
@@ -101,8 +108,8 @@ export class SymbioteSurface {
   teardown(): void {
     // The nominations first: an adapter that empties and disposes the surface without a commit in
     // between never reaches the commit sweep, and the walk below can't see those nodes either.
-    sweepDetachedBehaviors(this.children, detachAnimatedProps);
-    teardownSubtree(this.node, detachAnimatedProps);
+    sweepDetachedBehaviors(this.children, releaseNode);
+    teardownSubtree(this.node, releaseNode);
   }
 
   // Synchronous commit: used by React's resetAfterCommit, which already batches per logical update.
@@ -118,7 +125,7 @@ export class SymbioteSurface {
     // Guarded at the call site, not inside the sweep — this.children is a host read that builds the
     // whole top-level list, and it would run on every commit for a sweep with nothing to do.
     if (hasDetachCandidates()) {
-      sweepDetachedBehaviors(this.children, detachAnimatedProps);
+      sweepDetachedBehaviors(this.children, releaseNode);
     }
     const owner = surfaces.get(this.rootTag);
     const superseded = owner !== undefined && owner !== this;

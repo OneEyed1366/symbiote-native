@@ -1,9 +1,6 @@
-// Co-located tests for the Solid reactive primitives over the engine's runtime modules.
-// Both are driven through the REAL event source: a fake `__turboModuleProxy` supplies the
-// Appearance / DeviceInfo native modules and a fake `RN$registerCallableModule` captures the
-// device hub, so a test plays "native" and emits `appearanceChanged` / `didUpdateDimensions`
-// exactly as the platform does. Nothing about Appearance or Dimensions is stubbed — a primitive
-// that never subscribed would read its seed value forever and fail here.
+// Co-located tests for the Solid reactive primitives over the engine's runtime modules, driven
+// through RN's real device event emitter: `appearanceChanged` and `didUpdateDimensions` arrive
+// as the platform sends them
 //
 // What each primitive owns, and therefore what is asserted: (1) the accessor tracks the module
 // after the seed read, (2) `onCleanup` actually removes the subscription — proven by an emit
@@ -15,80 +12,22 @@
 
 import { createEffect, createRoot, type Accessor } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type {
-  IColorSchemeName,
-  IDimensionsPayload,
-  IDisplayMetrics,
+import {
+  Appearance,
+  type IColorSchemeName,
+  type IDisplayMetrics,
 } from '@symbiote-native/engine';
+import {
+  emitRnDeviceEvent,
+  emitWindowDimensions,
+  TEST_WINDOW as INITIAL_WINDOW,
+} from '@symbiote-native/test-utils';
 
 import { createColorScheme } from './create-color-scheme';
 import { createWindowDimensions } from './create-window-dimensions';
 
-// ---- fake native modules + device hub -----------------------------------
-
-let nativeScheme: IColorSchemeName = 'light';
-const fakeAppearance = {
-  getColorScheme: (): IColorSchemeName => nativeScheme,
-  setColorScheme: (scheme: IColorSchemeName | 'unspecified'): void => {
-    if (scheme !== 'unspecified') nativeScheme = scheme;
-  },
-  addListener: (): void => {},
-  removeListeners: (): void => {},
-};
-
-const INITIAL_WINDOW: IDisplayMetrics = {
-  width: 390,
-  height: 844,
-  scale: 3,
-  fontScale: 1,
-};
-const fakeDeviceInfo = {
-  getConstants: (): { Dimensions: IDimensionsPayload } => ({
-    Dimensions: { window: INITIAL_WINDOW, screen: INITIAL_WINDOW },
-  }),
-};
-
-const registeredModules: Record<string, unknown> = {
-  Appearance: fakeAppearance,
-  DeviceInfo: fakeDeviceInfo,
-};
-
-interface IDeviceHub {
-  emit: (eventType: string, ...args: unknown[]) => void;
-}
-
-let deviceHub: IDeviceHub | undefined;
-
-function isType<T>(value: unknown): value is T {
-  return value !== null && value !== undefined;
-}
-
-Object.assign(globalThis, {
-  __turboModuleProxy: <T>(name: string): T | null => {
-    const module = registeredModules[name];
-    if (!isType<T>(module)) return null;
-    return module;
-  },
-  RN$registerCallableModule: (
-    name: string,
-    factory: () => IDeviceHub,
-  ): void => {
-    if (name === 'RCTDeviceEventEmitter') deviceHub = factory();
-  },
-});
-
-// Play native. Throws rather than silently no-opping: a missing hub would make every
-// "the accessor updated" assertion pass for the wrong reason.
-function emitDeviceEvent(eventType: string, payload: unknown): void {
-  if (deviceHub === undefined) {
-    throw new Error('device event hub was never installed');
-  }
-  deviceHub.emit(eventType, payload);
-}
-
-function emitWindow(window: IDisplayMetrics, screen = window): void {
-  emitDeviceEvent('didUpdateDimensions', { window, screen });
-}
+const emitDeviceEvent = emitRnDeviceEvent;
+const emitWindow = emitWindowDimensions;
 
 // `createEffect` is a USER effect: Solid defers it to the end of the enclosing `runUpdates`, so
 // one created inside `createRoot`'s callback has not run yet when that callback returns a value.
@@ -100,7 +39,7 @@ function inRoot<T>(build: () => T): { value: T; dispose: () => void } {
 }
 
 beforeEach(() => {
-  nativeScheme = 'light';
+  Appearance.setColorScheme('unspecified');
 });
 
 afterEach(() => {
@@ -111,9 +50,9 @@ describe('createColorScheme', () => {
   // why: a Solid component body runs ONCE, so a primitive that returned a snapshot would pin the
   // app to the scheme it booted with and no test of the initial value could tell the difference.
   it('seeds from Appearance and tracks a native appearanceChanged event', () => {
-    const seen: (IColorSchemeName | null)[] = [];
+    const seen: (IColorSchemeName | null | undefined)[] = [];
     const { value: colorScheme, dispose } = inRoot<
-      Accessor<IColorSchemeName | null>
+      Accessor<IColorSchemeName | null | undefined>
     >(() => {
       const scheme = createColorScheme();
       createEffect(() => {
@@ -216,7 +155,7 @@ describe('createWindowDimensions', () => {
     expect(runs).toBe(1);
 
     // Same window values, a different object, and a screen that DID change.
-    emitWindow({ ...window }, { ...window, height: 1000 });
+    emitWindow({ ...window }, { ...window, height: 1_000 });
     expect(runs).toBe(1);
 
     emitWindow({ ...window, fontScale: 1.3 });
@@ -239,7 +178,7 @@ describe('createWindowDimensions', () => {
 
     dispose();
 
-    emitWindow({ width: 1024, height: 768, scale: 2, fontScale: 1 });
+    emitWindow({ width: 1_024, height: 768, scale: 2, fontScale: 1 });
     expect(dimensions()).toEqual(resized);
   });
 });

@@ -12,16 +12,16 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { AnimatedValue } from '@symbiote-native/engine';
 import type { INativeAnimationConfig } from '@symbiote-native/engine';
 
-interface INativeCall {
+type INativeCall = {
   method: string;
   args: unknown[];
-}
+};
 
-interface INativeEndResult {
+type INativeEndResult = {
   finished: boolean;
   value?: number;
   offset?: number;
-}
+};
 
 let nativeCalls: INativeCall[];
 let deliverResult: ((result: INativeEndResult) => void) | undefined;
@@ -76,10 +76,7 @@ beforeEach(() => {
 });
 
 describe('AnimatedValue.__startNativeAnimation — Positive', () => {
-  // why: a native-driven animation must exist as a native node BEFORE native is asked to
-  // animate it (create-then-start), and the animation must run on THIS value's own tag with the
-  // caller's id/config passed through verbatim — the driver owns the curve, the value owns the
-  // native handshake.
+  // Нода создаётся до старта анимации, а сама анимация идёт на собственном теге значения
   it('makes the value native and starts the native animation on its own tag with the given id/config', () => {
     const value = new AnimatedValue(0);
 
@@ -101,27 +98,25 @@ describe('AnimatedValue.__startNativeAnimation — Positive', () => {
     expect(start?.args[2]).toEqual({ type: 'frames', frames: [0, 1] });
   });
 
-  // why: when native reports back a resting `value`, the JS side must sync to it (so a
-  // subsequent JS read/animation continues from where native actually landed) WITHOUT issuing
-  // any further native call — native already moved the view, re-flushing to native would be a
-  // redundant round-trip.
+  // JS догоняет значение native без лишнего вызова обратно, т.к. native уже сдвинул вью
   it('on native completion with a value, reports finished via the callback and syncs the JS value, without a further native call', () => {
     const value = new AnimatedValue(0);
-    let finished: boolean | undefined;
+    let ended: unknown;
 
     value.__startNativeAnimation(
       { type: 'frames', frames: [0, 1] },
       9,
       result => {
-        finished = result;
+        ended = result;
       },
     );
     nativeCalls.length = 0; // only interested in what happens after native reports back
 
-    deliverResult?.({ finished: true, value: 42 });
+    deliverResult?.({ finished: true, value: 42, offset: 3 });
 
-    expect(finished).toBe(true);
-    expect(value.__getValue()).toBe(42);
+    // RN hands the whole native result to the app's callback, value and offset included
+    expect(ended).toEqual({ finished: true, value: 42, offset: 3 });
+    expect(value.__getValue()).toBe(45);
     expect(nativeCalls).toHaveLength(0);
   });
 

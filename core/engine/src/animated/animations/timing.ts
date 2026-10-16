@@ -3,8 +3,7 @@
 // ms, shaping progress through an easing function. The native-frame export and
 // __startAnimationIfNative branch are dropped.
 
-import type { IAnimation, IEndCallback } from '../animation';
-import type { AnimatedValue } from '../value';
+import type { IAnimationRun } from '../animation';
 import { Easing, type IEasingFunction } from '../easing';
 import { dlog } from '../../debug';
 import type { INativeAnimationConfig } from '../native/native-animated';
@@ -17,12 +16,12 @@ import {
   type ITimerHandle,
 } from './raf';
 
-export interface ITimingAnimationConfig extends IAnimationConfig {
+export type ITimingAnimationConfig = IAnimationConfig & {
   toValue: number;
   easing?: IEasingFunction;
   duration?: number;
   delay?: number;
-}
+};
 
 let cachedEaseInOut: IEasingFunction | undefined;
 function easeInOut(): IEasingFunction {
@@ -53,7 +52,7 @@ export class TimingAnimation extends BaseAnimation {
 
   // Native: hand the easing curve to native as a per-frame sample table.
   protected override getNativeAnimationConfig(): INativeAnimationConfig {
-    const frameDuration = 1000 / 60;
+    const frameDuration = 1_000 / 60;
     const numFrames = Math.round(this.duration / frameDuration);
     const frames: number[] = [];
     for (let frame = 0; frame < numFrames; frame++) {
@@ -70,20 +69,15 @@ export class TimingAnimation extends BaseAnimation {
     };
   }
 
-  override start(
-    fromValue: number,
-    onUpdate: (value: number) => void,
-    onEnd: IEndCallback,
-    _previousAnimation: IAnimation | null,
-    animatedValue: AnimatedValue,
-  ): void {
-    this.begin(onEnd);
+  override start(run: IAnimationRun): void {
+    const { fromValue, onUpdate, animatedValue } = run;
+    this.begin(run);
     this.fromValue = fromValue;
     this.onUpdate = onUpdate;
 
     const begin = (): void => {
       this.startTime = Date.now();
-      // Native took over → the JS rAF loop is skipped entirely.
+      // Если native взял анимацию, JS-цикл кадров не нужен
       if (this.startNativeIfNeeded(animatedValue)) return;
       if (this.duration === 0) {
         this.onUpdate(this.toValue);
@@ -93,10 +87,10 @@ export class TimingAnimation extends BaseAnimation {
       }
     };
 
-    if (this.delay !== 0) {
-      this.timeout = setTimer(begin, this.delay);
-    } else {
+    if (this.delay === 0) {
       begin();
+    } else {
+      this.timeout = setTimer(begin, this.delay);
     }
   }
 

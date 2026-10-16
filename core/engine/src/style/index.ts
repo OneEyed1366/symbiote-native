@@ -1,12 +1,6 @@
-// StyleSheet.flatten, ported. RN's idiom is `style={[base, override, cond && extra]}`,
-// an array of objects (and nested arrays) where later keys win. But Fabric's C++
-// reads a single flat props payload, so before we diff and commit we must collapse
-// that array into one plain object. This is the only place that collapse happens.
-//
-// Mirrors react-native/Libraries/StyleSheet/flattenStyle.js: recurse on the style
-// POSITION only, never on a property VALUE. `transform: [{translateX: 5}]` is an
-// array-valued prop and `shadowOffset: {width, height}` an object-valued prop; both
-// are copied through untouched. Only the top-level style slot is flattened.
+// TODO(rn-port): RN's `flattenStyle` returns `undefined` for a falsy style and the same object
+// for a single one, but callers here need a fresh non-null record, so it cannot be imported as is
+// Recurses on the style position only, never on a property value (`transform` stays an array)
 
 import { isRecord } from '../type-guards';
 

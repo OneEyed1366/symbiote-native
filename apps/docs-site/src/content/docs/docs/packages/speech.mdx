@@ -11,19 +11,6 @@ so every SymbioteNative adapter can reach it, not just React. Every export is a 
 or constant, so the React, Vue, Angular, Svelte, and Solid entry points are plain re-exports of the
 same `core`.
 
-| OS platform | Support |
-| ----------- | ------- |
-| iOS         | live    |
-| Android     | live    |
-
-| Framework adapter | Support |
-| ----------------- | ------- |
-| React             | live    |
-| Vue               | live    |
-| Angular           | live    |
-| Svelte            | live    |
-| Solid             | live    |
-
 ## Installation
 
 ```sh
@@ -287,11 +274,13 @@ completion callback is not guaranteed afterwards on iOS. Track state yourself if
 **My text is cut off or rejected.** Android rejects text longer than `maxSpeechInputLength`. Split
 long text into sentences and queue them.
 
-Sources: [Expo docs: Speech](https://docs.expo.dev/versions/latest/sdk/speech/),
-[expo/expo#10827 playsInSilentModeIOS does not influence Speech.speak](https://github.com/expo/expo/issues/10827),
-[expo/expo#24243 events like onDone do not fire on iOS](https://github.com/expo/expo/issues/24243),
-[expo/expo#12654 pause emits stopped and resume never emits done](https://github.com/expo/expo/issues/12654),
-[expo/expo#7260 Speech.speak not working for non-English on Android](https://github.com/expo/expo/issues/7260).
+Sources:
+
+- [Expo docs: Speech](https://docs.expo.dev/versions/latest/sdk/speech/)
+- [expo/expo#10827 playsInSilentModeIOS does not influence Speech.speak](https://github.com/expo/expo/issues/10827)
+- [expo/expo#24243 events like onDone do not fire on iOS](https://github.com/expo/expo/issues/24243)
+- [expo/expo#12654 pause emits stopped and resume never emits done](https://github.com/expo/expo/issues/12654)
+- [expo/expo#7260 Speech.speak not working for non-English on Android](https://github.com/expo/expo/issues/7260)
 
 ## How the wrapper works
 

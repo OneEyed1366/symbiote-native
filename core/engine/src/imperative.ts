@@ -103,6 +103,18 @@ export function getNativeNode(node: ISymbioteNode): object | undefined {
   return committedRecordOf(node)?.handle;
 }
 
+// What Fabric-level native libraries take for a view, Reanimated keys its registries by its family
+// undefined before the first commit and on a host that cannot build one
+export function getShadowNodeWrapper(node: ISymbioteNode): object | undefined {
+  flushOps();
+  return treeHost()?.shadowNodeWrapperOf?.(node);
+}
+
+// Changes when a reparent re-creates the node's Fabric family, see `ICommittedRecord`
+export function getFamilyGeneration(node: ISymbioteNode): number | undefined {
+  return committedRecordOf(node)?.familyGeneration;
+}
+
 // Actions waiting for their node's first commit — an adapter wiring a call at lifecycle time can
 // run before completeRoot under an async-batched commit, so the node has no handle yet. Each
 // waiter retries after a commit and is dropped once it runs; React runs its actions inline.

@@ -22,23 +22,28 @@
 
 <script lang="ts" generics="ItemT">
   import {
+    cellGapsFor,
+    createSeparatorBoard,
     flattenSections,
     resolveStickySectionHeaders,
-    scrollLocationToFlatIndex,
+    resolveScrollLocation,
+    SEPARATOR_GAP_KIND,
     sectionEntryKey,
-    unwrapEntryItem,
     type ISectionEntry,
-    type ISeparatorProps,
-    type ISeparators,
+    type ISeparatorGap,
   } from '@symbiote-native/components';
   import { Platform, dlog, type ISymbioteNode } from '@symbiote-native/engine';
   import VirtualizedList from '../virtualized-list/index.svelte';
+  import SectionItemCell from './section-item-cell.svelte';
   import { pickAccessibilityProps } from '../virtualized-list/virtualized-list-props';
   import type {
     IVirtualizedListHandle,
     IScrollViewHandle,
   } from '../virtualized-list/virtualized-list-props';
-  import type { IVirtualizedSectionListProps as IProps } from './virtualized-section-list-props';
+  import type {
+    IVirtualizedSectionListProps as IProps,
+    ISection,
+  } from './virtualized-section-list-props';
   import { pickAttachmentProps } from '../../runes/attachments';
 
   let props: IProps<ItemT> = $props();
@@ -49,8 +54,11 @@
   // component, not a symbiote-* host tag — see flat-list/index.svelte's identical comment).
   const accessibilityProps = $derived(pickAccessibilityProps(props));
 
+  type IEntry = ISectionEntry<ItemT, ISection<ItemT>>;
+
+  const board = createSeparatorBoard<Record<string, unknown>>();
   const flattened = $derived.by(() =>
-    flattenSections(props.sections, props.sectionSeparator !== undefined),
+    flattenSections<ItemT, ISection<ItemT>>(props.sections),
   );
   const entries = $derived(flattened.entries);
   const headerIndices = $derived(flattened.headerIndices);
@@ -80,28 +88,19 @@
     );
   });
 
-  function getEntry(_source: unknown, index: number): ISectionEntry<ItemT> {
+  function getEntry(_source: unknown, index: number): IEntry {
     return entries[index];
   }
   function getEntryCount(): number {
     return entries.length;
   }
-  function entryKeyExtractor(
-    entry: ISectionEntry<ItemT>,
-    index: number,
-  ): string {
-    return sectionEntryKey(entry, index, props.keyExtractor);
+  function entryKeyExtractor(entry: IEntry): string {
+    return sectionEntryKey(entry, props.keyExtractor);
   }
 
   // Hand the callback `sections`, not the entries: RN's inner VirtualizedList gets
   // `data={this.props.sections}` (VirtualizedSectionList.js:216) while ours streams the FLATTENED
-  // entries, so the same user code would otherwise see a different argument here than on RN.
-  //
-  // UPSTREAM-DIVERGENCE(react-native): the flat INDEX matches RN's (two rows per section, header
-  // and footer) only while the `sectionSeparator` snippet is unset. With it, flattenSections emits
-  // an extra 'section-separator' row per boundary that RN renders inside the neighbouring cell, so
-  // indices shift by one per boundary from the second section on. Deliberate - that row is how this
-  // adapter paints the separator; a caller combining the two must account for it.
+  // entries, so the same user code would otherwise see a different argument here than on RN
   const entryItemLayout = $derived.by(() => {
     const getItemLayout = props.getItemLayout;
     if (getItemLayout === undefined) return undefined;
@@ -112,14 +111,17 @@
       getItemLayout(props.sections, index);
   });
 
-  function entrySeparatorProps(
-    entryProps: ISeparatorProps<ISectionEntry<ItemT>>,
-  ): ISeparatorProps<ItemT> {
-    return {
-      ...entryProps,
-      leadingItem: unwrapEntryItem(entryProps.leadingItem),
-      trailingItem: unwrapEntryItem(entryProps.trailingItem),
-    };
+  // The separator snippet for a gap: the section one, or the item one where a section's own beats
+  // the list's
+  function separatorFor(gap: ISeparatorGap<ItemT, ISection<ItemT>>) {
+    if (gap.props === undefined) return undefined;
+    if (gap.kind === SEPARATOR_GAP_KIND.section) return props.sectionSeparator;
+    return gap.props.section.separator ?? props.separator;
+  }
+
+  function prevKeyOf(index: number): string | undefined {
+    const previous = entries[index - 1];
+    return previous === undefined ? undefined : entryKeyExtractor(previous);
   }
 
   // ---- imperative handle: scrollToLocation resolves (sectionIndex, itemIndex) to the flattened
@@ -132,31 +134,26 @@
     viewPosition?: number;
     animated?: boolean;
   }): void {
-    const flatIndex = scrollLocationToFlatIndex(
+    const target = resolveScrollLocation(
       headerIndices,
-      params.sectionIndex,
-      params.itemIndex,
+      stickyHeaderIndices,
+      params,
     );
-    if (flatIndex === undefined) {
+    if (target === undefined) {
       dlog(
         `VirtualizedSectionList scrollToLocation: section ${params.sectionIndex} out of range`,
       );
       return;
     }
     dlog(
-      `VirtualizedSectionList scrollToLocation section=${params.sectionIndex} item=${params.itemIndex} -> flat ${flatIndex}`,
+      `VirtualizedSectionList scrollToLocation section=${params.sectionIndex} item=${params.itemIndex} -> flat ${target.index}`,
     );
-    inner?.scrollToIndex({
-      index: flatIndex,
-      viewOffset: params.viewOffset,
-      viewPosition: params.viewPosition,
-      animated: params.animated,
-    });
+    inner?.scrollToIndex(target);
   }
   export function flashScrollIndicators(): void {
     inner?.flashScrollIndicators();
   }
-  export function getNativeScrollRef(): IScrollViewHandle | null {
+  export function getNativeScrollRef(): ISymbioteNode | null {
     return inner?.getNativeScrollRef() ?? null;
   }
   export function getScrollableNode(): IScrollViewHandle | null {
@@ -168,8 +165,14 @@
   export function getScrollNode(): ISymbioteNode | null {
     return inner?.getScrollNode() ?? null;
   }
+  export function getScrollRef(): ISymbioteNode | null {
+    return inner?.getScrollRef() ?? null;
+  }
   export function recordInteraction(): void {
     inner?.recordInteraction();
+  }
+  export function setNativeProps(props: Record<string, unknown>): void {
+    inner?.setNativeProps(props);
   }
 
   // `{@attach}` arrives as a symbol-keyed prop, which naming individual props below drops.
@@ -177,33 +180,28 @@
   const attachments = $derived(pickAttachmentProps(props));
 </script>
 
-{#snippet entryItem({
-  item: entry,
-  index,
-  separators,
-}: {
-  item: ISectionEntry<ItemT>;
-  index: number;
-  separators: ISeparators;
-})}
+{#snippet entryItem({ item: entry, index }: { item: IEntry; index: number })}
   {#if entry.kind === 'header'}
     {@render props.sectionHeader?.({ section: entry.section })}
   {:else if entry.kind === 'footer'}
     {@render props.sectionFooter?.({ section: entry.section })}
-  {:else if entry.kind === 'section-separator'}
-    {@render props.sectionSeparator?.()}
   {:else}
-    {@render props.item({
-      item: entry.item,
-      index: entry.itemIndex,
-      section: entry.section,
-      separators,
-    })}
+    {@const gaps = cellGapsFor(entries, index)}
+    <SectionItemCell
+      {board}
+      cellKey={entryKeyExtractor(entry)}
+      prevCellKey={prevKeyOf(index)}
+      item={entry.item}
+      index={entry.itemIndex}
+      section={entry.section}
+      renderItem={entry.section.item ?? props.item}
+      leadingGap={gaps.leading}
+      trailingGap={gaps.trailing}
+      leadingSeparator={separatorFor(gaps.leading)}
+      trailingSeparator={separatorFor(gaps.trailing)}
+      isInverted={props.inverted === true}
+    />
   {/if}
-{/snippet}
-
-{#snippet entrySeparator(entryProps: ISeparatorProps<ISectionEntry<ItemT>>)}
-  {@render props.separator?.(entrySeparatorProps(entryProps))}
 {/snippet}
 
 <VirtualizedList
@@ -214,7 +212,7 @@
   getItem={getEntry}
   getItemCount={getEntryCount}
   item={entryItem}
-  separator={props.separator ? entrySeparator : undefined}
+  cellRenderer={props.cellRenderer}
   header={props.header}
   footer={props.footer}
   empty={props.empty}
@@ -222,6 +220,7 @@
   getItemLayout={entryItemLayout}
   {stickyHeaderIndices}
   inverted={props.inverted}
+  horizontal={props.horizontal}
   extraData={props.extraData}
   onEndReached={props.onEndReached}
   onEndReachedThreshold={props.onEndReachedThreshold}
@@ -235,8 +234,10 @@
   maxToRenderPerBatch={props.maxToRenderPerBatch}
   updateCellsBatchingPeriod={props.updateCellsBatchingPeriod}
   windowSize={props.windowSize}
+  disableVirtualization={props.disableVirtualization}
   maintainVisibleContentPosition={props.maintainVisibleContentPosition}
   onScroll={props.onScroll}
+  onContentSizeChange={props.onContentSizeChange}
   onScrollBeginDrag={props.onScrollBeginDrag}
   onScrollEndDrag={props.onScrollEndDrag}
   onMomentumScrollBegin={props.onMomentumScrollBegin}
@@ -246,7 +247,11 @@
   keyboardDismissMode={props.keyboardDismissMode}
   removeClippedSubviews={props.removeClippedSubviews}
   nestedScrollEnabled={props.nestedScrollEnabled}
+  stickyHeaderHiddenOnScroll={props.stickyHeaderHiddenOnScroll}
+  innerViewRef={props.innerViewRef}
   style={props.style}
   contentContainerStyle={props.contentContainerStyle}
+  listHeaderComponentStyle={props.listHeaderComponentStyle}
+  listFooterComponentStyle={props.listFooterComponentStyle}
   class={props.class}
 />

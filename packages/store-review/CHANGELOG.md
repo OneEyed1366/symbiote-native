@@ -1,5 +1,11 @@
 # @symbiote-native/store-review
 
+## 3.0.5
+
+### Patch Changes
+
+- [`8c2c5d6`](https://github.com/OneEyed1366/symbiote-native/commit/8c2c5d63dd9e980aae19b392c63d73f9929b103e) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Comments and READMEs no longer point at project skills that were removed.
+
 ## 3.0.4
 
 ### Patch Changes
