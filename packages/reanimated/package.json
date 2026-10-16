@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/reanimated",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "react-native-reanimated 4 and react-native-worklets for SymbioteNative — one framework-agnostic core over the upstream hook helpers, reachable from the adapters. Shared values, animated styles, layout animations and CSS animations on the UI thread.",
   "license": "MIT",
   "keywords": [
