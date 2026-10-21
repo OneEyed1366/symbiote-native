@@ -9,7 +9,7 @@ final class CanaryCatalystUITests: XCTestCase {
     continueAfterFailure = false
     app.launch()
     XCTAssertTrue(app.staticTexts["catalyst-count"].waitForExistence(timeout: 30))
-    app.buttons["catalyst-reset"].tap()
+    app.buttons["catalyst-reset"].click()
   }
 
   override func tearDownWithError() throws {
@@ -25,7 +25,7 @@ final class CanaryCatalystUITests: XCTestCase {
   }
 
   func testEventsAndPersistenceAcrossRelaunch() {
-    app.buttons["catalyst-increment"].tap()
+    app.buttons["catalyst-increment"].click()
     assertLabel("catalyst-count", "Count: 1")
     app.terminate()
     app.launch()
@@ -35,12 +35,12 @@ final class CanaryCatalystUITests: XCTestCase {
 
   func testTextInputAndRemount() {
     let input = app.textFields["catalyst-input"]
-    input.tap()
+    input.click()
     input.typeText("Catalyst")
     assertLabel("catalyst-output", "Input: Catalyst")
-    app.buttons["catalyst-toggle"].tap()
+    app.buttons["catalyst-toggle"].click()
     XCTAssertFalse(input.exists)
-    app.buttons["catalyst-toggle"].tap()
+    app.buttons["catalyst-toggle"].click()
     XCTAssertTrue(input.waitForExistence(timeout: 5))
     XCTAssertEqual(input.value as? String, "Catalyst")
   }
@@ -51,7 +51,7 @@ final class CanaryCatalystUITests: XCTestCase {
     defer { pasteboard.items = previous }
 
     let input = app.textFields["catalyst-input"]
-    input.tap()
+    input.click()
     input.typeText("Clipboard canary")
     input.typeKey("a", modifierFlags: .command)
     input.typeKey("c", modifierFlags: .command)
@@ -66,15 +66,15 @@ final class CanaryCatalystUITests: XCTestCase {
     let original = window.frame
     let corner = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1))
       .withOffset(CGVector(dx: -2, dy: -2))
-    corner.press(forDuration: 0.2, thenDragTo: corner.withOffset(CGVector(dx: -120, dy: -80)))
+    corner.click(forDuration: 0.2, thenDragTo: corner.withOffset(CGVector(dx: -120, dy: -80)))
     XCTAssertNotEqual(window.frame.size, original.size)
     XCTAssertTrue(app.buttons["catalyst-increment"].isHittable)
 
-    let scroll = app.scrollViews["catalyst-scroll"]
+    let scroll = app.scrollViews.firstMatch
     let last = app.staticTexts["catalyst-row-39"]
     XCTAssertFalse(last.isHittable)
     for _ in 0..<8 where !last.isHittable {
-      scroll.swipeUp()
+      scroll.scroll(byDeltaX: 0, deltaY: -400)
     }
     XCTAssertTrue(last.isHittable)
   }
