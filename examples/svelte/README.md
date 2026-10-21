@@ -88,7 +88,55 @@ npx react-native bundle --platform android --entry-file index.js --dev false --b
 
 ## Note — shares the canary's native shell
 
-The native iOS/Android projects are copied verbatim from `examples/react`, so this app keeps the
-**same bundle id and app name ("Canary")**. On a simulator the canaries overwrite each other — run
+The mobile app keeps the **same bundle id and app name ("Canary")** as
+`examples/react`. On a simulator the canaries overwrite each other — run
 **one at a time**. The deep-link scheme is this app's own (`symbiotecanarysvelte://`), distinct from
 every other canary's, so a link never routes to whichever one the OS resolved last.
+
+## Mac Catalyst
+
+`CanaryCatalyst` builds the UIKit/Fabric host as a native Mac app. Its dedicated
+`index.catalyst.js` entry mounts `CatalystCanary.svelte` and embeds the JavaScript
+bundle, so the tests need no Metro server. The Mac bundle identifier is
+`dev.symbiotenative.canary.svelte.catalyst`.
+
+With Xcode 27 and Ruby 3.4 installed:
+
+```sh
+npm install
+bundle install
+nice -n 10 npm run test:catalyst
+```
+
+Local test builds use ad hoc signatures and allow the XCTest host to load its
+test bundle. macOS may ask you to authenticate to enable UI Automation.
+
+The native UI tests cover Svelte state updates, input remounting, keyboard
+copy/paste, settings across relaunch, scrolling, and window resizing. Test results
+are written beneath `ios/build/catalyst-results`; override the destination with
+`SYMBIOTE_CATALYST_RESULTS`.
+
+To verify freshly packed packages from this checkout, first run the root
+`prepublish-build`, then run from the repository root:
+
+```sh
+SYMBIOTE_CONSUMER_FRAMEWORKS=svelte \
+SYMBIOTE_CONSUMER_PLATFORMS=ios \
+SYMBIOTE_CONSUMER_CATALYST=1 \
+BUNDLE_GEMFILE="$PWD/examples/svelte/Gemfile" \
+nice -n 10 pnpm run check:bundle-isolation
+```
+
+CI runs this same packaged-consumer path on an Apple Silicon macOS runner and
+uploads the native `.xcresult` bundle. This canary verifies the core Svelte host;
+platform-specific integrations need their own Catalyst coverage.
+
+The example's `postinstall` applies a Reanimated 4.7.1 header patch. Catalyst can
+see both UIKit and AppKit headers; the reduced-motion helper must import the UI
+framework it uses. `patch-package --error-on-fail` makes dependency drift fail
+installation instead of silently dropping the fix.
+
+The Catalyst embed phase restores versioned-framework links and places privacy
+bundles in Resources in the prebuilt React and ReactNativeDependencies bundles
+before CocoaPods signs them. It operates on
+Xcode's `XCFrameworkIntermediates` copies.

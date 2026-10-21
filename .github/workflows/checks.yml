@@ -448,6 +448,48 @@ jobs:
           SYMBIOTE_CONSUMER_FRAMEWORKS: ${{ matrix.arm }}
           SYMBIOTE_NPM_CACHE_ROOT: ${{ runner.temp }}/npm-consumer-cache
 
+  catalyst:
+    name: Mac Catalyst
+    needs: [gate, typecheck]
+    if: needs.gate.outputs.cache-hit != 'true'
+    runs-on: xcode-27
+    timeout-minutes: 60
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: nice -n 10 pnpm install --frozen-lockfile --ignore-scripts
+      - uses: actions/download-artifact@v4
+        with:
+          name: build-output
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.4'
+          working-directory: examples/svelte
+          bundler-cache: true
+      - name: Enable UI testing on the disposable runner
+        run: |
+          sudo /usr/sbin/DevToolsSecurity -enable
+          sudo xcrun automationmodetool enable-automationmode-without-authentication
+      - run: nice -n 10 pnpm run check:bundle-isolation
+        env:
+          SYMBIOTE_CONSUMER_FRAMEWORKS: svelte
+          SYMBIOTE_CONSUMER_PLATFORMS: ios
+          SYMBIOTE_CONSUMER_CATALYST: '1'
+          SYMBIOTE_CATALYST_RESULTS: ${{ runner.temp }}/catalyst-results
+          BUNDLE_GEMFILE: ${{ github.workspace }}/examples/svelte/Gemfile
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: catalyst-results
+          path: ${{ runner.temp }}/catalyst-results
+          if-no-files-found: warn
+
   # Records that this tree passed, so the NEXT push/PR carrying the identical tree (a merge/squash/
   # rebase commit is the common case) hits the gate above instead of re-running everything. Only
   # runs when this job's own trigger actually did the work (cache-hit != 'true') and every check
@@ -460,7 +502,17 @@ jobs:
   # both states is what keeps a docs commit from re-running lint/typecheck/test forever after.
   mark-passed:
     name: Mark tree as passed
-    needs: [gate, changeset-status, lint, typecheck, test, itest, bundle-isolation]
+    needs:
+      [
+        gate,
+        changeset-status,
+        lint,
+        typecheck,
+        test,
+        itest,
+        bundle-isolation,
+        catalyst,
+      ]
     if: >
       always() &&
       needs.gate.outputs.cache-hit != 'true' &&
@@ -469,6 +521,7 @@ jobs:
       needs.typecheck.result == 'success' &&
       needs.test.result == 'success' &&
       needs.itest.result == 'success' &&
+      needs.catalyst.result == 'success' &&
       (needs['bundle-isolation'].result == 'success' ||
       needs['bundle-isolation'].result == 'skipped')
     runs-on: ubuntu-latest

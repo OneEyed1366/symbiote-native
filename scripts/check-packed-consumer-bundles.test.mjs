@@ -1,7 +1,32 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { npmCacheDirFor } from './check-packed-consumer-bundles.mjs';
+import {
+  npmCacheDirFor,
+  validateCatalystSelection,
+} from './check-packed-consumer-bundles.mjs';
+
+test('Catalyst cannot silently verify another arm or a non-native host', () => {
+  assert.doesNotThrow(() =>
+    validateCatalystSelection(['svelte'], ['ios'], 'darwin'),
+  );
+  assert.throws(
+    () => validateCatalystSelection(['svelte'], ['ios'], 'linux'),
+    /macOS/,
+  );
+  assert.throws(
+    () => validateCatalystSelection(['react'], ['ios'], 'darwin'),
+    /exactly/,
+  );
+  assert.throws(
+    () => validateCatalystSelection(['svelte', 'react'], ['ios'], 'darwin'),
+    /exactly/,
+  );
+  assert.throws(
+    () => validateCatalystSelection(['svelte'], ['ios', 'android'], 'darwin'),
+    /exactly/,
+  );
+});
 
 test('falls back to a disposable per-example dir when no cache root is given', () => {
   assert.equal(

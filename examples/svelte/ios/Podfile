@@ -27,8 +27,14 @@ target 'Canary' do
     react_native_post_install(
       installer,
       config[:reactNativePath],
-      :mac_catalyst_enabled => false,
+      :mac_catalyst_enabled => true,
       # :ccache_enabled => true
     )
+    # Catalyst deployment versions must exist in Xcode's iOS-to-macOS map.
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET[sdk=macosx*]'] = '15.2'
+      end
+    end
   end
 end

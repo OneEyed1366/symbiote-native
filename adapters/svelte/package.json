@@ -119,7 +119,7 @@
   "scripts": {
     "typecheck": "tsc --build",
     "format": "prettier --write \"src/**/*.{ts,svelte}\"",
-    "prepack": "pnpm run typecheck && cd ../.. && node scripts/copy-svelte-sources.mjs && node scripts/emit-svelte-declarations.mjs"
+    "prepack": "pnpm run typecheck && node prepack.mjs"
   },
   "dependencies": {
     "@symbiote-native/components": "workspace:*",

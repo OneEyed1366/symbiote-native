@@ -11,12 +11,25 @@
 		0C80B921A6F3F58F76C31292 /* libPods-Canary.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5DCACB8F33CDC322A6C60F78 /* libPods-Canary.a */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		72C5F8C2937E4CFAAE6D750A /* BootSplash.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = B2F1A0C8AAA04A459F673841 /* BootSplash.storyboard */; };
+		759F7743271FD76DF716C01E /* CanaryCatalystUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0350D62913E9DA710D33D5F7 /* CanaryCatalystUITests.swift */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
 		9F219187EB87BEBEB8C8DF6F /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
+		D55BC0EBC98811327691C421 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = EF77D9BEA965C4E0BB29169C /* Foundation.framework */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		E8DF094D30E800408D166D78 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 83CBB9F71A601CBA00E9B192 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 13B07F861A680F5B00A75B9A;
+			remoteInfo = Canary;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
+		0350D62913E9DA710D33D5F7 /* CanaryCatalystUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CanaryCatalystUITests.swift; sourceTree = "<group>"; };
 		13B07F961A680F5B00A75B9A /* Canary.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Canary.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = Canary/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = Canary/Info.plist; sourceTree = "<group>"; };
@@ -27,8 +40,10 @@
 		60CDED27307043A996C88E1B /* Colors.xcassets */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = folder.assetcatalog; name = Colors.xcassets; path = Canary/Colors.xcassets; sourceTree = "<group>"; };
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = Canary/AppDelegate.swift; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = Canary/LaunchScreen.storyboard; sourceTree = "<group>"; };
+		97BAF568CBE890E6E49F1041 /* CanaryCatalystUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CanaryCatalystUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B2F1A0C8AAA04A459F673841 /* BootSplash.storyboard */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = BootSplash.storyboard; path = Canary/BootSplash.storyboard; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
+		EF77D9BEA965C4E0BB29169C /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -37,6 +52,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				0C80B921A6F3F58F76C31292 /* libPods-Canary.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A474FA6C8996C217C837043F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D55BC0EBC98811327691C421 /* Foundation.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -62,6 +85,7 @@
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
 				5DCACB8F33CDC322A6C60F78 /* libPods-Canary.a */,
+				A6304A12DAE60B4390D67BC3 /* iOS */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -81,6 +105,7 @@
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
 				BBD78D7AC51CEA395F1C20DB /* Pods */,
+				F8D71F78843BB0BF336FD062 /* CanaryCatalystUITests */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -91,8 +116,17 @@
 			isa = PBXGroup;
 			children = (
 				13B07F961A680F5B00A75B9A /* Canary.app */,
+				97BAF568CBE890E6E49F1041 /* CanaryCatalystUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		A6304A12DAE60B4390D67BC3 /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				EF77D9BEA965C4E0BB29169C /* Foundation.framework */,
+			);
+			name = iOS;
 			sourceTree = "<group>";
 		};
 		BBD78D7AC51CEA395F1C20DB /* Pods */ = {
@@ -102,6 +136,15 @@
 				5709B34CF0A7D63546082F79 /* Pods-Canary.release.xcconfig */,
 			);
 			path = Pods;
+			sourceTree = "<group>";
+		};
+		F8D71F78843BB0BF336FD062 /* CanaryCatalystUITests */ = {
+			isa = PBXGroup;
+			children = (
+				0350D62913E9DA710D33D5F7 /* CanaryCatalystUITests.swift */,
+			);
+			name = CanaryCatalystUITests;
+			path = CanaryCatalystUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -116,6 +159,7 @@
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
+				E4D9ADEF913D54A627A86753 /* Normalize Catalyst frameworks */,
 				00EEFC60759A1932668264C0 /* [CP] Embed Pods Frameworks */,
 				E235C05ADACE081382539298 /* [CP] Copy Pods Resources */,
 			);
@@ -128,6 +172,24 @@
 			productReference = 13B07F961A680F5B00A75B9A /* Canary.app */;
 			productType = "com.apple.product-type.application";
 		};
+		C3B0A137FB1DEF7570711456 /* CanaryCatalystUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 486127F1581B8A01CE33DF03 /* Build configuration list for PBXNativeTarget "CanaryCatalystUITests" */;
+			buildPhases = (
+				48C930E130B2CDC361F1A630 /* Sources */,
+				A474FA6C8996C217C837043F /* Frameworks */,
+				531908F646530C1334B9C408 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				FCB5BF1F143E6F32B6EC9065 /* PBXTargetDependency */,
+			);
+			name = CanaryCatalystUITests;
+			productName = CanaryCatalystUITests;
+			productReference = 97BAF568CBE890E6E49F1041 /* CanaryCatalystUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -138,6 +200,9 @@
 				TargetAttributes = {
 					13B07F861A680F5B00A75B9A = {
 						LastSwiftMigration = 1120;
+					};
+					C3B0A137FB1DEF7570711456 = {
+						TestTargetID = 13B07F861A680F5B00A75B9A;
 					};
 				};
 			};
@@ -155,6 +220,7 @@
 			projectRoot = "";
 			targets = (
 				13B07F861A680F5B00A75B9A /* Canary */,
+				C3B0A137FB1DEF7570711456 /* CanaryCatalystUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -169,6 +235,13 @@
 				9F219187EB87BEBEB8C8DF6F /* PrivacyInfo.xcprivacy in Resources */,
 				72C5F8C2937E4CFAAE6D750A /* BootSplash.storyboard in Resources */,
 				08C742EC034C477CB155A637 /* Colors.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		531908F646530C1334B9C408 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -247,6 +320,25 @@
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Canary/Pods-Canary-resources.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
+		E4D9ADEF913D54A627A86753 /* Normalize Catalyst frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Normalize Catalyst frameworks";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e\nif [ \"${IS_MACCATALYST:-NO}\" = YES ]; then\n  . \"$REACT_NATIVE_PATH/scripts/xcode/with-environment.sh\"\n  \"$NODE_BINARY\" \"$PROJECT_DIR/../scripts/normalize-catalyst-frameworks.mjs\"\nfi\n";
+		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -258,7 +350,24 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		48C930E130B2CDC361F1A630 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				759F7743271FD76DF716C01E /* CanaryCatalystUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		FCB5BF1F143E6F32B6EC9065 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = Canary;
+			target = 13B07F861A680F5B00A75B9A /* Canary */;
+			targetProxy = E8DF094D30E800408D166D78 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
@@ -267,10 +376,14 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CURRENT_PROJECT_VERSION = 1;
+				DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER = NO;
 				ENABLE_BITCODE = NO;
+				"ENTRY_FILE[sdk=macosx*]" = index.catalyst.js;
 				INFOPLIST_FILE = Canary/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				"IPHONEOS_DEPLOYMENT_TARGET[sdk=macosx*]" = 15.2;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -282,8 +395,10 @@
 					"-lc++",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "org.reactjs.native.example.$(PRODUCT_NAME:rfc1034identifier)";
+				"PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]" = dev.symbiotenative.canary.svelte.catalyst;
 				PRODUCT_NAME = Canary;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = YES;
 				SWIFT_OBJC_BRIDGING_HEADER = "Canary/Canary-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -298,9 +413,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CURRENT_PROJECT_VERSION = 1;
+				DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER = NO;
+				"ENTRY_FILE[sdk=macosx*]" = index.catalyst.js;
 				INFOPLIST_FILE = Canary/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				"IPHONEOS_DEPLOYMENT_TARGET[sdk=macosx*]" = 15.2;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -312,8 +431,10 @@
 					"-lc++",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "org.reactjs.native.example.$(PRODUCT_NAME:rfc1034identifier)";
+				"PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]" = dev.symbiotenative.canary.svelte.catalyst;
 				PRODUCT_NAME = Canary;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = YES;
 				SWIFT_OBJC_BRIDGING_HEADER = "Canary/Canary-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -479,6 +600,45 @@
 			};
 			name = Release;
 		};
+		EFB6DC08D140845355A4A6ED /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
+				DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				"IPHONEOS_DEPLOYMENT_TARGET[sdk=macosx*]" = 15.2;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.symbiotenative.canary.svelte.catalyst.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = Canary;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		FB1061543CC09E7B93AA6893 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
+				DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				"IPHONEOS_DEPLOYMENT_TARGET[sdk=macosx*]" = 15.2;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.symbiotenative.canary.svelte.catalyst.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = Canary;
+			};
+			name = Debug;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -487,6 +647,15 @@
 			buildConfigurations = (
 				13B07F941A680F5B00A75B9A /* Debug */,
 				13B07F951A680F5B00A75B9A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		486127F1581B8A01CE33DF03 /* Build configuration list for PBXNativeTarget "CanaryCatalystUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				EFB6DC08D140845355A4A6ED /* Release */,
+				FB1061543CC09E7B93AA6893 /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

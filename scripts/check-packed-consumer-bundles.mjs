@@ -27,6 +27,24 @@ export const INTERNAL_PREFIX = '@symbiote-native/';
 export const KNOWN_FRAMEWORKS = ['react', 'vue', 'svelte', 'angular', 'solid'];
 export const PLATFORMS = ['ios', 'android'];
 
+export function validateCatalystSelection(
+  frameworks,
+  platforms,
+  host = process.platform,
+) {
+  if (host !== 'darwin') throw new Error('Catalyst tests require macOS');
+  if (
+    frameworks.length !== 1 ||
+    frameworks[0] !== 'svelte' ||
+    platforms.length !== 1 ||
+    platforms[0] !== 'ios'
+  ) {
+    throw new Error(
+      'Catalyst tests require exactly the svelte arm and ios platform',
+    );
+  }
+}
+
 // Keyed by ARM, which is not the same thing as a framework: one adapter can have more than one
 // canary, and `vue` has two. The key names the disposable directory; the FRAMEWORK an arm belongs
 // to is derived from its `adapter` (see `ownFrameworkOf`) — the one the foreign-file check may use.
@@ -283,33 +301,29 @@ function copyTrackedExample(exampleDir, destination) {
   }
 }
 
-// Each `pnpm pack` writes its own uniquely-named tarball into the shared packDirectory, so nothing
-// here is mutable shared state - safe to run concurrently (three packages - navigation, slider,
-// splash-screen - run a full Angular AOT compile as a prepack side effect and dominate either way).
+// Packing runs native/framework build hooks; keep them sequential to bound memory use.
 async function packPackages(names, packDirectory) {
   const entries = new Map(
     publishablePackageEntries().map(entry => [entry.name, entry]),
   );
   const tarballs = new Map();
-  await Promise.all(
-    names.map(async name => {
-      const entry = entries.get(name);
-      if (entry === undefined)
-        throw new Error(`${name} is not publishable from this checkout`);
-      const output = await runAsync(
-        'pnpm',
-        ['pack', '--pack-destination', packDirectory],
-        { cwd: join(REPO_ROOT, entry.dir) },
-      );
-      const finalLine = output.trim().split('\n').at(-1)?.trim();
-      if (!finalLine)
-        throw new Error(`pnpm pack returned no tarball path for ${name}`);
-      const tarball = resolve(join(REPO_ROOT, entry.dir), finalLine);
-      if (!existsSync(tarball))
-        throw new Error(`pnpm pack did not create ${tarball}`);
-      tarballs.set(name, tarball);
-    }),
-  );
+  for (const name of names) {
+    const entry = entries.get(name);
+    if (entry === undefined)
+      throw new Error(`${name} is not publishable from this checkout`);
+    const output = await runAsync(
+      'pnpm',
+      ['pack', '--pack-destination', packDirectory],
+      { cwd: join(REPO_ROOT, entry.dir) },
+    );
+    const finalLine = output.trim().split('\n').at(-1)?.trim();
+    if (!finalLine)
+      throw new Error(`pnpm pack returned no tarball path for ${name}`);
+    const tarball = resolve(join(REPO_ROOT, entry.dir), finalLine);
+    if (!existsSync(tarball))
+      throw new Error(`pnpm pack did not create ${tarball}`);
+    tarballs.set(name, tarball);
+  }
   return tarballs;
 }
 
@@ -395,6 +409,8 @@ async function bundleSources(exampleRoot, platform) {
         '--sourcemap-output',
         sourcemap,
         '--reset-cache',
+        '--max-workers',
+        '1',
       ],
       { cwd: exampleRoot },
     );
@@ -494,6 +510,17 @@ async function processExample(
       }),
     );
 
+    if (process.env.SYMBIOTE_CONSUMER_CATALYST === '1') {
+      console.log(
+        `${framework}: building and testing the packed Catalyst app ...`,
+      );
+      await runAsync('npm', ['run', 'test:catalyst'], {
+        cwd: exampleRoot,
+        env: frameworkNpmEnvironment,
+      });
+      log.push(`${framework}/catalyst: native UI tests passed`);
+    }
+
     log.push(
       `${framework}: done in ${((Date.now() - started) / 1000).toFixed(1)}s`,
     );
@@ -512,6 +539,9 @@ async function main() {
     Object.keys(FRAMEWORK_EXAMPLES),
   );
   const platforms = selectedValues('SYMBIOTE_CONSUMER_PLATFORMS', PLATFORMS);
+  if (process.env.SYMBIOTE_CONSUMER_CATALYST === '1') {
+    validateCatalystSelection(frameworks, platforms);
+  }
   const matrixRoot = mkdtempSync(join(tmpdir(), 'symbiote-consumer-matrix-'));
   const packDirectory = join(matrixRoot, 'tarballs');
   mkdirSync(packDirectory);
