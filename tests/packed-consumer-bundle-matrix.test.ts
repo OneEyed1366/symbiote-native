@@ -137,10 +137,16 @@ describe('packed consumer bundle matrix', () => {
       path.join(REPO_ROOT, '.github/workflows/checks.yml'),
       'utf8',
     );
-    expect(workflow).toContain(
+    // Only the native fixture job may pin an arm; the gate and matrix stay derived.
+    const jobs = workflow.split(/(?=^  [\w-]+:[ \t]*$)/m);
+    const matrixJob =
+      jobs.find(job => job.startsWith('  bundle-isolation:')) ?? '';
+    expect(matrixJob).toContain(
       'arm: ${{ fromJSON(needs.gate.outputs.bundle-arms) }}',
     );
-    const executable = workflow
+    const executable = jobs
+      .filter(job => !job.startsWith('  catalyst:'))
+      .join('')
       .split('\n')
       .filter(line => !line.trim().startsWith('#'))
       .join('\n');
