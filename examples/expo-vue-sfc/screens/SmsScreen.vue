@@ -82,7 +82,7 @@ function send(): void {
   >
     <Card testID="sms-capability-card" title="Can this device send SMS?">
       <ResultRow testID="sms-available" label="Available" :value="availability" />
-      <InfoNote>
+      <InfoNote class="info-text">
         NO is expected on the iOS simulator and on Android devices without telephony hardware.
       </InfoNote>
     </Card>

@@ -78,7 +78,7 @@ function handleCompose(): void {
   >
     <Card testID="mail-composer-capability-card" title="Capabilities">
       <ResultRow testID="mail-composer-available" label="Available" :value="availability" />
-      <InfoNote>NO is expected on the iOS simulator (no Mail account configured).</InfoNote>
+      <InfoNote class="info-text">NO is expected on the iOS simulator (no Mail account configured).</InfoNote>
       <ActionButton
         testID="mail-composer-clients-button"
         title="List mail clients"
