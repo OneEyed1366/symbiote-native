@@ -27,7 +27,8 @@ import CanaryScrollHeader from './CanaryScrollHeader.vue';
 import CanaryStatusBar from './CanaryStatusBar.vue';
 import CanaryStyleProps from './CanaryStyleProps.vue';
 import CanaryTunnel from './CanaryTunnel.vue';
-import { LOGO_URI, REFRESH_MS, overlayTunnel } from './canary-shared';
+import { usePullRefresh } from './canary-hooks';
+import { LOGO_URI, overlayTunnel } from './canary-shared';
 
 const COLOR = LINE_COLOR.primitives;
 const HERO_STYLE = { backgroundColor: COLOR };
@@ -36,18 +37,9 @@ const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Canary];
 const { Out: TunnelOut } = overlayTunnel;
 
 const count = ref(0);
-const isRefreshing = ref(false);
-const refreshes = ref(0);
-// shallowRef, not ref: the engine node must be held by identity, not wrapped in a reactive proxy
+const { isRefreshing, refreshes, onRefresh } = usePullRefresh();
+// `shallowRef` and not `ref`, since the engine node is held by identity, not as a reactive proxy
 const overlayHost = shallowRef<IHostInstance | null>(null);
-
-function onRefresh(): void {
-  isRefreshing.value = true;
-  setTimeout(() => {
-    isRefreshing.value = false;
-    refreshes.value += 1;
-  }, REFRESH_MS);
-}
 </script>
 
 <template>
