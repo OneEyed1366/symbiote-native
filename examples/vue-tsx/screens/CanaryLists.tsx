@@ -1,8 +1,10 @@
 import { defineComponent, ref } from 'vue';
 import { FlatList } from '@symbiote-native/vue';
 import type { IFlatListSlots, ISymbioteEvent } from '@symbiote-native/vue';
+import { ActionButton } from '../components/ActionButton';
 import { nativeNumber } from '../components/event-utils';
-import { CHIP_GAP, CHIP_WIDTH, TRACK_ON, chips, makeRows } from './canary-shared';
+import { MvcpDivider } from './canary-parts';
+import { ACCENT, CHIP_GAP, CHIP_WIDTH, TRACK_ON, chips, makeRows } from './canary-shared';
 
 type IChip = (typeof chips)[number];
 type IRow = { id: string; label: string };
@@ -103,11 +105,11 @@ export const CanaryMvcpList = defineComponent({
                 </view>
               ),
               // The divider is list chrome between measured cells: the offset table has to count it
-              separator: () => <view class="mvcp-divider" />,
+              separator: () => <MvcpDivider />,
             } satisfies IFlatListSlots<IRow>
           }
         </FlatList>
-        <button title="Prepend 5" color="#42b883" onPress={prepend} />
+        <ActionButton title="Prepend 5" color={ACCENT} onPress={prepend} />
       </>
     );
   },
