@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "pretypecheck": "css-dts .",
     "typecheck": "svelte-check --tsconfig ./tsconfig.typecheck.json --threshold error",
+    "test": "vitest run",
     "dev": "react-native start --reset-cache",
     "start": "react-native start",
     "e2e:build:ios": "detox build --configuration ios.sim.debug",
@@ -63,7 +64,8 @@
     "stylus": "^0.64.0",
     "svelte-check": "^4.0.0",
     "ts-jest": "^29.4.11",
-    "typescript": "~6.0.0"
+    "typescript": "~6.0.0",
+    "vitest": "^4.1.9"
   },
   "reanimated": {
     "staticFeatureFlags": {

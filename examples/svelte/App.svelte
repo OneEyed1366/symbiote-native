@@ -1,24 +1,9 @@
 <script lang="ts">
-  // Symbiote Svelte canary app entry: composes the native stack navigator
-  // (@symbiote-native/navigation/svelte) over the full demo screen surface. Menu is the initial
-  // route; Canary is the app's own former root content, reachable from the menu's first row.
-  // Details has no menu row of its own — it's the DeepLinking demo's resolution target
-  // (symbiotecanarysvelte://details/:id). Svelte twin of examples/vue-sfc/App.vue.
-  //
-  // Screen discovery differs from every other adapter: Svelte hands a component its children as
-  // an opaque Snippet, so <Stack> can't scan them the way React reads a children array or Vue
-  // scans slot vnodes. Each <Screen> marker registers ITSELF on a collector the navigator
-  // publishes on context (packages/navigation/src/svelte/screen-registry.ts).
-  //
-  // useLinkingIntegration takes a GETTER over the Stack's `bind:this` target, not the resolved
-  // handle: a Svelte component's script runs exactly once and `bind:this` only lands during
-  // mount, so the rune reads it inside its own $effect. `$state.raw` makes that read tracked, so
-  // the wiring re-runs the moment the binding resolves — no mount-ordering guarantee needed. See
-  // packages/navigation/src/svelte/linking.svelte.ts's header.
-  //
-  // The markers below can be laid out normally, as the shim turns a whitespace-only text into
-  // an anchor, so the gap between two <Screen> markers never reaches Fabric as a raw text node
+  // The native stack over every demo screen, starting at Menu
+  // Menu lists four sections, each opens a hub with its stops, Details is reached by deep link
+  // Each `<Screen>` marker registers itself on a collector the navigator publishes on context
   import './App.css';
+  import './navigation.css';
   import {
     Screen,
     Stack,
@@ -26,7 +11,7 @@
   } from '@symbiote-native/navigation/svelte';
   import type {
     INavigatorHandle,
-    IScreenOptions,
+    ISvelteScreenOptions,
   } from '@symbiote-native/navigation/svelte';
   import { hide } from '@symbiote-native/splash-screen/svelte';
 
@@ -34,44 +19,40 @@
   import CanaryScreen from './screens/CanaryScreen.svelte';
   import ApiPlaygroundScreen from './screens/ApiPlaygroundScreen.svelte';
   import DetailsScreen from './screens/DetailsScreen.svelte';
-  import HeaderOptionsScreen from './screens/HeaderOptionsScreen.svelte';
-  import { headerOptionsScreenOptions } from './screens/header-options-screen-options';
-  import SheetDemoScreen from './screens/SheetDemoScreen.svelte';
-  import TabsDemoScreen from './screens/TabsDemoScreen.svelte';
-  import DrawerDemoScreen from './screens/DrawerDemoScreen.svelte';
-  import NestedNavigatorsScreen from './screens/NestedNavigatorsScreen.svelte';
+  import HeaderOptionsScreen, {
+    headerOptionsScreenOptions,
+  } from './screens/HeaderOptionsScreen.svelte';
+  import SheetDemoScreen, {
+    sheetDemoScreenOptions,
+  } from './screens/SheetDemoScreen.svelte';
   import HooksDemoScreen from './screens/HooksDemoScreen.svelte';
-  import DeepLinkingScreen from './screens/DeepLinkingScreen.svelte';
-  import StatePersistenceScreen from './screens/StatePersistenceScreen.svelte';
   import BenchmarkScreen from './screens/BenchmarkScreen.svelte';
   import PrimitiveBenchScreen from './screens/PrimitiveBenchScreen.svelte';
   import StyleShowcaseScreen from './screens/StyleShowcaseScreen.svelte';
   import ReanimatedScreen from './screens/ReanimatedScreen.svelte';
+  import { DEMO_SCREENS } from './screens/demo-screens';
+  import { HUB_SCREENS } from './screens/hub-screens';
   import { APP_LINKING_CONFIG } from './navigation-linking';
   import { ROUTE_NAME } from './routes';
   import { LINE_COLOR } from './navigation-lines';
 
-  // The surface every demo screen's header shares — one dark, translucent bar, only the tint
-  // changing per line. Written once here rather than repeated inline on nine <Screen> markers.
-  const HEADER_BACKGROUND = '#1a1a1a';
+  const HEADER_BACKGROUND = '#0b1622';
   const DETAILS_TRANSITION_DURATION_MS = 300;
 
-  // Eight of the ten tour stops carry a byte-identical header apart from title and tint, so they
-  // share this builder. Menu, Details, HeaderOptions and SheetDemo each deviate on purpose (no
-  // headerShown, a transition, a large title, formSheet sizing) and are written out in full below.
-  function darkHeader(title: string, headerTintColor: string): IScreenOptions {
+  // Most headers differ only in title and tint, so they share this builder
+  function darkHeader(title: string, tint: string): ISvelteScreenOptions {
     return {
       title,
       headerShown: true,
       headerTranslucent: true,
-      headerTintColor,
+      headerTintColor: tint,
       headerTitleColor: '#ffffff',
       headerStyle: { backgroundColor: HEADER_BACKGROUND },
       headerUserInterfaceStyle: 'dark',
     };
   }
 
-  const menuScreenOptions: IScreenOptions = {
+  const menuScreenOptions: ISvelteScreenOptions = {
     title: 'Navigation Demos',
     headerTranslucent: true,
     headerTitleColor: '#ffffff',
@@ -79,17 +60,31 @@
     headerUserInterfaceStyle: 'dark',
   };
 
-  const canaryScreenOptions: IScreenOptions = darkHeader(
-    'Symbiote Canary',
-    LINE_COLOR.primitives,
+  const canaryScreenOptions = darkHeader('Symbiote Canary', LINE_COLOR.primitives);
+  const hooksDemoScreenOptions = darkHeader(
+    'Hooks Demo',
+    LINE_COLOR.introspection,
   );
-
-  const apiPlaygroundScreenOptions: IScreenOptions = darkHeader(
+  const apiPlaygroundScreenOptions = darkHeader(
     'API Playground',
-    LINE_COLOR.primitives,
+    LINE_COLOR.introspection,
+  );
+  const reanimatedScreenOptions = darkHeader(
+    'Reanimated',
+    LINE_COLOR.performance,
+  );
+  const benchmarkScreenOptions = darkHeader('Benchmark', LINE_COLOR.performance);
+  const primitiveBenchScreenOptions = darkHeader(
+    'Primitive benchmark',
+    LINE_COLOR.performance,
+  );
+  const styleShowcaseScreenOptions = darkHeader(
+    'Styling showcase',
+    LINE_COLOR.styling,
   );
 
-  const detailsScreenOptions: IScreenOptions = {
+  // Pinned, `default` resolves to a native transition of about 480ms
+  const detailsScreenOptions: ISvelteScreenOptions = {
     title: 'Navigation Demo',
     headerTranslucent: true,
     headerTintColor: LINE_COLOR.primitives,
@@ -100,75 +95,7 @@
     transitionDuration: DETAILS_TRANSITION_DURATION_MS,
   };
 
-  // Registered below on <Screen name={ROUTE_NAME.SheetDemo}> — a plain options object is enough
-  // here (unlike headerOptionsScreenOptions's resolver) since none of these fields need the live
-  // navigation handle.
-  const sheetDemoScreenOptions: IScreenOptions = {
-    title: 'Sheet Demo',
-    headerShown: true,
-    // Not translucent, as `formSheet` has its own header height accounting in react-native-screens
-    // An opaque `headerStyle` leaves that sizing path alone
-
-    // The screen wraps its content in a `ScrollView`, the one child react-native-screens resizes
-    // It has to be the first direct child of the wrapper, so the screen skips `SafeAreaView`
-    headerTintColor: LINE_COLOR.presentation,
-    headerTitleColor: '#ffffff',
-    headerStyle: { backgroundColor: HEADER_BACKGROUND },
-    headerUserInterfaceStyle: 'dark',
-    stackPresentation: 'formSheet',
-    sheetAllowedDetents: [0.3, 0.6, 1],
-    sheetGrabberVisible: true,
-    sheetCornerRadius: 20,
-    sheetInitialDetentIndex: 0,
-  };
-
-  const tabsDemoScreenOptions: IScreenOptions = darkHeader(
-    'Tabs Demo',
-    LINE_COLOR.structure,
-  );
-  const drawerDemoScreenOptions: IScreenOptions = darkHeader(
-    'Drawer Demo',
-    LINE_COLOR.structure,
-  );
-  const nestedNavigatorsScreenOptions: IScreenOptions = darkHeader(
-    'Nested Navigators',
-    LINE_COLOR.structure,
-  );
-  const hooksDemoScreenOptions: IScreenOptions = darkHeader(
-    'Hooks Demo',
-    LINE_COLOR.introspection,
-  );
-  const deepLinkingScreenOptions: IScreenOptions = darkHeader(
-    'Deep Linking',
-    LINE_COLOR.routing,
-  );
-  const statePersistenceScreenOptions: IScreenOptions = darkHeader(
-    'State Persistence',
-    LINE_COLOR.routing,
-  );
-  const benchmarkScreenOptions: IScreenOptions = darkHeader(
-    'Benchmark',
-    LINE_COLOR.performance,
-  );
-  const primitiveBenchScreenOptions: IScreenOptions = darkHeader(
-    'Primitive benchmark',
-    LINE_COLOR.performance,
-  );
-  const styleShowcaseScreenOptions: IScreenOptions = darkHeader(
-    'Styling showcase',
-    LINE_COLOR.styling,
-  );
-  const reanimatedScreenOptions: IScreenOptions = darkHeader(
-    'Reanimated',
-    LINE_COLOR.performance,
-  );
-
-  // `unknown` + a runtime guard, not `INavigatorHandle | null` directly. @symbiote-native/navigation
-  // ships Stack as a raw `.svelte` file, and TypeScript resolves an imported `.svelte` module from
-  // node_modules through svelte's ambient `declare module '*.svelte'` fallback — a bare
-  // `SvelteComponent<Record<string, any>>`, with the `export function` surface `bind:this` actually
-  // hands back erased. So the binding target cannot be annotated as the handle; it is narrowed on
-  // read instead. Same shape the navigator's own smoke test uses.
+  // The `bind:this` target is an opaque component type, so it is narrowed on read
   let stackInstance = $state.raw<unknown>(null);
 
   function isNavigatorHandle(value: unknown): value is INavigatorHandle {
@@ -180,12 +107,12 @@
     );
   }
 
+  // A getter, as `bind:this` only lands during mount and the rune reads it inside its effect
   useLinkingIntegration(APP_LINKING_CONFIG, () =>
     isNavigatorHandle(stackInstance) ? stackInstance : null,
   );
 
-  // Bare `hide()` at mount, as no logo assets are wired up for the `useHideAnimation` fade
-  // It sits at the root, not in a screen, as the first route mounted is Menu
+  // Bare `hide()` at the root, as the first route mounted is Menu
   $effect(() => {
     hide();
   });
@@ -197,15 +124,13 @@
     component={MenuScreen}
     options={menuScreenOptions}
   />
+  {#each HUB_SCREENS as hub (hub.name)}
+    <Screen name={hub.name} component={hub.component} options={hub.options} />
+  {/each}
   <Screen
     name={ROUTE_NAME.Canary}
     component={CanaryScreen}
     options={canaryScreenOptions}
-  />
-  <Screen
-    name={ROUTE_NAME.ApiPlayground}
-    component={ApiPlaygroundScreen}
-    options={apiPlaygroundScreenOptions}
   />
   <Screen
     name={ROUTE_NAME.Details}
@@ -217,25 +142,13 @@
     component={HeaderOptionsScreen}
     options={headerOptionsScreenOptions}
   />
+  {#each DEMO_SCREENS as demo (demo.name)}
+    <Screen name={demo.name} component={demo.component} options={demo.options} />
+  {/each}
   <Screen
     name={ROUTE_NAME.SheetDemo}
     component={SheetDemoScreen}
     options={sheetDemoScreenOptions}
-  />
-  <Screen
-    name={ROUTE_NAME.TabsDemo}
-    component={TabsDemoScreen}
-    options={tabsDemoScreenOptions}
-  />
-  <Screen
-    name={ROUTE_NAME.DrawerDemo}
-    component={DrawerDemoScreen}
-    options={drawerDemoScreenOptions}
-  />
-  <Screen
-    name={ROUTE_NAME.NestedNavigators}
-    component={NestedNavigatorsScreen}
-    options={nestedNavigatorsScreenOptions}
   />
   <Screen
     name={ROUTE_NAME.HooksDemo}
@@ -243,14 +156,14 @@
     options={hooksDemoScreenOptions}
   />
   <Screen
-    name={ROUTE_NAME.DeepLinking}
-    component={DeepLinkingScreen}
-    options={deepLinkingScreenOptions}
+    name={ROUTE_NAME.ApiPlayground}
+    component={ApiPlaygroundScreen}
+    options={apiPlaygroundScreenOptions}
   />
   <Screen
-    name={ROUTE_NAME.StatePersistence}
-    component={StatePersistenceScreen}
-    options={statePersistenceScreenOptions}
+    name={ROUTE_NAME.Reanimated}
+    component={ReanimatedScreen}
+    options={reanimatedScreenOptions}
   />
   <Screen
     name={ROUTE_NAME.Benchmark}
@@ -266,10 +179,5 @@
     name={ROUTE_NAME.StyleShowcase}
     component={StyleShowcaseScreen}
     options={styleShowcaseScreenOptions}
-  />
-  <Screen
-    name={ROUTE_NAME.Reanimated}
-    component={ReanimatedScreen}
-    options={reanimatedScreenOptions}
   />
 </Stack>

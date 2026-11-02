@@ -1,37 +1,56 @@
-<script lang="ts">
-  // Tabs demo: a bottom-tabs Tab navigator with 3 Tab.Screens. Home gets a custom tabBarIcon +
-  // tabBarActiveTintColor; Search gets a tabBarBadge; Profile stays plain to show the default
-  // tint/no-icon look side by side with the customized tabs. Each tab's content is its own
-  // component file (TabHomeScreen/TabSearchScreen/TabProfileScreen, siblings under ./screens) —
-  // one component per file being the Svelte idiom too, so this mirrors the Vue SFC port rather
-  // than React's per-file-multi-component TabsDemoScreen.tsx. `<TabScreen>` (not the dotted
-  // `Tab.Screen`) is the same marker imported directly — @symbiote-native/navigation/svelte
-  // exports it standalone. Svelte twin of examples/vue-sfc/screens/TabsDemoScreen.vue.
-  import { Tab, TabScreen } from '@symbiote-native/navigation/svelte';
+<script lang="ts" module>
+  import type { ISvelteScreenOptions } from '@symbiote-native/navigation/svelte';
   import { LINE_COLOR } from '../navigation-lines';
-  import TabHomeScreen from './TabHomeScreen.svelte';
-  import TabSearchScreen from './TabSearchScreen.svelte';
-  import TabProfileScreen from './TabProfileScreen.svelte';
+
+  export const tabsDemoScreenOptions: ISvelteScreenOptions = {
+    title: 'Tabs Demo',
+    headerShown: true,
+    headerTintColor: LINE_COLOR.structure,
+    headerTranslucent: true,
+    headerTitleColor: '#ffffff',
+    headerStyle: { backgroundColor: '#0b1622' },
+    headerUserInterfaceStyle: 'dark',
+  };
 </script>
 
-<Tab initialRouteName="Home">
-  <TabScreen
-    name="Home"
-    component={TabHomeScreen}
-    options={{
-      tabBarLabel: 'Home',
-      tabBarIcon: '🏠',
-      tabBarActiveTintColor: LINE_COLOR.structure,
-    }}
-  />
-  <TabScreen
-    name="Search"
-    component={TabSearchScreen}
-    options={{ tabBarLabel: 'Search', tabBarIcon: '🔍', tabBarBadge: 3 }}
-  />
-  <TabScreen
-    name="Profile"
-    component={TabProfileScreen}
-    options={{ tabBarLabel: 'Profile', tabBarIcon: '👤' }}
-  />
-</Tab>
+<script lang="ts">
+  import { Tab, TabScreen } from '@symbiote-native/navigation/svelte';
+  import { createPanelState } from './panel.svelte';
+  import TabHomeScreen from './TabHomeScreen.svelte';
+  import TabProfileScreen from './TabProfileScreen.svelte';
+  import TabSearchScreen from './TabSearchScreen.svelte';
+  import { provideTabsPanel } from './tabs/tabs-panel';
+  import {
+    DEFAULT_TABS_SETTINGS,
+    tabBarOptionsOf,
+    tabOptionsOf,
+  } from './tabs/tabs-settings';
+
+  // The panel lives above the `Tab`: a tab unmounts when it loses focus, the panel must not
+  const panel = createPanelState(DEFAULT_TABS_SETTINGS);
+  provideTabsPanel(panel);
+</script>
+
+<!-- The key remounts the bar when the initial tab changes -->
+{#key panel.settings.initial}
+  <Tab
+    initialRouteName={panel.settings.initial}
+    screenOptions={tabBarOptionsOf(panel.settings)}
+  >
+    <TabScreen
+      name="Home"
+      component={TabHomeScreen}
+      options={tabOptionsOf(panel.settings, 'Home')}
+    />
+    <TabScreen
+      name="Search"
+      component={TabSearchScreen}
+      options={tabOptionsOf(panel.settings, 'Search')}
+    />
+    <TabScreen
+      name="Profile"
+      component={TabProfileScreen}
+      options={tabOptionsOf(panel.settings, 'Profile')}
+    />
+  </Tab>
+{/key}
