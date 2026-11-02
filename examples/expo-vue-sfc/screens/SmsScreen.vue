@@ -6,6 +6,7 @@ import ActionButton from '../components/ActionButton.vue';
 import Card from '../components/Card.vue';
 import Explorer from '../components/Explorer.vue';
 import Field from '../components/Field.vue';
+import InfoNote from '../components/InfoNote.vue';
 import ResultRow from '../components/ResultRow.vue';
 import Scenario from '../components/Scenario.vue';
 import ScreenShell from '../components/ScreenShell.vue';
@@ -81,9 +82,9 @@ function send(): void {
   >
     <Card testID="sms-capability-card" title="Can this device send SMS?">
       <ResultRow testID="sms-available" label="Available" :value="availability" />
-      <text class="info-text">
+      <InfoNote>
         NO is expected on the iOS simulator and on Android devices without telephony hardware.
-      </text>
+      </InfoNote>
     </Card>
     <Scenario
       testID="sms-send-card"

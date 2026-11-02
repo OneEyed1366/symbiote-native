@@ -1,9 +1,7 @@
-// Stack.Screen: a declarative marker, never rendered on its own - Stack reads its props via
-// React.Children to build the static name -> {component, options} registry, then mounts the
-// registered component itself for each pushed route. Mirrors @react-navigation's JSX-config
-// screens, minus the linking/param-list generics (v1 scope).
+// `Stack.Screen` is a marker that is never rendered, `Stack` reads its props through `Children`
+// They build the registry of name to component and options, and `Stack` mounts each pushed route
 
-import type { FC, ReactElement, RefObject } from 'react';
+import type { FC, ReactElement, ReactNode, RefObject } from 'react';
 import type { IRoute } from '../core';
 import type {
   ISearchBarCommands,
@@ -12,11 +10,8 @@ import type {
 } from '../core';
 import type { INavigatorHandle } from '../core';
 
-// The imperative ref (focus/blur/clearText/setText/cancelSearch/toggleCancelButton) carries a
-// React ref type, so - per CLAUDE.md's <prop_types_split_agnostic_vs_per_adapter> - it cannot
-// live in the shared, agnostic ISearchBarOptions (core/navigator-props.ts). This adapter-only
-// overlay adds it on top of the agnostic field base, mirroring react-native-screens' own
-// SearchBarProps.ref: React.RefObject<SearchBarCommands | null>.
+// The imperative `ref` carries a React type, so it cannot sit in the shared `ISearchBarOptions`
+// This overlay adds it to the agnostic base, as the screens `SearchBarProps.ref` does
 export type IReactSearchBarOptions = ISearchBarOptions & {
   ref?: RefObject<ISearchBarCommands | null>;
 };
@@ -26,12 +21,14 @@ export type IReactScreenOptions = Omit<
   'headerSearchBarOptions'
 > & {
   headerSearchBarOptions?: IReactSearchBarOptions;
+  headerLeft?: () => ReactNode;
+  headerRight?: () => ReactNode;
+  headerTitle?: () => ReactNode;
+  sheetFooter?: () => ReactNode;
 };
 
-// The options resolver runs INSIDE the Stack while it computes a screen's options - its
-// bar-button/menu onPress handlers close over the live navigator handle. This is NOT the mounted
-// screen component (that one reads navigation/route via the hooks); it's a config callback with no
-// lifecycle, so hooks aren't available to it and the handle arrives as an argument instead.
+// The resolver runs inside `Stack` while it computes options, so bar button handlers close over it
+// It is a config callback with no lifecycle, so hooks are unavailable and the handle is an argument
 export type IScreenOptionsArgs = {
   route: IRoute<unknown>;
   navigation: INavigatorHandle;

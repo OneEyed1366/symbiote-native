@@ -1,194 +1,77 @@
-import { defineComponent, ref } from 'vue';
-import { useRoute } from '@symbiote-native/navigation/vue';
+import { defineComponent } from 'vue';
 import type { IScreenOptionsResolver } from '@symbiote-native/navigation/vue';
-import type { ISearchBarCommands } from '@symbiote-native/navigation';
+import { ScreenHero } from '../components/ScreenHero';
+import { LINE_COLOR } from '../navigation-lines';
 import { ROUTE_NAME } from '../routes';
-import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
-import { ActionButton } from '../components/ActionButton';
+import {
+  headerChromeOptionsOf,
+  readHeaderOptionsSettings,
+  searchBarOptionsOf,
+} from './header-options/header-options-settings';
+import { HeaderRecipes } from './header-options/HeaderRecipes';
+import { searchBarRef } from './header-options/search-bar-ref';
+import {
+  SearchEventRecipes,
+  SearchLayoutRecipes,
+} from './header-options/SearchRecipes';
 
-type IHeaderOptionsParams = {
-  lastHeaderAction?: string;
-  lastSearchText?: string;
-  lastSearchSubmitted?: string;
-  lastSearchBarEvent?: string;
+// Registered on the root Stack.Screen as a resolver: the panel switches live in the route params,
+// and the bar button, menu and search callbacks write what they heard back into the same params
+export const headerOptionsScreenOptions: IScreenOptionsResolver = ({
+  route,
+  navigation,
+}) => {
+  const settings = readHeaderOptionsSettings(route.params);
+  return {
+    title: 'Header Options',
+    headerShown: true,
+    headerTintColor: LINE_COLOR.presentation,
+    headerTitleColor: '#ffffff',
+    headerStyle: { backgroundColor: '#0b1622' },
+    // The large title has its own appearance, left unset it is system white
+    headerLargeStyle: { backgroundColor: '#0b1622' },
+    // The search field takes its chrome from this trait, not from the colours above
+    headerUserInterfaceStyle: 'dark',
+    ...headerChromeOptionsOf(settings, lastHeaderAction =>
+      navigation.setParams({ lastHeaderAction }),
+    ),
+    headerSearchBarOptions: {
+      ...searchBarOptionsOf(settings),
+      ref: searchBarRef,
+      onChangeText: lastSearchText => navigation.setParams({ lastSearchText }),
+      onSearchButtonPress: lastSearchSubmitted =>
+        navigation.setParams({ lastSearchSubmitted }),
+      onFocus: () => navigation.setParams({ lastSearchBarEvent: 'focused' }),
+      onBlur: () => navigation.setParams({ lastSearchBarEvent: 'blurred' }),
+      onCancelButtonPress: () =>
+        navigation.setParams({ lastSearchBarEvent: 'cancel pressed' }),
+      onClose: () =>
+        navigation.setParams({ lastSearchBarEvent: 'closed (Android)' }),
+      onOpen: () =>
+        navigation.setParams({ lastSearchBarEvent: 'opened (Android)' }),
+    },
+  };
 };
 
-function isHeaderOptionsParams(value: unknown): value is IHeaderOptionsParams {
-  return typeof value === 'object' && value !== null;
-}
-
-// headerSearchBarOptions.ref lives on the OPTIONS object, resolved by the Stack itself — a
-// different scope than HeaderOptionsScreen below. Module-scope `ref(null)` (not a component's own
-// ref) lets both share the SAME stable ref object: the resolver hands it to the navigator, the
-// screen's buttons read it back to drive the search bar imperatively. A multi-instance screen
-// would need the ref threaded through some other shared owner instead.
-const searchBarRef = ref<ISearchBarCommands | null>(null);
-
-// A resolver function (not a plain object) so its bar-button/menu onPress handlers can close over
-// the LIVE navigation handle and round-trip the pressed action back onto the route via
-// setParams(), which HeaderOptionsScreen below reads via useRoute() to display.
-export const headerOptionsScreenOptions: IScreenOptionsResolver = ({
-  navigation,
-}) => ({
-  title: 'Header Options',
-  headerShown: true,
-  headerTranslucent: true,
-  headerLargeTitle: true,
-  headerTintColor: LINE_COLOR.presentation,
-  headerTitleColor: '#ffffff',
-  headerStyle: { backgroundColor: '#0b1622' },
-  // headerStyle.backgroundColor only colors the collapsed/compact header — react-native-screens
-  // tracks the large-title (scroll-edge) appearance separately, defaulting to system white if
-  // left unset. Same color here so the header reads as one continuous dark bar whether the
-  // large title is expanded or collapsed.
-  headerLargeStyle: { backgroundColor: '#0b1622' },
-  // The search field's own blur/backdrop follows this OS-level trait, not any color prop above —
-  // left 'unspecified' it renders as a stray light band regardless of headerStyle/headerLargeStyle.
-  headerUserInterfaceStyle: 'dark',
-  headerLeftBarButtonItems: [
-    {
-      type: 'button',
-      title: 'Info',
-      onPress: () =>
-        navigation.setParams({ lastHeaderAction: 'left bar button: Info' }),
-    },
-  ],
-  headerRightBarButtonItems: [
-    {
-      type: 'menu',
-      title: 'More',
-      menu: {
-        title: 'Actions',
-        items: [
-          {
-            type: 'action',
-            title: 'Share',
-            onPress: () =>
-              navigation.setParams({ lastHeaderAction: 'menu: Share' }),
-          },
-          {
-            type: 'action',
-            title: 'Delete',
-            destructive: true,
-            onPress: () =>
-              navigation.setParams({ lastHeaderAction: 'menu: Delete' }),
-          },
-        ],
-      },
-    },
-  ],
-  headerSearchBarOptions: {
-    placeholder: 'Search demo…',
-    autoCapitalize: 'none',
-    placement: 'automatic',
-    ref: searchBarRef,
-    // Left unset, the search field defaults to a light/system background — a stark white band
-    // against this screen's dark theme (the container tint follows headerStyle fine, only the
-    // FIELD itself doesn't). barTintColor is the field's own bg (iOS); textColor/tintColor are
-    // the typed text + cursor/Cancel-button tint; hintTextColor/headerIconColor are the
-    // Android-only twins.
-    barTintColor: '#13243a',
-    textColor: '#ffffff',
-    tintColor: LINE_COLOR.presentation,
-    hintTextColor: '#41506a',
-    headerIconColor: LINE_COLOR.presentation,
-    onChangeText: text => navigation.setParams({ lastSearchText: text }),
-    onSearchButtonPress: text =>
-      navigation.setParams({ lastSearchSubmitted: text }),
-    onFocus: () => navigation.setParams({ lastSearchBarEvent: 'focused' }),
-    onBlur: () => navigation.setParams({ lastSearchBarEvent: 'blurred' }),
-    onCancelButtonPress: () =>
-      navigation.setParams({ lastSearchBarEvent: 'cancel pressed' }),
-    onClose: () =>
-      navigation.setParams({ lastSearchBarEvent: 'closed (Android)' }),
-    onOpen: () =>
-      navigation.setParams({ lastSearchBarEvent: 'opened (Android)' }),
-  },
-});
-
-/**
- * Header options demo: exercises headerLargeTitle, header colors, a left bar button, a right
- * bar-button menu (routed through setParams, see above), and the full headerSearchBarOptions
- * surface, including the imperative SearchBarCommands ref driven by the buttons below.
- */
+// The scroll view is the first child of the screen, so the large title can collapse with it
 export const HeaderOptionsScreen = defineComponent(
-  () => {
-    const route = useRoute();
-    return () => {
-      const params = isHeaderOptionsParams(route.value.params)
-        ? route.value.params
-        : {};
-      const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.HeaderOptions];
-      return (
-        <safe-area-view class="screen">
-          <view class="section">
-            <view class={`line-tag line-tag-${lineInfo.line}`}>
-              <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
-            </view>
-            <view class="hero-card">
-              <view
-                class="hero-badge"
-                style={{ backgroundColor: LINE_COLOR.presentation }}
-              >
-                <text class="hero-badge-text">HD</text>
-              </view>
-              <view class="hero-copy">
-                <text class="hero-title">Header options</text>
-                <text class="hero-body">
-                  Bar buttons, a right-side menu, a native search bar, and
-                  headerLargeTitle — every headerSearchBarOptions callback wired
-                  to a live control below.
-                </text>
-              </view>
-            </view>
-            <text class="info-text">
-              headerLargeTitle · headerTintColor · headerStyle.backgroundColor
-            </text>
-            <text testID="header-last-action" class="info-text">
-              {`last header action: ${params.lastHeaderAction ?? 'none yet — tap a bar button or menu item'}`}
-            </text>
-            <text testID="header-search-text" class="info-text">
-              {`last search text: ${params.lastSearchText ?? 'none yet — pull down and type'}`}
-            </text>
-            <text testID="header-search-submitted" class="info-text">
-              {`last search submitted: ${params.lastSearchSubmitted ?? 'none yet — type and press search'}`}
-            </text>
-            <text testID="header-search-event" class="info-text">
-              {`last search bar event: ${params.lastSearchBarEvent ?? 'none yet — focus/blur/cancel the search bar'}`}
-            </text>
-            <text class="note-text">
-              Pull down to reveal the search bar (headerSearchBarOptions), or
-              use the buttons below to drive it imperatively through its
-              SearchBarCommands ref.
-            </text>
-            <ActionButton
-              testID="search-bar-focus"
-              title="Focus search bar"
-              onPress={() => searchBarRef.value?.focus()}
-              color={LINE_COLOR.presentation}
-            />
-            <ActionButton
-              testID="search-bar-set-text"
-              title="Set text: preset value"
-              onPress={() => searchBarRef.value?.setText('preset value')}
-              color={LINE_COLOR.presentation}
-            />
-            <ActionButton
-              testID="search-bar-clear"
-              title="Clear search"
-              onPress={() => searchBarRef.value?.clearText()}
-              color={LINE_COLOR.presentation}
-            />
-            <ActionButton
-              testID="search-bar-cancel"
-              title="Cancel search"
-              onPress={() => searchBarRef.value?.cancelSearch()}
-              color={LINE_COLOR.presentation}
-            />
-          </view>
-        </safe-area-view>
-      );
-    };
-  },
+  () => () => (
+    <scroll-view
+      testID="header-options-scroll"
+      class="screen"
+      contentInsetAdjustmentBehavior="automatic"
+    >
+      <view class="scroll-content">
+        <ScreenHero
+          route={ROUTE_NAME.HeaderOptions}
+          title="Header options"
+          body="The native header: large title, bar buttons and menus, and the search bar with every knob and event."
+        />
+        <HeaderRecipes />
+        <SearchLayoutRecipes />
+        <SearchEventRecipes />
+      </view>
+    </scroll-view>
+  ),
   { name: 'HeaderOptionsScreen' },
 );

@@ -1,0 +1,213 @@
+/* Classes of the navigation demo screens. A custom property resolves inside its own file, so the
+   tokens used below are declared here and kept equal to the ones in App.css */
+:root {
+  --ink: #0b1622;
+  --paper: #13243a;
+  --mist: #41506a;
+  --chalk: #cbd5e1;
+  --chalk-bright: #ffffff;
+  --muted: #94a3b8;
+  --line-presentation: #5ec8f2;
+  --line-structure: #4fd1a5;
+  --line-introspection: #b18cf5;
+  --line-performance: #f5a524;
+}
+
+/* Label inside a switch row: takes the free width and wraps, so it never squeezes the switch */
+.switch-row-label {
+  flex: 1;
+  padding-right: 0.75rem;
+  color: var(--chalk);
+  font-size: 1rem;
+}
+
+/* Recipe panel, one searched question with its option, a live control and the visible effect */
+.recipe {
+  gap: 0.5rem;
+  padding: 1rem;
+  border-radius: 16px;
+  background-color: var(--paper);
+}
+
+.recipe-question {
+  color: var(--chalk-bright);
+  font-size: 1rem;
+  font-weight: bold;
+}
+
+.recipe-option {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.recipe-expected {
+  color: var(--chalk);
+  font-size: 0.8125rem;
+}
+
+/* Pills of ChoiceRow, border and fill colours come from the caller */
+.choice-row {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.choice-chip {
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+  padding-left: 0.875rem;
+  padding-right: 0.875rem;
+  border-radius: 12px;
+  border-width: 1.5px;
+}
+
+.choice-chip-text {
+  font-size: 0.8125rem;
+  font-weight: bold;
+}
+
+/* Toast near the bottom edge, drawn in the screen or inside a full window overlay */
+.toast {
+  position: absolute;
+  left: 1rem;
+  right: 1rem;
+  bottom: 3rem;
+  padding: 1rem;
+  border-radius: 12px;
+  background-color: var(--chalk-bright);
+}
+
+.toast-tree {
+  background-color: var(--line-performance);
+}
+
+.toast-overlay {
+  background-color: var(--line-structure);
+}
+
+.toast-text {
+  color: var(--ink);
+  font-size: 0.9375rem;
+  font-weight: bold;
+}
+
+/* Custom view inside a native header slot */
+.header-view {
+  padding-top: 0.375rem;
+  padding-bottom: 0.375rem;
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+  border-radius: 12px;
+  background-color: var(--paper);
+}
+
+.header-view-text {
+  color: var(--chalk-bright);
+  font-size: 0.8125rem;
+  font-weight: bold;
+}
+
+/* Content of the native tab bar accessory, the OS draws the capsule around it */
+.accessory {
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Card whose opacity and scale follow the transition, both are set from the progress value */
+.transition-card {
+  padding: 1.25rem;
+  border-radius: 12px;
+  background-color: var(--line-introspection);
+}
+
+.transition-card-text {
+  color: var(--ink);
+  font-size: 0.9375rem;
+  font-weight: bold;
+}
+
+/* Dim lamp with a lit layer on top, the lit layer's opacity is the flag value */
+.lamp-row {
+  flex-direction: row;
+  gap: 1rem;
+}
+
+.lamp {
+  flex: 1;
+  height: 3rem;
+  border-radius: 12px;
+  background-color: var(--mist);
+  justify-content: center;
+  align-items: center;
+}
+
+.lamp-lit {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 12px;
+  background-color: var(--line-introspection);
+}
+
+.lamp-text {
+  color: var(--chalk-bright);
+  font-size: 0.8125rem;
+  font-weight: bold;
+}
+
+/* Bar as tall as the native header, its height is the reported number */
+.ruler {
+  justify-content: center;
+  padding-left: 1rem;
+  border-radius: 12px;
+  background-color: var(--paper);
+  border-width: 1.5px;
+  border-color: var(--line-introspection);
+}
+
+.hub-group-title {
+  color: var(--mist);
+  font-size: 0.75rem;
+  letter-spacing: 0.125rem;
+  padding-top: 0.5rem;
+}
+
+.sheet-footer {
+  padding: 1rem 1.5rem;
+  background-color: var(--paper);
+  border-top-width: 1px;
+  border-top-color: var(--line-presentation);
+}
+
+.snapshot-input {
+  height: 10rem;
+  padding-top: 0.5rem;
+  font-size: 0.75rem;
+}
+
+.nested-inner {
+  flex: 1;
+  padding: 1.5rem;
+  gap: 1rem;
+}
+
+.sheet-footer-text {
+  color: var(--chalk-bright);
+  font-size: 0.9375rem;
+  text-align: center;
+}
+
+/* Scrolling list of resolved links on the deep linking screen */
+.parity-list {
+  height: 7.5rem;
+  border-radius: 10px;
+  background-color: #0f1e30;
+}
+
+/* Edge padding for the drawerContent panel, the background is the drawerStyle prop */
+.drawer-panel {
+  padding: 1rem;
+}

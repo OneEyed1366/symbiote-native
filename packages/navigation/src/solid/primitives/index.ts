@@ -7,6 +7,7 @@ export type { ITabNavigationHandle } from './use-tab-navigation';
 export { useDrawerNavigation } from './use-drawer-navigation';
 export type { IDrawerNavigationHandle } from './use-drawer-navigation';
 export { useRoute } from './use-route';
+export { useTransitionProgress } from './use-transition-progress';
 export { createIsFocused } from './create-is-focused';
 export { createFocusEffect } from './create-focus-effect';
 export { createNavigationState } from './create-navigation-state';

@@ -3,7 +3,12 @@
 // ../screen-props.ts documents.
 
 import type { Component, Snippet } from 'svelte';
-import type { INavigationEmitter, INavigatorHandle, IRoute } from '../../core';
+import type {
+  INativeContainerStyle,
+  INavigationEmitter,
+  INavigatorHandle,
+  IRoute,
+} from '../../core';
 import type { INavigationScopeValue } from '../navigation-context';
 import type { ISvelteScreenOptions } from '../screen-props';
 
@@ -12,6 +17,7 @@ import type { ISvelteScreenOptions } from '../screen-props';
 export type IStackProps = {
   initialRouteName?: string;
   screenOptions?: ISvelteScreenOptions;
+  nativeContainerStyle?: INativeContainerStyle;
   children?: Snippet;
 };
 

@@ -19,18 +19,14 @@
 // `<Stack>`) instead of letting it register with some far-away ancestor Tab - the failure mode a
 // per-kind key would have.
 //
-// Narrowing back out of the context is done by the three `collect*Screen` functions rather than by
-// a generic one taking `kind` as a parameter: a literal comparison is what lets TypeScript
-// discriminate the union, and a generic parameter would force a cast the project bans.
+// A marker names its `kind` and `collectScreen` compares it with the collector tag, with no
+// narrowing back out of the context needed as the collector methods are bivariant.
 
 import { createContext, createSignal, onCleanup, useContext } from 'solid-js';
 import type { Accessor, Component } from 'solid-js';
 import { dlog } from '@symbiote-native/engine';
-import type { IScreenProps } from './screen-props';
-import type { ITabScreenProps } from './tab-screen-props';
-import type { IDrawerScreenProps } from './drawer-screen-props';
 
-export type INavigatorKind = 'stack' | 'tab' | 'drawer';
+export type INavigatorKind = 'stack' | 'tab' | 'drawer' | 'nativeTab';
 
 // Every field is a GETTER over the marker's own `props`, so an app that changes `options` or
 // `component` on an already-mounted marker keeps the navigator's view of it live - Solid props are
@@ -49,21 +45,8 @@ type IScreenCollector<TKind extends INavigatorKind, TOptions> = {
   unregister(screen: IRegisteredScreen<TOptions>): void;
 };
 
-export type IStackScreenCollector = IScreenCollector<
-  'stack',
-  IScreenProps['options']
->;
-export type ITabScreenCollector = IScreenCollector<
-  'tab',
-  ITabScreenProps['options']
->;
-export type IDrawerScreenCollector = IScreenCollector<
-  'drawer',
-  IDrawerScreenProps['options']
->;
-
-export type IAnyScreenCollector =
-  IStackScreenCollector | ITabScreenCollector | IDrawerScreenCollector;
+// The collector methods are bivariant, so a navigator's own typed collector is assignable here
+type IAnyScreenCollector = IScreenCollector<INavigatorKind, unknown>;
 
 const ScreenCollectorContext = createContext<IAnyScreenCollector>();
 
@@ -100,27 +83,12 @@ function bind<TKind extends INavigatorKind, TOptions>(
   onCleanup(() => collector.unregister(screen));
 }
 
-export function collectStackScreen(
-  screen: IRegisteredScreen<IScreenProps['options']>,
+export function collectScreen<TOptions>(
+  kind: INavigatorKind,
+  screen: IRegisteredScreen<TOptions>,
 ): void {
-  const collector = collectorFor('stack', screen.name);
-  if (collector === undefined || collector.kind !== 'stack') return;
-  bind(collector, screen);
-}
-
-export function collectTabScreen(
-  screen: IRegisteredScreen<ITabScreenProps['options']>,
-): void {
-  const collector = collectorFor('tab', screen.name);
-  if (collector === undefined || collector.kind !== 'tab') return;
-  bind(collector, screen);
-}
-
-export function collectDrawerScreen(
-  screen: IRegisteredScreen<IDrawerScreenProps['options']>,
-): void {
-  const collector = collectorFor('drawer', screen.name);
-  if (collector === undefined || collector.kind !== 'drawer') return;
+  const collector = collectorFor(kind, screen.name);
+  if (collector === undefined) return;
   bind(collector, screen);
 }
 

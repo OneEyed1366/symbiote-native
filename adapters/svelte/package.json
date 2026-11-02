@@ -42,6 +42,7 @@
     "./runes/create-event-value-hook": "./src/runes/create-event-value-hook.svelte.ts",
     "./runes/use-native-view-controller": "./src/runes/use-native-view-controller.svelte.ts",
     "./runes/use-event": "./src/runes/use-event.svelte.ts",
+    "./runes/use-window-dimensions": "./src/runes/use-window-dimensions.svelte.ts",
     "./metro-svelte-transformer": "./metro-svelte-transformer.cjs",
     "./metro-css-parser": "./metro-css-parser.cjs"
   },
@@ -111,6 +112,10 @@
       "./runes/use-event": {
         "types": "./build/runes/use-event.svelte.d.ts",
         "default": "./build/runes/use-event.svelte.js"
+      },
+      "./runes/use-window-dimensions": {
+        "types": "./build/runes/use-window-dimensions.svelte.d.ts",
+        "default": "./build/runes/use-window-dimensions.svelte.js"
       },
       "./metro-svelte-transformer": "./metro-svelte-transformer.cjs",
       "./metro-css-parser": "./metro-css-parser.cjs"

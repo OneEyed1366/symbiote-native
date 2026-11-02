@@ -1,6 +1,7 @@
 // The every-primitive tour, the same screen as in the other adapters
 // The Solid rules its sections obey are in .claude/rules/solid-descriptor-bridge.md
 import { Show, createSignal } from 'solid-js';
+import type { IHostInstance } from '@symbiote-native/solid';
 import { AccessibilityDemo } from '../components/AccessibilityDemo';
 import { AnimatedDemo } from '../components/AnimatedDemo';
 import { AnimatedParityDemo } from '../components/AnimatedParityDemo';
@@ -13,7 +14,7 @@ import { ResponderDemo } from '../components/ResponderDemo';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 import { createPullRefresh } from './canary-hooks';
-import { LOGO_URI } from './canary-shared';
+import { LOGO_URI, overlayTunnel } from './canary-shared';
 import {
   CanaryCheckbox,
   CanaryCounter,
@@ -23,8 +24,8 @@ import {
   CanaryVolume,
 } from './CanaryControls';
 import { CanaryChips, CanaryFillProbe, CanaryMvcpList, CanaryRetentionCard } from './CanaryLists';
-import { CanaryModal } from './CanaryModal';
 import { CanaryNativeButtons } from './CanaryNativeButtons';
+import { CanaryModal, CanaryPortal, CanaryTunnel } from './CanaryOverlays';
 import { CanaryRuntimeNotes } from './CanaryRuntimeNotes';
 import { CanaryScrollHeader } from './CanaryScrollHeader';
 import { CanaryStatusBar } from './CanaryStatusBar';
@@ -58,6 +59,8 @@ function CanaryHero() {
 
 export function CanaryScreen() {
   const [count, setCount] = createSignal(0);
+  // A signal, since the ref fires while the element is built and the portal reads it later
+  const [overlayHost, setOverlayHost] = createSignal<IHostInstance | undefined>();
   const { isRefreshing, refreshes, onRefresh } = createPullRefresh();
   const tap = (): void => {
     setCount(value => value + 1);
@@ -107,7 +110,13 @@ export function CanaryScreen() {
         <view class="bottom-card">
           <text class="bottom-text">↑ you scrolled to the bottom</text>
         </view>
+        <CanaryPortal host={overlayHost()} />
+        <CanaryTunnel />
       </scroll-view>
+      {/* The portal and tunnel target, a sibling of the scroll view on the same surface */}
+      <view testID="overlay-host" ref={setOverlayHost} pointerEvents="box-none" class="overlay-host">
+        <overlayTunnel.Out />
+      </view>
     </safe-area-view>
   );
 }

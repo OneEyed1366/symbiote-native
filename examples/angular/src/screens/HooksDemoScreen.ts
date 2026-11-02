@@ -1,82 +1,52 @@
-import { Component, signal, type Signal } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import {
   injectFocusEffect,
   injectIsFocused,
   injectNavigationState,
+  injectStackNavigation,
 } from '@symbiote-native/navigation/angular';
+import { ActionButton } from '../components/ActionButton';
+import { Recipe } from '../components/Recipe';
+import { ScreenHero } from '../components/ScreenHero';
+import { recipeById } from '../navigation-recipes';
+import { LINE_COLOR } from '../navigation-lines';
 import { ROUTE_NAME } from '../routes';
-import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
-/**
- * Hooks demo: injectFocusEffect increments a signal every time this screen (re)gains focus and
- * records the moment it loses it; injectIsFocused visibly renders the live true/false; injectNavigationState
- * selects the whole route-name stack straight out of the root Stack's reducer state and renders
- * it as a list - navigate away and back (or push another screen) to watch all three update.
- * Angular twin of ../../react/screens/HooksDemoScreen.tsx - a `signal()` per piece of local state
- * instead of useState, so template reads stay reactive with zero manual change-detection calls.
- */
+const COLOR = LINE_COLOR.introspection;
+
 @Component({
-  selector: 'HooksDemoScreen',
+  selector: 'FocusEffectRecipe',
   standalone: true,
-  imports: [SYMBIOTE_ELEMENTS],
+  imports: [ActionButton, Recipe, SYMBIOTE_ELEMENTS],
   template: `
-    <safe-area-view class="screen">
-      <view class="section">
-        <view [class]="lineTagClass">
-          <text class="line-tag-text">{{ lineTagLabel }}</text>
-        </view>
-        <view class="hero-card">
-          <view class="hero-badge" [style]="heroBadgeStyle">
-            <text class="hero-badge-text">HK</text>
-          </view>
-          <view class="hero-copy">
-            <text class="hero-title">Hooks</text>
-            <text class="hero-body">
-              injectFocusEffect, injectIsFocused, and injectNavigationState -
-              introspecting the navigator's own live state from inside a screen.
-            </text>
-          </view>
-        </view>
-        <text testID="hooks-is-focused" class="info-text">{{
-          'injectIsFocused(): ' + isFocused()
-        }}</text>
-        <text testID="hooks-focus-count" class="info-text">{{
-          'injectFocusEffect focus count: ' + focusCount()
-        }}</text>
-        <text class="info-text">{{ blurText() }}</text>
-        <text class="section-label"
-          >injectNavigationState() · current route stack</text
-        >
-        @for (
-          name of routeNames();
-          track name + '-' + $index;
-          let index = $index
-        ) {
-          <text class="list-row-text">{{ index + '. ' + name }}</text>
-        }
-      </view>
-    </safe-area-view>
+    <Recipe [recipe]="effectOnce">
+      <text testID="hooks-mounted-at" class="info-text">
+        mounted once, at {{ mountedAt }}
+      </text>
+      <text testID="hooks-focus-count" class="info-text">
+        injectFocusEffect ran: {{ focusCount() }}
+      </text>
+      <text class="info-text">{{ blurText() }}</text>
+      <ActionButton
+        testID="hooks-push-details"
+        title="Push Details"
+        (press)="navigation.push(details)"
+        [color]="color"
+      ></ActionButton>
+    </Recipe>
   `,
 })
-export class HooksDemoScreen {
-  private readonly lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.HooksDemo];
-  readonly lineTagClass = `line-tag line-tag-${this.lineInfo.line}`;
-  readonly lineTagLabel = `${this.lineInfo.code} · ${this.lineInfo.label}`;
-  readonly heroBadgeStyle = { backgroundColor: LINE_COLOR.introspection };
-
+export class FocusEffectRecipe {
+  readonly navigation = injectStackNavigation();
+  readonly color = COLOR;
+  readonly details = ROUTE_NAME.Details;
+  readonly effectOnce = recipeById('hooks-effect-once');
+  readonly mountedAt = new Date().toLocaleTimeString();
   readonly focusCount = signal(0);
   readonly lastBlurAt = signal<number | undefined>(undefined);
 
-  readonly isFocused: Signal<boolean>;
-  readonly routeNames: Signal<string[]>;
-
   constructor() {
-    this.isFocused = injectIsFocused();
-    this.routeNames = injectNavigationState(state =>
-      state.routes.map(route => route.name),
-    );
-
     injectFocusEffect(() => {
       this.focusCount.update(count => count + 1);
       return () => this.lastBlurAt.set(Date.now());
@@ -84,7 +54,115 @@ export class HooksDemoScreen {
   }
 
   blurText(): string {
-    const at = this.lastBlurAt();
-    return at === undefined ? 'not blurred yet' : `last blurred at ${at}`;
+    const blurredAt = this.lastBlurAt();
+    return blurredAt === undefined
+      ? 'not blurred yet'
+      : `last blurred at ${blurredAt}`;
   }
+}
+
+@Component({
+  selector: 'IsFocusedRecipe',
+  standalone: true,
+  imports: [Recipe, SYMBIOTE_ELEMENTS],
+  template: `
+    <Recipe [recipe]="isFocusedRecipe">
+      <text testID="hooks-is-focused" class="info-text">
+        injectIsFocused(): {{ isFocused() }}
+      </text>
+    </Recipe>
+  `,
+})
+export class IsFocusedRecipe {
+  readonly isFocused = injectIsFocused();
+  readonly isFocusedRecipe = recipeById('hooks-is-focused');
+}
+
+@Component({
+  selector: 'NavigationStateRecipe',
+  standalone: true,
+  imports: [ActionButton, Recipe, SYMBIOTE_ELEMENTS],
+  template: `
+    <Recipe [recipe]="stateRecipe">
+      @for (name of routeNames(); track $index) {
+        <text class="list-row-text">{{ $index }}. {{ name }}</text>
+      }
+      <ActionButton
+        testID="hooks-push-self"
+        title="Push this screen again"
+        (press)="navigation.push(hooksDemo)"
+        [color]="color"
+      ></ActionButton>
+    </Recipe>
+  `,
+})
+export class NavigationStateRecipe {
+  readonly navigation = injectStackNavigation();
+  readonly color = COLOR;
+  readonly hooksDemo = ROUTE_NAME.HooksDemo;
+  readonly stateRecipe = recipeById('hooks-navigation-state');
+  readonly routeNames = injectNavigationState(state =>
+    state.routes.map(route => route.name),
+  );
+}
+
+@Component({
+  selector: 'RouteParamsRecipe',
+  standalone: true,
+  imports: [ActionButton, Recipe],
+  template: `
+    <Recipe [recipe]="paramsRecipe">
+      <ActionButton
+        testID="hooks-push-details-params"
+        title="Push Details with params"
+        (press)="pushWithParams()"
+        [color]="color"
+      ></ActionButton>
+    </Recipe>
+  `,
+})
+export class RouteParamsRecipe {
+  private readonly navigation = injectStackNavigation();
+
+  readonly color = COLOR;
+  readonly paramsRecipe = recipeById('hooks-route-params');
+
+  pushWithParams(): void {
+    this.navigation.push(ROUTE_NAME.Details, { openedFrom: 'hooks' });
+  }
+}
+
+// One recipe per question: a one-time mount value against `injectFocusEffect`, `injectIsFocused`,
+// the route stack from `injectNavigationState` and params sent with `push`
+@Component({
+  selector: 'HooksDemoScreen',
+  standalone: true,
+  imports: [
+    FocusEffectRecipe,
+    IsFocusedRecipe,
+    NavigationStateRecipe,
+    RouteParamsRecipe,
+    ScreenHero,
+    SYMBIOTE_ELEMENTS,
+  ],
+  template: `
+    <safe-area-view class="screen">
+      <scroll-view testID="hooks-scroll" class="screen">
+        <view class="scroll-content">
+          <ScreenHero
+            [route]="route"
+            title="Hooks"
+            body="Focus and state hooks of the navigator, each one answering a question people search for."
+          ></ScreenHero>
+          <FocusEffectRecipe></FocusEffectRecipe>
+          <IsFocusedRecipe></IsFocusedRecipe>
+          <NavigationStateRecipe></NavigationStateRecipe>
+          <RouteParamsRecipe></RouteParamsRecipe>
+        </view>
+      </scroll-view>
+    </safe-area-view>
+  `,
+})
+export class HooksDemoScreen {
+  readonly route = ROUTE_NAME.HooksDemo;
 }

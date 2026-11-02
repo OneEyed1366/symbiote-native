@@ -9,6 +9,7 @@ import {
   Vibration,
 } from '@symbiote-native/angular';
 import { ActionButton } from '../components/ActionButton';
+import { FlexButton } from './canary-parts';
 import {
   ACCENT,
   SHEET_CANCEL_INDEX,
@@ -20,46 +21,34 @@ import {
 @Component({
   selector: 'CanaryNativeButtons',
   standalone: true,
-  imports: [ActionButton, SYMBIOTE_ELEMENTS],
+  imports: [ActionButton, FlexButton, SYMBIOTE_ELEMENTS],
   template: `
     <view class="row">
-      <view class="flex-1">
-        <ActionButton
-          testID="angular-alert-btn"
-          title="Alert"
-          (press)="onAlert()"
-          [color]="accent"
-        />
-      </view>
+      <FlexButton
+        testID="angular-alert-btn"
+        title="Alert"
+        (press)="onAlert()"
+      />
       <!-- ActionSheetIOS has no Android native module, so it is iOS-only by design -->
       @if (hasActionSheet) {
-        <view class="flex-1">
-          <ActionButton
-            testID="angular-action-sheet-btn"
-            title="Action sheet"
-            (press)="onActionSheet()"
-            [color]="accent"
-          />
-        </view>
+        <FlexButton
+          testID="angular-action-sheet-btn"
+          title="Action sheet"
+          (press)="onActionSheet()"
+        />
       }
     </view>
     <view class="row">
-      <view class="flex-1">
-        <ActionButton
-          testID="angular-share-btn"
-          title="Share"
-          (press)="onShare()"
-          [color]="accent"
-        />
-      </view>
-      <view class="flex-1">
-        <ActionButton
-          testID="angular-vibrate-btn"
-          title="Vibrate"
-          (press)="onVibrate()"
-          [color]="accent"
-        />
-      </view>
+      <FlexButton
+        testID="angular-share-btn"
+        title="Share"
+        (press)="onShare()"
+      />
+      <FlexButton
+        testID="angular-vibrate-btn"
+        title="Vibrate"
+        (press)="onVibrate()"
+      />
     </view>
     <ActionButton
       testID="angular-open-url-btn"

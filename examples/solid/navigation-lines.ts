@@ -1,11 +1,9 @@
 import { ROUTE_NAME } from './routes';
-import type { ITourRouteName } from './routes';
+import type { IRouteName } from './routes';
 
-// Each tour screen sits on a thematic line, plus a Performance and a Styling line
-// A line shows on the row badge of MenuScreen, on the line tag of the screen and on the header
-
-// Ported from examples/svelte/navigation-lines.ts
-// `ROUTE_LINE_INFO` is exhaustive over every tour route, so a new screen needs no edit here
+// The tour screens sit on thematic lines: the part of the package a screen exercises, plus
+// Performance for the benchmarks and Styling for the CSS compiler demo
+// Kept in sync by hand with the `--line-*` tokens of App.css, the two share no import path
 export const NAV_LINE = {
   Primitives: 'primitives',
   Presentation: 'presentation',
@@ -19,22 +17,15 @@ export const NAV_LINE = {
 export type INavLine = (typeof NAV_LINE)[keyof typeof NAV_LINE];
 
 export const LINE_COLOR: Record<INavLine, string> = {
-  // Solid's own logo blue (the light stop of the solidjs.com mark) — CanaryScreen is the "every
-  // @symbiote-native/solid primitive" showcase, so its line wears Solid's color the way the Svelte
-  // port wears #ff3e00 and the React port #149eca. The one deliberate per-framework difference;
-  // every other line below is byte-identical across the canaries.
+  // The light stop of the Solid logo, the one line colour that differs between the flavors
   [NAV_LINE.Primitives]: '#76b3e1',
   [NAV_LINE.Presentation]: '#5ec8f2',
   [NAV_LINE.Structure]: '#4fd1a5',
   [NAV_LINE.Introspection]: '#b18cf5',
   [NAV_LINE.Routing]: '#f2789a',
-  // Amber — the only warm hue in the set, so a timing screen never reads as one of the
-  // navigation lines at a glance. Shared verbatim with every other canary: it is a line color,
-  // not the per-framework accent.
+  // Amber, the only warm hue in the set, so a timing screen never reads as a navigation line
   [NAV_LINE.Performance]: '#f5a524',
-  // Yellow-green, the one wide hue gap the six lines above leave open — far enough from
-  // Structure's mint and Performance's amber to read apart at badge size. The CSS showcase is
-  // not a navigation line either. Shared verbatim with examples/react.
+  // Yellow-green, far enough from Structure and Performance to read apart at badge size
   [NAV_LINE.Styling]: '#a3d94f',
 };
 
@@ -44,20 +35,41 @@ export type INavLineInfo = {
   label: string;
 };
 
+// Section hubs only list stops, they are no stops themselves
+export const HUB_ROUTE_NAME = [
+  ROUTE_NAME.FrameworkHub,
+  ROUTE_NAME.NavigationHub,
+  ROUTE_NAME.PackagesHub,
+  ROUTE_NAME.BenchmarksHub,
+] as const satisfies readonly IRouteName[];
+
+export type IHubRouteName = (typeof HUB_ROUTE_NAME)[number];
+
+// Every route a hub lists. Details is left out, it is a push target off a deep link
+export type ITourRouteName = Exclude<
+  IRouteName,
+  typeof ROUTE_NAME.Menu | typeof ROUTE_NAME.Details | IHubRouteName
+>;
+
 export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
   [ROUTE_NAME.Canary]: {
     line: NAV_LINE.Primitives,
     code: 'CN',
     label: 'PRIMITIVES LINE',
   },
-  [ROUTE_NAME.ApiPlayground]: {
-    line: NAV_LINE.Primitives,
-    code: 'AP',
-    label: 'PRIMITIVES LINE',
-  },
   [ROUTE_NAME.HeaderOptions]: {
     line: NAV_LINE.Presentation,
     code: 'HD',
+    label: 'PRESENTATION LINE',
+  },
+  [ROUTE_NAME.HeaderViews]: {
+    line: NAV_LINE.Presentation,
+    code: 'HV',
+    label: 'PRESENTATION LINE',
+  },
+  [ROUTE_NAME.Gestures]: {
+    line: NAV_LINE.Presentation,
+    code: 'GS',
     label: 'PRESENTATION LINE',
   },
   [ROUTE_NAME.SheetDemo]: {
@@ -68,6 +80,11 @@ export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
   [ROUTE_NAME.TabsDemo]: {
     line: NAV_LINE.Structure,
     code: 'TB',
+    label: 'STRUCTURE LINE',
+  },
+  [ROUTE_NAME.NativeTabs]: {
+    line: NAV_LINE.Structure,
+    code: 'NT',
     label: 'STRUCTURE LINE',
   },
   [ROUTE_NAME.DrawerDemo]: {
@@ -85,6 +102,36 @@ export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
     code: 'HK',
     label: 'INTROSPECTION LINE',
   },
+  [ROUTE_NAME.OverlayContainers]: {
+    line: NAV_LINE.Structure,
+    code: 'OC',
+    label: 'STRUCTURE LINE',
+  },
+  [ROUTE_NAME.Events]: {
+    line: NAV_LINE.Introspection,
+    code: 'EV',
+    label: 'INTROSPECTION LINE',
+  },
+  [ROUTE_NAME.TransitionProgress]: {
+    line: NAV_LINE.Introspection,
+    code: 'TP',
+    label: 'INTROSPECTION LINE',
+  },
+  [ROUTE_NAME.InsetsStatusBar]: {
+    line: NAV_LINE.Presentation,
+    code: 'IS',
+    label: 'PRESENTATION LINE',
+  },
+  [ROUTE_NAME.StackTransitions]: {
+    line: NAV_LINE.Routing,
+    code: 'ST',
+    label: 'ROUTING LINE',
+  },
+  [ROUTE_NAME.RuntimeConfig]: {
+    line: NAV_LINE.Introspection,
+    code: 'RC',
+    label: 'INTROSPECTION LINE',
+  },
   [ROUTE_NAME.DeepLinking]: {
     line: NAV_LINE.Routing,
     code: 'DL',
@@ -94,6 +141,11 @@ export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
     line: NAV_LINE.Routing,
     code: 'SP',
     label: 'ROUTING LINE',
+  },
+  [ROUTE_NAME.ApiPlayground]: {
+    line: NAV_LINE.Introspection,
+    code: 'AP',
+    label: 'INTROSPECTION LINE',
   },
   [ROUTE_NAME.Benchmark]: {
     line: NAV_LINE.Performance,

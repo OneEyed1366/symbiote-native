@@ -1,25 +1,16 @@
-<!-- Tabs demo · Profile tab: stays plain, no icon/badge/tint override — shows the default tab look side by side with the customized Home/Search tabs. Vue SFC twin of TabsDemoScreen.tsx's inline TabProfileScreen. -->
 <script setup lang="ts">
-import { useIsFocused } from '@symbiote-native/navigation/vue';
-import { ROUTE_NAME } from '../routes';
-import { ROUTE_LINE_INFO } from '../navigation-lines';
+import { useRoute } from '@symbiote-native/navigation/vue';
 
-const isFocused = useIsFocused();
-const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.TabsDemo];
+const route = useRoute();
 </script>
 
 <template>
-  <safe-area-view class="screen">
-    <view class="section">
-      <view :class="`line-tag line-tag-${lineInfo.line}`">
-        <text class="line-tag-text">
-          {{ `${lineInfo.code} · ${lineInfo.label}` }}
-        </text>
-      </view>
-      <text class="section-label"> Profile tab </text>
-      <text class="info-text">
-        {{ `focused: ${isFocused}` }}
+  <scroll-view class="screen" contentInsetAdjustmentBehavior="automatic">
+    <view class="scroll-content">
+      <text class="section-label">Profile tab</text>
+      <text testID="tabs-profile-params" class="info-text">
+        {{ `params: ${JSON.stringify(route.params) ?? 'none'}` }}
       </text>
     </view>
-  </safe-area-view>
+  </scroll-view>
 </template>

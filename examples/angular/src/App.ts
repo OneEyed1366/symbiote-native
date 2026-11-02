@@ -1,17 +1,10 @@
 /**
- * Symbiote canary app entry: composes the native stack navigator
- * (@symbiote-native/navigation/angular, driven by react-native-screens' RNSScreen/
- * RNSScreenStack native views) over the full demo screen surface. Menu is the initial
- * route — a menu of buttons, one per navigator/feature @symbiote-native/navigation exports;
- * Canary is unchanged and reachable from the menu's first row. Details has no menu row of its
- * own — it's the DeepLinking demo's resolution target (symbiotecanaryangular://details/:id),
- * reached only through that tour stop. The actual canary surface (every
- * @symbiote-native/angular primitive) lives in ./screens/CanaryScreen; the demo sections it
- * renders live under ./components. Angular twin of ../react/App.tsx.
+ * Canary root: the native stack over every demo screen, twin of `../react/App.tsx`
  *
  * @format
  */
 
+import { NgComponentOutlet } from '@angular/common';
 import {
   AfterViewInit,
   Component,
@@ -39,31 +32,43 @@ import {
   SheetDemoScreen,
   sheetDemoScreenOptions,
 } from './screens/SheetDemoScreen';
-import { TabsDemoScreen } from './screens/TabsDemoScreen';
-import { DrawerDemoScreen } from './screens/DrawerDemoScreen';
-import { NestedNavigatorsScreen } from './screens/NestedNavigatorsScreen';
 import { HooksDemoScreen } from './screens/HooksDemoScreen';
-import { DeepLinkingScreen } from './screens/DeepLinkingScreen';
-import { StatePersistenceScreen } from './screens/StatePersistenceScreen';
 import { ReactiveStyleScreen } from './screens/ReactiveStyleScreen';
 import { ApiPlaygroundScreen } from './screens/ApiPlaygroundScreen';
 import { BenchmarkScreen } from './screens/BenchmarkScreen';
 import { StyleShowcaseScreen } from './screens/StyleShowcaseScreen';
 import { ReanimatedScreen } from './screens/ReanimatedScreen';
+import { DEMO_SCREENS, OPTION_TEMPLATE_HOSTS } from './screens/demo-screens';
+import { HUB_SCREENS } from './screens/SectionHubScreen';
 import { APP_LINKING_CONFIG } from './navigation-linking';
 import { LINE_COLOR } from './navigation-lines';
-// Static look lives in App.css — a plain global .css file, compiled at build time by
-// @symbiote-native/css-parser and resolved at runtime through the shared style registry every
-// adapter's class/className/addClass path shares.
 import './App.css';
+import './navigation.css';
 
-const DARK_HEADER_STYLE = { backgroundColor: '#0b1622' } as const;
+const HEADER_BACKGROUND = '#0b1622';
+const DETAILS_TRANSITION_DURATION_MS = 300;
+
+// Most headers differ only in title and tint, so they share this builder
+function darkHeader(title: string, tint: string): IAngularScreenOptions {
+  return {
+    title,
+    headerShown: true,
+    headerTranslucent: true,
+    headerTintColor: tint,
+    headerTitleColor: '#ffffff',
+    headerStyle: { backgroundColor: HEADER_BACKGROUND },
+    headerUserInterfaceStyle: 'dark',
+  };
+}
 
 @Component({
   selector: 'symbiote-angular-app',
   standalone: true,
-  imports: [Stack, ScreenDirective],
+  imports: [Stack, ScreenDirective, NgComponentOutlet],
   template: `
+    @for (host of templateHosts; track host) {
+      <ng-container [ngComponentOutlet]="host"></ng-container>
+    }
     <Stack #nav initialRouteName="Menu">
       <ng-template
         symbioteScreen
@@ -71,6 +76,14 @@ const DARK_HEADER_STYLE = { backgroundColor: '#0b1622' } as const;
         [component]="menuScreen"
         [options]="menuOptions"
       ></ng-template>
+      @for (hub of hubs; track hub.name) {
+        <ng-template
+          symbioteScreen
+          [name]="hub.name"
+          [component]="hub.component"
+          [options]="hub.options"
+        ></ng-template>
+      }
       <ng-template
         symbioteScreen
         name="Canary"
@@ -89,6 +102,14 @@ const DARK_HEADER_STYLE = { backgroundColor: '#0b1622' } as const;
         [component]="headerOptionsScreen"
         [options]="headerOptionsOptions"
       ></ng-template>
+      @for (demo of demos; track demo.name) {
+        <ng-template
+          symbioteScreen
+          [name]="demo.name"
+          [component]="demo.component"
+          [options]="demo.options"
+        ></ng-template>
+      }
       <ng-template
         symbioteScreen
         name="SheetDemo"
@@ -97,39 +118,9 @@ const DARK_HEADER_STYLE = { backgroundColor: '#0b1622' } as const;
       ></ng-template>
       <ng-template
         symbioteScreen
-        name="TabsDemo"
-        [component]="tabsDemoScreen"
-        [options]="tabsDemoOptions"
-      ></ng-template>
-      <ng-template
-        symbioteScreen
-        name="DrawerDemo"
-        [component]="drawerDemoScreen"
-        [options]="drawerDemoOptions"
-      ></ng-template>
-      <ng-template
-        symbioteScreen
-        name="NestedNavigators"
-        [component]="nestedNavigatorsScreen"
-        [options]="nestedNavigatorsOptions"
-      ></ng-template>
-      <ng-template
-        symbioteScreen
         name="HooksDemo"
         [component]="hooksDemoScreen"
         [options]="hooksDemoOptions"
-      ></ng-template>
-      <ng-template
-        symbioteScreen
-        name="DeepLinking"
-        [component]="deepLinkingScreen"
-        [options]="deepLinkingOptions"
-      ></ng-template>
-      <ng-template
-        symbioteScreen
-        name="StatePersistence"
-        [component]="statePersistenceScreen"
-        [options]="statePersistenceOptions"
       ></ng-template>
       <ng-template
         symbioteScreen
@@ -145,6 +136,12 @@ const DARK_HEADER_STYLE = { backgroundColor: '#0b1622' } as const;
       ></ng-template>
       <ng-template
         symbioteScreen
+        name="Reanimated"
+        [component]="reanimatedScreen"
+        [options]="reanimatedOptions"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
         name="Benchmark"
         [component]="benchmarkScreen"
         [options]="benchmarkOptions"
@@ -155,12 +152,6 @@ const DARK_HEADER_STYLE = { backgroundColor: '#0b1622' } as const;
         [component]="styleShowcaseScreen"
         [options]="styleShowcaseOptions"
       ></ng-template>
-      <ng-template
-        symbioteScreen
-        name="Reanimated"
-        [component]="reanimatedScreen"
-        [options]="reanimatedOptions"
-      ></ng-template>
     </Stack>
   `,
 })
@@ -168,181 +159,71 @@ export class AppComponent implements OnInit, AfterViewInit {
   @ViewChild('nav') private readonly nav!: Stack;
   private readonly injector = inject(Injector);
 
+  readonly hubs = HUB_SCREENS;
+  readonly demos = DEMO_SCREENS;
+  readonly templateHosts = OPTION_TEMPLATE_HOSTS;
+
   readonly menuScreen = MenuScreen;
   readonly canaryScreen = CanaryScreen;
   readonly detailsScreen = DetailsScreen;
   readonly headerOptionsScreen = HeaderOptionsScreen;
   readonly sheetDemoScreen = SheetDemoScreen;
-  readonly tabsDemoScreen = TabsDemoScreen;
-  readonly drawerDemoScreen = DrawerDemoScreen;
-  readonly nestedNavigatorsScreen = NestedNavigatorsScreen;
   readonly hooksDemoScreen = HooksDemoScreen;
-  readonly deepLinkingScreen = DeepLinkingScreen;
-  readonly statePersistenceScreen = StatePersistenceScreen;
   readonly reactiveStyleScreen = ReactiveStyleScreen;
   readonly apiPlaygroundScreen = ApiPlaygroundScreen;
+  readonly reanimatedScreen = ReanimatedScreen;
   readonly benchmarkScreen = BenchmarkScreen;
   readonly styleShowcaseScreen = StyleShowcaseScreen;
-  readonly reanimatedScreen = ReanimatedScreen;
 
   readonly menuOptions: IAngularScreenOptions = {
     title: 'Navigation Demos',
     headerTranslucent: true,
     headerTitleColor: '#ffffff',
-    headerStyle: DARK_HEADER_STYLE,
+    headerStyle: { backgroundColor: HEADER_BACKGROUND },
     headerUserInterfaceStyle: 'dark',
   };
 
-  readonly canaryOptions: IAngularScreenOptions = {
-    title: 'Symbiote Canary',
-    headerShown: true,
-    headerTranslucent: true,
-    headerTintColor: LINE_COLOR.primitives,
-    headerTitleColor: '#ffffff',
-    headerStyle: DARK_HEADER_STYLE,
-    headerUserInterfaceStyle: 'dark',
-  };
+  readonly canaryOptions = darkHeader('Symbiote Canary', LINE_COLOR.primitives);
 
+  // Pinned, `default` resolves to a native transition of about 480ms
   readonly detailsOptions: IAngularScreenOptions = {
     title: 'Navigation Demo',
     headerTranslucent: true,
     headerTintColor: LINE_COLOR.primitives,
     headerTitleColor: '#ffffff',
-    headerStyle: DARK_HEADER_STYLE,
+    headerStyle: { backgroundColor: HEADER_BACKGROUND },
     headerUserInterfaceStyle: 'dark',
-    // Edge-flicker investigation experiment (see ../react/App.tsx's matching comment): 'default'
-    // resolved to an ~480ms native transition (measured via dlog). Explicit values here to check
-    // whether pinning stackAnimation/transitionDuration changes the artifact's presence/character.
     stackAnimation: 'slide_from_right',
-    transitionDuration: 300,
+    transitionDuration: DETAILS_TRANSITION_DURATION_MS,
   };
 
   readonly headerOptionsOptions = headerOptionsScreenOptions;
   readonly sheetDemoOptions = sheetDemoScreenOptions;
-
-  readonly tabsDemoOptions: IAngularScreenOptions = {
-    title: 'Tabs Demo',
-    headerShown: true,
-    headerTintColor: LINE_COLOR.structure,
-    headerTranslucent: true,
-    headerTitleColor: '#ffffff',
-    headerStyle: DARK_HEADER_STYLE,
-    headerUserInterfaceStyle: 'dark',
-  };
-
-  readonly drawerDemoOptions: IAngularScreenOptions = {
-    title: 'Drawer Demo',
-    headerShown: true,
-    headerTintColor: LINE_COLOR.structure,
-    headerTranslucent: true,
-    headerTitleColor: '#ffffff',
-    headerStyle: DARK_HEADER_STYLE,
-    headerUserInterfaceStyle: 'dark',
-  };
-
-  readonly nestedNavigatorsOptions: IAngularScreenOptions = {
-    title: 'Nested Navigators',
-    headerShown: true,
-    headerTintColor: LINE_COLOR.structure,
-    headerTranslucent: true,
-    headerTitleColor: '#ffffff',
-    headerStyle: DARK_HEADER_STYLE,
-    headerUserInterfaceStyle: 'dark',
-  };
-
-  readonly hooksDemoOptions: IAngularScreenOptions = {
-    title: 'Hooks Demo',
-    headerShown: true,
-    headerTintColor: LINE_COLOR.introspection,
-    headerTranslucent: true,
-    headerTitleColor: '#ffffff',
-    headerStyle: DARK_HEADER_STYLE,
-    headerUserInterfaceStyle: 'dark',
-  };
-
-  readonly deepLinkingOptions: IAngularScreenOptions = {
-    title: 'Deep Linking',
-    headerShown: true,
-    headerTintColor: LINE_COLOR.routing,
-    headerTranslucent: true,
-    headerTitleColor: '#ffffff',
-    headerStyle: DARK_HEADER_STYLE,
-    headerUserInterfaceStyle: 'dark',
-  };
-
-  readonly statePersistenceOptions: IAngularScreenOptions = {
-    title: 'State Persistence',
-    headerShown: true,
-    headerTintColor: LINE_COLOR.routing,
-    headerTranslucent: true,
-    headerTitleColor: '#ffffff',
-    headerStyle: DARK_HEADER_STYLE,
-    headerUserInterfaceStyle: 'dark',
-  };
-
-  readonly reactiveStyleOptions: IAngularScreenOptions = {
-    title: 'Reactive Style',
-    headerShown: true,
-    headerTranslucent: true,
-    headerTintColor: LINE_COLOR.primitives,
-    headerTitleColor: '#ffffff',
-    headerStyle: DARK_HEADER_STYLE,
-    headerUserInterfaceStyle: 'dark',
-  };
-
-  readonly apiPlaygroundOptions: IAngularScreenOptions = {
-    title: 'API Playground',
-    headerShown: true,
-    headerTranslucent: true,
-    headerTintColor: LINE_COLOR.primitives,
-    headerTitleColor: '#ffffff',
-    headerStyle: DARK_HEADER_STYLE,
-    headerUserInterfaceStyle: 'dark',
-  };
-
-  readonly benchmarkOptions: IAngularScreenOptions = {
-    title: 'Benchmark',
-    headerShown: true,
-    headerTranslucent: true,
-    headerTintColor: LINE_COLOR.performance,
-    headerTitleColor: '#ffffff',
-    headerStyle: DARK_HEADER_STYLE,
-    headerUserInterfaceStyle: 'dark',
-  };
-
-  readonly styleShowcaseOptions: IAngularScreenOptions = {
-    title: 'Styling showcase',
-    headerShown: true,
-    headerTranslucent: true,
-    headerTintColor: LINE_COLOR.styling,
-    headerTitleColor: '#ffffff',
-    headerStyle: DARK_HEADER_STYLE,
-    headerUserInterfaceStyle: 'dark',
-  };
-
-  readonly reanimatedOptions: IAngularScreenOptions = {
-    title: 'Reanimated',
-    headerShown: true,
-    headerTranslucent: true,
-    headerTintColor: LINE_COLOR.performance,
-    headerTitleColor: '#ffffff',
-    headerStyle: DARK_HEADER_STYLE,
-    headerUserInterfaceStyle: 'dark',
-  };
+  readonly hooksDemoOptions = darkHeader(
+    'Hooks Demo',
+    LINE_COLOR.introspection,
+  );
+  readonly reactiveStyleOptions = darkHeader(
+    'Reactive Style',
+    LINE_COLOR.primitives,
+  );
+  readonly apiPlaygroundOptions = darkHeader(
+    'API Playground',
+    LINE_COLOR.introspection,
+  );
+  readonly reanimatedOptions = darkHeader('Reanimated', LINE_COLOR.performance);
+  readonly benchmarkOptions = darkHeader('Benchmark', LINE_COLOR.performance);
+  readonly styleShowcaseOptions = darkHeader(
+    'Styling showcase',
+    LINE_COLOR.styling,
+  );
 
   ngOnInit(): void {
     hide();
   }
 
-  // injectLinkingIntegration needs `inject(DestroyRef)`, so it must run inside an injection
-  // context - plain lifecycle-hook bodies aren't one (only field initializers/constructors are),
-  // hence runInInjectionContext. `nav` (the Stack component instance itself, which implements
-  // INavigatorHandle directly) is already stable by the time @ViewChild resolves it, so
-  // ngAfterViewInit - the first hook Angular guarantees @ViewChild queries are populated - is the
-  // earliest safe call site. Angular's own twin of React's App.tsx LinkingRunner-mounted-once-handle-is-real
-  // dance: there, a plain ref only attaches during commit, so a child component gates the hook call
-  // until a non-null handle exists; here @ViewChild + runInInjectionContext achieves the same gating
-  // without needing a second component.
+  // `injectLinkingIntegration` needs an injection context, a lifecycle hook body is not one
+  // `nav` is the Stack itself and is set once the view exists, so this is the earliest safe call
   ngAfterViewInit(): void {
     runInInjectionContext(this.injector, () => {
       injectLinkingIntegration(APP_LINKING_CONFIG, this.nav);

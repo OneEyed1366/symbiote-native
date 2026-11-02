@@ -1,31 +1,53 @@
-// Nested navigators demo: THIS screen's content is a whole Tab navigator (not a plain View),
-// proving a navigator can be nested inside another navigator's screen. NestedTabHomeScreen's
-// "Pop parent Stack" button proves useNavigation()().getParent() reaches back through the Tab's own
-// scope to the enclosing root Stack and can drive it (pop this very screen off). Solid twin of
-// examples/svelte/screens/NestedNavigatorsScreen.svelte.
-//
-// The two <Tab.Screen> markers register from their OWN bodies onto the collector this Tab publishes
-// on context, exactly as the root Stack's do — the inner Tab captures them and the outer Stack does
-// not, because there is one collector key and the owner chain shadows it (see
-// packages/navigation/src/solid/nested-navigation.test.tsx).
-
 import { Tab } from '@symbiote-native/navigation/solid';
-import { NestedTabHomeScreen } from './NestedTabHomeScreen';
-import { NestedTabInfoScreen } from './NestedTabInfoScreen';
+import type { IScreenOptionsResolver } from '@symbiote-native/navigation/solid';
+import { LINE_COLOR } from '../navigation-lines';
+import {
+  NestedHomeScreen,
+  NestedInfoScreen,
+  NestedInnerStack,
+} from './nested/NestedScreens';
+import { NestedPanelContext } from './nested/nested-panel';
+import {
+  nestedOptionsOf,
+  nestedTabOptionsOf,
+  readNestedSettings,
+} from './nested/nested-settings';
+import { useRouteSettings } from './use-route-settings';
 
+// Opaque, so the bar of the parent and the bar of the inner stack read as two bars
+export const nestedNavigatorsScreenOptions: IScreenOptionsResolver = ({
+  route,
+}) => ({
+  title: 'Nested Navigators',
+  headerTintColor: LINE_COLOR.structure,
+  headerTitleColor: '#ffffff',
+  headerStyle: { backgroundColor: '#0b1622' },
+  headerUserInterfaceStyle: 'dark',
+  ...nestedOptionsOf(readNestedSettings(route.params)),
+});
+
+// The panel lives in the params of this route, the screen above both navigators owns it
 export function NestedNavigatorsScreen() {
+  const { settings, update } = useRouteSettings(readNestedSettings);
   return (
-    <Tab initialRouteName="NestedHome">
-      <Tab.Screen
-        name="NestedHome"
-        component={NestedTabHomeScreen}
-        options={{ tabBarLabel: 'Home' }}
-      />
-      <Tab.Screen
-        name="NestedInfo"
-        component={NestedTabInfoScreen}
-        options={{ tabBarLabel: 'Info' }}
-      />
-    </Tab>
+    <NestedPanelContext.Provider value={{ settings, update }}>
+      <Tab initialRouteName="NestedHome">
+        <Tab.Screen
+          name="NestedHome"
+          component={NestedHomeScreen}
+          options={nestedTabOptionsOf('NestedHome')}
+        />
+        <Tab.Screen
+          name="NestedInner"
+          component={NestedInnerStack}
+          options={nestedTabOptionsOf('NestedInner')}
+        />
+        <Tab.Screen
+          name="NestedInfo"
+          component={NestedInfoScreen}
+          options={nestedTabOptionsOf('NestedInfo')}
+        />
+      </Tab>
+    </NestedPanelContext.Provider>
   );
 }
