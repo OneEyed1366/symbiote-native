@@ -1,4 +1,4 @@
-import { Component, input } from '@angular/core';
+import { Component, Input } from '@angular/core';
 import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 
 // One titled block of the Reanimated screen
@@ -8,15 +8,15 @@ import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
   imports: [SYMBIOTE_ELEMENTS],
   template: `
     <view class="ra-section">
-      <text class="ra-section-title">{{ title() }}</text>
-      @if (note() !== undefined) {
-        <text class="ra-note">{{ note() }}</text>
+      <text class="ra-section-title">{{ title }}</text>
+      @if (note !== undefined) {
+        <text class="ra-note">{{ note }}</text>
       }
       <ng-content />
     </view>
   `,
 })
 export class Section {
-  readonly title = input.required<string>();
-  readonly note = input<string>();
+  @Input({ required: true }) title = '';
+  @Input() note?: string;
 }
