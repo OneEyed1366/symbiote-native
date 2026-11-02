@@ -1,32 +1,34 @@
 import { by, device, element, waitFor } from 'detox';
 
-// Covers CanaryScreen's overlay-surface demos (screens/CanaryScreen.ts, roughly lines 498-608):
-// the createPortal toast, the createTunnel toast, the ImageBackground container, and the
-// portal/tunnel target View they all resolve into. Both toast buttons sit immediately after
-// angular-open-modal in the scroll content — the same deep-scroll region probe.test.ts's
-// modal journey is skipped for (upstream Detox hittability bug, wix/Detox#3130/#4747/#2229) —
-// so these are a real attempt at that same failure class, not an assumed one.
+// The overlay demos of `CanaryScreen`: the `createPortal` toast, the `createTunnel` toast, the
+// ImageBackground container and the overlay host both toasts resolve into
+// Both toast buttons sit in the deep-scroll region where the Detox hittability bug bites
+
+const MAX_SCROLL_STEPS = 15;
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// Copied verbatim from probe.test.ts — see that file's own comment for why this shape (reset to
-// top, step-scroll with a visibility check per step, then a settle delay) is needed on a scroll
-// content this long with sync off.
-async function bringIntoView(id: string): Promise<void> {
-  const scrollView = element(by.id('angular-canary-scroll'));
-  const target = element(by.id(id));
-  await scrollView.scrollTo('top');
-  for (let step = 0; step < 15; step += 1) {
-    try {
-      await waitFor(target).toBeVisible().withTimeout(400);
-      break;
-    } catch {
-      await scrollView.scroll(500, 'down');
-    }
+// Own copy of the `probe.test.ts` helpers, each e2e file keeps its own
+async function scrollUntilVisible(
+  id: string,
+  stepsLeft: number,
+): Promise<void> {
+  try {
+    await waitFor(element(by.id(id)))
+      .toBeVisible()
+      .withTimeout(400);
+  } catch (error) {
+    if (stepsLeft <= 0) throw error;
+    await element(by.id('angular-canary-scroll')).scroll(500, 'down');
+    return scrollUntilVisible(id, stepsLeft - 1);
   }
-  await waitFor(target).toBeVisible().withTimeout(3_000);
+}
+
+async function bringIntoView(id: string): Promise<void> {
+  await element(by.id('angular-canary-scroll')).scrollTo('top');
+  await scrollUntilVisible(id, MAX_SCROLL_STEPS);
   await sleep(300);
 }
 
@@ -39,6 +41,10 @@ describe('Angular canary overlay demos', () => {
   });
 
   it('navigates from the menu into the Canary screen through Fabric', async () => {
+    await waitFor(element(by.id('menu-row-FrameworkHub')))
+      .toBeVisible()
+      .withTimeout(10_000);
+    await element(by.id('menu-row-FrameworkHub')).tap();
     await waitFor(element(by.id('menu-row-Canary')))
       .toBeVisible()
       .withTimeout(10_000);
@@ -46,27 +52,16 @@ describe('Angular canary overlay demos', () => {
     await waitFor(element(by.id('angular-safe-area')))
       .toExist()
       .withTimeout(10_000);
-    // This file's first real test scrolls immediately via bringIntoView — wait for the
-    // ScrollView itself to be laid out (real bounds, not zero-height) first, or the initial
-    // scrollTo('top') hits a zero-height container and throws. Same fix as
-    // canary-lists-scroll.test.ts / canary-native-modules.test.ts's beforeAll.
+    // The next test scrolls at once, so wait for the ScrollView to have real bounds
     await waitFor(element(by.id('angular-canary-scroll')))
       .toBeVisible()
       .withTimeout(10_000);
     await sleep(300);
   });
 
-  // The card is *portal'd out of the scroll content into angular-overlay-host (a fixed sibling
-  // of the ScrollView), so once it's open it no longer needs bringIntoView to interact with —
-  // only the open button, which lives deep in the scroll, does.
-  //
-  // SKIPPED: angular-toast-open sits deep in scroll content (elementFrame.y ≈ 5928 in this run),
-  // the same coordinate-space class of failure documented for angular-open-modal in
-  // probe.test.ts — Detox's own hittability pre-check reports the button non-hittable regardless
-  // of visibility, a long-standing upstream issue (wix/Detox #3130, #4747, #2229; see the
-  // symbiote-detox-e2e skill for the full investigation). Re-enable once upstream fixes
-  // hittability for deep/nested-scroll targets, or if CanaryScreen's nested FlatLists are ever
-  // pulled out of the ScrollView (the skill's own leading hypothesis for what aggravates this).
+  // SKIPPED: Detox reports `angular-toast-open` non-hittable, the upstream bug of `probe.test.ts`
+  // The card is portaled into the fixed `angular-overlay-host`, so only the open button scrolls
+  // Re-enable once it is fixed upstream or the nested FlatLists leave the ScrollView
   it.skip('opens and closes an Angular toast ported via createPortal', async () => {
     await bringIntoView('angular-toast-open');
     await element(by.id('angular-toast-open')).tap();
@@ -82,20 +77,9 @@ describe('Angular canary overlay demos', () => {
       .withTimeout(10_000);
   });
 
-  // createTunnel has no ViewContainerRef/target node — *tunnelIn just registers the card with a
-  // shared tunnel object, and tunnel-out (also mounted inside angular-overlay-host, see the
-  // template) reads it back through its own render. Different plumbing than createPortal, same
-  // observable result for this test: the card resolves into the same fixed overlay host, so the
-  // dismiss step needs no bringIntoView either.
-  //
-  // SKIPPED: the open button (deep in scroll content) and the toast-card visibility check both
-  // pass, but the dismiss tap fails — view bounds {{93.7, 717}, {92.7, 45}} reported exactly
-  // matching the element's own local size as "visible bounds", the identical signature already
-  // traced (see the symbiote-detox-e2e skill) for angular-open-modal / the header-options
-  // search-bar buttons: Detox's own hittability pre-check misreports a genuinely on-screen,
-  // non-scrolled element (angular-overlay-host is a fixed ScrollView sibling, not scroll
-  // content) as not hittable. No overlap/layout bug found in CanaryScreen.ts's markup for this
-  // button — same upstream Detox issue class (wix/Detox #3130, #4747, #2229), not an app bug.
+  // SKIPPED: open and visibility pass, the dismiss tap fails the Detox hittability pre-check
+  // The button sits in the fixed host, not scroll content, so it is the upstream bug and not ours
+  // `createTunnel` renders the same host, so the dismiss step needs no `bringIntoView`
   it.skip('opens and closes an Angular toast delivered via createTunnel', async () => {
     await bringIntoView('angular-tunnel-toast-open');
     await element(by.id('angular-tunnel-toast-open')).tap();
@@ -111,10 +95,7 @@ describe('Angular canary overlay demos', () => {
       .withTimeout(10_000);
   });
 
-  // probe.test.ts already checks angular-image-bg-label in isolation; this adds the container
-  // itself (angular-image-bg — the ImageBackground host, not just its overlaid Text child) so a
-  // regression that drops the background image but leaves the label standing wouldn't pass
-  // silently.
+  // `probe.test.ts` checks the label alone, this adds the container so a dropped image still fails
   it('renders the Angular ImageBackground container alongside its overlaid label', async () => {
     await bringIntoView('angular-image-bg');
     await waitFor(element(by.id('angular-image-bg')))
@@ -125,9 +106,7 @@ describe('Angular canary overlay demos', () => {
       .withTimeout(10_000);
   });
 
-  // angular-overlay-host is a fixed sibling of the ScrollView (pointerEvents="box-none", holding
-  // both the portal target and <tunnel-out>), not scroll content — it mounts with the screen, so
-  // no bringIntoView and no interaction: existence is the whole contract here.
+  // The host is a fixed sibling of the ScrollView and mounts with the screen, so existence is it
   it('renders the Angular overlay host outside the scroll content', async () => {
     await waitFor(element(by.id('angular-overlay-host')))
       .toExist()

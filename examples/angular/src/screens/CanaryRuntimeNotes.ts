@@ -1,16 +1,13 @@
-import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
 import {
-  AppState,
   ColorSchemeService,
-  KEYBOARD_EVENT,
-  Keyboard,
   PixelRatio,
   Platform,
   StyleSheet,
   SYMBIOTE_ELEMENTS,
   WindowDimensionsService,
 } from '@symbiote-native/angular';
-import { keyboardHeightOf } from './canary-shared';
+import { injectAppPhase, injectKeyboardHeight } from './canary-hooks';
 
 const PLATFORM_KIND = Platform.select({
   ios: 'native ios',
@@ -48,10 +45,8 @@ export class CanaryRuntimeNotes {
     `${Platform.OS} ${Platform.Version}${PAD_NOTE} · ${PLATFORM_KIND}` +
     ` · hairline ${StyleSheet.hairlineWidth.toFixed(3)}`;
 
-  private readonly keyboardHeight = signal(0);
-  private readonly appPhase = signal<string>(
-    AppState.currentState ?? 'unknown',
-  );
+  private readonly keyboardHeight = injectKeyboardHeight();
+  private readonly appPhase = injectAppPhase();
   readonly keyboardNote = computed(() =>
     this.keyboardHeight() > 0
       ? `keyboard up · ${this.keyboardHeight()}px`
@@ -64,20 +59,4 @@ export class CanaryRuntimeNotes {
       ` · ${this.colorScheme() ?? 'no-scheme'} · ${this.appPhase()}`
     );
   });
-
-  constructor() {
-    // native -> JS: the device hub pushes keyboard frames and lifecycle changes
-    const subscriptions = [
-      Keyboard.addListener(KEYBOARD_EVENT.didShow, (payload: unknown) =>
-        this.keyboardHeight.set(keyboardHeightOf(payload)),
-      ),
-      Keyboard.addListener(KEYBOARD_EVENT.didHide, () =>
-        this.keyboardHeight.set(0),
-      ),
-      AppState.addEventListener('change', next => this.appPhase.set(next)),
-    ];
-    inject(DestroyRef).onDestroy(() =>
-      subscriptions.forEach(subscription => subscription.remove()),
-    );
-  }
 }
