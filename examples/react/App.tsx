@@ -1,13 +1,6 @@
 /**
- * Symbiote canary app entry: composes the native stack navigator
- * (@symbiote-native/navigation/react, driven by react-native-screens' RNSScreen/
- * RNSScreenStack native views) over the full demo screen surface. Menu is the initial
- * route — a menu of buttons, one per navigator/feature @symbiote-native/navigation exports;
- * Canary is unchanged and reachable from the menu's first row. Details has no menu row of its
- * own — it's the DeepLinking demo's resolution target (symbiotecanary://details/:id), reached
- * only through that tour stop. The actual canary surface (every @symbiote-native/react
- * primitive) lives in ./screens/CanaryScreen; the demo sections it renders live under
- * ./components.
+ * Canary app entry: the native stack navigator over every demo screen, starting at Menu
+ * Menu lists four sections, each opens a hub with its stops; Details is reached only by deep link
  *
  * @format
  */
@@ -22,6 +15,7 @@ import type {
   INavigatorHandle,
 } from '@symbiote-native/navigation/react';
 import { MenuScreen } from './screens/MenuScreen';
+import { HUB_SCREENS } from './screens/SectionHubScreen';
 import { CanaryScreen } from './screens/CanaryScreen';
 import { DetailsScreen } from './screens/DetailsScreen';
 import {
@@ -32,12 +26,8 @@ import {
   SheetDemoScreen,
   sheetDemoScreenOptions,
 } from './screens/SheetDemoScreen';
-import { TabsDemoScreen } from './screens/TabsDemoScreen';
-import { DrawerDemoScreen } from './screens/DrawerDemoScreen';
-import { NestedNavigatorsScreen } from './screens/NestedNavigatorsScreen';
+import { DEMO_SCREENS } from './screens/demo-screens';
 import { HooksDemoScreen } from './screens/HooksDemoScreen';
-import { DeepLinkingScreen } from './screens/DeepLinkingScreen';
-import { StatePersistenceScreen } from './screens/StatePersistenceScreen';
 import { ApiPlaygroundScreen } from './screens/ApiPlaygroundScreen';
 import { BenchmarkScreen } from './screens/BenchmarkScreen';
 import { JsiNavigationCostScreen } from './screens/JsiNavigationCostScreen';
@@ -83,6 +73,14 @@ function App() {
             headerUserInterfaceStyle: 'dark',
           }}
         />
+        {HUB_SCREENS.map(hub => (
+          <Stack.Screen
+            key={hub.name}
+            name={hub.name}
+            component={hub.component}
+            options={hub.options}
+          />
+        ))}
         <Stack.Screen
           name={ROUTE_NAME.Canary}
           component={CanaryScreen}
@@ -106,9 +104,7 @@ function App() {
             headerTitleColor: '#ffffff',
             headerStyle: { backgroundColor: '#0b1622' },
             headerUserInterfaceStyle: 'dark',
-            // Edge-flicker investigation experiment: 'default' resolved to an ~480ms native
-            // transition (measured via dlog). Explicit values here to check whether pinning
-            // stackAnimation/transitionDuration changes the artifact's presence/character.
+            // Pinned, `default` resolves to a native transition of about 480ms
             stackAnimation: 'slide_from_right',
             transitionDuration: 300,
           }}
@@ -118,49 +114,18 @@ function App() {
           component={HeaderOptionsScreen}
           options={headerOptionsScreenOptions}
         />
+        {DEMO_SCREENS.map(demo => (
+          <Stack.Screen
+            key={demo.name}
+            name={demo.name}
+            component={demo.component}
+            options={demo.options}
+          />
+        ))}
         <Stack.Screen
           name={ROUTE_NAME.SheetDemo}
           component={SheetDemoScreen}
           options={sheetDemoScreenOptions}
-        />
-        <Stack.Screen
-          name={ROUTE_NAME.TabsDemo}
-          component={TabsDemoScreen}
-          options={{
-            title: 'Tabs Demo',
-            headerShown: true,
-            headerTintColor: LINE_COLOR.structure,
-            headerTranslucent: true,
-            headerTitleColor: '#ffffff',
-            headerStyle: { backgroundColor: '#0b1622' },
-            headerUserInterfaceStyle: 'dark',
-          }}
-        />
-        <Stack.Screen
-          name={ROUTE_NAME.DrawerDemo}
-          component={DrawerDemoScreen}
-          options={{
-            title: 'Drawer Demo',
-            headerShown: true,
-            headerTintColor: LINE_COLOR.structure,
-            headerTranslucent: true,
-            headerTitleColor: '#ffffff',
-            headerStyle: { backgroundColor: '#0b1622' },
-            headerUserInterfaceStyle: 'dark',
-          }}
-        />
-        <Stack.Screen
-          name={ROUTE_NAME.NestedNavigators}
-          component={NestedNavigatorsScreen}
-          options={{
-            title: 'Nested Navigators',
-            headerShown: true,
-            headerTintColor: LINE_COLOR.structure,
-            headerTranslucent: true,
-            headerTitleColor: '#ffffff',
-            headerStyle: { backgroundColor: '#0b1622' },
-            headerUserInterfaceStyle: 'dark',
-          }}
         />
         <Stack.Screen
           name={ROUTE_NAME.HooksDemo}
@@ -169,32 +134,6 @@ function App() {
             title: 'Hooks Demo',
             headerShown: true,
             headerTintColor: LINE_COLOR.introspection,
-            headerTranslucent: true,
-            headerTitleColor: '#ffffff',
-            headerStyle: { backgroundColor: '#0b1622' },
-            headerUserInterfaceStyle: 'dark',
-          }}
-        />
-        <Stack.Screen
-          name={ROUTE_NAME.DeepLinking}
-          component={DeepLinkingScreen}
-          options={{
-            title: 'Deep Linking',
-            headerShown: true,
-            headerTintColor: LINE_COLOR.routing,
-            headerTranslucent: true,
-            headerTitleColor: '#ffffff',
-            headerStyle: { backgroundColor: '#0b1622' },
-            headerUserInterfaceStyle: 'dark',
-          }}
-        />
-        <Stack.Screen
-          name={ROUTE_NAME.StatePersistence}
-          component={StatePersistenceScreen}
-          options={{
-            title: 'State Persistence',
-            headerShown: true,
-            headerTintColor: LINE_COLOR.routing,
             headerTranslucent: true,
             headerTitleColor: '#ffffff',
             headerStyle: { backgroundColor: '#0b1622' },
