@@ -1,18 +1,9 @@
-// Co-located Vue-driven pipeline test, the Vue twin of react/stack.test.tsx. Proves the shared
-// core drives Vue correctly against an INJECTED codegen-shaped ViewConfig: push/pop mount and
-// unmount RNSScreen children with the right activityState, the header title reaches
-// RNSScreenStackHeaderConfig, and the native onDismissed/onHeaderBackButtonClicked events drive a
-// pop through the imperative handle. Stack is imported from './index' (NOT the package barrel,
-// '.') so the third-party native-spec side-effect (../register) never loads headless.
-//
-// Route-stack REDUCER logic (navigatorReducer's push/pop/reset transitions) is core's own
-// responsibility and is covered by core's test suite - this file only proves Stack's OWN lifecycle
-// wiring: that dispatching through the imperative handle / a native event actually reaches the
-// reducer and that the result is bridged onto real RNSScreen/RNSScreenStackHeaderConfig props.
-//
-// No Negative group: Stack has no guard clause of its own that throws - "refuses to pop the last
-// route" is a no-op the reducer already fails closed on (core's contract), observed here as an
-// unchanged screen count, not a thrown error.
+// Vue twin of the React `Stack` test, run against an injected codegen-shaped ViewConfig
+// Imported from `./index`, not the package barrel, so `../register` never loads headless
+
+// Reducer transitions are core's own tests, this file proves only the lifecycle wiring into them
+
+// No Negative group: popping the last route is a no-op the reducer already fails closed on
 
 import { Fragment, defineComponent, h, ref } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -34,7 +25,12 @@ import {
 import { Stack } from './index';
 import type { INavigatorHandle } from './index';
 import { useRoute } from '../composables';
-import type { INavigatorState, ISearchBarCommands } from '../../core';
+import type {
+  INavigatorState,
+  IScreenOptionsResolver,
+  ISearchBarCommands,
+} from '../../core';
+import type { IVueScreenOptions } from '../screen';
 
 const ROOT_TAG = 4_512;
 const SCREEN_VIEW = 'RNSScreen';
@@ -42,6 +38,8 @@ const STACK_VIEW = 'RNSScreenStack';
 const HEADER_CONFIG_VIEW = 'RNSScreenStackHeaderConfig';
 const HEADER_SUBVIEW_VIEW = 'RNSScreenStackHeaderSubview';
 const SEARCH_BAR_VIEW = 'RNSSearchBar';
+const MODAL_SCREEN_VIEW = 'RNSModalScreen';
+const SHEET_FOOTER_VIEW = 'RNSScreenFooter';
 
 function directEvent(registrationName: string) {
   return { registrationName };
@@ -70,7 +68,7 @@ const RNS_SCREEN_STACK_VIEW_CONFIG = {
   directEventTypes: {
     topFinishTransitioning: directEvent('onFinishTransitioning'),
   },
-  validAttributes: {},
+  validAttributes: { nativeContainerBackgroundColor: true },
 };
 
 const RNS_HEADER_CONFIG_VIEW_CONFIG = {
@@ -103,6 +101,11 @@ const VIEW_CONFIGS: Record<string, INativeViewConfig> = {
   [STACK_VIEW]: RNS_SCREEN_STACK_VIEW_CONFIG,
   [HEADER_CONFIG_VIEW]: RNS_HEADER_CONFIG_VIEW_CONFIG,
   [SEARCH_BAR_VIEW]: RNS_SEARCH_BAR_VIEW_CONFIG,
+  [MODAL_SCREEN_VIEW]: RNS_SCREEN_VIEW_CONFIG,
+  [SHEET_FOOTER_VIEW]: {
+    directEventTypes: {},
+    validAttributes: { collapsable: true },
+  },
 };
 
 const fabric = installRecordingFabric();
@@ -247,6 +250,26 @@ describe('Vue Stack navigator', () => {
       expect(headerConfigOf(screens[0]).props.title).toBe('Home');
     });
 
+    it('paints the stack container with nativeContainerStyle.backgroundColor', async () => {
+      mount(
+        ROOT_TAG,
+        defineComponent({
+          setup: () => () =>
+            h(
+              Stack,
+              {
+                initialRouteName: 'Home',
+                nativeContainerStyle: { backgroundColor: '#112233' },
+              },
+              () => [h(Stack.Screen, { name: 'Home', component: HomeScreen })],
+            ),
+        }),
+      );
+      await tick();
+      const stack = fabric.find(node => node.viewName === STACK_VIEW);
+      expect(stack?.props.nativeContainerBackgroundColor).toBeDefined();
+    });
+
     // `RNSScreen` не допускает снижения `activityState`, поэтому после push оба маршрута на 2
     it('push() mounts a second RNSScreen and keeps the first at activityState 2', async () => {
       const handleRef = ref<INavigatorHandle | null>(null);
@@ -336,9 +359,7 @@ describe('Vue Stack navigator', () => {
       expect(screenNodes()).toHaveLength(1);
     });
 
-    // why: an iOS interactive swipe-back dismiss is entirely native-driven - RNSScreen fires
-    // onDismissed with no JS-side push/pop call at all, so Stack must treat that native event as
-    // equivalent to an imperative pop(), not require the app to call pop() itself.
+    // An iOS swipe-back fires `onDismissed` with no JS pop call, so `Stack` must pop on that event
     it('drives a pop from the native onDismissed event (iOS swipe/interactive dismiss)', async () => {
       const handleRef = ref<INavigatorHandle | null>(null);
       mountStack(handleRef, [
@@ -437,6 +458,34 @@ describe('Vue Stack navigator', () => {
       await tick();
       expect(receivedParams).toEqual({ id: 2 });
       expect(screenNodes()).toHaveLength(2);
+    });
+
+    // A demo panel steers the header with route params, so `setParams` has to re-run the resolver
+    it('setParams() re-runs an options resolver, the header follows the params', async () => {
+      const titleOf = (params: unknown): string => {
+        if (typeof params !== 'object' || params === null) return '';
+        const record: Record<string, unknown> = { ...params };
+        return typeof record.label === 'string' ? record.label : '';
+      };
+      const resolver: IScreenOptionsResolver = ({ route }) => ({
+        title: titleOf(route.params),
+      });
+      const handleRef = ref<INavigatorHandle | null>(null);
+      mountStack(handleRef, [
+        h(Stack.Screen, { name: 'Home', component: HomeScreen }),
+        h(Stack.Screen, {
+          name: 'Details',
+          component: DetailsScreen,
+          options: resolver,
+        }),
+      ]);
+      await tick();
+      handleRef.value?.push('Details', { label: 'first' });
+      await tick();
+      expect(headerConfigOf(screenNodes()[1]).props.title).toBe('first');
+      handleRef.value?.setParams({ label: 'second' });
+      await tick();
+      expect(headerConfigOf(screenNodes()[1]).props.title).toBe('second');
     });
 
     // why: setParams(params, key) must target the NAMED route, not just whichever one is currently
@@ -683,9 +732,7 @@ describe('Vue Stack navigator', () => {
       });
     });
 
-    // why: the boundary of the search-bar feature - when no headerSearchBarOptions is given, the
-    // header config must render with ZERO children (not a placeholder/empty subview), so a screen
-    // without a search bar pays no extra native cost.
+    // Without `headerSearchBarOptions` the header config has zero children, no empty subview
     it('renders the header config with zero children when there is no search bar', async () => {
       mount(
         ROOT_TAG,
@@ -750,5 +797,151 @@ describe('Vue Stack navigator', () => {
       ).toBeDefined();
       expect(handleRef.value?.canGoBack()).toBe(false);
     });
+  });
+});
+
+describe('Vue Stack custom header views', () => {
+  async function mountHome(options: IVueScreenOptions): Promise<void> {
+    mount(
+      ROOT_TAG,
+      defineComponent({
+        setup: () => () =>
+          h(Stack, { initialRouteName: 'Home' }, () => [
+            h(Stack.Screen, { name: 'Home', component: HomeScreen, options }),
+          ]),
+      }),
+    );
+    await tick();
+  }
+
+  function subviewOfType(type: string): IAuthoredNode | undefined {
+    return kidsOf(headerConfigOf(screenNodes()[0])).find(
+      kid => kid.viewName === HEADER_SUBVIEW_VIEW && kid.props.type === type,
+    );
+  }
+
+  it.each([
+    ['headerLeft', 'left'],
+    ['headerRight', 'right'],
+    ['headerTitle', 'center'],
+  ] as const)(
+    'mounts the %s vnode inside a %s subview',
+    async (option, type) => {
+      await mountHome({ [option]: () => h('text', {}, 'custom') });
+
+      const subview = subviewOfType(type);
+      expect(subview).toBeDefined();
+      const [content] = subview ? kidsOf(subview) : [];
+      expect(content && kidsOf(content)[0]?.props.text).toBe('custom');
+    },
+  );
+
+  it('sends the side priority and background options to the matching subview', async () => {
+    await mountHome({
+      headerRight: () => h('text', {}, 'more'),
+      headerRightVisibilityPriority: 'low',
+      headerRightBackgroundVisible: false,
+    });
+
+    expect(subviewOfType('right')?.props.visibilityPriority).toBe('low');
+    expect(subviewOfType('right')?.props.hidesSharedBackground).toBe(true);
+  });
+
+  it('hosts the back image source in a back subview holding an image', async () => {
+    await mountHome({
+      headerBackImageSource: { uri: 'https://example.test/b.png' },
+    });
+
+    const subview = subviewOfType('back');
+    expect(subview).toBeDefined();
+    const [image] = subview ? kidsOf(subview) : [];
+    expect(image?.viewName).toBe('RCTImageView');
+  });
+
+  it('keeps the search bar subview next to a custom one', async () => {
+    await mountHome({
+      headerLeft: () => h('text', {}, 'menu'),
+      headerSearchBarOptions: { placeholder: 'Search' },
+    });
+
+    expect(subviewOfType('left')).toBeDefined();
+    expect(subviewOfType('searchBar')).toBeDefined();
+  });
+
+  it('adds no subview when the app sets no custom view', async () => {
+    await mountHome({ title: 'Home' });
+
+    expect(kidsOf(headerConfigOf(screenNodes()[0]))).toHaveLength(0);
+  });
+});
+
+describe('Vue Stack sheet footer', () => {
+  async function mountHome(options: IVueScreenOptions): Promise<void> {
+    mount(
+      ROOT_TAG,
+      defineComponent({
+        setup: () => () =>
+          h(Stack, { initialRouteName: 'Home' }, () => [
+            h(Stack.Screen, { name: 'Home', component: HomeScreen, options }),
+          ]),
+      }),
+    );
+    await tick();
+  }
+
+  const footerNode = () =>
+    findInTree(node => node.viewName === SHEET_FOOTER_VIEW);
+  const sheetFooter = () => h('text', {}, 'footer');
+
+  it('mounts the footer content inside a native footer on a form sheet', async () => {
+    await mountHome({ stackPresentation: 'formSheet', sheetFooter });
+
+    const footer = footerNode();
+    expect(footer).toBeDefined();
+    const [content] = footer ? kidsOf(footer) : [];
+    expect(content && kidsOf(content)[0]?.props.text).toBe('footer');
+  });
+
+  it('keeps the footer a real view, as native finds it by class', async () => {
+    await mountHome({ stackPresentation: 'formSheet', sheetFooter });
+
+    expect(footerNode()?.props.collapsable).toBe(false);
+  });
+
+  it('puts the footer in the inner screen that holds the header', async () => {
+    await mountHome({ stackPresentation: 'formSheet', sheetFooter });
+
+    const inner = screenNodes()[0];
+    expect(kidsOf(inner).some(kid => kid.viewName === SHEET_FOOTER_VIEW)).toBe(
+      true,
+    );
+  });
+
+  it('puts the footer straight in the screen when the header is hidden', async () => {
+    await mountHome({
+      stackPresentation: 'formSheet',
+      headerShown: false,
+      sheetFooter,
+    });
+
+    const modal = findInTree(node => node.viewName === MODAL_SCREEN_VIEW);
+    expect(
+      modal && kidsOf(modal).some(kid => kid.viewName === SHEET_FOOTER_VIEW),
+    ).toBe(true);
+  });
+
+  it.each(['push', 'modal', 'pageSheet'] as const)(
+    'has no footer on a %s screen',
+    async stackPresentation => {
+      await mountHome({ stackPresentation, sheetFooter });
+
+      expect(footerNode()).toBeUndefined();
+    },
+  );
+
+  it('has no footer when the sheet sets none', async () => {
+    await mountHome({ stackPresentation: 'formSheet' });
+
+    expect(footerNode()).toBeUndefined();
   });
 });

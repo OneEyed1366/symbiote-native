@@ -41,9 +41,8 @@ export type ITabProps = {
 
 const TabImpl = defineComponent<ITabProps>(
   (_props, { attrs: rawAttrs, slots, expose }) => {
-    const attrs = normalizeVueAttrs(rawAttrs);
-    // Read BEFORE this Tab provides its own scope, as it becomes the `parent` of its screens
-    const ambientScopeRef = injectNavigationScope();
+    // Folded per call, as a copy taken once in setup would freeze every option at mount
+    const readAttrs = () => normalizeVueAttrs(rawAttrs);
     const routeIdPrefix = useId();
 
     // `null` means nothing was dispatched, which keeps `initialRouteName` honored when the
@@ -61,7 +60,7 @@ const TabImpl = defineComponent<ITabProps>(
     function resolveState(routes: readonly IRoute<unknown>[]): ITabRouterState {
       const dispatched = dispatchedState.value;
       return dispatched === null
-        ? createInitialTabState(routes, asString(attrs.initialRouteName))
+        ? createInitialTabState(routes, asString(readAttrs().initialRouteName))
         : reconcileTabRoutes(dispatched, routes);
     }
 
@@ -82,14 +81,18 @@ const TabImpl = defineComponent<ITabProps>(
     const tracker = createFocusTracker(emitterFor, 'Tab', nextTick);
     onUnmounted(() => tracker.dispose());
 
+    // Read BEFORE this Tab provides its own scope, as it becomes the `parent` of its screens
+    const ambientScopeRef = injectNavigationScope();
+
     return () => {
       const registry = collectTabRegistry(slots.default?.() ?? []);
       if (registry.size === 0) dlog('Tab: no <Tab.Screen> children registered');
       latestRoutes = buildFixedRoutes(registry, routeIdPrefix);
       const state = resolveState(latestRoutes);
       tracker.update(state.routes[state.index]?.key);
-      const screenOptions = isTabOptions(attrs.screenOptions)
-        ? attrs.screenOptions
+      const { screenOptions: rawScreenOptions } = readAttrs();
+      const screenOptions = isTabOptions(rawScreenOptions)
+        ? rawScreenOptions
         : undefined;
       return renderTabView({
         registry,

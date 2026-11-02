@@ -1,13 +1,6 @@
-// Navigator: framework-agnostic render half. A screen's content is an arbitrary framework
-// subtree the adapter owns (unlike the slider's one native leaf), so these resolvers hand back
-// plain props objects for the RNSScreen/RNSScreenStack leaves the adapter builds itself with real
-// children, and one full Descriptor for the header config. The header config Descriptor never
-// takes framework children (headerLeftBarButtonItems/headerRightBarButtonItems are native config
-// arrays from screen-options.ts, not elements), but can nest one RNSSearchBar leaf wrapped in an
-// RNSScreenStackHeaderSubview(type: 'searchBar'), matching how react-native-screens' own
-// ScreenStackHeaderSearchBarView mounts it. RNSScreenStackHeaderConfig.mm's mountChildComponentView
-// rejects a bare RNSSearchBar child natively ("only accepts children of type
-// ScreenStackHeaderSubview") and reads the search bar back out via `subview.subviews[0]`.
+// Render half of the navigator: plain props for the `RNSScreen`/`RNSScreenStack` leaves and one
+// header config `Descriptor` that never takes framework children
+// A search bar nests in a `RNSScreenStackHeaderSubview`, native rejects it as a bare child
 
 import { el } from '@symbiote-native/components';
 import type { IDescriptor } from '@symbiote-native/components';
@@ -30,10 +23,25 @@ import {
   STACK_DEFAULT_ANIMATION,
   STACK_DEFAULT_PRESENTATION,
 } from './constants';
+import { resolveContentWrapper } from './content-wrapper';
+import {
+  findAncestorEdgeInsets,
+  resolveEdgeInsetApplication,
+} from './edge-insets';
+import type {
+  IEdgeInsetApplication,
+  IEdgeInsetScope,
+  IEdgeInsetState,
+} from './edge-insets';
+import { resolveHeaderSubviewProps } from './header-subviews';
 import { computeActivityState } from './navigator-state';
+import { resolveSafeAreaHost } from './safe-area-view';
+import type { ISafeAreaHost } from './safe-area-view';
+import { featureFlags } from './screens-config';
 import type {
   IHeaderConfigViewProps,
   INavigatorPlatform,
+  IScreenEventPayloads,
   IScreenOptions,
   IScreenViewProps,
   ISearchBarOptions,
@@ -42,45 +50,19 @@ import type {
   IStackViewProps,
 } from './navigator-props';
 import {
+  resolveHeaderOptionEvents,
+  resolveScreenOptionEvents,
+} from './screen-events';
+import {
   resolveHeaderConfigView,
   resolveScreenView,
   resolveSearchBarView,
 } from './screen-options';
+import type { ITransitionProgress } from './transition-progress';
 
-// Mirrors react-native-screens' ScreenStackItem.tsx (getPositioningStyle): a formSheet's content
-// wrapper does not get `flex: 1`. RNSScreen.mm's updateBounds pushes the sheet's live native size
-// into Fabric's shadow state on every frame of a detent drag, and a `bottom: 0`-pinned wrapper
-// forces React to set a strict frame on every update, causing the flicker PR #1870 fixed by
-// switching to `absoluteWithNoBottom` (RNSScreen.mm: "we do not set bottom: 0 in JS for wrapper of
-// the screen content, causing React to not set strict frame every time the sheet size is updated").
-// Tradeoff: content shorter than the sheet's current detent leaves a gap below it.
-// RNSScreenContentWrapper.mm's coerceChildScrollViewComponentSizeToSize fixes that natively, but
-// only for a ScrollView child, which it resizes directly to the sheet's real frame bypassing
-// Yoga/flex, not something reachable from a style choice here.
-const SCREEN_CONTENT_WRAPPER_FLEX_STYLE = { flex: 1 };
-const SHEET_CONTENT_WRAPPER_STYLE = {
-  position: 'absolute',
-  top: 0,
-  start: 0,
-  end: 0,
-  bottom: undefined,
-};
-
-// Android's native header auto-offsets content via `AppBarLayout.ScrollingViewBehavior`, removed
-// by `headerTranslucent: true`. An opaque custom header relying on SafeAreaView (blind to the
-// sibling Toolbar) then clips its first 56dp — Android-only, and only when translucent.
-const ANDROID_HEADER_TOOLBAR_HEIGHT = 56;
-
-// react-native-screens' own Screen.tsx picks a different Fabric component for a modally-presented
-// screen ('RNSModalScreen' instead of plain 'RNSScreen') because "there is a need for different
-// shadow nodes" (its own comment). RNSScreen.mm's updateLayoutMetrics only skips applying Yoga's
-// computed frame for `[self isKindOfClass:RNSModalScreen.class]` ("the available space is most
-// likely restricted & differs from what Yoga resolves during first layout - we want to rely on
-// native layout here"). Emitting plain 'RNSScreen' for a formSheet/modal means that check never
-// matches, so Yoga's frame (computed as an ordinary push-stack sibling) applies uncorrected,
-// shifting the modal down by one full screen height (see register.ts's incident note). Mirrors
-// Screen.tsx's `shouldUseModalScreenComponent` exactly, including the iOS-only scope (Android
-// sizes modals natively regardless of Fabric view name).
+// A modal screen is `RNSModalScreen`: native skips Yoga's frame for that class and lays it out
+// A plain `RNSScreen` there gets the push-stack frame and shifts the modal down a full screen
+// Mirrors `shouldUseModalScreenComponent`, iOS only since Android sizes modals natively
 export function resolveScreenViewName(
   stackPresentation: IStackPresentation | undefined,
   isAndroid: boolean,
@@ -96,37 +78,9 @@ export function resolveScreenViewName(
     : RNS_MODAL_SCREEN_VIEW_NAME;
 }
 
-export function resolveScreenContentWrapperStyle(
-  stackPresentation: IStackPresentation | undefined,
-  headerHidden: boolean,
-  headerTranslucent: boolean | undefined,
-  isAndroid: boolean,
-): Record<string, unknown> {
-  let baseStyles;
-
-  if (stackPresentation !== 'formSheet') {
-    baseStyles = SCREEN_CONTENT_WRAPPER_FLEX_STYLE;
-  } else if (isAndroid) {
-    baseStyles = {
-      ...SHEET_CONTENT_WRAPPER_STYLE,
-      bottom: 0,
-    };
-  } else {
-    baseStyles = SHEET_CONTENT_WRAPPER_STYLE;
-  }
-
-  // paddingTop compensates the Android-only ScrollingViewBehavior removal above; iOS never needs
-  // it, so the `!isAndroid` check must stay.
-  if (!isAndroid || headerHidden || !headerTranslucent) return baseStyles;
-  return { ...baseStyles, paddingTop: ANDROID_HEADER_TOOLBAR_HEIGHT };
-}
-
-// A modally-presented screen (anything but 'push') has no UINavigationController on iOS, so
-// RNSScreenStackHeaderConfig has nothing to attach a header bar to. react-native-screens' own
-// ScreenStackItem.tsx (isHeaderInModal) works around this by nesting header + content inside a
-// second, inner RNSScreenStack/RNSScreen pair purely to host the native nav bar. This is a UIKit
-// constraint, not a React-renderer one, so it applies identically here. Android has no such
-// requirement (its header draws without a nav-controller host).
+// A modal has no `UINavigationController` on iOS, so the header bar has nothing to attach to
+// Screens nests header and content in an inner `RNSScreenStack`/`RNSScreen` pair, and so do we
+// Android needs no host for its header
 export function isHeaderInModal(
   stackPresentation: IStackPresentation | undefined,
   headerHidden: boolean,
@@ -164,39 +118,16 @@ export function resolveHeaderInModalScreenStyle(): Record<string, unknown> {
 export function resolveScreenProps(
   view: IScreenViewProps,
 ): Record<string, unknown> {
+  const { passthrough, ...native } = view;
   return {
-    ...view.passthrough,
-    screenId: view.screenId,
-    activityState: view.activityState,
-    gestureEnabled: view.gestureEnabled,
+    ...passthrough,
+    ...native,
     stackAnimation: view.stackAnimation ?? STACK_DEFAULT_ANIMATION,
     stackPresentation: view.stackPresentation ?? STACK_DEFAULT_PRESENTATION,
-    // Off by default upstream; a formSheet's updateBounds pushes the sheet's live native size
-    // into Fabric's shadow state on every drag frame, and this switches that push from
-    // Asynchronous to EventQueue::UpdateMode::unstable_Immediate. The ScrollView-frame correction
-    // that fills a taller detent (RNSScreenContentWrapper.mm's
-    // coerceChildScrollViewComponentSizeToSize) is driven by that same state, so an async push
-    // likely lags one step behind a fast drag. Scoped to formSheet: push/plain-modal screens have
-    // no comparable live-resize need.
+    // A `formSheet` pushes its live size into Fabric state every drag frame and the
+    // `ScrollView` frame fix reads that state, the vendor sends the flag for every screen
     synchronousShadowStateUpdatesEnabled:
-      view.stackPresentation === 'formSheet',
-    transitionDuration: view.transitionDuration,
-    sheetAllowedDetents: view.sheetAllowedDetents,
-    // Native RNSScreen's real prop names carry an "Index" suffix (react-native-screens' own
-    // types.tsx); without it the value never reaches the native view and silently falls back to
-    // RNS's default.
-    sheetLargestUndimmedDetentIndex: view.sheetLargestUndimmedDetent,
-    sheetInitialDetentIndex: view.sheetInitialDetent,
-    sheetGrabberVisible: view.sheetGrabberVisible,
-    sheetCornerRadius: view.sheetCornerRadius,
-    sheetExpandsWhenScrolledToEdge: view.sheetExpandsWhenScrolledToEdge,
-    sheetElevation: view.sheetElevation,
-    sheetShouldOverflowTopInset: view.sheetShouldOverflowTopInset,
-    sheetDefaultResizeAnimationEnabled: view.sheetDefaultResizeAnimationEnabled,
-    statusBarStyle: view.statusBarStyle,
-    statusBarHidden: view.statusBarHidden,
-    statusBarAnimation: view.statusBarAnimation,
-    screenOrientation: view.screenOrientation,
+      featureFlags.experiment.synchronousScreenUpdatesEnabled,
   };
 }
 
@@ -209,52 +140,59 @@ export function resolveStackProps(
   return { style: { flex: 1 }, ...view.passthrough };
 }
 
-// The RNSScreenStackHeaderConfig leaf is a full Descriptor since it never hosts framework children,
-// so the adapter bridges it verbatim (descriptorToReact/descriptorToVue) as the screen's first
-// child, ahead of the real content. `searchBarProps` nests as an RNSSearchBar wrapped in an
-// RNSScreenStackHeaderSubview(type: 'searchBar'), matching how react-native-screens' own JS
-// component mounts it (see resolveSearchBarView's comment in screen-options.ts); omitted when the
-// screen has no search bar.
+// Out of the flow so the header takes no room from the content, a row so subviews sit in line
+const HEADER_CONFIG_STYLE = {
+  position: 'absolute',
+  width: '100%',
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+};
+
+// Only iOS centers the subviews, on Android the toolbar places them itself
+const HEADER_CONFIG_IOS_STYLE = {
+  ...HEADER_CONFIG_STYLE,
+  alignItems: 'center',
+};
+
+// The header config is a `Descriptor` since it never hosts framework children
+// `searchBarProps` nests as a `RNSSearchBar` in a `RNSScreenStackHeaderSubview`, omitted when
+// the screen has no search bar
 export function renderHeaderConfig(
   view: IHeaderConfigViewProps,
+  insets: IEdgeInsetApplication,
+  isAndroid: boolean,
   searchBarProps?: Record<string, unknown>,
 ): IDescriptor {
+  const {
+    passthrough,
+    onPressHeaderBarButtonItem,
+    onPressHeaderBarButtonMenuItem,
+    ...native
+  } = view;
   const props: Record<string, unknown> = {
-    ...view.passthrough,
-    title: view.title,
-    hidden: view.hidden,
-    // Android-only (CustomToolbar.kt gates its WindowInsets padding on these; iOS's
-    // UINavigationController lays out under the safe area regardless). Upstream's JS
-    // ScreenStackHeaderConfig computes these via an EdgeInsetApplicationContext that coordinates a
-    // "consume once" top inset across nested headers; we drive RNSScreenStackHeaderConfig directly
-    // and skip that layer, so without this the native default (false) leaves the header glued
-    // under the status bar/cutout on Android. Every adapter renders one active header at a time,
-    // so consuming all four edges matches upstream's default for the common case; a genuine
-    // nested-header edge case would need upstream's same coordination.
-    consumeTopInset: !view.hidden,
-    consumeLeftInset: !view.hidden,
-    consumeRightInset: !view.hidden,
-    consumeBottomInset: !view.hidden,
-    backTitle: view.backTitle,
-    backTitleVisible: view.backTitleVisible,
-    backButtonDisplayMode: view.backButtonDisplayMode,
-    largeTitle: view.largeTitle,
-    translucent: view.translucent,
-    color: view.color,
-    titleColor: view.titleColor,
-    backgroundColor: view.backgroundColor,
-    largeTitleBackgroundColor: view.largeTitleBackgroundColor,
-    userInterfaceStyle: view.userInterfaceStyle,
-    headerLeftBarButtonItems: view.headerLeftBarButtonItems,
-    headerRightBarButtonItems: view.headerRightBarButtonItems,
-    [HEADER_ON_PRESS_BAR_BUTTON_ITEM]: view.onPressHeaderBarButtonItem,
-    [HEADER_ON_PRESS_BAR_BUTTON_MENU_ITEM]: view.onPressHeaderBarButtonMenuItem,
+    ...passthrough,
+    ...native,
+    style: isAndroid ? HEADER_CONFIG_STYLE : HEADER_CONFIG_IOS_STYLE,
+    pointerEvents: 'box-none',
+    // Android only: `CustomToolbar.kt` pads by window insets when these are set
+    consumeTopInset: insets.consumeTopInset,
+    consumeLeftInset: insets.consumeLeftInset,
+    consumeRightInset: insets.consumeRightInset,
+    consumeBottomInset: insets.consumeBottomInset,
+    legacyTopInsetBehavior:
+      view.legacyTopInsetBehavior ?? insets.legacyTopInsetBehavior,
+    synchronousShadowStateUpdatesEnabled:
+      featureFlags.experiment.synchronousHeaderConfigUpdatesEnabled,
+    [HEADER_ON_PRESS_BAR_BUTTON_ITEM]: onPressHeaderBarButtonItem,
+    [HEADER_ON_PRESS_BAR_BUTTON_MENU_ITEM]: onPressHeaderBarButtonMenuItem,
   };
   const children = searchBarProps
     ? [
-        el(RNS_SCREEN_STACK_HEADER_SUBVIEW_VIEW_NAME, { type: 'searchBar' }, [
-          el(RNS_SEARCH_BAR_VIEW_NAME, searchBarProps),
-        ]),
+        el(
+          RNS_SCREEN_STACK_HEADER_SUBVIEW_VIEW_NAME,
+          resolveHeaderSubviewProps('searchBar'),
+          [el(RNS_SEARCH_BAR_VIEW_NAME, searchBarProps)],
+        ),
       ]
     : [];
   return el(RNS_SCREEN_STACK_HEADER_CONFIG_VIEW_NAME, props, children);
@@ -332,13 +270,44 @@ export function buildSearchBarPassthrough(
   };
 }
 
-// A screen's resolved render plan: the framework-agnostic half of one RNSScreen entry, threading
-// a route's merged options through the same ~14-call resolver sequence every adapter's render loop
-// used to repeat by hand (see the architecture review this facade answers). Lifecycle-bound event
-// wiring (SCREEN_ON_* -> dispatch/emit, the search bar's imperative ref) stays adapter-owned and
-// arrives here already built, via `screenPassthrough`/`searchBarPassthrough`; likewise the actual
-// element/component creation (createElement/h/the Angular template) stays adapter-owned and reads
-// off this plan's fields instead of re-deriving them.
+// In a header-in-modal pair the inner screen holds the scroll view and the header, so it takes
+// these props, the outer screen must not report them twice
+const INNER_SCREEN_KEYS = [
+  'topScrollEdgeEffect',
+  'bottomScrollEdgeEffect',
+  'leftScrollEdgeEffect',
+  'rightScrollEdgeEffect',
+  'onHeaderHeightChange',
+] as const satisfies readonly (
+  keyof IScreenViewProps | keyof IScreenEventPayloads
+)[];
+
+function splitInnerScreenProps(
+  screenProps: Record<string, unknown>,
+  inModal: boolean,
+): { outer: Record<string, unknown>; inner: Record<string, unknown> } {
+  if (!inModal) return { outer: screenProps, inner: {} };
+  const outer = { ...screenProps };
+  const inner: Record<string, unknown> = {};
+  for (const key of INNER_SCREEN_KEYS) {
+    inner[key] = outer[key];
+    delete outer[key];
+  }
+  return { outer, inner };
+}
+
+function resolvePlanSearchBarProps(
+  input: IScreenRenderPlanInput,
+): Record<string, unknown> | undefined {
+  const searchBarOptions = input.options?.headerSearchBarOptions;
+  if (!searchBarOptions) return undefined;
+  return resolveSearchBarProps(
+    resolveSearchBarView(searchBarOptions, input.searchBarPassthrough ?? {}),
+  );
+}
+
+// The framework-agnostic half of one `RNSScreen` entry, built from merged route options
+// Events arrive wired via `screenPassthrough`/`searchBarPassthrough`, elements stay adapter-owned
 export type IScreenRenderPlanInput = {
   screenId: string;
   index: number;
@@ -347,6 +316,10 @@ export type IScreenRenderPlanInput = {
   platform: INavigatorPlatform;
   isAndroid: boolean;
   screenPassthrough: Record<string, unknown>;
+  // The scope of the screen this one is nested in, its header may already have taken the insets
+  parentScope?: IEdgeInsetScope;
+  // Set by a stack route whose screen reads its transition, it registers the native listener
+  transitionProgress?: ITransitionProgress;
   // Already includes the imperative ref key where an adapter wires one (React/Vue); Angular wires
   // its ref via a directive instead, so its map never carries one. Omitted entirely when the
   // screen has no search bar.
@@ -358,12 +331,11 @@ export type IScreenRenderPlan = {
   // The outer RNSScreen/RNSModalScreen Fabric component name (resolveScreenViewName).
   screenViewName: string;
   screenProps: Record<string, unknown>;
-  // Full Descriptor (react-native-screens' own react-native-renderer/src/ReactFiberConfigFabric.js
-  // style props + a nested RNSSearchBar child when the screen has one) for the adapters that
-  // bridge it verbatim via descriptorToReact/descriptorToVue; Angular reads only `.props` and
-  // renders the search bar itself through its own template (see isHeaderInModal's rationale below
-  // for why Angular's element assembly differs here).
+  // Header `Descriptor`, with a nested `RNSSearchBar` child when the screen has one
+  // React and Vue bridge it verbatim, Angular reads only `.props` and renders the search bar itself
   headerConfig: IDescriptor;
+  // What the screens below this header read as their enclosing state, the adapter files it in scope
+  edgeInsets: IEdgeInsetState;
   // The RNSSearchBar leaf's own props, standalone from `headerConfig` for the adapters (Angular)
   // that mount it as a separate host element rather than through `headerConfig`'s children.
   // undefined when the screen has no search bar.
@@ -371,69 +343,86 @@ export type IScreenRenderPlan = {
   // Always includes `collapsable: false` (see RNS_SCREEN_CONTENT_WRAPPER_VIEW_NAME's rationale in
   // core/constants.ts) - every adapter passed this exact pair together, never the style alone.
   contentWrapperProps: Record<string, unknown>;
+  // Wraps the screen component inside the content wrapper, undefined below iOS 26
+  safeAreaHost: ISafeAreaHost | undefined;
   inModal: boolean;
   innerStackStyle: Record<string, unknown>;
-  innerScreenStyle: Record<string, unknown>;
+  innerScreenProps: Record<string, unknown>;
 };
+
+// Kept apart so the plan reads as one line per part: the header, its search bar leaf and the
+// inset state the screens below inherit are all decided from the same insets
+function resolvePlanHeader(
+  input: IScreenRenderPlanInput,
+  isHeaderHidden: boolean,
+): Pick<IScreenRenderPlan, 'headerConfig' | 'edgeInsets' | 'searchBarProps'> {
+  const { options } = input;
+  const searchBarProps = resolvePlanSearchBarProps(input);
+  const insets = resolveEdgeInsetApplication(
+    findAncestorEdgeInsets(input.parentScope),
+    { ...options, headerVisible: !isHeaderHidden },
+  );
+  // `renderHeaderConfig` puts `searchBarProps` into `children` only, so Angular, which ignores
+  // `children`, can take the same descriptor
+  const headerConfig = renderHeaderConfig(
+    resolveHeaderConfigView(
+      options,
+      input.platform,
+      resolveHeaderOptionEvents(options ?? {}),
+    ),
+    insets,
+    input.isAndroid,
+    searchBarProps,
+  );
+  return { headerConfig, edgeInsets: insets.next, searchBarProps };
+}
 
 export function resolveScreenRenderPlan(
   input: IScreenRenderPlanInput,
 ): IScreenRenderPlan {
   const { options, isAndroid } = input;
-  const headerHidden = options?.headerShown === false;
   const activityState = computeActivityState(input.index, input.routeCount);
-
-  const screenProps = resolveScreenProps(
-    resolveScreenView(
-      input.screenId,
-      activityState,
-      options,
-      input.screenPassthrough,
-    ),
+  const allScreenProps = resolveScreenProps(
+    resolveScreenView(input.screenId, activityState, options, {
+      ...input.screenPassthrough,
+      ...resolveScreenOptionEvents(options ?? {}, input.transitionProgress),
+    }),
   );
-
-  const searchBarOptions = options?.headerSearchBarOptions;
-  const searchBarProps = searchBarOptions
-    ? resolveSearchBarProps(
-        resolveSearchBarView(
-          searchBarOptions,
-          input.searchBarPassthrough ?? {},
-        ),
-      )
-    : undefined;
-
-  // See renderHeaderConfig's own header comment for why `props` never reflects `searchBarProps` --
-  // only `children` does -- so passing it here unconditionally is safe even for Angular, which
-  // never reads `children` off the result.
-  const headerConfig = renderHeaderConfig(
-    resolveHeaderConfigView(options, input.platform),
-    searchBarProps,
+  const isHeaderHidden = options?.headerShown === false;
+  const inModal = isHeaderInModal(
+    options?.stackPresentation,
+    isHeaderHidden,
+    isAndroid,
   );
-
+  const { outer, inner } = splitInnerScreenProps(allScreenProps, inModal);
+  const header = resolvePlanHeader(input, isHeaderHidden);
+  const contentWrapper = resolveContentWrapper({
+    stackPresentation: options?.stackPresentation,
+    headerHidden: isHeaderHidden,
+    headerTranslucent: options?.headerTranslucent,
+    isAndroid,
+    sheetAllowedDetents: options?.sheetAllowedDetents,
+    contentStyle: options?.contentStyle,
+  });
   return {
     activityState,
     screenViewName: resolveScreenViewName(
       options?.stackPresentation,
       isAndroid,
     ),
-    screenProps,
-    headerConfig,
-    searchBarProps,
-    contentWrapperProps: {
-      style: resolveScreenContentWrapperStyle(
-        options?.stackPresentation,
-        headerHidden,
-        options?.headerTranslucent,
-        isAndroid,
-      ),
-      collapsable: false,
-    },
-    inModal: isHeaderInModal(
-      options?.stackPresentation,
-      headerHidden,
-      isAndroid,
-    ),
+    screenProps:
+      contentWrapper.screenStyle === undefined
+        ? outer
+        : { ...outer, style: contentWrapper.screenStyle },
+    ...header,
+    contentWrapperProps: { style: contentWrapper.style, collapsable: false },
+    safeAreaHost: resolveSafeAreaHost(options ?? {}, input.platform),
+    inModal,
     innerStackStyle: resolveHeaderInModalStackStyle(),
-    innerScreenStyle: resolveHeaderInModalScreenStyle(),
+    innerScreenProps: {
+      style: resolveHeaderInModalScreenStyle(),
+      activityState,
+      ...inner,
+    },
   };
 }

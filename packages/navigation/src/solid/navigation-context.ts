@@ -1,32 +1,26 @@
-// The lifecycle half of the framework-agnostic emitter (../core/navigation-events). Solid's twin of
-// React's Context / Vue's provide-inject / Svelte's setContext is `createContext` + a Provider over
-// one shared key, resolved along the OWNER chain - so a screen's subtree reads its own route,
-// navigator handle and per-route emitter without prop-drilling.
-//
-// THE VALUE IS AN ACCESSOR, never a route object. A Solid component body runs once and a context
-// value is captured once, so handing over `{ route, ... }` directly would freeze every consumer at
-// the route as it looked when the screen mounted - `setParams` produces a NEW route object under
-// the same key and would never reach `useRoute()`. This is the same accessors-not-values rule
-// descriptorToSolid is built on, one layer up (.claude/rules/solid-descriptor-bridge.md).
-//
-// Each navigator mounts ONE Provider per live route (keyed by route.key, exactly like React's
-// per-route `<NavigationContext.Provider>`), so sibling screens never see each other's scope -
-// an inherent property of any hierarchical dependency-injection scheme, not a React artifact.
-//
-// `parent` threads the ambient value a navigator read on ITS OWN mount (undefined at the root) into
-// the value it provides to its own screens, forming a linked list - this is what lets a screen
-// nested inside e.g. a Stack-screen-renders-a-Tab composition reach the enclosing Stack via
-// useNavigation().getParent().
+// A screen's route, navigator handle and emitter travel in one Solid context, a Provider per route
+// The value is an accessor, as a body runs once and `setParams` makes a new route object
 
 import { createContext, useContext } from 'solid-js';
 import type { Accessor } from 'solid-js';
-import type { IAnyNavigatorHandle, INavigationEmitter, IRoute } from '../core';
+import type {
+  IAnyNavigatorHandle,
+  IEdgeInsetState,
+  INavigationEmitter,
+  IRoute,
+  ITransitionProgress,
+} from '../core';
 export type { IAnyNavigatorHandle };
 
 export type INavigationScopeValue = {
   route: IRoute<unknown>;
   navigation: IAnyNavigatorHandle;
   emitter: INavigationEmitter;
+  // Only a Stack route has one, as native sends transition events for stack screens alone
+  transitionProgress?: ITransitionProgress;
+  // The insets this screen's header took, a nested header reads them up the `parent` chain
+  edgeInsets?: IEdgeInsetState;
+  // Links the enclosing screen's scope, so `getParent()` reaches a navigator above
   parent?: INavigationScopeValue;
 };
 
@@ -36,15 +30,12 @@ const NavigationScopeContext = createContext<INavigationScope>();
 
 export const NavigationScopeProvider = NavigationScopeContext.Provider;
 
-// undefined simply means "no ancestor scope", which is a legitimate state (the nesting root a
-// navigator itself reads on its own mount) rather than an error - callers that require one go
-// through requireNavigationScope below.
+// Undefined means no ancestor scope, which is the nesting root and not an error
 export function useNavigationScope(): INavigationScope | undefined {
   return useContext(NavigationScopeContext);
 }
 
-// The "throw if missing" half every primitive in ./primitives needs - they all read the scope and
-// threw the same shaped error, differing only in which function name the message names.
+// The throw every primitive shares, so a wording change lands once
 export function requireNavigationScope(functionName: string): INavigationScope {
   const scope = useNavigationScope();
   if (scope === undefined) {

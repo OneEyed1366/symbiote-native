@@ -6,18 +6,25 @@ import { descriptorToReact } from '@symbiote-native/react';
 import { dlog } from '@symbiote-native/engine';
 import {
   RNS_SCREEN_CONTENT_WRAPPER_VIEW_NAME,
+  RNS_SCREEN_STACK_HEADER_SUBVIEW_VIEW_NAME,
   RNS_SCREEN_STACK_VIEW_NAME,
   RNS_SCREEN_VIEW_NAME,
   buildStackHostProps,
   mergeScreenOptions,
+  resolveCustomHeaderSubviewElements,
+  resolveNativeContainerProps,
+  resolveSheetFooterElements,
   resolveStackRoutePlan,
 } from '../../core';
 import type {
+  INativeContainerStyle,
   INavigationEmitter,
   INavigatorHandle,
   INavigatorState,
   IRoute,
   IScreenRenderPlan,
+  ITransitionProgress,
+  ITransitionProgressStore,
 } from '../../core';
 import { NavigationContext } from '../navigation-context';
 import type { INavigationContextValue } from '../navigation-context';
@@ -36,6 +43,7 @@ type IRouteScreenInput = {
   parent: INavigationContextValue | undefined;
   onPop: () => void;
   loggedPropKeys: Set<string>;
+  transitionProgress: ITransitionProgress;
 };
 
 export type IStackRenderInput = {
@@ -47,6 +55,8 @@ export type IStackRenderInput = {
   emitterFor: (routeKey: string) => INavigationEmitter;
   onPop: () => void;
   loggedPropKeys: Set<string>;
+  transitionProgress: ITransitionProgressStore;
+  nativeContainerStyle: INativeContainerStyle | undefined;
 };
 
 // Must stay a real view (`collapsable: false`): native finds this class to size a `formSheet`
@@ -55,14 +65,28 @@ function buildScreenContent(
   input: IRouteScreenInput,
 ): ReactElement {
   const { route, navigation, emitter, parent, component } = input;
+  const { transitionProgress } = input;
+  const content = createElement(
+    NavigationContext.Provider,
+    {
+      value: {
+        route,
+        navigation,
+        emitter,
+        parent,
+        transitionProgress,
+        edgeInsets: plan.edgeInsets,
+      },
+    },
+    createElement(component),
+  );
+  const { safeAreaHost } = plan;
   return createElement(
     RNS_SCREEN_CONTENT_WRAPPER_VIEW_NAME,
     plan.contentWrapperProps,
-    createElement(
-      NavigationContext.Provider,
-      { value: { route, navigation, emitter, parent } },
-      createElement(component),
-    ),
+    safeAreaHost === undefined
+      ? content
+      : createElement(safeAreaHost.viewName, safeAreaHost.props, content),
   );
 }
 
@@ -70,18 +94,52 @@ function buildScreenContent(
 // header bar. Its screen mirrors `activityState`, else native parks it off the bottom edge
 function wrapInModalStack(
   plan: IScreenRenderPlan,
-  header: ReactElement,
-  content: ReactElement,
+  body: ReactElement[],
 ): ReactElement {
   return createElement(
     RNS_SCREEN_STACK_VIEW_NAME,
     { style: plan.innerStackStyle },
+    createElement(RNS_SCREEN_VIEW_NAME, plan.innerScreenProps, ...body),
+  );
+}
+
+// Only a `formSheet` has a footer, core says when, the app function supplies what goes inside
+function buildSheetFooter(options: IReactScreenOptions): ReactElement[] {
+  return resolveSheetFooterElements(options, (host, content) =>
     createElement(
-      RNS_SCREEN_VIEW_NAME,
-      { style: plan.innerScreenStyle, activityState: plan.activityState },
-      header,
+      host.viewName,
+      { key: host.viewName, ...host.props },
       content,
     ),
+  );
+}
+
+// The search bar subview comes from core's descriptor, these sit beside it in the header config
+function buildCustomSubviews(options: IReactScreenOptions): ReactElement[] {
+  return resolveCustomHeaderSubviewElements(options, {
+    subview: (host, content) =>
+      createElement(
+        RNS_SCREEN_STACK_HEADER_SUBVIEW_VIEW_NAME,
+        { key: host.kind, ...host.props },
+        content,
+      ),
+    image: props => createElement('image', props),
+  });
+}
+
+function buildHeader(
+  plan: IScreenRenderPlan,
+  options: IReactScreenOptions,
+): ReactElement {
+  const { type, props, children } = plan.headerConfig;
+  const bridged = children.map((child, index) =>
+    typeof child === 'string' ? child : descriptorToReact(child, index),
+  );
+  return createElement(
+    type,
+    props,
+    ...bridged,
+    ...buildCustomSubviews(options),
   );
 }
 
@@ -95,27 +153,29 @@ function renderRouteScreen(input: IRouteScreenInput): ReactElement {
     emitter: input.emitter,
     onPop: input.onPop,
     loggedKeys: input.loggedPropKeys,
+    parentScope: input.parent,
+    transitionProgress: input.transitionProgress,
     assignSearchBarHandle: handle => {
       const appRef = options.headerSearchBarOptions?.ref;
       if (appRef) appRef.current = handle;
     },
   });
-  const header = descriptorToReact(plan.headerConfig);
-  const content = buildScreenContent(plan, input);
+  const body = [
+    buildHeader(plan, options),
+    buildScreenContent(plan, input),
+    ...buildSheetFooter(options),
+  ];
   const props = { key: route.key, ...plan.screenProps };
   return plan.inModal
-    ? createElement(
-        plan.screenViewName,
-        props,
-        wrapInModalStack(plan, header, content),
-      )
-    : createElement(plan.screenViewName, props, header, content);
+    ? createElement(plan.screenViewName, props, wrapInModalStack(plan, body))
+    : createElement(plan.screenViewName, props, ...body);
 }
 
 const STACK_PROPS = buildStackHostProps();
 
 export function renderStack(input: IStackRenderInput): ReactElement {
   const { registry, state, screenOptions, navigation } = input;
+  input.transitionProgress.keepOnly(state.routes.map(route => route.key));
   const children = state.routes.map((route, index) => {
     const entry = registry.get(route.name);
     if (!entry) {
@@ -137,7 +197,12 @@ export function renderStack(input: IStackRenderInput): ReactElement {
       parent: input.parent,
       onPop: input.onPop,
       loggedPropKeys: input.loggedPropKeys,
+      transitionProgress: input.transitionProgress.forRoute(route.key),
     });
   });
-  return createElement(RNS_SCREEN_STACK_VIEW_NAME, STACK_PROPS, ...children);
+  const stackProps = {
+    ...STACK_PROPS,
+    ...resolveNativeContainerProps(input.nativeContainerStyle),
+  };
+  return createElement(RNS_SCREEN_STACK_VIEW_NAME, stackProps, ...children);
 }

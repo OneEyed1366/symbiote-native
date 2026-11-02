@@ -1,7 +1,9 @@
 <script lang="ts" module>
   // `RNSScreenStackHeaderConfig` requires every child to be a header subview, and `type` names
   // the slot this one fills
-  const HEADER_SUBVIEW_PROPS: Record<string, unknown> = { type: 'searchBar' };
+  import { resolveHeaderSubviewProps } from '../../core';
+
+  const HEADER_SUBVIEW_PROPS = resolveHeaderSubviewProps('searchBar');
 </script>
 
 <script lang="ts">
@@ -15,6 +17,10 @@
     RNS_SCREEN_STACK_VIEW_NAME,
     RNS_SCREEN_VIEW_NAME,
     RNS_SEARCH_BAR_VIEW_NAME,
+    createTransitionProgress,
+    resolveCustomHeaderSubviews,
+    resolveCustomHeaderViews,
+    resolveSheetFooterHost,
     resolveStackRoutePlan,
   } from '../../core';
   import type { IScreenRenderPlan } from '../../core';
@@ -32,16 +38,32 @@
     emitter,
     parentScope,
     // Destructured under a capitalized name because a Svelte template resolves a component tag
-    // only from a capitalized identifier.
+    // only from a capitalized identifier
     component: ScreenComponent,
     onPopRequested,
   }: IStackScreenProps = $props();
 
   const searchBarOptions = $derived(options.headerSearchBarOptions);
 
+  // The app's header views, filed by the leaf that hosts each, core lists which leaves exist
+  const headerViews = $derived(resolveCustomHeaderViews(options));
+  const subviewHosts = $derived(
+    resolveCustomHeaderSubviews(headerViews, options),
+  );
+
+  // Core says whether this screen has a footer, the snippet fills the host it names
+  const sheetFooterHost = $derived(
+    resolveSheetFooterHost({
+      stackPresentation: options.stackPresentation,
+      hasFooter: options.sheetFooter !== undefined,
+    }),
+  );
+
   // `assignSearchBarHandle` is left out: the handle rides its own attachment on the leaf below, so
   // no `ref` key can leak into the props bag
   const loggedKeys = new Set<string>();
+  // One set per route screen, as the keyed `{#each}` mounts this component once per route
+  const transitionProgress = createTransitionProgress();
   const plan = $derived.by<IScreenRenderPlan>(() =>
     resolveStackRoutePlan({
       route,
@@ -51,6 +73,8 @@
       emitter,
       onPop: onPopRequested,
       loggedKeys,
+      parentScope,
+      transitionProgress,
     }),
   );
 
@@ -59,18 +83,22 @@
   const innerStackProps = $derived<Record<string, unknown>>({
     style: plan.innerStackStyle,
   });
-  const innerScreenProps = $derived<Record<string, unknown>>({
-    style: plan.innerScreenStyle,
-    activityState: plan.activityState,
-  });
 
   const scopeValue = $derived<INavigationScopeValue>({
     route,
     navigation,
     emitter,
+    transitionProgress,
+    edgeInsets: plan.edgeInsets,
     parent: parentScope,
   });
 </script>
+
+{#snippet content()}
+  <NavigationScope value={scopeValue}>
+    <ScreenComponent />
+  </NavigationScope>
+{/snippet}
 
 {#snippet chrome()}
   <svelte:element
@@ -89,15 +117,42 @@
         />
       </svelte:element>
     {/if}
+    {#each subviewHosts as host (host.kind)}
+      <svelte:element
+        this={RNS_SCREEN_STACK_HEADER_SUBVIEW_VIEW_NAME}
+        {@attach hostProps(host.props)}
+      >
+        {#if host.imageProps !== undefined}
+          <svelte:element this="image" {@attach hostProps(host.imageProps)} />
+        {:else}
+          {@render headerViews[host.kind]?.()}
+        {/if}
+      </svelte:element>
+    {/each}
   </svelte:element>
   <svelte:element
     this={RNS_SCREEN_CONTENT_WRAPPER_VIEW_NAME}
     {@attach hostProps(plan.contentWrapperProps)}
   >
-    <NavigationScope value={scopeValue}>
-      <ScreenComponent />
-    </NavigationScope>
+    {#if plan.safeAreaHost !== undefined}
+      <svelte:element
+        this={plan.safeAreaHost.viewName}
+        {@attach hostProps(plan.safeAreaHost.props)}
+      >
+        {@render content()}
+      </svelte:element>
+    {:else}
+      {@render content()}
+    {/if}
   </svelte:element>
+  {#if sheetFooterHost !== undefined}
+    <svelte:element
+      this={sheetFooterHost.viewName}
+      {@attach hostProps(sheetFooterHost.props)}
+    >
+      {@render options.sheetFooter?.()}
+    </svelte:element>
+  {/if}
 {/snippet}
 
 <svelte:element
@@ -111,7 +166,7 @@
     >
       <svelte:element
         this={RNS_SCREEN_VIEW_NAME}
-        {@attach hostProps(innerScreenProps)}
+        {@attach hostProps(plan.innerScreenProps)}
       >
         {@render chrome()}
       </svelte:element>

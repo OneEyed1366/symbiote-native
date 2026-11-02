@@ -1,13 +1,6 @@
-// Stack, the React lifecycle half. The route-stack transitions (navigator-state) and the
-// options/props folds (screen-options, render-stack) live in @symbiote-native/navigation core,
-// shared verbatim with the Vue/Angular adapters; here React supplies the lifecycle - useReducer
-// for the pushed-route stack, useId + a ref counter for route-key generation, useImperativeHandle
-// for the push/pop/replace navigator handle - plus the descriptor bridge for the header config
-// leaf. Pushing/popping a route is an ordinary child mount/unmount: RNSScreenStack diffs its
-// RNSScreen children natively, so no imperative native command is needed here at all. Neither
-// this nor the Screen marker imports react-native-screens' own React components (ScreenStack.tsx
-// et al - hooks, crashes a non-React adapter); the native views are driven directly through the
-// ViewConfig ../register registers. See CLAUDE.md <third_party_rn_packages_are_react_only>.
+// React lifecycle half of `Stack`, route transitions and option folds live in core
+// A push or pop is a plain child mount, `RNSScreenStack` diffs its children natively
+// The library's own React components are never imported, `../register` supplies the ViewConfig
 
 import {
   forwardRef,
@@ -25,10 +18,11 @@ import {
   createEmitterStore,
   createRouteFactory,
   createStackHandle,
+  createTransitionProgressStore,
   navigatorReducer,
   reconcileStackRoutes,
 } from '../../core';
-import type { INavigatorHandle } from '../../core';
+import type { INativeContainerStyle, INavigatorHandle } from '../../core';
 import { collectRegistry } from '../collect-registry';
 import { NavigationContext } from '../navigation-context';
 import { Screen } from '../screen';
@@ -41,6 +35,7 @@ export type { INavigatorHandle } from '../../core';
 export type IStackProps = {
   initialRouteName?: string;
   screenOptions?: IReactScreenOptions;
+  nativeContainerStyle?: INativeContainerStyle;
   children?: ReactNode;
 };
 
@@ -62,6 +57,7 @@ const StackImpl = forwardRef<INavigatorHandle, IStackProps>(
     );
     const [{ emitterFor, broadcastState }] = useState(createEmitterStore);
     const [loggedPropKeys] = useState(() => new Set<string>());
+    const [transitionProgress] = useState(createTransitionProgressStore);
     const registeredNames = useMemo(() => [...registry.keys()], [registry]);
 
     const [dispatchedState, dispatch] = useReducer(
@@ -106,6 +102,8 @@ const StackImpl = forwardRef<INavigatorHandle, IStackProps>(
       emitterFor,
       onPop: () => dispatch({ type: 'pop', count: 1 }),
       loggedPropKeys,
+      transitionProgress,
+      nativeContainerStyle: props.nativeContainerStyle,
     });
   },
 );

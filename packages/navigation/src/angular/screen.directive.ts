@@ -1,12 +1,8 @@
-// [symbioteScreen]: a declarative marker, never rendered on its own - Stack reads its inputs via
-// @ContentChildren to build the static name -> {component, options} registry, then mounts the
-// registered component itself for each pushed route. Angular's twin of react/screen.ts's Screen
-// marker component; mirrors Angular Material's own `@ContentChildren(MatTab) tabs: QueryList<MatTab>`
-// pattern (a directive applied to an inert `<ng-template>`, never instantiated as a view - see
-// stack.ts's header for why that's safe: @ContentChildren resolves the light-DOM declaration,
-// independent of whether the template is ever instantiated).
+// `symbioteScreen` is a declarative marker on an inert `<ng-template>`, never rendered on its own
+// `Stack` reads its inputs through `@ContentChildren` into a name to component and options registry
+// It mirrors `@ContentChildren(MatTab)` in Angular Material, the stack header says why it is safe
 
-import { Directive, Input, type Type } from '@angular/core';
+import { Directive, Input, type TemplateRef, type Type } from '@angular/core';
 import type {
   ISearchBarCommands,
   ISearchBarOptions,
@@ -15,28 +11,32 @@ import type {
 } from '../core';
 import type { INavigatorHandle } from '../core';
 
-// The imperative ref (focus/blur/clearText/setText/cancelSearch/toggleCancelButton) carries a
-// framework ref type, so - per CLAUDE.md's <prop_types_split_agnostic_vs_per_adapter> - it cannot
-// live in the shared, agnostic ISearchBarOptions (core/navigator-props.ts). Angular has no
-// `RefObject` primitive of its own, but the underlying shape (`{ current: T | null }`, mutated
-// once the native view is available) is framework-agnostic in itself - the app constructs a plain
-// mutable object and this adapter assigns `.current` once the search bar's native node exists
-// (search-bar-ref.directive.ts), the same contract react/screen.ts's IReactSearchBarOptions uses.
+// The search bar commands ride a ref that cannot live in the shared `ISearchBarOptions`
+// Angular has no ref type, so the app passes a plain `{ current }` cell
+// `search-bar-ref.directive.ts` fills it once the native node exists
 export type IAngularSearchBarOptions = ISearchBarOptions & {
   ref?: { current: ISearchBarCommands | null };
+};
+
+// A header view is a template, Stack outlets it inside the subview leaf that hosts it
+export type IAngularHeaderViews = {
+  headerLeft?: TemplateRef<unknown>;
+  headerRight?: TemplateRef<unknown>;
+  headerTitle?: TemplateRef<unknown>;
 };
 
 export type IAngularScreenOptions = Omit<
   IScreenOptions,
   'headerSearchBarOptions'
-> & {
-  headerSearchBarOptions?: IAngularSearchBarOptions;
-};
+> &
+  IAngularHeaderViews & {
+    headerSearchBarOptions?: IAngularSearchBarOptions;
+    // Outlet inside the native footer of a `formSheet`, ignored on any other presentation
+    sheetFooter?: TemplateRef<unknown>;
+  };
 
-// A screen's options can be a plain object or a resolver run OUTSIDE the render lifecycle (when
-// Stack folds a route's options): its `navigation` argument is a live navigator handle a bar-button
-// onPress closes over, so this is NOT the props-based navigation the screen body reads via inject -
-// it's a deliberate escape hatch that stays.
+// Options are a plain object or a resolver that `Stack` runs outside the render lifecycle
+// Its `navigation` argument is the live handle a bar button closes over, not the injected one
 export type IScreenOptionsArgs = {
   route: IRoute<unknown>;
   navigation: INavigatorHandle;

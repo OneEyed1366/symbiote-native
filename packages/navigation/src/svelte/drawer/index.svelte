@@ -33,12 +33,7 @@
   import type { INavigationScopeValue } from '../navigation-context';
   import NavigationScope from '../navigation-scope.svelte';
   import { SCREEN_REGISTRY_HOST_PROPS } from '../registry-host';
-  import {
-    setScreenCollector,
-    toRegistry,
-    withoutScreen,
-  } from '../screen-registry';
-  import type { IRegisteredScreen } from '../screen-registry';
+  import { useScreenCollection } from '../screen-collection.svelte';
   import { trackFocus } from '../track-focus.svelte';
   import type { IDrawerScreenProps } from '../drawer-screen-props';
   import type { IDrawerProps } from './drawer-props';
@@ -74,20 +69,9 @@
     swipeMinVelocity,
   });
 
-  let screens = $state.raw<IRegisteredScreen<IDrawerScreenProps['options']>[]>(
-    [],
-  );
-  setScreenCollector<IDrawerScreenProps['options']>({
-    kind: 'drawer',
-    register: screen => {
-      screens = [...screens, screen];
-    },
-    unregister: screen => {
-      screens = withoutScreen(screens, screen);
-    },
-  });
-
-  const registry = $derived(toRegistry(screens));
+  const collection =
+    useScreenCollection<IDrawerScreenProps['options']>('drawer');
+  const registry = $derived(collection.registry);
 
   // Seeded from the registry until the first dispatch freezes it
   let dispatchedState = $state.raw<IDrawerRouterState | null>(null);

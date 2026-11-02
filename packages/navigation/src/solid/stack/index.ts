@@ -5,8 +5,12 @@
 import { For, createComponent, createMemo } from 'solid-js';
 import type { JSX } from '@symbiote-native/solid/jsx-runtime';
 import { insert } from '@symbiote-native/solid/renderer';
-import { RNS_SCREEN_STACK_VIEW_NAME, buildStackHostProps } from '../../core';
-import type { INavigatorHandle } from '../../core';
+import {
+  RNS_SCREEN_STACK_VIEW_NAME,
+  buildStackHostProps,
+  resolveNativeContainerProps,
+} from '../../core';
+import type { INativeContainerStyle, INavigatorHandle } from '../../core';
 import { hostElement } from '../host';
 import { useNavigationScope } from '../navigation-context';
 import {
@@ -26,6 +30,7 @@ export type { INavigatorHandle } from '../../core';
 export type IStackProps = {
   initialRouteName?: string;
   screenOptions?: ISolidScreenOptions;
+  nativeContainerStyle?: INativeContainerStyle;
   ref?: (handle: INavigatorHandle) => void;
   children?: JSX.Element;
 };
@@ -61,7 +66,10 @@ function StackImpl(props: IStackProps): JSX.Element {
     loggedKeys: new Set<string>(),
   });
 
-  const root = hostElement(RNS_SCREEN_STACK_VIEW_NAME, buildStackHostProps);
+  const root = hostElement(RNS_SCREEN_STACK_VIEW_NAME, () => ({
+    ...buildStackHostProps(),
+    ...resolveNativeContainerProps(props.nativeContainerStyle),
+  }));
   // The `<For>` is created EAGERLY and handed to `insert` as a value, as a thunk would read `each`
   // inside the insert effect and re-create the whole list on every route change
   insert(

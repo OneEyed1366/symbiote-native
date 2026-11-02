@@ -12,6 +12,7 @@ export type { ITabNavigationHandle } from './use-tab-navigation.svelte';
 export { useDrawerNavigation } from './use-drawer-navigation.svelte';
 export type { IDrawerNavigationHandle } from './use-drawer-navigation.svelte';
 export { useRoute } from './use-route.svelte';
+export { useTransitionProgress } from './use-transition-progress.svelte';
 export { useIsFocused } from './use-is-focused.svelte';
 export { useFocusEffect } from './use-focus-effect.svelte';
 export { useNavigationState } from './use-navigation-state.svelte';
