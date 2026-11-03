@@ -1,5 +1,11 @@
 # @symbiote-native/vue
 
+## 3.5.0
+
+### Minor Changes
+
+- [`2cf2ff4`](https://github.com/OneEyed1366/symbiote-native/commit/2cf2ff41ae41d5d26ab78ed2e758eea7d663169a) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - The Metro transformer now compiles a `.vue` file that has a template and no script, so a static template no longer fails the build with "has no `<script>` block"
+
 ## 3.4.0
 
 ### Minor Changes

@@ -221,7 +221,7 @@ catalog:
   react-native-is-edge-to-edge: ^1.3.1
   # Exact pin: `@symbiote-native/navigation` vendors its codegen specs, so a newer consumer install
   # would use native types our snapshot never generated (rule `native-proxy-package-files`)
-  react-native-screens: 4.26.0
+  react-native-screens: 4.30.0
   react-native-safe-area-context: ^5.5.2
   # Exact pins: packages/reanimated imports hook helpers that Reanimated does not publish
   # (`src/hook/*Common`), so a caret range could resolve a release where they moved

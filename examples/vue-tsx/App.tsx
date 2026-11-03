@@ -1,15 +1,17 @@
 /**
- * Canary app entry: the native stack navigator over the demo screens, Menu first
- * Details has no menu row, the DeepLinking stop resolves to it (symbiotecanaryvuetsx://details/:id)
+ * Canary app entry: the native stack navigator over every demo screen, starting at Menu
+ * Menu lists four sections, each opens a hub with its stops; Details is reached only by deep link
  *
  * @format
  */
 
 import './App.css';
+import './navigation.css';
 import { defineComponent, onMounted, ref } from 'vue';
 import { Stack, useLinkingIntegration } from '@symbiote-native/navigation/vue';
 import type { INavigatorHandle } from '@symbiote-native/navigation/vue';
 import { MenuScreen } from './screens/MenuScreen';
+import { HUB_SCREENS } from './screens/SectionHubScreen';
 import { CanaryScreen } from './screens/CanaryScreen';
 import { DetailsScreen } from './screens/DetailsScreen';
 import {
@@ -20,16 +22,12 @@ import {
   SheetDemoScreen,
   sheetDemoScreenOptions,
 } from './screens/SheetDemoScreen';
-import { TabsDemoScreen } from './screens/TabsDemoScreen';
-import { DrawerDemoScreen } from './screens/DrawerDemoScreen';
-import { NestedNavigatorsScreen } from './screens/NestedNavigatorsScreen';
+import { DEMO_SCREENS } from './screens/demo-screens';
 import { HooksDemoScreen } from './screens/HooksDemoScreen';
-import { DeepLinkingScreen } from './screens/DeepLinkingScreen';
-import { StatePersistenceScreen } from './screens/StatePersistenceScreen';
 import { ApiPlaygroundScreen } from './screens/ApiPlaygroundScreen';
 import { BenchmarkScreen } from './screens/BenchmarkScreen';
-import { StyleShowcaseScreen } from './screens/StyleShowcaseScreen';
 import { ReanimatedScreen } from './screens/ReanimatedScreen';
+import { StyleShowcaseScreen } from './screens/StyleShowcaseScreen';
 import { APP_LINKING_CONFIG } from './navigation-linking';
 import { ROUTE_NAME } from './routes';
 import { LINE_COLOR } from './navigation-lines';
@@ -44,6 +42,7 @@ const App = defineComponent({
 
     // Takes the Ref of the Stack itself and reads `.value` in its own `onMounted`
     // Children mount first, so the Stack has filled `stackHandle` through `expose()` by then
+    // eslint-disable-next-line react-hooks/rules-of-hooks -- a Vue composable inside `setup()`
     useLinkingIntegration(APP_LINKING_CONFIG, stackHandle);
 
     return () => (
@@ -59,6 +58,14 @@ const App = defineComponent({
             headerUserInterfaceStyle: 'dark',
           }}
         />
+        {HUB_SCREENS.map(hub => (
+          <Stack.Screen
+            key={hub.name}
+            name={hub.name}
+            component={hub.component}
+            options={hub.options}
+          />
+        ))}
         <Stack.Screen
           name={ROUTE_NAME.Canary}
           component={CanaryScreen}
@@ -92,49 +99,18 @@ const App = defineComponent({
           component={HeaderOptionsScreen}
           options={headerOptionsScreenOptions}
         />
+        {DEMO_SCREENS.map(demo => (
+          <Stack.Screen
+            key={demo.name}
+            name={demo.name}
+            component={demo.component}
+            options={demo.options}
+          />
+        ))}
         <Stack.Screen
           name={ROUTE_NAME.SheetDemo}
           component={SheetDemoScreen}
           options={sheetDemoScreenOptions}
-        />
-        <Stack.Screen
-          name={ROUTE_NAME.TabsDemo}
-          component={TabsDemoScreen}
-          options={{
-            title: 'Tabs Demo',
-            headerShown: true,
-            headerTintColor: LINE_COLOR.structure,
-            headerTranslucent: true,
-            headerTitleColor: '#ffffff',
-            headerStyle: { backgroundColor: '#0b1622' },
-            headerUserInterfaceStyle: 'dark',
-          }}
-        />
-        <Stack.Screen
-          name={ROUTE_NAME.DrawerDemo}
-          component={DrawerDemoScreen}
-          options={{
-            title: 'Drawer Demo',
-            headerShown: true,
-            headerTintColor: LINE_COLOR.structure,
-            headerTranslucent: true,
-            headerTitleColor: '#ffffff',
-            headerStyle: { backgroundColor: '#0b1622' },
-            headerUserInterfaceStyle: 'dark',
-          }}
-        />
-        <Stack.Screen
-          name={ROUTE_NAME.NestedNavigators}
-          component={NestedNavigatorsScreen}
-          options={{
-            title: 'Nested Navigators',
-            headerShown: true,
-            headerTintColor: LINE_COLOR.structure,
-            headerTranslucent: true,
-            headerTitleColor: '#ffffff',
-            headerStyle: { backgroundColor: '#0b1622' },
-            headerUserInterfaceStyle: 'dark',
-          }}
         />
         <Stack.Screen
           name={ROUTE_NAME.HooksDemo}
@@ -150,38 +126,25 @@ const App = defineComponent({
           }}
         />
         <Stack.Screen
-          name={ROUTE_NAME.DeepLinking}
-          component={DeepLinkingScreen}
-          options={{
-            title: 'Deep Linking',
-            headerShown: true,
-            headerTintColor: LINE_COLOR.routing,
-            headerTranslucent: true,
-            headerTitleColor: '#ffffff',
-            headerStyle: { backgroundColor: '#0b1622' },
-            headerUserInterfaceStyle: 'dark',
-          }}
-        />
-        <Stack.Screen
-          name={ROUTE_NAME.StatePersistence}
-          component={StatePersistenceScreen}
-          options={{
-            title: 'State Persistence',
-            headerShown: true,
-            headerTintColor: LINE_COLOR.routing,
-            headerTranslucent: true,
-            headerTitleColor: '#ffffff',
-            headerStyle: { backgroundColor: '#0b1622' },
-            headerUserInterfaceStyle: 'dark',
-          }}
-        />
-        <Stack.Screen
           name={ROUTE_NAME.ApiPlayground}
           component={ApiPlaygroundScreen}
           options={{
             title: 'API Playground',
             headerShown: true,
-            headerTintColor: LINE_COLOR.framework,
+            headerTintColor: LINE_COLOR.introspection,
+            headerTranslucent: true,
+            headerTitleColor: '#ffffff',
+            headerStyle: { backgroundColor: '#0b1622' },
+            headerUserInterfaceStyle: 'dark',
+          }}
+        />
+        <Stack.Screen
+          name={ROUTE_NAME.Reanimated}
+          component={ReanimatedScreen}
+          options={{
+            title: 'Reanimated',
+            headerShown: true,
+            headerTintColor: LINE_COLOR.performance,
             headerTranslucent: true,
             headerTitleColor: '#ffffff',
             headerStyle: { backgroundColor: '#0b1622' },
@@ -208,19 +171,6 @@ const App = defineComponent({
             title: 'Styling showcase',
             headerShown: true,
             headerTintColor: LINE_COLOR.styling,
-            headerTranslucent: true,
-            headerTitleColor: '#ffffff',
-            headerStyle: { backgroundColor: '#0b1622' },
-            headerUserInterfaceStyle: 'dark',
-          }}
-        />
-        <Stack.Screen
-          name={ROUTE_NAME.Reanimated}
-          component={ReanimatedScreen}
-          options={{
-            title: 'Reanimated',
-            headerShown: true,
-            headerTintColor: LINE_COLOR.performance,
             headerTranslucent: true,
             headerTitleColor: '#ffffff',
             headerStyle: { backgroundColor: '#0b1622' },

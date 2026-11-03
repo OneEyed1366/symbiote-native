@@ -53,10 +53,9 @@ export type IDrawerProps = IDrawerOptions & {
 
 const DrawerImpl = defineComponent<IDrawerProps>(
   (_props, { attrs: rawAttrs, slots, expose }) => {
-    const attrs = normalizeVueAttrs(rawAttrs);
-    // Read BEFORE this Drawer provides its own scope, as it becomes the `parent` of its screens
-    const ambientScopeRef = injectNavigationScope();
-    const readOptions = (): IDrawerOptions => readDrawerOptions(attrs);
+    // Folded per call, as a copy taken once in setup would freeze every option at mount
+    const readAttrs = () => normalizeVueAttrs(rawAttrs);
+    const readOptions = (): IDrawerOptions => readDrawerOptions(readAttrs());
 
     const initialRoutes = buildFixedRoutes(
       collectDrawerRegistry(slots.default?.() ?? []),
@@ -67,7 +66,7 @@ const DrawerImpl = defineComponent<IDrawerProps>(
     const state = shallowRef(
       createInitialDrawerRouterState(
         initialRoutes,
-        asString(attrs.initialRouteName),
+        asString(readAttrs().initialRouteName),
       ),
     );
 
@@ -86,15 +85,19 @@ const DrawerImpl = defineComponent<IDrawerProps>(
     const { emitterFor } = createEmitterStore();
     trackFocus(state, emitterFor, 'Drawer');
 
+    // Read BEFORE this Drawer provides its own scope, as it becomes the `parent` of its screens
+    const ambientScopeRef = injectNavigationScope();
+
     return () => {
       const registry = collectDrawerRegistry(slots.default?.() ?? []);
       if (registry.size === 0)
         dlog('Drawer: no <Drawer.Screen> children registered');
+      const attrs = readAttrs();
       return renderDrawerView({
         registry,
         state: state.value,
         handle,
-        options: readOptions(),
+        options: readDrawerOptions(attrs),
         drawerStyle: isStyleProp(attrs.drawerStyle)
           ? attrs.drawerStyle
           : undefined,

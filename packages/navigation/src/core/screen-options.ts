@@ -16,68 +16,17 @@ import type {
   IScreenViewProps,
   ISearchBarOptions,
   ISearchBarViewProps,
-  ISheetAllowedDetents,
-  ISheetInitialDetent,
-  ISheetLargestUndimmedDetent,
 } from './navigator-props';
 import {
   buildHeaderBarButtonDispatch,
   prepareHeaderBarButtonItems,
 } from './header-bar-buttons';
-
-// These sentinels must be kept in sync with react-native-screens' native side - they are RNS's
-// own compat values for the 'fitToContents'/'large'/'medium'/'all' legacy presets, replicated
-// here because we drive RNSScreen directly (no react-native-screens JS component in the path).
-const SHEET_FIT_TO_CONTENTS: number[] = [-1];
-const SHEET_COMPAT_LARGE: number[] = [1.0];
-const SHEET_COMPAT_MEDIUM: number[] = [0.5];
-const SHEET_COMPAT_ALL: number[] = [0.5, 1.0];
-const SHEET_DIMMED_ALWAYS = -1;
-
-function resolveSheetAllowedDetents(
-  compat: ISheetAllowedDetents | undefined,
-): number[] {
-  if (compat === undefined) return SHEET_COMPAT_LARGE;
-  if (Array.isArray(compat)) return compat;
-  switch (compat) {
-    case 'fitToContents':
-      return SHEET_FIT_TO_CONTENTS;
-    case 'large':
-      return SHEET_COMPAT_LARGE;
-    case 'medium':
-      return SHEET_COMPAT_MEDIUM;
-    case 'all':
-      return SHEET_COMPAT_ALL;
-  }
-}
-
-function resolveSheetLargestUndimmedDetent(
-  compat: ISheetLargestUndimmedDetent | undefined,
-  lastDetentIndex: number,
-): number {
-  if (typeof compat === 'number') return compat;
-  switch (compat) {
-    case 'last':
-      return lastDetentIndex;
-    case 'large':
-      return 1;
-    case 'medium':
-      return 0;
-    case 'none':
-    case 'all':
-    case undefined:
-      return SHEET_DIMMED_ALWAYS;
-  }
-}
-
-function resolveSheetInitialDetent(
-  compat: ISheetInitialDetent | undefined,
-  lastDetentIndex: number,
-): number {
-  if (compat === 'last') return lastDetentIndex;
-  if (compat === undefined) return 0;
-  return compat;
-}
+import { featureFlags, isAndroidForCurrentPlatform } from './screens-config';
+import {
+  resolveSheetAllowedDetents,
+  resolveSheetInitialDetent,
+  resolveSheetLargestUndimmedDetent,
+} from './sheet-detents';
 
 function toOptionalBooleanNativeProp(
   value: boolean | undefined,
@@ -86,36 +35,120 @@ function toOptionalBooleanNativeProp(
   return value ? 'true' : 'false';
 }
 
+// Gesture, system bar and scroll edge fields, read from a defaulted `options` so no read branches
+function resolveScreenBehaviorView(options: IScreenOptions) {
+  const {
+    start = -1,
+    end = -1,
+    top = -1,
+    bottom = -1,
+  } = options.gestureResponseDistance ?? {};
+  const edges = options.scrollEdgeEffects ?? {};
+  return {
+    customAnimationOnSwipe: options.customAnimationOnSwipe,
+    fullScreenSwipeEnabled: toOptionalBooleanNativeProp(
+      options.fullScreenSwipeEnabled,
+    ),
+    fullScreenSwipeShadowEnabled: options.fullScreenSwipeShadowEnabled,
+    gestureResponseDistance: { start, end, top, bottom },
+    swipeDirection: options.swipeDirection,
+    hideKeyboardOnSwipe: options.hideKeyboardOnSwipe,
+    nativeBackButtonDismissalEnabled: options.nativeBackButtonDismissalEnabled,
+    preventNativeDismiss: options.preventNativeDismiss,
+    replaceAnimation: options.replaceAnimation,
+    homeIndicatorHidden: options.homeIndicatorHidden,
+    statusBarColor: options.statusBarColor,
+    statusBarTranslucent: options.statusBarTranslucent,
+    navigationBarColor: options.navigationBarColor,
+    navigationBarTranslucent: options.navigationBarTranslucent,
+    navigationBarHidden: options.navigationBarHidden,
+    topScrollEdgeEffect: edges.top,
+    bottomScrollEdgeEffect: edges.bottom,
+    leftScrollEdgeEffect: edges.left,
+    rightScrollEdgeEffect: edges.right,
+    androidResetScreenShadowStateOnOrientationChangeEnabled:
+      options.androidResetScreenShadowStateOnOrientationChangeEnabled ??
+      featureFlags.experiment
+        .androidResetScreenShadowStateOnOrientationChangeEnabled,
+    iosOrientationInheritanceFixEnabled:
+      options.iosOrientationInheritanceFixEnabled ??
+      featureFlags.experiment.iosOrientationInheritanceFixEnabled,
+  };
+}
+
+// Native names these flags in the hiding sense, the app's visible/enabled flags are inverted
+export function negateOptional(
+  value: boolean | undefined,
+): boolean | undefined {
+  return value === undefined ? undefined : !value;
+}
+
+// Header fonts, shadows and back button fields, read from a defaulted `options`
+function resolveHeaderAppearanceView(options: IScreenOptions) {
+  const {
+    fontFamily: titleFontFamily,
+    fontSize: titleFontSize,
+    fontWeight: titleFontWeight,
+  } = options.headerTitleStyle ?? {};
+  const { fontFamily: backTitleFontFamily, fontSize: backTitleFontSize } =
+    options.headerBackTitleStyle ?? {};
+  const {
+    fontFamily: largeTitleFontFamily,
+    fontSize: largeTitleFontSize,
+    fontWeight: largeTitleFontWeight,
+    color: largeTitleColor,
+  } = options.headerLargeTitleStyle ?? {};
+  return {
+    titleFontFamily,
+    titleFontSize,
+    titleFontWeight,
+    backTitleFontFamily,
+    backTitleFontSize,
+    largeTitleFontFamily,
+    largeTitleFontSize,
+    largeTitleFontWeight,
+    largeTitleColor,
+    hideShadow: negateOptional(options.headerShadowVisible),
+    largeTitleHideShadow: negateOptional(options.headerLargeTitleShadowVisible),
+    hideBackButton: negateOptional(options.headerBackVisible),
+    disableBackButtonMenu: negateOptional(options.headerBackButtonMenuEnabled),
+    blurEffect: options.headerBlurEffect,
+    backButtonInCustomView: options.headerBackButtonInCustomView,
+    topInsetEnabled: options.headerTopInsetEnabled,
+    legacyTopInsetBehavior: options.headerLegacyTopInsetBehavior,
+    direction: options.headerDirection,
+  };
+}
+
 export function resolveHeaderConfigView(
   options: IScreenOptions | undefined,
   platform: INavigatorPlatform,
   passthrough: Record<string, unknown> = {},
 ): IHeaderConfigViewProps {
+  const opts = options ?? {};
+  const leftItems = platform.headerBarButtonsAvailable
+    ? opts.headerLeftBarButtonItems
+    : undefined;
+  const rightItems = platform.headerBarButtonsAvailable
+    ? opts.headerRightBarButtonItems
+    : undefined;
   return {
-    title: options?.title,
-    hidden: options?.headerShown === false,
-    backTitle: options?.headerBackTitle,
+    title: opts.title,
+    hidden: opts.headerShown === false,
+    backTitle: opts.headerBackTitle,
     backTitleVisible: platform.defaultHeaderBackTitleVisible,
-    backButtonDisplayMode: options?.headerBackButtonDisplayMode,
-    largeTitle: options?.headerLargeTitle,
-    translucent: options?.headerTranslucent,
-    color: options?.headerTintColor,
-    titleColor: options?.headerTitleColor,
-    backgroundColor: options?.headerStyle?.backgroundColor,
-    largeTitleBackgroundColor: options?.headerLargeStyle?.backgroundColor,
-    userInterfaceStyle: options?.headerUserInterfaceStyle,
-    headerLeftBarButtonItems: prepareHeaderBarButtonItems(
-      options?.headerLeftBarButtonItems,
-      'left',
-    ),
-    headerRightBarButtonItems: prepareHeaderBarButtonItems(
-      options?.headerRightBarButtonItems,
-      'right',
-    ),
-    ...buildHeaderBarButtonDispatch(
-      options?.headerLeftBarButtonItems,
-      options?.headerRightBarButtonItems,
-    ),
+    backButtonDisplayMode: opts.headerBackButtonDisplayMode,
+    largeTitle: opts.headerLargeTitle,
+    translucent: opts.headerTranslucent,
+    color: opts.headerTintColor,
+    titleColor: opts.headerTitleColor,
+    backgroundColor: opts.headerStyle?.backgroundColor,
+    largeTitleBackgroundColor: opts.headerLargeStyle?.backgroundColor,
+    userInterfaceStyle: opts.headerUserInterfaceStyle,
+    headerLeftBarButtonItems: prepareHeaderBarButtonItems(leftItems, 'left'),
+    headerRightBarButtonItems: prepareHeaderBarButtonItems(rightItems, 'right'),
+    ...buildHeaderBarButtonDispatch(leftItems, rightItems),
+    ...resolveHeaderAppearanceView(opts),
     passthrough,
   };
 }
@@ -126,37 +159,40 @@ export function resolveScreenView(
   options: IScreenOptions | undefined,
   passthrough: Record<string, unknown> = {},
 ): IScreenViewProps {
+  const opts = options ?? {};
   const sheetAllowedDetents = resolveSheetAllowedDetents(
-    options?.sheetAllowedDetents,
+    opts.sheetAllowedDetents,
+    isAndroidForCurrentPlatform,
   );
   const lastDetentIndex = sheetAllowedDetents.length - 1;
   return {
     screenId,
     activityState,
-    gestureEnabled: options?.gestureEnabled,
-    stackAnimation: options?.stackAnimation,
-    stackPresentation: options?.stackPresentation,
-    transitionDuration: options?.transitionDuration,
+    gestureEnabled: opts.gestureEnabled,
+    stackAnimation: opts.stackAnimation,
+    stackPresentation: opts.stackPresentation,
+    transitionDuration: opts.transitionDuration,
     sheetAllowedDetents,
     sheetLargestUndimmedDetent: resolveSheetLargestUndimmedDetent(
-      options?.sheetLargestUndimmedDetentIndex,
+      opts.sheetLargestUndimmedDetentIndex,
       lastDetentIndex,
     ),
     sheetInitialDetent: resolveSheetInitialDetent(
-      options?.sheetInitialDetentIndex,
+      opts.sheetInitialDetentIndex,
       lastDetentIndex,
     ),
-    sheetGrabberVisible: options?.sheetGrabberVisible,
-    sheetCornerRadius: options?.sheetCornerRadius,
-    sheetExpandsWhenScrolledToEdge: options?.sheetExpandsWhenScrolledToEdge,
-    sheetElevation: options?.sheetElevation,
-    sheetShouldOverflowTopInset: options?.sheetShouldOverflowTopInset,
-    sheetDefaultResizeAnimationEnabled:
-      options?.sheetDefaultResizeAnimationEnabled,
-    statusBarStyle: options?.statusBarStyle,
-    statusBarHidden: options?.statusBarHidden,
-    statusBarAnimation: options?.statusBarAnimation,
-    screenOrientation: options?.screenOrientation,
+    sheetGrabberVisible: opts.sheetGrabberVisible,
+    sheetCornerRadius: opts.sheetCornerRadius,
+    // The vendor defaults this to `true` in JS while the native spec says `false`
+    sheetExpandsWhenScrolledToEdge: opts.sheetExpandsWhenScrolledToEdge ?? true,
+    sheetElevation: opts.sheetElevation,
+    sheetShouldOverflowTopInset: opts.sheetShouldOverflowTopInset,
+    sheetDefaultResizeAnimationEnabled: opts.sheetDefaultResizeAnimationEnabled,
+    statusBarStyle: opts.statusBarStyle,
+    statusBarHidden: opts.statusBarHidden,
+    statusBarAnimation: opts.statusBarAnimation,
+    screenOrientation: opts.screenOrientation,
+    ...resolveScreenBehaviorView(opts),
     passthrough,
   };
 }
@@ -168,24 +204,25 @@ export function resolveSearchBarView(
   options: ISearchBarOptions | undefined,
   passthrough: Record<string, unknown> = {},
 ): ISearchBarViewProps {
+  const opts = options ?? {};
   return {
-    placeholder: options?.placeholder,
-    autoCapitalize: options?.autoCapitalize,
-    placement: options?.placement,
-    hideWhenScrolling: options?.hideWhenScrolling,
-    allowToolbarIntegration: options?.allowToolbarIntegration,
-    obscureBackground: toOptionalBooleanNativeProp(options?.obscureBackground),
-    hideNavigationBar: toOptionalBooleanNativeProp(options?.hideNavigationBar),
-    cancelButtonText: options?.cancelButtonText,
-    barTintColor: options?.barTintColor,
-    tintColor: options?.tintColor,
-    textColor: options?.textColor,
-    autoFocus: options?.autoFocus,
-    disableBackButtonOverride: options?.disableBackButtonOverride,
-    inputType: options?.inputType,
-    hintTextColor: options?.hintTextColor,
-    headerIconColor: options?.headerIconColor,
-    shouldShowHintSearchIcon: options?.shouldShowHintSearchIcon,
+    placeholder: opts.placeholder,
+    autoCapitalize: opts.autoCapitalize,
+    placement: opts.placement,
+    hideWhenScrolling: opts.hideWhenScrolling,
+    allowToolbarIntegration: opts.allowToolbarIntegration,
+    obscureBackground: toOptionalBooleanNativeProp(opts.obscureBackground),
+    hideNavigationBar: toOptionalBooleanNativeProp(opts.hideNavigationBar),
+    cancelButtonText: opts.cancelButtonText,
+    barTintColor: opts.barTintColor,
+    tintColor: opts.tintColor,
+    textColor: opts.textColor,
+    autoFocus: opts.autoFocus,
+    disableBackButtonOverride: opts.disableBackButtonOverride,
+    inputType: opts.inputType,
+    hintTextColor: opts.hintTextColor,
+    headerIconColor: opts.headerIconColor,
+    shouldShowHintSearchIcon: opts.shouldShowHintSearchIcon,
     passthrough,
   };
 }

@@ -1,49 +1,61 @@
-<script lang="ts">
-  // Sheet presentation demo: this screen is PUSHED with stackPresentation: 'formSheet' (see
-  // App.svelte's sheetDemoScreenOptions) and three sheetAllowedDetents (30% / 60% / full height) —
-  // drag the grabber between them. "Present" is the Menu screen's push onto this route; "Dismiss"
-  // below is this route's own pop, both driving the native sheet the same way a real app would
-  // toggle it from a button. Deliberately skips SafeAreaView, matching the React and Vue ports —
-  // see App.svelte's sheetDemoScreenOptions comment for react-native-screens' formSheet-sizing
-  // rationale (the ScrollView below must be this screen's own first direct child). Svelte twin of
-  // examples/vue-sfc/screens/SheetDemoScreen.vue.
-  import { useStackNavigation } from '@symbiote-native/navigation/svelte';
-  import { ROUTE_NAME } from '../routes';
-  import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
-  import ActionButton from '../components/ActionButton.svelte';
+<script lang="ts" module>
+  import type { IScreenOptionsResolver } from '@symbiote-native/navigation/svelte';
+  import { LINE_COLOR } from '../navigation-lines';
+  import { readSheetSettings, sheetOptionsOf } from './sheet/sheet-settings';
+  import { sheetLog } from './sheet/use-sheet-log';
 
-  // This screen is only ever mounted under a Stack, so useStackNavigation() hands back the
-  // Stack-specific handle (pop) directly — no union narrowing.
-  const navigation = useStackNavigation();
-  const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.SheetDemo];
+  // The panel is a plain screen, a sheet is the same route pushed again with the panel as params
+  // The header stays opaque, a `formSheet` has its own header height accounting
+  export const sheetDemoScreenOptions: IScreenOptionsResolver = ({ route }) => {
+    const settings = readSheetSettings(route.params);
+    return {
+      title: settings.isSheet ? 'Sheet' : 'Sheet presentation',
+      headerShown: true,
+      headerTintColor: LINE_COLOR.presentation,
+      headerTitleColor: '#ffffff',
+      headerStyle: { backgroundColor: '#0b1622' },
+      headerUserInterfaceStyle: 'dark',
+      ...sheetOptionsOf(settings),
+      sheetFooter: settings.isSheet && settings.hasFooter ? footer : undefined,
+      onSheetDetentChanged: ({ index, isStable }) =>
+        sheetLog.append(
+          'detent',
+          `detent ${index}, ${isStable ? 'stable' : 'moving'}`,
+          { isTick: !isStable },
+        ),
+    };
+  };
 </script>
 
-<scroll-view class="screen" contentContainerStyle="section">
-  <view class={`line-tag line-tag-${lineInfo.line}`}>
-    <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+<script lang="ts">
+  import { useRoute } from '@symbiote-native/navigation/svelte';
+  import ScreenHero from '../components/ScreenHero.svelte';
+  import { ROUTE_NAME } from '../routes';
+  import SheetBody from './sheet/SheetBody.svelte';
+  import SheetPanel from './sheet/SheetPanel.svelte';
+
+  const route = useRoute();
+  const isSheet = $derived(readSheetSettings(route.current.params).isSheet);
+</script>
+
+{#snippet footer()}
+  <view testID="sheet-footer-bar" class="sheet-footer">
+    <text class="sheet-footer-text">Sheet footer</text>
   </view>
-  <view class="hero-card">
-    <view
-      class="hero-badge"
-      style={{ backgroundColor: LINE_COLOR.presentation }}
-    >
-      <text class="hero-badge-text">SH</text>
+{/snippet}
+
+<!-- The scroll view is the first child, no `SafeAreaView` above it, so a taller detent fills it -->
+<scroll-view testID="sheet-scroll" class="screen">
+  {#if isSheet}
+    <SheetBody />
+  {:else}
+    <view class="scroll-content">
+      <ScreenHero
+        route={ROUTE_NAME.SheetDemo}
+        title="Sheet presentation"
+        body="Pick how the sheet looks and behaves, then present it. A sheet is this route pushed again."
+      />
+      <SheetPanel />
     </view>
-    <view class="hero-copy">
-      <text class="hero-title">Sheet presentation</text>
-      <text class="hero-body">
-        Pushed with stackPresentation: formSheet and three detents — drag the
-        grabber between 30%, 60%, and full height.
-      </text>
-    </view>
-  </view>
-  <text class="info-text">
-    stackPresentation: formSheet · detents 30% / 60% / 100% · drag the grabber
-  </text>
-  <ActionButton
-    testID="sheet-dismiss"
-    title="Dismiss"
-    onPress={() => navigation.current.pop()}
-    color={LINE_COLOR.presentation}
-  />
+  {/if}
 </scroll-view>

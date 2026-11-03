@@ -46,6 +46,16 @@ export type INavLineInfo = {
   label: string;
 };
 
+// Section hubs only list stops, they are no stops themselves
+export const HUB_ROUTE_NAME = [
+  ROUTE_NAME.FrameworkHub,
+  ROUTE_NAME.NavigationHub,
+  ROUTE_NAME.PackagesHub,
+  ROUTE_NAME.BenchmarksHub,
+] as const satisfies readonly IRouteName[];
+
+export type IHubRouteName = (typeof HUB_ROUTE_NAME)[number];
+
 // Every route reachable from MenuScreen, minus Menu itself. Deliberately excludes Details — it's a
 // plain push-target off Canary, not one of the 12 tour stops. StyleShowcase is the 12th and is
 // React-only for now: it rides on top of the 11-stop tour the other canaries share, the way
@@ -53,7 +63,7 @@ export type INavLineInfo = {
 // debt, recorded in the symbiote-sfc-style-compiler skill.
 export type ITourRouteName = Exclude<
   IRouteName,
-  typeof ROUTE_NAME.Menu | typeof ROUTE_NAME.Details
+  typeof ROUTE_NAME.Menu | typeof ROUTE_NAME.Details | IHubRouteName
 >;
 
 export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
@@ -67,6 +77,16 @@ export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
     code: 'HD',
     label: 'PRESENTATION LINE',
   },
+  [ROUTE_NAME.HeaderViews]: {
+    line: NAV_LINE.Presentation,
+    code: 'HV',
+    label: 'PRESENTATION LINE',
+  },
+  [ROUTE_NAME.Gestures]: {
+    line: NAV_LINE.Presentation,
+    code: 'GS',
+    label: 'PRESENTATION LINE',
+  },
   [ROUTE_NAME.SheetDemo]: {
     line: NAV_LINE.Presentation,
     code: 'SH',
@@ -75,6 +95,11 @@ export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
   [ROUTE_NAME.TabsDemo]: {
     line: NAV_LINE.Structure,
     code: 'TB',
+    label: 'STRUCTURE LINE',
+  },
+  [ROUTE_NAME.NativeTabs]: {
+    line: NAV_LINE.Structure,
+    code: 'NT',
     label: 'STRUCTURE LINE',
   },
   [ROUTE_NAME.DrawerDemo]: {
@@ -90,6 +115,36 @@ export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
   [ROUTE_NAME.HooksDemo]: {
     line: NAV_LINE.Introspection,
     code: 'HK',
+    label: 'INTROSPECTION LINE',
+  },
+  [ROUTE_NAME.OverlayContainers]: {
+    line: NAV_LINE.Structure,
+    code: 'OC',
+    label: 'STRUCTURE LINE',
+  },
+  [ROUTE_NAME.Events]: {
+    line: NAV_LINE.Introspection,
+    code: 'EV',
+    label: 'INTROSPECTION LINE',
+  },
+  [ROUTE_NAME.TransitionProgress]: {
+    line: NAV_LINE.Introspection,
+    code: 'TP',
+    label: 'INTROSPECTION LINE',
+  },
+  [ROUTE_NAME.InsetsStatusBar]: {
+    line: NAV_LINE.Presentation,
+    code: 'IS',
+    label: 'PRESENTATION LINE',
+  },
+  [ROUTE_NAME.StackTransitions]: {
+    line: NAV_LINE.Routing,
+    code: 'ST',
+    label: 'ROUTING LINE',
+  },
+  [ROUTE_NAME.RuntimeConfig]: {
+    line: NAV_LINE.Introspection,
+    code: 'RC',
     label: 'INTROSPECTION LINE',
   },
   [ROUTE_NAME.DeepLinking]: {

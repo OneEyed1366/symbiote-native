@@ -1,3 +1,5 @@
+import { createTunnel } from '@symbiote-native/solid';
+
 export type IChip = { id: string; index: number; color: string };
 export type IMvcpRow = { id: string; label: string };
 
@@ -10,6 +12,8 @@ export const INPUT_HINT = '#7f8db3';
 export const SITE = 'https://www.solidjs.com';
 export const LOGO_URI =
   'https://www.solidjs.com/img/logo/without-wordmark/logo.png';
+
+export const overlayTunnel = createTunnel();
 
 export const CHIPS: ReadonlyArray<IChip> = Array.from(
   { length: 24 },

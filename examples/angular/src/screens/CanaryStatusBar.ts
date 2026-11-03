@@ -4,8 +4,7 @@ import {
   StatusBar,
   SYMBIOTE_ELEMENTS,
 } from '@symbiote-native/angular';
-import { ActionButton } from '../components/ActionButton';
-import { ACCENT } from './canary-shared';
+import { FlexButton } from './canary-parts';
 
 const BAR_RED = '#dd0031';
 const BAR_DEFAULT = '#111827';
@@ -15,51 +14,38 @@ const FADE = 'fade';
 @Component({
   selector: 'CanaryStatusBar',
   standalone: true,
-  imports: [ActionButton, SYMBIOTE_ELEMENTS],
+  imports: [FlexButton, SYMBIOTE_ELEMENTS],
   template: `
     <view class="row">
-      <view class="flex-1">
-        <ActionButton
-          testID="angular-status-bar-hidden-btn"
-          [title]="isHidden() ? 'Show status bar' : 'Hide status bar'"
-          (press)="toggleHidden()"
-          [color]="accent"
-        />
-      </view>
-      <view class="flex-1">
-        <ActionButton
-          testID="angular-status-bar-style-btn"
-          [title]="isDark() ? 'Light text' : 'Dark text'"
-          (press)="toggleStyle()"
-          [color]="accent"
-        />
-      </view>
+      <FlexButton
+        testID="angular-status-bar-hidden-btn"
+        [title]="isHidden() ? 'Show status bar' : 'Hide status bar'"
+        (press)="toggleHidden()"
+      />
+      <FlexButton
+        testID="angular-status-bar-style-btn"
+        [title]="isDark() ? 'Light text' : 'Dark text'"
+        (press)="toggleStyle()"
+      />
     </view>
     <!-- Android-only window flags. PASS: the strip changes and the app stays rendered -->
     @if (isAndroid) {
       <view class="row">
-        <view class="flex-1">
-          <ActionButton
-            testID="angular-status-bar-bg-btn"
-            [title]="isRed() ? 'BG default' : 'BG red'"
-            (press)="toggleRed()"
-            [color]="accent"
-          />
-        </view>
-        <view class="flex-1">
-          <ActionButton
-            testID="angular-status-bar-translucent-btn"
-            [title]="isTranslucent() ? 'Opaque' : 'Translucent'"
-            (press)="toggleTranslucent()"
-            [color]="accent"
-          />
-        </view>
+        <FlexButton
+          testID="angular-status-bar-bg-btn"
+          [title]="isRed() ? 'BG default' : 'BG red'"
+          (press)="toggleRed()"
+        />
+        <FlexButton
+          testID="angular-status-bar-translucent-btn"
+          [title]="isTranslucent() ? 'Opaque' : 'Translucent'"
+          (press)="toggleTranslucent()"
+        />
       </view>
     }
   `,
 })
 export class CanaryStatusBar {
-  readonly accent = ACCENT;
   readonly isAndroid = Platform.OS === 'android';
 
   readonly isHidden = signal(false);

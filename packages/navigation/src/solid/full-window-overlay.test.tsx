@@ -1,0 +1,66 @@
+// Solid `FullWindowOverlay` against an injected ViewConfig, headless runs as iOS
+// Core's own tests cover the Android fallback, this file proves the children and window size wiring
+
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import {
+  mount,
+  unmount,
+  setNativeViewConfigSource,
+} from '@symbiote-native/solid';
+import { Dimensions } from '@symbiote-native/engine';
+import type { INativeViewConfig } from '@symbiote-native/engine';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
+import { FullWindowOverlay } from './full-window-overlay';
+
+const ROOT_TAG = 7_122;
+const OVERLAY_VIEW = 'RNSFullWindowOverlay';
+
+const VIEW_CONFIGS: Record<string, INativeViewConfig> = {
+  [OVERLAY_VIEW]: {
+    directEventTypes: {},
+    validAttributes: { accessibilityContainerViewIsModal: true },
+  },
+};
+
+const fabric = installRecordingFabric();
+setNativeViewConfigSource(name => VIEW_CONFIGS[name]);
+
+beforeEach(() => fabric.reset());
+afterEach(() => unmount(ROOT_TAG));
+
+const flush = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
+
+const overlayNode = () => fabric.find(node => node.viewName === OVERLAY_VIEW);
+
+describe('Solid FullWindowOverlay', () => {
+  it('mounts the native overlay with its children inside', async () => {
+    mount(ROOT_TAG, () => (
+      <FullWindowOverlay>
+        <view testID="inside" />
+      </FullWindowOverlay>
+    ));
+    await flush();
+
+    expect(overlayNode()).toBeDefined();
+    expect(fabric.find(node => node.props.testID === 'inside')).toBeDefined();
+  });
+
+  it('sizes the overlay to the window', async () => {
+    mount(ROOT_TAG, () => <FullWindowOverlay />);
+    await flush();
+
+    const { width, height } = Dimensions.get('window');
+    const entries = [overlayNode()?.props.style].flat(Infinity);
+    expect(entries).toContainEqual(expect.objectContaining({ width, height }));
+  });
+
+  it('sends the modal flag under its native name', async () => {
+    mount(ROOT_TAG, () => (
+      <FullWindowOverlay unstable_accessibilityContainerViewIsModal={false} />
+    ));
+    await flush();
+
+    expect(overlayNode()?.props.accessibilityContainerViewIsModal).toBe(false);
+  });
+});

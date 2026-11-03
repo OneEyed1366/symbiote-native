@@ -32,11 +32,7 @@
   import type { INavigationScopeValue } from '../navigation-context';
   import NavigationScope from '../navigation-scope.svelte';
   import { SCREEN_REGISTRY_HOST_PROPS } from '../registry-host';
-  import {
-    setScreenCollector,
-    toRegistry,
-    withoutScreen,
-  } from '../screen-registry';
+  import { useScreenCollection } from '../screen-collection.svelte';
   import type { IRegisteredScreen } from '../screen-registry';
   import { trackFocus } from '../track-focus.svelte';
   import type { ITabScreenProps } from '../tab-screen-props';
@@ -49,18 +45,8 @@
 
   const routeIdPrefix = `tab-${(tabInstanceCounter += 1)}`;
 
-  let screens = $state.raw<IRegisteredScreen<ITabScreenProps['options']>[]>([]);
-  setScreenCollector<ITabScreenProps['options']>({
-    kind: 'tab',
-    register: screen => {
-      screens = [...screens, screen];
-    },
-    unregister: screen => {
-      screens = withoutScreen(screens, screen);
-    },
-  });
-
-  const registry = $derived(toRegistry(screens));
+  const collection = useScreenCollection<ITabScreenProps['options']>('tab');
+  const registry = $derived(collection.registry);
 
   // The routes are a projection of the registry, so a marker adding or dropping its tab changes
   // them. Keys come from the route name, so deriving again re-keys nothing

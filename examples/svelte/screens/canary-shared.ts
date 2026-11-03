@@ -1,6 +1,7 @@
 import { LINE_COLOR, NAV_LINE } from '../navigation-lines';
 
 export const REFRESH_MS = 2_000;
+export const FREEZE_MS = 3_000;
 export const STATUS_BAR_RED = '#ff0000';
 export const STATUS_BAR_DEFAULT = '#1a1a1a';
 export const PLACEHOLDER_COLOR = '#6a6a6a';
@@ -15,6 +16,16 @@ export const SHEET_CANCEL_INDEX = 2;
 
 // Svelte's brand flame, read from the one place it is defined
 export const ACCENT = LINE_COLOR[NAV_LINE.Primitives];
+
+export function makeRows(
+  from: number,
+  count: number,
+): { id: string; label: string }[] {
+  return Array.from({ length: count }, (_value, index) => {
+    const position = from + index;
+    return { id: `row-${position}`, label: `item ${position}` };
+  });
+}
 
 export function keyboardHeightOf(payload: unknown): number {
   if (

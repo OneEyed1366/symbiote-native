@@ -6,27 +6,29 @@
 // component body runs ONCE, so `{ name: props.name }` would freeze the marker at its mount-time
 // values and an app that swaps `options` on a live marker would silently keep the old header.
 //
-// The three live in one file because they differ only in which collector they call - three
-// near-identical files would drift the way the two descriptor-shape guards did before they were
-// lifted into @symbiote-native/components.
+// The four markers share one file, as they differ only in the kind they name
 //
-// Returning `undefined` (not an empty host element) is what keeps a marker free: Solid inserts
-// nothing for it, and where a following sibling forces a position placeholder the renderer emits an
-// engine ANCHOR, which the commit walk skips. Svelte needed a hidden zero-size host for its markers
-// because its compiler turns the whitespace BETWEEN them into real text nodes; Solid's JSX drops
-// that whitespace, so the hazard does not exist here.
+// Returning `undefined` makes Solid insert nothing, and a placeholder anchor is skipped by the walk
 
-import {
-  collectDrawerScreen,
-  collectStackScreen,
-  collectTabScreen,
-} from './screen-registry';
+import type { Component } from 'solid-js';
+import { collectScreen } from './screen-registry';
+import type { IRegisteredScreen } from './screen-registry';
 import type { IScreenProps } from './screen-props';
 import type { ITabScreenProps } from './tab-screen-props';
 import type { IDrawerScreenProps } from './drawer-screen-props';
+import type { INativeTabScreenProps } from './native-tab-screen-props';
 
-export function Screen(props: IScreenProps): undefined {
-  collectStackScreen({
+type IMarkerProps<TOptions> = {
+  name: string;
+  component: Component;
+  options?: TOptions;
+  initialParams?: unknown;
+};
+
+function liveScreen<TOptions>(
+  props: IMarkerProps<TOptions>,
+): IRegisteredScreen<TOptions | undefined> {
+  return {
     get name() {
       return props.name;
     },
@@ -39,42 +41,25 @@ export function Screen(props: IScreenProps): undefined {
     get initialParams() {
       return props.initialParams;
     },
-  });
+  };
+}
+
+export function Screen(props: IScreenProps): undefined {
+  collectScreen('stack', liveScreen(props));
   return undefined;
 }
 
 export function TabScreen(props: ITabScreenProps): undefined {
-  collectTabScreen({
-    get name() {
-      return props.name;
-    },
-    get component() {
-      return props.component;
-    },
-    get options() {
-      return props.options;
-    },
-    get initialParams() {
-      return props.initialParams;
-    },
-  });
+  collectScreen('tab', liveScreen(props));
   return undefined;
 }
 
 export function DrawerScreen(props: IDrawerScreenProps): undefined {
-  collectDrawerScreen({
-    get name() {
-      return props.name;
-    },
-    get component() {
-      return props.component;
-    },
-    get options() {
-      return props.options;
-    },
-    get initialParams() {
-      return props.initialParams;
-    },
-  });
+  collectScreen('drawer', liveScreen(props));
+  return undefined;
+}
+
+export function NativeTabScreen(props: INativeTabScreenProps): undefined {
+  collectScreen('nativeTab', liveScreen(props));
   return undefined;
 }

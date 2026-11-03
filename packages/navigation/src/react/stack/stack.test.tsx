@@ -1,19 +1,10 @@
-// Co-located React-driven test (ADR 0025) for the @symbiote-native/navigation React Stack. Proves
-// the shared core drives React correctly against an INJECTED codegen-shaped ViewConfig (mirrors
-// packages/slider/src/react/slider/slider.test.tsx): push/pop mount and unmount RNSScreen
-// children with the right activityState, the header title reaches RNSScreenStackHeaderConfig,
-// and the native onDismissed/onHeaderBackButtonClicked events drive a pop through the imperative
-// handle. Stack is imported from './stack' (NOT the package barrel, '.') so the third-party
-// native-spec side-effect (../register) never loads headless.
-//
-// Route-stack REDUCER logic (navigatorReducer's push/pop/reset transitions) is core's own
-// responsibility and is covered by core's test suite - this file only proves Stack's OWN lifecycle
-// wiring: that dispatching through the imperative handle / a native event actually reaches the
-// reducer and that the result is bridged onto real RNSScreen/RNSScreenStackHeaderConfig props.
-//
-// No Negative group: Stack has no guard clause of its own that throws - "refuses to pop the last
-// route" is a no-op the reducer already fails closed on (core's contract), observed here as an
-// unchanged screen count, not a thrown error.
+// React `Stack` against an injected codegen-shaped ViewConfig: push and pop mount `RNSScreen`
+// children, native dismiss events drive a pop, the header title reaches the header config
+// Imported from `./index`, not the package barrel, so `../register` never loads headless
+
+// Reducer transitions are core's own tests, this file proves only the lifecycle wiring into them
+
+// No Negative group: popping the last route is a no-op the reducer already fails closed on
 
 import { act, createElement, createRef, useState } from 'react';
 import type { RefObject } from 'react';
@@ -37,6 +28,7 @@ import { Stack } from './index';
 import type { INavigatorHandle } from './index';
 import { useRoute } from '../hooks';
 import type { INavigatorState, ISearchBarCommands } from '../../core';
+import type { IReactScreenOptions } from '../screen';
 
 const ROOT_TAG = 512;
 const SCREEN_VIEW = 'RNSScreen';
@@ -44,6 +36,8 @@ const STACK_VIEW = 'RNSScreenStack';
 const HEADER_CONFIG_VIEW = 'RNSScreenStackHeaderConfig';
 const HEADER_SUBVIEW_VIEW = 'RNSScreenStackHeaderSubview';
 const SEARCH_BAR_VIEW = 'RNSSearchBar';
+const MODAL_SCREEN_VIEW = 'RNSModalScreen';
+const SHEET_FOOTER_VIEW = 'RNSScreenFooter';
 
 function directEvent(registrationName: string) {
   return { registrationName };
@@ -72,7 +66,7 @@ const RNS_SCREEN_STACK_VIEW_CONFIG = {
   directEventTypes: {
     topFinishTransitioning: directEvent('onFinishTransitioning'),
   },
-  validAttributes: {},
+  validAttributes: { nativeContainerBackgroundColor: true },
 };
 
 const RNS_HEADER_CONFIG_VIEW_CONFIG = {
@@ -107,6 +101,11 @@ const VIEW_CONFIGS: Record<string, INativeViewConfig> = {
   [STACK_VIEW]: RNS_SCREEN_STACK_VIEW_CONFIG,
   [HEADER_CONFIG_VIEW]: RNS_HEADER_CONFIG_VIEW_CONFIG,
   [SEARCH_BAR_VIEW]: RNS_SEARCH_BAR_VIEW_CONFIG,
+  [MODAL_SCREEN_VIEW]: RNS_SCREEN_VIEW_CONFIG,
+  [SHEET_FOOTER_VIEW]: {
+    directEventTypes: {},
+    validAttributes: { collapsable: true },
+  },
 };
 
 const fabric = installRecordingFabric();
@@ -215,8 +214,7 @@ function DynamicStackHost({
 
 describe('React Stack navigator', () => {
   describe('Positive', () => {
-    // why: only the initial route mounts as a real RNSScreen, at the focused activityState (2), and
-    // its header title reaches the native header config - the baseline every other case here builds on.
+    // Baseline for the rest: only the initial route mounts, focused, with its header title
     it('mounts only the initial route as an RNSScreen, focused', () => {
       mount(
         ROOT_TAG,
@@ -241,10 +239,23 @@ describe('React Stack navigator', () => {
       expect(headerConfigOf(screens[0]).props.title).toBe('Home');
     });
 
-    // why: react-native-screens' native RNSScreen asserts an already-mounted NativeStack screen's
-    // activityState can never decrease, and @react-navigation/native-stack's real algorithm never
-    // demotes a route below the focused index to anything but 0 - both routes must stay
-    // activityState 2 after a push, not just the new top.
+    it('paints the stack container with nativeContainerStyle.backgroundColor', () => {
+      mount(
+        ROOT_TAG,
+        createElement(
+          Stack,
+          {
+            initialRouteName: 'Home',
+            nativeContainerStyle: { backgroundColor: '#112233' },
+          },
+          createElement(Stack.Screen, { name: 'Home', component: HomeScreen }),
+        ),
+      );
+      const stack = fabric.find(node => node.viewName === STACK_VIEW);
+      expect(stack?.props.nativeContainerBackgroundColor).toBeDefined();
+    });
+
+    // Native asserts a mounted screen's `activityState` never decreases, so both routes stay at 2
     it('push() mounts a second RNSScreen and keeps the first at activityState 2', () => {
       const ref = createRef<INavigatorHandle>();
       mount(
@@ -308,9 +319,7 @@ describe('React Stack navigator', () => {
       expect(screenNodes()).toHaveLength(1);
     });
 
-    // why: an iOS interactive swipe-back dismiss is entirely native-driven - RNSScreen fires
-    // onDismissed with no JS-side push/pop call at all, so Stack must treat that native event as
-    // equivalent to an imperative pop(), not require the app to call pop() itself.
+    // An iOS swipe-back fires `onDismissed` with no JS pop call, so `Stack` must pop on that event
     it('drives a pop from the native onDismissed event (iOS swipe/interactive dismiss)', () => {
       const ref = createRef<INavigatorHandle>();
       mount(
@@ -554,9 +563,8 @@ describe('React Stack navigator', () => {
       expect(receivedText).toBe('asdf');
     });
 
-    // why: every other search bar lifecycle event (focus/blur/cancel/searchButtonPress/close/open)
-    // must reach its own matching app-supplied callback - proven together since they share the same
-    // buildSearchBarPassthrough wiring and a per-event regression would otherwise need its own file.
+    // The other search bar events share one `buildSearchBarPassthrough` wiring, each must reach
+    // its own app callback
     it('forwards every other native search bar event to its app-supplied callback', () => {
       const received: {
         focus: number;
@@ -617,10 +625,8 @@ describe('React Stack navigator', () => {
       });
     });
 
-    // why: the app-supplied search bar ref must drive REAL imperative native commands
-    // (focus/setText/toggleCancelButton/clearText/cancelSearch/blur) on the committed RNSSearchBar
-    // node, proving the lazy-getter ref callback (buildSearchBarHandle) resolves to the actual host
-    // instance rather than a stale or null one.
+    // The app ref must send real native commands to the committed `RNSSearchBar`, so the lazy
+    // `buildSearchBarHandle` getter has to resolve the live host instance
     it('drives imperative SearchBarCommands (focus/setText/…) through the app-supplied ref', () => {
       const searchBarRef = createRef<ISearchBarCommands>();
       mount(
@@ -682,9 +688,7 @@ describe('React Stack navigator', () => {
       });
     });
 
-    // why: the boundary of the search-bar feature - when no headerSearchBarOptions is given, the
-    // header config must render with ZERO children (not a placeholder/empty subview), so a screen
-    // without a search bar pays no extra native cost.
+    // Without `headerSearchBarOptions` the header config has zero children, no empty subview
     it('renders the header config with zero children when there is no search bar', () => {
       mount(
         ROOT_TAG,
@@ -698,10 +702,8 @@ describe('React Stack navigator', () => {
       expect(kidsOf(header)).toHaveLength(0);
     });
 
-    // why: the route list is navigation HISTORY, not a projection of the markers, so a marker that
-    // unmounts while its route is still pushed used to leave a phantom entry - a mounted RNSScreen
-    // whose registry lookup finds nothing, i.e. a blank screen the user cannot leave. Reconciling
-    // against the registry must drop that entry and leave the user on a route that really renders.
+    // A marker that unmounts while its route is pushed must not leave a blank screen the user
+    // cannot leave, reconciling against the registry drops that entry
     it('drops a pushed route whose <Stack.Screen> marker unregisters', () => {
       const ref = createRef<INavigatorHandle>();
       mount(ROOT_TAG, createElement(DynamicStackHost, { navRef: ref }));
@@ -722,9 +724,8 @@ describe('React Stack navigator', () => {
       expect(ref.current?.canGoBack()).toBe(false);
     });
 
-    // why: the pruning must be PERSISTED, not just painted - a phantom left in the reducer's state
-    // has the next push rebuild the stack on top of it, and the user then has to press back TWICE
-    // to leave a route they only visited once.
+    // The pruning must reach the reducer state, else the next push rebuilds on the phantom and
+    // back needs two presses
     it('keeps the pruned history when a new route is pushed afterwards', () => {
       const ref = createRef<INavigatorHandle>();
       mount(ROOT_TAG, createElement(DynamicStackHost, { navRef: ref }));
@@ -739,5 +740,150 @@ describe('React Stack navigator', () => {
       ).toBeDefined();
       expect(ref.current?.canGoBack()).toBe(false);
     });
+  });
+});
+
+describe('React Stack custom header views', () => {
+  function mountHome(options: IReactScreenOptions): void {
+    mount(
+      ROOT_TAG,
+      createElement(
+        Stack,
+        { initialRouteName: 'Home' },
+        createElement(Stack.Screen, {
+          name: 'Home',
+          component: HomeScreen,
+          options,
+        }),
+      ),
+    );
+  }
+
+  function subviewOfType(type: string): IAuthoredNode | undefined {
+    return kidsOf(headerConfigOf(screenNodes()[0])).find(
+      kid => kid.viewName === HEADER_SUBVIEW_VIEW && kid.props.type === type,
+    );
+  }
+
+  it.each([
+    ['headerLeft', 'left'],
+    ['headerRight', 'right'],
+    ['headerTitle', 'center'],
+  ] as const)('mounts the %s element inside a %s subview', (option, type) => {
+    mountHome({ [option]: () => createElement('text', {}, 'custom') });
+
+    const subview = subviewOfType(type);
+    expect(subview).toBeDefined();
+    const [content] = subview ? kidsOf(subview) : [];
+    expect(content && kidsOf(content)[0]?.props.text).toBe('custom');
+  });
+
+  it('sends the side priority and background options to the matching subview', () => {
+    mountHome({
+      headerRight: () => createElement('text', {}, 'more'),
+      headerRightVisibilityPriority: 'low',
+      headerRightBackgroundVisible: false,
+    });
+
+    expect(subviewOfType('right')?.props.visibilityPriority).toBe('low');
+    expect(subviewOfType('right')?.props.hidesSharedBackground).toBe(true);
+  });
+
+  it('hosts the back image source in a back subview holding an image', () => {
+    mountHome({ headerBackImageSource: { uri: 'https://example.test/b.png' } });
+
+    const subview = subviewOfType('back');
+    expect(subview).toBeDefined();
+    const [image] = subview ? kidsOf(subview) : [];
+    expect(image?.viewName).toBe('RCTImageView');
+  });
+
+  it('keeps the search bar subview next to a custom one', () => {
+    mountHome({
+      headerLeft: () => createElement('text', {}, 'menu'),
+      headerSearchBarOptions: { placeholder: 'Search' },
+    });
+
+    expect(subviewOfType('left')).toBeDefined();
+    expect(subviewOfType('searchBar')).toBeDefined();
+  });
+
+  it('adds no subview when the app sets no custom view', () => {
+    mountHome({ title: 'Home' });
+
+    expect(kidsOf(headerConfigOf(screenNodes()[0]))).toHaveLength(0);
+  });
+});
+
+describe('React Stack sheet footer', () => {
+  function mountHome(options: IReactScreenOptions): void {
+    mount(
+      ROOT_TAG,
+      createElement(
+        Stack,
+        { initialRouteName: 'Home' },
+        createElement(Stack.Screen, {
+          name: 'Home',
+          component: HomeScreen,
+          options,
+        }),
+      ),
+    );
+  }
+
+  const footerNode = () =>
+    findInTree(node => node.viewName === SHEET_FOOTER_VIEW);
+  const sheetFooter = () => createElement('text', {}, 'footer');
+
+  it('mounts the footer content inside a native footer on a form sheet', () => {
+    mountHome({ stackPresentation: 'formSheet', sheetFooter });
+
+    const footer = footerNode();
+    expect(footer).toBeDefined();
+    const [content] = footer ? kidsOf(footer) : [];
+    expect(content && kidsOf(content)[0]?.props.text).toBe('footer');
+  });
+
+  it('keeps the footer a real view, as native finds it by class', () => {
+    mountHome({ stackPresentation: 'formSheet', sheetFooter });
+
+    expect(footerNode()?.props.collapsable).toBe(false);
+  });
+
+  it('puts the footer in the inner screen that holds the header', () => {
+    mountHome({ stackPresentation: 'formSheet', sheetFooter });
+
+    const inner = screenNodes()[0];
+    expect(kidsOf(inner).some(kid => kid.viewName === SHEET_FOOTER_VIEW)).toBe(
+      true,
+    );
+  });
+
+  it('puts the footer straight in the screen when the header is hidden', () => {
+    mountHome({
+      stackPresentation: 'formSheet',
+      headerShown: false,
+      sheetFooter,
+    });
+
+    const modal = findInTree(node => node.viewName === MODAL_SCREEN_VIEW);
+    expect(
+      modal && kidsOf(modal).some(kid => kid.viewName === SHEET_FOOTER_VIEW),
+    ).toBe(true);
+  });
+
+  it.each(['push', 'modal', 'pageSheet'] as const)(
+    'has no footer on a %s screen',
+    stackPresentation => {
+      mountHome({ stackPresentation, sheetFooter });
+
+      expect(footerNode()).toBeUndefined();
+    },
+  );
+
+  it('has no footer when the sheet sets none', () => {
+    mountHome({ stackPresentation: 'formSheet' });
+
+    expect(footerNode()).toBeUndefined();
   });
 });

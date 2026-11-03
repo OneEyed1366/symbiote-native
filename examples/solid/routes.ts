@@ -1,114 +1,35 @@
-// Route names shared by the <Stack.Screen name="..."> markers and every `push` call
+// Route names shared by the `<Screen name>` markers in App.tsx and every `push` call
 // One source of truth, so a typo cannot create a dead route on one side only
-
-// Ported from examples/react/routes.ts and examples/svelte/routes.ts, the names are agnostic
-// `ITourRouteName` lives here, as `MENU_ROWS` needs it and navigation-lines.ts imports this file
 
 export const ROUTE_NAME = {
   Menu: 'Menu',
   Canary: 'Canary',
-  ApiPlayground: 'ApiPlayground',
-  StyleShowcase: 'StyleShowcase',
   Details: 'Details',
   HeaderOptions: 'HeaderOptions',
   SheetDemo: 'SheetDemo',
   TabsDemo: 'TabsDemo',
+  NativeTabs: 'NativeTabs',
+  HeaderViews: 'HeaderViews',
+  Gestures: 'Gestures',
+  Events: 'Events',
+  OverlayContainers: 'OverlayContainers',
+  TransitionProgress: 'TransitionProgress',
+  InsetsStatusBar: 'InsetsStatusBar',
+  StackTransitions: 'StackTransitions',
+  RuntimeConfig: 'RuntimeConfig',
   DrawerDemo: 'DrawerDemo',
   NestedNavigators: 'NestedNavigators',
   HooksDemo: 'HooksDemo',
   DeepLinking: 'DeepLinking',
   StatePersistence: 'StatePersistence',
+  ApiPlayground: 'ApiPlayground',
   Benchmark: 'Benchmark',
+  StyleShowcase: 'StyleShowcase',
   Reanimated: 'Reanimated',
+  FrameworkHub: 'FrameworkHub',
+  NavigationHub: 'NavigationHub',
+  PackagesHub: 'PackagesHub',
+  BenchmarksHub: 'BenchmarksHub',
 } as const;
 
 export type IRouteName = (typeof ROUTE_NAME)[keyof typeof ROUTE_NAME];
-
-// Every route reachable from MenuScreen, minus Menu itself. Excludes Details too: it is the
-// DeepLinking demo's resolution target (symbiotecanarysolid://details/:id), not a tour stop.
-export type ITourRouteName = Exclude<
-  IRouteName,
-  typeof ROUTE_NAME.Menu | typeof ROUTE_NAME.Details
->;
-
-export type IMenuRow = {
-  route: ITourRouteName;
-  label: string;
-  blurb: string;
-};
-
-// The menu is data-driven on purpose: adding a demo screen is one entry here plus one
-// <Stack.Screen> marker in App.tsx, never an edit inside MenuScreen's JSX. Only routes that have a
-// registered screen belong in this array — an entry whose marker does not exist yet renders a row
-// that pushes a route the navigator cannot resolve.
-// Order matches examples/react row-for-row, so the two canaries can be read side by side; the
-// Svelte port has no Styling stop yet, so it is the same list minus that row. Only the two
-// Solid-specific blurbs differ.
-export const MENU_ROWS: readonly IMenuRow[] = [
-  {
-    route: ROUTE_NAME.Canary,
-    label: 'All primitives (Canary)',
-    blurb: 'every @symbiote-native/solid primitive',
-  },
-  {
-    route: ROUTE_NAME.ApiPlayground,
-    label: 'API Playground',
-    blurb: 'signals, stores, control flow, Suspense — solid-js itself, live',
-  },
-  {
-    route: ROUTE_NAME.StyleShowcase,
-    label: 'Styling showcase',
-    blurb: 'CSS · Modules · SCSS/Less/Stylus — and what is refused',
-  },
-  {
-    route: ROUTE_NAME.HeaderOptions,
-    label: 'Header options',
-    blurb: 'bar buttons, menu, search bar, large title',
-  },
-  {
-    route: ROUTE_NAME.SheetDemo,
-    label: 'Sheet presentation',
-    blurb: 'formSheet + multiple detents',
-  },
-  {
-    route: ROUTE_NAME.TabsDemo,
-    label: 'Tabs',
-    blurb: 'bottom-tabs — icon, badge, tint',
-  },
-  {
-    route: ROUTE_NAME.DrawerDemo,
-    label: 'Drawer',
-    blurb: 'swipeable drawer — right side, slide type',
-  },
-  {
-    route: ROUTE_NAME.NestedNavigators,
-    label: 'Nested navigators',
-    blurb: 'Tab nested in a Stack screen + getParent()',
-  },
-  {
-    route: ROUTE_NAME.HooksDemo,
-    label: 'Hooks',
-    blurb: 'useFocusEffect / useIsFocused / useNavigationState',
-  },
-  {
-    route: ROUTE_NAME.DeepLinking,
-    label: 'Deep linking',
-    blurb: 'resolveRouteFromUrl against a typed URL',
-  },
-  {
-    route: ROUTE_NAME.StatePersistence,
-    label: 'State persistence',
-    blurb: 'serialize/deserialize the Stack state',
-  },
-  {
-    route: ROUTE_NAME.Benchmark,
-    label: 'Benchmark',
-    blurb: 'js-framework-benchmark ops + JS-thread FPS',
-  },
-  {
-    route: ROUTE_NAME.Reanimated,
-    label: 'Reanimated',
-    blurb:
-      'spring, derived values, entering and exiting, layout, scroll offset',
-  },
-];

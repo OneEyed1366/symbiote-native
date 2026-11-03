@@ -134,7 +134,8 @@ function trimReflowedTextNodeTransform(node) {
   }
 }
 
-const SYMBIOTE_SOURCE_PREFIX = '@symbiote-native/';
+// The scope of this package's own name, `@symbiote-native/`, so the prefix has one source
+const SYMBIOTE_SOURCE_PREFIX = `${require('./package.json').name.split('/')[0]}/`;
 
 // Local names the file imports from any `@symbiote-native/*` package (`FlatList`, `Animated`)
 function symbioteImportsOf(descriptor) {
@@ -251,12 +252,19 @@ function parseDescriptor(src, filename) {
       `Vue SFC parse error in ${filename}:\n${errors.map(String).join('\n')}`,
     );
   }
-  if (descriptor.scriptSetup == null && descriptor.script == null) {
-    throw new Error(
-      `Vue SFC ${filename} has no <script> / <script setup> block`,
-    );
+  if (descriptor.scriptSetup != null || descriptor.script != null) {
+    return descriptor;
   }
-  return descriptor;
+  if (descriptor.template == null) {
+    throw new Error(`Vue SFC ${filename} has no <template> / <script> block`);
+  }
+  // `compileScript` refuses a file without a script, yet a static template is a valid component
+  // A `<script setup>` appended after the source keeps every line number of the file
+  // It carries a comment since the parser drops a blank block, which would recurse forever
+  return parseDescriptor(
+    `${src}\n<script setup>/* static template */</script>\n`,
+    filename,
+  );
 }
 
 // `<style scoped>` and `<style module>` are one mechanism, lightningcss' CSS-Modules renaming
@@ -271,11 +279,10 @@ function compileSfcStyleBlock({ style, content, filename, scopeId }) {
     return { rules: compiled.rules, binding: [bindingName, compiled.classMap] };
   }
   if (style.scoped) {
-    const compiled = compileScopedCss(content, {
+    return compileScopedCss(content, {
       filename,
       pattern: `[local]__${scopeId}`,
     });
-    return { rules: compiled.rules, names: compiled.names };
   }
   return { rules: compileCssToRules(content, { filename }).rules };
 }
